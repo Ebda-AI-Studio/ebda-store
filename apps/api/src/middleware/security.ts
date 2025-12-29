@@ -154,6 +154,37 @@ export const paymentLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// File upload limiter - more restrictive
+export const uploadLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 20, // 20 uploads per minute
+  message: {
+    success: false,
+    error: { code: 'RATE_LIMITED', message: 'Too many upload requests, please slow down.' }
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    // Limit per user, not per IP
+    return req.user?.userId || req.ip || 'anonymous';
+  },
+});
+
+// Daily upload limit per user
+export const dailyUploadLimiter = rateLimit({
+  windowMs: 24 * 60 * 60 * 1000, // 24 hours
+  max: 500, // 500 uploads per day per user
+  message: {
+    success: false,
+    error: { code: 'DAILY_LIMIT', message: 'Daily upload limit reached. Try again tomorrow.' }
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    return req.user?.userId || req.ip || 'anonymous';
+  },
+});
+
 // ==========================================
 // Audit Logging
 // ==========================================

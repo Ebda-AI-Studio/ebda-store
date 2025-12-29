@@ -16,7 +16,7 @@ class RedisService {
     try {
       this.client = new Redis(config.redisUrl, {
         maxRetriesPerRequest: 3,
-        retryStrategy(times) {
+        retryStrategy(times: number) {
           if (times > 3) {
             console.warn('[REDIS] Max retries reached, falling back to in-memory');
             return null;
@@ -31,7 +31,7 @@ class RedisService {
         console.log('[REDIS] Connected successfully');
       });
 
-      this.client.on('error', (err) => {
+      this.client.on('error', (err: Error) => {
         console.error('[REDIS] Connection error:', err.message);
         this.isConnected = false;
       });
@@ -42,7 +42,7 @@ class RedisService {
       });
 
       await this.client.connect();
-    } catch (error) {
+    } catch {
       console.warn('[REDIS] Failed to connect, using in-memory fallback');
       this.client = null;
       this.isConnected = false;

@@ -239,7 +239,7 @@ export class TapPaymentProvider implements IPaymentProvider {
     };
   }
 
-  async getPaymentMethods(amount: number, currency: Currency): Promise<AvailablePaymentMethod[]> {
+  async getPaymentMethods(_amount: number, currency: Currency): Promise<AvailablePaymentMethod[]> {
     // Tap uses source IDs for payment methods
     const methods: AvailablePaymentMethod[] = [
       { id: 'src_kw.knet', code: 'knet', name: 'KNET', nameAr: 'كي نت' },

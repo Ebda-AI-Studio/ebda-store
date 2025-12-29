@@ -3,7 +3,7 @@ import multer from 'multer';
 import { authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/rbac';
 import { StorageService } from '../services/storage.service';
-import { writeLimiter, auditLog } from '../middleware/security';
+import { uploadLimiter, dailyUploadLimiter, auditLog } from '../middleware/security';
 
 const router = Router();
 
@@ -52,7 +52,8 @@ router.post(
   '/image',
   authenticate,
   requirePermission('products:write'),
-  writeLimiter,
+  uploadLimiter,
+  dailyUploadLimiter,
   upload.single('file'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -104,7 +105,8 @@ router.post(
   '/images',
   authenticate,
   requirePermission('products:write'),
-  writeLimiter,
+  uploadLimiter,
+  dailyUploadLimiter,
   upload.array('files', 10),
   async (req: Request, res: Response, next: NextFunction) => {
     try {

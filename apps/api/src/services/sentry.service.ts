@@ -1,10 +1,10 @@
 import * as Sentry from '@sentry/node';
 import { nodeProfilingIntegration } from '@sentry/profiling-node';
-import { Express, Request, Response, NextFunction } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { config } from '../config';
 
 // ==========================================
-// Sentry Error Monitoring Service
+// Sentry Error Monitoring Service (v8 API)
 // ==========================================
 
 export class SentryService {
@@ -13,7 +13,7 @@ export class SentryService {
   /**
    * Initialize Sentry
    */
-  static init(app?: Express): void {
+  static init(): void {
     if (this.isInitialized) {
       return;
     }
@@ -29,7 +29,6 @@ export class SentryService {
       release: config.appVersion || '1.0.0',
 
       integrations: [
-        // Performance monitoring
         nodeProfilingIntegration(),
       ],
 
@@ -40,37 +39,6 @@ export class SentryService {
       // Don't send errors in development by default
       enabled: config.nodeEnv !== 'development' || config.sentryDebug,
 
-      // Filter out sensitive data
-      beforeSend(event, hint) {
-        // Remove sensitive headers
-        if (event.request?.headers) {
-          delete event.request.headers.authorization;
-          delete event.request.headers.cookie;
-          delete event.request.headers['x-csrf-token'];
-        }
-
-        // Remove sensitive data from request body
-        if (event.request?.data) {
-          const sensitiveFields = ['password', 'passwordHash', 'token', 'secret', 'apiKey'];
-          try {
-            const data = typeof event.request.data === 'string'
-              ? JSON.parse(event.request.data)
-              : event.request.data;
-
-            for (const field of sensitiveFields) {
-              if (data[field]) {
-                data[field] = '[REDACTED]';
-              }
-            }
-            event.request.data = JSON.stringify(data);
-          } catch {
-            // Ignore parsing errors
-          }
-        }
-
-        return event;
-      },
-
       // Ignore certain errors
       ignoreErrors: [
         'RATE_LIMITED',
@@ -80,37 +48,26 @@ export class SentryService {
       ],
     });
 
-    if (app) {
-      // Add Sentry request handler (must be first middleware)
-      app.use(Sentry.Handlers.requestHandler());
-
-      // Add tracing middleware
-      app.use(Sentry.Handlers.tracingHandler());
-    }
-
     this.isInitialized = true;
     console.log('[SENTRY] Initialized');
   }
 
   /**
-   * Get Sentry error handler middleware
-   * Must be added after all controllers but before other error handlers
+   * Express error handler middleware
    */
   static errorHandler() {
-    return Sentry.Handlers.errorHandler({
-      shouldHandleError(error) {
-        // Capture all 500+ errors
-        if (error.status && error.status >= 500) {
-          return true;
-        }
-        // Don't capture 4xx errors (client errors)
-        if (error.status && error.status < 500) {
-          return false;
-        }
-        // Capture unhandled errors
-        return true;
-      },
-    });
+    return (err: Error & { status?: number }, req: Request, _res: Response, next: NextFunction) => {
+      if (this.isInitialized && (!err.status || err.status >= 500)) {
+        Sentry.captureException(err, {
+          extra: {
+            url: req.url,
+            method: req.method,
+            headers: req.headers,
+          },
+        });
+      }
+      next(err);
+    };
   }
 
   /**
@@ -129,25 +86,11 @@ export class SentryService {
       return '';
     }
 
-    Sentry.withScope((scope) => {
-      if (context?.user) {
-        scope.setUser({ id: context.user.id, email: context.user.email });
-      }
-
-      if (context?.tags) {
-        for (const [key, value] of Object.entries(context.tags)) {
-          scope.setTag(key, value);
-        }
-      }
-
-      if (context?.extra) {
-        for (const [key, value] of Object.entries(context.extra)) {
-          scope.setExtra(key, value);
-        }
-      }
+    return Sentry.captureException(error, {
+      user: context?.user ? { id: context.user.id, email: context.user.email } : undefined,
+      tags: context?.tags,
+      extra: context?.extra,
     });
-
-    return Sentry.captureException(error);
   }
 
   /**
@@ -166,21 +109,11 @@ export class SentryService {
       return '';
     }
 
-    Sentry.withScope((scope) => {
-      if (context?.tags) {
-        for (const [key, value] of Object.entries(context.tags)) {
-          scope.setTag(key, value);
-        }
-      }
-
-      if (context?.extra) {
-        for (const [key, value] of Object.entries(context.extra)) {
-          scope.setExtra(key, value);
-        }
-      }
+    return Sentry.captureMessage(message, {
+      level,
+      tags: context?.tags,
+      extra: context?.extra,
     });
-
-    return Sentry.captureMessage(message, level);
   }
 
   /**
@@ -215,17 +148,6 @@ export class SentryService {
       level: breadcrumb.level || 'info',
       data: breadcrumb.data,
     });
-  }
-
-  /**
-   * Start a performance transaction
-   */
-  static startTransaction(
-    name: string,
-    op: string
-  ): ReturnType<typeof Sentry.startSpan> | null {
-    if (!this.isInitialized) return null;
-    return Sentry.startSpan({ name, op }, () => {});
   }
 
   /**

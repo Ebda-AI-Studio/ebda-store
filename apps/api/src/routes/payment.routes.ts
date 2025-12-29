@@ -220,7 +220,7 @@ router.post(
         details: {
           refundId: refund.refundId,
           amount: refund.amount,
-          reason: data.reason,
+          reason: data.reason || null,
         },
         ip: req.ip,
         userAgent: req.headers['user-agent'],

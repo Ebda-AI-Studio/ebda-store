@@ -9,7 +9,6 @@ import {
   PaymentStatusResponse,
   RefundRequest,
   RefundResponse,
-  WebhookPayload,
   AvailablePaymentMethod,
   Currency,
 } from './types';
@@ -88,7 +87,10 @@ class PaymentFactory {
     if (config.defaultPaymentProvider) {
       this.defaultProvider = config.defaultPaymentProvider as PaymentProvider;
     } else if (this.providers.size > 0) {
-      this.defaultProvider = this.providers.keys().next().value;
+      const firstProvider = this.providers.keys().next().value;
+      if (firstProvider) {
+        this.defaultProvider = firstProvider;
+      }
     }
 
     console.log(`[PAYMENT] Initialized providers: ${Array.from(this.providers.keys()).join(', ')}`);

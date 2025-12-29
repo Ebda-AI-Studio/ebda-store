@@ -58,7 +58,7 @@ router.post('/login', authLimiter, async (req: Request, res: Response, next: Nex
     const sessionId = req.headers['x-session-id'] as string;
     let csrfToken: string | undefined;
     if (sessionId) {
-      csrfToken = generateCsrfToken(sessionId);
+      csrfToken = await generateCsrfToken(sessionId);
     }
 
     // Audit log
