@@ -1,0 +1,96 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    /* Force Orange #ff6e00 = 26° 100% 50% */
+    --primary: 26 100% 50%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 30 100% 96%;
+    --secondary-foreground: 26 100% 35%;
+    --muted: 30 20% 96%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 30 100% 96%;
+    --accent-foreground: 26 100% 35%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 26 100% 50%;
+    --radius: 0.5rem;
+    --sidebar: 30 20% 98%;
+    --sidebar-foreground: 222.2 84% 4.9%;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --primary: 26 100% 50%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 26 50% 15%;
+    --secondary-foreground: 30 100% 90%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 26 50% 15%;
+    --accent-foreground: 30 100% 90%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 26 100% 50%;
+    --sidebar: 222.2 84% 6%;
+    --sidebar-foreground: 210 40% 98%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Toast Animations */
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.3s ease-out;
+}
+
+/* Focus visible for accessibility */
+:focus-visible {
+  @apply outline-none ring-2 ring-primary ring-offset-2;
+}
+
+/* Sidebar transition for mobile */
+@media (max-width: 1023px) {
+  .sidebar-overlay {
+    @apply fixed inset-0 bg-black/50 z-40 transition-opacity;
+  }
+
+  .sidebar-mobile {
+    @apply fixed left-0 top-0 h-full z-50 transform transition-transform duration-300;
+  }
+
+  .sidebar-mobile.closed {
+    @apply -translate-x-full;
+  }
+}

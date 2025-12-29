@@ -1,0 +1,426 @@
+// Force Website Builder - Database Schema
+// Prisma ORM
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==========================================
+// User & Authentication
+// ==========================================
+
+model User {
+  id               String     @id @default(uuid())
+  email            String     @unique
+  passwordHash     String     @map("password_hash")
+  firstName        String     @map("first_name")
+  lastName         String     @map("last_name")
+  role             UserRole   @default(customer)
+  status           UserStatus @default(active)
+  emailVerified    Boolean    @default(false) @map("email_verified")
+  avatar           String?
+  stripeCustomerId String?    @unique @map("stripe_customer_id")
+  lastLoginAt      DateTime?  @map("last_login_at")
+  createdAt        DateTime   @default(now()) @map("created_at")
+  updatedAt        DateTime   @updatedAt @map("updated_at")
+  deletedAt        DateTime?  @map("deleted_at") // Soft delete support
+
+  // Relations
+  stores        Store[]
+  orders        Order[]
+  carts         Cart[]
+  addresses     Address[]
+  refreshTokens RefreshToken[]
+  auditLogs     AuditLog[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  customer
+  store_admin
+  super_admin
+}
+
+enum UserStatus {
+  active
+  inactive
+  suspended
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String   @map("user_id")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+// ==========================================
+// Store (Multi-tenant)
+// ==========================================
+
+model Store {
+  id        String      @id @default(uuid())
+  name      String
+  slug      String      @unique
+  domain    String?     @unique
+  ownerId   String      @map("owner_id")
+  status    StoreStatus @default(active)
+  plan      StorePlan   @default(starter)
+  logo      String?
+  favicon   String?
+  settings  Json        @default("{}")
+  createdAt DateTime    @default(now()) @map("created_at")
+  updatedAt DateTime    @updatedAt @map("updated_at")
+  deletedAt DateTime?   @map("deleted_at") // Soft delete support
+
+  // Relations
+  owner      User        @relation(fields: [ownerId], references: [id])
+  products   Product[]
+  categories Category[]
+  orders     Order[]
+  carts      Cart[]
+  customers  Customer[]
+
+  @@map("stores")
+}
+
+model Customer {
+  id        String   @id @default(uuid())
+  storeId   String   @map("store_id")
+  email     String
+  firstName String   @map("first_name")
+  lastName  String   @map("last_name")
+  phone     String?
+  notes     String?
+  totalOrders Int    @default(0) @map("total_orders")
+  totalSpent  Int    @default(0) @map("total_spent")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, email])
+  @@map("customers")
+}
+
+enum StoreStatus {
+  active
+  inactive
+  suspended
+}
+
+enum StorePlan {
+  free
+  starter
+  professional
+  enterprise
+}
+
+// ==========================================
+// Products & Categories
+// ==========================================
+
+model Category {
+  id          String    @id @default(uuid())
+  storeId     String    @map("store_id")
+  name        String
+  slug        String
+  description String?
+  image       String?
+  parentId    String?   @map("parent_id")
+  position    Int       @default(0)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at") // Soft delete support
+
+  // Relations
+  store    Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryHierarchy")
+  products ProductCategory[]
+
+  @@unique([storeId, slug])
+  @@map("categories")
+}
+
+model Product {
+  id             String        @id @default(uuid())
+  storeId        String        @map("store_id")
+  name           String
+  slug           String
+  description    String?
+  price          Int           // Price in cents
+  compareAtPrice Int?          @map("compare_at_price")
+  costPrice      Int?          @map("cost_price")
+  sku            String?
+  barcode        String?
+  inventory      Int           @default(0)
+  trackInventory Boolean       @default(true) @map("track_inventory")
+  weight         Float?
+  status         ProductStatus @default(draft)
+  featured       Boolean       @default(false)
+  metaTitle      String?       @map("meta_title")
+  metaDescription String?      @map("meta_description")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+  deletedAt      DateTime?     @map("deleted_at") // Soft delete support
+
+  // Relations
+  store      Store             @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  images     ProductImage[]
+  categories ProductCategory[]
+  cartItems  CartItem[]
+  orderItems OrderItem[]
+  tags       ProductTag[]
+
+  @@unique([storeId, slug])
+  @@map("products")
+}
+
+enum ProductStatus {
+  draft
+  active
+  archived
+}
+
+model ProductImage {
+  id        String   @id @default(uuid())
+  productId String   @map("product_id")
+  url       String
+  alt       String?
+  position  Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("product_images")
+}
+
+model ProductCategory {
+  productId  String @map("product_id")
+  categoryId String @map("category_id")
+
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([productId, categoryId])
+  @@map("product_categories")
+}
+
+model Tag {
+  id       String       @id @default(uuid())
+  name     String       @unique
+  products ProductTag[]
+
+  @@map("tags")
+}
+
+model ProductTag {
+  productId String @map("product_id")
+  tagId     String @map("tag_id")
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  tag     Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([productId, tagId])
+  @@map("product_tags")
+}
+
+// ==========================================
+// Cart
+// ==========================================
+
+model Cart {
+  id         String   @id @default(uuid())
+  storeId    String   @map("store_id")
+  customerId String?  @map("customer_id")
+  sessionId  String   @map("session_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  store    Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  customer User?      @relation(fields: [customerId], references: [id])
+  items    CartItem[]
+
+  @@unique([storeId, sessionId])
+  @@map("carts")
+}
+
+model CartItem {
+  id        String   @id @default(uuid())
+  cartId    String   @map("cart_id")
+  productId String   @map("product_id")
+  quantity  Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  cart    Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@unique([cartId, productId])
+  @@map("cart_items")
+}
+
+// ==========================================
+// Orders
+// ==========================================
+
+model Order {
+  id              String             @id @default(uuid())
+  storeId         String             @map("store_id")
+  customerId      String             @map("customer_id")
+  orderNumber     String             @unique @map("order_number")
+  status          OrderStatus        @default(pending)
+  paymentStatus   OrderPaymentStatus @default(unpaid) @map("payment_status")
+  subtotal        Int
+  tax             Int                @default(0)
+  shipping        Int                @default(0)
+  discount        Int                @default(0)
+  total           Int
+  currency        String             @default("USD")
+  notes           String?
+  shippingAddress Json               @map("shipping_address")
+  billingAddress  Json               @map("billing_address")
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+  deletedAt       DateTime?          @map("deleted_at") // Soft delete support
+
+  // Relations
+  store    Store       @relation(fields: [storeId], references: [id])
+  customer User        @relation(fields: [customerId], references: [id])
+  items    OrderItem[]
+  payments Payment[]
+
+  @@map("orders")
+}
+
+enum OrderPaymentStatus {
+  unpaid
+  paid
+  failed
+  refunded
+  disputed
+}
+
+enum OrderStatus {
+  pending
+  confirmed
+  processing
+  shipped
+  delivered
+  cancelled
+  refunded
+}
+
+model OrderItem {
+  id          String @id @default(uuid())
+  orderId     String @map("order_id")
+  productId   String @map("product_id")
+  productName String @map("product_name")
+  sku         String?
+  quantity    Int
+  price       Int
+  total       Int
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("order_items")
+}
+
+model Payment {
+  id                    String        @id @default(uuid())
+  orderId               String        @map("order_id")
+  method                String        @default("stripe")
+  status                PaymentStatus @default(pending)
+  amount                Int
+  currency              String        @default("USD")
+  transactionId         String?       @map("transaction_id")
+  stripePaymentIntentId String?       @unique @map("stripe_payment_intent_id")
+  stripeSessionId       String?       @unique @map("stripe_session_id")
+  stripeRefundId        String?       @map("stripe_refund_id")
+  refundedAmount        Int           @default(0) @map("refunded_amount")
+  failureReason         String?       @map("failure_reason")
+  paidAt                DateTime?     @map("paid_at")
+  metadata              Json?
+  createdAt             DateTime      @default(now()) @map("created_at")
+  updatedAt             DateTime      @updatedAt @map("updated_at")
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@map("payments")
+}
+
+enum PaymentStatus {
+  pending
+  processing
+  completed
+  failed
+  refunded
+  partially_refunded
+  disputed
+}
+
+// ==========================================
+// Audit Logging
+// ==========================================
+
+model AuditLog {
+  id           String   @id @default(uuid())
+  action       String
+  userId       String?  @map("user_id")
+  resourceType String   @map("resource_type")
+  resourceId   String?  @map("resource_id")
+  details      Json     @default("{}")
+  ipAddress    String?  @map("ip_address")
+  userAgent    String?  @map("user_agent")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([action])
+  @@index([resourceType])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ==========================================
+// Addresses
+// ==========================================
+
+model Address {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  type       String   @default("shipping") // shipping, billing
+  firstName  String   @map("first_name")
+  lastName   String   @map("last_name")
+  company    String?
+  address1   String
+  address2   String?
+  city       String
+  state      String
+  postalCode String   @map("postal_code")
+  country    String
+  phone      String?
+  isDefault  Boolean  @default(false) @map("is_default")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("addresses")
+}
