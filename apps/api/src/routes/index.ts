@@ -6,6 +6,7 @@ import cartRoutes from './cart.routes';
 import orderRoutes from './order.routes';
 import publicRoutes from './public.routes';
 import paymentRoutes from './payment.routes';
+import paymentSettingsRoutes from './payment-settings.routes';
 import aiRoutes from './ai.routes';
 import uploadRoutes from './upload.routes';
 import adminRoutes from './admin.routes';
@@ -18,6 +19,9 @@ router.use('/auth', authRoutes);
 
 // Payment routes
 router.use('/payments', paymentRoutes);
+
+// Payment settings (super admin)
+router.use('/payment-settings', paymentSettingsRoutes);
 
 // AI routes (Force AI)
 router.use('/ai', aiRoutes);

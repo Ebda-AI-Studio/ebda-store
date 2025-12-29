@@ -1,6 +1,7 @@
 import { prisma } from '@force/database';
 import { config } from '../../config';
 import { AppError } from '../../middleware/error-handler';
+import { encryption } from '../encryption.service';
 import {
   IPaymentProvider,
   PaymentProvider,
@@ -19,87 +20,357 @@ import { UPaymentsProvider } from './upayments.provider';
 
 // ==========================================
 // Payment Factory
-// Unified interface for all Kuwait payment providers
+// Database-driven configuration for Kuwait payment providers
+// Supports both global and per-store configurations
 // ==========================================
 
-class PaymentFactory {
-  private providers: Map<PaymentProvider, IPaymentProvider> = new Map();
-  private defaultProvider: PaymentProvider = 'tap';
+interface ProviderConfig {
+  provider: PaymentProvider;
+  apiKey: string;
+  secretKey?: string;
+  merchantId?: string;
+  webhookSecret?: string;
+  isTestMode: boolean;
+  isEnabled: boolean;
+  isDefault: boolean;
+  displayName?: string;
+  displayNameAr?: string;
+  supportedMethods: string[];
+  supportedCurrencies: string[];
+  fixedFee: number;
+  percentageFee: number;
+}
 
-  constructor() {
-    this.initializeProviders();
+interface CachedProviders {
+  providers: Map<PaymentProvider, IPaymentProvider>;
+  defaultProvider: PaymentProvider | null;
+  configs: Map<PaymentProvider, ProviderConfig>;
+  timestamp: number;
+}
+
+class PaymentFactory {
+  // Cache providers by storeId (null = global)
+  private cache: Map<string | null, CachedProviders> = new Map();
+  private cacheTimeout = 5 * 60 * 1000; // 5 minutes
+  private initializationPromises: Map<string | null, Promise<void>> = new Map();
+
+  /**
+   * Get or initialize providers for a store (or global if storeId is null)
+   */
+  async getProviders(storeId?: string | null): Promise<CachedProviders> {
+    const cacheKey = storeId || null;
+    const cached = this.cache.get(cacheKey);
+
+    // Return cached if valid
+    if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
+      return cached;
+    }
+
+    // Check if already initializing to prevent concurrent initialization
+    const existingPromise = this.initializationPromises.get(cacheKey);
+    if (existingPromise) {
+      await existingPromise;
+      return this.cache.get(cacheKey)!;
+    }
+
+    // Initialize providers
+    const initPromise = this.initializeProviders(cacheKey);
+    this.initializationPromises.set(cacheKey, initPromise);
+
+    try {
+      await initPromise;
+      return this.cache.get(cacheKey)!;
+    } finally {
+      this.initializationPromises.delete(cacheKey);
+    }
   }
 
-  private initializeProviders(): void {
+  /**
+   * Initialize providers from database configuration
+   */
+  private async initializeProviders(storeId: string | null): Promise<void> {
+    const providers = new Map<PaymentProvider, IPaymentProvider>();
+    const configs = new Map<PaymentProvider, ProviderConfig>();
+    let defaultProvider: PaymentProvider | null = null;
+
+    try {
+      // First try to get store-specific config, then fall back to global
+      let dbConfigs = await prisma.paymentConfig.findMany({
+        where: {
+          storeId: storeId,
+          isEnabled: true,
+        },
+        orderBy: { provider: 'asc' },
+      });
+
+      // If no store-specific config, try global config
+      if (dbConfigs.length === 0 && storeId !== null) {
+        dbConfigs = await prisma.paymentConfig.findMany({
+          where: {
+            storeId: null,
+            isEnabled: true,
+          },
+          orderBy: { provider: 'asc' },
+        });
+      }
+
+      // Fall back to environment variables if no database config
+      if (dbConfigs.length === 0) {
+        console.log('[PAYMENT] No database config found, using environment variables');
+        this.initializeFromEnv(providers, configs);
+      } else {
+        // Initialize from database config
+        for (const dbConfig of dbConfigs) {
+          try {
+            const providerConfig: ProviderConfig = {
+              provider: dbConfig.provider as PaymentProvider,
+              apiKey: dbConfig.apiKey ? encryption.decrypt(dbConfig.apiKey) : '',
+              secretKey: dbConfig.secretKey ? encryption.decrypt(dbConfig.secretKey) : undefined,
+              merchantId: dbConfig.merchantId ? encryption.decrypt(dbConfig.merchantId) : undefined,
+              webhookSecret: dbConfig.webhookSecret ? encryption.decrypt(dbConfig.webhookSecret) : undefined,
+              isTestMode: dbConfig.testMode,
+              isEnabled: dbConfig.isEnabled,
+              isDefault: dbConfig.isDefault,
+              displayName: dbConfig.displayName || undefined,
+              displayNameAr: dbConfig.displayNameAr || undefined,
+              supportedMethods: dbConfig.supportedMethods,
+              supportedCurrencies: dbConfig.supportedCurrencies,
+              fixedFee: dbConfig.fixedFee,
+              percentageFee: dbConfig.percentageFee,
+            };
+
+            if (!providerConfig.apiKey) {
+              console.warn(`[PAYMENT] Skipping ${dbConfig.provider}: No API key configured`);
+              continue;
+            }
+
+            const provider = this.createProvider(providerConfig);
+            if (provider) {
+              providers.set(providerConfig.provider, provider);
+              configs.set(providerConfig.provider, providerConfig);
+
+              if (dbConfig.isDefault) {
+                defaultProvider = providerConfig.provider;
+              }
+            }
+          } catch (error) {
+            console.error(`[PAYMENT] Failed to initialize ${dbConfig.provider}:`, error);
+          }
+        }
+      }
+
+      // Set default provider if not explicitly set
+      if (!defaultProvider && providers.size > 0) {
+        defaultProvider = providers.keys().next().value || null;
+      }
+
+      console.log(`[PAYMENT] Initialized ${storeId ? `store ${storeId}` : 'global'} providers: ${Array.from(providers.keys()).join(', ') || 'none'}`);
+      console.log(`[PAYMENT] Default provider: ${defaultProvider || 'none'}`);
+
+      this.cache.set(storeId, {
+        providers,
+        configs,
+        defaultProvider,
+        timestamp: Date.now(),
+      });
+    } catch (error) {
+      console.error('[PAYMENT] Failed to initialize providers:', error);
+
+      // Initialize from env as fallback
+      this.initializeFromEnv(providers, configs);
+
+      if (providers.size > 0) {
+        defaultProvider = providers.keys().next().value || null;
+      }
+
+      this.cache.set(storeId, {
+        providers,
+        configs,
+        defaultProvider,
+        timestamp: Date.now(),
+      });
+    }
+  }
+
+  /**
+   * Initialize from environment variables (fallback)
+   */
+  private initializeFromEnv(
+    providers: Map<PaymentProvider, IPaymentProvider>,
+    configs: Map<PaymentProvider, ProviderConfig>
+  ): void {
     // Initialize Tap Payments
     if (config.tapApiKey) {
-      const tap = new TapPaymentProvider();
-      tap.initialize({
+      const providerConfig: ProviderConfig = {
+        provider: 'tap',
         apiKey: config.tapApiKey,
         secretKey: config.tapSecretKey,
-        baseUrl: '',
-        isTestMode: config.paymentTestMode,
         webhookSecret: config.tapWebhookSecret,
-      });
-      this.providers.set('tap', tap);
+        isTestMode: config.paymentTestMode,
+        isEnabled: true,
+        isDefault: true,
+        supportedMethods: ['knet', 'visa', 'mastercard', 'apple_pay'],
+        supportedCurrencies: ['KWD', 'USD', 'SAR', 'AED', 'BHD'],
+        fixedFee: 0,
+        percentageFee: 2.5,
+      };
+      const tap = this.createProvider(providerConfig);
+      if (tap) {
+        providers.set('tap', tap);
+        configs.set('tap', providerConfig);
+      }
     }
 
     // Initialize MyFatoorah
     if (config.myfatoorahApiKey) {
-      const myfatoorah = new MyFatoorahPaymentProvider();
-      myfatoorah.initialize({
+      const providerConfig: ProviderConfig = {
+        provider: 'myfatoorah',
         apiKey: config.myfatoorahApiKey,
-        baseUrl: '',
         isTestMode: config.paymentTestMode,
-      });
-      this.providers.set('myfatoorah', myfatoorah);
+        isEnabled: true,
+        isDefault: false,
+        supportedMethods: ['knet', 'visa', 'mastercard'],
+        supportedCurrencies: ['KWD', 'USD', 'SAR', 'AED', 'BHD'],
+        fixedFee: 0,
+        percentageFee: 2.0,
+      };
+      const myfatoorah = this.createProvider(providerConfig);
+      if (myfatoorah) {
+        providers.set('myfatoorah', myfatoorah);
+        configs.set('myfatoorah', providerConfig);
+      }
     }
 
     // Initialize Hesabe
     if (config.hesabeApiKey) {
-      const hesabe = new HesabePaymentProvider();
-      hesabe.initialize({
+      const providerConfig: ProviderConfig = {
+        provider: 'hesabe',
         apiKey: config.hesabeApiKey,
         secretKey: config.hesabeSecretKey,
         merchantId: config.hesabeMerchantId,
-        baseUrl: '',
-        isTestMode: config.paymentTestMode,
         webhookSecret: config.hesabeWebhookSecret,
-      });
-      this.providers.set('hesabe', hesabe);
+        isTestMode: config.paymentTestMode,
+        isEnabled: true,
+        isDefault: false,
+        supportedMethods: ['knet', 'visa', 'mastercard'],
+        supportedCurrencies: ['KWD'],
+        fixedFee: 0,
+        percentageFee: 2.5,
+      };
+      const hesabe = this.createProvider(providerConfig);
+      if (hesabe) {
+        providers.set('hesabe', hesabe);
+        configs.set('hesabe', providerConfig);
+      }
     }
 
     // Initialize UPayments
     if (config.upaymentsApiKey) {
-      const upayments = new UPaymentsProvider();
-      upayments.initialize({
+      const providerConfig: ProviderConfig = {
+        provider: 'upayments',
         apiKey: config.upaymentsApiKey,
         secretKey: config.upaymentsSecretKey,
         merchantId: config.upaymentsMerchantId,
-        baseUrl: '',
-        isTestMode: config.paymentTestMode,
         webhookSecret: config.upaymentsWebhookSecret,
-      });
-      this.providers.set('upayments', upayments);
-    }
-
-    // Set default provider
-    if (config.defaultPaymentProvider) {
-      this.defaultProvider = config.defaultPaymentProvider as PaymentProvider;
-    } else if (this.providers.size > 0) {
-      const firstProvider = this.providers.keys().next().value;
-      if (firstProvider) {
-        this.defaultProvider = firstProvider;
+        isTestMode: config.paymentTestMode,
+        isEnabled: true,
+        isDefault: false,
+        supportedMethods: ['knet', 'visa', 'mastercard', 'apple_pay', 'samsung_pay'],
+        supportedCurrencies: ['KWD'],
+        fixedFee: 0,
+        percentageFee: 2.5,
+      };
+      const upayments = this.createProvider(providerConfig);
+      if (upayments) {
+        providers.set('upayments', upayments);
+        configs.set('upayments', providerConfig);
       }
     }
-
-    console.log(`[PAYMENT] Initialized providers: ${Array.from(this.providers.keys()).join(', ')}`);
-    console.log(`[PAYMENT] Default provider: ${this.defaultProvider}`);
   }
 
-  getProvider(provider?: PaymentProvider): IPaymentProvider {
-    const providerName = provider || this.defaultProvider;
-    const p = this.providers.get(providerName);
+  /**
+   * Create a provider instance from config
+   */
+  private createProvider(config: ProviderConfig): IPaymentProvider | null {
+    try {
+      let provider: IPaymentProvider;
+
+      switch (config.provider) {
+        case 'tap':
+          provider = new TapPaymentProvider();
+          provider.initialize({
+            apiKey: config.apiKey,
+            secretKey: config.secretKey,
+            baseUrl: '',
+            isTestMode: config.isTestMode,
+            webhookSecret: config.webhookSecret,
+          });
+          break;
+
+        case 'myfatoorah':
+          provider = new MyFatoorahPaymentProvider();
+          provider.initialize({
+            apiKey: config.apiKey,
+            baseUrl: '',
+            isTestMode: config.isTestMode,
+          });
+          break;
+
+        case 'hesabe':
+          provider = new HesabePaymentProvider();
+          provider.initialize({
+            apiKey: config.apiKey,
+            secretKey: config.secretKey,
+            merchantId: config.merchantId,
+            baseUrl: '',
+            isTestMode: config.isTestMode,
+            webhookSecret: config.webhookSecret,
+          });
+          break;
+
+        case 'upayments':
+          provider = new UPaymentsProvider();
+          provider.initialize({
+            apiKey: config.apiKey,
+            secretKey: config.secretKey,
+            merchantId: config.merchantId,
+            baseUrl: '',
+            isTestMode: config.isTestMode,
+            webhookSecret: config.webhookSecret,
+          });
+          break;
+
+        default:
+          console.warn(`[PAYMENT] Unknown provider: ${config.provider}`);
+          return null;
+      }
+
+      return provider;
+    } catch (error) {
+      console.error(`[PAYMENT] Failed to create provider ${config.provider}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Get a specific provider
+   */
+  async getProvider(
+    provider?: PaymentProvider,
+    storeId?: string | null
+  ): Promise<IPaymentProvider> {
+    const cached = await this.getProviders(storeId);
+    const providerName = provider || cached.defaultProvider;
+
+    if (!providerName) {
+      throw new AppError(
+        500,
+        'PAYMENT_NOT_CONFIGURED',
+        'No payment providers configured'
+      );
+    }
+
+    const p = cached.providers.get(providerName);
 
     if (!p) {
       throw new AppError(
@@ -112,12 +383,53 @@ class PaymentFactory {
     return p;
   }
 
-  getAvailableProviders(): PaymentProvider[] {
-    return Array.from(this.providers.keys());
+  /**
+   * Get provider configuration
+   */
+  async getProviderConfig(
+    provider: PaymentProvider,
+    storeId?: string | null
+  ): Promise<ProviderConfig | undefined> {
+    const cached = await this.getProviders(storeId);
+    return cached.configs.get(provider);
   }
 
-  isProviderAvailable(provider: PaymentProvider): boolean {
-    return this.providers.has(provider);
+  /**
+   * Get available providers for a store
+   */
+  async getAvailableProviders(storeId?: string | null): Promise<PaymentProvider[]> {
+    const cached = await this.getProviders(storeId);
+    return Array.from(cached.providers.keys());
+  }
+
+  /**
+   * Check if a provider is available
+   */
+  async isProviderAvailable(
+    provider: PaymentProvider,
+    storeId?: string | null
+  ): Promise<boolean> {
+    const cached = await this.getProviders(storeId);
+    return cached.providers.has(provider);
+  }
+
+  /**
+   * Clear cache for a store (call when config changes)
+   */
+  clearCache(storeId?: string | null): void {
+    if (storeId === undefined) {
+      this.cache.clear();
+    } else {
+      this.cache.delete(storeId);
+    }
+  }
+
+  /**
+   * Get default provider for a store
+   */
+  async getDefaultProvider(storeId?: string | null): Promise<PaymentProvider | null> {
+    const cached = await this.getProviders(storeId);
+    return cached.defaultProvider;
   }
 }
 
@@ -132,8 +444,8 @@ export class PaymentService {
   /**
    * Get available payment providers
    */
-  static getAvailableProviders(): PaymentProvider[] {
-    return factory.getAvailableProviders();
+  static async getAvailableProviders(storeId?: string): Promise<PaymentProvider[]> {
+    return factory.getAvailableProviders(storeId);
   }
 
   /**
@@ -142,15 +454,20 @@ export class PaymentService {
   static async getPaymentMethods(
     amount: number,
     currency: Currency = 'KWD',
-    provider?: PaymentProvider
-  ): Promise<{ provider: PaymentProvider; methods: AvailablePaymentMethod[] }[]> {
-    const providers = provider ? [provider] : factory.getAvailableProviders();
-    const results: { provider: PaymentProvider; methods: AvailablePaymentMethod[] }[] = [];
+    provider?: PaymentProvider,
+    storeId?: string
+  ): Promise<{ provider: PaymentProvider; methods: AvailablePaymentMethod[]; config?: ProviderConfig }[]> {
+    const providers = provider
+      ? [provider]
+      : await factory.getAvailableProviders(storeId);
+    const results: { provider: PaymentProvider; methods: AvailablePaymentMethod[]; config?: ProviderConfig }[] = [];
 
     for (const p of providers) {
       try {
-        const methods = await factory.getProvider(p).getPaymentMethods(amount, currency);
-        results.push({ provider: p, methods });
+        const providerInstance = await factory.getProvider(p, storeId);
+        const methods = await providerInstance.getPaymentMethods(amount, currency);
+        const providerConfig = await factory.getProviderConfig(p, storeId);
+        results.push({ provider: p, methods, config: providerConfig });
       } catch (error) {
         console.error(`[PAYMENT] Failed to get methods from ${p}:`, error);
       }
@@ -164,20 +481,24 @@ export class PaymentService {
    */
   static async createPayment(
     request: CreatePaymentRequest,
-    provider?: PaymentProvider
+    provider?: PaymentProvider,
+    storeId?: string
   ): Promise<PaymentResponse> {
-    const p = factory.getProvider(provider);
+    const p = await factory.getProvider(provider, storeId);
     const response = await p.createPayment(request);
 
     // Store payment record in database
     await prisma.payment.create({
       data: {
         orderId: request.orderId,
-        method: p.name,
+        provider: p.name,
+        method: null, // Will be set when payment is completed via webhook
         amount: request.amount,
         currency: request.currency,
         status: 'pending',
         transactionId: response.transactionId,
+        invoiceId: response.invoiceId,
+        paymentUrl: response.paymentUrl,
         metadata: {
           provider: p.name,
           invoiceId: response.invoiceId,
@@ -195,25 +516,32 @@ export class PaymentService {
    */
   static async getPaymentStatus(
     transactionId: string,
-    provider?: PaymentProvider
+    provider?: PaymentProvider,
+    storeId?: string
   ): Promise<PaymentStatusResponse> {
     // Try to find the payment in database to get the provider
     const payment = await prisma.payment.findFirst({
       where: { transactionId },
+      include: { order: { include: { store: true } } },
     });
 
-    const providerName = provider || (payment?.method as PaymentProvider) || 'tap';
-    return factory.getProvider(providerName).getPaymentStatus(transactionId);
+    const providerName = provider || (payment?.provider as PaymentProvider) || 'tap';
+    const effectiveStoreId = storeId || payment?.order?.storeId;
+    return (await factory.getProvider(providerName, effectiveStoreId)).getPaymentStatus(transactionId);
   }
 
   /**
    * Process refund
    */
-  static async refund(request: RefundRequest, provider?: PaymentProvider): Promise<RefundResponse> {
+  static async refund(
+    request: RefundRequest,
+    provider?: PaymentProvider,
+    storeId?: string
+  ): Promise<RefundResponse> {
     // Find payment to get provider
     const payment = await prisma.payment.findFirst({
       where: { transactionId: request.transactionId },
-      include: { order: true },
+      include: { order: { include: { store: true } } },
     });
 
     if (!payment) {
@@ -224,8 +552,9 @@ export class PaymentService {
       throw new AppError(400, 'INVALID_STATE', 'Payment is not completed');
     }
 
-    const providerName = provider || (payment.method as PaymentProvider);
-    const response = await factory.getProvider(providerName).refund(request);
+    const providerName = provider || (payment.provider as PaymentProvider);
+    const effectiveStoreId = storeId || payment.order?.storeId;
+    const response = await (await factory.getProvider(providerName, effectiveStoreId)).refund(request);
 
     // Update payment record
     const isFullRefund = !request.amount || request.amount >= payment.amount;
@@ -234,6 +563,7 @@ export class PaymentService {
       where: { id: payment.id },
       data: {
         status: isFullRefund ? 'refunded' : 'partially_refunded',
+        refundId: response.refundId,
         refundedAmount: { increment: request.amount || payment.amount },
         metadata: {
           ...(payment.metadata as object || {}),
@@ -260,9 +590,10 @@ export class PaymentService {
   static async handleWebhook(
     provider: PaymentProvider,
     payload: unknown,
-    signature?: string
+    signature?: string,
+    storeId?: string
   ): Promise<{ success: boolean; status?: string }> {
-    const p = factory.getProvider(provider);
+    const p = await factory.getProvider(provider, storeId);
 
     // Verify signature if provided
     if (signature && !p.verifyWebhook(payload, signature)) {
@@ -277,7 +608,7 @@ export class PaymentService {
       where: {
         OR: [
           { transactionId: webhookData.transactionId },
-          { transactionId: webhookData.invoiceId },
+          { invoiceId: webhookData.invoiceId },
         ],
       },
       include: { order: true },
@@ -361,6 +692,7 @@ export class PaymentService {
           include: {
             items: { include: { product: true } },
             customer: true,
+            store: true,
           },
         },
       },
@@ -397,7 +729,15 @@ export class PaymentService {
         errorUrl: `${config.webUrl}/checkout/error`,
         webhookUrl: `${config.apiUrl}/webhooks/payment`,
       },
-      provider || (payment.method as PaymentProvider)
+      provider || (payment.provider as PaymentProvider),
+      order.storeId
     );
+  }
+
+  /**
+   * Clear provider cache (call when config changes)
+   */
+  static clearCache(storeId?: string): void {
+    factory.clearCache(storeId);
   }
 }

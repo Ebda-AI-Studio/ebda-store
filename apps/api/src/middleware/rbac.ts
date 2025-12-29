@@ -32,7 +32,11 @@ export type Permission =
   | 'audit:read'
   // AI permissions
   | 'ai:use'
-  | 'ai:manage';
+  | 'ai:manage'
+  // System settings permissions (super admin)
+  | 'settings:read'
+  | 'settings:write'
+  | 'settings:delete';
 
 // ==========================================
 // Role Definitions
@@ -90,6 +94,10 @@ const rolePermissions: Record<Role, Permission[]> = {
     'audit:read',
     'ai:use',
     'ai:manage',
+    // System settings (super admin only)
+    'settings:read',
+    'settings:write',
+    'settings:delete',
   ],
 };
 
