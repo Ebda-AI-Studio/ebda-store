@@ -35,7 +35,7 @@ export default function CouponsPage() {
   const [editingCoupon, setEditingCoupon] = useState<Coupon | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterActive, setFilterActive] = useState<'all' | 'active' | 'inactive'>('all');
-  const [storeName, setStoreName] = useState('');
+  const [_storeName, setStoreName] = useState('');
 
   // Form state
   const [formData, setFormData] = useState({

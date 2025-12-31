@@ -55,7 +55,7 @@ export default function InventoryPage() {
   const params = useParams();
   const storeId = params.id as string;
 
-  const [storeName, setStoreName] = useState('');
+  const [_storeName, setStoreName] = useState('');
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<InventoryStats | null>(null);
   const [products, setProducts] = useState<ProductInventory[]>([]);

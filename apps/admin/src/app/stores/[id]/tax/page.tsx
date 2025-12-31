@@ -62,7 +62,7 @@ export default function TaxSettingsPage() {
     defaultTaxRate: null,
   });
   const [rates, setRates] = useState<TaxRate[]>([]);
-  const [storeName, setStoreName] = useState('');
+  const [_storeName, setStoreName] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);

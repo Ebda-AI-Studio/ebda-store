@@ -74,7 +74,7 @@ export default function LoyaltySettingsPage() {
   const params = useParams();
   const storeId = params.id as string;
 
-  const [storeName, setStoreName] = useState('');
+  const [_storeName, setStoreName] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [loyaltyEnabled, setLoyaltyEnabled] = useState(false);

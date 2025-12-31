@@ -58,7 +58,7 @@ export default function ShippingSettingsPage() {
   const storeId = params.id as string;
 
   const [zones, setZones] = useState<ShippingZone[]>([]);
-  const [storeName, setStoreName] = useState('');
+  const [_storeName, setStoreName] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showModal, setShowModal] = useState(false);
