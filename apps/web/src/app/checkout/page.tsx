@@ -77,11 +77,7 @@ function formatPrice(fils: number) {
 export default function CheckoutPage() {
   const router = useRouter();
   const { store } = useStore();
-  const {
-    items: cartContextItems,
-    total: cartContextTotal,
-    itemCount: cartContextItemCount,
-  } = useCart();
+  const { items: cartContextItems, total: cartContextTotal } = useCart();
   const [step, setStep] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);

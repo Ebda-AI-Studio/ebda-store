@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { Button, Badge, useToast } from '@force/ui';
 import { useCart } from '../../../contexts/CartContext';
@@ -70,7 +69,7 @@ export default function ProductDetailPage() {
   const [selectedImage, setSelectedImage] = useState(0);
   const [isAdding, setIsAdding] = useState(false);
   const { success } = useToast();
-  const { addItem, itemCount } = useCart();
+  const { addItem } = useCart();
 
   const handleAddToCart = async () => {
     setIsAdding(true);
