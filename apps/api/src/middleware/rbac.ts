@@ -33,6 +33,9 @@ export type Permission =
   // AI permissions
   | 'ai:use'
   | 'ai:manage'
+  // Returns permissions
+  | 'returns:read'
+  | 'returns:write'
   // System settings permissions (super admin)
   | 'settings:read'
   | 'settings:write'
@@ -71,6 +74,8 @@ const rolePermissions: Record<Role, Permission[]> = {
     'payments:refund',
     'audit:read',
     'ai:manage',
+    'returns:read',
+    'returns:write',
   ],
   super_admin: [
     // All permissions
@@ -94,6 +99,8 @@ const rolePermissions: Record<Role, Permission[]> = {
     'audit:read',
     'ai:use',
     'ai:manage',
+    'returns:read',
+    'returns:write',
     // System settings (super admin only)
     'settings:read',
     'settings:write',

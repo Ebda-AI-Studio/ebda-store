@@ -6,8 +6,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ==========================================
@@ -20,23 +21,30 @@ model User {
   passwordHash     String     @map("password_hash")
   firstName        String     @map("first_name")
   lastName         String     @map("last_name")
+  phone            String?
   role             UserRole   @default(customer)
   status           UserStatus @default(active)
   emailVerified    Boolean    @default(false) @map("email_verified")
   avatar           String?
-  stripeCustomerId String?    @unique @map("stripe_customer_id")
+  language         String     @default("en") // en, ar
   lastLoginAt      DateTime?  @map("last_login_at")
   createdAt        DateTime   @default(now()) @map("created_at")
   updatedAt        DateTime   @updatedAt @map("updated_at")
   deletedAt        DateTime?  @map("deleted_at") // Soft delete support
 
   // Relations
-  stores        Store[]
-  orders        Order[]
-  carts         Cart[]
-  addresses     Address[]
-  refreshTokens RefreshToken[]
-  auditLogs     AuditLog[]
+  stores              Store[]
+  orders              Order[]
+  carts               Cart[]
+  addresses           Address[]
+  refreshTokens       RefreshToken[]
+  verificationTokens  VerificationToken[]
+  auditLogs           AuditLog[]
+  wishlists           Wishlist[]
+  reviews             Review[]
+  returns             Return[]
+  loyaltyPoints       LoyaltyPoints[]
+  loyaltyTransactions LoyaltyTransaction[]
 
   @@map("users")
 }
@@ -65,24 +73,101 @@ model RefreshToken {
   @@map("refresh_tokens")
 }
 
+model VerificationToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String   @map("user_id")
+  type      VerificationTokenType @default(email)
+  expiresAt DateTime @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+  @@map("verification_tokens")
+}
+
+enum VerificationTokenType {
+  email
+  password_reset
+  two_factor
+}
+
 // ==========================================
 // Store (Multi-tenant)
 // ==========================================
 
 model Store {
-  id        String      @id @default(uuid())
-  name      String
-  slug      String      @unique
-  domain    String?     @unique
-  ownerId   String      @map("owner_id")
-  status    StoreStatus @default(active)
-  plan      StorePlan   @default(starter)
-  logo      String?
-  favicon   String?
-  settings  Json        @default("{}")
-  createdAt DateTime    @default(now()) @map("created_at")
-  updatedAt DateTime    @updatedAt @map("updated_at")
-  deletedAt DateTime?   @map("deleted_at") // Soft delete support
+  id          String      @id @default(uuid())
+  name        String
+  nameAr      String?     @map("name_ar")
+  slug        String      @unique
+  domain      String?     @unique
+  ownerId     String      @map("owner_id")
+  status      StoreStatus @default(active)
+  plan        StorePlan   @default(starter)
+  logo        String?
+  logoAr      String?     @map("logo_ar")
+  favicon     String?
+  description String?
+  descriptionAr String?   @map("description_ar")
+  currency    String      @default("KWD")
+  timezone    String      @default("Asia/Kuwait")
+  settings    Json        @default("{}")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+  deletedAt   DateTime?   @map("deleted_at") // Soft delete support
+
+  // Template & Theme
+  template        StoreTemplate @default(modern)
+  theme           Json          @default("{}") // StoreTheme JSON
+
+  // Social Links
+  socialLinks     Json          @default("{}") @map("social_links") // StoreSocialLinks JSON
+
+  // Contact Information
+  email           String?
+  phone           String?
+  phoneAr         String?       @map("phone_ar")
+  whatsapp        String?
+  address         String?
+  addressAr       String?       @map("address_ar")
+
+  // Announcement Bar
+  announcementBar Json?         @map("announcement_bar") // AnnouncementBar JSON
+
+  // SEO
+  metaTitle         String?     @map("meta_title")
+  metaTitleAr       String?     @map("meta_title_ar")
+  metaDescription   String?     @map("meta_description")
+  metaDescriptionAr String?     @map("meta_description_ar")
+
+  // Marketing Pixels & Analytics
+  marketingPixels   Json        @default("{}") @map("marketing_pixels") // MarketingPixels JSON
+  // Individual pixel IDs for quick access
+  metaPixelId       String?     @map("meta_pixel_id")        // Facebook/Meta Pixel
+  tiktokPixelId     String?     @map("tiktok_pixel_id")      // TikTok Pixel
+  snapchatPixelId   String?     @map("snapchat_pixel_id")    // Snapchat Pixel
+  googleAnalyticsId String?     @map("google_analytics_id")  // GA4 Measurement ID
+  googleTagManagerId String?    @map("google_tag_manager_id") // GTM Container ID
+  googleAdsId       String?     @map("google_ads_id")        // Google Ads Conversion ID
+  twitterPixelId    String?     @map("twitter_pixel_id")     // Twitter/X Pixel
+  pinterestTagId    String?     @map("pinterest_tag_id")     // Pinterest Tag
+
+  // Tax Settings
+  taxEnabled        Boolean     @default(false) @map("tax_enabled")
+  taxIncludedInPrice Boolean    @default(false) @map("tax_included_in_price") // Prices include tax
+  defaultTaxRate    Decimal?    @map("default_tax_rate") @db.Decimal(5, 2) // Default tax percentage
+
+  // Loyalty Program Settings
+  loyaltyEnabled    Boolean     @default(false) @map("loyalty_enabled")
+  loyaltySettings   Json        @default("{}") @map("loyalty_settings") // LoyaltySettings JSON
+
+  // PWA Settings
+  pwaEnabled        Boolean     @default(false) @map("pwa_enabled")
+  pwaSettings       Json        @default("{}") @map("pwa_settings") // PWASettings JSON
 
   // Relations
   owner          User            @relation(fields: [ownerId], references: [id])
@@ -92,6 +177,16 @@ model Store {
   carts          Cart[]
   customers      Customer[]
   paymentConfigs PaymentConfig[]
+  coupons        Coupon[]
+  shippingZones  ShippingZone[]
+  taxRates       TaxRate[]
+  loyaltyPoints  LoyaltyPoints[]
+  loyaltyTransactions LoyaltyTransaction[]
+  wishlists      Wishlist[]
+  newsletters    NewsletterSubscriber[]
+  reviews        Review[]
+  returns        Return[]
+  inventoryHistory InventoryHistory[]
 
   @@map("stores")
 }
@@ -128,22 +223,33 @@ enum StorePlan {
   enterprise
 }
 
+enum StoreTemplate {
+  modern
+  classic
+  minimal
+  bold
+  elegant
+}
+
 // ==========================================
 // Products & Categories
 // ==========================================
 
 model Category {
-  id          String    @id @default(uuid())
-  storeId     String    @map("store_id")
-  name        String
-  slug        String
-  description String?
-  image       String?
-  parentId    String?   @map("parent_id")
-  position    Int       @default(0)
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
-  deletedAt   DateTime? @map("deleted_at") // Soft delete support
+  id            String    @id @default(uuid())
+  storeId       String    @map("store_id")
+  name          String
+  nameAr        String?   @map("name_ar")
+  slug          String
+  description   String?
+  descriptionAr String?   @map("description_ar")
+  image         String?
+  parentId      String?   @map("parent_id")
+  position      Int       @default(0)
+  isActive      Boolean   @default(true) @map("is_active")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  deletedAt     DateTime? @map("deleted_at") // Soft delete support
 
   // Relations
   store    Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
@@ -156,36 +262,55 @@ model Category {
 }
 
 model Product {
-  id             String        @id @default(uuid())
-  storeId        String        @map("store_id")
-  name           String
-  slug           String
-  description    String?
-  price          Int           // Price in cents
-  compareAtPrice Int?          @map("compare_at_price")
-  costPrice      Int?          @map("cost_price")
-  sku            String?
-  barcode        String?
-  inventory      Int           @default(0)
-  trackInventory Boolean       @default(true) @map("track_inventory")
-  weight         Float?
-  status         ProductStatus @default(draft)
-  featured       Boolean       @default(false)
-  metaTitle      String?       @map("meta_title")
-  metaDescription String?      @map("meta_description")
-  createdAt      DateTime      @default(now()) @map("created_at")
-  updatedAt      DateTime      @updatedAt @map("updated_at")
-  deletedAt      DateTime?     @map("deleted_at") // Soft delete support
+  id               String        @id @default(uuid())
+  storeId          String        @map("store_id")
+  name             String
+  nameAr           String?       @map("name_ar")
+  slug             String
+  description      String?
+  descriptionAr    String?       @map("description_ar")
+  price            Int           // Price in fils (1 KWD = 1000 fils)
+  compareAtPrice   Int?          @map("compare_at_price")
+  costPrice        Int?          @map("cost_price")
+  sku              String?
+  barcode          String?
+  inventory        Int           @default(0)
+  lowStockThreshold Int          @default(5) @map("low_stock_threshold")
+  trackInventory   Boolean       @default(true) @map("track_inventory")
+  weight           Float?
+  dimensions       Json?         // { length, width, height }
+  status           ProductStatus @default(draft)
+  featured         Boolean       @default(false)
+  isNew            Boolean       @default(false) @map("is_new")
+  viewCount        Int           @default(0) @map("view_count")
+  metaTitle        String?       @map("meta_title")
+  metaTitleAr      String?       @map("meta_title_ar")
+  metaDescription  String?       @map("meta_description")
+  metaDescriptionAr String?      @map("meta_description_ar")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+  deletedAt        DateTime?     @map("deleted_at") // Soft delete support
+
+  // Variants
+  hasVariants      Boolean       @default(false) @map("has_variants")
 
   // Relations
-  store      Store             @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  images     ProductImage[]
-  categories ProductCategory[]
-  cartItems  CartItem[]
-  orderItems OrderItem[]
-  tags       ProductTag[]
+  store            Store             @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  images           ProductImage[]
+  categories       ProductCategory[]
+  cartItems        CartItem[]
+  orderItems       OrderItem[]
+  tags             ProductTag[]
+  wishlists        WishlistItem[]
+  reviews          Review[]
+  returnItems      ReturnItem[]
+  inventoryHistory InventoryHistory[]
+  options          ProductOption[]
+  variants         ProductVariant[]
 
   @@unique([storeId, slug])
+  @@index([status])
+  @@index([featured])
   @@map("products")
 }
 
@@ -193,6 +318,44 @@ enum ProductStatus {
   draft
   active
   archived
+}
+
+// ==========================================
+// Inventory Management
+// ==========================================
+
+model InventoryHistory {
+  id            String              @id @default(uuid())
+  productId     String              @map("product_id")
+  storeId       String              @map("store_id")
+  type          InventoryChangeType
+  quantity      Int                 // Change amount (positive or negative)
+  previousStock Int                 @map("previous_stock")
+  newStock      Int                 @map("new_stock")
+  reason        String?
+  reference     String?             // Order ID, adjustment ID, etc.
+  createdBy     String?             @map("created_by") // User ID who made the change
+  createdAt     DateTime            @default(now()) @map("created_at")
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  store   Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([storeId])
+  @@index([createdAt])
+  @@map("inventory_history")
+}
+
+enum InventoryChangeType {
+  manual_add        // Manual stock increase
+  manual_remove     // Manual stock decrease
+  sale              // Sold via order
+  return_stock      // Returned to stock
+  adjustment        // Inventory count adjustment
+  damage            // Damaged goods
+  transfer_in       // Transferred from another location
+  transfer_out      // Transferred to another location
+  initial           // Initial stock setup
 }
 
 model ProductImage {
@@ -239,6 +402,83 @@ model ProductTag {
 }
 
 // ==========================================
+// Product Variants
+// ==========================================
+
+// Option types like "Size", "Color"
+model ProductOption {
+  id        String   @id @default(uuid())
+  productId String   @map("product_id")
+  name      String   // e.g., "Size", "Color"
+  nameAr    String?  @map("name_ar")
+  position  Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  product Product              @relation(fields: [productId], references: [id], onDelete: Cascade)
+  values  ProductOptionValue[]
+
+  @@unique([productId, name])
+  @@map("product_options")
+}
+
+// Option values like "Small", "Red"
+model ProductOptionValue {
+  id        String   @id @default(uuid())
+  optionId  String   @map("option_id")
+  value     String   // e.g., "Small", "Red"
+  valueAr   String?  @map("value_ar")
+  position  Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  option   ProductOption           @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  variants ProductVariantOption[]
+
+  @@unique([optionId, value])
+  @@map("product_option_values")
+}
+
+// A specific variant combining options (e.g., "Size: Large, Color: Red")
+model ProductVariant {
+  id             String   @id @default(uuid())
+  productId      String   @map("product_id")
+  title          String   // Generated from option values: "Large / Red"
+  titleAr        String?  @map("title_ar")
+  sku            String?
+  barcode        String?
+  price          Int?     // Override price (null = use product price)
+  compareAtPrice Int?     @map("compare_at_price")
+  costPrice      Int?     @map("cost_price")
+  inventory      Int      @default(0)
+  weight         Float?
+  imageUrl       String?  @map("image_url")
+  position       Int      @default(0)
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  product    Product                @relation(fields: [productId], references: [id], onDelete: Cascade)
+  options    ProductVariantOption[]
+  cartItems  CartItem[]
+  orderItems OrderItem[]
+
+  @@index([productId])
+  @@index([sku])
+  @@map("product_variants")
+}
+
+// Junction table linking variants to their option values
+model ProductVariantOption {
+  variantId String @map("variant_id")
+  valueId   String @map("value_id")
+
+  variant ProductVariant     @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  value   ProductOptionValue @relation(fields: [valueId], references: [id], onDelete: Cascade)
+
+  @@id([variantId, valueId])
+  @@map("product_variant_options")
+}
+
+// ==========================================
 // Cart
 // ==========================================
 
@@ -263,14 +503,16 @@ model CartItem {
   id        String   @id @default(uuid())
   cartId    String   @map("cart_id")
   productId String   @map("product_id")
+  variantId String?  @map("variant_id")
   quantity  Int      @default(1)
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  cart    Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
-  product Product @relation(fields: [productId], references: [id])
+  cart    Cart            @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product Product         @relation(fields: [productId], references: [id])
+  variant ProductVariant? @relation(fields: [variantId], references: [id])
 
-  @@unique([cartId, productId])
+  @@unique([cartId, productId, variantId])
   @@map("cart_items")
 }
 
@@ -290,20 +532,31 @@ model Order {
   shipping        Int                @default(0)
   discount        Int                @default(0)
   total           Int
-  currency        String             @default("USD")
+  currency        String             @default("KWD")
+  couponCode      String?            @map("coupon_code")
+  couponDiscount  Int                @default(0) @map("coupon_discount")
   notes           String?
+  customerNotes   String?            @map("customer_notes")
   shippingAddress Json               @map("shipping_address")
   billingAddress  Json               @map("billing_address")
+  shippedAt       DateTime?          @map("shipped_at")
+  deliveredAt     DateTime?          @map("delivered_at")
   createdAt       DateTime           @default(now()) @map("created_at")
   updatedAt       DateTime           @updatedAt @map("updated_at")
   deletedAt       DateTime?          @map("deleted_at") // Soft delete support
 
   // Relations
-  store    Store       @relation(fields: [storeId], references: [id])
-  customer User        @relation(fields: [customerId], references: [id])
-  items    OrderItem[]
-  payments Payment[]
+  store               Store       @relation(fields: [storeId], references: [id])
+  customer            User        @relation(fields: [customerId], references: [id])
+  items               OrderItem[]
+  payments            Payment[]
+  reviews             Review[]
+  returns             Return[]
+  loyaltyTransactions LoyaltyTransaction[]
 
+  @@index([status])
+  @@index([paymentStatus])
+  @@index([createdAt])
   @@map("orders")
 }
 
@@ -326,17 +579,21 @@ enum OrderStatus {
 }
 
 model OrderItem {
-  id          String @id @default(uuid())
-  orderId     String @map("order_id")
-  productId   String @map("product_id")
-  productName String @map("product_name")
+  id          String  @id @default(uuid())
+  orderId     String  @map("order_id")
+  productId   String  @map("product_id")
+  variantId   String? @map("variant_id")
+  productName String  @map("product_name")
+  variantName String? @map("variant_name") // e.g., "Large / Red"
   sku         String?
   quantity    Int
   price       Int
   total       Int
 
-  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product Product @relation(fields: [productId], references: [id])
+  order       Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product     Product         @relation(fields: [productId], references: [id])
+  variant     ProductVariant? @relation(fields: [variantId], references: [id])
+  returnItems ReturnItem[]
 
   @@map("order_items")
 }
@@ -377,6 +634,88 @@ enum PaymentStatus {
   refunded
   partially_refunded
   disputed
+}
+
+// ==========================================
+// Returns & Exchanges
+// ==========================================
+
+model Return {
+  id            String       @id @default(uuid())
+  storeId       String       @map("store_id")
+  orderId       String       @map("order_id")
+  customerId    String       @map("customer_id")
+  returnNumber  String       @unique @map("return_number")
+  type          ReturnType   @default(return)
+  status        ReturnStatus @default(pending)
+  reason        String
+  reasonDetail  String?      @map("reason_detail")
+
+  // Refund info
+  refundAmount  Int          @default(0) @map("refund_amount")
+  refundMethod  String?      @map("refund_method") // original, store_credit, bank_transfer
+  refundedAt    DateTime?    @map("refunded_at")
+
+  // Shipping
+  trackingNumber String?     @map("tracking_number")
+  shippedAt      DateTime?   @map("shipped_at")
+  receivedAt     DateTime?   @map("received_at")
+
+  // Admin
+  approvedBy    String?      @map("approved_by")
+  approvedAt    DateTime?    @map("approved_at")
+  rejectedBy    String?      @map("rejected_by")
+  rejectedAt    DateTime?    @map("rejected_at")
+  rejectionReason String?    @map("rejection_reason")
+
+  adminNotes    String?      @map("admin_notes")
+  customerNotes String?      @map("customer_notes")
+
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+
+  store     Store        @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  order     Order        @relation(fields: [orderId], references: [id])
+  customer  User         @relation(fields: [customerId], references: [id])
+  items     ReturnItem[]
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("returns")
+}
+
+model ReturnItem {
+  id          String  @id @default(uuid())
+  returnId    String  @map("return_id")
+  orderItemId String  @map("order_item_id")
+  productId   String  @map("product_id")
+  productName String  @map("product_name")
+  quantity    Int
+  reason      String?
+  condition   String? // new, opened, damaged
+
+  return      Return     @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  orderItem   OrderItem  @relation(fields: [orderItemId], references: [id])
+  product     Product    @relation(fields: [productId], references: [id])
+
+  @@map("return_items")
+}
+
+enum ReturnType {
+  return
+  exchange
+  refund
+}
+
+enum ReturnStatus {
+  pending
+  approved
+  rejected
+  shipped
+  received
+  inspecting
+  completed
+  cancelled
 }
 
 // ==========================================
@@ -494,8 +833,14 @@ model Address {
   address2   String?
   city       String
   state      String
-  postalCode String   @map("postal_code")
-  country    String
+  area       String?  // Kuwait-specific area/block
+  block      String?  // Kuwait-specific block
+  street     String?
+  building   String?
+  floor      String?
+  apartment  String?
+  postalCode String?  @map("postal_code")
+  country    String   @default("Kuwait")
   phone      String?
   isDefault  Boolean  @default(false) @map("is_default")
   createdAt  DateTime @default(now()) @map("created_at")
@@ -504,4 +849,240 @@ model Address {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("addresses")
+}
+
+// ==========================================
+// Wishlist
+// ==========================================
+
+model Wishlist {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  storeId   String   @map("store_id")
+  name      String   @default("My Wishlist")
+  isPublic  Boolean  @default(false) @map("is_public")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user  User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  store Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  items WishlistItem[]
+
+  @@unique([userId, storeId])
+  @@map("wishlists")
+}
+
+model WishlistItem {
+  id         String   @id @default(uuid())
+  wishlistId String   @map("wishlist_id")
+  productId  String   @map("product_id")
+  addedAt    DateTime @default(now()) @map("added_at")
+
+  wishlist Wishlist @relation(fields: [wishlistId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([wishlistId, productId])
+  @@map("wishlist_items")
+}
+
+// ==========================================
+// Coupons & Discounts
+// ==========================================
+
+model Coupon {
+  id               String       @id @default(uuid())
+  storeId          String       @map("store_id")
+  code             String
+  name             String
+  nameAr           String?      @map("name_ar")
+  description      String?
+  descriptionAr    String?      @map("description_ar")
+  type             CouponType   @default(percentage)
+  value            Int          // percentage (0-100) or fixed amount in fils
+  minOrderAmount   Int?         @map("min_order_amount")
+  maxDiscount      Int?         @map("max_discount") // Max discount for percentage coupons
+  usageLimit       Int?         @map("usage_limit")
+  usageCount       Int          @default(0) @map("usage_count")
+  usageLimitPerUser Int?        @map("usage_limit_per_user")
+  isActive         Boolean      @default(true) @map("is_active")
+  startsAt         DateTime?    @map("starts_at")
+  expiresAt        DateTime?    @map("expires_at")
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, code])
+  @@index([code])
+  @@index([isActive])
+  @@map("coupons")
+}
+
+enum CouponType {
+  percentage
+  fixed
+  free_shipping
+}
+
+// ==========================================
+// Shipping Zones
+// ==========================================
+
+model ShippingZone {
+  id                     String   @id @default(uuid())
+  storeId                String   @map("store_id")
+  name                   String
+  nameAr                 String?  @map("name_ar")
+  areas                  Json     @default("[]") // Array of area/city names
+  areasAr                Json     @default("[]") @map("areas_ar") // Arabic area names
+  deliveryFee            Int      @default(0) @map("delivery_fee") // In fils (1 KWD = 1000 fils)
+  freeShippingThreshold  Int?     @map("free_shipping_threshold") // Order amount for free shipping
+  estimatedDays          Int?     @map("estimated_days") // Estimated delivery days
+  estimatedDaysMin       Int?     @map("estimated_days_min") // Min delivery days
+  estimatedDaysMax       Int?     @map("estimated_days_max") // Max delivery days
+  position               Int      @default(0) // Sort order
+  isActive               Boolean  @default(true) @map("is_active")
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId])
+  @@index([isActive])
+  @@map("shipping_zones")
+}
+
+// ==========================================
+// Tax Rates
+// ==========================================
+
+model TaxRate {
+  id            String   @id @default(uuid())
+  storeId       String   @map("store_id")
+  name          String   // e.g., "VAT", "Sales Tax", "GST"
+  nameAr        String?  @map("name_ar")
+  rate          Decimal  @db.Decimal(5, 2) // Tax percentage (e.g., 5.00 for 5%)
+  country       String?  // ISO country code (null = all countries)
+  state         String?  // State/region (null = all states)
+  priority      Int      @default(0) // Higher priority rates override lower
+  isCompound    Boolean  @default(false) @map("is_compound") // Apply on top of other taxes
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId])
+  @@index([country, state])
+  @@map("tax_rates")
+}
+
+// ==========================================
+// Loyalty Program
+// ==========================================
+
+model LoyaltyPoints {
+  id            String   @id @default(uuid())
+  storeId       String   @map("store_id")
+  customerId    String   @map("customer_id")
+  points        Int      @default(0) // Current point balance
+  totalEarned   Int      @default(0) @map("total_earned") // Lifetime earned
+  totalRedeemed Int      @default(0) @map("total_redeemed") // Lifetime redeemed
+  tier          String   @default("bronze") // bronze, silver, gold, platinum
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  store    Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  customer User  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, customerId])
+  @@index([storeId])
+  @@index([customerId])
+  @@map("loyalty_points")
+}
+
+model LoyaltyTransaction {
+  id            String              @id @default(uuid())
+  storeId       String              @map("store_id")
+  customerId    String              @map("customer_id")
+  orderId       String?             @map("order_id")
+  type          LoyaltyTransactionType
+  points        Int                 // Positive for earn, negative for redeem
+  description   String?
+  expiresAt     DateTime?           @map("expires_at")
+  createdAt     DateTime            @default(now()) @map("created_at")
+
+  store    Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  customer User   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  order    Order? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([storeId])
+  @@index([customerId])
+  @@index([orderId])
+  @@map("loyalty_transactions")
+}
+
+enum LoyaltyTransactionType {
+  earn_purchase    // Points earned from purchase
+  earn_signup      // Bonus points for signing up
+  earn_referral    // Points for referring someone
+  earn_review      // Points for leaving a review
+  earn_birthday    // Birthday bonus points
+  earn_manual      // Manually added by admin
+  redeem_discount  // Points redeemed for discount
+  redeem_product   // Points redeemed for free product
+  expire           // Points expired
+  adjust           // Manual adjustment
+}
+
+// ==========================================
+// Newsletter Subscriptions
+// ==========================================
+
+model NewsletterSubscriber {
+  id           String   @id @default(uuid())
+  storeId      String   @map("store_id")
+  email        String
+  firstName    String?  @map("first_name")
+  lastName     String?  @map("last_name")
+  isActive     Boolean  @default(true) @map("is_active")
+  subscribedAt DateTime @default(now()) @map("subscribed_at")
+  unsubscribedAt DateTime? @map("unsubscribed_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, email])
+  @@map("newsletter_subscribers")
+}
+
+// ==========================================
+// Reviews & Ratings
+// ==========================================
+
+model Review {
+  id           String   @id @default(uuid())
+  storeId      String   @map("store_id")
+  productId    String   @map("product_id")
+  customerId   String?  @map("customer_id")
+  orderId      String?  @map("order_id")
+  rating       Int      // 1-5
+  title        String?
+  comment      String?
+  isVerified   Boolean  @default(false) @map("is_verified") // Verified purchase
+  isApproved   Boolean  @default(false) @map("is_approved")
+  helpfulCount Int      @default(0) @map("helpful_count")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  store    Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  customer User?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  order    Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([productId])
+  @@index([storeId])
+  @@index([customerId])
+  @@index([rating])
+  @@map("reviews")
 }

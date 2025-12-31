@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+/* eslint-disable react-hooks/set-state-in-effect */
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
-import axios from 'axios';
+import { Header, Footer } from '../../components';
 
 interface WishlistItem {
   id: string;
@@ -24,26 +25,33 @@ export default function WishlistPage() {
   const [items, setItems] = useState<WishlistItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const hasFetched = useRef(false);
 
   const loadWishlist = useCallback(async () => {
+    setError(null);
     try {
-      const response = await api.get('/wishlist');
-      if (response.data.success) {
-        setItems(response.data.data.items || []);
-      }
-    } catch (error) {
-      console.error('Failed to load wishlist:', error);
-      // If unauthorized, clear token
-      if (axios.isAxiosError(error) && error.response?.status === 401) {
+      const response = await api.get<{ items: WishlistItem[] }>('/wishlist');
+      if (response.success && response.data) {
+        setItems(response.data.items || []);
+      } else if (response.error?.code === 'UNAUTHORIZED') {
         localStorage.removeItem('accessToken');
         setIsLoggedIn(false);
+      } else {
+        setError(response.error?.message || 'Failed to load wishlist');
       }
-    } finally {
-      setIsLoading(false);
+    } catch (err) {
+      console.error('Failed to load wishlist:', err);
+      setError('Unable to load wishlist. Please check your connection.');
     }
+    setIsLoading(false);
   }, []);
 
-  const checkAuthAndLoad = useCallback(async () => {
+  useEffect(() => {
+    if (hasFetched.current) return;
+    hasFetched.current = true;
+
     const token = localStorage.getItem('accessToken');
     if (!token) {
       setIsLoggedIn(false);
@@ -52,70 +60,126 @@ export default function WishlistPage() {
     }
 
     setIsLoggedIn(true);
-    await loadWishlist();
+    loadWishlist();
   }, [loadWishlist]);
 
-  useEffect(() => {
-    checkAuthAndLoad();
-  }, [checkAuthAndLoad]);
-
   async function removeFromWishlist(itemId: string) {
+    setActionError(null);
     try {
-      await api.delete(`/wishlist/${itemId}`);
-      setItems(items.filter(item => item.id !== itemId));
-    } catch (error) {
-      console.error('Failed to remove item:', error);
+      const response = await api.delete(`/wishlist/${itemId}`);
+      if (response.success) {
+        setItems(items.filter(item => item.id !== itemId));
+      } else {
+        setActionError('Failed to remove item from wishlist');
+      }
+    } catch (err) {
+      console.error('Failed to remove item:', err);
+      setActionError('Failed to remove item. Please try again.');
     }
   }
 
   async function addToCart(productId: string) {
+    setActionError(null);
     try {
-      await api.post('/cart/items', { productId, quantity: 1 });
-      router.push('/cart');
-    } catch (error) {
-      console.error('Failed to add to cart:', error);
+      const response = await api.post('/cart/items', { productId, quantity: 1 });
+      if (response.success) {
+        router.push('/cart');
+      } else {
+        setActionError(response.error?.message || 'Failed to add to cart');
+      }
+    } catch (err) {
+      console.error('Failed to add to cart:', err);
+      setActionError('Failed to add to cart. Please try again.');
     }
   }
 
   if (isLoading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-8">My Wishlist</h1>
-        <div className="space-y-4">
-          {[...Array(3)].map((_, i) => (
-            <div key={i} className="bg-gray-100 animate-pulse h-24 rounded-lg"></div>
-          ))}
+      <main className="flex min-h-screen flex-col bg-background">
+        <Header />
+        <div className="container mx-auto px-4 py-8 flex-1">
+          <h1 className="text-3xl font-bold mb-8">My Wishlist</h1>
+          <div className="space-y-4">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="bg-gray-100 animate-pulse h-24 rounded-lg"></div>
+            ))}
+          </div>
         </div>
-      </div>
+        <Footer />
+      </main>
     );
   }
 
   if (!isLoggedIn) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-8">My Wishlist</h1>
-        <div className="text-center py-12 bg-gray-50 rounded-lg">
-          <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-          </svg>
-          <h2 className="text-xl font-semibold mb-2">Sign in to view your wishlist</h2>
-          <p className="text-gray-500 mb-4">Save your favorite items for later</p>
-          <Link
-            href="/auth/login?redirect=/wishlist"
-            className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            Sign In
-          </Link>
+      <main className="flex min-h-screen flex-col bg-background">
+        <Header />
+        <div className="container mx-auto px-4 py-8 flex-1">
+          <h1 className="text-3xl font-bold mb-8">My Wishlist</h1>
+          <div className="text-center py-12 bg-muted rounded-xl">
+            <svg className="w-16 h-16 text-muted-foreground mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+            </svg>
+            <h2 className="text-xl font-semibold mb-2">Sign in to view your wishlist</h2>
+            <p className="text-muted-foreground mb-4">Save your favorite items for later</p>
+            <Link
+              href="/auth/login?redirect=/wishlist"
+              className="inline-flex items-center px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90"
+            >
+              Sign In
+            </Link>
+          </div>
         </div>
-      </div>
+        <Footer />
+      </main>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-8">My Wishlist</h1>
+    <main className="flex min-h-screen flex-col bg-background">
+      <Header />
+      <div className="container mx-auto px-4 py-8 flex-1">
+        <h1 className="text-3xl font-bold mb-8">My Wishlist</h1>
 
-      {items.length === 0 ? (
+        {/* Error Display */}
+        {error && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-center gap-3">
+            <svg className="h-5 w-5 text-red-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <p className="text-red-700 flex-1">{error}</p>
+            <button
+              onClick={() => loadWishlist()}
+              className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Action Error Toast */}
+      {actionError && (
+        <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <div className="flex items-center gap-3">
+            <svg className="h-5 w-5 text-yellow-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <p className="text-yellow-700 flex-1">{actionError}</p>
+            <button
+              onClick={() => setActionError(null)}
+              className="p-1 text-yellow-500 hover:text-yellow-700"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!error && items.length === 0 ? (
         <div className="text-center py-12 bg-gray-50 rounded-lg">
           <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
@@ -192,6 +256,8 @@ export default function WishlistPage() {
           ))}
         </div>
       )}
-    </div>
+      </div>
+      <Footer />
+    </main>
   );
 }

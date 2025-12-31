@@ -1,213 +1,605 @@
+/**
+ * Database Seed Script
+ *
+ * Creates demo data for development and testing:
+ * - Super Admin user
+ * - Demo store with products and categories
+ * - Sample customers and orders
+ *
+ * Run with: npx ts-node --esm src/seed.ts
+ */
+
 import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcryptjs';
+import * as bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
-async function main() {
-  console.log('🌱 Starting database seed...');
+// ============================================
+// Helper Functions
+// ============================================
 
-  // Create admin user
-  const adminPassword = await bcrypt.hash('admin123', 12);
-  const admin = await prisma.user.upsert({
-    where: { email: 'admin@forcemedia.com' },
-    update: {},
-    create: {
+function generateSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+}
+
+function priceInFils(kwd: number): number {
+  return Math.round(kwd * 1000);
+}
+
+async function hashPassword(password: string): Promise<string> {
+  return bcrypt.hash(password, 10);
+}
+
+// ============================================
+// Demo Data
+// ============================================
+
+const DEMO_CATEGORIES = [
+  {
+    name: 'Electronics',
+    nameAr: 'إلكترونيات',
+    description: 'Phones, laptops, and gadgets',
+    descriptionAr: 'هواتف، لابتوبات، وأجهزة إلكترونية',
+    children: [
+      { name: 'Smartphones', nameAr: 'هواتف ذكية' },
+      { name: 'Laptops', nameAr: 'لابتوبات' },
+      { name: 'Accessories', nameAr: 'إكسسوارات' },
+    ],
+  },
+  {
+    name: 'Fashion',
+    nameAr: 'أزياء',
+    description: 'Clothing and accessories',
+    descriptionAr: 'ملابس وإكسسوارات',
+    children: [
+      { name: 'Men', nameAr: 'رجال' },
+      { name: 'Women', nameAr: 'نساء' },
+      { name: 'Kids', nameAr: 'أطفال' },
+    ],
+  },
+  {
+    name: 'Home & Garden',
+    nameAr: 'المنزل والحديقة',
+    description: 'Furniture and decor',
+    descriptionAr: 'أثاث وديكور',
+    children: [
+      { name: 'Furniture', nameAr: 'أثاث' },
+      { name: 'Decor', nameAr: 'ديكور' },
+      { name: 'Kitchen', nameAr: 'مطبخ' },
+    ],
+  },
+];
+
+const DEMO_PRODUCTS = [
+  // Electronics - Smartphones
+  {
+    name: 'iPhone 15 Pro Max',
+    nameAr: 'آيفون 15 برو ماكس',
+    description: 'The most advanced iPhone ever with titanium design and A17 Pro chip.',
+    descriptionAr: 'أحدث آيفون بتصميم تيتانيوم وشريحة A17 برو.',
+    price: 450,
+    compareAtPrice: 500,
+    inventory: 25,
+    category: 'Smartphones',
+    featured: true,
+    isNew: true,
+    images: [
+      'https://images.unsplash.com/photo-1696348149297-5ffcc9d6a41a?w=800',
+      'https://images.unsplash.com/photo-1695048133096-e2e9adaebb4b?w=800',
+    ],
+  },
+  {
+    name: 'Samsung Galaxy S24 Ultra',
+    nameAr: 'سامسونج جالاكسي S24 الترا',
+    description: 'Premium Android smartphone with S Pen and AI features.',
+    descriptionAr: 'هاتف أندرويد فاخر مع قلم S وميزات الذكاء الاصطناعي.',
+    price: 380,
+    compareAtPrice: 420,
+    inventory: 30,
+    category: 'Smartphones',
+    featured: true,
+    images: [
+      'https://images.unsplash.com/photo-1610945415295-d9bbf067e59c?w=800',
+    ],
+  },
+  // Electronics - Laptops
+  {
+    name: 'MacBook Pro 16"',
+    nameAr: 'ماك بوك برو 16 إنش',
+    description: 'Powerful laptop for professionals with M3 Max chip.',
+    descriptionAr: 'لابتوب قوي للمحترفين بشريحة M3 ماكس.',
+    price: 950,
+    inventory: 10,
+    category: 'Laptops',
+    featured: true,
+    images: [
+      'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800',
+    ],
+  },
+  {
+    name: 'Dell XPS 15',
+    nameAr: 'ديل XPS 15',
+    description: 'Premium Windows laptop with stunning display.',
+    descriptionAr: 'لابتوب ويندوز فاخر بشاشة مذهلة.',
+    price: 650,
+    compareAtPrice: 750,
+    inventory: 15,
+    category: 'Laptops',
+    images: [
+      'https://images.unsplash.com/photo-1593642632559-0c6d3fc62b89?w=800',
+    ],
+  },
+  // Electronics - Accessories
+  {
+    name: 'AirPods Pro 2',
+    nameAr: 'إيربودز برو 2',
+    description: 'Premium wireless earbuds with active noise cancellation.',
+    descriptionAr: 'سماعات لاسلكية فاخرة مع إلغاء الضوضاء.',
+    price: 85,
+    inventory: 50,
+    category: 'Accessories',
+    isNew: true,
+    images: [
+      'https://images.unsplash.com/photo-1588423771073-b8903fbb85b5?w=800',
+    ],
+  },
+  // Fashion - Men
+  {
+    name: 'Premium Cotton T-Shirt',
+    nameAr: 'تيشيرت قطن فاخر',
+    description: 'Comfortable cotton t-shirt for everyday wear.',
+    descriptionAr: 'تيشيرت قطني مريح للارتداء اليومي.',
+    price: 15,
+    compareAtPrice: 20,
+    inventory: 100,
+    category: 'Men',
+    images: [
+      'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=800',
+    ],
+  },
+  {
+    name: 'Classic Denim Jeans',
+    nameAr: 'جينز دينم كلاسيكي',
+    description: 'Timeless denim jeans with perfect fit.',
+    descriptionAr: 'جينز دينم كلاسيكي بمقاس مثالي.',
+    price: 45,
+    inventory: 75,
+    category: 'Men',
+    images: [
+      'https://images.unsplash.com/photo-1542272604-787c3835535d?w=800',
+    ],
+  },
+  // Fashion - Women
+  {
+    name: 'Elegant Abaya',
+    nameAr: 'عباية أنيقة',
+    description: 'Beautifully designed abaya with modern touches.',
+    descriptionAr: 'عباية بتصميم جميل ولمسات عصرية.',
+    price: 75,
+    inventory: 40,
+    category: 'Women',
+    featured: true,
+    images: [
+      'https://images.unsplash.com/photo-1590243735654-f1c7a9f00b2e?w=800',
+    ],
+  },
+  {
+    name: 'Designer Handbag',
+    nameAr: 'حقيبة يد مصممة',
+    description: 'Luxury handbag for every occasion.',
+    descriptionAr: 'حقيبة يد فاخرة لكل مناسبة.',
+    price: 120,
+    compareAtPrice: 150,
+    inventory: 20,
+    category: 'Women',
+    isNew: true,
+    images: [
+      'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=800',
+    ],
+  },
+  // Home & Garden - Furniture
+  {
+    name: 'Modern Sofa Set',
+    nameAr: 'طقم كنب عصري',
+    description: 'Comfortable 3-piece sofa set for your living room.',
+    descriptionAr: 'طقم كنب مريح من 3 قطع لغرفة المعيشة.',
+    price: 850,
+    inventory: 5,
+    category: 'Furniture',
+    featured: true,
+    images: [
+      'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=800',
+    ],
+  },
+  {
+    name: 'Dining Table',
+    nameAr: 'طاولة طعام',
+    description: 'Elegant dining table for 6 persons.',
+    descriptionAr: 'طاولة طعام أنيقة لـ 6 أشخاص.',
+    price: 350,
+    inventory: 8,
+    category: 'Furniture',
+    images: [
+      'https://images.unsplash.com/photo-1617806118233-18e1de247200?w=800',
+    ],
+  },
+  // Home & Garden - Decor
+  {
+    name: 'Decorative Lamp',
+    nameAr: 'مصباح ديكوري',
+    description: 'Modern decorative lamp for ambient lighting.',
+    descriptionAr: 'مصباح ديكوري عصري للإضاءة المحيطة.',
+    price: 45,
+    inventory: 30,
+    category: 'Decor',
+    images: [
+      'https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=800',
+    ],
+  },
+];
+
+// ============================================
+// Seed Functions
+// ============================================
+
+async function seedSuperAdmin() {
+  console.log('Creating super admin user...');
+
+  const existingAdmin = await prisma.user.findFirst({
+    where: { role: 'super_admin' },
+  });
+
+  if (existingAdmin) {
+    console.log('Super admin already exists, skipping...');
+    return existingAdmin;
+  }
+
+  const admin = await prisma.user.create({
+    data: {
       email: 'admin@forcemedia.com',
-      passwordHash: adminPassword,
-      firstName: 'Admin',
-      lastName: 'User',
+      passwordHash: await hashPassword('Admin@123'),
+      firstName: 'Super',
+      lastName: 'Admin',
       role: 'super_admin',
       emailVerified: true,
+      language: 'en',
     },
   });
-  console.log('✅ Created admin user:', admin.email);
 
-  // Create demo customer
-  const customerPassword = await bcrypt.hash('customer123', 12);
-  const customer = await prisma.user.upsert({
-    where: { email: 'customer@example.com' },
-    update: {},
-    create: {
-      email: 'customer@example.com',
-      passwordHash: customerPassword,
-      firstName: 'John',
-      lastName: 'Doe',
-      role: 'customer',
-      emailVerified: true,
-    },
+  console.log(`Created super admin: ${admin.email}`);
+  return admin;
+}
+
+async function seedDemoStore(ownerId: string) {
+  console.log('Creating demo store...');
+
+  const existingStore = await prisma.store.findFirst({
+    where: { slug: 'demo-store' },
   });
-  console.log('✅ Created demo customer:', customer.email);
 
-  // Create demo store
-  const store = await prisma.store.upsert({
-    where: { slug: 'force-demo-store' },
-    update: {},
-    create: {
-      name: 'Force Demo Store',
-      slug: 'force-demo-store',
-      ownerId: admin.id,
+  if (existingStore) {
+    console.log('Demo store already exists, skipping...');
+    return existingStore;
+  }
+
+  const store = await prisma.store.create({
+    data: {
+      name: 'Demo Store',
+      nameAr: 'المتجر التجريبي',
+      slug: 'demo-store',
+      ownerId,
       status: 'active',
-      settings: {
-        currency: 'USD',
-        timezone: 'America/New_York',
-        locale: 'en-US',
-        theme: 'default',
+      plan: 'professional',
+      description: 'A demo store showcasing the platform features',
+      descriptionAr: 'متجر تجريبي يعرض ميزات المنصة',
+      currency: 'KWD',
+      template: 'modern',
+      theme: {
+        primaryColor: '26 100% 50%',
+        primaryForeground: '0 0% 100%',
+        secondaryColor: '220 14% 96%',
+        secondaryForeground: '220 9% 46%',
+        fontFamily: 'modern',
+        borderRadius: 'lg',
       },
+      socialLinks: {
+        instagram: 'https://instagram.com/demo',
+        twitter: 'https://twitter.com/demo',
+        whatsapp: '+965-1234-5678',
+      },
+      email: 'contact@demostore.com',
+      phone: '+965 1234 5678',
+      phoneAr: '+٩٦٥ ١٢٣٤ ٥٦٧٨',
+      whatsapp: '+96512345678',
+      address: 'Kuwait City, Kuwait',
+      addressAr: 'مدينة الكويت، الكويت',
+      announcementBar: {
+        enabled: true,
+        text: 'Free shipping on orders over 25 KWD!',
+        textAr: 'شحن مجاني للطلبات فوق 25 د.ك!',
+        bgColor: '26 100% 50%',
+        textColor: '0 0% 100%',
+      },
+      metaTitle: 'Demo Store - Quality Products',
+      metaTitleAr: 'المتجر التجريبي - منتجات عالية الجودة',
+      metaDescription: 'Shop the best products at Demo Store',
+      metaDescriptionAr: 'تسوق أفضل المنتجات في المتجر التجريبي',
+      marketingPixels: {},
     },
   });
-  console.log('✅ Created demo store:', store.name);
 
-  // Create categories
-  const categories = await Promise.all([
-    prisma.category.upsert({
-      where: { storeId_slug: { storeId: store.id, slug: 'electronics' } },
-      update: {},
-      create: {
-        storeId: store.id,
-        name: 'Electronics',
-        slug: 'electronics',
-        description: 'Electronic devices and accessories',
-      },
-    }),
-    prisma.category.upsert({
-      where: { storeId_slug: { storeId: store.id, slug: 'accessories' } },
-      update: {},
-      create: {
-        storeId: store.id,
-        name: 'Accessories',
-        slug: 'accessories',
-        description: 'Tech accessories and peripherals',
-      },
-    }),
-    prisma.category.upsert({
-      where: { storeId_slug: { storeId: store.id, slug: 'wearables' } },
-      update: {},
-      create: {
-        storeId: store.id,
-        name: 'Wearables',
-        slug: 'wearables',
-        description: 'Smartwatches and fitness trackers',
-      },
-    }),
-  ]);
-  console.log('✅ Created categories:', categories.length);
+  console.log(`Created demo store: ${store.name}`);
+  return store;
+}
 
-  // Create products
-  const products = [
+async function seedCategories(storeId: string) {
+  console.log('Creating categories...');
+
+  const existingCategories = await prisma.category.count({
+    where: { storeId },
+  });
+
+  if (existingCategories > 0) {
+    console.log('Categories already exist, skipping...');
+    return;
+  }
+
+  for (const catData of DEMO_CATEGORIES) {
+    const parentCategory = await prisma.category.create({
+      data: {
+        storeId,
+        name: catData.name,
+        nameAr: catData.nameAr,
+        slug: generateSlug(catData.name),
+        description: catData.description,
+        descriptionAr: catData.descriptionAr,
+        isActive: true,
+      },
+    });
+
+    for (const child of catData.children || []) {
+      await prisma.category.create({
+        data: {
+          storeId,
+          name: child.name,
+          nameAr: child.nameAr,
+          slug: generateSlug(child.name),
+          parentId: parentCategory.id,
+          isActive: true,
+        },
+      });
+    }
+  }
+
+  console.log('Categories created successfully');
+}
+
+async function seedProducts(storeId: string) {
+  console.log('Creating products...');
+
+  const existingProducts = await prisma.product.count({
+    where: { storeId },
+  });
+
+  if (existingProducts > 0) {
+    console.log('Products already exist, skipping...');
+    return;
+  }
+
+  // Get all categories
+  const categories = await prisma.category.findMany({
+    where: { storeId },
+  });
+
+  const categoryMap = new Map(categories.map(c => [c.name, c.id]));
+
+  for (const productData of DEMO_PRODUCTS) {
+    const categoryId = categoryMap.get(productData.category);
+
+    const product = await prisma.product.create({
+      data: {
+        storeId,
+        name: productData.name,
+        nameAr: productData.nameAr,
+        slug: generateSlug(productData.name),
+        description: productData.description,
+        descriptionAr: productData.descriptionAr,
+        price: priceInFils(productData.price),
+        compareAtPrice: productData.compareAtPrice ? priceInFils(productData.compareAtPrice) : null,
+        inventory: productData.inventory,
+        status: 'active',
+        featured: productData.featured || false,
+        isNew: productData.isNew || false,
+        sku: `SKU-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`.toUpperCase(),
+      },
+    });
+
+    // Add images
+    for (let i = 0; i < productData.images.length; i++) {
+      await prisma.productImage.create({
+        data: {
+          productId: product.id,
+          url: productData.images[i],
+          alt: productData.name,
+          position: i,
+        },
+      });
+    }
+
+    // Link to category
+    if (categoryId) {
+      await prisma.productCategory.create({
+        data: {
+          productId: product.id,
+          categoryId,
+        },
+      });
+    }
+  }
+
+  console.log('Products created successfully');
+}
+
+async function seedDemoCustomers(storeId: string) {
+  console.log('Creating demo customers...');
+
+  const existingCustomers = await prisma.customer.count({
+    where: { storeId },
+  });
+
+  if (existingCustomers > 0) {
+    console.log('Customers already exist, skipping...');
+    return;
+  }
+
+  const customers = [
+    { firstName: 'Ahmed', lastName: 'Al-Sabah', email: 'ahmed@example.com', phone: '+96599001234' },
+    { firstName: 'Fatima', lastName: 'Al-Rashid', email: 'fatima@example.com', phone: '+96599002345' },
+    { firstName: 'Mohammed', lastName: 'Al-Mutawa', email: 'mohammed@example.com', phone: '+96599003456' },
+    { firstName: 'Sara', lastName: 'Al-Essa', email: 'sara@example.com', phone: '+96599004567' },
+    { firstName: 'Khalid', lastName: 'Al-Fahad', email: 'khalid@example.com', phone: '+96599005678' },
+  ];
+
+  for (const customer of customers) {
+    await prisma.customer.create({
+      data: {
+        storeId,
+        ...customer,
+        totalOrders: Math.floor(Math.random() * 10),
+        totalSpent: priceInFils(Math.floor(Math.random() * 500)),
+      },
+    });
+  }
+
+  console.log('Demo customers created successfully');
+}
+
+async function seedPaymentConfig(storeId: string) {
+  console.log('Creating payment configurations...');
+
+  const existingConfigs = await prisma.paymentConfig.count({
+    where: { storeId },
+  });
+
+  if (existingConfigs > 0) {
+    console.log('Payment configs already exist, skipping...');
+    return;
+  }
+
+  // Create a demo Tap payment config (disabled by default)
+  await prisma.paymentConfig.create({
+    data: {
+      storeId,
+      provider: 'tap',
+      isEnabled: false,
+      testMode: true,
+      apiKey: 'pk_test_demo',
+      secretKey: 'sk_test_demo',
+    },
+  });
+
+  console.log('Payment configurations created');
+}
+
+async function seedCoupons(storeId: string) {
+  console.log('Creating demo coupons...');
+
+  const existingCoupons = await prisma.coupon.count({
+    where: { storeId },
+  });
+
+  if (existingCoupons > 0) {
+    console.log('Coupons already exist, skipping...');
+    return;
+  }
+
+  const coupons = [
     {
-      name: 'Premium Wireless Headphones',
-      slug: 'premium-wireless-headphones',
-      description: 'High-quality wireless headphones with noise cancellation',
-      price: 29900, // $299.00
-      compareAtPrice: 34900,
-      sku: 'HEADPHONES-001',
-      inventory: 50,
-      status: 'active' as const,
-      featured: true,
-      categorySlug: 'electronics',
+      code: 'WELCOME10',
+      name: 'Welcome Discount',
+      nameAr: 'خصم الترحيب',
+      type: 'percentage' as const,
+      value: 10,
+      description: '10% off for new customers',
+      descriptionAr: 'خصم 10% للعملاء الجدد',
+      usageLimit: 100,
     },
     {
-      name: 'Smart Watch Pro',
-      slug: 'smart-watch-pro',
-      description: 'Advanced smartwatch with health monitoring features',
-      price: 39900, // $399.00
-      compareAtPrice: 44900,
-      sku: 'WATCH-001',
-      inventory: 30,
-      status: 'active' as const,
-      featured: true,
-      categorySlug: 'wearables',
+      code: 'SAVE5KD',
+      name: 'Save 5 KWD',
+      nameAr: 'وفر 5 د.ك',
+      type: 'fixed' as const,
+      value: priceInFils(5),
+      description: '5 KWD off your order',
+      descriptionAr: 'خصم 5 د.ك على طلبك',
+      minOrderAmount: priceInFils(30),
     },
     {
-      name: 'USB-C Hub 7-in-1',
-      slug: 'usb-c-hub-7-in-1',
-      description: 'Multi-port USB-C hub for laptops',
-      price: 7900, // $79.00
-      sku: 'HUB-001',
-      inventory: 100,
-      status: 'active' as const,
-      featured: false,
-      categorySlug: 'accessories',
-    },
-    {
-      name: 'Wireless Mechanical Keyboard',
-      slug: 'wireless-mechanical-keyboard',
-      description: 'Premium mechanical keyboard with RGB lighting',
-      price: 14900, // $149.00
-      compareAtPrice: 17900,
-      sku: 'KEYBOARD-001',
-      inventory: 45,
-      status: 'active' as const,
-      featured: true,
-      categorySlug: 'accessories',
-    },
-    {
-      name: 'Portable Bluetooth Speaker',
-      slug: 'portable-bluetooth-speaker',
-      description: 'Waterproof portable speaker with 20-hour battery life',
-      price: 12900, // $129.00
-      sku: 'SPEAKER-001',
-      inventory: 60,
-      status: 'active' as const,
-      featured: false,
-      categorySlug: 'electronics',
-    },
-    {
-      name: 'Fitness Tracker Band',
-      slug: 'fitness-tracker-band',
-      description: 'Lightweight fitness tracker with heart rate monitoring',
-      price: 9900, // $99.00
-      compareAtPrice: 12900,
-      sku: 'TRACKER-001',
-      inventory: 80,
-      status: 'active' as const,
-      featured: true,
-      categorySlug: 'wearables',
+      code: 'FREESHIP',
+      name: 'Free Shipping',
+      nameAr: 'شحن مجاني',
+      type: 'free_shipping' as const,
+      value: 0,
+      description: 'Free shipping on any order',
+      descriptionAr: 'شحن مجاني على أي طلب',
     },
   ];
 
-  for (const productData of products) {
-    const category = categories.find(c => c.slug === productData.categorySlug);
-    const { categorySlug, ...data } = productData;
+  const futureDate = new Date();
+  futureDate.setMonth(futureDate.getMonth() + 6);
 
-    const product = await prisma.product.upsert({
-      where: { storeId_slug: { storeId: store.id, slug: data.slug } },
-      update: {},
-      create: {
-        storeId: store.id,
-        ...data,
-        images: {
-          create: [
-            {
-              url: `https://placehold.co/600x600/ff6e00/white?text=${encodeURIComponent(data.name)}`,
-              alt: data.name,
-              position: 0,
-            },
-          ],
-        },
-        categories: category
-          ? {
-              create: [{ categoryId: category.id }],
-            }
-          : undefined,
+  for (const coupon of coupons) {
+    await prisma.coupon.create({
+      data: {
+        storeId,
+        ...coupon,
+        isActive: true,
+        expiresAt: futureDate,
       },
     });
-    console.log('✅ Created product:', product.name);
   }
 
-  console.log('');
-  console.log('🎉 Database seed completed!');
-  console.log('');
-  console.log('📋 Demo Credentials:');
-  console.log('   Admin: admin@forcemedia.com / admin123');
-  console.log('   Customer: customer@example.com / customer123');
-  console.log('');
-  console.log(`🏪 Demo Store ID: ${store.id}`);
+  console.log('Demo coupons created successfully');
+}
+
+// ============================================
+// Main Seed Function
+// ============================================
+
+async function main() {
+  console.log('🌱 Starting database seed...\n');
+
+  try {
+    // Create super admin
+    const admin = await seedSuperAdmin();
+
+    // Create demo store
+    const store = await seedDemoStore(admin.id);
+
+    // Seed store data
+    await seedCategories(store.id);
+    await seedProducts(store.id);
+    await seedDemoCustomers(store.id);
+    await seedPaymentConfig(store.id);
+    await seedCoupons(store.id);
+
+    console.log('\n✅ Database seeded successfully!');
+    console.log('\n📝 Login credentials:');
+    console.log('   Email: admin@forcemedia.com');
+    console.log('   Password: Admin@123');
+    console.log('\n🏪 Demo store: demo-store');
+  } catch (error) {
+    console.error('❌ Seed failed:', error);
+    throw error;
+  }
 }
 
 main()
-  .catch(e => {
-    console.error('❌ Seed failed:', e);
+  .catch((e) => {
+    console.error(e);
     process.exit(1);
   })
   .finally(async () => {

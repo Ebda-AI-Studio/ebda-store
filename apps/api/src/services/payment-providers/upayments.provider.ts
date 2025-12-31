@@ -82,7 +82,7 @@ export class UPaymentsProvider implements IPaymentProvider {
       body: body ? JSON.stringify(body) : undefined,
     });
 
-    const data = await response.json();
+    const data = await response.json() as { status?: string; message?: string };
 
     if (!response.ok || data.status === 'error') {
       console.error('[UPAYMENTS ERROR]', data);

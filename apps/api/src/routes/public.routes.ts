@@ -409,4 +409,67 @@ router.get('/store', async (_req: Request, res: Response, next: NextFunction) =>
   }
 });
 
+// GET /store/resolve - Resolve store by domain header (for multi-tenant)
+router.get('/store/resolve', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const domain = req.headers['x-store-domain'] as string;
+
+    if (!domain) {
+      res.status(400).json({
+        success: false,
+        error: { code: 'MISSING_DOMAIN', message: 'x-store-domain header is required' },
+      });
+      return;
+    }
+
+    // Find store by domain
+    const store = await prisma.store.findFirst({
+      where: {
+        domain,
+        status: 'active',
+      },
+      select: {
+        id: true,
+        name: true,
+        nameAr: true,
+        slug: true,
+        domain: true,
+        logo: true,
+        logoAr: true,
+        favicon: true,
+        template: true,
+        theme: true,
+        socialLinks: true,
+        email: true,
+        phone: true,
+        phoneAr: true,
+        whatsapp: true,
+        address: true,
+        addressAr: true,
+        announcementBar: true,
+        metaTitle: true,
+        metaTitleAr: true,
+        metaDescription: true,
+        metaDescriptionAr: true,
+        settings: true,
+      },
+    });
+
+    if (!store) {
+      res.status(404).json({
+        success: false,
+        error: { code: 'STORE_NOT_FOUND', message: `No store found for domain: ${domain}` },
+      });
+      return;
+    }
+
+    res.json({
+      success: true,
+      data: { store },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;

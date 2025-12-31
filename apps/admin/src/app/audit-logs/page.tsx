@@ -80,7 +80,7 @@ export default function AuditLogsPage() {
       if (entityFilter !== 'all') params.append('entityType', entityFilter);
       if (actionFilter !== 'all') params.append('action', actionFilter);
 
-      const response = await fetch(`http://localhost:4000/api/v1/admin/audit-logs?${params}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/admin/audit-logs?${params}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) {

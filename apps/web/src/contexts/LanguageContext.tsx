@@ -1,0 +1,163 @@
+'use client';
+
+import { createContext, useContext, useState, useLayoutEffect, ReactNode } from 'react';
+
+type Language = 'en' | 'ar';
+type Direction = 'ltr' | 'rtl';
+
+interface LanguageContextType {
+  language: Language;
+  direction: Direction;
+  setLanguage: (lang: Language) => void;
+  t: (en: string, ar: string) => string;
+}
+
+const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
+
+// Get initial language from localStorage (client-side only)
+function getInitialLanguage(): Language {
+  if (typeof window === 'undefined') return 'en';
+  const savedLang = localStorage.getItem('force-language') as Language;
+  if (savedLang && ['en', 'ar'].includes(savedLang)) {
+    return savedLang;
+  }
+  return 'en';
+}
+
+export function LanguageProvider({ children }: { children: ReactNode }) {
+  const [language, setLanguageState] = useState<Language>(getInitialLanguage);
+  const direction: Direction = language === 'ar' ? 'rtl' : 'ltr';
+
+  // Use useLayoutEffect to avoid flash - sync document attributes
+  useLayoutEffect(() => {
+    document.documentElement.dir = direction;
+    document.documentElement.lang = language;
+    document.body.style.fontFamily = language === 'ar'
+      ? 'var(--font-arabic), var(--font-sans), sans-serif'
+      : 'var(--font-sans), sans-serif';
+    localStorage.setItem('force-language', language);
+  }, [language, direction]);
+
+  const setLanguage = (lang: Language) => {
+    setLanguageState(lang);
+  };
+
+  // Simple translation helper - returns Arabic or English text
+  const t = (en: string, ar: string) => {
+    return language === 'ar' ? ar : en;
+  };
+
+  return (
+    <LanguageContext.Provider value={{ language, direction, setLanguage, t }}>
+      {children}
+    </LanguageContext.Provider>
+  );
+}
+
+export function useLanguage() {
+  const context = useContext(LanguageContext);
+  if (context === undefined) {
+    throw new Error('useLanguage must be used within a LanguageProvider');
+  }
+  return context;
+}
+
+// Common translations for the storefront
+export const translations = {
+  // Header
+  'Products': 'المنتجات',
+  'Categories': 'الفئات',
+  'About': 'من نحن',
+  'Contact': 'اتصل بنا',
+  'Search products...': 'البحث عن المنتجات...',
+  'Sign In': 'تسجيل الدخول',
+  'Cart': 'السلة',
+  'Wishlist': 'المفضلة',
+
+  // Home Page
+  'Shop Now': 'تسوق الآن',
+  'View All': 'عرض الكل',
+  'Featured Products': 'منتجات مميزة',
+  'New Arrivals': 'وصل حديثاً',
+  'Best Sellers': 'الأكثر مبيعاً',
+  'On Sale': 'تخفيضات',
+
+  // Product
+  'Add to Cart': 'أضف إلى السلة',
+  'Buy Now': 'اشتري الآن',
+  'In Stock': 'متوفر',
+  'Out of Stock': 'غير متوفر',
+  'Description': 'الوصف',
+  'Reviews': 'التقييمات',
+
+  // Cart
+  'Shopping Cart': 'سلة التسوق',
+  'Your cart is empty': 'سلة التسوق فارغة',
+  'Continue Shopping': 'متابعة التسوق',
+  'Subtotal': 'المجموع الفرعي',
+  'Shipping': 'الشحن',
+  'Free': 'مجاني',
+  'Total': 'الإجمالي',
+  'Proceed to Checkout': 'المتابعة للدفع',
+  'Order Summary': 'ملخص الطلب',
+  'Promo Code': 'كود الخصم',
+  'Apply': 'تطبيق',
+
+  // Checkout
+  'Checkout': 'الدفع',
+  'Shipping Address': 'عنوان الشحن',
+  'Payment Method': 'طريقة الدفع',
+  'Place Order': 'تأكيد الطلب',
+
+  // Account
+  'My Account': 'حسابي',
+  'My Orders': 'طلباتي',
+  'Addresses': 'العناوين',
+  'Settings': 'الإعدادات',
+  'Logout': 'تسجيل الخروج',
+
+  // Footer
+  'Shop': 'تسوق',
+  'Support': 'الدعم',
+  'Company': 'الشركة',
+  'FAQ': 'الأسئلة الشائعة',
+  'Shipping Info': 'معلومات الشحن',
+  'Returns & Refunds': 'المرتجعات والاستبدال',
+  'Privacy Policy': 'سياسة الخصوصية',
+  'Terms of Service': 'الشروط والأحكام',
+  'About Us': 'من نحن',
+  'Newsletter': 'النشرة البريدية',
+  'Email': 'البريد الإلكتروني',
+  'We accept:': 'نقبل الدفع عبر:',
+
+  // Common
+  'Home': 'الرئيسية',
+  'All Products': 'كل المنتجات',
+  'Filter': 'تصفية',
+  'Sort': 'ترتيب',
+  'Price': 'السعر',
+  'Low to High': 'من الأقل للأعلى',
+  'High to Low': 'من الأعلى للأقل',
+  'Search': 'بحث',
+  'No results found': 'لم يتم العثور على نتائج',
+  'Loading...': 'جاري التحميل...',
+  'Error': 'خطأ',
+  'Success': 'تم بنجاح',
+  'KWD': 'د.ك',
+
+  // Shipping
+  'Free delivery on orders over 20 KWD': 'توصيل مجاني للطلبات فوق 20 د.ك',
+  'Same-day delivery across Kuwait': 'توصيل في نفس اليوم في جميع أنحاء الكويت',
+
+  // Auth
+  'Login': 'دخول',
+  'Register': 'تسجيل',
+  'Create Account': 'إنشاء حساب',
+  'Forgot Password?': 'نسيت كلمة المرور؟',
+  'Password': 'كلمة المرور',
+  'Confirm Password': 'تأكيد كلمة المرور',
+  'Full Name': 'الاسم الكامل',
+  'Phone': 'الهاتف',
+} as const;
+
+export type TranslationKey = keyof typeof translations;

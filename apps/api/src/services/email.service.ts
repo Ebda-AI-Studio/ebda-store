@@ -174,6 +174,42 @@ export class EmailService {
   }
 
   /**
+   * Email Verification
+   */
+  static async sendEmailVerification(data: {
+    email: string;
+    name: string;
+    verificationUrl: string;
+    expiresIn: string;
+  }): Promise<void> {
+    const html = this.renderTemplate('email-verification', data);
+
+    await this.send({
+      to: data.email,
+      subject: 'Verify Your Email Address',
+      html,
+    });
+  }
+
+  /**
+   * Resend Email Verification
+   */
+  static async sendResendVerification(data: {
+    email: string;
+    name: string;
+    verificationUrl: string;
+    expiresIn: string;
+  }): Promise<void> {
+    const html = this.renderTemplate('resend-verification', data);
+
+    await this.send({
+      to: data.email,
+      subject: 'Verify Your Email Address - New Link',
+      html,
+    });
+  }
+
+  /**
    * Admin Alert: New Order
    */
   static async sendAdminNewOrder(data: OrderEmailData): Promise<void> {
@@ -214,6 +250,8 @@ export class EmailService {
       'order-shipped': (d) => this.orderShippedTemplate(d as { customerEmail: string; customerName: string; orderNumber: string; trackingNumber?: string; trackingUrl?: string; carrier?: string }),
       'password-reset': (d) => this.passwordResetTemplate(d as { email: string; name: string; resetUrl: string; expiresIn: string }),
       'welcome': (d) => this.welcomeTemplate(d as { email: string; name: string }),
+      'email-verification': (d) => this.emailVerificationTemplate(d as { email: string; name: string; verificationUrl: string; expiresIn: string }),
+      'resend-verification': (d) => this.resendVerificationTemplate(d as { email: string; name: string; verificationUrl: string; expiresIn: string }),
       'admin-new-order': (d) => this.adminNewOrderTemplate(d as OrderEmailData),
       'admin-refund': (d) => this.adminRefundTemplate(d as { orderNumber: string; amount: number; reason?: string }),
     };
@@ -418,6 +456,46 @@ export class EmailService {
   }
 
   /**
+   * Email Verification Template
+   */
+  private static emailVerificationTemplate(d: { email: string; name: string; verificationUrl: string; expiresIn: string }): string {
+    return EmailService.baseTemplate(`
+      <h2>Verify Your Email Address</h2>
+      <p>Hi ${d.name},</p>
+      <p>Thank you for registering! Please verify your email address to complete your account setup.</p>
+      <p style="text-align: center; margin: 24px 0;">
+        <a href="${d.verificationUrl}" class="button">Verify Email</a>
+      </p>
+      <p>This link will expire in ${d.expiresIn}.</p>
+      <p style="font-size: 14px; color: #666;">If you didn't create an account, you can safely ignore this email.</p>
+      <p style="font-size: 12px; color: #999; margin-top: 24px;">
+        If the button above doesn't work, copy and paste this link into your browser:<br>
+        <a href="${d.verificationUrl}" style="color: #ff6e00; word-break: break-all;">${d.verificationUrl}</a>
+      </p>
+    `);
+  }
+
+  /**
+   * Resend Email Verification Template
+   */
+  private static resendVerificationTemplate(d: { email: string; name: string; verificationUrl: string; expiresIn: string }): string {
+    return EmailService.baseTemplate(`
+      <h2>New Verification Link</h2>
+      <p>Hi ${d.name},</p>
+      <p>Here's your new email verification link as requested.</p>
+      <p style="text-align: center; margin: 24px 0;">
+        <a href="${d.verificationUrl}" class="button">Verify Email</a>
+      </p>
+      <p>This link will expire in ${d.expiresIn}.</p>
+      <p style="font-size: 14px; color: #666;">If you didn't request this, please contact support.</p>
+      <p style="font-size: 12px; color: #999; margin-top: 24px;">
+        If the button above doesn't work, copy and paste this link into your browser:<br>
+        <a href="${d.verificationUrl}" style="color: #ff6e00; word-break: break-all;">${d.verificationUrl}</a>
+      </p>
+    `);
+  }
+
+  /**
    * Admin New Order Template
    */
   private static adminNewOrderTemplate(d: OrderEmailData): string {
@@ -446,6 +524,81 @@ export class EmailService {
         <a href="${config.adminUrl}/orders" class="button">View Details</a>
       </p>
     `);
+  }
+
+  /**
+   * Return Confirmation Template
+   */
+  private static returnConfirmationTemplate(d: { customerName: string; storeName: string; returnNumber: string; orderNumber: string; type: string }): string {
+    const typeLabel = d.type === 'exchange' ? 'Exchange' : d.type === 'refund' ? 'Refund' : 'Return';
+    return EmailService.baseTemplate(`
+      <h2>${typeLabel} Request Received</h2>
+      <p>Hi ${d.customerName},</p>
+      <p>We have received your ${typeLabel.toLowerCase()} request for order #${d.orderNumber}.</p>
+      <p><strong>${typeLabel} Number:</strong> ${d.returnNumber}</p>
+      <p>Our team will review your request and get back to you within 1-2 business days.</p>
+      <p style="font-size: 14px; color: #666; margin-top: 24px;">
+        If you have any questions, please don't hesitate to contact our support team.
+      </p>
+      <p style="margin-top: 24px;">Thank you for your patience!</p>
+      <p>Best regards,<br>${d.storeName} Team</p>
+    `);
+  }
+
+  /**
+   * Return Status Update Template
+   */
+  private static returnStatusUpdateTemplate(d: { customerName: string; storeName: string; returnNumber: string; status: string; notes?: string }): string {
+    const statusMessages: Record<string, string> = {
+      approved: 'Your return request has been approved! Please ship the items back to us using the provided instructions.',
+      rejected: 'Unfortunately, we were unable to approve your return request.',
+      shipped: 'We have noted that your return items have been shipped.',
+      received: 'We have received your returned items and they are being inspected.',
+      inspecting: 'Your items are currently being inspected by our team.',
+      completed: 'Your return has been completed and your refund has been processed.',
+      cancelled: 'Your return request has been cancelled.',
+    };
+
+    const message = statusMessages[d.status] || `Your return request status has been updated to: ${d.status}`;
+
+    return EmailService.baseTemplate(`
+      <h2>Return Status Update</h2>
+      <p>Hi ${d.customerName},</p>
+      <p><strong>Return Number:</strong> ${d.returnNumber}</p>
+      <p>${message}</p>
+      ${d.notes ? `<p><strong>Note from our team:</strong> ${d.notes}</p>` : ''}
+      <p style="font-size: 14px; color: #666; margin-top: 24px;">
+        If you have any questions, please contact our support team.
+      </p>
+      <p>Best regards,<br>${d.storeName} Team</p>
+    `);
+  }
+
+  /**
+   * Send Return Confirmation Email
+   */
+  static async sendReturnConfirmation(data: { email: string; customerName: string; storeName: string; returnNumber: string; orderNumber: string; type: string }) {
+    const typeLabel = data.type === 'exchange' ? 'Exchange' : data.type === 'refund' ? 'Refund' : 'Return';
+    const html = this.returnConfirmationTemplate(data);
+    await this.send({
+      to: data.email,
+      subject: `${typeLabel} Request Received - #${data.returnNumber}`,
+      html,
+      text: this.htmlToText(html),
+    });
+  }
+
+  /**
+   * Send Return Status Update Email
+   */
+  static async sendReturnStatusUpdate(data: { email: string; customerName: string; storeName: string; returnNumber: string; status: string; notes?: string }) {
+    const html = this.returnStatusUpdateTemplate(data);
+    await this.send({
+      to: data.email,
+      subject: `Return Status Update - #${data.returnNumber}`,
+      html,
+      text: this.htmlToText(html),
+    });
   }
 
   /**

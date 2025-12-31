@@ -3,7 +3,7 @@
  * Tests for API endpoints and their integration with services
  */
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect } from 'vitest';
 
 // API base URL for testing
 const API_URL = 'http://localhost:4000/api/v1';

@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { Button, Badge } from '@force/ui';
 import { AdminLayout } from '../../components/AdminLayout';
+import { ErrorState } from '../../components/ErrorState';
 
 interface User {
   id: string;
@@ -49,11 +50,13 @@ export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 10, total: 0, totalPages: 0 });
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
 
   const fetchUsers = useCallback(async () => {
     try {
+      setError(null);
       const token = localStorage.getItem('authToken');
       const params = new URLSearchParams({
         page: pagination.page.toString(),
@@ -62,16 +65,23 @@ export default function UsersPage() {
       if (roleFilter !== 'all') params.append('role', roleFilter);
       if (search) params.append('search', search);
 
-      const response = await fetch(`http://localhost:4000/api/v1/admin/users?${params}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/admin/users?${params}`,
+        {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }
+      );
       if (response.ok) {
         const data = await response.json();
         setUsers(data.data.users || []);
         setPagination(prev => ({ ...prev, ...data.data.pagination }));
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        setError(errorData.error?.message || 'Failed to fetch users');
       }
     } catch (error) {
       console.error('Failed to fetch users:', error);
+      setError('Unable to connect to the server. Please check your connection and try again.');
     } finally {
       setIsLoading(false);
     }
@@ -138,7 +148,17 @@ export default function UsersPage() {
         </div>
       </div>
 
+      {/* Error State */}
+      {error && !isLoading && (
+        <ErrorState
+          title="Failed to load users"
+          message={error}
+          onRetry={fetchUsers}
+        />
+      )}
+
       {/* Users Table */}
+      {!error && (
       <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
         <table className="w-full">
           <thead className="bg-gray-50 border-b">
@@ -276,6 +296,7 @@ export default function UsersPage() {
           </div>
         )}
       </div>
+      )}
     </AdminLayout>
   );
 }

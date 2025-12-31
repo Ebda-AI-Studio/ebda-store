@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
 
 // Common types
 interface User {
@@ -246,15 +246,19 @@ class ApiClient {
   // Products (public endpoints)
   async getProducts(params?: Record<string, string>) {
     const query = params ? `?${new URLSearchParams(params)}` : '';
-    return this.request<{ products: Product[]; meta: PaginationMeta }>(`/products${query}`);
+    return this.request<{ products: Product[]; meta: PaginationMeta }>(`/public/products${query}`);
   }
 
   async getProduct(slugOrId: string) {
-    return this.request<{ product: Product }>(`/products/${slugOrId}`);
+    return this.request<{ product: Product }>(`/public/products/${slugOrId}`);
   }
 
   async getCategories() {
-    return this.request<{ categories: Category[] }>('/categories');
+    return this.request<{ categories: Category[] }>('/public/categories');
+  }
+
+  async getFeaturedProducts(limit = 8) {
+    return this.request<{ products: Product[]; meta: PaginationMeta }>(`/public/products?featured=true&limit=${limit}`);
   }
 
   // Store-scoped products (for admin)
@@ -269,54 +273,54 @@ class ApiClient {
 
   // Cart (public endpoints - uses default store)
   async getCart() {
-    return this.request<{ cart: Cart }>('/cart');
+    return this.request<{ cart: Cart }>('/public/cart');
   }
 
   async addToCart(productId: string, quantity = 1) {
-    return this.request<{ cart: Cart }>('/cart/items', {
+    return this.request<{ cart: Cart }>('/public/cart/items', {
       method: 'POST',
       body: JSON.stringify({ productId, quantity }),
     });
   }
 
   async updateCartItem(itemId: string, quantity: number) {
-    return this.request<{ cart: Cart }>(`/cart/items/${itemId}`, {
+    return this.request<{ cart: Cart }>(`/public/cart/items/${itemId}`, {
       method: 'PUT',
       body: JSON.stringify({ quantity }),
     });
   }
 
   async removeCartItem(itemId: string) {
-    return this.request<{ cart: Cart }>(`/cart/items/${itemId}`, {
+    return this.request<{ cart: Cart }>(`/public/cart/items/${itemId}`, {
       method: 'DELETE',
     });
   }
 
   async clearCart() {
-    return this.request<{ cart: Cart }>('/cart', {
+    return this.request<{ cart: Cart }>('/public/cart', {
       method: 'DELETE',
     });
   }
 
   // Orders (public endpoints)
   async createOrder(data: CreateOrderData) {
-    return this.request<{ order: Order }>('/orders', {
+    return this.request<{ order: Order }>('/public/orders', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
   async getOrders() {
-    return this.request<{ orders: Order[] }>('/orders');
+    return this.request<{ orders: Order[] }>('/public/orders');
   }
 
   async getOrder(orderId: string) {
-    return this.request<{ order: Order }>(`/orders/${orderId}`);
+    return this.request<{ order: Order }>(`/public/orders/${orderId}`);
   }
 
   // Store
   async getStore() {
-    return this.request<{ store: Store }>('/store');
+    return this.request<{ store: Store }>('/public/store');
   }
 
   // Generic methods for other endpoints

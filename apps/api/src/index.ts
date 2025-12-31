@@ -1,4 +1,5 @@
 import express from 'express';
+import { createServer } from 'http';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
@@ -14,8 +15,14 @@ import {
 } from './middleware/security';
 import routes from './routes';
 import webhookRoutes from './routes/webhook.routes';
+import { socketService } from './services/socket.service';
+import { setupSwagger } from './docs/swagger';
 
 const app = express();
+const httpServer = createServer(app);
+
+// Initialize Socket.io
+socketService.initialize(httpServer);
 
 // Request ID for tracing
 app.use(requestId);
@@ -88,6 +95,9 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// API Documentation (Swagger)
+setupSwagger(app);
+
 // API Routes
 app.use('/api/v1', routes);
 
@@ -95,9 +105,11 @@ app.use('/api/v1', routes);
 app.use(errorHandler);
 
 // Start server
-app.listen(config.port, () => {
+httpServer.listen(config.port, () => {
   console.log(`🚀 API Server running on http://${config.host}:${config.port}`);
   console.log(`📝 Environment: ${config.nodeEnv}`);
+  console.log(`🔌 WebSocket enabled`);
+  console.log(`📚 API Docs: http://${config.host}:${config.port}/docs`);
 });
 
 export default app;

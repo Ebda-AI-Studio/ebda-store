@@ -26,7 +26,68 @@ const createProductSchema = z.object({
 
 const updateProductSchema = createProductSchema.partial();
 
-// GET /stores/:storeId/products - List products
+/**
+ * @swagger
+ * /stores/{storeId}/products:
+ *   get:
+ *     summary: List products
+ *     description: Get paginated list of products for a store
+ *     tags: [Products]
+ *     security: []
+ *     parameters:
+ *       - in: path
+ *         name: storeId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [active, draft, archived]
+ *       - in: query
+ *         name: category
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: featured
+ *         schema:
+ *           type: boolean
+ *     responses:
+ *       200:
+ *         description: List of products
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     products:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/Product'
+ *                     meta:
+ *                       $ref: '#/components/schemas/Pagination'
+ */
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { storeId } = req.params;
@@ -44,6 +105,85 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     res.json({
       success: true,
       data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /stores/:storeId/products/search - Advanced search with filters
+router.get('/search', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { storeId } = req.params;
+    const {
+      q,
+      page,
+      limit,
+      categories,
+      tags,
+      minPrice,
+      maxPrice,
+      inStock,
+      onSale,
+      isNew,
+      featured,
+      sortBy,
+    } = req.query;
+
+    const result = await ProductService.advancedSearch(storeId, {
+      query: q as string,
+      page: page ? parseInt(page as string) : undefined,
+      limit: limit ? parseInt(limit as string) : undefined,
+      categories: categories ? (categories as string).split(',') : undefined,
+      tags: tags ? (tags as string).split(',') : undefined,
+      minPrice: minPrice ? parseInt(minPrice as string) : undefined,
+      maxPrice: maxPrice ? parseInt(maxPrice as string) : undefined,
+      inStock: inStock === 'true',
+      onSale: onSale === 'true',
+      isNew: isNew === 'true',
+      featured: featured === 'true',
+      sortBy: sortBy as 'newest' | 'oldest' | 'price_asc' | 'price_desc' | 'name_asc' | 'name_desc' | 'popular' | 'rating',
+    });
+
+    res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /stores/:storeId/products/suggestions - Search suggestions
+router.get('/suggestions', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { storeId } = req.params;
+    const { q, limit } = req.query;
+
+    const result = await ProductService.getSearchSuggestions(
+      storeId,
+      q as string,
+      limit ? parseInt(limit as string) : undefined
+    );
+
+    res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /stores/:storeId/products/filters - Get available filter options
+router.get('/filters', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { storeId } = req.params;
+    const filters = await ProductService.getFilterOptions(storeId);
+
+    res.json({
+      success: true,
+      data: { filters },
     });
   } catch (error) {
     next(error);

@@ -81,7 +81,7 @@ export class TapPaymentProvider implements IPaymentProvider {
       body: body ? JSON.stringify(body) : undefined,
     });
 
-    const data = await response.json();
+    const data = await response.json() as { errors?: { description: string }[] };
 
     if (!response.ok) {
       console.error('[TAP ERROR]', data);

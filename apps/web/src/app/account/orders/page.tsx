@@ -12,11 +12,12 @@ interface Order {
   createdAt: string;
   items: {
     id: string;
+    productId?: string;
     quantity: number;
     price: number;
-    product: {
+    product?: {
       name: string;
-      images: string[];
+      images: Array<{ id: string; url: string; alt?: string }>;
     };
   }[];
 }
@@ -24,19 +25,25 @@ interface Order {
 export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchOrders();
   }, []);
 
   async function fetchOrders() {
+    setError(null);
+    setIsLoading(true);
     try {
       const result = await api.getOrders();
       if (result.success && result.data) {
         setOrders(result.data.orders);
+      } else if (result.error) {
+        setError(result.error.message || 'Failed to load orders');
       }
-    } catch (error) {
-      console.error('Failed to fetch orders:', error);
+    } catch (err) {
+      console.error('Failed to fetch orders:', err);
+      setError('Unable to load orders. Please check your connection.');
     } finally {
       setIsLoading(false);
     }
@@ -86,7 +93,25 @@ export default function OrdersPage() {
         <p className="mt-1 text-gray-500">View and track your orders</p>
       </div>
 
-      {orders.length > 0 ? (
+      {/* Error Display */}
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+          <div className="flex items-center gap-3">
+            <svg className="h-5 w-5 text-red-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <p className="text-red-700 flex-1">{error}</p>
+            <button
+              onClick={() => fetchOrders()}
+              className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!error && orders.length > 0 ? (
         <div className="space-y-4">
           {orders.map(order => (
             <div key={order.id} className="rounded-xl border bg-white shadow-sm overflow-hidden">
@@ -116,10 +141,10 @@ export default function OrdersPage() {
                     {order.items.map(item => (
                       <div key={item.id} className="flex items-center gap-4">
                         <div className="h-16 w-16 flex-shrink-0 rounded-lg bg-gray-100">
-                          {item.product.images?.[0] ? (
+                          {item.product?.images?.[0]?.url ? (
                             <img
-                              src={item.product.images[0]}
-                              alt={item.product.name}
+                              src={item.product.images[0].url}
+                              alt={item.product?.name || 'Product'}
                               className="h-full w-full rounded-lg object-cover"
                             />
                           ) : (
@@ -131,7 +156,7 @@ export default function OrdersPage() {
                           )}
                         </div>
                         <div className="flex-1">
-                          <p className="font-medium text-gray-900">{item.product.name}</p>
+                          <p className="font-medium text-gray-900">{item.product?.name || 'Product'}</p>
                           <p className="text-sm text-gray-500">Qty: {item.quantity}</p>
                         </div>
                         <p className="font-medium text-gray-900">{formatPrice(item.price)}</p>
@@ -154,7 +179,7 @@ export default function OrdersPage() {
             </div>
           ))}
         </div>
-      ) : (
+      ) : !error ? (
         <div className="rounded-xl border bg-white p-12 text-center shadow-sm">
           <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -168,7 +193,7 @@ export default function OrdersPage() {
             Start Shopping
           </Link>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

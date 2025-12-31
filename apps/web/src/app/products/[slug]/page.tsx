@@ -4,6 +4,8 @@ import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Button, Badge, useToast } from '@force/ui';
+import { useCart } from '../../../contexts/CartContext';
+import { Header, Footer } from '../../../components';
 
 // Demo product data
 const product = {
@@ -49,45 +51,29 @@ export default function ProductDetailPage() {
   const [selectedImage, setSelectedImage] = useState(0);
   const [isAdding, setIsAdding] = useState(false);
   const { success } = useToast();
+  const { addItem, itemCount } = useCart();
 
   const handleAddToCart = async () => {
     setIsAdding(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 500));
+    // Simulate API call delay for UX
+    await new Promise(resolve => setTimeout(resolve, 300));
+    addItem({
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      slug: product.slug,
+      image: product.images[0]?.url,
+      category: product.category,
+    }, quantity);
     setIsAdding(false);
     success('Added to cart!', `${quantity}x ${product.name} added to your cart`);
   };
 
   return (
-    <main className="min-h-screen bg-white">
-      {/* Navigation */}
-      <nav className="sticky top-0 z-50 border-b bg-white/80 backdrop-blur-md">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <Link href="/" className="flex items-center gap-2">
-            <Image src="/logo.svg" alt="Force Media" width={40} height={30} />
-            <span className="text-xl font-bold">
-              <span className="text-primary">Force</span>
-              <span className="text-gray-700"> Store</span>
-            </span>
-          </Link>
-          <div className="flex items-center gap-4">
-            <Link href="/products" className="text-sm text-gray-600 hover:text-primary">
-              Products
-            </Link>
-            <Link href="/cart" className="relative text-sm text-gray-600 hover:text-primary">
-              Cart
-              <span className="absolute -right-2 -top-2 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] text-white">
-                0
-              </span>
-            </Link>
-            <Link href="/auth/login">
-              <Button size="sm">Sign In</Button>
-            </Link>
-          </div>
-        </div>
-      </nav>
+    <main className="min-h-screen bg-background flex flex-col">
+      <Header />
 
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 flex-1">
         {/* Breadcrumb */}
         <nav className="mb-8 flex items-center gap-2 text-sm text-gray-500">
           <Link href="/" className="hover:text-primary">Home</Link>
@@ -252,20 +238,7 @@ export default function ProductDetailPage() {
         </div>
       </div>
 
-      {/* Footer */}
-      <footer className="mt-16 border-t bg-gray-50">
-        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-          <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
-            <div className="flex items-center gap-2">
-              <Image src="/logo.svg" alt="Force Media" width={24} height={18} />
-              <span className="text-sm font-semibold text-gray-700">Force Store</span>
-            </div>
-            <p className="text-xs text-gray-500">
-              &copy; {new Date().getFullYear()} Force Media. All rights reserved.
-            </p>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </main>
   );
 }

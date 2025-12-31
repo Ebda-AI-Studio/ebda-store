@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '@/lib/api';
+import { Header, Footer } from '../../components';
 
 interface Product {
   id: string;
@@ -11,16 +12,17 @@ interface Product {
   slug: string;
   price: number;
   compareAtPrice?: number;
-  images: string[];
+  images: Array<{ id: string; url: string; alt?: string }>;
   description?: string;
 }
 
 function SearchContent() {
   const searchParams = useSearchParams();
-  const query = searchParams.get('q') || '';
+  const query = searchParams?.get('q') || '';
   const [searchTerm, setSearchTerm] = useState(query);
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (query) {
@@ -36,13 +38,17 @@ function SearchContent() {
     }
 
     setIsLoading(true);
+    setError(null);
     try {
-      const response = await api.get(`/products?search=${encodeURIComponent(term)}`);
-      if (response.data.success) {
-        setProducts(response.data.data.products || []);
+      const response = await api.getProducts({ search: term });
+      if (response.success && response.data) {
+        setProducts(response.data.products || []);
+      } else {
+        setError(response.error?.message || 'Failed to search products');
       }
-    } catch (error) {
-      console.error('Search failed:', error);
+    } catch (err) {
+      console.error('Search failed:', err);
+      setError('Unable to search. Please check your connection and try again.');
     } finally {
       setIsLoading(false);
     }
@@ -55,26 +61,47 @@ function SearchContent() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-8">Search Products</h1>
+    <main className="flex min-h-screen flex-col bg-background">
+      <Header />
+      <div className="container mx-auto px-4 py-8 flex-1">
+        <h1 className="text-3xl font-bold mb-8">Search Products</h1>
 
-      <form onSubmit={handleSearch} className="mb-8">
-        <div className="flex gap-4 max-w-2xl">
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search for products..."
-            className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <button
-            type="submit"
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Search
-          </button>
+        <form onSubmit={handleSearch} className="mb-8">
+          <div className="flex gap-4 max-w-2xl">
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search for products..."
+              className="flex-1 px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+            <button
+              type="submit"
+              className="px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+            >
+              Search
+            </button>
+          </div>
+        </form>
+
+      {error && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-center gap-3">
+            <svg className="h-5 w-5 text-red-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <div className="flex-1">
+              <p className="text-red-700">{error}</p>
+            </div>
+            <button
+              onClick={() => performSearch(searchTerm)}
+              className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
+            >
+              Retry
+            </button>
+          </div>
         </div>
-      </form>
+      )}
 
       {isLoading ? (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
@@ -82,7 +109,7 @@ function SearchContent() {
             <div key={i} className="bg-gray-100 animate-pulse rounded-lg h-64"></div>
           ))}
         </div>
-      ) : products.length > 0 ? (
+      ) : !error && products.length > 0 ? (
         <>
           <p className="text-gray-600 mb-6">
             {products.length} result{products.length !== 1 ? 's' : ''} for &quot;{query || searchTerm}&quot;
@@ -95,9 +122,9 @@ function SearchContent() {
                 className="group bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow"
               >
                 <div className="aspect-square bg-gray-100 relative">
-                  {product.images?.[0] ? (
+                  {product.images?.[0]?.url ? (
                     <img
-                      src={product.images[0]}
+                      src={product.images[0].url}
                       alt={product.name}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                     />
@@ -134,21 +161,27 @@ function SearchContent() {
           </Link>
         </div>
       ) : (
-        <div className="text-center py-12">
-          <p className="text-gray-500">Enter a search term to find products</p>
+          <div className="text-center py-12">
+          <p className="text-muted-foreground">Enter a search term to find products</p>
         </div>
       )}
-    </div>
+      </div>
+      <Footer />
+    </main>
   );
 }
 
 export default function SearchPage() {
   return (
     <Suspense fallback={
-      <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-8">Search Products</h1>
-        <div className="animate-pulse bg-gray-100 h-12 max-w-2xl rounded-lg"></div>
-      </div>
+      <main className="flex min-h-screen flex-col bg-background">
+        <Header />
+        <div className="container mx-auto px-4 py-8 flex-1">
+          <h1 className="text-3xl font-bold mb-8">Search Products</h1>
+          <div className="animate-pulse bg-muted h-12 max-w-2xl rounded-lg"></div>
+        </div>
+        <Footer />
+      </main>
     }>
       <SearchContent />
     </Suspense>

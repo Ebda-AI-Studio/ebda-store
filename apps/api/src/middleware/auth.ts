@@ -33,6 +33,30 @@ export function authenticate(req: Request, _res: Response, next: NextFunction): 
   }
 }
 
+/**
+ * Optional authentication - sets req.user if valid token provided, but doesn't require it
+ */
+export function optionalAuthenticate(req: Request, _res: Response, next: NextFunction): void {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    // No token provided, continue without user
+    next();
+    return;
+  }
+
+  const token = authHeader.split(' ')[1];
+
+  try {
+    const payload = jwt.verify(token, config.jwtSecret) as AuthPayload;
+    req.user = payload;
+  } catch {
+    // Invalid token, continue without user
+  }
+
+  next();
+}
+
 export function authorize(...roles: string[]) {
   return (req: Request, _res: Response, next: NextFunction): void => {
     if (!req.user) {

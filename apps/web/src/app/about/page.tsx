@@ -1,10 +1,13 @@
 'use client';
 
 import Link from 'next/link';
+import { Header, Footer } from '../../components';
 
 export default function AboutPage() {
   return (
-    <div className="container mx-auto px-4 py-8">
+    <main className="flex min-h-screen flex-col bg-background">
+      <Header />
+      <div className="container mx-auto px-4 py-8 flex-1">
       <div className="max-w-4xl mx-auto">
         <h1 className="text-4xl font-bold mb-8">About Us</h1>
 
@@ -77,7 +80,7 @@ export default function AboutPage() {
             </p>
             <Link
               href="/contact"
-              className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              className="inline-flex items-center px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
             >
               Get in Touch
               <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -87,6 +90,8 @@ export default function AboutPage() {
           </section>
         </div>
       </div>
-    </div>
+      </div>
+      <Footer />
+    </main>
   );
 }

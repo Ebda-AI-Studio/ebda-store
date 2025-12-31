@@ -9,6 +9,7 @@ interface CreatedStore {
   id: string;
   name: string;
   slug: string;
+  domain?: string;
 }
 
 interface CreatedOwner {
@@ -16,6 +17,7 @@ interface CreatedOwner {
   email: string;
   firstName: string;
   lastName: string;
+  temporaryPassword?: string;
 }
 
 type Step = 'store' | 'owner' | 'plan' | 'review';
@@ -156,7 +158,7 @@ export default function CreateStorePage() {
         plan: formData.plan,
         domain: formData.customDomain || undefined,
       };
-      const response = await fetch('http://localhost:4000/api/v1/admin/stores', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/admin/stores`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

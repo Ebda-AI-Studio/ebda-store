@@ -563,7 +563,7 @@ router.post(
 
       try {
         switch (provider) {
-          case 'tap':
+          case 'tap': {
             const tapResponse = await fetch('https://api.tap.company/v2/test', {
               method: 'GET',
               headers: { Authorization: `Bearer ${apiKey}` },
@@ -574,8 +574,9 @@ router.post(
               latency: Date.now() - startTime,
             };
             break;
+          }
 
-          case 'myfatoorah':
+          case 'myfatoorah': {
             const mfResponse = await fetch(
               config.testMode
                 ? 'https://apitest.myfatoorah.com/v2/GetPaymentStatus'
@@ -595,6 +596,7 @@ router.post(
               latency: Date.now() - startTime,
             };
             break;
+          }
 
           case 'hesabe':
           case 'upayments':

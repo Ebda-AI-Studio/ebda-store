@@ -4,7 +4,7 @@ import { authenticate } from '../middleware/auth';
 import { requireRole } from '../middleware/rbac';
 import { ProvisioningService } from '../services/provisioning.service';
 import { auditLog } from '../middleware/security';
-import { prisma, Prisma } from '@force/database';
+import { prisma, Prisma, UserRole, ProductStatus, OrderStatus, OrderPaymentStatus } from '@force/database';
 
 const router = Router();
 
@@ -211,7 +211,7 @@ router.get('/users', async (req: Request, res: Response, next: NextFunction) => 
     const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
 
     const where: Prisma.UserWhereInput = {};
-    if (role && role !== 'all') where.role = role as string;
+    if (role && role !== 'all') where.role = role as UserRole;
     if (search) {
       where.OR = [
         { email: { contains: search as string, mode: 'insensitive' } },
@@ -327,7 +327,7 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
 
     const where: Prisma.ProductWhereInput = {};
     if (storeId) where.storeId = storeId as string;
-    if (status) where.status = status as string;
+    if (status) where.status = status as ProductStatus;
     if (search) {
       where.OR = [
         { name: { contains: search as string, mode: 'insensitive' } },
@@ -367,6 +367,59 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
 });
 
 /**
+ * GET /admin/products/:id
+ * Get a single product by ID across all stores
+ */
+router.get('/products/:id', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+
+    const product = await prisma.product.findUnique({
+      where: { id },
+      include: {
+        store: { select: { id: true, name: true, slug: true } },
+        images: { orderBy: { position: 'asc' } },
+        categories: {
+          include: { category: { select: { id: true, name: true } } },
+        },
+        variants: {
+          include: {
+            options: {
+              include: {
+                value: {
+                  include: { option: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!product) {
+      res.status(404).json({
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'Product not found' },
+      });
+      return;
+    }
+
+    // Transform categories to flat array
+    const transformedProduct = {
+      ...product,
+      categories: product.categories.map((pc) => pc.category),
+    };
+
+    res.json({
+      success: true,
+      data: { product: transformedProduct },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
  * GET /admin/orders
  * List all orders across all stores
  */
@@ -377,8 +430,8 @@ router.get('/orders', async (req: Request, res: Response, next: NextFunction) =>
 
     const where: Prisma.OrderWhereInput = {};
     if (storeId) where.storeId = storeId as string;
-    if (status) where.status = status as string;
-    if (paymentStatus) where.paymentStatus = paymentStatus as string;
+    if (status) where.status = status as OrderStatus;
+    if (paymentStatus) where.paymentStatus = paymentStatus as OrderPaymentStatus;
 
     const [orders, total] = await Promise.all([
       prisma.order.findMany({

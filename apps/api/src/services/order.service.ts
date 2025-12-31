@@ -1,6 +1,8 @@
-import { prisma, Prisma } from '@force/database';
+import { prisma, Prisma, OrderStatus } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import { CartService } from './cart.service';
+import { EmailService, type OrderEmailData } from './email.service';
+import { socketService } from './socket.service';
 
 interface CreateOrderData {
   shippingAddress: {
@@ -47,7 +49,7 @@ export class OrderService {
     const skip = (page - 1) * limit;
 
     const where: Prisma.OrderWhereInput = { storeId };
-    if (status) where.status = status;
+    if (status) where.status = status as OrderStatus;
     if (customerId) where.customerId = customerId;
 
     const [orders, total] = await Promise.all([
@@ -215,6 +217,44 @@ export class OrderService {
       return newOrder;
     });
 
+    // Send order confirmation email
+    try {
+      const emailData: OrderEmailData = {
+        orderNumber: order.orderNumber,
+        customerName: `${order.customer.firstName} ${order.customer.lastName}`.trim() || order.customer.email,
+        customerEmail: order.customer.email,
+        items: order.items.map(item => ({
+          name: item.productName,
+          quantity: item.quantity,
+          price: item.price,
+        })),
+        subtotal: order.subtotal,
+        tax: order.tax,
+        shipping: order.shipping,
+        total: order.total,
+        shippingAddress: data.shippingAddress,
+      };
+
+      await Promise.all([
+        EmailService.sendOrderConfirmation(emailData),
+        EmailService.sendAdminNewOrder(emailData),
+      ]);
+    } catch (emailError) {
+      console.error('Failed to send order confirmation email:', emailError);
+      // Don't throw - order was created successfully
+    }
+
+    // Send real-time notification to store admins
+    try {
+      socketService.newOrderNotification(storeId, {
+        orderNumber: order.orderNumber,
+        total: order.total,
+        customerName: `${order.customer.firstName} ${order.customer.lastName}`.trim() || order.customer.email,
+      });
+    } catch (notifyError) {
+      console.error('Failed to send order notification:', notifyError);
+    }
+
     return order;
   }
 
@@ -263,6 +303,58 @@ export class OrderService {
           data: { inventory: { increment: item.quantity } },
         });
       }
+    }
+
+    // Send status update emails
+    try {
+      const customerEmail = updatedOrder.customer.email;
+      const customerName = `${updatedOrder.customer.firstName} ${updatedOrder.customer.lastName}`.trim() || customerEmail;
+
+      if (status === 'shipped') {
+        await EmailService.sendOrderShipped({
+          customerEmail,
+          customerName,
+          orderNumber: updatedOrder.orderNumber,
+          // trackingNumber and trackingUrl can be passed when available
+        });
+      } else if (status === 'confirmed') {
+        // Payment success / order confirmed
+        const shippingAddr = updatedOrder.shippingAddress as { firstName: string; lastName: string; address1: string; address2?: string; city: string; state: string; postalCode: string; country: string };
+        await EmailService.sendPaymentSuccess({
+          orderNumber: updatedOrder.orderNumber,
+          customerName,
+          customerEmail,
+          items: updatedOrder.items.map(item => ({
+            name: item.productName,
+            quantity: item.quantity,
+            price: item.price,
+          })),
+          subtotal: updatedOrder.subtotal,
+          tax: updatedOrder.tax,
+          shipping: updatedOrder.shipping,
+          total: updatedOrder.total,
+          shippingAddress: shippingAddr,
+        });
+      } else if (status === 'refunded') {
+        await EmailService.sendAdminRefund({
+          orderNumber: updatedOrder.orderNumber,
+          amount: updatedOrder.total,
+          reason: 'Order refunded',
+        });
+      }
+    } catch (emailError) {
+      console.error('Failed to send order status email:', emailError);
+      // Don't throw - status was updated successfully
+    }
+
+    // Send real-time notification to customer
+    try {
+      socketService.orderStatusNotification(updatedOrder.customerId, {
+        orderNumber: updatedOrder.orderNumber,
+        status,
+      });
+    } catch (notifyError) {
+      console.error('Failed to send order status notification:', notifyError);
     }
 
     return updatedOrder;

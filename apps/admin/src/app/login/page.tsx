@@ -71,7 +71,7 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="mt-1"
-                placeholder="admin@forcemedia.com"
+                placeholder="a.sharaf@forcemediakw.com"
               />
             </div>
 
@@ -108,7 +108,7 @@ export default function LoginPage() {
           </form>
 
           <p className="mt-8 text-center text-xs text-gray-500">
-            Demo credentials: admin@forcemedia.com / admin123
+            Demo credentials: a.sharaf@forcemediakw.com / Admin@123
           </p>
         </div>
       </div>

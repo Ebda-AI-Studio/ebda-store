@@ -13,9 +13,14 @@
   "dependencies": {
     "@force/shared": "*",
     "@force/ui": "*",
-    "next": "14.2.35",
+    "@types/swagger-ui-express": "^4.1.8",
+    "date-fns": "^4.1.0",
+    "next": "^16.1.1",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "socket.io-client": "^4.8.3",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
     "@types/react": "^18.2.0",

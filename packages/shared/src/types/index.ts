@@ -1,5 +1,8 @@
 // Shared Types
 
+// Store Theme & Template Types
+export * from './store-theme';
+
 // API Response Types
 export interface ApiResponse<T = unknown> {
   success: boolean;

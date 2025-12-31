@@ -1,4 +1,4 @@
-import { prisma, Prisma } from '@force/database';
+import { prisma, Prisma, StoreStatus } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import { AuthService } from './auth.service';
 import { EmailService } from './email.service';
@@ -185,7 +185,7 @@ export class ProvisioningService {
     const skip = (page - 1) * limit;
 
     const where: Prisma.StoreWhereInput = {};
-    if (status) where.status = status;
+    if (status) where.status = status as StoreStatus;
     if (search) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },

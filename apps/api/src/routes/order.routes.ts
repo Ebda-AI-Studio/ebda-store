@@ -44,7 +44,7 @@ router.get('/', authenticate, async (req: Request, res: Response, next: NextFunc
     const { page, limit, status } = req.query;
 
     // Check if admin or getting own orders
-    const isAdmin = req.user?.role === 'admin' || req.user?.role === 'super_admin';
+    const isAdmin = req.user?.role === 'store_admin' || req.user?.role === 'super_admin';
 
     const result = await OrderService.list(storeId, {
       page: page ? parseInt(page as string) : undefined,
@@ -70,7 +70,7 @@ router.get('/:id', authenticate, async (req: Request, res: Response, next: NextF
     const order = await OrderService.getById(storeId, id);
 
     // Check authorization
-    const isAdmin = req.user?.role === 'admin' || req.user?.role === 'super_admin';
+    const isAdmin = req.user?.role === 'store_admin' || req.user?.role === 'super_admin';
     if (!isAdmin && order.customerId !== req.user?.userId) {
       res.status(403).json({
         success: false,

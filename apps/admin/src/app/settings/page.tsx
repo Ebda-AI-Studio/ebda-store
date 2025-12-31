@@ -29,10 +29,10 @@ export default function SettingsPage() {
     // General
     storeName: 'Force Store',
     storeEmail: 'support@forcemedia.com',
-    storePhone: '+1 (555) 123-4567',
-    storeAddress: '123 Business St, New York, NY 10001',
-    currency: 'USD',
-    timezone: 'America/New_York',
+    storePhone: '+965 1234 5678',
+    storeAddress: 'Kuwait City, Kuwait',
+    currency: 'KWD',
+    timezone: 'Asia/Kuwait',
     // Notifications
     orderNotifications: true,
     customerNotifications: true,
@@ -208,27 +208,56 @@ export default function SettingsPage() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between rounded-lg border p-4">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-100">
-                        <span className="text-lg font-bold text-purple-600">S</span>
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100">
+                        <span className="text-lg font-bold text-blue-600">K</span>
                       </div>
                       <div>
-                        <p className="font-medium text-gray-900">Stripe</p>
-                        <p className="text-sm text-gray-500">Accept credit cards and more</p>
+                        <p className="font-medium text-gray-900">KNET</p>
+                        <p className="text-sm text-gray-500">Kuwait&apos;s primary debit card network</p>
                       </div>
                     </div>
                     <Button variant="outline" size="sm">Configure</Button>
                   </div>
                   <div className="flex items-center justify-between rounded-lg border p-4">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100">
-                        <span className="text-lg font-bold text-blue-600">P</span>
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100">
+                        <span className="text-lg font-bold text-emerald-600">T</span>
                       </div>
                       <div>
-                        <p className="font-medium text-gray-900">PayPal</p>
-                        <p className="text-sm text-gray-500">Accept PayPal payments</p>
+                        <p className="font-medium text-gray-900">Tap Payments</p>
+                        <p className="text-sm text-gray-500">Credit cards, Apple Pay, Google Pay</p>
+                      </div>
+                    </div>
+                    <Button variant="outline" size="sm">Configure</Button>
+                  </div>
+                  <div className="flex items-center justify-between rounded-lg border p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-100">
+                        <span className="text-lg font-bold text-primary">M</span>
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900">MyFatoorah</p>
+                        <p className="text-sm text-gray-500">Kuwait payment gateway</p>
                       </div>
                     </div>
                     <Button variant="outline" size="sm">Connect</Button>
+                  </div>
+                  <div className="flex items-center justify-between rounded-lg border p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100">
+                        <svg className="h-5 w-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900">Cash on Delivery</p>
+                        <p className="text-sm text-gray-500">Accept payment upon delivery</p>
+                      </div>
+                    </div>
+                    <label className="relative inline-flex cursor-pointer items-center">
+                      <input type="checkbox" defaultChecked className="peer sr-only" />
+                      <div className="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-white"></div>
+                    </label>
                   </div>
                 </div>
               </div>

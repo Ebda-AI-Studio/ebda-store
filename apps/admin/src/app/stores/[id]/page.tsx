@@ -55,16 +55,19 @@ const statusColors = {
 
 export default function StoreDetailPage() {
   const params = useParams();
+  const storeId = params?.id as string;
   const [store, setStore] = useState<Store | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [editForm, setEditForm] = useState({ name: '', slug: '', plan: '', status: '' });
+  const [formErrors, setFormErrors] = useState<{ name?: string; slug?: string }>({});
 
   const fetchStore = useCallback(async () => {
+    if (!storeId) return;
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`http://localhost:4000/api/v1/admin/stores/${params.id}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/admin/stores/${storeId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) {
@@ -82,28 +85,70 @@ export default function StoreDetailPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [params.id]);
+  }, [storeId]);
 
   useEffect(() => {
     fetchStore();
   }, [fetchStore]);
 
+  function validateForm(): boolean {
+    const errors: { name?: string; slug?: string } = {};
+
+    // Validate name
+    if (!editForm.name.trim()) {
+      errors.name = 'Store name is required';
+    } else if (editForm.name.trim().length < 2) {
+      errors.name = 'Store name must be at least 2 characters';
+    } else if (editForm.name.trim().length > 100) {
+      errors.name = 'Store name must be less than 100 characters';
+    }
+
+    // Validate slug
+    if (!editForm.slug.trim()) {
+      errors.slug = 'URL slug is required';
+    } else if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(editForm.slug)) {
+      errors.slug = 'Slug must be lowercase, alphanumeric, with hyphens only';
+    } else if (editForm.slug.length < 3) {
+      errors.slug = 'Slug must be at least 3 characters';
+    } else if (editForm.slug.length > 50) {
+      errors.slug = 'Slug must be less than 50 characters';
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  }
+
   async function handleSave() {
+    if (!validateForm()) {
+      return;
+    }
+
     setIsSaving(true);
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`http://localhost:4000/api/v1/admin/stores/${params.id}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/admin/stores/${storeId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify(editForm),
+        body: JSON.stringify({
+          name: editForm.name.trim(),
+          slug: editForm.slug.trim().toLowerCase(),
+          plan: editForm.plan,
+          status: editForm.status,
+        }),
       });
       if (response.ok) {
         const data = await response.json();
         setStore(data.data.store);
         setIsEditing(false);
+        setFormErrors({});
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        if (errorData.error?.message?.toLowerCase().includes('slug')) {
+          setFormErrors({ slug: 'This slug is already in use' });
+        }
       }
     } catch (error) {
       console.error('Failed to update store:', error);
@@ -114,7 +159,7 @@ export default function StoreDetailPage() {
 
   async function handleStatusChange(newStatus: string) {
     const token = localStorage.getItem('authToken');
-    await fetch(`http://localhost:4000/api/v1/admin/stores/${params.id}/status`, {
+    await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/admin/stores/${storeId}/status`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -205,7 +250,18 @@ export default function StoreDetailPage() {
             <h2 className="font-semibold text-gray-900">Store Details</h2>
             {isEditing && (
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => setIsEditing(false)}>
+                <Button variant="outline" size="sm" onClick={() => {
+                  setIsEditing(false);
+                  setFormErrors({});
+                  if (store) {
+                    setEditForm({
+                      name: store.name,
+                      slug: store.slug,
+                      plan: store.plan,
+                      status: store.status,
+                    });
+                  }
+                }}>
                   Cancel
                 </Button>
                 <Button size="sm" onClick={handleSave} disabled={isSaving}>
@@ -222,18 +278,35 @@ export default function StoreDetailPage() {
                   <Input
                     id="name"
                     value={editForm.name}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, name: e.target.value }))}
-                    className="mt-1"
+                    onChange={(e) => {
+                      setEditForm(prev => ({ ...prev, name: e.target.value }));
+                      if (formErrors.name) setFormErrors(prev => ({ ...prev, name: undefined }));
+                    }}
+                    className={`mt-1 ${formErrors.name ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
                   />
+                  {formErrors.name && (
+                    <p className="mt-1 text-sm text-red-500">{formErrors.name}</p>
+                  )}
                 </div>
                 <div>
                   <Label htmlFor="slug">URL Slug</Label>
                   <Input
                     id="slug"
                     value={editForm.slug}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, slug: e.target.value }))}
-                    className="mt-1"
+                    onChange={(e) => {
+                      const value = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
+                      setEditForm(prev => ({ ...prev, slug: value }));
+                      if (formErrors.slug) setFormErrors(prev => ({ ...prev, slug: undefined }));
+                    }}
+                    className={`mt-1 ${formErrors.slug ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
+                    placeholder="my-store-name"
                   />
+                  {formErrors.slug && (
+                    <p className="mt-1 text-sm text-red-500">{formErrors.slug}</p>
+                  )}
+                  <p className="mt-1 text-xs text-gray-500">
+                    Your store will be at: {editForm.slug || 'your-slug'}.forcemediakw.com
+                  </p>
                 </div>
                 <div>
                   <Label htmlFor="plan">Plan</Label>
@@ -407,6 +480,223 @@ export default function StoreDetailPage() {
             <div>
               <p className="font-medium text-gray-900">Analytics</p>
               <p className="text-xs text-gray-500">View store metrics</p>
+            </div>
+          </Link>
+        </div>
+      </div>
+
+      {/* Settings Section */}
+      <div className="mt-8">
+        <h2 className="mb-4 font-semibold text-gray-900">Settings & Configuration</h2>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Link
+            href={`/stores/${store.id}/branding`}
+            className="flex items-center gap-3 rounded-xl border bg-white p-4 shadow-sm transition hover:border-primary hover:shadow-md"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-pink-100">
+              <svg className="h-5 w-5 text-pink-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+              </svg>
+            </div>
+            <div>
+              <p className="font-medium text-gray-900">Branding</p>
+              <p className="text-xs text-gray-500">Logo, colors, fonts</p>
+            </div>
+          </Link>
+
+          <Link
+            href={`/stores/${store.id}/template`}
+            className="flex items-center gap-3 rounded-xl border bg-white p-4 shadow-sm transition hover:border-primary hover:shadow-md"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-100">
+              <svg className="h-5 w-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+              </svg>
+            </div>
+            <div>
+              <p className="font-medium text-gray-900">Template</p>
+              <p className="text-xs text-gray-500">Choose store design</p>
+            </div>
+          </Link>
+
+          <Link
+            href={`/stores/${store.id}/reviews`}
+            className="flex items-center gap-3 rounded-xl border bg-white p-4 shadow-sm transition hover:border-primary hover:shadow-md"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-yellow-100">
+              <svg className="h-5 w-5 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+              </svg>
+            </div>
+            <div>
+              <p className="font-medium text-gray-900">Reviews</p>
+              <p className="text-xs text-gray-500">Manage reviews</p>
+            </div>
+          </Link>
+
+          <Link
+            href={`/stores/${store.id}/returns`}
+            className="flex items-center gap-3 rounded-xl border bg-white p-4 shadow-sm transition hover:border-primary hover:shadow-md"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-100">
+              <svg className="h-5 w-5 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3m9 14V5a2 2 0 00-2-2H6a2 2 0 00-2 2v16l4-2 4 2 4-2 4 2z" />
+              </svg>
+            </div>
+            <div>
+              <p className="font-medium text-gray-900">Returns</p>
+              <p className="text-xs text-gray-500">Manage returns & refunds</p>
+            </div>
+          </Link>
+
+          <Link
+            href={`/stores/${store.id}/coupons`}
+            className="flex items-center gap-3 rounded-xl border bg-white p-4 shadow-sm transition hover:border-primary hover:shadow-md"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100">
+              <svg className="h-5 w-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+              </svg>
+            </div>
+            <div>
+              <p className="font-medium text-gray-900">Coupons</p>
+              <p className="text-xs text-gray-500">Discounts & promotions</p>
+            </div>
+          </Link>
+
+          <Link
+            href={`/stores/${store.id}/shipping`}
+            className="flex items-center gap-3 rounded-xl border bg-white p-4 shadow-sm transition hover:border-primary hover:shadow-md"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-cyan-100">
+              <svg className="h-5 w-5 text-cyan-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+              </svg>
+            </div>
+            <div>
+              <p className="font-medium text-gray-900">Shipping</p>
+              <p className="text-xs text-gray-500">Delivery zones & rates</p>
+            </div>
+          </Link>
+
+          <Link
+            href={`/stores/${store.id}/tax`}
+            className="flex items-center gap-3 rounded-xl border bg-white p-4 shadow-sm transition hover:border-primary hover:shadow-md"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100">
+              <svg className="h-5 w-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <div>
+              <p className="font-medium text-gray-900">Tax Settings</p>
+              <p className="text-xs text-gray-500">Tax rates & configuration</p>
+            </div>
+          </Link>
+
+          <Link
+            href={`/stores/${store.id}/loyalty`}
+            className="flex items-center gap-3 rounded-xl border bg-white p-4 shadow-sm transition hover:border-primary hover:shadow-md"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100">
+              <svg className="h-5 w-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div>
+              <p className="font-medium text-gray-900">Loyalty Program</p>
+              <p className="text-xs text-gray-500">Points & rewards</p>
+            </div>
+          </Link>
+
+          <Link
+            href={`/stores/${store.id}/pwa`}
+            className="flex items-center gap-3 rounded-xl border bg-white p-4 shadow-sm transition hover:border-primary hover:shadow-md"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-100">
+              <svg className="h-5 w-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <div>
+              <p className="font-medium text-gray-900">PWA Settings</p>
+              <p className="text-xs text-gray-500">Mobile app experience</p>
+            </div>
+          </Link>
+
+          <Link
+            href={`/stores/${store.id}/inventory`}
+            className="flex items-center gap-3 rounded-xl border bg-white p-4 shadow-sm transition hover:border-primary hover:shadow-md"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-teal-100">
+              <svg className="h-5 w-5 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+              </svg>
+            </div>
+            <div>
+              <p className="font-medium text-gray-900">Inventory</p>
+              <p className="text-xs text-gray-500">Stock management</p>
+            </div>
+          </Link>
+
+          <Link
+            href={`/stores/${store.id}/bulk`}
+            className="flex items-center gap-3 rounded-xl border bg-white p-4 shadow-sm transition hover:border-primary hover:shadow-md"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sky-100">
+              <svg className="h-5 w-5 text-sky-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+            </div>
+            <div>
+              <p className="font-medium text-gray-900">Bulk Import/Export</p>
+              <p className="text-xs text-gray-500">CSV product upload</p>
+            </div>
+          </Link>
+
+          <Link
+            href={`/stores/${store.id}/categories`}
+            className="flex items-center gap-3 rounded-xl border bg-white p-4 shadow-sm transition hover:border-primary hover:shadow-md"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-lime-100">
+              <svg className="h-5 w-5 text-lime-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+              </svg>
+            </div>
+            <div>
+              <p className="font-medium text-gray-900">Categories</p>
+              <p className="text-xs text-gray-500">Product categories</p>
+            </div>
+          </Link>
+
+          <Link
+            href={`/stores/${store.id}/marketing-pixels`}
+            className="flex items-center gap-3 rounded-xl border bg-white p-4 shadow-sm transition hover:border-primary hover:shadow-md"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-100">
+              <svg className="h-5 w-5 text-violet-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+            </div>
+            <div>
+              <p className="font-medium text-gray-900">Marketing Pixels</p>
+              <p className="text-xs text-gray-500">Analytics & tracking</p>
+            </div>
+          </Link>
+
+          <Link
+            href={`/stores/${store.id}/settings`}
+            className="flex items-center gap-3 rounded-xl border bg-white p-4 shadow-sm transition hover:border-primary hover:shadow-md"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100">
+              <svg className="h-5 w-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </div>
+            <div>
+              <p className="font-medium text-gray-900">Settings</p>
+              <p className="text-xs text-gray-500">Store configuration</p>
             </div>
           </Link>
         </div>

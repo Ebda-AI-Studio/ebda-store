@@ -3,18 +3,12 @@
  * Tests for authentication utilities and middleware
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
 // Test utilities
-import {
-  mockUser,
-  mockAdmin,
-  createMockRequest,
-  createMockResponse,
-  createMockNext,
-} from '../setup';
+import { mockUser, mockAdmin } from '../setup';
 
 describe('Authentication', () => {
   describe('Password Hashing', () => {

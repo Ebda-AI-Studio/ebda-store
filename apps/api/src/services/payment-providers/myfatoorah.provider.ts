@@ -103,7 +103,7 @@ export class MyFatoorahPaymentProvider implements IPaymentProvider {
       body: body ? JSON.stringify(body) : undefined,
     });
 
-    const data = await response.json();
+    const data = await response.json() as { IsSuccess: boolean; Message?: string; ValidationErrors?: { Error: string }[]; Data?: unknown };
 
     if (!response.ok || !data.IsSuccess) {
       console.error('[MYFATOORAH ERROR]', data);

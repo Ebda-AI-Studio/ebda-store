@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import { Button } from '@force/ui';
+import { AdminLayout } from '../../components/AdminLayout';
 
 interface Category {
   id: string;
@@ -22,18 +24,24 @@ export default function CategoriesPage() {
   const loading = false;
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Categories</h1>
-        <button className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
+    <AdminLayout
+      title="Categories"
+      subtitle="Manage product categories across all stores"
+      actions={
+        <Button size="sm">
+          <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
           Add Category
-        </button>
-      </div>
-
+        </Button>
+      }
+    >
       {loading ? (
-        <div className="text-center py-8">Loading...</div>
+        <div className="flex items-center justify-center py-12">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+        </div>
       ) : (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
@@ -46,13 +54,13 @@ export default function CategoriesPage() {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {categories.map((category) => (
-                <tr key={category.id}>
+                <tr key={category.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap font-medium">{category.name}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-gray-500">{category.slug}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-gray-500 font-mono text-sm">{category.slug}</td>
                   <td className="px-6 py-4 text-gray-500">{category.description || '-'}</td>
                   <td className="px-6 py-4 whitespace-nowrap">{category.productCount}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <button className="text-blue-600 hover:text-blue-800 mr-3">Edit</button>
+                    <button className="text-primary hover:text-primary/80 mr-3">Edit</button>
                     <button className="text-red-600 hover:text-red-800">Delete</button>
                   </td>
                 </tr>
@@ -61,6 +69,6 @@ export default function CategoriesPage() {
           </table>
         </div>
       )}
-    </div>
+    </AdminLayout>
   );
 }

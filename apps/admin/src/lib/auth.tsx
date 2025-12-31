@@ -13,6 +13,7 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
+  token: string | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
@@ -26,6 +27,7 @@ const API_URL = 'http://localhost:4000/api/v1';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
@@ -44,6 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (response.ok) {
         const data = await response.json();
         localStorage.setItem('authToken', data.data.accessToken);
+        setToken(data.data.accessToken);
         if (data.data.refreshToken) {
           localStorage.setItem('refreshToken', data.data.refreshToken);
         }
@@ -58,27 +61,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const checkAuth = useCallback(async () => {
-    const token = localStorage.getItem('authToken');
+    const storedToken = localStorage.getItem('authToken');
 
-    if (!token) {
+    if (!storedToken) {
       setIsLoading(false);
       return;
     }
 
     try {
       const response = await fetch(`${API_URL}/auth/me`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 'Authorization': `Bearer ${storedToken}` }
       });
 
       if (response.ok) {
         const data = await response.json();
         setUser(data.data.user);
+        setToken(storedToken);
       } else if (response.status === 401) {
         // Try to refresh token
         const refreshed = await refreshToken();
         if (!refreshed) {
           localStorage.removeItem('authToken');
           localStorage.removeItem('refreshToken');
+          setToken(null);
         }
       }
     } catch (error) {
@@ -120,6 +125,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     localStorage.setItem('authToken', data.data.accessToken);
     localStorage.setItem('refreshToken', data.data.refreshToken);
+    setToken(data.data.accessToken);
     setUser(data.data.user);
     router.push('/');
   }
@@ -138,6 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     localStorage.removeItem('authToken');
     localStorage.removeItem('refreshToken');
+    setToken(null);
     setUser(null);
     router.push('/login');
   }
@@ -145,6 +152,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider value={{
       user,
+      token,
       isLoading,
       isAuthenticated: !!user,
       login,

@@ -3,7 +3,26 @@ const nextConfig = {
   reactStrictMode: true,
   transpilePackages: ['@force/ui', '@force/shared'],
   images: {
-    domains: ['localhost', 'cdn.forcemedia.com'],
+    remotePatterns: [
+      {
+        protocol: 'http',
+        hostname: 'localhost',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'cdn.forcemedia.com',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.supabase.co',
+        port: '',
+        pathname: '/storage/**',
+      },
+    ],
     formats: ['image/avif', 'image/webp'],
   },
   experimental: {

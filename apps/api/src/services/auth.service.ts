@@ -56,6 +56,7 @@ export class AuthService {
         firstName: firstName || '',
         lastName: lastName || '',
         role: 'customer',
+        emailVerified: false,
       },
       select: {
         id: true,
@@ -63,6 +64,7 @@ export class AuthService {
         firstName: true,
         lastName: true,
         role: true,
+        emailVerified: true,
         createdAt: true,
       },
     });
@@ -74,7 +76,141 @@ export class AuthService {
       role: user.role,
     });
 
-    return { user, ...tokens };
+    // Send verification email
+    await this.sendVerificationEmail(user.id, user.email, `${user.firstName} ${user.lastName}`.trim() || user.email);
+
+    return { user, ...tokens, emailVerificationSent: true };
+  }
+
+  /**
+   * Create and send email verification token
+   */
+  static async sendVerificationEmail(userId: string, email: string, name: string): Promise<void> {
+    // Delete any existing verification tokens for this user
+    await prisma.verificationToken.deleteMany({
+      where: {
+        userId,
+        type: 'email',
+      },
+    });
+
+    // Generate verification token
+    const token = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+    // Store verification token
+    await prisma.verificationToken.create({
+      data: {
+        token: tokenHash,
+        userId,
+        type: 'email',
+        expiresAt,
+      },
+    });
+
+    // Send verification email
+    const verificationUrl = `${config.webUrl}/auth/verify-email?token=${token}`;
+    await EmailService.sendEmailVerification({
+      email,
+      name,
+      verificationUrl,
+      expiresIn: '24 hours',
+    });
+  }
+
+  /**
+   * Verify email with token
+   */
+  static async verifyEmail(token: string): Promise<{ success: boolean; message: string }> {
+    // Hash the provided token
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+    // Find the verification token
+    const verificationToken = await prisma.verificationToken.findFirst({
+      where: {
+        token: tokenHash,
+        type: 'email',
+        usedAt: null,
+      },
+      include: { user: true },
+    });
+
+    if (!verificationToken) {
+      throw new AppError(400, 'TOKEN_INVALID', 'Invalid verification token');
+    }
+
+    if (verificationToken.expiresAt < new Date()) {
+      // Delete expired token
+      await prisma.verificationToken.delete({
+        where: { id: verificationToken.id },
+      });
+      throw new AppError(400, 'TOKEN_EXPIRED', 'Verification token has expired. Please request a new one.');
+    }
+
+    if (verificationToken.user.emailVerified) {
+      return { success: true, message: 'Email already verified' };
+    }
+
+    // Update user as verified and mark token as used
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: verificationToken.userId },
+        data: { emailVerified: true },
+      }),
+      prisma.verificationToken.update({
+        where: { id: verificationToken.id },
+        data: { usedAt: new Date() },
+      }),
+    ]);
+
+    // Send welcome email
+    await EmailService.sendWelcome({
+      email: verificationToken.user.email,
+      name: `${verificationToken.user.firstName} ${verificationToken.user.lastName}`.trim() || verificationToken.user.email,
+    });
+
+    return { success: true, message: 'Email verified successfully' };
+  }
+
+  /**
+   * Resend verification email
+   */
+  static async resendVerificationEmail(email: string): Promise<{ success: boolean; message: string }> {
+    const user = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (!user) {
+      // Don't reveal if user exists
+      return { success: true, message: 'If an account exists with this email, a verification link has been sent.' };
+    }
+
+    if (user.emailVerified) {
+      return { success: true, message: 'Email is already verified' };
+    }
+
+    // Check if there's a recent verification token (within last 2 minutes) to prevent spam
+    const recentToken = await prisma.verificationToken.findFirst({
+      where: {
+        userId: user.id,
+        type: 'email',
+        createdAt: { gt: new Date(Date.now() - 2 * 60 * 1000) },
+      },
+    });
+
+    if (recentToken) {
+      throw new AppError(429, 'TOO_MANY_REQUESTS', 'Please wait a few minutes before requesting another verification email');
+    }
+
+    // Send new verification email
+    await this.sendVerificationEmail(
+      user.id,
+      user.email,
+      `${user.firstName} ${user.lastName}`.trim() || user.email
+    );
+
+    return { success: true, message: 'Verification email sent' };
   }
 
   static async login(email: string, password: string) {
@@ -107,6 +243,7 @@ export class AuthService {
         firstName: user.firstName,
         lastName: user.lastName,
         role: user.role,
+        emailVerified: user.emailVerified,
       },
       ...tokens,
     };
@@ -155,6 +292,7 @@ export class AuthService {
         lastName: true,
         role: true,
         avatar: true,
+        emailVerified: true,
         createdAt: true,
         updatedAt: true,
       },

@@ -1,4 +1,4 @@
-import { prisma } from '@force/database';
+import { prisma, Prisma } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import { slugify } from '@force/shared';
 
@@ -6,7 +6,7 @@ interface CreateStoreData {
   name: string;
   slug?: string;
   domain?: string;
-  settings?: Record<string, unknown>;
+  settings?: Prisma.InputJsonValue;
 }
 
 type UpdateStoreData = Partial<CreateStoreData>;
@@ -195,5 +195,162 @@ export class StoreService {
       totalRevenue: totalRevenue._sum.total || 0,
       recentOrders,
     };
+  }
+
+  static async getByDomain(domain: string) {
+    const store = await prisma.store.findUnique({
+      where: { domain },
+      include: {
+        _count: { select: { products: true, categories: true } },
+      },
+    });
+
+    if (!store) {
+      throw new AppError(404, 'NOT_FOUND', 'Store not found');
+    }
+
+    return store;
+  }
+
+  static async updateTemplate(storeId: string, template: string) {
+    await this.getById(storeId);
+
+    const validTemplates = ['modern', 'classic', 'minimal', 'bold', 'elegant'];
+    if (!validTemplates.includes(template)) {
+      throw new AppError(400, 'INVALID_TEMPLATE', `Template must be one of: ${validTemplates.join(', ')}`);
+    }
+
+    const updatedStore = await prisma.store.update({
+      where: { id: storeId },
+      data: { template: template as 'modern' | 'classic' | 'minimal' | 'bold' | 'elegant' },
+    });
+
+    return updatedStore;
+  }
+
+  static async updateTheme(storeId: string, theme: Prisma.InputJsonValue) {
+    await this.getById(storeId);
+
+    const updatedStore = await prisma.store.update({
+      where: { id: storeId },
+      data: { theme },
+    });
+
+    return updatedStore;
+  }
+
+  static async updateBranding(storeId: string, branding: {
+    name?: string;
+    nameAr?: string;
+    logo?: string;
+    logoAr?: string;
+    favicon?: string;
+  }) {
+    await this.getById(storeId);
+
+    const updatedStore = await prisma.store.update({
+      where: { id: storeId },
+      data: {
+        name: branding.name,
+        nameAr: branding.nameAr,
+        logo: branding.logo,
+        logoAr: branding.logoAr,
+        favicon: branding.favicon,
+      },
+    });
+
+    return updatedStore;
+  }
+
+  static async updateSocialLinks(storeId: string, socialLinks: Prisma.InputJsonValue) {
+    await this.getById(storeId);
+
+    const updatedStore = await prisma.store.update({
+      where: { id: storeId },
+      data: { socialLinks },
+    });
+
+    return updatedStore;
+  }
+
+  static async updateContactInfo(storeId: string, contact: {
+    email?: string;
+    phone?: string;
+    phoneAr?: string;
+    whatsapp?: string;
+    address?: string;
+    addressAr?: string;
+  }) {
+    await this.getById(storeId);
+
+    const updatedStore = await prisma.store.update({
+      where: { id: storeId },
+      data: {
+        email: contact.email,
+        phone: contact.phone,
+        phoneAr: contact.phoneAr,
+        whatsapp: contact.whatsapp,
+        address: contact.address,
+        addressAr: contact.addressAr,
+      },
+    });
+
+    return updatedStore;
+  }
+
+  static async updateAnnouncementBar(storeId: string, announcementBar: Prisma.InputJsonValue) {
+    await this.getById(storeId);
+
+    const updatedStore = await prisma.store.update({
+      where: { id: storeId },
+      data: { announcementBar },
+    });
+
+    return updatedStore;
+  }
+
+  static async updateSeo(storeId: string, seo: {
+    metaTitle?: string;
+    metaTitleAr?: string;
+    metaDescription?: string;
+    metaDescriptionAr?: string;
+  }) {
+    await this.getById(storeId);
+
+    const updatedStore = await prisma.store.update({
+      where: { id: storeId },
+      data: {
+        metaTitle: seo.metaTitle,
+        metaTitleAr: seo.metaTitleAr,
+        metaDescription: seo.metaDescription,
+        metaDescriptionAr: seo.metaDescriptionAr,
+      },
+    });
+
+    return updatedStore;
+  }
+
+  static async updateMarketingPixels(storeId: string, marketingPixels: Prisma.InputJsonValue) {
+    await this.getById(storeId);
+
+    // Extract individual pixel IDs from the marketingPixels object for quick access
+    const pixels = marketingPixels as Record<string, { enabled?: boolean; pixelId?: string; measurementId?: string; containerId?: string; conversionId?: string; tagId?: string }>;
+
+    const updatedStore = await prisma.store.update({
+      where: { id: storeId },
+      data: {
+        marketingPixels,
+        metaPixelId: pixels.meta?.enabled ? pixels.meta.pixelId : null,
+        tiktokPixelId: pixels.tiktok?.enabled ? pixels.tiktok.pixelId : null,
+        snapchatPixelId: pixels.snapchat?.enabled ? pixels.snapchat.pixelId : null,
+        googleAnalyticsId: pixels.googleAnalytics?.enabled ? pixels.googleAnalytics.measurementId : null,
+        googleTagManagerId: pixels.googleTagManager?.enabled ? pixels.googleTagManager.containerId : null,
+        googleAdsId: pixels.googleAds?.enabled ? pixels.googleAds.conversionId : null,
+        twitterPixelId: pixels.twitter?.enabled ? pixels.twitter.pixelId : null,
+        pinterestTagId: pixels.pinterest?.enabled ? pixels.pinterest.tagId : null,
+      },
+    });
+
+    return updatedStore;
   }
 }
