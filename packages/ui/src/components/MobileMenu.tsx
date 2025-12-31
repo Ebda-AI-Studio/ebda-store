@@ -124,14 +124,16 @@ export const MobileMenu = forwardRef<HTMLDivElement, MobileMenuProps>(
 
     // Handle body scroll lock and reset submenu state when menu closes
     useEffect(() => {
-      if (isOpen) {
-        document.body.style.overflow = 'hidden';
-      } else {
-        document.body.style.overflow = '';
-        // Reset submenu state when closed
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setSubmenuStack([]);
-      }
+      const handleMenuState = () => {
+        if (isOpen) {
+          document.body.style.overflow = 'hidden';
+        } else {
+          document.body.style.overflow = '';
+          // Reset submenu state when closed
+          setSubmenuStack([]);
+        }
+      };
+      handleMenuState();
       return () => {
         document.body.style.overflow = '';
       };
