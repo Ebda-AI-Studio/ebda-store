@@ -49,18 +49,25 @@ export default function BoldProductCard({
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-            <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            <svg
+              className="w-16 h-16"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+              />
             </svg>
           </div>
         )}
 
         {/* Badges - playful rotations */}
-        <ProductBadgeGroup
-          absolute
-          position={isRtl ? 'top-right' : 'top-left'}
-          isRtl={isRtl}
-        >
+        <ProductBadgeGroup absolute position={isRtl ? 'top-right' : 'top-left'} isRtl={isRtl}>
           {discount > 0 && (
             <ProductBadge
               variant="sale"
@@ -87,7 +94,7 @@ export default function BoldProductCard({
             'absolute bottom-4 inset-x-4 transition-all duration-300',
             isHovered ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
           )}
-          onClick={(e) => e.preventDefault()}
+          onClick={e => e.preventDefault()}
         >
           <AddToCartButton
             productId={product.id}

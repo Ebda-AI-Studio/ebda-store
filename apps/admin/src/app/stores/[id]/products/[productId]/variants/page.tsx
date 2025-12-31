@@ -117,9 +117,12 @@ export default function ProductVariantsPage() {
   async function handleAddOption() {
     if (!newOptionName.trim() || !newOptionValues.trim()) return;
 
-    const values = newOptionValues.split(',').map(v => ({
-      value: v.trim(),
-    })).filter(v => v.value);
+    const values = newOptionValues
+      .split(',')
+      .map(v => ({
+        value: v.trim(),
+      }))
+      .filter(v => v.value);
 
     try {
       const token = localStorage.getItem('authToken');
@@ -256,7 +259,9 @@ export default function ProductVariantsPage() {
             sku: variantForm.sku || null,
             barcode: variantForm.barcode || null,
             price: variantForm.price ? parseInt(variantForm.price) : null,
-            compareAtPrice: variantForm.compareAtPrice ? parseInt(variantForm.compareAtPrice) : null,
+            compareAtPrice: variantForm.compareAtPrice
+              ? parseInt(variantForm.compareAtPrice)
+              : null,
             costPrice: variantForm.costPrice ? parseInt(variantForm.costPrice) : null,
             inventory: parseInt(variantForm.inventory) || 0,
             weight: variantForm.weight ? parseFloat(variantForm.weight) : null,
@@ -339,7 +344,12 @@ export default function ProductVariantsPage() {
       actions={
         <Button variant="outline" onClick={() => router.push(`/stores/${storeId}/products`)}>
           <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M10 19l-7-7m0 0l7-7m-7 7h18"
+            />
           </svg>
           Back to Products
         </Button>
@@ -350,7 +360,11 @@ export default function ProductVariantsPage() {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="font-semibold text-gray-900">{product.name}</h2>
-            {product.nameAr && <p className="text-sm text-gray-500" dir="rtl">{product.nameAr}</p>}
+            {product.nameAr && (
+              <p className="text-sm text-gray-500" dir="rtl">
+                {product.nameAr}
+              </p>
+            )}
             <p className="text-sm text-gray-500 mt-1">Base Price: {formatPrice(product.price)}</p>
           </div>
           <div className="text-right">
@@ -376,7 +390,9 @@ export default function ProductVariantsPage() {
             {options.length === 0 ? (
               <div className="p-6 text-center text-gray-500">
                 <p className="text-sm">No options defined yet.</p>
-                <p className="text-xs mt-1">Add options like &quot;Size&quot; or &quot;Color&quot;</p>
+                <p className="text-xs mt-1">
+                  Add options like &quot;Size&quot; or &quot;Color&quot;
+                </p>
               </div>
             ) : (
               <div className="divide-y">
@@ -386,15 +402,27 @@ export default function ProductVariantsPage() {
                       <div>
                         <p className="font-medium text-gray-900">{option.name}</p>
                         {option.nameAr && (
-                          <p className="text-xs text-gray-500" dir="rtl">{option.nameAr}</p>
+                          <p className="text-xs text-gray-500" dir="rtl">
+                            {option.nameAr}
+                          </p>
                         )}
                       </div>
                       <button
                         onClick={() => handleDeleteOption(option.id)}
                         className="text-gray-400 hover:text-red-600"
                       >
-                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        <svg
+                          className="h-4 w-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                          />
                         </svg>
                       </button>
                     </div>
@@ -409,8 +437,18 @@ export default function ProductVariantsPage() {
                             onClick={() => handleDeleteValue(value.id)}
                             className="text-gray-400 hover:text-red-600"
                           >
-                            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            <svg
+                              className="h-3 w-3"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M6 18L18 6M6 6l12 12"
+                              />
                             </svg>
                           </button>
                         </span>
@@ -432,7 +470,12 @@ export default function ProductVariantsPage() {
           {options.length > 0 && (
             <Button className="w-full" onClick={handleGenerateVariants}>
               <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
               </svg>
               Generate All Variants
             </Button>
@@ -442,15 +485,23 @@ export default function ProductVariantsPage() {
         {/* Variants Table */}
         <div className="lg:col-span-2 rounded-xl border bg-white shadow-sm">
           <div className="border-b p-4">
-            <h3 className="font-semibold text-gray-900">
-              Variants ({variants.length})
-            </h3>
+            <h3 className="font-semibold text-gray-900">Variants ({variants.length})</h3>
           </div>
 
           {variants.length === 0 ? (
             <div className="p-6 text-center text-gray-500">
-              <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              <svg
+                className="mx-auto h-12 w-12 text-gray-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                />
               </svg>
               <p className="mt-2 text-sm">No variants created yet.</p>
               <p className="text-xs">Add options and click &quot;Generate All Variants&quot;</p>
@@ -474,14 +525,16 @@ export default function ProductVariantsPage() {
                       <td className="px-4 py-3">
                         <p className="font-medium text-gray-900">{variant.title}</p>
                         {variant.titleAr && (
-                          <p className="text-xs text-gray-500" dir="rtl">{variant.titleAr}</p>
+                          <p className="text-xs text-gray-500" dir="rtl">
+                            {variant.titleAr}
+                          </p>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-gray-600">
-                        {variant.sku || '-'}
-                      </td>
+                      <td className="px-4 py-3 text-gray-600">{variant.sku || '-'}</td>
                       <td className="px-4 py-3 text-right">
-                        {variant.price ? formatPrice(variant.price) : (
+                        {variant.price ? (
+                          formatPrice(variant.price)
+                        ) : (
                           <span className="text-gray-400">Base</span>
                         )}
                       </td>
@@ -501,16 +554,36 @@ export default function ProductVariantsPage() {
                             onClick={() => openEditVariant(variant)}
                             className="text-gray-400 hover:text-primary"
                           >
-                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            <svg
+                              className="h-4 w-4"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                              />
                             </svg>
                           </button>
                           <button
                             onClick={() => handleDeleteVariant(variant.id)}
                             className="text-gray-400 hover:text-red-600"
                           >
-                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            <svg
+                              className="h-4 w-4"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                              />
                             </svg>
                           </button>
                         </div>
@@ -664,7 +737,9 @@ export default function ProductVariantsPage() {
                     id="variantCompareAt"
                     type="number"
                     value={variantForm.compareAtPrice}
-                    onChange={e => setVariantForm(prev => ({ ...prev, compareAtPrice: e.target.value }))}
+                    onChange={e =>
+                      setVariantForm(prev => ({ ...prev, compareAtPrice: e.target.value }))
+                    }
                     className="mt-1"
                   />
                 </div>

@@ -172,9 +172,8 @@ export class ShippingService {
     // Try to find exact match for area
     let matchedZone = zones.find(zone => {
       const areas = zone.areas as string[];
-      return areas.some(a =>
-        a.toLowerCase() === area.toLowerCase() ||
-        area.toLowerCase().includes(a.toLowerCase())
+      return areas.some(
+        a => a.toLowerCase() === area.toLowerCase() || area.toLowerCase().includes(a.toLowerCase())
       );
     });
 

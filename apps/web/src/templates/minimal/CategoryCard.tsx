@@ -7,10 +7,7 @@ export default function MinimalCategoryCard({ category, isRtl = false }: Categor
   const displayName = isRtl && category.nameAr ? category.nameAr : category.name;
 
   return (
-    <Link
-      href={`/products?category=${category.slug}`}
-      className="group block"
-    >
+    <Link href={`/products?category=${category.slug}`} className="group block">
       {/* Image - Clean square */}
       <div className="aspect-square bg-muted overflow-hidden mb-4">
         {category.image ? (

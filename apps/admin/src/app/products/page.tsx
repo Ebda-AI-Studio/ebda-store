@@ -112,9 +112,7 @@ export default function ProductsPage() {
   };
 
   const toggleSelect = (id: string) => {
-    setSelectedProducts(prev =>
-      prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]
-    );
+    setSelectedProducts(prev => (prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]));
   };
 
   const handleDelete = (product: Product) => {
@@ -157,7 +155,7 @@ export default function ProductsPage() {
       setBulkDeleting(true);
 
       // Delete each selected product
-      const deletePromises = selectedProducts.map(async (productId) => {
+      const deletePromises = selectedProducts.map(async productId => {
         const product = products.find(p => p.id === productId);
         if (!product) return;
 
@@ -192,7 +190,7 @@ export default function ProductsPage() {
       setBulkStatusUpdating(true);
 
       // Update each selected product's status
-      const updatePromises = selectedProducts.map(async (productId) => {
+      const updatePromises = selectedProducts.map(async productId => {
         const product = products.find(p => p.id === productId);
         if (!product) return;
 
@@ -201,7 +199,7 @@ export default function ProductsPage() {
           {
             method: 'PUT',
             headers: {
-              'Authorization': `Bearer ${token}`,
+              Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({ status: selectedBulkStatus }),
@@ -212,9 +210,9 @@ export default function ProductsPage() {
       await Promise.all(updatePromises);
 
       // Update status in local state
-      setProducts(prev => prev.map(p =>
-        selectedProducts.includes(p.id) ? { ...p, status: selectedBulkStatus } : p
-      ));
+      setProducts(prev =>
+        prev.map(p => (selectedProducts.includes(p.id) ? { ...p, status: selectedBulkStatus } : p))
+      );
       setSelectedProducts([]);
     } catch (error) {
       console.error('Error updating products:', error);
@@ -227,7 +225,11 @@ export default function ProductsPage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'active':
-        return <Badge variant="default" className="bg-green-100 text-green-700">Active</Badge>;
+        return (
+          <Badge variant="default" className="bg-green-100 text-green-700">
+            Active
+          </Badge>
+        );
       case 'draft':
         return <Badge variant="secondary">Draft</Badge>;
       case 'archived':
@@ -255,7 +257,12 @@ export default function ProductsPage() {
         <Link href="/products/new">
           <Button size="sm">
             <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 4v16m8-8H4"
+              />
             </svg>
             Add Product
           </Button>
@@ -309,7 +316,12 @@ export default function ProductsPage() {
             onClick={() => setIsBulkStatusModalOpen(true)}
           >
             <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+              />
             </svg>
             Change Status
           </Button>
@@ -320,7 +332,12 @@ export default function ProductsPage() {
             onClick={() => setIsBulkDeleteModalOpen(true)}
           >
             <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+              />
             </svg>
             Delete Selected
           </Button>
@@ -337,11 +354,7 @@ export default function ProductsPage() {
 
       {/* Error State */}
       {error && !loading && (
-        <ErrorState
-          title="Failed to load products"
-          message={error}
-          onRetry={fetchProducts}
-        />
+        <ErrorState title="Failed to load products" message={error} onRetry={fetchProducts} />
       )}
 
       {/* Loading State */}
@@ -359,7 +372,10 @@ export default function ProductsPage() {
                   <th className="w-12 px-4 py-3">
                     <input
                       type="checkbox"
-                      checked={selectedProducts.length === filteredProducts.length && filteredProducts.length > 0}
+                      checked={
+                        selectedProducts.length === filteredProducts.length &&
+                        filteredProducts.length > 0
+                      }
                       onChange={toggleSelectAll}
                       className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
                     />
@@ -410,37 +426,77 @@ export default function ProductsPage() {
                           </div>
                         ) : (
                           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-primary/10 to-orange-100">
-                            <svg className="h-5 w-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                            <svg
+                              className="h-5 w-5 text-primary"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={1.5}
+                                d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                              />
                             </svg>
                           </div>
                         )}
-                        <Link href={`/products/${product.id}`} className="font-medium text-gray-900 hover:text-primary">
+                        <Link
+                          href={`/products/${product.id}`}
+                          className="font-medium text-gray-900 hover:text-primary"
+                        >
                           {product.name}
                         </Link>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-500 font-mono">{product.sku || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-500 font-mono">
+                      {product.sku || '-'}
+                    </td>
                     <td className="px-4 py-3">
-                      <Link href={`/stores/${product.store.id}`} className="text-sm text-gray-600 hover:text-primary">
+                      <Link
+                        href={`/stores/${product.store.id}`}
+                        className="text-sm text-gray-600 hover:text-primary"
+                      >
                         {product.store.name}
                       </Link>
                     </td>
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900">{formatPrice(product.price)}</td>
+                    <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                      {formatPrice(product.price)}
+                    </td>
                     <td className="px-4 py-3 text-sm">{getInventoryStatus(product.inventory)}</td>
                     <td className="px-4 py-3">{getStatusBadge(product.status)}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-2">
                         <Link href={`/products/${product.id}`}>
                           <Button variant="ghost" size="sm">
-                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            <svg
+                              className="h-4 w-4"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                              />
                             </svg>
                           </Button>
                         </Link>
                         <Button variant="ghost" size="sm" onClick={() => handleDelete(product)}>
-                          <svg className="h-4 w-4 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          <svg
+                            className="h-4 w-4 text-red-500"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                            />
                           </svg>
                         </Button>
                       </div>
@@ -452,12 +508,24 @@ export default function ProductsPage() {
 
             {filteredProducts.length === 0 && (
               <div className="py-12 text-center">
-                <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                <svg
+                  className="mx-auto h-12 w-12 text-gray-400"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                  />
                 </svg>
                 <h3 className="mt-4 text-sm font-medium text-gray-900">No products found</h3>
                 <p className="mt-1 text-sm text-gray-500">
-                  {search ? 'Try adjusting your search criteria.' : 'Get started by adding your first product.'}
+                  {search
+                    ? 'Try adjusting your search criteria.'
+                    : 'Get started by adding your first product.'}
                 </p>
                 <Link href="/products/new">
                   <Button className="mt-4">Add Product</Button>
@@ -470,7 +538,8 @@ export default function ProductsPage() {
           {pagination && pagination.totalPages > 1 && (
             <div className="mt-4 flex items-center justify-between">
               <p className="text-sm text-gray-600">
-                Showing {((page - 1) * 20) + 1} to {Math.min(page * 20, pagination.total)} of {pagination.total} products
+                Showing {(page - 1) * 20 + 1} to {Math.min(page * 20, pagination.total)} of{' '}
+                {pagination.total} products
               </p>
               <div className="flex gap-2">
                 <Button
@@ -502,13 +571,24 @@ export default function ProductsPage() {
         title="Delete Product"
       >
         <p className="text-sm text-muted-foreground">
-          Are you sure you want to delete <strong>{productToDelete?.name}</strong>? This action cannot be undone.
+          Are you sure you want to delete <strong>{productToDelete?.name}</strong>? This action
+          cannot be undone.
         </p>
         <div className="mt-6 flex justify-end gap-3">
-          <Button variant="outline" className="rounded-xl" onClick={() => setIsDeleteModalOpen(false)} disabled={deleting}>
+          <Button
+            variant="outline"
+            className="rounded-xl"
+            onClick={() => setIsDeleteModalOpen(false)}
+            disabled={deleting}
+          >
             Cancel
           </Button>
-          <Button variant="destructive" className="rounded-xl" onClick={confirmDelete} disabled={deleting}>
+          <Button
+            variant="destructive"
+            className="rounded-xl"
+            onClick={confirmDelete}
+            disabled={deleting}
+          >
             {deleting ? 'Deleting...' : 'Delete'}
           </Button>
         </div>
@@ -521,13 +601,24 @@ export default function ProductsPage() {
         title="Delete Selected Products"
       >
         <p className="text-sm text-muted-foreground">
-          Are you sure you want to delete <strong>{selectedProducts.length} products</strong>? This action cannot be undone.
+          Are you sure you want to delete <strong>{selectedProducts.length} products</strong>? This
+          action cannot be undone.
         </p>
         <div className="mt-6 flex justify-end gap-3">
-          <Button variant="outline" className="rounded-xl" onClick={() => setIsBulkDeleteModalOpen(false)} disabled={bulkDeleting}>
+          <Button
+            variant="outline"
+            className="rounded-xl"
+            onClick={() => setIsBulkDeleteModalOpen(false)}
+            disabled={bulkDeleting}
+          >
             Cancel
           </Button>
-          <Button variant="destructive" className="rounded-xl" onClick={confirmBulkDelete} disabled={bulkDeleting}>
+          <Button
+            variant="destructive"
+            className="rounded-xl"
+            onClick={confirmBulkDelete}
+            disabled={bulkDeleting}
+          >
             {bulkDeleting ? 'Deleting...' : `Delete ${selectedProducts.length} Products`}
           </Button>
         </div>
@@ -544,7 +635,7 @@ export default function ProductsPage() {
         </p>
         <select
           value={selectedBulkStatus}
-          onChange={(e) => setSelectedBulkStatus(e.target.value)}
+          onChange={e => setSelectedBulkStatus(e.target.value)}
           className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
         >
           <option value="active">Active</option>
@@ -552,10 +643,19 @@ export default function ProductsPage() {
           <option value="archived">Archived</option>
         </select>
         <div className="mt-6 flex justify-end gap-3">
-          <Button variant="outline" className="rounded-xl" onClick={() => setIsBulkStatusModalOpen(false)} disabled={bulkStatusUpdating}>
+          <Button
+            variant="outline"
+            className="rounded-xl"
+            onClick={() => setIsBulkStatusModalOpen(false)}
+            disabled={bulkStatusUpdating}
+          >
             Cancel
           </Button>
-          <Button className="rounded-xl" onClick={confirmBulkStatusUpdate} disabled={bulkStatusUpdating}>
+          <Button
+            className="rounded-xl"
+            onClick={confirmBulkStatusUpdate}
+            disabled={bulkStatusUpdating}
+          >
             {bulkStatusUpdating ? 'Updating...' : 'Update Status'}
           </Button>
         </div>

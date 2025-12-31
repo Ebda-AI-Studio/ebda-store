@@ -137,7 +137,8 @@ async function fetchStoreByDomain(domain: string): Promise<ResolvedStore | null>
       whatsapp: storeData.whatsapp,
       address: storeData.address,
       addressAr: storeData.addressAr,
-      announcementBar: typeof storeData.announcementBar === 'object' ? storeData.announcementBar : undefined,
+      announcementBar:
+        typeof storeData.announcementBar === 'object' ? storeData.announcementBar : undefined,
       metaTitle: storeData.metaTitle,
       metaTitleAr: storeData.metaTitleAr,
       metaDescription: storeData.metaDescription,
@@ -245,7 +246,8 @@ export async function getStoreById(storeId: string): Promise<ResolvedStore | nul
       whatsapp: storeData.whatsapp,
       address: storeData.address,
       addressAr: storeData.addressAr,
-      announcementBar: typeof storeData.announcementBar === 'object' ? storeData.announcementBar : undefined,
+      announcementBar:
+        typeof storeData.announcementBar === 'object' ? storeData.announcementBar : undefined,
       metaTitle: storeData.metaTitle,
       metaTitleAr: storeData.metaTitleAr,
       metaDescription: storeData.metaDescription,

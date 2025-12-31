@@ -17,19 +17,12 @@ export default function BoldAnnouncementBar({
     <div className="flex items-center justify-center gap-3">
       <span className="text-xl">🔥</span>
       <span className="font-black tracking-wide">{displayText}</span>
-      {link && (
-        <span className="inline-flex items-center gap-1 font-black">
-          →
-        </span>
-      )}
+      {link && <span className="inline-flex items-center gap-1 font-black">→</span>}
     </div>
   );
 
   return (
-    <div
-      className="bg-primary text-primary-foreground py-3 px-4"
-      dir={isRtl ? 'rtl' : 'ltr'}
-    >
+    <div className="bg-primary text-primary-foreground py-3 px-4" dir={isRtl ? 'rtl' : 'ltr'}>
       <div className="container mx-auto">
         {link ? (
           <Link href={link} className="block hover:opacity-80 transition-opacity">

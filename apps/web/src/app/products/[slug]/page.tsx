@@ -14,7 +14,8 @@ const product = {
   slug: 'premium-wireless-headphones',
   price: 29900,
   compareAtPrice: 34900,
-  description: 'Experience premium sound quality with our wireless headphones. Featuring active noise cancellation, 30-hour battery life, and ultra-comfortable ear cushions for extended listening sessions.',
+  description:
+    'Experience premium sound quality with our wireless headphones. Featuring active noise cancellation, 30-hour battery life, and ultra-comfortable ear cushions for extended listening sessions.',
   features: [
     'Active Noise Cancellation',
     '30-hour battery life',
@@ -34,9 +35,27 @@ const product = {
 };
 
 const relatedProducts = [
-  { id: '2', name: 'Smart Watch Pro', slug: 'smart-watch-pro', price: 39900, category: 'Wearables' },
-  { id: '3', name: 'Wireless Mechanical Keyboard', slug: 'wireless-mechanical-keyboard', price: 14900, category: 'Accessories' },
-  { id: '4', name: 'Portable Bluetooth Speaker', slug: 'portable-bluetooth-speaker', price: 12900, category: 'Electronics' },
+  {
+    id: '2',
+    name: 'Smart Watch Pro',
+    slug: 'smart-watch-pro',
+    price: 39900,
+    category: 'Wearables',
+  },
+  {
+    id: '3',
+    name: 'Wireless Mechanical Keyboard',
+    slug: 'wireless-mechanical-keyboard',
+    price: 14900,
+    category: 'Accessories',
+  },
+  {
+    id: '4',
+    name: 'Portable Bluetooth Speaker',
+    slug: 'portable-bluetooth-speaker',
+    price: 12900,
+    category: 'Electronics',
+  },
 ];
 
 function formatPrice(cents: number) {
@@ -57,14 +76,17 @@ export default function ProductDetailPage() {
     setIsAdding(true);
     // Simulate API call delay for UX
     await new Promise(resolve => setTimeout(resolve, 300));
-    addItem({
-      id: product.id,
-      name: product.name,
-      price: product.price,
-      slug: product.slug,
-      image: product.images[0]?.url,
-      category: product.category,
-    }, quantity);
+    addItem(
+      {
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        slug: product.slug,
+        image: product.images[0]?.url,
+        category: product.category,
+      },
+      quantity
+    );
     setIsAdding(false);
     success('Added to cart!', `${quantity}x ${product.name} added to your cart`);
   };
@@ -76,9 +98,13 @@ export default function ProductDetailPage() {
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 flex-1">
         {/* Breadcrumb */}
         <nav className="mb-8 flex items-center gap-2 text-sm text-gray-500">
-          <Link href="/" className="hover:text-primary">Home</Link>
+          <Link href="/" className="hover:text-primary">
+            Home
+          </Link>
           <span>/</span>
-          <Link href="/products" className="hover:text-primary">Products</Link>
+          <Link href="/products" className="hover:text-primary">
+            Products
+          </Link>
           <span>/</span>
           <span className="text-gray-900">{product.name}</span>
         </nav>
@@ -90,8 +116,18 @@ export default function ProductDetailPage() {
             <div className="aspect-square overflow-hidden rounded-2xl bg-gradient-to-br from-orange-50 to-orange-100">
               <div className="flex h-full items-center justify-center">
                 <div className="mx-auto flex h-40 w-40 items-center justify-center rounded-full bg-primary/20">
-                  <svg className="h-20 w-20 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                  <svg
+                    className="h-20 w-20 text-primary"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                    />
                   </svg>
                 </div>
               </div>
@@ -102,13 +138,25 @@ export default function ProductDetailPage() {
                   key={index}
                   onClick={() => setSelectedImage(index)}
                   className={`aspect-square overflow-hidden rounded-lg bg-gradient-to-br from-orange-50 to-orange-100 transition ${
-                    selectedImage === index ? 'ring-2 ring-primary' : 'hover:ring-2 hover:ring-gray-300'
+                    selectedImage === index
+                      ? 'ring-2 ring-primary'
+                      : 'hover:ring-2 hover:ring-gray-300'
                   }`}
                 >
                   <div className="flex h-full items-center justify-center">
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/20">
-                      <svg className="h-5 w-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                      <svg
+                        className="h-5 w-5 text-primary"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1.5}
+                          d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                        />
                       </svg>
                     </div>
                   </div>
@@ -131,9 +179,7 @@ export default function ProductDetailPage() {
             <h1 className="text-3xl font-bold text-gray-900">{product.name}</h1>
 
             <div className="mt-4 flex items-baseline gap-3">
-              <span className="text-3xl font-bold text-primary">
-                {formatPrice(product.price)}
-              </span>
+              <span className="text-3xl font-bold text-primary">{formatPrice(product.price)}</span>
               {product.compareAtPrice && (
                 <span className="text-xl text-gray-400 line-through">
                   {formatPrice(product.compareAtPrice)}
@@ -141,9 +187,7 @@ export default function ProductDetailPage() {
               )}
             </div>
 
-            <p className="mt-6 text-gray-600 leading-relaxed">
-              {product.description}
-            </p>
+            <p className="mt-6 text-gray-600 leading-relaxed">{product.description}</p>
 
             {/* Features */}
             <div className="mt-6">
@@ -151,8 +195,18 @@ export default function ProductDetailPage() {
               <ul className="mt-3 space-y-2">
                 {product.features.map((feature, index) => (
                   <li key={index} className="flex items-center gap-2 text-sm text-gray-600">
-                    <svg className="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    <svg
+                      className="h-4 w-4 text-primary"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M5 13l4 4L19 7"
+                      />
                     </svg>
                     {feature}
                   </li>
@@ -179,23 +233,21 @@ export default function ProductDetailPage() {
                     +
                   </button>
                 </div>
-                <span className="text-sm text-gray-500">
-                  {product.inventory} in stock
-                </span>
+                <span className="text-sm text-gray-500">{product.inventory} in stock</span>
               </div>
 
               <div className="flex gap-4">
-                <Button
-                  size="lg"
-                  className="flex-1"
-                  onClick={handleAddToCart}
-                  isLoading={isAdding}
-                >
+                <Button size="lg" className="flex-1" onClick={handleAddToCart} isLoading={isAdding}>
                   Add to Cart
                 </Button>
                 <Button size="lg" variant="outline">
                   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                    />
                   </svg>
                 </Button>
               </div>
@@ -221,15 +273,27 @@ export default function ProductDetailPage() {
                 <div className="aspect-square overflow-hidden rounded-lg bg-gradient-to-br from-orange-50 to-orange-100">
                   <div className="flex h-full items-center justify-center">
                     <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/20">
-                      <svg className="h-8 w-8 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                      <svg
+                        className="h-8 w-8 text-primary"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1.5}
+                          d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                        />
                       </svg>
                     </div>
                   </div>
                 </div>
                 <div className="mt-4">
                   <p className="text-xs text-gray-500">{item.category}</p>
-                  <h3 className="mt-1 font-medium text-gray-900 group-hover:text-primary">{item.name}</h3>
+                  <h3 className="mt-1 font-medium text-gray-900 group-hover:text-primary">
+                    {item.name}
+                  </h3>
                   <p className="mt-2 font-bold text-primary">{formatPrice(item.price)}</p>
                 </div>
               </Link>

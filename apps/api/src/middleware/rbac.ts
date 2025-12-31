@@ -48,11 +48,7 @@ export type Permission =
 export type Role = 'customer' | 'admin' | 'super_admin';
 
 const rolePermissions: Record<Role, Permission[]> = {
-  customer: [
-    'products:read',
-    'orders:read',
-    'ai:use',
-  ],
+  customer: ['products:read', 'orders:read', 'ai:use'],
   admin: [
     // All customer permissions
     'products:read',

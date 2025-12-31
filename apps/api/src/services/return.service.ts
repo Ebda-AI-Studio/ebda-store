@@ -168,7 +168,7 @@ export class ReturnService {
     const refundAmount = data.items.reduce((total, item) => {
       const orderItem = order.items.find(oi => oi.id === item.orderItemId);
       if (orderItem) {
-        return total + (orderItem.price * item.quantity);
+        return total + orderItem.price * item.quantity;
       }
       return total;
     }, 0);
@@ -328,12 +328,7 @@ export class ReturnService {
   /**
    * Complete return and process refund
    */
-  static async complete(
-    storeId: string,
-    returnId: string,
-    _userId: string,
-    refundMethod: string
-  ) {
+  static async complete(storeId: string, returnId: string, _userId: string, refundMethod: string) {
     const returnRequest = await this.getById(storeId, returnId);
 
     if (returnRequest.status !== 'received' && returnRequest.status !== 'inspecting') {

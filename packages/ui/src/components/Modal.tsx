@@ -25,10 +25,7 @@ export function Modal({ isOpen, onClose, children, title, className, size = 'md'
   return (
     <Fragment>
       {/* Backdrop */}
-      <div
-        className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
-        onClick={onClose}
-      />
+      <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       {/* Modal */}
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div
@@ -47,14 +44,17 @@ export function Modal({ isOpen, onClose, children, title, className, size = 'md'
                 className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
               >
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </button>
             </div>
           )}
-          <div className="px-6 py-4">
-            {children}
-          </div>
+          <div className="px-6 py-4">{children}</div>
         </div>
       </div>
     </Fragment>
@@ -62,25 +62,15 @@ export function Modal({ isOpen, onClose, children, title, className, size = 'md'
 }
 
 export function ModalHeader({ children, className }: { children: ReactNode; className?: string }) {
-  return (
-    <div className={cn('border-b px-6 py-4', className)}>
-      {children}
-    </div>
-  );
+  return <div className={cn('border-b px-6 py-4', className)}>{children}</div>;
 }
 
 export function ModalBody({ children, className }: { children: ReactNode; className?: string }) {
-  return (
-    <div className={cn('px-6 py-4', className)}>
-      {children}
-    </div>
-  );
+  return <div className={cn('px-6 py-4', className)}>{children}</div>;
 }
 
 export function ModalFooter({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className={cn('border-t px-6 py-4 flex justify-end gap-3', className)}>
-      {children}
-    </div>
+    <div className={cn('border-t px-6 py-4 flex justify-end gap-3', className)}>{children}</div>
   );
 }

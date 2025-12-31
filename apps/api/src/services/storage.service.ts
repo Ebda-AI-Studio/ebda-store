@@ -1,4 +1,9 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import {
+  S3Client,
+  PutObjectCommand,
+  DeleteObjectCommand,
+  GetObjectCommand,
+} from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
@@ -137,9 +142,7 @@ export class StorageService {
     files: Array<{ buffer: Buffer; filename: string }>,
     options: UploadOptions = {}
   ): Promise<UploadResult[]> {
-    return Promise.all(
-      files.map(file => this.upload(file.buffer, file.filename, options))
-    );
+    return Promise.all(files.map(file => this.upload(file.buffer, file.filename, options)));
   }
 
   /**
@@ -220,7 +223,8 @@ export class StorageService {
    * Extract key from URL
    */
   static getKeyFromUrl(url: string): string | null {
-    const publicUrl = config.storagePublicUrl || `${config.storageEndpoint}/${config.storageBucket}`;
+    const publicUrl =
+      config.storagePublicUrl || `${config.storageEndpoint}/${config.storageBucket}`;
     if (url.startsWith(publicUrl)) {
       return url.replace(`${publicUrl}/`, '');
     }

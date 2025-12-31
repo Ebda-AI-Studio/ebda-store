@@ -68,7 +68,7 @@ export default function ReviewsPage() {
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/reviews/admin?status=${filter}&page=${meta.page}&limit=${meta.limit}`,
         {
-          headers: { 'Authorization': `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` },
         }
       );
       if (response.ok) {
@@ -90,10 +90,13 @@ export default function ReviewsPage() {
   async function handleApprove(reviewId: string) {
     try {
       const token = localStorage.getItem('authToken');
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/reviews/admin/${reviewId}/approve`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/reviews/admin/${reviewId}/approve`,
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
       fetchReviews();
     } catch (error) {
       console.error('Failed to approve review:', error);
@@ -103,10 +106,13 @@ export default function ReviewsPage() {
   async function handleReject(reviewId: string) {
     try {
       const token = localStorage.getItem('authToken');
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/reviews/admin/${reviewId}/reject`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/reviews/admin/${reviewId}/reject`,
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
       fetchReviews();
     } catch (error) {
       console.error('Failed to reject review:', error);
@@ -117,10 +123,13 @@ export default function ReviewsPage() {
     if (!confirm('Are you sure you want to delete this review?')) return;
     try {
       const token = localStorage.getItem('authToken');
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/reviews/admin/${reviewId}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/reviews/admin/${reviewId}`,
+        {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
       fetchReviews();
     } catch (error) {
       console.error('Failed to delete review:', error);
@@ -128,10 +137,7 @@ export default function ReviewsPage() {
   }
 
   return (
-    <AdminLayout
-      title="Reviews"
-      subtitle="Manage product reviews and ratings"
-    >
+    <AdminLayout title="Reviews" subtitle="Manage product reviews and ratings">
       {/* Filters */}
       <div className="mb-6 flex gap-2">
         <Button
@@ -165,7 +171,7 @@ export default function ReviewsPage() {
           <div className="p-8 text-center text-gray-500">No reviews found</div>
         ) : (
           <div className="divide-y">
-            {reviews.map((review) => (
+            {reviews.map(review => (
               <div key={review.id} className="p-6">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
@@ -191,10 +197,12 @@ export default function ReviewsPage() {
 
                     <div className="flex items-center gap-4 text-xs text-gray-500">
                       <span>
-                        Product: <span className="font-medium text-gray-700">{review.product.name}</span>
+                        Product:{' '}
+                        <span className="font-medium text-gray-700">{review.product.name}</span>
                       </span>
                       <span>
-                        By: <span className="font-medium text-gray-700">
+                        By:{' '}
+                        <span className="font-medium text-gray-700">
                           {review.customer
                             ? `${review.customer.firstName} ${review.customer.lastName}`
                             : 'Anonymous'}
@@ -207,19 +215,12 @@ export default function ReviewsPage() {
 
                   <div className="flex gap-2">
                     {!review.isApproved && (
-                      <Button
-                        size="sm"
-                        onClick={() => handleApprove(review.id)}
-                      >
+                      <Button size="sm" onClick={() => handleApprove(review.id)}>
                         Approve
                       </Button>
                     )}
                     {review.isApproved && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleReject(review.id)}
-                      >
+                      <Button variant="outline" size="sm" onClick={() => handleReject(review.id)}>
                         Unapprove
                       </Button>
                     )}
@@ -242,7 +243,8 @@ export default function ReviewsPage() {
         {meta.totalPages > 1 && (
           <div className="flex items-center justify-between border-t px-6 py-3">
             <p className="text-sm text-gray-500">
-              Showing {(meta.page - 1) * meta.limit + 1} to {Math.min(meta.page * meta.limit, meta.total)} of {meta.total} reviews
+              Showing {(meta.page - 1) * meta.limit + 1} to{' '}
+              {Math.min(meta.page * meta.limit, meta.total)} of {meta.total} reviews
             </p>
             <div className="flex gap-2">
               <Button

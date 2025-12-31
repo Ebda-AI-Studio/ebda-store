@@ -51,9 +51,11 @@ export class InventoryService {
 
     const totalProducts = products.length;
     const totalStock = products.reduce((sum, p) => sum + p.inventory, 0);
-    const lowStockCount = products.filter(p => p.inventory > 0 && p.inventory <= p.lowStockThreshold).length;
+    const lowStockCount = products.filter(
+      p => p.inventory > 0 && p.inventory <= p.lowStockThreshold
+    ).length;
     const outOfStockCount = products.filter(p => p.inventory <= 0).length;
-    const totalValue = products.reduce((sum, p) => sum + (p.inventory * (p.costPrice || 0)), 0);
+    const totalValue = products.reduce((sum, p) => sum + p.inventory * (p.costPrice || 0), 0);
 
     return {
       totalProducts,
@@ -77,7 +79,10 @@ export class InventoryService {
       sortBy?: 'name' | 'inventory' | 'sku';
       sortOrder?: 'asc' | 'desc';
     }
-  ): Promise<{ products: ProductInventory[]; pagination: { page: number; limit: number; total: number; totalPages: number } }> {
+  ): Promise<{
+    products: ProductInventory[];
+    pagination: { page: number; limit: number; total: number; totalPages: number };
+  }> {
     const page = options?.page || 1;
     const limit = options?.limit || 20;
     const skip = (page - 1) * limit;
@@ -264,7 +269,10 @@ export class InventoryService {
         trackInventory: updatedProduct.trackInventory,
         costPrice: updatedProduct.costPrice,
         status: updatedProduct.status,
-        stockStatus: this.getStockStatus(updatedProduct.inventory, updatedProduct.lowStockThreshold),
+        stockStatus: this.getStockStatus(
+          updatedProduct.inventory,
+          updatedProduct.lowStockThreshold
+        ),
         stockValue: updatedProduct.inventory * (updatedProduct.costPrice || 0),
       },
       history,
@@ -289,7 +297,9 @@ export class InventoryService {
         successful++;
       } catch (error) {
         failed++;
-        errors.push(`Product ${adjustment.productId}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        errors.push(
+          `Product ${adjustment.productId}: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
       }
     }
 
@@ -359,7 +369,10 @@ export class InventoryService {
         trackInventory: updatedProduct.trackInventory,
         costPrice: updatedProduct.costPrice,
         status: updatedProduct.status,
-        stockStatus: this.getStockStatus(updatedProduct.inventory, updatedProduct.lowStockThreshold),
+        stockStatus: this.getStockStatus(
+          updatedProduct.inventory,
+          updatedProduct.lowStockThreshold
+        ),
         stockValue: updatedProduct.inventory * (updatedProduct.costPrice || 0),
       },
       history,

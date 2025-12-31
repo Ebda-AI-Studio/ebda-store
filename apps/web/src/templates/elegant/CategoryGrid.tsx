@@ -28,12 +28,8 @@ export default function ElegantCategoryGrid({
 
         {/* Grid - 3 columns for elegant spacing */}
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-8 md:gap-12">
-          {categories.map((category) => (
-            <CategoryCard
-              key={category.id}
-              category={category}
-              isRtl={isRtl}
-            />
+          {categories.map(category => (
+            <CategoryCard key={category.id} category={category} isRtl={isRtl} />
           ))}
         </div>
       </div>

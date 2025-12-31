@@ -14,14 +14,18 @@ export default function BoldProductGrid({
 }: ProductGridProps) {
   const displayTitle = isRtl && titleAr ? titleAr : title;
 
-  const gridCols = {
-    2: 'grid-cols-1 sm:grid-cols-2',
-    3: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
-    4: 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4',
-  }[columns] || 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4';
+  const gridCols =
+    {
+      2: 'grid-cols-1 sm:grid-cols-2',
+      3: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
+      4: 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4',
+    }[columns] || 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4';
 
   return (
-    <section className="py-20 md:py-28 bg-background relative overflow-hidden" dir={isRtl ? 'rtl' : 'ltr'}>
+    <section
+      className="py-20 md:py-28 bg-background relative overflow-hidden"
+      dir={isRtl ? 'rtl' : 'ltr'}
+    >
       {/* Background accents */}
       <div className="absolute bottom-0 right-0 w-1/2 h-1/2 bg-primary/5 rounded-full blur-3xl translate-x-1/2 translate-y-1/2" />
 
@@ -38,7 +42,7 @@ export default function BoldProductGrid({
 
         {/* Products Grid */}
         <div className={`grid ${gridCols} gap-6 md:gap-8`}>
-          {products.map((product) => (
+          {products.map(product => (
             <ProductCard
               key={product.id}
               product={product}

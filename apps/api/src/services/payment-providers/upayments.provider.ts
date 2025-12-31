@@ -76,13 +76,13 @@ export class UPaymentsProvider implements IPaymentProvider {
     const response = await fetch(`${this.config.baseUrl}${endpoint}`, {
       method,
       headers: {
-        'Authorization': `Bearer ${this.config.apiKey}`,
+        Authorization: `Bearer ${this.config.apiKey}`,
         'Content-Type': 'application/json',
       },
       body: body ? JSON.stringify(body) : undefined,
     });
 
-    const data = await response.json() as { status?: string; message?: string };
+    const data = (await response.json()) as { status?: string; message?: string };
 
     if (!response.ok || data.status === 'error') {
       console.error('[UPAYMENTS ERROR]', data);
@@ -215,10 +215,7 @@ export class UPaymentsProvider implements IPaymentProvider {
       .update(payloadString)
       .digest('hex');
 
-    return crypto.timingSafeEqual(
-      Buffer.from(signature),
-      Buffer.from(expectedSignature)
-    );
+    return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature));
   }
 
   parseWebhook(payload: unknown): WebhookPayload {

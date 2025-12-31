@@ -22,7 +22,7 @@ export default function ReportsPage() {
       actions={
         <select
           value={dateRange}
-          onChange={(e) => setDateRange(e.target.value)}
+          onChange={e => setDateRange(e.target.value)}
           className="rounded-xl border border-input bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
         >
           <option value="today">Today</option>
@@ -34,17 +34,23 @@ export default function ReportsPage() {
       }
     >
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {reports.map((report) => (
+        {reports.map(report => (
           <div
             key={report.name}
             className="force-card p-6 hover:shadow-lg transition-shadow cursor-pointer group"
           >
             <div className="text-4xl mb-4">{report.icon}</div>
-            <h3 className="text-lg font-semibold mb-2 group-hover:text-primary transition-colors">{report.name}</h3>
+            <h3 className="text-lg font-semibold mb-2 group-hover:text-primary transition-colors">
+              {report.name}
+            </h3>
             <p className="text-muted-foreground text-sm mb-4">{report.description}</p>
             <div className="flex space-x-4">
-              <button className="text-primary hover:text-primary/80 text-sm font-medium">View</button>
-              <button className="text-muted-foreground hover:text-foreground text-sm">Export</button>
+              <button className="text-primary hover:text-primary/80 text-sm font-medium">
+                View
+              </button>
+              <button className="text-muted-foreground hover:text-foreground text-sm">
+                Export
+              </button>
             </div>
           </div>
         ))}

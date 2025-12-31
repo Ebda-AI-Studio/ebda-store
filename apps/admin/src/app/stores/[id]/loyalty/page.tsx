@@ -93,9 +93,12 @@ export default function LoyaltySettingsPage() {
   const fetchStoreName = useCallback(async () => {
     try {
       const token = localStorage.getItem('authToken');
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/stores/${storeId}`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/stores/${storeId}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
       if (res.ok) {
         const data = await res.json();
         setStoreName(data.data?.store?.name || '');
@@ -110,7 +113,7 @@ export default function LoyaltySettingsPage() {
       const token = localStorage.getItem('authToken');
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/stores/${storeId}/loyalty/settings`,
-        { headers: { 'Authorization': `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       if (res.ok) {
         const data = await res.json();
@@ -127,7 +130,7 @@ export default function LoyaltySettingsPage() {
       const token = localStorage.getItem('authToken');
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/stores/${storeId}/loyalty/stats`,
-        { headers: { 'Authorization': `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       if (res.ok) {
         const data = await res.json();
@@ -146,7 +149,7 @@ export default function LoyaltySettingsPage() {
 
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/stores/${storeId}/loyalty/members?${params}`,
-        { headers: { 'Authorization': `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       if (res.ok) {
         const data = await res.json();
@@ -183,7 +186,7 @@ export default function LoyaltySettingsPage() {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({ loyaltyEnabled: !loyaltyEnabled }),
         }
@@ -208,7 +211,7 @@ export default function LoyaltySettingsPage() {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({ settings }),
         }
@@ -233,7 +236,7 @@ export default function LoyaltySettingsPage() {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
             points: parseInt(awardPoints),
@@ -293,15 +296,21 @@ export default function LoyaltySettingsPage() {
               </div>
               <div className="bg-white rounded-xl border border-gray-200 p-4">
                 <p className="text-sm text-gray-500">Points Issued</p>
-                <p className="text-2xl font-bold text-green-600">{stats.totalPointsIssued.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-green-600">
+                  {stats.totalPointsIssued.toLocaleString()}
+                </p>
               </div>
               <div className="bg-white rounded-xl border border-gray-200 p-4">
                 <p className="text-sm text-gray-500">Points Redeemed</p>
-                <p className="text-2xl font-bold text-orange-600">{stats.totalPointsRedeemed.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-orange-600">
+                  {stats.totalPointsRedeemed.toLocaleString()}
+                </p>
               </div>
               <div className="bg-white rounded-xl border border-gray-200 p-4">
                 <p className="text-sm text-gray-500">Outstanding</p>
-                <p className="text-2xl font-bold text-blue-600">{stats.outstandingPoints.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-blue-600">
+                  {stats.outstandingPoints.toLocaleString()}
+                </p>
               </div>
               <div className="bg-white rounded-xl border border-gray-200 p-4">
                 <p className="text-sm text-gray-500 mb-2">Tier Breakdown</p>
@@ -359,7 +368,9 @@ export default function LoyaltySettingsPage() {
                       type="number"
                       min="1"
                       value={settings.pointsPerDinar}
-                      onChange={(e) => setSettings({ ...settings, pointsPerDinar: parseInt(e.target.value) || 1 })}
+                      onChange={e =>
+                        setSettings({ ...settings, pointsPerDinar: parseInt(e.target.value) || 1 })
+                      }
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                       disabled={!loyaltyEnabled}
                     />
@@ -372,7 +383,9 @@ export default function LoyaltySettingsPage() {
                       type="number"
                       min="0"
                       value={settings.signupBonus}
-                      onChange={(e) => setSettings({ ...settings, signupBonus: parseInt(e.target.value) || 0 })}
+                      onChange={e =>
+                        setSettings({ ...settings, signupBonus: parseInt(e.target.value) || 0 })
+                      }
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                       disabled={!loyaltyEnabled}
                     />
@@ -385,7 +398,9 @@ export default function LoyaltySettingsPage() {
                       type="number"
                       min="0"
                       value={settings.referralBonus}
-                      onChange={(e) => setSettings({ ...settings, referralBonus: parseInt(e.target.value) || 0 })}
+                      onChange={e =>
+                        setSettings({ ...settings, referralBonus: parseInt(e.target.value) || 0 })
+                      }
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                       disabled={!loyaltyEnabled}
                     />
@@ -398,7 +413,9 @@ export default function LoyaltySettingsPage() {
                       type="number"
                       min="0"
                       value={settings.reviewBonus}
-                      onChange={(e) => setSettings({ ...settings, reviewBonus: parseInt(e.target.value) || 0 })}
+                      onChange={e =>
+                        setSettings({ ...settings, reviewBonus: parseInt(e.target.value) || 0 })
+                      }
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                       disabled={!loyaltyEnabled}
                     />
@@ -411,7 +428,9 @@ export default function LoyaltySettingsPage() {
                       type="number"
                       min="0"
                       value={settings.birthdayBonus}
-                      onChange={(e) => setSettings({ ...settings, birthdayBonus: parseInt(e.target.value) || 0 })}
+                      onChange={e =>
+                        setSettings({ ...settings, birthdayBonus: parseInt(e.target.value) || 0 })
+                      }
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                       disabled={!loyaltyEnabled}
                     />
@@ -423,11 +442,13 @@ export default function LoyaltySettingsPage() {
               <div className="bg-white rounded-xl border border-gray-200 p-6">
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">Membership Tiers</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {(['bronze', 'silver', 'gold', 'platinum'] as const).map((tier) => (
+                  {(['bronze', 'silver', 'gold', 'platinum'] as const).map(tier => (
                     <div key={tier} className={`p-4 rounded-lg ${TIER_COLORS[tier].bg}`}>
                       <div className="flex items-center gap-2 mb-3">
                         <div className={`w-3 h-3 rounded-full ${TIER_COLORS[tier].icon}`}></div>
-                        <h3 className={`font-semibold capitalize ${TIER_COLORS[tier].text}`}>{tier}</h3>
+                        <h3 className={`font-semibold capitalize ${TIER_COLORS[tier].text}`}>
+                          {tier}
+                        </h3>
                       </div>
                       <div className="space-y-3">
                         <div>
@@ -436,13 +457,18 @@ export default function LoyaltySettingsPage() {
                             type="number"
                             min="0"
                             value={settings.tiers[tier].minPoints}
-                            onChange={(e) => setSettings({
-                              ...settings,
-                              tiers: {
-                                ...settings.tiers,
-                                [tier]: { ...settings.tiers[tier], minPoints: parseInt(e.target.value) || 0 },
-                              },
-                            })}
+                            onChange={e =>
+                              setSettings({
+                                ...settings,
+                                tiers: {
+                                  ...settings.tiers,
+                                  [tier]: {
+                                    ...settings.tiers[tier],
+                                    minPoints: parseInt(e.target.value) || 0,
+                                  },
+                                },
+                              })
+                            }
                             className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                             disabled={!loyaltyEnabled || tier === 'bronze'}
                           />
@@ -454,13 +480,18 @@ export default function LoyaltySettingsPage() {
                             step="0.05"
                             min="1"
                             value={settings.tiers[tier].multiplier}
-                            onChange={(e) => setSettings({
-                              ...settings,
-                              tiers: {
-                                ...settings.tiers,
-                                [tier]: { ...settings.tiers[tier], multiplier: parseFloat(e.target.value) || 1 },
-                              },
-                            })}
+                            onChange={e =>
+                              setSettings({
+                                ...settings,
+                                tiers: {
+                                  ...settings.tiers,
+                                  [tier]: {
+                                    ...settings.tiers[tier],
+                                    multiplier: parseFloat(e.target.value) || 1,
+                                  },
+                                },
+                              })
+                            }
                             className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                             disabled={!loyaltyEnabled}
                           />
@@ -483,11 +514,15 @@ export default function LoyaltySettingsPage() {
                       type="number"
                       min="1"
                       value={settings.pointsValue}
-                      onChange={(e) => setSettings({ ...settings, pointsValue: parseInt(e.target.value) || 1 })}
+                      onChange={e =>
+                        setSettings({ ...settings, pointsValue: parseInt(e.target.value) || 1 })
+                      }
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                       disabled={!loyaltyEnabled}
                     />
-                    <p className="text-xs text-gray-500 mt-1">1 point = {settings.pointsValue} fils</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      1 point = {settings.pointsValue} fils
+                    </p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -497,7 +532,9 @@ export default function LoyaltySettingsPage() {
                       type="number"
                       min="0"
                       value={settings.minRedeemPoints}
-                      onChange={(e) => setSettings({ ...settings, minRedeemPoints: parseInt(e.target.value) || 0 })}
+                      onChange={e =>
+                        setSettings({ ...settings, minRedeemPoints: parseInt(e.target.value) || 0 })
+                      }
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                       disabled={!loyaltyEnabled}
                     />
@@ -511,7 +548,12 @@ export default function LoyaltySettingsPage() {
                       min="0"
                       max="100"
                       value={settings.maxRedeemPercentage}
-                      onChange={(e) => setSettings({ ...settings, maxRedeemPercentage: parseInt(e.target.value) || 0 })}
+                      onChange={e =>
+                        setSettings({
+                          ...settings,
+                          maxRedeemPercentage: parseInt(e.target.value) || 0,
+                        })
+                      }
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                       disabled={!loyaltyEnabled}
                     />
@@ -524,7 +566,12 @@ export default function LoyaltySettingsPage() {
                       type="number"
                       min="0"
                       value={settings.expirationMonths}
-                      onChange={(e) => setSettings({ ...settings, expirationMonths: parseInt(e.target.value) || 0 })}
+                      onChange={e =>
+                        setSettings({
+                          ...settings,
+                          expirationMonths: parseInt(e.target.value) || 0,
+                        })
+                      }
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                       disabled={!loyaltyEnabled}
                     />
@@ -541,7 +588,9 @@ export default function LoyaltySettingsPage() {
                     disabled={saving}
                     className="px-6 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50 flex items-center gap-2"
                   >
-                    {saving && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
+                    {saving && (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    )}
                     Save Settings
                   </button>
                 </div>
@@ -554,7 +603,7 @@ export default function LoyaltySettingsPage() {
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
               {/* Tier Filter */}
               <div className="flex gap-2 p-4 bg-gray-50 border-b border-gray-200">
-                {['all', 'bronze', 'silver', 'gold', 'platinum'].map((t) => (
+                {['all', 'bronze', 'silver', 'gold', 'platinum'].map(t => (
                   <button
                     key={t}
                     onClick={() => setTierFilter(t)}
@@ -573,27 +622,51 @@ export default function LoyaltySettingsPage() {
               {members.length === 0 ? (
                 <div className="p-12 text-center">
                   <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                    <svg
+                      className="w-8 h-8 text-gray-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1.5}
+                        d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                      />
                     </svg>
                   </div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">No Members Yet</h3>
-                  <p className="text-gray-600">Customers will appear here when they join your loyalty program</p>
+                  <p className="text-gray-600">
+                    Customers will appear here when they join your loyalty program
+                  </p>
                 </div>
               ) : (
                 <table className="w-full">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Member</th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Tier</th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Points Balance</th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Total Earned</th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Total Redeemed</th>
-                      <th className="text-right px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Member
+                      </th>
+                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Tier
+                      </th>
+                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Points Balance
+                      </th>
+                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Total Earned
+                      </th>
+                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Total Redeemed
+                      </th>
+                      <th className="text-right px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {members.map((member) => (
+                    {members.map(member => (
                       <tr key={member.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4">
                           <div>
@@ -604,12 +677,16 @@ export default function LoyaltySettingsPage() {
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium capitalize ${TIER_COLORS[member.tier]?.bg} ${TIER_COLORS[member.tier]?.text}`}>
+                          <span
+                            className={`px-2 py-1 rounded-full text-xs font-medium capitalize ${TIER_COLORS[member.tier]?.bg} ${TIER_COLORS[member.tier]?.text}`}
+                          >
                             {member.tier}
                           </span>
                         </td>
                         <td className="px-6 py-4">
-                          <span className="font-medium text-gray-900">{member.points.toLocaleString()}</span>
+                          <span className="font-medium text-gray-900">
+                            {member.points.toLocaleString()}
+                          </span>
                         </td>
                         <td className="px-6 py-4 text-green-600">
                           +{member.totalEarned.toLocaleString()}
@@ -652,7 +729,12 @@ export default function LoyaltySettingsPage() {
                 className="p-2 text-gray-400 hover:text-gray-600"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </button>
             </div>
@@ -660,7 +742,10 @@ export default function LoyaltySettingsPage() {
             <form onSubmit={handleAwardPoints} className="p-6 space-y-4">
               <div>
                 <p className="text-sm text-gray-600 mb-4">
-                  Award points to <strong>{selectedMember.customer.firstName} {selectedMember.customer.lastName}</strong>
+                  Award points to{' '}
+                  <strong>
+                    {selectedMember.customer.firstName} {selectedMember.customer.lastName}
+                  </strong>
                 </p>
               </div>
 
@@ -671,7 +756,7 @@ export default function LoyaltySettingsPage() {
                 <input
                   type="number"
                   value={awardPoints}
-                  onChange={(e) => setAwardPoints(e.target.value)}
+                  onChange={e => setAwardPoints(e.target.value)}
                   placeholder="Enter points (negative to deduct)"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   required
@@ -679,13 +764,11 @@ export default function LoyaltySettingsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Reason
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Reason</label>
                 <input
                   type="text"
                   value={awardReason}
-                  onChange={(e) => setAwardReason(e.target.value)}
+                  onChange={e => setAwardReason(e.target.value)}
                   placeholder="Optional reason for adjustment"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                 />
@@ -707,7 +790,9 @@ export default function LoyaltySettingsPage() {
                   disabled={saving || !awardPoints}
                   className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 flex items-center gap-2"
                 >
-                  {saving && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
+                  {saving && (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  )}
                   Award Points
                 </button>
               </div>

@@ -343,7 +343,9 @@ export function applyThemeToDocument(theme: StoreTheme): void {
   if (!g.document) return;
 
   const vars = themeToCssVars(theme);
-  const doc = g.document as { documentElement?: { style?: { setProperty: (k: string, v: string) => void } } };
+  const doc = g.document as {
+    documentElement?: { style?: { setProperty: (k: string, v: string) => void } };
+  };
   const root = doc.documentElement;
   const style = root?.style;
 
@@ -567,7 +569,8 @@ export const MARKETING_PLATFORMS: MarketingPlatformInfo[] = [
     description: 'Track conversions from Twitter/X ads',
     descriptionAr: 'تتبع التحويلات من إعلانات تويتر/إكس',
     icon: 'twitter',
-    docsUrl: 'https://business.twitter.com/en/help/campaign-measurement-and-analytics/conversion-tracking-for-websites.html',
+    docsUrl:
+      'https://business.twitter.com/en/help/campaign-measurement-and-analytics/conversion-tracking-for-websites.html',
     idLabel: 'Pixel ID',
     idPlaceholder: 'xxxxx',
   },
@@ -589,7 +592,7 @@ export const MARKETING_PLATFORMS: MarketingPlatformInfo[] = [
  */
 export function hasActivePixels(pixels: MarketingPixels): boolean {
   return Object.values(pixels).some(
-    (config) => config && typeof config === 'object' && 'enabled' in config && config.enabled
+    config => config && typeof config === 'object' && 'enabled' in config && config.enabled
   );
 }
 
@@ -597,10 +600,8 @@ export function hasActivePixels(pixels: MarketingPixels): boolean {
  * Get list of enabled pixel platforms
  */
 export function getEnabledPixels(pixels: MarketingPixels): (keyof MarketingPixels)[] {
-  return (Object.keys(pixels) as (keyof MarketingPixels)[]).filter(
-    (key) => {
-      const config = pixels[key];
-      return config && typeof config === 'object' && 'enabled' in config && config.enabled;
-    }
-  );
+  return (Object.keys(pixels) as (keyof MarketingPixels)[]).filter(key => {
+    const config = pixels[key];
+    return config && typeof config === 'object' && 'enabled' in config && config.enabled;
+  });
 }

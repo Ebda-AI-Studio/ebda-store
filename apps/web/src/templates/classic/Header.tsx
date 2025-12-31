@@ -54,7 +54,12 @@ export default function ClassicHeader({
             aria-label="Menu"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 12h16M4 18h16" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M4 6h16M4 12h16M4 18h16"
+              />
             </svg>
           </button>
 
@@ -75,17 +80,32 @@ export default function ClassicHeader({
               aria-label="Search"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
               </svg>
             </button>
             <Link href={isLoggedIn ? '/account' : '/auth/login'} aria-label="Account">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                />
               </svg>
             </Link>
             <Link href="/cart" className="relative" aria-label="Cart">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
+                />
               </svg>
               {cartItemCount > 0 && (
                 <span className="absolute -top-2 -right-2 bg-foreground text-background text-xs w-5 h-5 rounded-full flex items-center justify-center font-serif">
@@ -101,7 +121,7 @@ export default function ClassicHeader({
       <nav className="hidden md:block border-t border-border">
         <div className="container mx-auto px-4">
           <ul className="flex items-center justify-center gap-8 py-4">
-            {navigation.map((item) => (
+            {navigation.map(item => (
               <li key={item.href}>
                 <Link
                   href={item.href}
@@ -123,7 +143,7 @@ export default function ClassicHeader({
               id="classic-search"
               type="text"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={e => setSearchQuery(e.target.value)}
               placeholder={isRtl ? 'ابحث في مجموعتنا...' : 'Search our collection...'}
               className="w-full py-2 px-4 border-b-2 border-border bg-transparent font-serif text-center focus:outline-none focus:border-foreground transition-colors"
               dir={isRtl ? 'rtl' : 'ltr'}
@@ -137,7 +157,7 @@ export default function ClassicHeader({
         <div className="md:hidden border-t border-border py-4">
           <nav className="container mx-auto px-4">
             <ul className="space-y-4">
-              {navigation.map((item) => (
+              {navigation.map(item => (
                 <li key={item.href}>
                   <Link
                     href={item.href}

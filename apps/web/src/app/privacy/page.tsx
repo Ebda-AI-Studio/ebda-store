@@ -9,7 +9,12 @@ export default function PrivacyPage() {
         <div className="text-center">
           <h1 className="text-3xl font-bold text-gray-900">Privacy Policy</h1>
           <p className="mt-2 text-gray-500">
-            Last updated: {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+            Last updated:{' '}
+            {new Date().toLocaleDateString('en-US', {
+              month: 'long',
+              day: 'numeric',
+              year: 'numeric',
+            })}
           </p>
         </div>
 
@@ -30,10 +35,10 @@ export default function PrivacyPage() {
             </section>
 
             <section className="mb-8">
-              <h2 className="text-xl font-semibold text-gray-900">2. How We Use Your Information</h2>
-              <p className="mt-2 text-gray-600">
-                We use the information we collect to:
-              </p>
+              <h2 className="text-xl font-semibold text-gray-900">
+                2. How We Use Your Information
+              </h2>
+              <p className="mt-2 text-gray-600">We use the information we collect to:</p>
               <ul className="mt-2 list-disc space-y-1 pl-5 text-gray-600">
                 <li>Process and fulfill your orders</li>
                 <li>Send order confirmations and shipping updates</li>
@@ -49,7 +54,9 @@ export default function PrivacyPage() {
                 We do not sell your personal information. We may share your information with:
               </p>
               <ul className="mt-2 list-disc space-y-1 pl-5 text-gray-600">
-                <li>Service providers who assist in our operations (payment processing, shipping)</li>
+                <li>
+                  Service providers who assist in our operations (payment processing, shipping)
+                </li>
                 <li>Law enforcement when required by law</li>
                 <li>Business partners with your explicit consent</li>
               </ul>
@@ -58,7 +65,8 @@ export default function PrivacyPage() {
             <section className="mb-8">
               <h2 className="text-xl font-semibold text-gray-900">4. Data Security</h2>
               <p className="mt-2 text-gray-600">
-                We implement appropriate security measures to protect your personal information, including:
+                We implement appropriate security measures to protect your personal information,
+                including:
               </p>
               <ul className="mt-2 list-disc space-y-1 pl-5 text-gray-600">
                 <li>SSL encryption for all data transmission</li>
@@ -70,9 +78,7 @@ export default function PrivacyPage() {
 
             <section className="mb-8">
               <h2 className="text-xl font-semibold text-gray-900">5. Cookies</h2>
-              <p className="mt-2 text-gray-600">
-                We use cookies and similar technologies to:
-              </p>
+              <p className="mt-2 text-gray-600">We use cookies and similar technologies to:</p>
               <ul className="mt-2 list-disc space-y-1 pl-5 text-gray-600">
                 <li>Keep you logged in to your account</li>
                 <li>Remember your cart contents</li>
@@ -83,9 +89,7 @@ export default function PrivacyPage() {
 
             <section className="mb-8">
               <h2 className="text-xl font-semibold text-gray-900">6. Your Rights</h2>
-              <p className="mt-2 text-gray-600">
-                You have the right to:
-              </p>
+              <p className="mt-2 text-gray-600">You have the right to:</p>
               <ul className="mt-2 list-disc space-y-1 pl-5 text-gray-600">
                 <li>Access your personal information</li>
                 <li>Correct inaccurate information</li>
@@ -101,7 +105,8 @@ export default function PrivacyPage() {
                 If you have any questions about this Privacy Policy, please contact us at:
               </p>
               <p className="mt-2 text-gray-600">
-                Email: privacy@forcemedia.com<br />
+                Email: privacy@forcemedia.com
+                <br />
                 Address: Kuwait City, Kuwait
               </p>
             </section>

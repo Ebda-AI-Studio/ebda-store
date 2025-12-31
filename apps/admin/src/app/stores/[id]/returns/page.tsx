@@ -106,7 +106,7 @@ export default function ReturnsPage() {
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/returns/admin/list?page=${meta.page}&limit=${meta.limit}${statusFilter}`,
         {
-          headers: { 'Authorization': `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` },
         }
       );
       if (response.ok) {
@@ -128,7 +128,7 @@ export default function ReturnsPage() {
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/returns/admin/stats`,
         {
-          headers: { 'Authorization': `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` },
         }
       );
       if (response.ok) {
@@ -148,10 +148,13 @@ export default function ReturnsPage() {
   async function handleApprove(returnId: string) {
     try {
       const token = localStorage.getItem('authToken');
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/returns/admin/${returnId}/approve`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/returns/admin/${returnId}/approve`,
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
       fetchReturns();
       fetchStats();
       setShowDetails(false);
@@ -165,14 +168,17 @@ export default function ReturnsPage() {
     if (!reason) return;
     try {
       const token = localStorage.getItem('authToken');
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/returns/admin/${returnId}/reject`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ reason })
-      });
+      await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/returns/admin/${returnId}/reject`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ reason }),
+        }
+      );
       fetchReturns();
       fetchStats();
       setShowDetails(false);
@@ -184,10 +190,13 @@ export default function ReturnsPage() {
   async function handleReceived(returnId: string) {
     try {
       const token = localStorage.getItem('authToken');
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/returns/admin/${returnId}/received`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/returns/admin/${returnId}/received`,
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
       fetchReturns();
       fetchStats();
       setShowDetails(false);
@@ -201,14 +210,17 @@ export default function ReturnsPage() {
     if (!refundMethod) return;
     try {
       const token = localStorage.getItem('authToken');
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/returns/admin/${returnId}/complete`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ refundMethod })
-      });
+      await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/returns/admin/${returnId}/complete`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ refundMethod }),
+        }
+      );
       fetchReturns();
       fetchStats();
       setShowDetails(false);
@@ -218,10 +230,7 @@ export default function ReturnsPage() {
   }
 
   return (
-    <AdminLayout
-      title="Returns & Exchanges"
-      subtitle="Manage return requests and refunds"
-    >
+    <AdminLayout title="Returns & Exchanges" subtitle="Manage return requests and refunds">
       {/* Stats */}
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -246,7 +255,7 @@ export default function ReturnsPage() {
 
       {/* Filters */}
       <div className="mb-6 flex gap-2">
-        {(['all', 'pending', 'approved', 'completed'] as const).map((f) => (
+        {(['all', 'pending', 'approved', 'completed'] as const).map(f => (
           <Button
             key={f}
             variant={filter === f ? 'default' : 'outline'}
@@ -266,11 +275,14 @@ export default function ReturnsPage() {
           <div className="p-8 text-center text-gray-500">No returns found</div>
         ) : (
           <div className="divide-y">
-            {returns.map((ret) => (
+            {returns.map(ret => (
               <div
                 key={ret.id}
                 className="p-6 hover:bg-gray-50 cursor-pointer"
-                onClick={() => { setSelectedReturn(ret); setShowDetails(true); }}
+                onClick={() => {
+                  setSelectedReturn(ret);
+                  setShowDetails(true);
+                }}
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
@@ -279,13 +291,12 @@ export default function ReturnsPage() {
                       <Badge className={statusColors[ret.status] || 'bg-gray-100 text-gray-800'}>
                         {ret.status}
                       </Badge>
-                      <Badge variant="outline">
-                        {typeLabels[ret.type] || ret.type}
-                      </Badge>
+                      <Badge variant="outline">{typeLabels[ret.type] || ret.type}</Badge>
                     </div>
                     <p className="text-sm text-gray-600 mb-2">
                       <span className="font-medium">Order:</span> #{ret.order.orderNumber} |
-                      <span className="font-medium ml-2">Customer:</span> {ret.customer.firstName} {ret.customer.lastName}
+                      <span className="font-medium ml-2">Customer:</span> {ret.customer.firstName}{' '}
+                      {ret.customer.lastName}
                     </p>
                     <p className="text-sm text-gray-500">
                       <span className="font-medium">Reason:</span> {ret.reason}
@@ -293,27 +304,54 @@ export default function ReturnsPage() {
                     <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
                       <span>{formatDate(ret.createdAt)}</span>
                       <span>{ret.items.length} item(s)</span>
-                      <span className="font-medium text-gray-700">{formatCurrency(ret.refundAmount)}</span>
+                      <span className="font-medium text-gray-700">
+                        {formatCurrency(ret.refundAmount)}
+                      </span>
                     </div>
                   </div>
                   <div className="flex gap-2">
                     {ret.status === 'pending' && (
                       <>
-                        <Button size="sm" onClick={(e) => { e.stopPropagation(); handleApprove(ret.id); }}>
+                        <Button
+                          size="sm"
+                          onClick={e => {
+                            e.stopPropagation();
+                            handleApprove(ret.id);
+                          }}
+                        >
                           Approve
                         </Button>
-                        <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); handleReject(ret.id); }}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={e => {
+                            e.stopPropagation();
+                            handleReject(ret.id);
+                          }}
+                        >
                           Reject
                         </Button>
                       </>
                     )}
                     {ret.status === 'approved' && (
-                      <Button size="sm" onClick={(e) => { e.stopPropagation(); handleReceived(ret.id); }}>
+                      <Button
+                        size="sm"
+                        onClick={e => {
+                          e.stopPropagation();
+                          handleReceived(ret.id);
+                        }}
+                      >
                         Mark Received
                       </Button>
                     )}
                     {(ret.status === 'received' || ret.status === 'inspecting') && (
-                      <Button size="sm" onClick={(e) => { e.stopPropagation(); handleComplete(ret.id); }}>
+                      <Button
+                        size="sm"
+                        onClick={e => {
+                          e.stopPropagation();
+                          handleComplete(ret.id);
+                        }}
+                      >
                         Complete & Refund
                       </Button>
                     )}
@@ -328,7 +366,8 @@ export default function ReturnsPage() {
         {meta.totalPages > 1 && (
           <div className="flex items-center justify-between border-t px-6 py-3">
             <p className="text-sm text-gray-500">
-              Showing {(meta.page - 1) * meta.limit + 1} to {Math.min(meta.page * meta.limit, meta.total)} of {meta.total} returns
+              Showing {(meta.page - 1) * meta.limit + 1} to{' '}
+              {Math.min(meta.page * meta.limit, meta.total)} of {meta.total} returns
             </p>
             <div className="flex gap-2">
               <Button
@@ -354,32 +393,54 @@ export default function ReturnsPage() {
 
       {/* Details Modal */}
       {showDetails && selectedReturn && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowDetails(false)}>
-          <div className="bg-white rounded-xl shadow-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+          onClick={() => setShowDetails(false)}
+        >
+          <div
+            className="bg-white rounded-xl shadow-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto"
+            onClick={e => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between border-b p-4">
               <div>
-                <h2 className="font-semibold text-gray-900">Return #{selectedReturn.returnNumber}</h2>
+                <h2 className="font-semibold text-gray-900">
+                  Return #{selectedReturn.returnNumber}
+                </h2>
                 <p className="text-sm text-gray-500">Order #{selectedReturn.order.orderNumber}</p>
               </div>
-              <button onClick={() => setShowDetails(false)} className="text-gray-400 hover:text-gray-600">
+              <button
+                onClick={() => setShowDetails(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </button>
             </div>
             <div className="p-6 space-y-6">
               {/* Status & Type */}
               <div className="flex items-center gap-3">
-                <Badge className={statusColors[selectedReturn.status] || 'bg-gray-100 text-gray-800'}>
+                <Badge
+                  className={statusColors[selectedReturn.status] || 'bg-gray-100 text-gray-800'}
+                >
                   {selectedReturn.status}
                 </Badge>
-                <Badge variant="outline">{typeLabels[selectedReturn.type] || selectedReturn.type}</Badge>
+                <Badge variant="outline">
+                  {typeLabels[selectedReturn.type] || selectedReturn.type}
+                </Badge>
               </div>
 
               {/* Customer Info */}
               <div>
                 <h3 className="font-medium text-gray-900 mb-2">Customer</h3>
-                <p className="text-sm text-gray-600">{selectedReturn.customer.firstName} {selectedReturn.customer.lastName}</p>
+                <p className="text-sm text-gray-600">
+                  {selectedReturn.customer.firstName} {selectedReturn.customer.lastName}
+                </p>
                 <p className="text-sm text-gray-500">{selectedReturn.customer.email}</p>
               </div>
 
@@ -396,20 +457,39 @@ export default function ReturnsPage() {
               <div>
                 <h3 className="font-medium text-gray-900 mb-2">Items</h3>
                 <div className="space-y-2">
-                  {selectedReturn.items.map((item) => (
-                    <div key={item.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                  {selectedReturn.items.map(item => (
+                    <div
+                      key={item.id}
+                      className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg"
+                    >
                       {item.product?.images?.[0]?.url ? (
-                        <img src={item.product.images[0].url} alt="" className="w-12 h-12 rounded object-cover" />
+                        <img
+                          src={item.product.images[0].url}
+                          alt=""
+                          className="w-12 h-12 rounded object-cover"
+                        />
                       ) : (
                         <div className="w-12 h-12 rounded bg-gray-200 flex items-center justify-center">
-                          <svg className="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                          <svg
+                            className="w-6 h-6 text-gray-400"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                            />
                           </svg>
                         </div>
                       )}
                       <div className="flex-1">
                         <p className="font-medium text-gray-900">{item.productName}</p>
-                        <p className="text-sm text-gray-500">Qty: {item.quantity} | Condition: {item.condition || 'N/A'}</p>
+                        <p className="text-sm text-gray-500">
+                          Qty: {item.quantity} | Condition: {item.condition || 'N/A'}
+                        </p>
                       </div>
                     </div>
                   ))}
@@ -419,7 +499,9 @@ export default function ReturnsPage() {
               {/* Refund Info */}
               <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                 <span className="font-medium text-gray-900">Refund Amount</span>
-                <span className="text-lg font-bold text-orange-600">{formatCurrency(selectedReturn.refundAmount)}</span>
+                <span className="text-lg font-bold text-orange-600">
+                  {formatCurrency(selectedReturn.refundAmount)}
+                </span>
               </div>
 
               {/* Actions */}
@@ -429,7 +511,11 @@ export default function ReturnsPage() {
                     <Button className="flex-1" onClick={() => handleApprove(selectedReturn.id)}>
                       Approve Return
                     </Button>
-                    <Button variant="outline" className="flex-1" onClick={() => handleReject(selectedReturn.id)}>
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => handleReject(selectedReturn.id)}
+                    >
                       Reject
                     </Button>
                   </>
@@ -439,7 +525,8 @@ export default function ReturnsPage() {
                     Mark as Received
                   </Button>
                 )}
-                {(selectedReturn.status === 'received' || selectedReturn.status === 'inspecting') && (
+                {(selectedReturn.status === 'received' ||
+                  selectedReturn.status === 'inspecting') && (
                   <Button className="flex-1" onClick={() => handleComplete(selectedReturn.id)}>
                     Complete & Process Refund
                   </Button>

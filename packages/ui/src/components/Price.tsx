@@ -80,23 +80,11 @@ export const Price = forwardRef<HTMLDivElement, PriceProps>(
         {...props}
       >
         {/* Current Price */}
-        <span
-          className={cn(
-            'font-bold text-primary',
-            sizeStyles[size]
-          )}
-        >
-          {formatPrice(price)}
-        </span>
+        <span className={cn('font-bold text-primary', sizeStyles[size])}>{formatPrice(price)}</span>
 
         {/* Compare At Price */}
         {hasDiscount && (
-          <span
-            className={cn(
-              'text-muted-foreground line-through',
-              compareSizeStyles[size]
-            )}
-          >
+          <span className={cn('text-muted-foreground line-through', compareSizeStyles[size])}>
             {formatPrice(compareAtPrice!)}
           </span>
         )}

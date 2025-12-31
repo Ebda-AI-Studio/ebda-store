@@ -2,11 +2,7 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "target": "ES2017",
-    "lib": [
-      "DOM",
-      "DOM.Iterable",
-      "ES2017"
-    ],
+    "lib": ["DOM", "DOM.Iterable", "ES2017"],
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "jsx": "preserve",
@@ -14,15 +10,9 @@
     "incremental": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": [
-        "./src/*"
-      ],
-      "@force/shared": [
-        "../../packages/shared/src"
-      ],
-      "@force/ui": [
-        "../../packages/ui/src"
-      ]
+      "@/*": ["./src/*"],
+      "@force/shared": ["../../packages/shared/src"],
+      "@force/ui": ["../../packages/ui/src"]
     },
     "plugins": [
       {
@@ -32,13 +22,6 @@
     "allowJs": true,
     "strictNullChecks": true
   },
-  "include": [
-    "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
-    ".next/types/**/*.ts"
-  ],
-  "exclude": [
-    "node_modules"
-  ]
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
 }

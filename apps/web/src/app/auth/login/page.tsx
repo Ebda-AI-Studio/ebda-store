@@ -47,9 +47,7 @@ export default function LoginPage() {
               <span className="text-gray-700"> Store</span>
             </span>
           </Link>
-          <h2 className="mt-6 text-3xl font-bold tracking-tight text-gray-900">
-            Welcome back
-          </h2>
+          <h2 className="mt-6 text-3xl font-bold tracking-tight text-gray-900">Welcome back</h2>
           <p className="mt-2 text-sm text-gray-600">
             Don&apos;t have an account?{' '}
             <Link href="/auth/register" className="font-medium text-primary hover:underline">
@@ -61,9 +59,7 @@ export default function LoginPage() {
         {/* Form */}
         <div className="rounded-xl border bg-white p-8 shadow-sm">
           {error && (
-            <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">
-              {error}
-            </div>
+            <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">{error}</div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -147,9 +143,13 @@ export default function LoginPage() {
 
         <p className="text-center text-xs text-gray-500">
           By signing in, you agree to our{' '}
-          <Link href="/terms" className="text-primary hover:underline">Terms of Service</Link>
-          {' '}and{' '}
-          <Link href="/privacy" className="text-primary hover:underline">Privacy Policy</Link>
+          <Link href="/terms" className="text-primary hover:underline">
+            Terms of Service
+          </Link>{' '}
+          and{' '}
+          <Link href="/privacy" className="text-primary hover:underline">
+            Privacy Policy
+          </Link>
         </p>
       </div>
     </main>

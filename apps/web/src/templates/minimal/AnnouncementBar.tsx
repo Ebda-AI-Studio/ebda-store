@@ -13,11 +13,7 @@ export default function MinimalAnnouncementBar({
 
   if (!displayText) return null;
 
-  const content = (
-    <span className="text-xs tracking-[0.15em] uppercase">
-      {displayText}
-    </span>
-  );
+  const content = <span className="text-xs tracking-[0.15em] uppercase">{displayText}</span>;
 
   return (
     <div

@@ -51,7 +51,16 @@ export class ProvisioningService {
    * Provision a new store with owner account
    */
   static async provisionStore(input: ProvisionStoreInput): Promise<ProvisioningResult> {
-    const { storeName, storeSlug, domain, plan = 'starter', ownerEmail, ownerName, ownerPassword, settings } = input;
+    const {
+      storeName,
+      storeSlug,
+      domain,
+      plan = 'starter',
+      ownerEmail,
+      ownerName,
+      ownerPassword,
+      settings,
+    } = input;
 
     // Generate slug if not provided
     const slug = storeSlug || this.generateSlug(storeName);
@@ -164,9 +173,7 @@ export class ProvisioningService {
         temporaryPassword: !existingUser ? tempPassword : undefined,
       },
       urls: {
-        storefront: domain
-          ? `https://${domain}`
-          : `${process.env.WEB_URL}/${result.store.slug}`,
+        storefront: domain ? `https://${domain}` : `${process.env.WEB_URL}/${result.store.slug}`,
         admin: `${process.env.ADMIN_URL}`,
       },
     };
@@ -175,12 +182,14 @@ export class ProvisioningService {
   /**
    * List all stores (admin only)
    */
-  static async listStores(options: {
-    page?: number;
-    limit?: number;
-    status?: string;
-    search?: string;
-  } = {}) {
+  static async listStores(
+    options: {
+      page?: number;
+      limit?: number;
+      status?: string;
+      search?: string;
+    } = {}
+  ) {
     const { page = 1, limit = 20, status, search } = options;
     const skip = (page - 1) * limit;
 
@@ -227,18 +236,15 @@ export class ProvisioningService {
    * Get store statistics
    */
   static async getStoreStats(storeId: string) {
-    const [
-      productCount,
-      orderCount,
-      customerCount,
-      revenueResult,
-    ] = await Promise.all([
+    const [productCount, orderCount, customerCount, revenueResult] = await Promise.all([
       prisma.product.count({ where: { storeId } }),
       prisma.order.count({ where: { storeId } }),
-      prisma.order.groupBy({
-        by: ['customerId'],
-        where: { storeId },
-      }).then(r => r.length),
+      prisma.order
+        .groupBy({
+          by: ['customerId'],
+          where: { storeId },
+        })
+        .then(r => r.length),
       prisma.order.aggregate({
         where: { storeId, paymentStatus: 'paid' },
         _sum: { total: true },

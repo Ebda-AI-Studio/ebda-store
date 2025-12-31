@@ -23,7 +23,9 @@ export function LanguageSwitcher({ variant = 'default', className = '' }: Langua
   }
 
   return (
-    <div className={`flex items-center gap-1 rounded-xl border border-border bg-background p-1 ${className}`}>
+    <div
+      className={`flex items-center gap-1 rounded-xl border border-border bg-background p-1 ${className}`}
+    >
       <button
         onClick={() => setLanguage('en')}
         className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${

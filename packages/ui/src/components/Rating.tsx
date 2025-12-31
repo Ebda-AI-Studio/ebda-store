@@ -159,8 +159,8 @@ export const Rating = forwardRef<HTMLDivElement, RatingProps>(
     const formattedCount = formatCount
       ? formatCount(count ?? 0)
       : count !== undefined
-      ? `(${count})`
-      : null;
+        ? `(${count})`
+        : null;
 
     return (
       <div
@@ -186,12 +186,13 @@ export const Rating = forwardRef<HTMLDivElement, RatingProps>(
                 onMouseEnter={() => handleMouseEnter(index)}
                 onMouseLeave={handleMouseLeave}
                 onClick={() => handleClick(index)}
-                onKeyDown={(e) => handleKeyDown(e, index)}
+                onKeyDown={e => handleKeyDown(e, index)}
                 tabIndex={interactive ? 0 : undefined}
                 role={interactive ? 'radio' : undefined}
                 aria-checked={interactive ? index + 1 === value : undefined}
                 className={cn(
-                  interactive && 'transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 rounded'
+                  interactive &&
+                    'transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 rounded'
                 )}
               >
                 <StarIcon
@@ -207,9 +208,7 @@ export const Rating = forwardRef<HTMLDivElement, RatingProps>(
         </div>
 
         {showCount && formattedCount && (
-          <span className={cn('text-muted-foreground', styles.text)}>
-            {formattedCount}
-          </span>
+          <span className={cn('text-muted-foreground', styles.text)}>{formattedCount}</span>
         )}
       </div>
     );

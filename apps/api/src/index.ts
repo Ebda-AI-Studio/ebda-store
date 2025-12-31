@@ -7,12 +7,7 @@ import rateLimit from 'express-rate-limit';
 import { config } from './config';
 import { errorHandler } from './middleware/error-handler';
 import { requestLogger } from './middleware/request-logger';
-import {
-  securityHeaders,
-  requestId,
-  sanitizeInput,
-  csrfProtection,
-} from './middleware/security';
+import { securityHeaders, requestId, sanitizeInput, csrfProtection } from './middleware/security';
 import routes from './routes';
 import webhookRoutes from './routes/webhook.routes';
 import { socketService } from './services/socket.service';
@@ -28,29 +23,33 @@ socketService.initialize(httpServer);
 app.use(requestId);
 
 // Security middleware
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", 'data:', 'https:'],
-      scriptSrc: ["'self'"],
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:', 'https:'],
+        scriptSrc: ["'self'"],
+      },
     },
-  },
-  crossOriginEmbedderPolicy: false,
-}));
+    crossOriginEmbedderPolicy: false,
+  })
+);
 app.use(securityHeaders);
 
 // Compression middleware for better performance
-app.use(compression({
-  filter: (req, res) => {
-    if (req.headers['x-no-compression']) {
-      return false;
-    }
-    return compression.filter(req, res);
-  },
-  level: 6,
-}));
+app.use(
+  compression({
+    filter: (req, res) => {
+      if (req.headers['x-no-compression']) {
+        return false;
+      }
+      return compression.filter(req, res);
+    },
+    level: 6,
+  })
+);
 
 app.use(
   cors({
@@ -67,7 +66,7 @@ app.use(
     max: 100, // limit each IP to 100 requests per windowMs
     message: {
       success: false,
-      error: { code: 'RATE_LIMITED', message: 'Too many requests, please try again later.' }
+      error: { code: 'RATE_LIMITED', message: 'Too many requests, please try again later.' },
     },
     standardHeaders: true,
     legacyHeaders: false,

@@ -127,7 +127,9 @@ class PaymentFactory {
               apiKey: dbConfig.apiKey ? encryption.decrypt(dbConfig.apiKey) : '',
               secretKey: dbConfig.secretKey ? encryption.decrypt(dbConfig.secretKey) : undefined,
               merchantId: dbConfig.merchantId ? encryption.decrypt(dbConfig.merchantId) : undefined,
-              webhookSecret: dbConfig.webhookSecret ? encryption.decrypt(dbConfig.webhookSecret) : undefined,
+              webhookSecret: dbConfig.webhookSecret
+                ? encryption.decrypt(dbConfig.webhookSecret)
+                : undefined,
               isTestMode: dbConfig.testMode,
               isEnabled: dbConfig.isEnabled,
               isDefault: dbConfig.isDefault,
@@ -164,7 +166,9 @@ class PaymentFactory {
         defaultProvider = providers.keys().next().value || null;
       }
 
-      console.log(`[PAYMENT] Initialized ${storeId ? `store ${storeId}` : 'global'} providers: ${Array.from(providers.keys()).join(', ') || 'none'}`);
+      console.log(
+        `[PAYMENT] Initialized ${storeId ? `store ${storeId}` : 'global'} providers: ${Array.from(providers.keys()).join(', ') || 'none'}`
+      );
       console.log(`[PAYMENT] Default provider: ${defaultProvider || 'none'}`);
 
       this.cache.set(storeId, {
@@ -363,11 +367,7 @@ class PaymentFactory {
     const providerName = provider || cached.defaultProvider;
 
     if (!providerName) {
-      throw new AppError(
-        500,
-        'PAYMENT_NOT_CONFIGURED',
-        'No payment providers configured'
-      );
+      throw new AppError(500, 'PAYMENT_NOT_CONFIGURED', 'No payment providers configured');
     }
 
     const p = cached.providers.get(providerName);
@@ -405,10 +405,7 @@ class PaymentFactory {
   /**
    * Check if a provider is available
    */
-  async isProviderAvailable(
-    provider: PaymentProvider,
-    storeId?: string | null
-  ): Promise<boolean> {
+  async isProviderAvailable(provider: PaymentProvider, storeId?: string | null): Promise<boolean> {
     const cached = await this.getProviders(storeId);
     return cached.providers.has(provider);
   }
@@ -456,11 +453,15 @@ export class PaymentService {
     currency: Currency = 'KWD',
     provider?: PaymentProvider,
     storeId?: string
-  ): Promise<{ provider: PaymentProvider; methods: AvailablePaymentMethod[]; config?: ProviderConfig }[]> {
-    const providers = provider
-      ? [provider]
-      : await factory.getAvailableProviders(storeId);
-    const results: { provider: PaymentProvider; methods: AvailablePaymentMethod[]; config?: ProviderConfig }[] = [];
+  ): Promise<
+    { provider: PaymentProvider; methods: AvailablePaymentMethod[]; config?: ProviderConfig }[]
+  > {
+    const providers = provider ? [provider] : await factory.getAvailableProviders(storeId);
+    const results: {
+      provider: PaymentProvider;
+      methods: AvailablePaymentMethod[];
+      config?: ProviderConfig;
+    }[] = [];
 
     for (const p of providers) {
       try {
@@ -527,7 +528,9 @@ export class PaymentService {
 
     const providerName = provider || (payment?.provider as PaymentProvider) || 'tap';
     const effectiveStoreId = storeId || payment?.order?.storeId;
-    return (await factory.getProvider(providerName, effectiveStoreId)).getPaymentStatus(transactionId);
+    return (await factory.getProvider(providerName, effectiveStoreId)).getPaymentStatus(
+      transactionId
+    );
   }
 
   /**
@@ -554,7 +557,9 @@ export class PaymentService {
 
     const providerName = provider || (payment.provider as PaymentProvider);
     const effectiveStoreId = storeId || payment.order?.storeId;
-    const response = await (await factory.getProvider(providerName, effectiveStoreId)).refund(request);
+    const response = await (
+      await factory.getProvider(providerName, effectiveStoreId)
+    ).refund(request);
 
     // Update payment record
     const isFullRefund = !request.amount || request.amount >= payment.amount;
@@ -566,7 +571,7 @@ export class PaymentService {
         refundId: response.refundId,
         refundedAmount: { increment: request.amount || payment.amount },
         metadata: {
-          ...(payment.metadata as object || {}),
+          ...((payment.metadata as object) || {}),
           refundId: response.refundId,
           refundStatus: response.status,
         },
@@ -606,10 +611,7 @@ export class PaymentService {
     // Find and update payment
     const payment = await prisma.payment.findFirst({
       where: {
-        OR: [
-          { transactionId: webhookData.transactionId },
-          { invoiceId: webhookData.invoiceId },
-        ],
+        OR: [{ transactionId: webhookData.transactionId }, { invoiceId: webhookData.invoiceId }],
       },
       include: { order: true },
     });
@@ -645,7 +647,7 @@ export class PaymentService {
         status: webhookData.status,
         paidAt: webhookData.paidAt,
         metadata: {
-          ...(payment.metadata as object || {}),
+          ...((payment.metadata as object) || {}),
           webhookEvent: webhookData.event,
           paymentMethod: webhookData.paymentMethod,
           paidCurrency: webhookData.currency,

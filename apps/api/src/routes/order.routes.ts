@@ -29,7 +29,15 @@ const createOrderSchema = z.object({
 });
 
 const updateStatusSchema = z.object({
-  status: z.enum(['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded']),
+  status: z.enum([
+    'pending',
+    'confirmed',
+    'processing',
+    'shipped',
+    'delivered',
+    'cancelled',
+    'refunded',
+  ]),
 });
 
 // Helper to get session ID
@@ -95,12 +103,7 @@ router.post('/', authenticate, async (req: Request, res: Response, next: NextFun
     const sessionId = getSessionId(req);
     const data = createOrderSchema.parse(req.body);
 
-    const order = await OrderService.create(
-      storeId,
-      req.user!.userId,
-      sessionId,
-      data
-    );
+    const order = await OrderService.create(storeId, req.user!.userId, sessionId, data);
 
     res.status(201).json({
       success: true,

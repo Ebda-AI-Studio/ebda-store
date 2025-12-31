@@ -38,11 +38,11 @@ A multi-tenant SaaS platform that allows Force Media (Super Admin) to provision 
 
 ## User Roles
 
-| Role | Access Level | Capabilities |
-|------|--------------|--------------|
+| Role            | Access Level  | Capabilities                                                       |
+| --------------- | ------------- | ------------------------------------------------------------------ |
 | **Super Admin** | Platform-wide | Create/manage stores, view all data, manage users, view audit logs |
-| **Store Admin** | Single store | Manage products, orders, customers, store settings, view analytics |
-| **Customer** | Storefront | Browse products, place orders, manage account |
+| **Store Admin** | Single store  | Manage products, orders, customers, store settings, view analytics |
+| **Customer**    | Storefront    | Browse products, place orders, manage account                      |
 
 ## Project Structure
 
@@ -65,6 +65,7 @@ force-website-builder/
 ## API Routes
 
 ### Super Admin Routes (`/api/v1/admin/*`)
+
 - `GET /admin/dashboard` - Platform statistics
 - `GET /admin/stores` - List all stores
 - `POST /admin/stores` - Provision new store
@@ -75,6 +76,7 @@ force-website-builder/
 - `GET /admin/audit-logs` - View audit logs
 
 ### Store-Scoped Routes (`/api/v1/stores/:storeId/*`)
+
 - `GET /stores/:storeId/products` - List store products
 - `POST /stores/:storeId/products` - Create product
 - `GET /stores/:storeId/orders` - List store orders
@@ -110,32 +112,32 @@ npm run dev
 
 ## Available Scripts
 
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Start all apps in development mode |
-| `npm run dev:web` | Start web storefront only |
-| `npm run dev:api` | Start API server only |
-| `npm run dev:admin` | Start admin dashboard only |
-| `npm run build` | Build all apps for production |
-| `npm run lint` | Run ESLint across all workspaces |
-| `npm run format` | Format code with Prettier |
-| `npm run test` | Run tests across all workspaces |
-| `npm run docker:up` | Start Docker services |
-| `npm run docker:down` | Stop Docker services |
-| `npm run db:studio` | Open Prisma Studio |
+| Command               | Description                        |
+| --------------------- | ---------------------------------- |
+| `npm run dev`         | Start all apps in development mode |
+| `npm run dev:web`     | Start web storefront only          |
+| `npm run dev:api`     | Start API server only              |
+| `npm run dev:admin`   | Start admin dashboard only         |
+| `npm run build`       | Build all apps for production      |
+| `npm run lint`        | Run ESLint across all workspaces   |
+| `npm run format`      | Format code with Prettier          |
+| `npm run test`        | Run tests across all workspaces    |
+| `npm run docker:up`   | Start Docker services              |
+| `npm run docker:down` | Stop Docker services               |
+| `npm run db:studio`   | Open Prisma Studio                 |
 
 ## Ports
 
-| Service | Port |
-|---------|------|
-| Web Storefront | 3000 |
+| Service         | Port |
+| --------------- | ---- |
+| Web Storefront  | 3000 |
 | Admin Dashboard | 3001 |
-| API Server | 4000 |
-| PostgreSQL | 5432 |
-| Redis | 6379 |
-| Elasticsearch | 9200 |
-| MinIO Console | 9001 |
-| MailHog UI | 8025 |
+| API Server      | 4000 |
+| PostgreSQL      | 5432 |
+| Redis           | 6379 |
+| Elasticsearch   | 9200 |
+| MinIO Console   | 9001 |
+| MailHog UI      | 8025 |
 
 ## Tech Stack
 

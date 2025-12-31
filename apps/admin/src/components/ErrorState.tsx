@@ -37,12 +37,7 @@ export function ErrorState({
         <p className="text-muted-foreground mb-6 max-w-sm">{message}</p>
         {onRetry && (
           <Button onClick={onRetry} className="gap-2">
-            <svg
-              className="h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"

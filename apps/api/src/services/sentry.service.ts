@@ -28,9 +28,7 @@ export class SentryService {
       environment: config.nodeEnv,
       release: config.appVersion || '1.0.0',
 
-      integrations: [
-        nodeProfilingIntegration(),
-      ],
+      integrations: [nodeProfilingIntegration()],
 
       // Performance sampling
       tracesSampleRate: config.nodeEnv === 'production' ? 0.1 : 1.0,
@@ -40,12 +38,7 @@ export class SentryService {
       enabled: config.nodeEnv !== 'development' || config.sentryDebug,
 
       // Ignore certain errors
-      ignoreErrors: [
-        'RATE_LIMITED',
-        'UNAUTHORIZED',
-        'NOT_FOUND',
-        'ValidationError',
-      ],
+      ignoreErrors: ['RATE_LIMITED', 'UNAUTHORIZED', 'NOT_FOUND', 'ValidationError'],
     });
 
     this.isInitialized = true;

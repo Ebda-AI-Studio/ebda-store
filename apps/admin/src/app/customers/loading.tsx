@@ -3,10 +3,7 @@ import { AdminLayout } from '../../components/AdminLayout';
 
 export default function CustomersLoading() {
   return (
-    <AdminLayout
-      title="Customers"
-      subtitle="Loading..."
-    >
+    <AdminLayout title="Customers" subtitle="Loading...">
       {/* Filters Skeleton */}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex gap-2">

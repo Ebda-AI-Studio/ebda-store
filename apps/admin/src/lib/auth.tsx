@@ -70,7 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     try {
       const response = await fetch(`${API_URL}/auth/me`, {
-        headers: { 'Authorization': `Bearer ${storedToken}` }
+        headers: { Authorization: `Bearer ${storedToken}` },
       });
 
       if (response.ok) {
@@ -150,15 +150,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{
-      user,
-      token,
-      isLoading,
-      isAuthenticated: !!user,
-      login,
-      logout,
-      refreshToken,
-    }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        isLoading,
+        isAuthenticated: !!user,
+        login,
+        logout,
+        refreshToken,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

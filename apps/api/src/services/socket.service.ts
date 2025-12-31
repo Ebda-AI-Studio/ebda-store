@@ -38,7 +38,8 @@ class SocketService {
     // Authentication middleware
     this.io.use(async (socket, next) => {
       try {
-        const token = socket.handshake.auth.token || socket.handshake.headers.authorization?.split(' ')[1];
+        const token =
+          socket.handshake.auth.token || socket.handshake.headers.authorization?.split(' ')[1];
 
         if (!token) {
           return next(new Error('Authentication required'));
@@ -52,7 +53,7 @@ class SocketService {
       }
     });
 
-    this.io.on('connection', (socket) => {
+    this.io.on('connection', socket => {
       this.handleConnection(socket);
     });
 
@@ -94,7 +95,7 @@ class SocketService {
     });
 
     // Handle errors
-    socket.on('error', (error) => {
+    socket.on('error', error => {
       console.error(`Socket error for user ${user.userId}:`, error);
     });
   }
@@ -174,7 +175,10 @@ class SocketService {
   /**
    * Notification helpers for common events
    */
-  newOrderNotification(storeId: string, order: { orderNumber: string; total: number; customerName: string }) {
+  newOrderNotification(
+    storeId: string,
+    order: { orderNumber: string; total: number; customerName: string }
+  ) {
     this.notifyStore(storeId, {
       type: 'new_order',
       title: 'New Order Received',
@@ -184,7 +188,10 @@ class SocketService {
     });
   }
 
-  newReviewNotification(storeId: string, review: { productName: string; rating: number; customerName: string }) {
+  newReviewNotification(
+    storeId: string,
+    review: { productName: string; rating: number; customerName: string }
+  ) {
     this.notifyStore(storeId, {
       type: 'new_review',
       title: 'New Product Review',
@@ -194,7 +201,10 @@ class SocketService {
     });
   }
 
-  newReturnNotification(storeId: string, returnRequest: { returnNumber: string; orderNumber: string; customerName: string }) {
+  newReturnNotification(
+    storeId: string,
+    returnRequest: { returnNumber: string; orderNumber: string; customerName: string }
+  ) {
     this.notifyStore(storeId, {
       type: 'new_return',
       title: 'New Return Request',
@@ -224,7 +234,10 @@ class SocketService {
     });
   }
 
-  returnStatusNotification(userId: string, returnRequest: { returnNumber: string; status: string }) {
+  returnStatusNotification(
+    userId: string,
+    returnRequest: { returnNumber: string; status: string }
+  ) {
     this.notifyUser(userId, {
       type: 'return_status',
       title: 'Return Status Updated',

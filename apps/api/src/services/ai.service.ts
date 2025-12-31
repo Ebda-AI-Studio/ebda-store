@@ -37,7 +37,8 @@ export interface AIGenerationResult {
 }
 
 export class AIService {
-  private static readonly API_ENDPOINT = config.aiApiEndpoint || 'https://api.anthropic.com/v1/messages';
+  private static readonly API_ENDPOINT =
+    config.aiApiEndpoint || 'https://api.anthropic.com/v1/messages';
   private static readonly API_KEY = config.aiApiKey || '';
   private static readonly MODEL = 'claude-3-haiku-20240307';
 
@@ -51,8 +52,17 @@ export class AIService {
   /**
    * Generate product description
    */
-  static async generateProductDescription(input: ProductDescriptionInput): Promise<AIGenerationResult> {
-    const { name, category, features, targetAudience, tone = 'professional', length = 'medium' } = input;
+  static async generateProductDescription(
+    input: ProductDescriptionInput
+  ): Promise<AIGenerationResult> {
+    const {
+      name,
+      category,
+      features,
+      targetAudience,
+      tone = 'professional',
+      length = 'medium',
+    } = input;
 
     const lengthGuide = {
       short: '50-100 words',
@@ -198,7 +208,10 @@ Return ONLY the JSON, no additional text or markdown.`;
   /**
    * Improve existing text
    */
-  static async improveText(text: string, goal: 'clarity' | 'engagement' | 'seo' | 'conciseness'): Promise<AIGenerationResult> {
+  static async improveText(
+    text: string,
+    goal: 'clarity' | 'engagement' | 'seo' | 'conciseness'
+  ): Promise<AIGenerationResult> {
     const goalGuide = {
       clarity: 'Make the text clearer and easier to understand',
       engagement: 'Make the text more engaging and persuasive',
@@ -289,7 +302,7 @@ Return ONLY the category description text.`;
         throw new AppError(502, 'AI_API_ERROR', 'Failed to generate content');
       }
 
-      const data = await response.json() as {
+      const data = (await response.json()) as {
         content: Array<{ text: string }>;
         usage?: { output_tokens: number };
         model: string;
@@ -317,7 +330,8 @@ Return ONLY the category description text.`;
     if (prompt.includes('SEO')) {
       return JSON.stringify({
         metaTitle: 'Premium Quality Product | Shop Now',
-        metaDescription: 'Discover our premium product. High quality, great value. Free shipping available. Shop now!',
+        metaDescription:
+          'Discover our premium product. High quality, great value. Free shipping available. Shop now!',
         keywords: ['premium', 'quality', 'shop', 'buy', 'best'],
       });
     }

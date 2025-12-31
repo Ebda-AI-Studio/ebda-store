@@ -7,7 +7,7 @@ const prisma = new PrismaClient();
 
 // Helper to get store ID from request header
 function getStoreIdFromHeader(req: Request): string | null {
-  return req.headers['x-store-id'] as string || null;
+  return (req.headers['x-store-id'] as string) || null;
 }
 
 // Get user's wishlist items
@@ -70,15 +70,17 @@ router.get('/', authenticate, async (req: Request, res: Response, next: NextFunc
       });
     }
 
-    const items = wishlist.items.map((item) => ({
+    const items = wishlist.items.map(item => ({
       id: item.id,
       product: {
         id: item.product.id,
         name: item.product.name,
         slug: item.product.slug,
         price: item.product.price / 1000, // Convert fils to KWD
-        compareAtPrice: item.product.compareAtPrice ? item.product.compareAtPrice / 1000 : undefined,
-        images: item.product.images.map((img) => img.url),
+        compareAtPrice: item.product.compareAtPrice
+          ? item.product.compareAtPrice / 1000
+          : undefined,
+        images: item.product.images.map(img => img.url),
         status: item.product.status,
       },
     }));
@@ -190,8 +192,10 @@ router.post('/', authenticate, async (req: Request, res: Response, next: NextFun
             name: item.product.name,
             slug: item.product.slug,
             price: item.product.price / 1000,
-            compareAtPrice: item.product.compareAtPrice ? item.product.compareAtPrice / 1000 : undefined,
-            images: item.product.images.map((img) => img.url),
+            compareAtPrice: item.product.compareAtPrice
+              ? item.product.compareAtPrice / 1000
+              : undefined,
+            images: item.product.images.map(img => img.url),
             status: item.product.status,
           },
         },

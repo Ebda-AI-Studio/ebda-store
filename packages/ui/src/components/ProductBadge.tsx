@@ -3,7 +3,14 @@
 import { forwardRef } from 'react';
 import { cn } from '../utils/cn';
 
-export type ProductBadgeVariant = 'sale' | 'new' | 'soldOut' | 'featured' | 'limited' | 'bestseller' | 'custom';
+export type ProductBadgeVariant =
+  | 'sale'
+  | 'new'
+  | 'soldOut'
+  | 'featured'
+  | 'limited'
+  | 'bestseller'
+  | 'custom';
 
 export interface ProductBadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
   /** Badge variant */
@@ -130,7 +137,10 @@ export interface ProductBadgeGroupProps extends React.HTMLAttributes<HTMLDivElem
 }
 
 export const ProductBadgeGroup = forwardRef<HTMLDivElement, ProductBadgeGroupProps>(
-  ({ position = 'top-left', absolute = false, isRtl = false, className, children, ...props }, ref) => {
+  (
+    { position = 'top-left', absolute = false, isRtl = false, className, children, ...props },
+    ref
+  ) => {
     return (
       <div
         ref={ref}

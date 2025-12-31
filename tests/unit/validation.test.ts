@@ -9,7 +9,12 @@ import { z } from 'zod';
 // Define test schemas (matching API schemas)
 const createStoreSchema = z.object({
   name: z.string().min(1).max(100),
-  slug: z.string().min(1).max(100).regex(/^[a-z0-9-]+$/).optional(),
+  slug: z
+    .string()
+    .min(1)
+    .max(100)
+    .regex(/^[a-z0-9-]+$/)
+    .optional(),
   domain: z.string().optional(),
   settings: z.record(z.unknown()).optional(),
 });

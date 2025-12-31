@@ -13,7 +13,10 @@ export interface SearchSuggestion {
   url?: string;
 }
 
-export interface SearchBarProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'onSubmit' | 'size'> {
+export interface SearchBarProps extends Omit<
+  React.InputHTMLAttributes<HTMLInputElement>,
+  'onChange' | 'onSubmit' | 'size'
+> {
   /** Current search value */
   value?: string;
   /** Callback when value changes */
@@ -73,9 +76,11 @@ const sizeStyles = {
 };
 
 const variantStyles = {
-  default: 'bg-background border border-border focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20',
+  default:
+    'bg-background border border-border focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20',
   minimal: 'bg-transparent border-b border-border focus-within:border-primary',
-  filled: 'bg-muted border border-transparent focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20',
+  filled:
+    'bg-muted border border-transparent focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20',
   outline: 'bg-transparent border-2 border-border focus-within:border-primary',
 };
 
@@ -198,15 +203,11 @@ export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
         switch (e.key) {
           case 'ArrowDown':
             e.preventDefault();
-            setActiveIndex((prev) =>
-              prev < suggestions.length - 1 ? prev + 1 : 0
-            );
+            setActiveIndex(prev => (prev < suggestions.length - 1 ? prev + 1 : 0));
             break;
           case 'ArrowUp':
             e.preventDefault();
-            setActiveIndex((prev) =>
-              prev > 0 ? prev - 1 : suggestions.length - 1
-            );
+            setActiveIndex(prev => (prev > 0 ? prev - 1 : suggestions.length - 1));
             break;
           case 'Enter':
             e.preventDefault();
@@ -228,10 +229,7 @@ export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
     // Close on outside click
     useEffect(() => {
       const handleClickOutside = (e: MouseEvent) => {
-        if (
-          containerRef.current &&
-          !containerRef.current.contains(e.target as Node)
-        ) {
+        if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
           setIsOpen(false);
         }
       };
@@ -276,11 +274,7 @@ export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
     };
 
     return (
-      <div
-        ref={containerRef}
-        className="relative w-full"
-        dir={isRtl ? 'rtl' : 'ltr'}
-      >
+      <div ref={containerRef} className="relative w-full" dir={isRtl ? 'rtl' : 'ltr'}>
         <form onSubmit={handleSubmit} role="search">
           <div
             className={cn(
@@ -312,10 +306,11 @@ export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
 
             {/* Input */}
             <input
-              ref={(node) => {
+              ref={node => {
                 (inputRef as React.MutableRefObject<HTMLInputElement | null>).current = node;
                 if (typeof ref === 'function') ref(node);
-                else if (ref) (ref as React.MutableRefObject<HTMLInputElement | null>).current = node;
+                else if (ref)
+                  (ref as React.MutableRefObject<HTMLInputElement | null>).current = node;
               }}
               type="search"
               value={value}
@@ -351,12 +346,7 @@ export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
                 )}
                 aria-label={labels.clear}
               >
-                <svg
-                  className={styles.clear}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
+                <svg className={styles.clear} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -369,12 +359,7 @@ export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
 
             {/* Loading Spinner */}
             {isLoading && (
-              <div
-                className={cn(
-                  'absolute',
-                  isRtl ? 'left-10' : 'right-10'
-                )}
-              >
+              <div className={cn('absolute', isRtl ? 'left-10' : 'right-10')}>
                 <svg
                   className={cn('animate-spin text-muted-foreground', styles.clear)}
                   fill="none"
@@ -409,9 +394,7 @@ export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
             role="listbox"
           >
             {suggestions.length === 0 && !isLoading ? (
-              <div className="px-4 py-3 text-muted-foreground text-center">
-                {labels.noResults}
-              </div>
+              <div className="px-4 py-3 text-muted-foreground text-center">{labels.noResults}</div>
             ) : (
               <div className="max-h-96 overflow-y-auto">
                 {Object.entries(groupedSuggestions).map(([type, items]) => (
@@ -420,7 +403,7 @@ export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
                       {getTypeLabel(type)}
                     </div>
                     <ul>
-                      {items.map((suggestion) => {
+                      {items.map(suggestion => {
                         const flatIndex = suggestions.indexOf(suggestion);
                         return (
                           <li key={suggestion.id}>
@@ -448,18 +431,48 @@ export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
                               ) : (
                                 <div className="w-6 h-6 flex items-center justify-center text-muted-foreground flex-shrink-0">
                                   {suggestion.type === 'category' && (
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                                    <svg
+                                      className="w-4 h-4"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
+                                      />
                                     </svg>
                                   )}
                                   {suggestion.type === 'brand' && (
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                                    <svg
+                                      className="w-4 h-4"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
+                                      />
                                     </svg>
                                   )}
                                   {suggestion.type === 'query' && (
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    <svg
+                                      className="w-4 h-4"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                                      />
                                     </svg>
                                   )}
                                 </div>
@@ -468,19 +481,16 @@ export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
                               {/* Text */}
                               <div className="flex-1 min-w-0">
                                 <p className="truncate">
-                                  {isRtl && suggestion.textAr
-                                    ? suggestion.textAr
-                                    : suggestion.text}
+                                  {isRtl && suggestion.textAr ? suggestion.textAr : suggestion.text}
                                 </p>
                               </div>
 
                               {/* Price for products */}
-                              {suggestion.type === 'product' &&
-                                suggestion.price !== undefined && (
-                                  <span className="text-sm font-medium text-primary flex-shrink-0">
-                                    {formatPrice(suggestion.price)}
-                                  </span>
-                                )}
+                              {suggestion.type === 'product' && suggestion.price !== undefined && (
+                                <span className="text-sm font-medium text-primary flex-shrink-0">
+                                  {formatPrice(suggestion.price)}
+                                </span>
+                              )}
 
                               {/* Arrow for navigation */}
                               <svg

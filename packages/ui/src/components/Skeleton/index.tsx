@@ -12,14 +12,7 @@ interface SkeletonProps {
 
 // Base Skeleton
 export function Skeleton({ className }: SkeletonProps) {
-  return (
-    <div
-      className={cn(
-        'animate-pulse bg-gray-200 rounded',
-        className
-      )}
-    />
-  );
+  return <div className={cn('animate-pulse bg-gray-200 rounded', className)} />;
 }
 
 // Text Skeleton
@@ -27,29 +20,27 @@ export function SkeletonText({ lines = 3, className }: { lines?: number; classNa
   return (
     <div className={cn('space-y-2', className)}>
       {Array.from({ length: lines }).map((_, i) => (
-        <Skeleton
-          key={i}
-          className={cn(
-            'h-4',
-            i === lines - 1 ? 'w-2/3' : 'w-full'
-          )}
-        />
+        <Skeleton key={i} className={cn('h-4', i === lines - 1 ? 'w-2/3' : 'w-full')} />
       ))}
     </div>
   );
 }
 
 // Avatar Skeleton
-export function SkeletonAvatar({ size = 'md', className }: { size?: 'sm' | 'md' | 'lg'; className?: string }) {
+export function SkeletonAvatar({
+  size = 'md',
+  className,
+}: {
+  size?: 'sm' | 'md' | 'lg';
+  className?: string;
+}) {
   const sizeClasses = {
     sm: 'w-8 h-8',
     md: 'w-12 h-12',
     lg: 'w-16 h-16',
   };
 
-  return (
-    <Skeleton className={cn('rounded-full', sizeClasses[size], className)} />
-  );
+  return <Skeleton className={cn('rounded-full', sizeClasses[size], className)} />;
 }
 
 // Button Skeleton
@@ -91,7 +82,13 @@ export function SkeletonProductCard({ className }: SkeletonProps) {
 }
 
 // Table Row Skeleton
-export function SkeletonTableRow({ columns = 4, className }: { columns?: number; className?: string }) {
+export function SkeletonTableRow({
+  columns = 4,
+  className,
+}: {
+  columns?: number;
+  className?: string;
+}) {
   return (
     <tr className={cn('border-b', className)}>
       {Array.from({ length: columns }).map((_, i) => (
@@ -104,7 +101,15 @@ export function SkeletonTableRow({ columns = 4, className }: { columns?: number;
 }
 
 // Table Skeleton
-export function SkeletonTable({ rows = 5, columns = 4, className }: { rows?: number; columns?: number; className?: string }) {
+export function SkeletonTable({
+  rows = 5,
+  columns = 4,
+  className,
+}: {
+  rows?: number;
+  columns?: number;
+  className?: string;
+}) {
   return (
     <div className={cn('bg-white rounded-lg border overflow-hidden', className)}>
       <table className="w-full">
@@ -142,7 +147,13 @@ export function SkeletonStats({ className }: SkeletonProps) {
 }
 
 // Dashboard Stats Grid Skeleton
-export function SkeletonDashboardStats({ count = 4, className }: { count?: number; className?: string }) {
+export function SkeletonDashboardStats({
+  count = 4,
+  className,
+}: {
+  count?: number;
+  className?: string;
+}) {
   return (
     <div className={cn('grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4', className)}>
       {Array.from({ length: count }).map((_, i) => (

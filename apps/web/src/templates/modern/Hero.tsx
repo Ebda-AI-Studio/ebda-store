@@ -14,8 +14,14 @@ export default function ModernHero({
   ctaLink = '/products',
   isRtl = false,
 }: HeroProps) {
-  const displayTitle = isRtl && titleAr ? titleAr : title || (isRtl ? 'اكتشف مجموعتنا الجديدة' : 'Discover Our New Collection');
-  const displaySubtitle = isRtl && subtitleAr ? subtitleAr : subtitle || (isRtl ? 'منتجات مميزة بأفضل الأسعار' : 'Premium products at the best prices');
+  const displayTitle =
+    isRtl && titleAr
+      ? titleAr
+      : title || (isRtl ? 'اكتشف مجموعتنا الجديدة' : 'Discover Our New Collection');
+  const displaySubtitle =
+    isRtl && subtitleAr
+      ? subtitleAr
+      : subtitle || (isRtl ? 'منتجات مميزة بأفضل الأسعار' : 'Premium products at the best prices');
   const displayCta = isRtl && ctaTextAr ? ctaTextAr : ctaText || (isRtl ? 'تسوق الآن' : 'Shop Now');
 
   return (
@@ -27,9 +33,7 @@ export default function ModernHero({
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-foreground leading-tight">
               {displayTitle}
             </h1>
-            <p className="text-lg md:text-xl text-muted-foreground max-w-lg">
-              {displaySubtitle}
-            </p>
+            <p className="text-lg md:text-xl text-muted-foreground max-w-lg">{displaySubtitle}</p>
             <div className="flex flex-wrap gap-4">
               <Link
                 href={ctaLink}
@@ -42,7 +46,12 @@ export default function ModernHero({
                   stroke="currentColor"
                   viewBox="0 0 24 24"
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M17 8l4 4m0 0l-4 4m4-4H3"
+                  />
                 </svg>
               </Link>
             </div>
@@ -52,17 +61,23 @@ export default function ModernHero({
           <div className={`relative ${isRtl ? 'lg:order-1' : 'lg:order-2'}`}>
             <div className="relative aspect-[4/3] rounded-2xl overflow-hidden shadow-2xl">
               {image ? (
-                <img
-                  src={image}
-                  alt={displayTitle}
-                  className="w-full h-full object-cover"
-                />
+                <img src={image} alt={displayTitle} className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
                   <div className="text-center p-8">
                     <div className="w-24 h-24 mx-auto mb-4 rounded-2xl bg-primary/10 flex items-center justify-center">
-                      <svg className="w-12 h-12 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                      <svg
+                        className="w-12 h-12 text-primary"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1.5}
+                          d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                        />
                       </svg>
                     </div>
                     <p className="text-muted-foreground">{isRtl ? 'صورة البانر' : 'Hero Image'}</p>

@@ -74,7 +74,7 @@ export class PWAService {
       throw new AppError(404, 'NOT_FOUND', 'Store not found');
     }
 
-    const storedSettings = store.pwaSettings as Partial<PWASettings> || {};
+    const storedSettings = (store.pwaSettings as Partial<PWASettings>) || {};
     const settings: PWASettings = {
       ...DEFAULT_PWA_SETTINGS,
       ...storedSettings,
@@ -248,7 +248,7 @@ export class PWAService {
       };
     }
 
-    const settings = store.pwaSettings as Partial<PWASettings> || {};
+    const settings = (store.pwaSettings as Partial<PWASettings>) || {};
 
     return {
       enabled: true,

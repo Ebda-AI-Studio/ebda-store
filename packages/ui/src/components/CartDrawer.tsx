@@ -172,7 +172,7 @@ export const CartDrawer = forwardRef<HTMLDivElement, CartDrawerProps>(
 
         {/* Drawer */}
         <div
-          ref={(node) => {
+          ref={node => {
             (drawerRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
             if (typeof ref === 'function') ref(node);
             else if (ref) (ref as React.MutableRefObject<HTMLDivElement | null>).current = node;
@@ -184,20 +184,13 @@ export const CartDrawer = forwardRef<HTMLDivElement, CartDrawerProps>(
           className={cn(
             'absolute top-0 h-full w-full max-w-md bg-background shadow-2xl transition-transform duration-300 ease-out',
             isRtl ? 'left-0' : 'right-0',
-            isOpen
-              ? 'translate-x-0'
-              : isRtl
-              ? '-translate-x-full'
-              : 'translate-x-full'
+            isOpen ? 'translate-x-0' : isRtl ? '-translate-x-full' : 'translate-x-full'
           )}
         >
           <div className="flex h-full flex-col">
             {/* Header */}
             <header className="flex items-center justify-between border-b border-border px-4 py-4">
-              <h2
-                id="cart-drawer-title"
-                className="text-lg font-semibold text-foreground"
-              >
+              <h2 id="cart-drawer-title" className="text-lg font-semibold text-foreground">
                 {labels.title}
                 {itemCount > 0 && (
                   <span className="ml-2 text-sm font-normal text-muted-foreground">
@@ -211,7 +204,12 @@ export const CartDrawer = forwardRef<HTMLDivElement, CartDrawerProps>(
                 aria-label={isRtl ? 'إغلاق' : 'Close cart'}
               >
                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </button>
             </header>
@@ -244,7 +242,7 @@ export const CartDrawer = forwardRef<HTMLDivElement, CartDrawerProps>(
                 </div>
               ) : (
                 <ul className="space-y-4">
-                  {items.map((item) => (
+                  {items.map(item => (
                     <li
                       key={item.id}
                       className="flex gap-4 rounded-lg border border-border bg-card p-3"
@@ -294,8 +292,18 @@ export const CartDrawer = forwardRef<HTMLDivElement, CartDrawerProps>(
                             className="text-muted-foreground hover:text-red-500 transition-colors"
                             aria-label={`${labels.remove} ${item.name}`}
                           >
-                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            <svg
+                              className="h-4 w-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M6 18L18 6M6 6l12 12"
+                              />
                             </svg>
                           </button>
                         </div>
@@ -303,7 +311,7 @@ export const CartDrawer = forwardRef<HTMLDivElement, CartDrawerProps>(
                         <div className="mt-2 flex items-center justify-between">
                           <QuantitySelector
                             value={item.quantity}
-                            onChange={(qty) => onUpdateQuantity(item.id, qty)}
+                            onChange={qty => onUpdateQuantity(item.id, qty)}
                             min={1}
                             max={item.maxQuantity || 99}
                             size="sm"
@@ -339,32 +347,32 @@ export const CartDrawer = forwardRef<HTMLDivElement, CartDrawerProps>(
                 </div>
 
                 {/* Shipping Note */}
-                <p className="text-sm text-muted-foreground text-center">
-                  {labels.shippingNote}
-                </p>
+                <p className="text-sm text-muted-foreground text-center">{labels.shippingNote}</p>
 
                 {/* Actions */}
                 <div className="space-y-2">
-                  <Button
-                    onClick={onCheckout}
-                    className="w-full"
-                    size="lg"
-                    disabled={isLoading}
-                  >
+                  <Button onClick={onCheckout} className="w-full" size="lg" disabled={isLoading}>
                     {isLoading ? (
                       <svg className="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                        />
                       </svg>
                     ) : (
                       labels.checkout
                     )}
                   </Button>
-                  <Button
-                    variant="outline"
-                    onClick={onClose}
-                    className="w-full"
-                  >
+                  <Button variant="outline" onClick={onClose} className="w-full">
                     {labels.continueShopping}
                   </Button>
                 </div>

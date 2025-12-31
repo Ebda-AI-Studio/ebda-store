@@ -38,7 +38,15 @@ interface AdvancedSearchOptions {
   onSale?: boolean;
   isNew?: boolean;
   featured?: boolean;
-  sortBy?: 'newest' | 'oldest' | 'price_asc' | 'price_desc' | 'name_asc' | 'name_desc' | 'popular' | 'rating';
+  sortBy?:
+    | 'newest'
+    | 'oldest'
+    | 'price_asc'
+    | 'price_desc'
+    | 'name_asc'
+    | 'name_desc'
+    | 'popular'
+    | 'rating';
 }
 
 export class ProductService {
@@ -362,10 +370,7 @@ export class ProductService {
     if (categories && categories.length > 0) {
       where.categories = {
         some: {
-          OR: [
-            { categoryId: { in: categories } },
-            { category: { slug: { in: categories } } },
-          ],
+          OR: [{ categoryId: { in: categories } }, { category: { slug: { in: categories } } }],
         },
       };
     }
@@ -374,29 +379,22 @@ export class ProductService {
     if (tags && tags.length > 0) {
       where.tags = {
         some: {
-          OR: [
-            { tagId: { in: tags } },
-            { tag: { name: { in: tags, mode: 'insensitive' } } },
-          ],
+          OR: [{ tagId: { in: tags } }, { tag: { name: { in: tags, mode: 'insensitive' } } }],
         },
       };
     }
 
     // Price range filter
     if (minPrice !== undefined) {
-      where.price = { ...(where.price as object || {}), gte: minPrice };
+      where.price = { ...((where.price as object) || {}), gte: minPrice };
     }
     if (maxPrice !== undefined) {
-      where.price = { ...(where.price as object || {}), lte: maxPrice };
+      where.price = { ...((where.price as object) || {}), lte: maxPrice };
     }
 
     // In stock filter
     if (inStock === true) {
-      where.OR = [
-        ...(where.OR || []),
-        { trackInventory: false },
-        { inventory: { gt: 0 } },
-      ];
+      where.OR = [...(where.OR || []), { trackInventory: false }, { inventory: { gt: 0 } }];
     }
 
     // On sale filter (has compare price higher than regular price)
@@ -470,9 +468,10 @@ export class ProductService {
     // Calculate average ratings
     const productsWithRatings = products.map(product => {
       const ratings = product.reviews.map(r => r.rating);
-      const avgRating = ratings.length > 0
-        ? Math.round((ratings.reduce((a, b) => a + b, 0) / ratings.length) * 10) / 10
-        : null;
+      const avgRating =
+        ratings.length > 0
+          ? Math.round((ratings.reduce((a, b) => a + b, 0) / ratings.length) * 10) / 10
+          : null;
       return {
         ...product,
         reviews: undefined,

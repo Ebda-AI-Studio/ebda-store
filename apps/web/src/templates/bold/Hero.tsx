@@ -15,11 +15,17 @@ export default function BoldHero({
   isRtl = false,
 }: HeroProps) {
   const displayTitle = isRtl && titleAr ? titleAr : title || (isRtl ? 'اكتشف الجديد' : 'GO BOLD');
-  const displaySubtitle = isRtl && subtitleAr ? subtitleAr : subtitle || (isRtl ? 'تميز بأسلوبك' : 'Stand out from the crowd');
+  const displaySubtitle =
+    isRtl && subtitleAr
+      ? subtitleAr
+      : subtitle || (isRtl ? 'تميز بأسلوبك' : 'Stand out from the crowd');
   const displayCta = isRtl && ctaTextAr ? ctaTextAr : ctaText || (isRtl ? 'تسوق الآن' : 'Shop Now');
 
   return (
-    <section className="relative min-h-[100vh] bg-primary overflow-hidden" dir={isRtl ? 'rtl' : 'ltr'}>
+    <section
+      className="relative min-h-[100vh] bg-primary overflow-hidden"
+      dir={isRtl ? 'rtl' : 'ltr'}
+    >
       {/* Dynamic Background Pattern */}
       <div className="absolute inset-0 opacity-20">
         <div className="absolute top-0 left-0 w-96 h-96 bg-white rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
@@ -31,7 +37,13 @@ export default function BoldHero({
       <div className="absolute inset-0 opacity-5">
         <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
           <defs>
-            <pattern id="bold-stripes" width="60" height="60" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <pattern
+              id="bold-stripes"
+              width="60"
+              height="60"
+              patternUnits="userSpaceOnUse"
+              patternTransform="rotate(45)"
+            >
               <line x1="0" y1="0" x2="0" y2="60" stroke="white" strokeWidth="20" />
             </pattern>
           </defs>
@@ -76,13 +88,20 @@ export default function BoldHero({
                 stroke="currentColor"
                 viewBox="0 0 24 24"
               >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={3}
+                  d="M13 7l5 5m0 0l-5 5m5-5H6"
+                />
               </svg>
             </Link>
           </div>
 
           {/* Image - Dynamic angle */}
-          <div className={`flex-1 ${isRtl ? 'lg:order-1' : 'lg:order-2'} w-full max-w-lg lg:max-w-none`}>
+          <div
+            className={`flex-1 ${isRtl ? 'lg:order-1' : 'lg:order-2'} w-full max-w-lg lg:max-w-none`}
+          >
             <div className="relative">
               {/* Background shape */}
               <div className="absolute inset-0 bg-white/10 rounded-3xl rotate-6 scale-105" />
@@ -91,20 +110,28 @@ export default function BoldHero({
               {/* Image container */}
               <div className="relative aspect-square rounded-3xl overflow-hidden shadow-2xl">
                 {image ? (
-                  <img
-                    src={image}
-                    alt={displayTitle}
-                    className="w-full h-full object-cover"
-                  />
+                  <img src={image} alt={displayTitle} className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full bg-white/10 flex items-center justify-center">
                     <div className="text-center p-8">
                       <div className="w-24 h-24 mx-auto mb-4 rounded-2xl bg-white/10 flex items-center justify-center">
-                        <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        <svg
+                          className="w-12 h-12 text-white"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                          />
                         </svg>
                       </div>
-                      <p className="text-white/70 font-bold">{isRtl ? 'صورة البانر' : 'Hero Image'}</p>
+                      <p className="text-white/70 font-bold">
+                        {isRtl ? 'صورة البانر' : 'Hero Image'}
+                      </p>
                     </div>
                   </div>
                 )}
@@ -121,8 +148,18 @@ export default function BoldHero({
 
       {/* Scroll indicator */}
       <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
-        <svg className="w-8 h-8 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+        <svg
+          className="w-8 h-8 text-white/50"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M19 14l-7 7m0 0l-7-7m7 7V3"
+          />
         </svg>
       </div>
     </section>

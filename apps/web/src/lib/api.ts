@@ -151,10 +151,7 @@ class ApiClient {
     return sessionId;
   }
 
-  private async request<T>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<ApiResponse<T>> {
+  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
       'X-Session-ID': this.getSessionId(),
@@ -214,7 +211,8 @@ class ApiClient {
   }
 
   async logout() {
-    const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('refreshToken') : null;
+    const refreshToken =
+      typeof window !== 'undefined' ? localStorage.getItem('refreshToken') : null;
     await this.request('/auth/logout', {
       method: 'POST',
       body: JSON.stringify({ refreshToken }),
@@ -258,13 +256,17 @@ class ApiClient {
   }
 
   async getFeaturedProducts(limit = 8) {
-    return this.request<{ products: Product[]; meta: PaginationMeta }>(`/public/products?featured=true&limit=${limit}`);
+    return this.request<{ products: Product[]; meta: PaginationMeta }>(
+      `/public/products?featured=true&limit=${limit}`
+    );
   }
 
   // Store-scoped products (for admin)
   async getStoreProducts(storeId: string, params?: Record<string, string>) {
     const query = params ? `?${new URLSearchParams(params)}` : '';
-    return this.request<{ products: Product[]; meta: PaginationMeta }>(`/stores/${storeId}/products${query}`);
+    return this.request<{ products: Product[]; meta: PaginationMeta }>(
+      `/stores/${storeId}/products${query}`
+    );
   }
 
   async getStoreProduct(storeId: string, productId: string) {

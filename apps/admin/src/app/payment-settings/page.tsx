@@ -24,32 +24,33 @@ interface PaymentConfig {
   lastHealthCheck: string | null;
 }
 
-const PROVIDER_INFO: Record<string, { name: string; nameAr: string; logo: string; color: string }> = {
-  tap: {
-    name: 'Tap Payments',
-    nameAr: 'تاب للمدفوعات',
-    logo: '/providers/tap.svg',
-    color: '#00D4AA',
-  },
-  myfatoorah: {
-    name: 'MyFatoorah',
-    nameAr: 'ماي فاتورة',
-    logo: '/providers/myfatoorah.svg',
-    color: '#00A651',
-  },
-  hesabe: {
-    name: 'Hesabe',
-    nameAr: 'حسابي',
-    logo: '/providers/hesabe.svg',
-    color: '#E31837',
-  },
-  upayments: {
-    name: 'UPayments',
-    nameAr: 'يو بيمنتس',
-    logo: '/providers/upayments.svg',
-    color: '#1E88E5',
-  },
-};
+const PROVIDER_INFO: Record<string, { name: string; nameAr: string; logo: string; color: string }> =
+  {
+    tap: {
+      name: 'Tap Payments',
+      nameAr: 'تاب للمدفوعات',
+      logo: '/providers/tap.svg',
+      color: '#00D4AA',
+    },
+    myfatoorah: {
+      name: 'MyFatoorah',
+      nameAr: 'ماي فاتورة',
+      logo: '/providers/myfatoorah.svg',
+      color: '#00A651',
+    },
+    hesabe: {
+      name: 'Hesabe',
+      nameAr: 'حسابي',
+      logo: '/providers/hesabe.svg',
+      color: '#E31837',
+    },
+    upayments: {
+      name: 'UPayments',
+      nameAr: 'يو بيمنتس',
+      logo: '/providers/upayments.svg',
+      color: '#1E88E5',
+    },
+  };
 
 const PAYMENT_METHODS = [
   { id: 'knet', name: 'KNET', nameAr: 'كي نت' },
@@ -219,7 +220,9 @@ export default function PaymentSettingsPage() {
       unknown: 'bg-gray-100 text-gray-800',
     };
     return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${colors[status] || colors.unknown}`}>
+      <span
+        className={`px-2 py-1 rounded-full text-xs font-medium ${colors[status] || colors.unknown}`}
+      >
         {status}
       </span>
     );
@@ -249,10 +252,7 @@ export default function PaymentSettingsPage() {
         {error && (
           <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
             <p className="text-red-600">{error}</p>
-            <button
-              onClick={() => setError(null)}
-              className="text-red-500 underline text-sm mt-1"
-            >
+            <button onClick={() => setError(null)} className="text-red-500 underline text-sm mt-1">
               Dismiss
             </button>
           </div>
@@ -325,7 +325,9 @@ export default function PaymentSettingsPage() {
                         </div>
                         <div>
                           <span className="text-gray-500">API Key:</span>
-                          <span className="ml-2 font-mono text-xs">{config!.apiKey || 'Not set'}</span>
+                          <span className="ml-2 font-mono text-xs">
+                            {config!.apiKey || 'Not set'}
+                          </span>
                         </div>
                         <div>
                           <span className="text-gray-500">Fee:</span>
@@ -552,7 +554,10 @@ export default function PaymentSettingsPage() {
                           onChange={e => {
                             const methods = formData.supportedMethods || [];
                             if (e.target.checked) {
-                              setFormData({ ...formData, supportedMethods: [...methods, method.id] });
+                              setFormData({
+                                ...formData,
+                                supportedMethods: [...methods, method.id],
+                              });
                             } else {
                               setFormData({
                                 ...formData,
@@ -582,7 +587,10 @@ export default function PaymentSettingsPage() {
                         min="0"
                         value={(formData.fixedFee || 0) / 1000}
                         onChange={e =>
-                          setFormData({ ...formData, fixedFee: Math.round(parseFloat(e.target.value) * 1000) })
+                          setFormData({
+                            ...formData,
+                            fixedFee: Math.round(parseFloat(e.target.value) * 1000),
+                          })
                         }
                         className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
                         placeholder="0.000"

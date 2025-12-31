@@ -14,9 +14,7 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
           ? '\x1b[33m' // Yellow
           : '\x1b[32m'; // Green
 
-    console.log(
-      `${statusColor}${req.method}\x1b[0m ${req.path} ${res.statusCode} - ${duration}ms`
-    );
+    console.log(`${statusColor}${req.method}\x1b[0m ${req.path} ${res.statusCode} - ${duration}ms`);
   });
 
   next();

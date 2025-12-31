@@ -15,13 +15,7 @@ const upload = multer({
     files: 10, // Max 10 files at once
   },
   fileFilter: (_req, file, cb) => {
-    const allowedTypes = [
-      'image/jpeg',
-      'image/png',
-      'image/gif',
-      'image/webp',
-      'image/svg+xml',
-    ];
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
 
     if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
@@ -67,11 +61,9 @@ router.post(
 
       const folder = (req.query.folder as string) || 'products';
 
-      const result = await StorageService.upload(
-        req.file.buffer,
-        req.file.originalname,
-        { folder }
-      );
+      const result = await StorageService.upload(req.file.buffer, req.file.originalname, {
+        folder,
+      });
 
       await auditLog({
         action: 'file.uploaded',
@@ -169,11 +161,7 @@ router.post(
         return;
       }
 
-      const result = await StorageService.getUploadUrl(
-        filename,
-        contentType,
-        folder || 'products'
-      );
+      const result = await StorageService.getUploadUrl(filename, contentType, folder || 'products');
 
       res.json({
         success: true,

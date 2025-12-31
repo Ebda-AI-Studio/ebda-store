@@ -22,12 +22,8 @@ export default function MinimalCategoryGrid({
 
         {/* Grid - Simple 4 columns */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
-          {categories.map((category) => (
-            <CategoryCard
-              key={category.id}
-              category={category}
-              isRtl={isRtl}
-            />
+          {categories.map(category => (
+            <CategoryCard key={category.id} category={category} isRtl={isRtl} />
           ))}
         </div>
       </div>

@@ -44,10 +44,12 @@ export class EmailService {
     host: config.smtpHost,
     port: config.smtpPort,
     secure: config.smtpPort === 465,
-    auth: config.smtpUser ? {
-      user: config.smtpUser,
-      pass: config.smtpPassword,
-    } : undefined,
+    auth: config.smtpUser
+      ? {
+          user: config.smtpUser,
+          pass: config.smtpPassword,
+        }
+      : undefined,
   });
 
   /**
@@ -160,10 +162,7 @@ export class EmailService {
   /**
    * Welcome Email
    */
-  static async sendWelcome(data: {
-    email: string;
-    name: string;
-  }): Promise<void> {
+  static async sendWelcome(data: { email: string; name: string }): Promise<void> {
     const html = this.renderTemplate('welcome', data);
 
     await this.send({
@@ -244,16 +243,39 @@ export class EmailService {
    */
   private static renderTemplate(templateName: string, data: object): string {
     const templates: Record<string, (data: object) => string> = {
-      'order-confirmation': (d) => this.orderConfirmationTemplate(d as OrderEmailData),
-      'payment-success': (d) => this.paymentSuccessTemplate(d as OrderEmailData),
-      'payment-failed': (d) => this.paymentFailedTemplate(d as { customerEmail: string; customerName: string; orderNumber: string; reason?: string }),
-      'order-shipped': (d) => this.orderShippedTemplate(d as { customerEmail: string; customerName: string; orderNumber: string; trackingNumber?: string; trackingUrl?: string; carrier?: string }),
-      'password-reset': (d) => this.passwordResetTemplate(d as { email: string; name: string; resetUrl: string; expiresIn: string }),
-      'welcome': (d) => this.welcomeTemplate(d as { email: string; name: string }),
-      'email-verification': (d) => this.emailVerificationTemplate(d as { email: string; name: string; verificationUrl: string; expiresIn: string }),
-      'resend-verification': (d) => this.resendVerificationTemplate(d as { email: string; name: string; verificationUrl: string; expiresIn: string }),
-      'admin-new-order': (d) => this.adminNewOrderTemplate(d as OrderEmailData),
-      'admin-refund': (d) => this.adminRefundTemplate(d as { orderNumber: string; amount: number; reason?: string }),
+      'order-confirmation': d => this.orderConfirmationTemplate(d as OrderEmailData),
+      'payment-success': d => this.paymentSuccessTemplate(d as OrderEmailData),
+      'payment-failed': d =>
+        this.paymentFailedTemplate(
+          d as { customerEmail: string; customerName: string; orderNumber: string; reason?: string }
+        ),
+      'order-shipped': d =>
+        this.orderShippedTemplate(
+          d as {
+            customerEmail: string;
+            customerName: string;
+            orderNumber: string;
+            trackingNumber?: string;
+            trackingUrl?: string;
+            carrier?: string;
+          }
+        ),
+      'password-reset': d =>
+        this.passwordResetTemplate(
+          d as { email: string; name: string; resetUrl: string; expiresIn: string }
+        ),
+      welcome: d => this.welcomeTemplate(d as { email: string; name: string }),
+      'email-verification': d =>
+        this.emailVerificationTemplate(
+          d as { email: string; name: string; verificationUrl: string; expiresIn: string }
+        ),
+      'resend-verification': d =>
+        this.resendVerificationTemplate(
+          d as { email: string; name: string; verificationUrl: string; expiresIn: string }
+        ),
+      'admin-new-order': d => this.adminNewOrderTemplate(d as OrderEmailData),
+      'admin-refund': d =>
+        this.adminRefundTemplate(d as { orderNumber: string; amount: number; reason?: string }),
     };
 
     const template = templates[templateName];
@@ -311,13 +333,17 @@ export class EmailService {
    * Order Confirmation Template
    */
   private static orderConfirmationTemplate(d: OrderEmailData): string {
-    const itemsHtml = d.items.map(item => `
+    const itemsHtml = d.items
+      .map(
+        item => `
       <tr>
         <td>${item.name}</td>
         <td style="text-align: center;">${item.quantity}</td>
         <td style="text-align: right;">$${(item.price / 100).toFixed(2)}</td>
       </tr>
-    `).join('');
+    `
+      )
+      .join('');
 
     return EmailService.baseTemplate(`
       <h2>Thank you for your order!</h2>
@@ -386,7 +412,12 @@ export class EmailService {
   /**
    * Payment Failed Template
    */
-  private static paymentFailedTemplate(d: { customerEmail: string; customerName: string; orderNumber: string; reason?: string }): string {
+  private static paymentFailedTemplate(d: {
+    customerEmail: string;
+    customerName: string;
+    orderNumber: string;
+    reason?: string;
+  }): string {
     return EmailService.baseTemplate(`
       <h2>Payment Failed</h2>
       <p>Hi ${d.customerName},</p>
@@ -402,18 +433,29 @@ export class EmailService {
   /**
    * Order Shipped Template
    */
-  private static orderShippedTemplate(d: { customerEmail: string; customerName: string; orderNumber: string; trackingNumber?: string; trackingUrl?: string; carrier?: string }): string {
+  private static orderShippedTemplate(d: {
+    customerEmail: string;
+    customerName: string;
+    orderNumber: string;
+    trackingNumber?: string;
+    trackingUrl?: string;
+    carrier?: string;
+  }): string {
     return EmailService.baseTemplate(`
       <h2>Your Order Has Shipped!</h2>
       <p>Hi ${d.customerName},</p>
       <p>Great news! Your order #${d.orderNumber} is on its way.</p>
       ${d.carrier ? `<p><strong>Carrier:</strong> ${d.carrier}</p>` : ''}
       ${d.trackingNumber ? `<p><strong>Tracking Number:</strong> ${d.trackingNumber}</p>` : ''}
-      ${d.trackingUrl ? `
+      ${
+        d.trackingUrl
+          ? `
         <p style="text-align: center; margin: 24px 0;">
           <a href="${d.trackingUrl}" class="button">Track Your Order</a>
         </p>
-      ` : ''}
+      `
+          : ''
+      }
       <p>Thank you for shopping with us!</p>
     `);
   }
@@ -421,7 +463,12 @@ export class EmailService {
   /**
    * Password Reset Template
    */
-  private static passwordResetTemplate(d: { email: string; name: string; resetUrl: string; expiresIn: string }): string {
+  private static passwordResetTemplate(d: {
+    email: string;
+    name: string;
+    resetUrl: string;
+    expiresIn: string;
+  }): string {
     return EmailService.baseTemplate(`
       <h2>Reset Your Password</h2>
       <p>Hi ${d.name},</p>
@@ -458,7 +505,12 @@ export class EmailService {
   /**
    * Email Verification Template
    */
-  private static emailVerificationTemplate(d: { email: string; name: string; verificationUrl: string; expiresIn: string }): string {
+  private static emailVerificationTemplate(d: {
+    email: string;
+    name: string;
+    verificationUrl: string;
+    expiresIn: string;
+  }): string {
     return EmailService.baseTemplate(`
       <h2>Verify Your Email Address</h2>
       <p>Hi ${d.name},</p>
@@ -478,7 +530,12 @@ export class EmailService {
   /**
    * Resend Email Verification Template
    */
-  private static resendVerificationTemplate(d: { email: string; name: string; verificationUrl: string; expiresIn: string }): string {
+  private static resendVerificationTemplate(d: {
+    email: string;
+    name: string;
+    verificationUrl: string;
+    expiresIn: string;
+  }): string {
     return EmailService.baseTemplate(`
       <h2>New Verification Link</h2>
       <p>Hi ${d.name},</p>
@@ -514,7 +571,11 @@ export class EmailService {
   /**
    * Admin Refund Template
    */
-  private static adminRefundTemplate(d: { orderNumber: string; amount: number; reason?: string }): string {
+  private static adminRefundTemplate(d: {
+    orderNumber: string;
+    amount: number;
+    reason?: string;
+  }): string {
     return EmailService.baseTemplate(`
       <h2>Refund Processed</h2>
       <p><strong>Order #${d.orderNumber}</strong></p>
@@ -529,8 +590,15 @@ export class EmailService {
   /**
    * Return Confirmation Template
    */
-  private static returnConfirmationTemplate(d: { customerName: string; storeName: string; returnNumber: string; orderNumber: string; type: string }): string {
-    const typeLabel = d.type === 'exchange' ? 'Exchange' : d.type === 'refund' ? 'Refund' : 'Return';
+  private static returnConfirmationTemplate(d: {
+    customerName: string;
+    storeName: string;
+    returnNumber: string;
+    orderNumber: string;
+    type: string;
+  }): string {
+    const typeLabel =
+      d.type === 'exchange' ? 'Exchange' : d.type === 'refund' ? 'Refund' : 'Return';
     return EmailService.baseTemplate(`
       <h2>${typeLabel} Request Received</h2>
       <p>Hi ${d.customerName},</p>
@@ -548,9 +616,16 @@ export class EmailService {
   /**
    * Return Status Update Template
    */
-  private static returnStatusUpdateTemplate(d: { customerName: string; storeName: string; returnNumber: string; status: string; notes?: string }): string {
+  private static returnStatusUpdateTemplate(d: {
+    customerName: string;
+    storeName: string;
+    returnNumber: string;
+    status: string;
+    notes?: string;
+  }): string {
     const statusMessages: Record<string, string> = {
-      approved: 'Your return request has been approved! Please ship the items back to us using the provided instructions.',
+      approved:
+        'Your return request has been approved! Please ship the items back to us using the provided instructions.',
       rejected: 'Unfortunately, we were unable to approve your return request.',
       shipped: 'We have noted that your return items have been shipped.',
       received: 'We have received your returned items and they are being inspected.',
@@ -559,7 +634,8 @@ export class EmailService {
       cancelled: 'Your return request has been cancelled.',
     };
 
-    const message = statusMessages[d.status] || `Your return request status has been updated to: ${d.status}`;
+    const message =
+      statusMessages[d.status] || `Your return request status has been updated to: ${d.status}`;
 
     return EmailService.baseTemplate(`
       <h2>Return Status Update</h2>
@@ -577,8 +653,16 @@ export class EmailService {
   /**
    * Send Return Confirmation Email
    */
-  static async sendReturnConfirmation(data: { email: string; customerName: string; storeName: string; returnNumber: string; orderNumber: string; type: string }) {
-    const typeLabel = data.type === 'exchange' ? 'Exchange' : data.type === 'refund' ? 'Refund' : 'Return';
+  static async sendReturnConfirmation(data: {
+    email: string;
+    customerName: string;
+    storeName: string;
+    returnNumber: string;
+    orderNumber: string;
+    type: string;
+  }) {
+    const typeLabel =
+      data.type === 'exchange' ? 'Exchange' : data.type === 'refund' ? 'Refund' : 'Return';
     const html = this.returnConfirmationTemplate(data);
     await this.send({
       to: data.email,
@@ -591,7 +675,14 @@ export class EmailService {
   /**
    * Send Return Status Update Email
    */
-  static async sendReturnStatusUpdate(data: { email: string; customerName: string; storeName: string; returnNumber: string; status: string; notes?: string }) {
+  static async sendReturnStatusUpdate(data: {
+    email: string;
+    customerName: string;
+    storeName: string;
+    returnNumber: string;
+    status: string;
+    notes?: string;
+  }) {
     const html = this.returnStatusUpdateTemplate(data);
     await this.send({
       to: data.email,

@@ -12,7 +12,8 @@ export default function BoldFooter({
 }: FooterProps) {
   const displayName = isRtl && branding.nameAr ? branding.nameAr : branding.name;
   const displayLogo = isRtl && branding.logoAr ? branding.logoAr : branding.logo;
-  const displayDescription = isRtl && branding.descriptionAr ? branding.descriptionAr : branding.description;
+  const displayDescription =
+    isRtl && branding.descriptionAr ? branding.descriptionAr : branding.description;
   const displayPhone = isRtl && contact.phoneAr ? contact.phoneAr : contact.phone;
   const displayAddress = isRtl && contact.addressAr ? contact.addressAr : contact.address;
 
@@ -24,7 +25,10 @@ export default function BoldFooter({
   ].filter(s => s.url);
 
   return (
-    <footer className="bg-foreground text-background mt-auto relative overflow-hidden" dir={isRtl ? 'rtl' : 'ltr'}>
+    <footer
+      className="bg-foreground text-background mt-auto relative overflow-hidden"
+      dir={isRtl ? 'rtl' : 'ltr'}
+    >
       {/* Background Pattern */}
       <div className="absolute inset-0 opacity-5">
         <div className="absolute top-0 right-0 w-96 h-96 bg-primary rounded-full blur-3xl" />
@@ -74,7 +78,7 @@ export default function BoldFooter({
               {isRtl ? 'روابط سريعة' : 'Quick Links'}
             </h4>
             <ul className="space-y-3">
-              {navigation.map((item) => (
+              {navigation.map(item => (
                 <li key={item.href}>
                   <Link
                     href={item.href}
@@ -115,9 +119,7 @@ export default function BoldFooter({
                   </a>
                 </li>
               )}
-              {displayAddress && (
-                <li className="text-background/70">{displayAddress}</li>
-              )}
+              {displayAddress && <li className="text-background/70">{displayAddress}</li>}
             </ul>
           </div>
         </div>
@@ -128,10 +130,16 @@ export default function BoldFooter({
             © {new Date().getFullYear()} {displayName}
           </p>
           <div className="flex gap-6">
-            <Link href="/privacy" className="text-background/50 hover:text-primary transition-colors font-medium">
+            <Link
+              href="/privacy"
+              className="text-background/50 hover:text-primary transition-colors font-medium"
+            >
               {isRtl ? 'الخصوصية' : 'Privacy'}
             </Link>
-            <Link href="/terms" className="text-background/50 hover:text-primary transition-colors font-medium">
+            <Link
+              href="/terms"
+              className="text-background/50 hover:text-primary transition-colors font-medium"
+            >
               {isRtl ? 'الشروط' : 'Terms'}
             </Link>
           </div>

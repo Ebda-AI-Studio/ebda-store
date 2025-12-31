@@ -177,9 +177,7 @@ export const MOCK_DATA = {
       label: 'Categories',
       labelAr: 'الفئات',
       href: '/categories',
-      children: [
-        { label: 'Sub Category', labelAr: 'فئة فرعية', href: '/categories/sub' },
-      ],
+      children: [{ label: 'Sub Category', labelAr: 'فئة فرعية', href: '/categories/sub' }],
     },
     { label: 'About', labelAr: 'عنا', href: '/about' },
     { label: 'Contact', labelAr: 'اتصل بنا', href: '/contact' },
@@ -232,7 +230,11 @@ export function getTestScenarios(slot: TemplateSlot): TestScenario[] {
           name: 'Multiple products',
           description: 'Grid with multiple products',
           props: {
-            products: [MOCK_DATA.product, MOCK_DATA.productWithNoImage, MOCK_DATA.productOutOfStock],
+            products: [
+              MOCK_DATA.product,
+              MOCK_DATA.productWithNoImage,
+              MOCK_DATA.productOutOfStock,
+            ],
             isRtl: false,
             currency: 'KWD',
             columns: 4,
@@ -444,14 +446,14 @@ export function logValidationResult(templateId: TemplateId, result: ValidationRe
     console.log('✅ Template is valid');
   } else {
     console.error('❌ Template has errors:');
-    result.errors.forEach((error) => {
+    result.errors.forEach(error => {
       console.error(`  [${error.slot}] ${error.code}: ${error.message}`);
     });
   }
 
   if (result.warnings.length > 0) {
     console.warn('⚠️ Warnings:');
-    result.warnings.forEach((warning) => {
+    result.warnings.forEach(warning => {
       console.warn(`  [${warning.slot}] ${warning.code}: ${warning.message}`);
     });
   }

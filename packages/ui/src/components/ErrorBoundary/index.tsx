@@ -76,9 +76,7 @@ export function ErrorFallback({ error, onRetry }: ErrorFallbackProps) {
             />
           </svg>
         </div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">
-          Something went wrong
-        </h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">Something went wrong</h3>
         <p className="text-gray-600 mb-4">
           {error?.message || 'An unexpected error occurred. Please try again.'}
         </p>
@@ -87,12 +85,7 @@ export function ErrorFallback({ error, onRetry }: ErrorFallbackProps) {
             onClick={onRetry}
             className="inline-flex items-center px-4 py-2 bg-[#ff6e00] text-white rounded-lg hover:bg-[#e56200] transition-colors"
           >
-            <svg
-              className="w-4 h-4 mr-2"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
+            <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -128,17 +121,14 @@ export function PageErrorFallback({ error, onRetry }: ErrorFallbackProps) {
             />
           </svg>
         </div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-3">
-          Oops! Something went wrong
-        </h1>
+        <h1 className="text-2xl font-bold text-gray-900 mb-3">Oops! Something went wrong</h1>
         <p className="text-gray-600 mb-6">
-          We apologize for the inconvenience. Please try refreshing the page or contact support if the problem persists.
+          We apologize for the inconvenience. Please try refreshing the page or contact support if
+          the problem persists.
         </p>
         {process.env.NODE_ENV === 'development' && error && (
           <details className="text-left bg-gray-100 rounded-lg p-4 mb-6">
-            <summary className="cursor-pointer font-medium text-gray-700">
-              Error Details
-            </summary>
+            <summary className="cursor-pointer font-medium text-gray-700">Error Details</summary>
             <pre className="mt-2 text-sm text-red-600 overflow-auto">
               {error.message}
               {'\n\n'}

@@ -56,17 +56,30 @@ export default function SettingsPage() {
   };
 
   const tabs = [
-    { id: 'general', label: 'General', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z' },
-    { id: 'notifications', label: 'Notifications', icon: 'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9' },
-    { id: 'shipping', label: 'Shipping', icon: 'M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4' },
-    { id: 'payments', label: 'Payments', icon: 'M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z' },
+    {
+      id: 'general',
+      label: 'General',
+      icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z',
+    },
+    {
+      id: 'notifications',
+      label: 'Notifications',
+      icon: 'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9',
+    },
+    {
+      id: 'shipping',
+      label: 'Shipping',
+      icon: 'M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4',
+    },
+    {
+      id: 'payments',
+      label: 'Payments',
+      icon: 'M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z',
+    },
   ];
 
   return (
-    <AdminLayout
-      title="Settings"
-      subtitle="Manage your store configuration"
-    >
+    <AdminLayout title="Settings" subtitle="Manage your store configuration">
       <div className="flex flex-col gap-6 lg:flex-row">
         {/* Tabs */}
         <div className="lg:w-64">
@@ -82,7 +95,12 @@ export default function SettingsPage() {
                 }`}
               >
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={tab.icon} />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d={tab.icon}
+                  />
                 </svg>
                 {tab.label}
               </button>
@@ -148,12 +166,31 @@ export default function SettingsPage() {
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Email Notifications</h2>
               <div className="space-y-4">
                 {[
-                  { key: 'orderNotifications', label: 'Order Notifications', description: 'Receive emails for new orders' },
-                  { key: 'customerNotifications', label: 'Customer Notifications', description: 'Get notified when new customers register' },
-                  { key: 'inventoryAlerts', label: 'Inventory Alerts', description: 'Alerts when products are low in stock' },
-                  { key: 'marketingEmails', label: 'Marketing Emails', description: 'Receive tips and product updates' },
+                  {
+                    key: 'orderNotifications',
+                    label: 'Order Notifications',
+                    description: 'Receive emails for new orders',
+                  },
+                  {
+                    key: 'customerNotifications',
+                    label: 'Customer Notifications',
+                    description: 'Get notified when new customers register',
+                  },
+                  {
+                    key: 'inventoryAlerts',
+                    label: 'Inventory Alerts',
+                    description: 'Alerts when products are low in stock',
+                  },
+                  {
+                    key: 'marketingEmails',
+                    label: 'Marketing Emails',
+                    description: 'Receive tips and product updates',
+                  },
                 ].map(item => (
-                  <div key={item.key} className="flex items-center justify-between rounded-lg border p-4">
+                  <div
+                    key={item.key}
+                    className="flex items-center justify-between rounded-lg border p-4"
+                  >
                     <div>
                       <p className="font-medium text-gray-900">{item.label}</p>
                       <p className="text-sm text-gray-500">{item.description}</p>
@@ -213,10 +250,14 @@ export default function SettingsPage() {
                       </div>
                       <div>
                         <p className="font-medium text-gray-900">KNET</p>
-                        <p className="text-sm text-gray-500">Kuwait&apos;s primary debit card network</p>
+                        <p className="text-sm text-gray-500">
+                          Kuwait&apos;s primary debit card network
+                        </p>
                       </div>
                     </div>
-                    <Button variant="outline" size="sm">Configure</Button>
+                    <Button variant="outline" size="sm">
+                      Configure
+                    </Button>
                   </div>
                   <div className="flex items-center justify-between rounded-lg border p-4">
                     <div className="flex items-center gap-3">
@@ -228,7 +269,9 @@ export default function SettingsPage() {
                         <p className="text-sm text-gray-500">Credit cards, Apple Pay, Google Pay</p>
                       </div>
                     </div>
-                    <Button variant="outline" size="sm">Configure</Button>
+                    <Button variant="outline" size="sm">
+                      Configure
+                    </Button>
                   </div>
                   <div className="flex items-center justify-between rounded-lg border p-4">
                     <div className="flex items-center gap-3">
@@ -240,13 +283,25 @@ export default function SettingsPage() {
                         <p className="text-sm text-gray-500">Kuwait payment gateway</p>
                       </div>
                     </div>
-                    <Button variant="outline" size="sm">Connect</Button>
+                    <Button variant="outline" size="sm">
+                      Connect
+                    </Button>
                   </div>
                   <div className="flex items-center justify-between rounded-lg border p-4">
                     <div className="flex items-center gap-3">
                       <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100">
-                        <svg className="h-5 w-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                        <svg
+                          className="h-5 w-5 text-amber-600"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
+                          />
                         </svg>
                       </div>
                       <div>
@@ -265,12 +320,7 @@ export default function SettingsPage() {
               <div className="rounded-xl border bg-white p-6 shadow-sm">
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">Tax Settings</h2>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Input
-                    label="Tax Rate (%)"
-                    type="number"
-                    step="0.01"
-                    defaultValue="10"
-                  />
+                  <Input label="Tax Rate (%)" type="number" step="0.01" defaultValue="10" />
                   <Select
                     label="Tax Calculation"
                     defaultValue="inclusive"

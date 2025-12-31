@@ -89,9 +89,7 @@ export default function RegisterPage() {
         {/* Form */}
         <div className="rounded-xl border bg-white p-8 shadow-sm">
           {error && (
-            <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">
-              {error}
-            </div>
+            <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">{error}</div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
@@ -148,9 +146,13 @@ export default function RegisterPage() {
               />
               <label htmlFor="terms" className="text-sm text-gray-600">
                 I agree to the{' '}
-                <Link href="/terms" className="text-primary hover:underline">Terms of Service</Link>
-                {' '}and{' '}
-                <Link href="/privacy" className="text-primary hover:underline">Privacy Policy</Link>
+                <Link href="/terms" className="text-primary hover:underline">
+                  Terms of Service
+                </Link>{' '}
+                and{' '}
+                <Link href="/privacy" className="text-primary hover:underline">
+                  Privacy Policy
+                </Link>
               </label>
             </div>
 

@@ -3,7 +3,10 @@
 import { forwardRef } from 'react';
 import { cn } from '../utils/cn';
 
-export interface QuantitySelectorProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'onChange'> {
+export interface QuantitySelectorProps extends Omit<
+  React.HTMLAttributes<HTMLDivElement>,
+  'onChange'
+> {
   /** Current quantity value */
   value: number;
   /** Callback when quantity changes */
@@ -166,7 +169,12 @@ export const QuantitySelector = forwardRef<HTMLDivElement, QuantitySelectorProps
             aria-label={isRtl ? 'زيادة الكمية' : 'Increase quantity'}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 4v16m8-8H4"
+              />
             </svg>
           </button>
         </div>

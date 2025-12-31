@@ -217,7 +217,11 @@ export class StoreService {
 
     const validTemplates = ['modern', 'classic', 'minimal', 'bold', 'elegant'];
     if (!validTemplates.includes(template)) {
-      throw new AppError(400, 'INVALID_TEMPLATE', `Template must be one of: ${validTemplates.join(', ')}`);
+      throw new AppError(
+        400,
+        'INVALID_TEMPLATE',
+        `Template must be one of: ${validTemplates.join(', ')}`
+      );
     }
 
     const updatedStore = await prisma.store.update({
@@ -239,13 +243,16 @@ export class StoreService {
     return updatedStore;
   }
 
-  static async updateBranding(storeId: string, branding: {
-    name?: string;
-    nameAr?: string;
-    logo?: string;
-    logoAr?: string;
-    favicon?: string;
-  }) {
+  static async updateBranding(
+    storeId: string,
+    branding: {
+      name?: string;
+      nameAr?: string;
+      logo?: string;
+      logoAr?: string;
+      favicon?: string;
+    }
+  ) {
     await this.getById(storeId);
 
     const updatedStore = await prisma.store.update({
@@ -273,14 +280,17 @@ export class StoreService {
     return updatedStore;
   }
 
-  static async updateContactInfo(storeId: string, contact: {
-    email?: string;
-    phone?: string;
-    phoneAr?: string;
-    whatsapp?: string;
-    address?: string;
-    addressAr?: string;
-  }) {
+  static async updateContactInfo(
+    storeId: string,
+    contact: {
+      email?: string;
+      phone?: string;
+      phoneAr?: string;
+      whatsapp?: string;
+      address?: string;
+      addressAr?: string;
+    }
+  ) {
     await this.getById(storeId);
 
     const updatedStore = await prisma.store.update({
@@ -309,12 +319,15 @@ export class StoreService {
     return updatedStore;
   }
 
-  static async updateSeo(storeId: string, seo: {
-    metaTitle?: string;
-    metaTitleAr?: string;
-    metaDescription?: string;
-    metaDescriptionAr?: string;
-  }) {
+  static async updateSeo(
+    storeId: string,
+    seo: {
+      metaTitle?: string;
+      metaTitleAr?: string;
+      metaDescription?: string;
+      metaDescriptionAr?: string;
+    }
+  ) {
     await this.getById(storeId);
 
     const updatedStore = await prisma.store.update({
@@ -334,7 +347,17 @@ export class StoreService {
     await this.getById(storeId);
 
     // Extract individual pixel IDs from the marketingPixels object for quick access
-    const pixels = marketingPixels as Record<string, { enabled?: boolean; pixelId?: string; measurementId?: string; containerId?: string; conversionId?: string; tagId?: string }>;
+    const pixels = marketingPixels as Record<
+      string,
+      {
+        enabled?: boolean;
+        pixelId?: string;
+        measurementId?: string;
+        containerId?: string;
+        conversionId?: string;
+        tagId?: string;
+      }
+    >;
 
     const updatedStore = await prisma.store.update({
       where: { id: storeId },
@@ -343,8 +366,12 @@ export class StoreService {
         metaPixelId: pixels.meta?.enabled ? pixels.meta.pixelId : null,
         tiktokPixelId: pixels.tiktok?.enabled ? pixels.tiktok.pixelId : null,
         snapchatPixelId: pixels.snapchat?.enabled ? pixels.snapchat.pixelId : null,
-        googleAnalyticsId: pixels.googleAnalytics?.enabled ? pixels.googleAnalytics.measurementId : null,
-        googleTagManagerId: pixels.googleTagManager?.enabled ? pixels.googleTagManager.containerId : null,
+        googleAnalyticsId: pixels.googleAnalytics?.enabled
+          ? pixels.googleAnalytics.measurementId
+          : null,
+        googleTagManagerId: pixels.googleTagManager?.enabled
+          ? pixels.googleTagManager.containerId
+          : null,
         googleAdsId: pixels.googleAds?.enabled ? pixels.googleAds.conversionId : null,
         twitterPixelId: pixels.twitter?.enabled ? pixels.twitter.pixelId : null,
         pinterestTagId: pixels.pinterest?.enabled ? pixels.pinterest.tagId : null,

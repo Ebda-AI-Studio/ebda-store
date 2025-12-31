@@ -58,16 +58,16 @@ npm run dev
 
 ### Available Scripts
 
-| Script | Description |
-|--------|-------------|
-| `npm run dev` | Start all apps in development mode |
-| `npm run build` | Build all apps for production |
-| `npm run test` | Run all tests |
-| `npm run test:coverage` | Run tests with coverage report |
-| `npm run lint` | Lint all code |
-| `npm run lint:fix` | Fix linting issues |
-| `npm run db:migrate` | Run database migrations |
-| `npm run db:seed` | Seed the database |
+| Script                  | Description                        |
+| ----------------------- | ---------------------------------- |
+| `npm run dev`           | Start all apps in development mode |
+| `npm run build`         | Build all apps for production      |
+| `npm run test`          | Run all tests                      |
+| `npm run test:coverage` | Run tests with coverage report     |
+| `npm run lint`          | Lint all code                      |
+| `npm run lint:fix`      | Fix linting issues                 |
+| `npm run db:migrate`    | Run database migrations            |
+| `npm run db:seed`       | Seed the database                  |
 
 ## Project Structure
 

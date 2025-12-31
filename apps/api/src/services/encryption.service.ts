@@ -52,12 +52,7 @@ class EncryptionService {
     const authTag = cipher.getAuthTag();
 
     // Combine salt + iv + authTag + encrypted data
-    const combined = Buffer.concat([
-      salt,
-      iv,
-      authTag,
-      Buffer.from(encrypted, 'hex'),
-    ]);
+    const combined = Buffer.concat([salt, iv, authTag, Buffer.from(encrypted, 'hex')]);
 
     return combined.toString('base64');
   }
@@ -101,10 +96,7 @@ class EncryptionService {
    * Hash a value (one-way, for comparisons)
    */
   hash(value: string): string {
-    return crypto
-      .createHmac('sha256', this.getKey())
-      .update(value)
-      .digest('hex');
+    return crypto.createHmac('sha256', this.getKey()).update(value).digest('hex');
   }
 
   /**

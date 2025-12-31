@@ -226,7 +226,11 @@ export class BulkService {
 
     const lines = csvData.split('\n').filter(line => line.trim());
     if (lines.length < 2) {
-      throw new AppError(400, 'INVALID_CSV', 'CSV file must have a header row and at least one data row');
+      throw new AppError(
+        400,
+        'INVALID_CSV',
+        'CSV file must have a header row and at least one data row'
+      );
     }
 
     const headers = this.parseCSVLine(lines[0]);
@@ -287,7 +291,8 @@ export class BulkService {
           barcode: row.barcode || null,
           inventory: row.inventory ? parseInt(String(row.inventory)) : 0,
           lowStockThreshold: row.lowStockThreshold ? parseInt(String(row.lowStockThreshold)) : 5,
-          trackInventory: row.trackInventory !== undefined ? String(row.trackInventory) === 'true' : true,
+          trackInventory:
+            row.trackInventory !== undefined ? String(row.trackInventory) === 'true' : true,
           weight: row.weight ? parseFloat(String(row.weight)) : null,
           status: (row.status as ProductStatus) || 'draft',
           featured: row.featured !== undefined ? String(row.featured) === 'true' : false,
@@ -308,7 +313,12 @@ export class BulkService {
 
           // Update categories if provided
           if (row.categories) {
-            await this.updateProductCategories(existingProduct.id, storeId, row.categories, categoryCache);
+            await this.updateProductCategories(
+              existingProduct.id,
+              storeId,
+              row.categories,
+              categoryCache
+            );
           }
 
           // Update tags if provided
@@ -363,7 +373,10 @@ export class BulkService {
         } else {
           // Product exists but updateExisting is false
           result.failed++;
-          result.errors.push({ row: rowIndex, error: `Product with SKU "${row.sku}" or slug "${slug}" already exists` });
+          result.errors.push({
+            row: rowIndex,
+            error: `Product with SKU "${row.sku}" or slug "${slug}" already exists`,
+          });
         }
       } catch (error) {
         result.failed++;
@@ -413,7 +426,9 @@ export class BulkService {
         deleted++;
       } catch (error) {
         failed++;
-        errors.push(`Product ${productId}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        errors.push(
+          `Product ${productId}: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
       }
     }
 
@@ -452,7 +467,9 @@ export class BulkService {
         updated++;
       } catch (error) {
         failed++;
-        errors.push(`Product ${productId}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        errors.push(
+          `Product ${productId}: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
       }
     }
 
@@ -515,7 +532,11 @@ export class BulkService {
       .trim();
   }
 
-  private static async ensureUniqueSlug(storeId: string, slug: string, excludeId?: string): Promise<string> {
+  private static async ensureUniqueSlug(
+    storeId: string,
+    slug: string,
+    excludeId?: string
+  ): Promise<string> {
     let uniqueSlug = slug;
     let counter = 1;
     let isUnique = false;
@@ -547,7 +568,10 @@ export class BulkService {
     categoriesStr: string,
     cache: Map<string, string>
   ): Promise<void> {
-    const categoryNames = categoriesStr.split(',').map(c => c.trim()).filter(Boolean);
+    const categoryNames = categoriesStr
+      .split(',')
+      .map(c => c.trim())
+      .filter(Boolean);
 
     // Delete existing categories
     await prisma.productCategory.deleteMany({ where: { productId } });
@@ -608,7 +632,10 @@ export class BulkService {
     tagsStr: string,
     cache: Map<string, string>
   ): Promise<void> {
-    const tagNames = tagsStr.split(',').map(t => t.trim()).filter(Boolean);
+    const tagNames = tagsStr
+      .split(',')
+      .map(t => t.trim())
+      .filter(Boolean);
 
     // Delete existing tags
     await prisma.productTag.deleteMany({ where: { productId } });
@@ -639,7 +666,10 @@ export class BulkService {
   }
 
   private static async updateProductImages(productId: string, imagesStr: string): Promise<void> {
-    const imageUrls = imagesStr.split(',').map(i => i.trim()).filter(Boolean);
+    const imageUrls = imagesStr
+      .split(',')
+      .map(i => i.trim())
+      .filter(Boolean);
 
     // Delete existing images
     await prisma.productImage.deleteMany({ where: { productId } });

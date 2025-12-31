@@ -4,7 +4,14 @@ import { authenticate } from '../middleware/auth';
 import { requireRole } from '../middleware/rbac';
 import { ProvisioningService } from '../services/provisioning.service';
 import { auditLog } from '../middleware/security';
-import { prisma, Prisma, UserRole, ProductStatus, OrderStatus, OrderPaymentStatus } from '@force/database';
+import {
+  prisma,
+  Prisma,
+  UserRole,
+  ProductStatus,
+  OrderStatus,
+  OrderPaymentStatus,
+} from '@force/database';
 
 const router = Router();
 
@@ -15,17 +22,24 @@ router.use(requireRole('super_admin'));
 // Validation schemas
 const provisionStoreSchema = z.object({
   storeName: z.string().min(1).max(100),
-  storeSlug: z.string().min(1).max(50).regex(/^[a-z0-9-]+$/).optional(),
+  storeSlug: z
+    .string()
+    .min(1)
+    .max(50)
+    .regex(/^[a-z0-9-]+$/)
+    .optional(),
   domain: z.string().optional(),
   plan: z.enum(['free', 'starter', 'professional', 'enterprise']).optional(),
   ownerEmail: z.string().email(),
   ownerName: z.string().min(1),
   ownerPassword: z.string().min(8).optional(),
-  settings: z.object({
-    theme: z.string().optional(),
-    currency: z.string().optional(),
-    timezone: z.string().optional(),
-  }).optional(),
+  settings: z
+    .object({
+      theme: z.string().optional(),
+      currency: z.string().optional(),
+      timezone: z.string().optional(),
+    })
+    .optional(),
 });
 
 /**
@@ -266,37 +280,31 @@ router.get('/users', async (req: Request, res: Response, next: NextFunction) => 
  */
 router.get('/dashboard', async (_req: Request, res: Response, next: NextFunction) => {
   try {
-    const [
-      storeCount,
-      userCount,
-      orderCount,
-      revenueResult,
-      recentStores,
-      recentOrders,
-    ] = await Promise.all([
-      prisma.store.count(),
-      prisma.user.count(),
-      prisma.order.count(),
-      prisma.order.aggregate({
-        where: { paymentStatus: 'paid' },
-        _sum: { total: true },
-      }),
-      prisma.store.findMany({
-        take: 5,
-        orderBy: { createdAt: 'desc' },
-        include: {
-          owner: { select: { email: true } },
-        },
-      }),
-      prisma.order.findMany({
-        take: 10,
-        orderBy: { createdAt: 'desc' },
-        include: {
-          customer: { select: { email: true, firstName: true, lastName: true } },
-          store: { select: { name: true } },
-        },
-      }),
-    ]);
+    const [storeCount, userCount, orderCount, revenueResult, recentStores, recentOrders] =
+      await Promise.all([
+        prisma.store.count(),
+        prisma.user.count(),
+        prisma.order.count(),
+        prisma.order.aggregate({
+          where: { paymentStatus: 'paid' },
+          _sum: { total: true },
+        }),
+        prisma.store.findMany({
+          take: 5,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            owner: { select: { email: true } },
+          },
+        }),
+        prisma.order.findMany({
+          take: 10,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            customer: { select: { email: true, firstName: true, lastName: true } },
+            store: { select: { name: true } },
+          },
+        }),
+      ]);
 
     res.json({
       success: true,
@@ -407,7 +415,7 @@ router.get('/products/:id', async (req: Request, res: Response, next: NextFuncti
     // Transform categories to flat array
     const transformedProduct = {
       ...product,
-      categories: product.categories.map((pc) => pc.category),
+      categories: product.categories.map(pc => pc.category),
     };
 
     res.json({

@@ -64,7 +64,9 @@ export default function InventoryPage() {
   const [alerts, setAlerts] = useState<ProductInventory[]>([]);
 
   const [activeTab, setActiveTab] = useState<'products' | 'history' | 'alerts'>('products');
-  const [stockFilter, setStockFilter] = useState<'all' | 'in_stock' | 'low_stock' | 'out_of_stock'>('all');
+  const [stockFilter, setStockFilter] = useState<'all' | 'in_stock' | 'low_stock' | 'out_of_stock'>(
+    'all'
+  );
   const [search, setSearch] = useState('');
 
   const [showAdjustModal, setShowAdjustModal] = useState(false);
@@ -77,9 +79,12 @@ export default function InventoryPage() {
   const fetchStoreName = useCallback(async () => {
     try {
       const token = localStorage.getItem('authToken');
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/stores/${storeId}`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/stores/${storeId}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
       if (res.ok) {
         const data = await res.json();
         setStoreName(data.data?.store?.name || '');
@@ -94,7 +99,7 @@ export default function InventoryPage() {
       const token = localStorage.getItem('authToken');
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/stores/${storeId}/inventory/stats`,
-        { headers: { 'Authorization': `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       if (res.ok) {
         const data = await res.json();
@@ -116,7 +121,7 @@ export default function InventoryPage() {
 
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/stores/${storeId}/inventory/products?${params}`,
-        { headers: { 'Authorization': `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       if (res.ok) {
         const data = await res.json();
@@ -132,7 +137,7 @@ export default function InventoryPage() {
       const token = localStorage.getItem('authToken');
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/stores/${storeId}/inventory/history?limit=50`,
-        { headers: { 'Authorization': `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       if (res.ok) {
         const data = await res.json();
@@ -148,7 +153,7 @@ export default function InventoryPage() {
       const token = localStorage.getItem('authToken');
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/stores/${storeId}/inventory/alerts`,
-        { headers: { 'Authorization': `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       if (res.ok) {
         const data = await res.json();
@@ -161,7 +166,13 @@ export default function InventoryPage() {
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
-    await Promise.all([fetchStoreName(), fetchStats(), fetchProducts(), fetchHistory(), fetchAlerts()]);
+    await Promise.all([
+      fetchStoreName(),
+      fetchStats(),
+      fetchProducts(),
+      fetchHistory(),
+      fetchAlerts(),
+    ]);
     setLoading(false);
   }, [fetchStoreName, fetchStats, fetchProducts, fetchHistory, fetchAlerts]);
 
@@ -195,7 +206,7 @@ export default function InventoryPage() {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
             productId: selectedProduct.id,
@@ -240,10 +251,7 @@ export default function InventoryPage() {
   };
 
   return (
-    <AdminLayout
-      title="Inventory Management"
-      subtitle="Track and manage your product stock levels"
-    >
+    <AdminLayout title="Inventory Management" subtitle="Track and manage your product stock levels">
       {loading ? (
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
@@ -259,7 +267,9 @@ export default function InventoryPage() {
               </div>
               <div className="bg-white rounded-xl border border-gray-200 p-4">
                 <p className="text-sm text-gray-500">Total Stock</p>
-                <p className="text-2xl font-bold text-blue-600">{stats.totalStock.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-blue-600">
+                  {stats.totalStock.toLocaleString()}
+                </p>
               </div>
               <div className="bg-white rounded-xl border border-gray-200 p-4">
                 <p className="text-sm text-gray-500">Low Stock</p>
@@ -271,7 +281,9 @@ export default function InventoryPage() {
               </div>
               <div className="bg-white rounded-xl border border-gray-200 p-4">
                 <p className="text-sm text-gray-500">Stock Value</p>
-                <p className="text-2xl font-bold text-green-600">{(stats.totalValue / 1000).toFixed(3)} KWD</p>
+                <p className="text-2xl font-bold text-green-600">
+                  {(stats.totalValue / 1000).toFixed(3)} KWD
+                </p>
               </div>
             </div>
           )}
@@ -281,8 +293,18 @@ export default function InventoryPage() {
             <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-6">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center">
-                  <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  <svg
+                    className="w-5 h-5 text-yellow-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                    />
                   </svg>
                 </div>
                 <div className="flex-1">
@@ -290,7 +312,7 @@ export default function InventoryPage() {
                     {alerts.length} product{alerts.length > 1 ? 's' : ''} need attention
                   </p>
                   <p className="text-sm text-yellow-700">
-                    {alerts.filter(a => a.stockStatus === 'out_of_stock').length} out of stock, {' '}
+                    {alerts.filter(a => a.stockStatus === 'out_of_stock').length} out of stock,{' '}
                     {alerts.filter(a => a.stockStatus === 'low_stock').length} low stock
                   </p>
                 </div>
@@ -353,12 +375,12 @@ export default function InventoryPage() {
                     type="text"
                     placeholder="Search products..."
                     value={search}
-                    onChange={(e) => setSearch(e.target.value)}
+                    onChange={e => setSearch(e.target.value)}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   />
                 </div>
                 <div className="flex gap-2">
-                  {(['all', 'in_stock', 'low_stock', 'out_of_stock'] as const).map((filter) => (
+                  {(['all', 'in_stock', 'low_stock', 'out_of_stock'] as const).map(filter => (
                     <button
                       key={filter}
                       onClick={() => setStockFilter(filter)}
@@ -383,27 +405,43 @@ export default function InventoryPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Product</th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">SKU</th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Threshold</th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Value</th>
-                      <th className="text-right px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Product
+                      </th>
+                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        SKU
+                      </th>
+                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Stock
+                      </th>
+                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Threshold
+                      </th>
+                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Status
+                      </th>
+                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Value
+                      </th>
+                      <th className="text-right px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {products.map((product) => (
+                    {products.map(product => (
                       <tr key={product.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4">
                           <div>
                             <div className="font-medium text-gray-900">{product.name}</div>
-                            {product.nameAr && <div className="text-sm text-gray-500 font-arabic">{product.nameAr}</div>}
+                            {product.nameAr && (
+                              <div className="text-sm text-gray-500 font-arabic">
+                                {product.nameAr}
+                              </div>
+                            )}
                           </div>
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-600">
-                          {product.sku || '-'}
-                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600">{product.sku || '-'}</td>
                         <td className="px-6 py-4">
                           <span className="font-semibold text-gray-900">{product.inventory}</span>
                         </td>
@@ -411,12 +449,16 @@ export default function InventoryPage() {
                           {product.lowStockThreshold}
                         </td>
                         <td className="px-6 py-4">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${STOCK_STATUS_STYLES[product.stockStatus].bg} ${STOCK_STATUS_STYLES[product.stockStatus].text}`}>
+                          <span
+                            className={`px-2 py-1 rounded-full text-xs font-medium ${STOCK_STATUS_STYLES[product.stockStatus].bg} ${STOCK_STATUS_STYLES[product.stockStatus].text}`}
+                          >
                             {STOCK_STATUS_STYLES[product.stockStatus].label}
                           </span>
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-600">
-                          {product.costPrice ? `${(product.stockValue / 1000).toFixed(3)} KWD` : '-'}
+                          {product.costPrice
+                            ? `${(product.stockValue / 1000).toFixed(3)} KWD`
+                            : '-'}
                         </td>
                         <td className="px-6 py-4 text-right">
                           <button
@@ -448,16 +490,28 @@ export default function InventoryPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Product</th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Change</th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Reason</th>
+                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Date
+                      </th>
+                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Product
+                      </th>
+                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Type
+                      </th>
+                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Change
+                      </th>
+                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Stock
+                      </th>
+                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Reason
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {history.map((item) => (
+                    {history.map(item => (
                       <tr key={item.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 text-sm text-gray-600">
                           {new Date(item.createdAt).toLocaleDateString('en-US', {
@@ -468,23 +522,28 @@ export default function InventoryPage() {
                           })}
                         </td>
                         <td className="px-6 py-4">
-                          <div className="font-medium text-gray-900">{item.product?.name || '-'}</div>
-                          {item.product?.sku && <div className="text-xs text-gray-500">{item.product.sku}</div>}
+                          <div className="font-medium text-gray-900">
+                            {item.product?.name || '-'}
+                          </div>
+                          {item.product?.sku && (
+                            <div className="text-xs text-gray-500">{item.product.sku}</div>
+                          )}
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-600">
                           {formatChangeType(item.type)}
                         </td>
                         <td className="px-6 py-4">
-                          <span className={`font-medium ${item.quantity >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {item.quantity >= 0 ? '+' : ''}{item.quantity}
+                          <span
+                            className={`font-medium ${item.quantity >= 0 ? 'text-green-600' : 'text-red-600'}`}
+                          >
+                            {item.quantity >= 0 ? '+' : ''}
+                            {item.quantity}
                           </span>
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-600">
                           {item.previousStock} → {item.newStock}
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-500">
-                          {item.reason || '-'}
-                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-500">{item.reason || '-'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -499,8 +558,18 @@ export default function InventoryPage() {
               {alerts.length === 0 ? (
                 <div className="p-12 text-center">
                   <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    <svg
+                      className="w-8 h-8 text-green-600"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M5 13l4 4L19 7"
+                      />
                     </svg>
                   </div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">All Good!</h3>
@@ -510,26 +579,42 @@ export default function InventoryPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Product</th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">SKU</th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Current Stock</th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Threshold</th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                      <th className="text-right px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Product
+                      </th>
+                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        SKU
+                      </th>
+                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Current Stock
+                      </th>
+                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Threshold
+                      </th>
+                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Status
+                      </th>
+                      <th className="text-right px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {alerts.map((product) => (
+                    {alerts.map(product => (
                       <tr key={product.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4">
                           <div className="font-medium text-gray-900">{product.name}</div>
-                          {product.nameAr && <div className="text-sm text-gray-500 font-arabic">{product.nameAr}</div>}
+                          {product.nameAr && (
+                            <div className="text-sm text-gray-500 font-arabic">
+                              {product.nameAr}
+                            </div>
+                          )}
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-600">
-                          {product.sku || '-'}
-                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600">{product.sku || '-'}</td>
                         <td className="px-6 py-4">
-                          <span className={`font-semibold ${product.inventory <= 0 ? 'text-red-600' : 'text-yellow-600'}`}>
+                          <span
+                            className={`font-semibold ${product.inventory <= 0 ? 'text-red-600' : 'text-yellow-600'}`}
+                          >
                             {product.inventory}
                           </span>
                         </td>
@@ -537,7 +622,9 @@ export default function InventoryPage() {
                           {product.lowStockThreshold}
                         </td>
                         <td className="px-6 py-4">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${STOCK_STATUS_STYLES[product.stockStatus].bg} ${STOCK_STATUS_STYLES[product.stockStatus].text}`}>
+                          <span
+                            className={`px-2 py-1 rounded-full text-xs font-medium ${STOCK_STATUS_STYLES[product.stockStatus].bg} ${STOCK_STATUS_STYLES[product.stockStatus].text}`}
+                          >
                             {STOCK_STATUS_STYLES[product.stockStatus].label}
                           </span>
                         </td>
@@ -576,7 +663,12 @@ export default function InventoryPage() {
                 className="p-2 text-gray-400 hover:text-gray-600"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </button>
             </div>
@@ -593,11 +685,13 @@ export default function InventoryPage() {
                 </label>
                 <select
                   value={adjustType}
-                  onChange={(e) => setAdjustType(e.target.value)}
+                  onChange={e => setAdjustType(e.target.value)}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                 >
-                  {ADJUSTMENT_TYPES.map((type) => (
-                    <option key={type.value} value={type.value}>{type.label}</option>
+                  {ADJUSTMENT_TYPES.map(type => (
+                    <option key={type.value} value={type.value}>
+                      {type.label}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -610,32 +704,29 @@ export default function InventoryPage() {
                   type="number"
                   min="1"
                   value={adjustQuantity}
-                  onChange={(e) => setAdjustQuantity(e.target.value)}
+                  onChange={e => setAdjustQuantity(e.target.value)}
                   placeholder="Enter quantity"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   required
                 />
                 {adjustQuantity && (
                   <p className="text-sm text-gray-500 mt-1">
-                    New stock will be: {' '}
+                    New stock will be:{' '}
                     <span className="font-medium">
                       {['manual_remove', 'damage'].includes(adjustType)
                         ? Math.max(0, selectedProduct.inventory - parseInt(adjustQuantity || '0'))
-                        : selectedProduct.inventory + parseInt(adjustQuantity || '0')
-                      }
+                        : selectedProduct.inventory + parseInt(adjustQuantity || '0')}
                     </span>
                   </p>
                 )}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Reason
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Reason</label>
                 <input
                   type="text"
                   value={adjustReason}
-                  onChange={(e) => setAdjustReason(e.target.value)}
+                  onChange={e => setAdjustReason(e.target.value)}
                   placeholder="Optional reason for adjustment"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                 />
@@ -657,7 +748,9 @@ export default function InventoryPage() {
                   disabled={saving || !adjustQuantity}
                   className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 flex items-center gap-2"
                 >
-                  {saving && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
+                  {saving && (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  )}
                   Apply
                 </button>
               </div>

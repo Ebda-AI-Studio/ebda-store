@@ -29,10 +29,25 @@ export default function ModernProductGrid({
 
   if (products.length === 0) {
     return (
-      <div className="py-16 text-center" role="status" aria-label={isRtl ? 'لا توجد منتجات' : 'No products found'}>
+      <div
+        className="py-16 text-center"
+        role="status"
+        aria-label={isRtl ? 'لا توجد منتجات' : 'No products found'}
+      >
         <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-muted flex items-center justify-center">
-          <svg className="w-12 h-12 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+          <svg
+            className="w-12 h-12 text-muted-foreground"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.5}
+              d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+            />
           </svg>
         </div>
         <h3 className="text-lg font-semibold text-foreground mb-2">
@@ -51,7 +66,7 @@ export default function ModernProductGrid({
       role="list"
       aria-label={isRtl ? 'قائمة المنتجات' : 'Product list'}
     >
-      {products.map((product) => (
+      {products.map(product => (
         <div key={product.id} role="listitem">
           <ProductCard
             product={product}

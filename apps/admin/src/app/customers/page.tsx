@@ -47,7 +47,12 @@ function formatDate(dateString: string) {
 export default function CustomersPage() {
   const { token } = useAuth();
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 20, total: 0, totalPages: 0 });
+  const [pagination, setPagination] = useState<Pagination>({
+    page: 1,
+    limit: 20,
+    total: 0,
+    totalPages: 0,
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -112,9 +117,13 @@ export default function CustomersPage() {
   const stats = {
     total: pagination.total,
     totalRevenue: customers.reduce((sum, c) => sum + c.totalSpent, 0),
-    avgOrderValue: customers.length > 0
-      ? customers.reduce((sum, c) => sum + (c.totalOrders > 0 ? c.totalSpent / c.totalOrders : 0), 0) / customers.length
-      : 0,
+    avgOrderValue:
+      customers.length > 0
+        ? customers.reduce(
+            (sum, c) => sum + (c.totalOrders > 0 ? c.totalSpent / c.totalOrders : 0),
+            0
+          ) / customers.length
+        : 0,
     topSpenders: customers.filter(c => c.totalSpent > 100000).length, // > 100 KWD
   };
 
@@ -161,11 +170,7 @@ export default function CustomersPage() {
 
       {/* Error State */}
       {error && !isLoading && (
-        <ErrorState
-          title="Failed to load customers"
-          message={error}
-          onRetry={fetchCustomers}
-        />
+        <ErrorState title="Failed to load customers" message={error} onRetry={fetchCustomers} />
       )}
 
       {/* Loading State */}
@@ -217,32 +222,62 @@ export default function CustomersPage() {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-sm font-medium text-primary">
-                          {customer.firstName?.[0]}{customer.lastName?.[0]}
+                          {customer.firstName?.[0]}
+                          {customer.lastName?.[0]}
                         </div>
                         <div>
-                          <p className="font-medium text-foreground">{customer.firstName} {customer.lastName}</p>
+                          <p className="font-medium text-foreground">
+                            {customer.firstName} {customer.lastName}
+                          </p>
                           <p className="text-xs text-muted-foreground">{customer.email}</p>
                         </div>
                       </div>
                     </td>
                     <td className="px-4 py-3 hidden md:table-cell">
-                      <span className="text-sm text-muted-foreground">{customer.store?.name || 'N/A'}</span>
+                      <span className="text-sm text-muted-foreground">
+                        {customer.store?.name || 'N/A'}
+                      </span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="text-sm font-medium text-foreground">{customer.totalOrders} orders</span>
+                      <span className="text-sm font-medium text-foreground">
+                        {customer.totalOrders} orders
+                      </span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="font-semibold text-foreground">{formatPrice(customer.totalSpent)}</span>
+                      <span className="font-semibold text-foreground">
+                        {formatPrice(customer.totalSpent)}
+                      </span>
                     </td>
                     <td className="px-4 py-3 hidden sm:table-cell">
-                      <span className="text-sm text-muted-foreground">{formatDate(customer.createdAt)}</span>
+                      <span className="text-sm text-muted-foreground">
+                        {formatDate(customer.createdAt)}
+                      </span>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-2">
-                        <Button variant="ghost" size="sm" onClick={() => viewCustomerDetails(customer)}>
-                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => viewCustomerDetails(customer)}
+                        >
+                          <svg
+                            className="h-4 w-4"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                            />
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                            />
                           </svg>
                         </Button>
                       </div>
@@ -257,9 +292,15 @@ export default function CustomersPage() {
           {pagination.totalPages > 1 && (
             <div className="mt-4 flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
-                Showing <span className="font-medium text-foreground">{((pagination.page - 1) * pagination.limit) + 1}</span> to{' '}
-                <span className="font-medium text-foreground">{Math.min(pagination.page * pagination.limit, pagination.total)}</span> of{' '}
-                <span className="font-medium text-foreground">{pagination.total}</span> customers
+                Showing{' '}
+                <span className="font-medium text-foreground">
+                  {(pagination.page - 1) * pagination.limit + 1}
+                </span>{' '}
+                to{' '}
+                <span className="font-medium text-foreground">
+                  {Math.min(pagination.page * pagination.limit, pagination.total)}
+                </span>{' '}
+                of <span className="font-medium text-foreground">{pagination.total}</span> customers
               </p>
               <div className="flex gap-2">
                 <Button
@@ -289,8 +330,18 @@ export default function CustomersPage() {
         <div className="force-card py-16">
           <div className="flex flex-col items-center text-center">
             <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-primary/20 to-primary/5">
-              <svg className="h-10 w-10 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+              <svg
+                className="h-10 w-10 text-primary"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
+                />
               </svg>
             </div>
             <h3 className="text-xl font-semibold text-foreground mb-2">No customers found</h3>
@@ -314,24 +365,33 @@ export default function CustomersPage() {
             {/* Profile */}
             <div className="flex items-center gap-4">
               <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-xl font-bold text-primary">
-                {selectedCustomer.firstName?.[0]}{selectedCustomer.lastName?.[0]}
+                {selectedCustomer.firstName?.[0]}
+                {selectedCustomer.lastName?.[0]}
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-foreground">{selectedCustomer.firstName} {selectedCustomer.lastName}</h3>
+                <h3 className="text-lg font-semibold text-foreground">
+                  {selectedCustomer.firstName} {selectedCustomer.lastName}
+                </h3>
                 <p className="text-sm text-muted-foreground">{selectedCustomer.email}</p>
               </div>
             </div>
 
             {/* Store */}
             <div className="rounded-xl bg-muted/30 p-4">
-              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Store</h4>
+              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                Store
+              </h4>
               <p className="font-medium text-foreground">{selectedCustomer.store?.name || 'N/A'}</p>
             </div>
 
             {/* Contact */}
             <div>
-              <h4 className="text-sm font-medium text-muted-foreground mb-2">Contact Information</h4>
-              <p className="text-sm text-foreground">{selectedCustomer.phone || 'No phone provided'}</p>
+              <h4 className="text-sm font-medium text-muted-foreground mb-2">
+                Contact Information
+              </h4>
+              <p className="text-sm text-foreground">
+                {selectedCustomer.phone || 'No phone provided'}
+              </p>
               <p className="text-sm text-foreground">{selectedCustomer.email}</p>
             </div>
 
@@ -343,18 +403,26 @@ export default function CustomersPage() {
               </div>
               <div className="rounded-xl bg-muted/30 p-4">
                 <p className="text-xs text-muted-foreground">Total Spent</p>
-                <p className="text-xl font-bold text-primary">{formatPrice(selectedCustomer.totalSpent)}</p>
+                <p className="text-xl font-bold text-primary">
+                  {formatPrice(selectedCustomer.totalSpent)}
+                </p>
               </div>
             </div>
 
             {/* Dates */}
             <div className="text-sm">
               <p className="text-muted-foreground">Customer Since</p>
-              <p className="font-medium text-foreground">{formatDate(selectedCustomer.createdAt)}</p>
+              <p className="font-medium text-foreground">
+                {formatDate(selectedCustomer.createdAt)}
+              </p>
             </div>
 
             <div className="flex justify-end gap-3 pt-4 border-t">
-              <Button variant="outline" className="rounded-xl" onClick={() => setIsDetailModalOpen(false)}>
+              <Button
+                variant="outline"
+                className="rounded-xl"
+                onClick={() => setIsDetailModalOpen(false)}
+              >
                 Close
               </Button>
             </div>

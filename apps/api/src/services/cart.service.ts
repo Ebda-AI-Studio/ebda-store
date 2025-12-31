@@ -39,10 +39,7 @@ export class CartService {
     }
 
     // Calculate totals
-    const subtotal = cart.items.reduce(
-      (sum, item) => sum + item.product.price * item.quantity,
-      0
-    );
+    const subtotal = cart.items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
 
     return { ...cart, subtotal };
   }
@@ -134,12 +131,7 @@ export class CartService {
     return this.getOrCreate(storeId, sessionId, customerId);
   }
 
-  static async removeItem(
-    storeId: string,
-    sessionId: string,
-    itemId: string,
-    customerId?: string
-  ) {
+  static async removeItem(storeId: string, sessionId: string, itemId: string, customerId?: string) {
     const cart = await this.getOrCreate(storeId, sessionId, customerId);
 
     const item = await prisma.cartItem.findFirst({
@@ -165,11 +157,7 @@ export class CartService {
     return this.getOrCreate(storeId, sessionId, customerId);
   }
 
-  static async mergeGuestCart(
-    storeId: string,
-    guestSessionId: string,
-    customerId: string
-  ) {
+  static async mergeGuestCart(storeId: string, guestSessionId: string, customerId: string) {
     const [guestCart, userCart] = await Promise.all([
       prisma.cart.findFirst({
         where: { storeId, sessionId: guestSessionId, customerId: null },
@@ -194,9 +182,7 @@ export class CartService {
 
     // Merge items
     for (const guestItem of guestCart.items) {
-      const existingItem = userCart?.items.find(
-        item => item.productId === guestItem.productId
-      );
+      const existingItem = userCart?.items.find(item => item.productId === guestItem.productId);
 
       if (existingItem) {
         await prisma.cartItem.update({

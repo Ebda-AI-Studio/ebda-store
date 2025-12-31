@@ -27,7 +27,12 @@ export default function ClassicAnnouncementBar({
           stroke="currentColor"
           viewBox="0 0 24 24"
         >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={1.5}
+            d="M17 8l4 4m0 0l-4 4m4-4H3"
+          />
         </svg>
       )}
 
@@ -37,10 +42,7 @@ export default function ClassicAnnouncementBar({
   );
 
   return (
-    <div
-      className="bg-foreground text-background py-3 px-4"
-      dir={isRtl ? 'rtl' : 'ltr'}
-    >
+    <div className="bg-foreground text-background py-3 px-4" dir={isRtl ? 'rtl' : 'ltr'}>
       <div className="container mx-auto">
         {link ? (
           <Link href={link} className="block hover:opacity-80 transition-opacity">

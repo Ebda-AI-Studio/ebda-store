@@ -5,9 +5,25 @@
 
 export type PaymentProvider = 'tap' | 'myfatoorah' | 'hesabe' | 'upayments';
 
-export type PaymentMethod = 'knet' | 'visa' | 'mastercard' | 'amex' | 'mada' | 'apple_pay' | 'google_pay' | 'samsung_pay';
+export type PaymentMethod =
+  | 'knet'
+  | 'visa'
+  | 'mastercard'
+  | 'amex'
+  | 'mada'
+  | 'apple_pay'
+  | 'google_pay'
+  | 'samsung_pay';
 
-export type PaymentStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'refunded' | 'partially_refunded' | 'cancelled' | 'expired';
+export type PaymentStatus =
+  | 'pending'
+  | 'processing'
+  | 'completed'
+  | 'failed'
+  | 'refunded'
+  | 'partially_refunded'
+  | 'cancelled'
+  | 'expired';
 
 export type Currency = 'KWD' | 'USD' | 'EUR' | 'GBP' | 'AED' | 'SAR' | 'BHD' | 'OMR' | 'QAR';
 

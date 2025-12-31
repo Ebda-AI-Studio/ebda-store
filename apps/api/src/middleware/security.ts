@@ -77,7 +77,7 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
   // For authenticated routes, verify CSRF token asynchronously
   if (req.headers.authorization) {
     verifyCsrfToken(sessionId, csrfToken)
-      .then((valid) => {
+      .then(valid => {
         if (!valid) {
           res.status(403).json({
             success: false,
@@ -107,11 +107,11 @@ export const authLimiter = rateLimit({
   max: 5, // 5 attempts per window
   message: {
     success: false,
-    error: { code: 'RATE_LIMITED', message: 'Too many login attempts, please try again later.' }
+    error: { code: 'RATE_LIMITED', message: 'Too many login attempts, please try again later.' },
   },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => {
+  keyGenerator: req => {
     // Use IP + email for more granular limiting
     const email = req.body?.email || 'unknown';
     return `${req.ip}-${email}`;
@@ -124,7 +124,10 @@ export const passwordResetLimiter = rateLimit({
   max: 3, // 3 attempts per hour
   message: {
     success: false,
-    error: { code: 'RATE_LIMITED', message: 'Too many password reset requests, please try again later.' }
+    error: {
+      code: 'RATE_LIMITED',
+      message: 'Too many password reset requests, please try again later.',
+    },
   },
   standardHeaders: true,
   legacyHeaders: false,
@@ -136,7 +139,7 @@ export const writeLimiter = rateLimit({
   max: 30, // 30 writes per minute
   message: {
     success: false,
-    error: { code: 'RATE_LIMITED', message: 'Too many requests, please slow down.' }
+    error: { code: 'RATE_LIMITED', message: 'Too many requests, please slow down.' },
   },
   standardHeaders: true,
   legacyHeaders: false,
@@ -148,7 +151,7 @@ export const paymentLimiter = rateLimit({
   max: 10, // 10 payment attempts per minute
   message: {
     success: false,
-    error: { code: 'RATE_LIMITED', message: 'Too many payment attempts, please wait.' }
+    error: { code: 'RATE_LIMITED', message: 'Too many payment attempts, please wait.' },
   },
   standardHeaders: true,
   legacyHeaders: false,
@@ -160,11 +163,11 @@ export const uploadLimiter = rateLimit({
   max: 20, // 20 uploads per minute
   message: {
     success: false,
-    error: { code: 'RATE_LIMITED', message: 'Too many upload requests, please slow down.' }
+    error: { code: 'RATE_LIMITED', message: 'Too many upload requests, please slow down.' },
   },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => {
+  keyGenerator: req => {
     // Limit per user, not per IP
     return req.user?.userId || req.ip || 'anonymous';
   },
@@ -176,11 +179,11 @@ export const dailyUploadLimiter = rateLimit({
   max: 500, // 500 uploads per day per user
   message: {
     success: false,
-    error: { code: 'DAILY_LIMIT', message: 'Daily upload limit reached. Try again tomorrow.' }
+    error: { code: 'DAILY_LIMIT', message: 'Daily upload limit reached. Try again tomorrow.' },
   },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => {
+  keyGenerator: req => {
     return req.user?.userId || req.ip || 'anonymous';
   },
 });
@@ -316,7 +319,7 @@ export function securityHeaders(_req: Request, res: Response, next: NextFunction
 // ==========================================
 
 export function requestId(req: Request, res: Response, next: NextFunction) {
-  const id = req.headers['x-request-id'] as string || uuidv4();
+  const id = (req.headers['x-request-id'] as string) || uuidv4();
   req.headers['x-request-id'] = id;
   res.setHeader('X-Request-Id', id);
   next();

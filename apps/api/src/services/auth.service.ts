@@ -77,7 +77,11 @@ export class AuthService {
     });
 
     // Send verification email
-    await this.sendVerificationEmail(user.id, user.email, `${user.firstName} ${user.lastName}`.trim() || user.email);
+    await this.sendVerificationEmail(
+      user.id,
+      user.email,
+      `${user.firstName} ${user.lastName}`.trim() || user.email
+    );
 
     return { user, ...tokens, emailVerificationSent: true };
   }
@@ -145,7 +149,11 @@ export class AuthService {
       await prisma.verificationToken.delete({
         where: { id: verificationToken.id },
       });
-      throw new AppError(400, 'TOKEN_EXPIRED', 'Verification token has expired. Please request a new one.');
+      throw new AppError(
+        400,
+        'TOKEN_EXPIRED',
+        'Verification token has expired. Please request a new one.'
+      );
     }
 
     if (verificationToken.user.emailVerified) {
@@ -167,7 +175,9 @@ export class AuthService {
     // Send welcome email
     await EmailService.sendWelcome({
       email: verificationToken.user.email,
-      name: `${verificationToken.user.firstName} ${verificationToken.user.lastName}`.trim() || verificationToken.user.email,
+      name:
+        `${verificationToken.user.firstName} ${verificationToken.user.lastName}`.trim() ||
+        verificationToken.user.email,
     });
 
     return { success: true, message: 'Email verified successfully' };
@@ -176,14 +186,19 @@ export class AuthService {
   /**
    * Resend verification email
    */
-  static async resendVerificationEmail(email: string): Promise<{ success: boolean; message: string }> {
+  static async resendVerificationEmail(
+    email: string
+  ): Promise<{ success: boolean; message: string }> {
     const user = await prisma.user.findUnique({
       where: { email },
     });
 
     if (!user) {
       // Don't reveal if user exists
-      return { success: true, message: 'If an account exists with this email, a verification link has been sent.' };
+      return {
+        success: true,
+        message: 'If an account exists with this email, a verification link has been sent.',
+      };
     }
 
     if (user.emailVerified) {
@@ -200,7 +215,11 @@ export class AuthService {
     });
 
     if (recentToken) {
-      throw new AppError(429, 'TOO_MANY_REQUESTS', 'Please wait a few minutes before requesting another verification email');
+      throw new AppError(
+        429,
+        'TOO_MANY_REQUESTS',
+        'Please wait a few minutes before requesting another verification email'
+      );
     }
 
     // Send new verification email
@@ -383,11 +402,9 @@ export class AuthService {
     });
 
     // Generate refresh token (30 days)
-    const refreshToken = jwt.sign(
-      { ...payload, type: 'refresh' },
-      config.jwtSecret,
-      { expiresIn: '30d' }
-    );
+    const refreshToken = jwt.sign({ ...payload, type: 'refresh' }, config.jwtSecret, {
+      expiresIn: '30d',
+    });
 
     // Store refresh token in database
     const expiresAt = new Date();

@@ -41,7 +41,12 @@ export interface MobileMenuProps {
     menu: string;
   }>;
   /** Link component for Next.js Link or custom routing */
-  LinkComponent?: React.ComponentType<{ href: string; className?: string; onClick?: () => void; children: React.ReactNode }>;
+  LinkComponent?: React.ComponentType<{
+    href: string;
+    className?: string;
+    onClick?: () => void;
+    children: React.ReactNode;
+  }>;
 }
 
 const defaultLabels = {
@@ -87,9 +92,23 @@ export const MobileMenu = forwardRef<HTMLDivElement, MobileMenuProps>(
     };
 
     // Default anchor link if no custom component provided
-    const Link = LinkComponent || (({ href, className, onClick, children }: { href: string; className?: string; onClick?: () => void; children: React.ReactNode }) => (
-      <a href={href} className={className} onClick={onClick}>{children}</a>
-    ));
+    const Link =
+      LinkComponent ||
+      (({
+        href,
+        className,
+        onClick,
+        children,
+      }: {
+        href: string;
+        className?: string;
+        onClick?: () => void;
+        children: React.ReactNode;
+      }) => (
+        <a href={href} className={className} onClick={onClick}>
+          {children}
+        </a>
+      ));
 
     // Handle escape key
     useEffect(() => {
@@ -135,11 +154,11 @@ export const MobileMenu = forwardRef<HTMLDivElement, MobileMenuProps>(
     };
 
     const handleSubmenuOpen = (item: MobileMenuItem) => {
-      setSubmenuStack((prev) => [...prev, item]);
+      setSubmenuStack(prev => [...prev, item]);
     };
 
     const handleBack = () => {
-      setSubmenuStack((prev) => prev.slice(0, -1));
+      setSubmenuStack(prev => prev.slice(0, -1));
     };
 
     const handleItemClick = () => {
@@ -156,18 +175,17 @@ export const MobileMenu = forwardRef<HTMLDivElement, MobileMenuProps>(
     };
 
     const currentItems = getCurrentItems();
-    const currentTitle = submenuStack.length > 0
-      ? (isRtl && submenuStack[submenuStack.length - 1].labelAr
+    const currentTitle =
+      submenuStack.length > 0
+        ? isRtl && submenuStack[submenuStack.length - 1].labelAr
           ? submenuStack[submenuStack.length - 1].labelAr
-          : submenuStack[submenuStack.length - 1].label)
-      : labels.menu;
+          : submenuStack[submenuStack.length - 1].label
+        : labels.menu;
 
     if (typeof window === 'undefined') return null;
 
     // Adjust position for RTL
-    const menuPosition = isRtl
-      ? (position === 'left' ? 'right' : 'left')
-      : position;
+    const menuPosition = isRtl ? (position === 'left' ? 'right' : 'left') : position;
 
     return createPortal(
       <div
@@ -189,7 +207,7 @@ export const MobileMenu = forwardRef<HTMLDivElement, MobileMenuProps>(
 
         {/* Menu Panel */}
         <div
-          ref={(node) => {
+          ref={node => {
             (menuRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
             if (typeof ref === 'function') ref(node);
             else if (ref) (ref as React.MutableRefObject<HTMLDivElement | null>).current = node;
@@ -204,8 +222,8 @@ export const MobileMenu = forwardRef<HTMLDivElement, MobileMenuProps>(
             isOpen
               ? 'translate-x-0'
               : menuPosition === 'left'
-              ? '-translate-x-full'
-              : 'translate-x-full'
+                ? '-translate-x-full'
+                : 'translate-x-full'
           )}
         >
           <div className="flex h-full flex-col">
@@ -218,12 +236,7 @@ export const MobileMenu = forwardRef<HTMLDivElement, MobileMenuProps>(
                     className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
                     aria-label={labels.back}
                   >
-                    <svg
-                      className="w-5 h-5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -246,7 +259,12 @@ export const MobileMenu = forwardRef<HTMLDivElement, MobileMenuProps>(
                 aria-label={labels.close}
               >
                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </button>
             </header>
@@ -268,7 +286,7 @@ export const MobileMenu = forwardRef<HTMLDivElement, MobileMenuProps>(
             {/* Menu Items */}
             <nav className="flex-1 overflow-y-auto py-2">
               <ul className="space-y-1 px-2">
-                {currentItems.map((item) => {
+                {currentItems.map(item => {
                   const hasChildren = item.children && item.children.length > 0;
                   const label = isRtl && item.labelAr ? item.labelAr : item.label;
                   const badge = isRtl && item.badgeAr ? item.badgeAr : item.badge;
@@ -314,9 +332,7 @@ export const MobileMenu = forwardRef<HTMLDivElement, MobileMenuProps>(
                           className="flex items-center gap-3 px-4 py-3 rounded-lg text-foreground hover:bg-muted transition-colors"
                         >
                           {item.icon && (
-                            <span className="flex-shrink-0 text-muted-foreground">
-                              {item.icon}
-                            </span>
+                            <span className="flex-shrink-0 text-muted-foreground">{item.icon}</span>
                           )}
                           <span className="font-medium">{label}</span>
                           {badge && (
@@ -327,9 +343,7 @@ export const MobileMenu = forwardRef<HTMLDivElement, MobileMenuProps>(
                         </Link>
                       ) : (
                         <span className="flex items-center gap-3 px-4 py-3 rounded-lg text-muted-foreground">
-                          {item.icon && (
-                            <span className="flex-shrink-0">{item.icon}</span>
-                          )}
+                          {item.icon && <span className="flex-shrink-0">{item.icon}</span>}
                           <span className="font-medium">{label}</span>
                           {badge && (
                             <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-primary text-primary-foreground">
@@ -346,9 +360,7 @@ export const MobileMenu = forwardRef<HTMLDivElement, MobileMenuProps>(
 
             {/* Footer */}
             {footerContent && submenuStack.length === 0 && (
-              <footer className="border-t border-border px-4 py-4">
-                {footerContent}
-              </footer>
+              <footer className="border-t border-border px-4 py-4">{footerContent}</footer>
             )}
           </div>
         </div>
@@ -397,7 +409,9 @@ export const MobileMenuButton = forwardRef<HTMLButtonElement, MobileMenuButtonPr
           buttonSizeStyles[size],
           className
         )}
-        aria-label={isOpen ? (isRtl ? 'إغلاق القائمة' : 'Close menu') : (isRtl ? 'فتح القائمة' : 'Open menu')}
+        aria-label={
+          isOpen ? (isRtl ? 'إغلاق القائمة' : 'Close menu') : isRtl ? 'فتح القائمة' : 'Open menu'
+        }
         aria-expanded={isOpen}
         {...props}
       >

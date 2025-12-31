@@ -83,9 +83,7 @@ export class MyFatoorahPaymentProvider implements IPaymentProvider {
   initialize(config: PaymentProviderConfig): void {
     this.config = {
       ...config,
-      baseUrl: config.isTestMode
-        ? 'https://apitest.myfatoorah.com'
-        : 'https://api.myfatoorah.com',
+      baseUrl: config.isTestMode ? 'https://apitest.myfatoorah.com' : 'https://api.myfatoorah.com',
     };
   }
 
@@ -97,13 +95,18 @@ export class MyFatoorahPaymentProvider implements IPaymentProvider {
     const response = await fetch(`${this.config.baseUrl}${endpoint}`, {
       method,
       headers: {
-        'Authorization': `Bearer ${this.config.apiKey}`,
+        Authorization: `Bearer ${this.config.apiKey}`,
         'Content-Type': 'application/json',
       },
       body: body ? JSON.stringify(body) : undefined,
     });
 
-    const data = await response.json() as { IsSuccess: boolean; Message?: string; ValidationErrors?: { Error: string }[]; Data?: unknown };
+    const data = (await response.json()) as {
+      IsSuccess: boolean;
+      Message?: string;
+      ValidationErrors?: { Error: string }[];
+      Data?: unknown;
+    };
 
     if (!response.ok || !data.IsSuccess) {
       console.error('[MYFATOORAH ERROR]', data);
@@ -119,14 +122,13 @@ export class MyFatoorahPaymentProvider implements IPaymentProvider {
     const amountInKWD = request.amount / 1000; // Convert fils to KWD
 
     // First get available payment methods
-    const methodsResponse = await this.request<{ IsSuccess: boolean; Data: { PaymentMethods: MyFatoorahPaymentMethod[] } }>(
-      '/v2/InitiatePayment',
-      'POST',
-      {
-        InvoiceAmount: amountInKWD,
-        CurrencyIso: request.currency,
-      }
-    );
+    const methodsResponse = await this.request<{
+      IsSuccess: boolean;
+      Data: { PaymentMethods: MyFatoorahPaymentMethod[] };
+    }>('/v2/InitiatePayment', 'POST', {
+      InvoiceAmount: amountInKWD,
+      CurrencyIso: request.currency,
+    });
 
     const paymentMethods = methodsResponse.Data.PaymentMethods;
 
@@ -178,14 +180,10 @@ export class MyFatoorahPaymentProvider implements IPaymentProvider {
   }
 
   async getPaymentStatus(transactionId: string): Promise<PaymentStatusResponse> {
-    const response = await this.request<MyFatoorahStatusResponse>(
-      '/v2/GetPaymentStatus',
-      'POST',
-      {
-        Key: transactionId,
-        KeyType: 'InvoiceId',
-      }
-    );
+    const response = await this.request<MyFatoorahStatusResponse>('/v2/GetPaymentStatus', 'POST', {
+      Key: transactionId,
+      KeyType: 'InvoiceId',
+    });
 
     const data = response.Data;
 
@@ -203,7 +201,7 @@ export class MyFatoorahPaymentProvider implements IPaymentProvider {
       invoiceId: data.InvoiceId.toString(),
       status: statusMap[data.InvoiceStatus] || 'pending',
       amount: Math.round(data.InvoiceValue * 1000),
-      currency: data.PaidCurrency as Currency || 'KWD',
+      currency: (data.PaidCurrency as Currency) || 'KWD',
       paidAmount: data.PaidCurrencyValue ? Math.round(data.PaidCurrencyValue * 1000) : undefined,
       paidCurrency: data.PaidCurrency as Currency,
       paymentMethod: data.PaymentMethod,
@@ -291,14 +289,13 @@ export class MyFatoorahPaymentProvider implements IPaymentProvider {
   }
 
   async getPaymentMethods(amount: number, currency: Currency): Promise<AvailablePaymentMethod[]> {
-    const response = await this.request<{ IsSuccess: boolean; Data: { PaymentMethods: MyFatoorahPaymentMethod[] } }>(
-      '/v2/InitiatePayment',
-      'POST',
-      {
-        InvoiceAmount: amount / 1000,
-        CurrencyIso: currency,
-      }
-    );
+    const response = await this.request<{
+      IsSuccess: boolean;
+      Data: { PaymentMethods: MyFatoorahPaymentMethod[] };
+    }>('/v2/InitiatePayment', 'POST', {
+      InvoiceAmount: amount / 1000,
+      CurrencyIso: currency,
+    });
 
     return response.Data.PaymentMethods.map(m => ({
       id: m.PaymentMethodId,

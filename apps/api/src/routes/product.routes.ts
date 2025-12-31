@@ -10,7 +10,12 @@ const router = Router({ mergeParams: true });
 // Validation schemas
 const createProductSchema = z.object({
   name: z.string().min(1).max(255),
-  slug: z.string().min(1).max(255).regex(/^[a-z0-9-]+$/).optional(),
+  slug: z
+    .string()
+    .min(1)
+    .max(255)
+    .regex(/^[a-z0-9-]+$/)
+    .optional(),
   description: z.string().optional(),
   price: z.number().int().min(0),
   compareAtPrice: z.number().int().min(0).optional(),
@@ -18,10 +23,14 @@ const createProductSchema = z.object({
   inventory: z.number().int().min(0).optional(),
   status: z.enum(['draft', 'active', 'archived']).optional(),
   categories: z.array(z.string()).optional(),
-  images: z.array(z.object({
-    url: z.string().url(),
-    alt: z.string().optional(),
-  })).optional(),
+  images: z
+    .array(
+      z.object({
+        url: z.string().url(),
+        alt: z.string().optional(),
+      })
+    )
+    .optional(),
 });
 
 const updateProductSchema = createProductSchema.partial();
@@ -142,7 +151,15 @@ router.get('/search', async (req: Request, res: Response, next: NextFunction) =>
       onSale: onSale === 'true',
       isNew: isNew === 'true',
       featured: featured === 'true',
-      sortBy: sortBy as 'newest' | 'oldest' | 'price_asc' | 'price_desc' | 'name_asc' | 'name_desc' | 'popular' | 'rating',
+      sortBy: sortBy as
+        | 'newest'
+        | 'oldest'
+        | 'price_asc'
+        | 'price_desc'
+        | 'name_asc'
+        | 'name_desc'
+        | 'popular'
+        | 'rating',
     });
 
     res.json({

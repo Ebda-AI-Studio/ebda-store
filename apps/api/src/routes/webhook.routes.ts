@@ -14,43 +14,41 @@ const router = Router();
  * POST /webhooks/payment/:provider
  * Handle payment provider webhooks
  */
-router.post(
-  '/payment/:provider',
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const provider = req.params.provider as PaymentProvider;
-      const signature = req.headers['x-signature'] as string
-        || req.headers['x-tap-signature'] as string
-        || req.headers['x-myfatoorah-signature'] as string
-        || req.headers['x-hesabe-signature'] as string
-        || req.headers['x-upayments-signature'] as string
-        || '';
+router.post('/payment/:provider', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const provider = req.params.provider as PaymentProvider;
+    const signature =
+      (req.headers['x-signature'] as string) ||
+      (req.headers['x-tap-signature'] as string) ||
+      (req.headers['x-myfatoorah-signature'] as string) ||
+      (req.headers['x-hesabe-signature'] as string) ||
+      (req.headers['x-upayments-signature'] as string) ||
+      '';
 
-      // Validate provider
-      const validProviders: PaymentProvider[] = ['tap', 'myfatoorah', 'hesabe', 'upayments'];
-      if (!validProviders.includes(provider)) {
-        res.status(400).json({
-          success: false,
-          error: { code: 'INVALID_PROVIDER', message: 'Invalid payment provider' },
-        });
-        return;
-      }
-
-      // Handle webhook
-      const result = await PaymentService.handleWebhook(provider, req.body, signature);
-
-      console.log(`[WEBHOOK] ${provider}: ${JSON.stringify(result)}`);
-
-      res.json({
-        success: true,
-        data: result,
+    // Validate provider
+    const validProviders: PaymentProvider[] = ['tap', 'myfatoorah', 'hesabe', 'upayments'];
+    if (!validProviders.includes(provider)) {
+      res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_PROVIDER', message: 'Invalid payment provider' },
       });
-    } catch (error) {
-      console.error('[WEBHOOK ERROR]', error);
-      next(error);
+      return;
     }
+
+    // Handle webhook
+    const result = await PaymentService.handleWebhook(provider, req.body, signature);
+
+    console.log(`[WEBHOOK] ${provider}: ${JSON.stringify(result)}`);
+
+    res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    console.error('[WEBHOOK ERROR]', error);
+    next(error);
   }
-);
+});
 
 /**
  * POST /webhooks/payment
@@ -71,7 +69,7 @@ router.post('/payment', async (req: Request, res: Response, next: NextFunction) 
       provider = 'tap';
     }
 
-    const signature = req.headers['x-signature'] as string || '';
+    const signature = (req.headers['x-signature'] as string) || '';
     const result = await PaymentService.handleWebhook(provider, req.body, signature);
 
     console.log(`[WEBHOOK] Auto-detected ${provider}: ${JSON.stringify(result)}`);
@@ -106,7 +104,9 @@ router.get('/payment/callback', async (req: Request, res: Response) => {
     if (status.status === 'completed') {
       res.redirect(`${config.webUrl}/checkout/success?transaction=${transactionId}`);
     } else if (status.status === 'failed' || status.status === 'cancelled') {
-      res.redirect(`${config.webUrl}/checkout/error?reason=${status.failureReason || status.status}`);
+      res.redirect(
+        `${config.webUrl}/checkout/error?reason=${status.failureReason || status.status}`
+      );
     } else {
       res.redirect(`${config.webUrl}/checkout/pending?transaction=${transactionId}`);
     }

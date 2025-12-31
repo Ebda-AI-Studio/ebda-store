@@ -3,7 +3,10 @@
 import { forwardRef, useState } from 'react';
 import { cn } from '../utils/cn';
 
-export interface WishlistButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'onChange' | 'onToggle'> {
+export interface WishlistButtonProps extends Omit<
+  React.ButtonHTMLAttributes<HTMLButtonElement>,
+  'onChange' | 'onToggle'
+> {
   /** Product ID */
   productId: string;
   /** Whether the item is already in wishlist */
@@ -113,11 +116,7 @@ export const WishlistButton = forwardRef<HTMLButtonElement, WishlistButtonProps>
       }
     };
 
-    const label = isLoading
-      ? labels.adding
-      : isWishlisted
-      ? labels.remove
-      : labels.add;
+    const label = isLoading ? labels.adding : isWishlisted ? labels.remove : labels.add;
 
     return (
       <button

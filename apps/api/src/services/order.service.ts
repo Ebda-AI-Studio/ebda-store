@@ -155,10 +155,7 @@ export class OrderService {
     }
 
     // Calculate totals
-    const subtotal = cart.items.reduce(
-      (sum, item) => sum + item.product.price * item.quantity,
-      0
-    );
+    const subtotal = cart.items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
     const tax = Math.round(subtotal * 0.1); // 10% tax (simplified)
     const shipping = 0; // Free shipping (simplified)
     const total = subtotal + tax + shipping;
@@ -221,7 +218,8 @@ export class OrderService {
     try {
       const emailData: OrderEmailData = {
         orderNumber: order.orderNumber,
-        customerName: `${order.customer.firstName} ${order.customer.lastName}`.trim() || order.customer.email,
+        customerName:
+          `${order.customer.firstName} ${order.customer.lastName}`.trim() || order.customer.email,
         customerEmail: order.customer.email,
         items: order.items.map(item => ({
           name: item.productName,
@@ -249,7 +247,8 @@ export class OrderService {
       socketService.newOrderNotification(storeId, {
         orderNumber: order.orderNumber,
         total: order.total,
-        customerName: `${order.customer.firstName} ${order.customer.lastName}`.trim() || order.customer.email,
+        customerName:
+          `${order.customer.firstName} ${order.customer.lastName}`.trim() || order.customer.email,
       });
     } catch (notifyError) {
       console.error('Failed to send order notification:', notifyError);
@@ -261,7 +260,14 @@ export class OrderService {
   static async updateStatus(
     storeId: string,
     orderId: string,
-    status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded'
+    status:
+      | 'pending'
+      | 'confirmed'
+      | 'processing'
+      | 'shipped'
+      | 'delivered'
+      | 'cancelled'
+      | 'refunded'
   ) {
     const order = await this.getById(storeId, orderId);
 
@@ -308,7 +314,9 @@ export class OrderService {
     // Send status update emails
     try {
       const customerEmail = updatedOrder.customer.email;
-      const customerName = `${updatedOrder.customer.firstName} ${updatedOrder.customer.lastName}`.trim() || customerEmail;
+      const customerName =
+        `${updatedOrder.customer.firstName} ${updatedOrder.customer.lastName}`.trim() ||
+        customerEmail;
 
       if (status === 'shipped') {
         await EmailService.sendOrderShipped({
@@ -319,7 +327,16 @@ export class OrderService {
         });
       } else if (status === 'confirmed') {
         // Payment success / order confirmed
-        const shippingAddr = updatedOrder.shippingAddress as { firstName: string; lastName: string; address1: string; address2?: string; city: string; state: string; postalCode: string; country: string };
+        const shippingAddr = updatedOrder.shippingAddress as {
+          firstName: string;
+          lastName: string;
+          address1: string;
+          address2?: string;
+          city: string;
+          state: string;
+          postalCode: string;
+          country: string;
+        };
         await EmailService.sendPaymentSuccess({
           orderNumber: updatedOrder.orderNumber,
           customerName,

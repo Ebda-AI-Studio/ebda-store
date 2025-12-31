@@ -12,7 +12,10 @@ export default function BoldCategoryGrid({
   const displayTitle = isRtl && titleAr ? titleAr : title;
 
   return (
-    <section className="py-20 md:py-28 bg-background relative overflow-hidden" dir={isRtl ? 'rtl' : 'ltr'}>
+    <section
+      className="py-20 md:py-28 bg-background relative overflow-hidden"
+      dir={isRtl ? 'rtl' : 'ltr'}
+    >
       {/* Background accent */}
       <div className="absolute top-0 left-0 w-1/2 h-1/2 bg-primary/5 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
 
@@ -30,14 +33,8 @@ export default function BoldCategoryGrid({
         {/* Grid - Staggered layout for dynamism */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
           {categories.map((category, index) => (
-            <div
-              key={category.id}
-              className={index % 2 === 1 ? 'lg:translate-y-8' : ''}
-            >
-              <CategoryCard
-                category={category}
-                isRtl={isRtl}
-              />
+            <div key={category.id} className={index % 2 === 1 ? 'lg:translate-y-8' : ''}>
+              <CategoryCard category={category} isRtl={isRtl} />
             </div>
           ))}
         </div>

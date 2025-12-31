@@ -105,15 +105,13 @@ export const ProductFilters = forwardRef<HTMLDivElement, ProductFiltersProps>(
     },
     ref
   ) => {
-    const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>(
-      () => {
-        const initial: Record<string, boolean> = {};
-        sections.forEach((s) => {
-          initial[s.id] = s.isExpanded !== false;
-        });
-        return initial;
-      }
-    );
+    const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>(() => {
+      const initial: Record<string, boolean> = {};
+      sections.forEach(s => {
+        initial[s.id] = s.isExpanded !== false;
+      });
+      return initial;
+    });
 
     const [localPriceRange, setLocalPriceRange] = useState<PriceRange | undefined>(
       activeFilters.priceRange
@@ -126,7 +124,7 @@ export const ProductFilters = forwardRef<HTMLDivElement, ProductFiltersProps>(
 
     const toggleSection = (sectionId: string) => {
       if (!collapsible) return;
-      setExpandedSections((prev) => ({
+      setExpandedSections(prev => ({
         ...prev,
         [sectionId]: !prev[sectionId],
       }));
@@ -137,7 +135,7 @@ export const ProductFilters = forwardRef<HTMLDivElement, ProductFiltersProps>(
         const currentValues = (activeFilters[sectionId] as string[]) || [];
         const newValues = checked
           ? [...currentValues, optionId]
-          : currentValues.filter((v) => v !== optionId);
+          : currentValues.filter(v => v !== optionId);
 
         onFiltersChange({
           ...activeFilters,
@@ -182,7 +180,7 @@ export const ProductFilters = forwardRef<HTMLDivElement, ProductFiltersProps>(
     };
 
     const hasActiveFilters = Object.values(activeFilters).some(
-      (v) => v !== undefined && (Array.isArray(v) ? v.length > 0 : true)
+      v => v !== undefined && (Array.isArray(v) ? v.length > 0 : true)
     );
 
     return (
@@ -210,7 +208,7 @@ export const ProductFilters = forwardRef<HTMLDivElement, ProductFiltersProps>(
             <input
               type="checkbox"
               checked={activeFilters.inStock || false}
-              onChange={(e) => handleToggleChange('inStock', e.target.checked)}
+              onChange={e => handleToggleChange('inStock', e.target.checked)}
               className="w-4 h-4 rounded border-border text-primary focus:ring-primary"
             />
             <span className="text-sm">{labels.inStock}</span>
@@ -219,7 +217,7 @@ export const ProductFilters = forwardRef<HTMLDivElement, ProductFiltersProps>(
             <input
               type="checkbox"
               checked={activeFilters.onSale || false}
-              onChange={(e) => handleToggleChange('onSale', e.target.checked)}
+              onChange={e => handleToggleChange('onSale', e.target.checked)}
               className="w-4 h-4 rounded border-border text-primary focus:ring-primary"
             />
             <span className="text-sm">{labels.onSale}</span>
@@ -227,11 +225,8 @@ export const ProductFilters = forwardRef<HTMLDivElement, ProductFiltersProps>(
         </div>
 
         {/* Filter Sections */}
-        {sections.map((section) => (
-          <div
-            key={section.id}
-            className="border-t border-border pt-4"
-          >
+        {sections.map(section => (
+          <div key={section.id} className="border-t border-border pt-4">
             {/* Section Header */}
             <button
               onClick={() => toggleSection(section.id)}
@@ -253,7 +248,12 @@ export const ProductFilters = forwardRef<HTMLDivElement, ProductFiltersProps>(
                   stroke="currentColor"
                   viewBox="0 0 24 24"
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 9l-7 7-7-7"
+                  />
                 </svg>
               )}
             </button>
@@ -263,7 +263,7 @@ export const ProductFilters = forwardRef<HTMLDivElement, ProductFiltersProps>(
               <div className="mt-3 space-y-2">
                 {/* Checkbox / Radio Options */}
                 {(section.type === 'checkbox' || section.type === 'radio') &&
-                  section.options?.map((option) => {
+                  section.options?.map(option => {
                     const isChecked = ((activeFilters[section.id] as string[]) || []).includes(
                       option.id
                     );
@@ -276,7 +276,7 @@ export const ProductFilters = forwardRef<HTMLDivElement, ProductFiltersProps>(
                           type={section.type}
                           name={section.id}
                           checked={isChecked}
-                          onChange={(e) =>
+                          onChange={e =>
                             section.type === 'checkbox'
                               ? handleCheckboxChange(section.id, option.id, e.target.checked)
                               : handleRadioChange(section.id, option.id)
@@ -296,16 +296,14 @@ export const ProductFilters = forwardRef<HTMLDivElement, ProductFiltersProps>(
                 {/* Color Options */}
                 {section.type === 'color' && section.colorOptions && (
                   <div className="flex flex-wrap gap-2">
-                    {section.colorOptions.map((option) => {
+                    {section.colorOptions.map(option => {
                       const isChecked = ((activeFilters[section.id] as string[]) || []).includes(
                         option.id
                       );
                       return (
                         <button
                           key={option.id}
-                          onClick={() =>
-                            handleCheckboxChange(section.id, option.id, !isChecked)
-                          }
+                          onClick={() => handleCheckboxChange(section.id, option.id, !isChecked)}
                           className={cn(
                             'w-8 h-8 rounded-full border-2 transition-all',
                             isChecked
@@ -324,16 +322,14 @@ export const ProductFilters = forwardRef<HTMLDivElement, ProductFiltersProps>(
                 {/* Size Options */}
                 {section.type === 'size' && section.options && (
                   <div className="flex flex-wrap gap-2">
-                    {section.options.map((option) => {
+                    {section.options.map(option => {
                       const isChecked = ((activeFilters[section.id] as string[]) || []).includes(
                         option.id
                       );
                       return (
                         <button
                           key={option.id}
-                          onClick={() =>
-                            handleCheckboxChange(section.id, option.id, !isChecked)
-                          }
+                          onClick={() => handleCheckboxChange(section.id, option.id, !isChecked)}
                           className={cn(
                             'min-w-[40px] h-10 px-3 rounded-lg border text-sm font-medium transition-all',
                             isChecked
@@ -358,8 +354,8 @@ export const ProductFilters = forwardRef<HTMLDivElement, ProductFiltersProps>(
                         <input
                           type="number"
                           value={localPriceRange?.min ?? section.priceRange.min}
-                          onChange={(e) =>
-                            setLocalPriceRange((prev) => ({
+                          onChange={e =>
+                            setLocalPriceRange(prev => ({
                               min: Number(e.target.value) * 1000,
                               max: prev?.max ?? section.priceRange!.max,
                             }))
@@ -374,8 +370,8 @@ export const ProductFilters = forwardRef<HTMLDivElement, ProductFiltersProps>(
                         <input
                           type="number"
                           value={localPriceRange?.max ?? section.priceRange.max}
-                          onChange={(e) =>
-                            setLocalPriceRange((prev) => ({
+                          onChange={e =>
+                            setLocalPriceRange(prev => ({
                               min: prev?.min ?? section.priceRange!.min,
                               max: Number(e.target.value) * 1000,
                             }))

@@ -8,7 +8,12 @@ const router = Router();
 // Validation schemas
 const createStoreSchema = z.object({
   name: z.string().min(1).max(100),
-  slug: z.string().min(1).max(100).regex(/^[a-z0-9-]+$/).optional(),
+  slug: z
+    .string()
+    .min(1)
+    .max(100)
+    .regex(/^[a-z0-9-]+$/)
+    .optional(),
   domain: z.string().optional(),
   settings: z.record(z.any()).optional(),
 });
@@ -59,23 +64,28 @@ const updateStoreSchema = createStoreSchema.partial();
  *       403:
  *         $ref: '#/components/responses/ForbiddenError'
  */
-router.get('/', authenticate, authorize('store_admin', 'super_admin'), async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { page, limit } = req.query;
+router.get(
+  '/',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { page, limit } = req.query;
 
-    const result = await StoreService.list({
-      page: page ? parseInt(page as string) : undefined,
-      limit: limit ? parseInt(limit as string) : undefined,
-    });
+      const result = await StoreService.list({
+        page: page ? parseInt(page as string) : undefined,
+        limit: limit ? parseInt(limit as string) : undefined,
+      });
 
-    res.json({
-      success: true,
-      data: result,
-    });
-  } catch (error) {
-    next(error);
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 // GET /stores/:id - Get store by ID
 router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
@@ -158,196 +168,251 @@ router.get('/:id/stats', authenticate, async (req: Request, res: Response, next:
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  */
-router.post('/', authenticate, authorize('store_admin', 'super_admin'), async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const data = createStoreSchema.parse(req.body);
+router.post(
+  '/',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const data = createStoreSchema.parse(req.body);
 
-    const store = await StoreService.create(req.user!.userId, data);
+      const store = await StoreService.create(req.user!.userId, data);
 
-    res.status(201).json({
-      success: true,
-      data: { store },
-    });
-  } catch (error) {
-    next(error);
+      res.status(201).json({
+        success: true,
+        data: { store },
+      });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 // PUT /stores/:id - Update store (admin only)
-router.put('/:id', authenticate, authorize('store_admin', 'super_admin'), async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { id } = req.params;
-    const data = updateStoreSchema.parse(req.body);
+router.put(
+  '/:id',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const data = updateStoreSchema.parse(req.body);
 
-    const store = await StoreService.update(id, data);
+      const store = await StoreService.update(id, data);
 
-    res.json({
-      success: true,
-      data: { store },
-    });
-  } catch (error) {
-    next(error);
+      res.json({
+        success: true,
+        data: { store },
+      });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 // DELETE /stores/:id - Delete store
-router.delete('/:id', authenticate, authorize('super_admin'), async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { id } = req.params;
+router.delete(
+  '/:id',
+  authenticate,
+  authorize('super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
 
-    await StoreService.delete(id);
+      await StoreService.delete(id);
 
-    res.json({
-      success: true,
-      data: { message: 'Store deleted successfully' },
-    });
-  } catch (error) {
-    next(error);
+      res.json({
+        success: true,
+        data: { message: 'Store deleted successfully' },
+      });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 // PUT /stores/:id/template - Update store template
-router.put('/:id/template', authenticate, authorize('store_admin', 'super_admin'), async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { id } = req.params;
-    const { template } = req.body;
+router.put(
+  '/:id/template',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const { template } = req.body;
 
-    if (!template) {
-      res.status(400).json({
-        success: false,
-        error: { code: 'MISSING_TEMPLATE', message: 'Template is required' },
+      if (!template) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'MISSING_TEMPLATE', message: 'Template is required' },
+        });
+        return;
+      }
+
+      const store = await StoreService.updateTemplate(id, template);
+
+      res.json({
+        success: true,
+        data: { store },
       });
-      return;
+    } catch (error) {
+      next(error);
     }
-
-    const store = await StoreService.updateTemplate(id, template);
-
-    res.json({
-      success: true,
-      data: { store },
-    });
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 // PUT /stores/:id/theme - Update store theme
-router.put('/:id/theme', authenticate, authorize('store_admin', 'super_admin'), async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { id } = req.params;
-    const theme = req.body;
+router.put(
+  '/:id/theme',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const theme = req.body;
 
-    const store = await StoreService.updateTheme(id, theme);
+      const store = await StoreService.updateTheme(id, theme);
 
-    res.json({
-      success: true,
-      data: { store },
-    });
-  } catch (error) {
-    next(error);
+      res.json({
+        success: true,
+        data: { store },
+      });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 // PUT /stores/:id/branding - Update store branding
-router.put('/:id/branding', authenticate, authorize('store_admin', 'super_admin'), async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { id } = req.params;
-    const branding = req.body;
+router.put(
+  '/:id/branding',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const branding = req.body;
 
-    const store = await StoreService.updateBranding(id, branding);
+      const store = await StoreService.updateBranding(id, branding);
 
-    res.json({
-      success: true,
-      data: { store },
-    });
-  } catch (error) {
-    next(error);
+      res.json({
+        success: true,
+        data: { store },
+      });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 // PUT /stores/:id/social - Update store social links
-router.put('/:id/social', authenticate, authorize('store_admin', 'super_admin'), async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { id } = req.params;
-    const socialLinks = req.body;
+router.put(
+  '/:id/social',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const socialLinks = req.body;
 
-    const store = await StoreService.updateSocialLinks(id, socialLinks);
+      const store = await StoreService.updateSocialLinks(id, socialLinks);
 
-    res.json({
-      success: true,
-      data: { store },
-    });
-  } catch (error) {
-    next(error);
+      res.json({
+        success: true,
+        data: { store },
+      });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 // PUT /stores/:id/contact - Update store contact info
-router.put('/:id/contact', authenticate, authorize('store_admin', 'super_admin'), async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { id } = req.params;
-    const contact = req.body;
+router.put(
+  '/:id/contact',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const contact = req.body;
 
-    const store = await StoreService.updateContactInfo(id, contact);
+      const store = await StoreService.updateContactInfo(id, contact);
 
-    res.json({
-      success: true,
-      data: { store },
-    });
-  } catch (error) {
-    next(error);
+      res.json({
+        success: true,
+        data: { store },
+      });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 // PUT /stores/:id/announcement - Update store announcement bar
-router.put('/:id/announcement', authenticate, authorize('store_admin', 'super_admin'), async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { id } = req.params;
-    const announcementBar = req.body;
+router.put(
+  '/:id/announcement',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const announcementBar = req.body;
 
-    const store = await StoreService.updateAnnouncementBar(id, announcementBar);
+      const store = await StoreService.updateAnnouncementBar(id, announcementBar);
 
-    res.json({
-      success: true,
-      data: { store },
-    });
-  } catch (error) {
-    next(error);
+      res.json({
+        success: true,
+        data: { store },
+      });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 // PUT /stores/:id/seo - Update store SEO settings
-router.put('/:id/seo', authenticate, authorize('store_admin', 'super_admin'), async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { id } = req.params;
-    const seo = req.body;
+router.put(
+  '/:id/seo',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const seo = req.body;
 
-    const store = await StoreService.updateSeo(id, seo);
+      const store = await StoreService.updateSeo(id, seo);
 
-    res.json({
-      success: true,
-      data: { store },
-    });
-  } catch (error) {
-    next(error);
+      res.json({
+        success: true,
+        data: { store },
+      });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 // PUT /stores/:id/marketing-pixels - Update store marketing pixels
-router.put('/:id/marketing-pixels', authenticate, authorize('store_admin', 'super_admin'), async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { id } = req.params;
-    const { marketingPixels } = req.body;
+router.put(
+  '/:id/marketing-pixels',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const { marketingPixels } = req.body;
 
-    const store = await StoreService.updateMarketingPixels(id, marketingPixels);
+      const store = await StoreService.updateMarketingPixels(id, marketingPixels);
 
-    res.json({
-      success: true,
-      data: { store },
-    });
-  } catch (error) {
-    next(error);
+      res.json({
+        success: true,
+        data: { store },
+      });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 export default router;

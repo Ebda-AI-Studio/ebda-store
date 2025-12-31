@@ -46,8 +46,18 @@ export default function ForgotPasswordPage() {
 
           <div className="rounded-xl border bg-white p-8 shadow-sm">
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
-              <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              <svg
+                className="h-6 w-6 text-green-600"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 13l4 4L19 7"
+                />
               </svg>
             </div>
             <h2 className="mt-4 text-xl font-semibold text-gray-900">Check your email</h2>
@@ -85,9 +95,7 @@ export default function ForgotPasswordPage() {
               <span className="text-gray-700"> Store</span>
             </span>
           </Link>
-          <h2 className="mt-6 text-3xl font-bold tracking-tight text-gray-900">
-            Forgot password?
-          </h2>
+          <h2 className="mt-6 text-3xl font-bold tracking-tight text-gray-900">Forgot password?</h2>
           <p className="mt-2 text-sm text-gray-600">
             No worries, we&apos;ll send you reset instructions.
           </p>
@@ -96,9 +104,7 @@ export default function ForgotPasswordPage() {
         {/* Form */}
         <div className="rounded-xl border bg-white p-8 shadow-sm">
           {error && (
-            <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">
-              {error}
-            </div>
+            <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">{error}</div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">

@@ -14,8 +14,10 @@ export default function MinimalHero({
   ctaLink = '/products',
   isRtl = false,
 }: HeroProps) {
-  const displayTitle = isRtl && titleAr ? titleAr : title || (isRtl ? 'البساطة في التصميم' : 'Simply Beautiful');
-  const displaySubtitle = isRtl && subtitleAr ? subtitleAr : subtitle || (isRtl ? 'أقل تعني أكثر' : 'Less is more');
+  const displayTitle =
+    isRtl && titleAr ? titleAr : title || (isRtl ? 'البساطة في التصميم' : 'Simply Beautiful');
+  const displaySubtitle =
+    isRtl && subtitleAr ? subtitleAr : subtitle || (isRtl ? 'أقل تعني أكثر' : 'Less is more');
   const displayCta = isRtl && ctaTextAr ? ctaTextAr : ctaText || (isRtl ? 'تصفح' : 'Browse');
 
   return (
@@ -41,11 +43,7 @@ export default function MinimalHero({
           {/* Image - Full width, clean */}
           <div className="aspect-[21/9] bg-muted overflow-hidden">
             {image ? (
-              <img
-                src={image}
-                alt={displayTitle}
-                className="w-full h-full object-cover"
-              />
+              <img src={image} alt={displayTitle} className="w-full h-full object-cover" />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
                 <span className="text-sm text-muted-foreground tracking-widest uppercase">

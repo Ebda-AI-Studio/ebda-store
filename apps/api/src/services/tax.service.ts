@@ -191,7 +191,11 @@ export class TaxService {
     subtotal: number,
     country?: string,
     state?: string
-  ): Promise<{ taxAmount: number; taxRate: number; taxBreakdown: Array<{ name: string; rate: number; amount: number }> }> {
+  ): Promise<{
+    taxAmount: number;
+    taxRate: number;
+    taxBreakdown: Array<{ name: string; rate: number; amount: number }>;
+  }> {
     const settings = await this.getSettings(storeId);
 
     if (!settings.taxEnabled) {

@@ -60,9 +60,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       const existingItem = currentItems.find(i => i.id === item.id);
       if (existingItem) {
         return currentItems.map(i =>
-          i.id === item.id
-            ? { ...i, quantity: i.quantity + quantity }
-            : i
+          i.id === item.id ? { ...i, quantity: i.quantity + quantity } : i
         );
       }
       return [...currentItems, { ...item, quantity }];
@@ -73,17 +71,18 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setItems(currentItems => currentItems.filter(item => item.id !== id));
   }, []);
 
-  const updateQuantity = useCallback((id: string, quantity: number) => {
-    if (quantity <= 0) {
-      removeItem(id);
-      return;
-    }
-    setItems(currentItems =>
-      currentItems.map(item =>
-        item.id === id ? { ...item, quantity } : item
-      )
-    );
-  }, [removeItem]);
+  const updateQuantity = useCallback(
+    (id: string, quantity: number) => {
+      if (quantity <= 0) {
+        removeItem(id);
+        return;
+      }
+      setItems(currentItems =>
+        currentItems.map(item => (item.id === id ? { ...item, quantity } : item))
+      );
+    },
+    [removeItem]
+  );
 
   const clearCart = useCallback(() => {
     setItems([]);

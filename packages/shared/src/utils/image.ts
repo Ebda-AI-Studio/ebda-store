@@ -121,7 +121,7 @@ export function generateSrcSet(
   options: ImageOptimizationOptions = {}
 ): string {
   return widths
-    .map((width) => {
+    .map(width => {
       const transformedUrl = transformImageUrl(url, width, options);
       return `${transformedUrl} ${width}w`;
     })
@@ -131,9 +131,7 @@ export function generateSrcSet(
 /**
  * Generate sizes attribute for responsive images
  */
-export function generateSizes(
-  config: { breakpoint: number; size: string }[]
-): string {
+export function generateSizes(config: { breakpoint: number; size: string }[]): string {
   const sorted = [...config].sort((a, b) => b.breakpoint - a.breakpoint);
   const parts = sorted.map(({ breakpoint, size }) => `(min-width: ${breakpoint}px) ${size}`);
   // Add default size
@@ -154,7 +152,7 @@ export function getResponsiveImage(
   } = {}
 ): ResponsiveImage {
   const {
-    widths = IMAGE_BREAKPOINTS.filter((w) => w <= dimensions.width * 2),
+    widths = IMAGE_BREAKPOINTS.filter(w => w <= dimensions.width * 2),
     sizes = [
       { breakpoint: 1280, size: '50vw' },
       { breakpoint: 768, size: '75vw' },
@@ -195,10 +193,7 @@ export function generatePlaceholder(
 /**
  * Generate a shimmer placeholder animation
  */
-export function generateShimmerPlaceholder(
-  width: number,
-  height: number
-): string {
+export function generateShimmerPlaceholder(width: number, height: number): string {
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}">
       <defs>
@@ -313,7 +308,7 @@ export function isImageUrl(url: string): boolean {
 
     // Check common image extensions
     const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.avif', '.svg', '.bmp'];
-    if (imageExtensions.some((ext) => pathname.endsWith(ext))) {
+    if (imageExtensions.some(ext => pathname.endsWith(ext))) {
       return true;
     }
 
@@ -325,7 +320,7 @@ export function isImageUrl(url: string): boolean {
       'images.pexels.com',
       'images.unsplash.com',
     ];
-    if (imageCdnPatterns.some((pattern) => urlObj.hostname.includes(pattern))) {
+    if (imageCdnPatterns.some(pattern => urlObj.hostname.includes(pattern))) {
       return true;
     }
 

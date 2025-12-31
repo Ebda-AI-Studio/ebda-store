@@ -27,7 +27,11 @@ export interface BreadcrumbProps extends React.HTMLAttributes<HTMLElement> {
   /** Maximum items to show before collapsing */
   maxItems?: number;
   /** Link component for Next.js Link or custom routing */
-  LinkComponent?: React.ComponentType<{ href: string; className?: string; children: React.ReactNode }>;
+  LinkComponent?: React.ComponentType<{
+    href: string;
+    className?: string;
+    children: React.ReactNode;
+  }>;
 }
 
 const sizeStyles = {
@@ -92,9 +96,21 @@ export const Breadcrumb = forwardRef<HTMLElement, BreadcrumbProps>(
     ref
   ) => {
     // Default anchor link if no custom component provided
-    const Link = LinkComponent || (({ href, className, children }: { href: string; className?: string; children: React.ReactNode }) => (
-      <a href={href} className={className}>{children}</a>
-    ));
+    const Link =
+      LinkComponent ||
+      (({
+        href,
+        className,
+        children,
+      }: {
+        href: string;
+        className?: string;
+        children: React.ReactNode;
+      }) => (
+        <a href={href} className={className}>
+          {children}
+        </a>
+      ));
 
     const renderSeparator = () => {
       const SeparatorIcon = separatorIcons[separator];
@@ -141,9 +157,7 @@ export const Breadcrumb = forwardRef<HTMLElement, BreadcrumbProps>(
                   <span
                     className={cn(
                       'font-medium',
-                      isLast || item.isCurrent
-                        ? 'text-foreground'
-                        : 'text-muted-foreground'
+                      isLast || item.isCurrent ? 'text-foreground' : 'text-muted-foreground'
                     )}
                     aria-current={item.isCurrent || isLast ? 'page' : undefined}
                   >

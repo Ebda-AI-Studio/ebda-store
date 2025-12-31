@@ -14,41 +14,41 @@ const createReturnSchema = z.object({
   reason: z.string().min(1).max(500),
   reasonDetail: z.string().max(2000).optional(),
   customerNotes: z.string().max(2000).optional(),
-  items: z.array(z.object({
-    orderItemId: z.string().uuid(),
-    productId: z.string().uuid(),
-    productName: z.string(),
-    quantity: z.number().int().min(1),
-    reason: z.string().optional(),
-    condition: z.enum(['new', 'opened', 'damaged']).optional(),
-  })).min(1),
+  items: z
+    .array(
+      z.object({
+        orderItemId: z.string().uuid(),
+        productId: z.string().uuid(),
+        productName: z.string(),
+        quantity: z.number().int().min(1),
+        reason: z.string().optional(),
+        condition: z.enum(['new', 'opened', 'damaged']).optional(),
+      })
+    )
+    .min(1),
 });
 
 // Customer Routes
 
 // GET /stores/:storeId/returns - List customer returns
-router.get(
-  '/',
-  authenticate,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const { page, limit, status } = req.query;
+router.get('/', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { page, limit, status } = req.query;
 
-      const result = await ReturnService.getCustomerReturns(req.user!.userId, {
-        page: page ? parseInt(page as string) : undefined,
-        limit: limit ? parseInt(limit as string) : undefined,
-        status: status as string,
-      });
+    const result = await ReturnService.getCustomerReturns(req.user!.userId, {
+      page: page ? parseInt(page as string) : undefined,
+      limit: limit ? parseInt(limit as string) : undefined,
+      status: status as string,
+    });
 
-      res.json({
-        success: true,
-        data: result,
-      });
-    } catch (error) {
-      next(error);
-    }
+    res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    next(error);
   }
-);
+});
 
 // POST /stores/:storeId/returns - Create return request
 router.post(
@@ -87,33 +87,29 @@ router.post(
 );
 
 // GET /stores/:storeId/returns/:id - Get return details
-router.get(
-  '/:id',
-  authenticate,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const { storeId, id } = req.params;
+router.get('/:id', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { storeId, id } = req.params;
 
-      const returnRequest = await ReturnService.getById(storeId, id);
+    const returnRequest = await ReturnService.getById(storeId, id);
 
-      // Check if customer owns this return
-      if (returnRequest.customerId !== req.user!.userId && req.user!.role === 'customer') {
-        res.status(403).json({
-          success: false,
-          error: { code: 'FORBIDDEN', message: 'Access denied' },
-        });
-        return;
-      }
-
-      res.json({
-        success: true,
-        data: { return: returnRequest },
+    // Check if customer owns this return
+    if (returnRequest.customerId !== req.user!.userId && req.user!.role === 'customer') {
+      res.status(403).json({
+        success: false,
+        error: { code: 'FORBIDDEN', message: 'Access denied' },
       });
-    } catch (error) {
-      next(error);
+      return;
     }
+
+    res.json({
+      success: true,
+      data: { return: returnRequest },
+    });
+  } catch (error) {
+    next(error);
   }
-);
+});
 
 // Admin Routes
 
@@ -292,7 +288,12 @@ router.post(
         return;
       }
 
-      const returnRequest = await ReturnService.complete(storeId, id, req.user!.userId, refundMethod);
+      const returnRequest = await ReturnService.complete(
+        storeId,
+        id,
+        req.user!.userId,
+        refundMethod
+      );
 
       // Audit log
       await auditLog({

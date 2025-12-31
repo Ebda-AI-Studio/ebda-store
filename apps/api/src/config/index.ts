@@ -102,7 +102,12 @@ if (config.nodeEnv === 'production') {
   }
 
   // Warn if no payment provider is configured
-  if (!config.tapApiKey && !config.myfatoorahApiKey && !config.hesabeApiKey && !config.upaymentsApiKey) {
+  if (
+    !config.tapApiKey &&
+    !config.myfatoorahApiKey &&
+    !config.hesabeApiKey &&
+    !config.upaymentsApiKey
+  ) {
     console.warn('[CONFIG] Warning: No payment provider configured!');
   }
 }

@@ -47,10 +47,7 @@ export default function AnalyticsPage() {
   const maxRevenue = Math.max(...monthlyRevenue.map(m => m.revenue));
 
   return (
-    <AdminLayout
-      title="Analytics"
-      subtitle="Track your store performance"
-    >
+    <AdminLayout title="Analytics" subtitle="Track your store performance">
       {/* Overview Stats */}
       <div className="mb-8 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
@@ -105,7 +102,7 @@ export default function AnalyticsPage() {
           <CardContent>
             <div className="h-64">
               <div className="flex h-full items-end gap-2">
-                {monthlyRevenue.map((item) => (
+                {monthlyRevenue.map(item => (
                   <div key={item.month} className="flex-1 flex flex-col items-center gap-2">
                     <div
                       className="w-full bg-gradient-to-t from-primary to-orange-400 rounded-t transition-all hover:from-primary/80 hover:to-orange-300"
@@ -128,11 +125,13 @@ export default function AnalyticsPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {topCategories.map((category) => (
+              {topCategories.map(category => (
                 <div key={category.name}>
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-sm font-medium text-gray-700">{category.name}</span>
-                    <span className="text-sm text-gray-500">{category.sales} sales ({category.percentage}%)</span>
+                    <span className="text-sm text-gray-500">
+                      {category.sales} sales ({category.percentage}%)
+                    </span>
                   </div>
                   <div className="h-2 w-full rounded-full bg-gray-100">
                     <div
@@ -154,17 +153,29 @@ export default function AnalyticsPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {trafficSources.map((source) => (
+              {trafficSources.map(source => (
                 <div key={source.source} className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-                      <svg className="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                      <svg
+                        className="h-4 w-4 text-primary"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
+                        />
                       </svg>
                     </div>
                     <div>
                       <p className="text-sm font-medium text-gray-900">{source.source}</p>
-                      <p className="text-xs text-gray-500">{source.visits.toLocaleString()} visits</p>
+                      <p className="text-xs text-gray-500">
+                        {source.visits.toLocaleString()} visits
+                      </p>
                     </div>
                   </div>
                   <span className="text-sm font-medium text-gray-600">{source.percentage}%</span>
@@ -184,14 +195,41 @@ export default function AnalyticsPage() {
         <CardContent>
           <div className="space-y-4">
             {[
-              { icon: '🛒', text: 'New order #ORD-156 from John Doe', time: '5 minutes ago', color: 'bg-blue-100' },
-              { icon: '👤', text: 'New customer registered: alice@example.com', time: '12 minutes ago', color: 'bg-green-100' },
-              { icon: '📦', text: 'Order #ORD-154 shipped to Jane Smith', time: '1 hour ago', color: 'bg-purple-100' },
-              { icon: '⭐', text: 'New 5-star review on Premium Headphones', time: '2 hours ago', color: 'bg-yellow-100' },
-              { icon: '💰', text: 'Payment received for order #ORD-153', time: '3 hours ago', color: 'bg-primary/10' },
+              {
+                icon: '🛒',
+                text: 'New order #ORD-156 from John Doe',
+                time: '5 minutes ago',
+                color: 'bg-blue-100',
+              },
+              {
+                icon: '👤',
+                text: 'New customer registered: alice@example.com',
+                time: '12 minutes ago',
+                color: 'bg-green-100',
+              },
+              {
+                icon: '📦',
+                text: 'Order #ORD-154 shipped to Jane Smith',
+                time: '1 hour ago',
+                color: 'bg-purple-100',
+              },
+              {
+                icon: '⭐',
+                text: 'New 5-star review on Premium Headphones',
+                time: '2 hours ago',
+                color: 'bg-yellow-100',
+              },
+              {
+                icon: '💰',
+                text: 'Payment received for order #ORD-153',
+                time: '3 hours ago',
+                color: 'bg-primary/10',
+              },
             ].map((activity, index) => (
               <div key={index} className="flex items-center gap-4">
-                <div className={`flex h-10 w-10 items-center justify-center rounded-full ${activity.color}`}>
+                <div
+                  className={`flex h-10 w-10 items-center justify-center rounded-full ${activity.color}`}
+                >
                   <span className="text-lg">{activity.icon}</span>
                 </div>
                 <div className="flex-1">

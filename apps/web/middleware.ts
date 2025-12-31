@@ -25,9 +25,7 @@ function isPlatformDomain(hostname: string): boolean {
   // Remove port if present
   const host = hostname.split(':')[0];
 
-  return PLATFORM_DOMAINS.some(domain =>
-    host === domain || host.endsWith(`.${domain}`)
-  );
+  return PLATFORM_DOMAINS.some(domain => host === domain || host.endsWith(`.${domain}`));
 }
 
 /**

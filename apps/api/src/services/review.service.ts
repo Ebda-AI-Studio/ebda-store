@@ -187,11 +187,7 @@ export class ReviewService {
   /**
    * Create a review
    */
-  static async create(
-    storeId: string,
-    customerId: string | null,
-    data: CreateReviewData
-  ) {
+  static async create(storeId: string, customerId: string | null, data: CreateReviewData) {
     // Validate rating
     if (data.rating < 1 || data.rating > 5) {
       throw new AppError(400, 'VALIDATION_ERROR', 'Rating must be between 1 and 5');

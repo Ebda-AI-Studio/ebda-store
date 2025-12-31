@@ -58,9 +58,7 @@ export class HesabePaymentProvider implements IPaymentProvider {
   initialize(config: PaymentProviderConfig): void {
     this.config = {
       ...config,
-      baseUrl: config.isTestMode
-        ? 'https://sandbox.hesabe.com'
-        : 'https://api.hesabe.com',
+      baseUrl: config.isTestMode ? 'https://sandbox.hesabe.com' : 'https://api.hesabe.com',
     };
 
     // Parse secret key for IV and encryption key
@@ -108,13 +106,13 @@ export class HesabePaymentProvider implements IPaymentProvider {
     const response = await fetch(`${this.config.baseUrl}${endpoint}`, {
       method,
       headers: {
-        'accessCode': this.config.apiKey,
+        accessCode: this.config.apiKey,
         'Content-Type': 'application/json',
       },
       body: encryptedData ? JSON.stringify({ data: encryptedData }) : undefined,
     });
 
-    const result = await response.json() as HesabeCheckoutResponse;
+    const result = (await response.json()) as HesabeCheckoutResponse;
 
     if (!response.ok || !result.status) {
       console.error('[HESABE ERROR]', result);
@@ -146,11 +144,7 @@ export class HesabePaymentProvider implements IPaymentProvider {
       variable5: JSON.stringify(request.metadata || {}),
     };
 
-    const result = await this.request<HesabeDecryptedCheckout>(
-      '/checkout',
-      'POST',
-      checkoutData
-    );
+    const result = await this.request<HesabeDecryptedCheckout>('/checkout', 'POST', checkoutData);
 
     return {
       success: true,
@@ -164,11 +158,9 @@ export class HesabePaymentProvider implements IPaymentProvider {
   }
 
   async getPaymentStatus(transactionId: string): Promise<PaymentStatusResponse> {
-    const response = await this.request<HesabePaymentStatus>(
-      '/payment/status',
-      'POST',
-      { paymentId: transactionId }
-    );
+    const response = await this.request<HesabePaymentStatus>('/payment/status', 'POST', {
+      paymentId: transactionId,
+    });
 
     const data = response.response;
 
@@ -229,10 +221,7 @@ export class HesabePaymentProvider implements IPaymentProvider {
       .update(payloadString)
       .digest('hex');
 
-    return crypto.timingSafeEqual(
-      Buffer.from(signature),
-      Buffer.from(expectedSignature)
-    );
+    return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature));
   }
 
   parseWebhook(payload: unknown): WebhookPayload {
@@ -267,11 +256,41 @@ export class HesabePaymentProvider implements IPaymentProvider {
   async getPaymentMethods(_amount: number, _currency: Currency): Promise<AvailablePaymentMethod[]> {
     // Hesabe payment methods
     return [
-      { id: 1, code: 'knet', name: 'KNET', nameAr: 'كي نت', logo: 'https://www.hesabe.com/images/knet.png' },
-      { id: 2, code: 'visa', name: 'Visa', nameAr: 'فيزا', logo: 'https://www.hesabe.com/images/visa.png' },
-      { id: 3, code: 'mastercard', name: 'Mastercard', nameAr: 'ماستركارد', logo: 'https://www.hesabe.com/images/mastercard.png' },
-      { id: 7, code: 'apple_pay', name: 'Apple Pay', nameAr: 'آبل باي', logo: 'https://www.hesabe.com/images/applepay.png' },
-      { id: 8, code: 'samsung_pay', name: 'Samsung Pay', nameAr: 'سامسونج باي', logo: 'https://www.hesabe.com/images/samsungpay.png' },
+      {
+        id: 1,
+        code: 'knet',
+        name: 'KNET',
+        nameAr: 'كي نت',
+        logo: 'https://www.hesabe.com/images/knet.png',
+      },
+      {
+        id: 2,
+        code: 'visa',
+        name: 'Visa',
+        nameAr: 'فيزا',
+        logo: 'https://www.hesabe.com/images/visa.png',
+      },
+      {
+        id: 3,
+        code: 'mastercard',
+        name: 'Mastercard',
+        nameAr: 'ماستركارد',
+        logo: 'https://www.hesabe.com/images/mastercard.png',
+      },
+      {
+        id: 7,
+        code: 'apple_pay',
+        name: 'Apple Pay',
+        nameAr: 'آبل باي',
+        logo: 'https://www.hesabe.com/images/applepay.png',
+      },
+      {
+        id: 8,
+        code: 'samsung_pay',
+        name: 'Samsung Pay',
+        nameAr: 'سامسونج باي',
+        logo: 'https://www.hesabe.com/images/samsungpay.png',
+      },
     ];
   }
 }

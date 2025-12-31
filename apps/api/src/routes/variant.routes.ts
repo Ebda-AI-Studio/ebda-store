@@ -9,10 +9,15 @@ const router = Router();
 const createOptionSchema = z.object({
   name: z.string().min(1).max(100),
   nameAr: z.string().max(100).optional(),
-  values: z.array(z.object({
-    value: z.string().min(1).max(100),
-    valueAr: z.string().max(100).optional(),
-  })).min(1).max(50),
+  values: z
+    .array(
+      z.object({
+        value: z.string().min(1).max(100),
+        valueAr: z.string().max(100).optional(),
+      })
+    )
+    .min(1)
+    .max(50),
 });
 
 const updateOptionSchema = z.object({
@@ -55,10 +60,15 @@ const updateVariantSchema = z.object({
 });
 
 const bulkInventorySchema = z.object({
-  updates: z.array(z.object({
-    variantId: z.string().uuid(),
-    inventory: z.number().int().min(0),
-  })).min(1).max(100),
+  updates: z
+    .array(
+      z.object({
+        variantId: z.string().uuid(),
+        inventory: z.number().int().min(0),
+      })
+    )
+    .min(1)
+    .max(100),
 });
 
 const reorderSchema = z.object({

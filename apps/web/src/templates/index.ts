@@ -3,56 +3,61 @@ import type { TemplateComponents } from './types';
 
 // Lazy load templates for code splitting
 const templates: Record<TemplateId, () => Promise<TemplateComponents>> = {
-  modern: () => import('./modern').then(m => ({
-    Header: m.Header,
-    Footer: m.Footer,
-    Hero: m.Hero,
-    ProductCard: m.ProductCard,
-    ProductGrid: m.ProductGrid,
-    CategoryCard: m.CategoryCard,
-    CategoryGrid: m.CategoryGrid,
-    AnnouncementBar: m.AnnouncementBar,
-  })),
-  classic: () => import('./classic').then(m => ({
-    Header: m.Header,
-    Footer: m.Footer,
-    Hero: m.Hero,
-    ProductCard: m.ProductCard,
-    ProductGrid: m.ProductGrid,
-    CategoryCard: m.CategoryCard,
-    CategoryGrid: m.CategoryGrid,
-    AnnouncementBar: m.AnnouncementBar,
-  })),
-  minimal: () => import('./minimal').then(m => ({
-    Header: m.Header,
-    Footer: m.Footer,
-    Hero: m.Hero,
-    ProductCard: m.ProductCard,
-    ProductGrid: m.ProductGrid,
-    CategoryCard: m.CategoryCard,
-    CategoryGrid: m.CategoryGrid,
-    AnnouncementBar: m.AnnouncementBar,
-  })),
-  bold: () => import('./bold').then(m => ({
-    Header: m.Header,
-    Footer: m.Footer,
-    Hero: m.Hero,
-    ProductCard: m.ProductCard,
-    ProductGrid: m.ProductGrid,
-    CategoryCard: m.CategoryCard,
-    CategoryGrid: m.CategoryGrid,
-    AnnouncementBar: m.AnnouncementBar,
-  })),
-  elegant: () => import('./elegant').then(m => ({
-    Header: m.Header,
-    Footer: m.Footer,
-    Hero: m.Hero,
-    ProductCard: m.ProductCard,
-    ProductGrid: m.ProductGrid,
-    CategoryCard: m.CategoryCard,
-    CategoryGrid: m.CategoryGrid,
-    AnnouncementBar: m.AnnouncementBar,
-  })),
+  modern: () =>
+    import('./modern').then(m => ({
+      Header: m.Header,
+      Footer: m.Footer,
+      Hero: m.Hero,
+      ProductCard: m.ProductCard,
+      ProductGrid: m.ProductGrid,
+      CategoryCard: m.CategoryCard,
+      CategoryGrid: m.CategoryGrid,
+      AnnouncementBar: m.AnnouncementBar,
+    })),
+  classic: () =>
+    import('./classic').then(m => ({
+      Header: m.Header,
+      Footer: m.Footer,
+      Hero: m.Hero,
+      ProductCard: m.ProductCard,
+      ProductGrid: m.ProductGrid,
+      CategoryCard: m.CategoryCard,
+      CategoryGrid: m.CategoryGrid,
+      AnnouncementBar: m.AnnouncementBar,
+    })),
+  minimal: () =>
+    import('./minimal').then(m => ({
+      Header: m.Header,
+      Footer: m.Footer,
+      Hero: m.Hero,
+      ProductCard: m.ProductCard,
+      ProductGrid: m.ProductGrid,
+      CategoryCard: m.CategoryCard,
+      CategoryGrid: m.CategoryGrid,
+      AnnouncementBar: m.AnnouncementBar,
+    })),
+  bold: () =>
+    import('./bold').then(m => ({
+      Header: m.Header,
+      Footer: m.Footer,
+      Hero: m.Hero,
+      ProductCard: m.ProductCard,
+      ProductGrid: m.ProductGrid,
+      CategoryCard: m.CategoryCard,
+      CategoryGrid: m.CategoryGrid,
+      AnnouncementBar: m.AnnouncementBar,
+    })),
+  elegant: () =>
+    import('./elegant').then(m => ({
+      Header: m.Header,
+      Footer: m.Footer,
+      Hero: m.Hero,
+      ProductCard: m.ProductCard,
+      ProductGrid: m.ProductGrid,
+      CategoryCard: m.CategoryCard,
+      CategoryGrid: m.CategoryGrid,
+      AnnouncementBar: m.AnnouncementBar,
+    })),
 };
 
 /**

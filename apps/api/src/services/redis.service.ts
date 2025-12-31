@@ -84,7 +84,11 @@ class RedisService {
   // Session Management
   // ==========================================
 
-  async setSession(sessionId: string, data: Record<string, unknown>, ttlSeconds = 86400): Promise<void> {
+  async setSession(
+    sessionId: string,
+    data: Record<string, unknown>,
+    ttlSeconds = 86400
+  ): Promise<void> {
     if (!this.isAvailable()) return;
     await this.client!.setex(`session:${sessionId}`, ttlSeconds, JSON.stringify(data));
   }
@@ -149,7 +153,7 @@ class RedisService {
     multi.expire(redisKey, windowSeconds);
     const results = await multi.exec();
 
-    return results?.[0]?.[1] as number || 0;
+    return (results?.[0]?.[1] as number) || 0;
   }
 
   async getRateLimitCount(key: string): Promise<number> {

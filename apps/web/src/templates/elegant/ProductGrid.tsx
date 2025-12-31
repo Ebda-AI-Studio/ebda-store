@@ -14,11 +14,12 @@ export default function ElegantProductGrid({
 }: ProductGridProps) {
   const displayTitle = isRtl && titleAr ? titleAr : title;
 
-  const gridCols = {
-    2: 'grid-cols-1 sm:grid-cols-2',
-    3: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
-    4: 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4',
-  }[columns] || 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4';
+  const gridCols =
+    {
+      2: 'grid-cols-1 sm:grid-cols-2',
+      3: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
+      4: 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4',
+    }[columns] || 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4';
 
   return (
     <section className="py-20 md:py-28 bg-background" dir={isRtl ? 'rtl' : 'ltr'}>
@@ -37,7 +38,7 @@ export default function ElegantProductGrid({
 
         {/* Products Grid */}
         <div className={`grid ${gridCols} gap-8 md:gap-12`}>
-          {products.map((product) => (
+          {products.map(product => (
             <ProductCard
               key={product.id}
               product={product}

@@ -32,9 +32,10 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   useLayoutEffect(() => {
     document.documentElement.dir = direction;
     document.documentElement.lang = language;
-    document.body.style.fontFamily = language === 'ar'
-      ? 'var(--font-arabic), var(--font-sans), sans-serif'
-      : 'var(--font-sans), sans-serif';
+    document.body.style.fontFamily =
+      language === 'ar'
+        ? 'var(--font-arabic), var(--font-sans), sans-serif'
+        : 'var(--font-sans), sans-serif';
     localStorage.setItem('force-language', language);
   }, [language, direction]);
 
@@ -65,14 +66,14 @@ export function useLanguage() {
 // Common translations for the storefront
 export const translations = {
   // Header
-  'Products': 'المنتجات',
-  'Categories': 'الفئات',
-  'About': 'من نحن',
-  'Contact': 'اتصل بنا',
+  Products: 'المنتجات',
+  Categories: 'الفئات',
+  About: 'من نحن',
+  Contact: 'اتصل بنا',
   'Search products...': 'البحث عن المنتجات...',
   'Sign In': 'تسجيل الدخول',
-  'Cart': 'السلة',
-  'Wishlist': 'المفضلة',
+  Cart: 'السلة',
+  Wishlist: 'المفضلة',
 
   // Home Page
   'Shop Now': 'تسوق الآن',
@@ -87,24 +88,24 @@ export const translations = {
   'Buy Now': 'اشتري الآن',
   'In Stock': 'متوفر',
   'Out of Stock': 'غير متوفر',
-  'Description': 'الوصف',
-  'Reviews': 'التقييمات',
+  Description: 'الوصف',
+  Reviews: 'التقييمات',
 
   // Cart
   'Shopping Cart': 'سلة التسوق',
   'Your cart is empty': 'سلة التسوق فارغة',
   'Continue Shopping': 'متابعة التسوق',
-  'Subtotal': 'المجموع الفرعي',
-  'Shipping': 'الشحن',
-  'Free': 'مجاني',
-  'Total': 'الإجمالي',
+  Subtotal: 'المجموع الفرعي',
+  Shipping: 'الشحن',
+  Free: 'مجاني',
+  Total: 'الإجمالي',
   'Proceed to Checkout': 'المتابعة للدفع',
   'Order Summary': 'ملخص الطلب',
   'Promo Code': 'كود الخصم',
-  'Apply': 'تطبيق',
+  Apply: 'تطبيق',
 
   // Checkout
-  'Checkout': 'الدفع',
+  Checkout: 'الدفع',
   'Shipping Address': 'عنوان الشحن',
   'Payment Method': 'طريقة الدفع',
   'Place Order': 'تأكيد الطلب',
@@ -112,52 +113,52 @@ export const translations = {
   // Account
   'My Account': 'حسابي',
   'My Orders': 'طلباتي',
-  'Addresses': 'العناوين',
-  'Settings': 'الإعدادات',
-  'Logout': 'تسجيل الخروج',
+  Addresses: 'العناوين',
+  Settings: 'الإعدادات',
+  Logout: 'تسجيل الخروج',
 
   // Footer
-  'Shop': 'تسوق',
-  'Support': 'الدعم',
-  'Company': 'الشركة',
-  'FAQ': 'الأسئلة الشائعة',
+  Shop: 'تسوق',
+  Support: 'الدعم',
+  Company: 'الشركة',
+  FAQ: 'الأسئلة الشائعة',
   'Shipping Info': 'معلومات الشحن',
   'Returns & Refunds': 'المرتجعات والاستبدال',
   'Privacy Policy': 'سياسة الخصوصية',
   'Terms of Service': 'الشروط والأحكام',
   'About Us': 'من نحن',
-  'Newsletter': 'النشرة البريدية',
-  'Email': 'البريد الإلكتروني',
+  Newsletter: 'النشرة البريدية',
+  Email: 'البريد الإلكتروني',
   'We accept:': 'نقبل الدفع عبر:',
 
   // Common
-  'Home': 'الرئيسية',
+  Home: 'الرئيسية',
   'All Products': 'كل المنتجات',
-  'Filter': 'تصفية',
-  'Sort': 'ترتيب',
-  'Price': 'السعر',
+  Filter: 'تصفية',
+  Sort: 'ترتيب',
+  Price: 'السعر',
   'Low to High': 'من الأقل للأعلى',
   'High to Low': 'من الأعلى للأقل',
-  'Search': 'بحث',
+  Search: 'بحث',
   'No results found': 'لم يتم العثور على نتائج',
   'Loading...': 'جاري التحميل...',
-  'Error': 'خطأ',
-  'Success': 'تم بنجاح',
-  'KWD': 'د.ك',
+  Error: 'خطأ',
+  Success: 'تم بنجاح',
+  KWD: 'د.ك',
 
   // Shipping
   'Free delivery on orders over 20 KWD': 'توصيل مجاني للطلبات فوق 20 د.ك',
   'Same-day delivery across Kuwait': 'توصيل في نفس اليوم في جميع أنحاء الكويت',
 
   // Auth
-  'Login': 'دخول',
-  'Register': 'تسجيل',
+  Login: 'دخول',
+  Register: 'تسجيل',
   'Create Account': 'إنشاء حساب',
   'Forgot Password?': 'نسيت كلمة المرور؟',
-  'Password': 'كلمة المرور',
+  Password: 'كلمة المرور',
   'Confirm Password': 'تأكيد كلمة المرور',
   'Full Name': 'الاسم الكامل',
-  'Phone': 'الهاتف',
+  Phone: 'الهاتف',
 } as const;
 
 export type TranslationKey = keyof typeof translations;

@@ -75,7 +75,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       setNotifications(prev => [newNotification, ...prev].slice(0, 50)); // Keep last 50
     });
 
-    socketRef.current.on('connect_error', (error) => {
+    socketRef.current.on('connect_error', error => {
       console.error('Socket connection error:', error.message);
     });
 
@@ -100,9 +100,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   }, []);
 
   const markAsRead = useCallback((id: string) => {
-    setNotifications(prev =>
-      prev.map(n => (n.id === id ? { ...n, read: true } : n))
-    );
+    setNotifications(prev => prev.map(n => (n.id === id ? { ...n, read: true } : n)));
   }, []);
 
   const markAllAsRead = useCallback(() => {

@@ -89,7 +89,8 @@ module.exports = {
       repo: 'git@github.com:forcemedia/force-website-builder.git',
       path: '/var/www/force-website-builder',
       'pre-deploy-local': '',
-      'post-deploy': 'npm install && npm run build && pm2 reload ecosystem.config.js --env production',
+      'post-deploy':
+        'npm install && npm run build && pm2 reload ecosystem.config.js --env production',
       'pre-setup': '',
       env: {
         NODE_ENV: 'production',

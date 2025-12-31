@@ -101,9 +101,7 @@ const DEMO_PRODUCTS = [
     inventory: 30,
     category: 'Smartphones',
     featured: true,
-    images: [
-      'https://images.unsplash.com/photo-1610945415295-d9bbf067e59c?w=800',
-    ],
+    images: ['https://images.unsplash.com/photo-1610945415295-d9bbf067e59c?w=800'],
   },
   // Electronics - Laptops
   {
@@ -115,9 +113,7 @@ const DEMO_PRODUCTS = [
     inventory: 10,
     category: 'Laptops',
     featured: true,
-    images: [
-      'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800',
-    ],
+    images: ['https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800'],
   },
   {
     name: 'Dell XPS 15',
@@ -128,9 +124,7 @@ const DEMO_PRODUCTS = [
     compareAtPrice: 750,
     inventory: 15,
     category: 'Laptops',
-    images: [
-      'https://images.unsplash.com/photo-1593642632559-0c6d3fc62b89?w=800',
-    ],
+    images: ['https://images.unsplash.com/photo-1593642632559-0c6d3fc62b89?w=800'],
   },
   // Electronics - Accessories
   {
@@ -142,9 +136,7 @@ const DEMO_PRODUCTS = [
     inventory: 50,
     category: 'Accessories',
     isNew: true,
-    images: [
-      'https://images.unsplash.com/photo-1588423771073-b8903fbb85b5?w=800',
-    ],
+    images: ['https://images.unsplash.com/photo-1588423771073-b8903fbb85b5?w=800'],
   },
   // Fashion - Men
   {
@@ -156,9 +148,7 @@ const DEMO_PRODUCTS = [
     compareAtPrice: 20,
     inventory: 100,
     category: 'Men',
-    images: [
-      'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=800',
-    ],
+    images: ['https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=800'],
   },
   {
     name: 'Classic Denim Jeans',
@@ -168,9 +158,7 @@ const DEMO_PRODUCTS = [
     price: 45,
     inventory: 75,
     category: 'Men',
-    images: [
-      'https://images.unsplash.com/photo-1542272604-787c3835535d?w=800',
-    ],
+    images: ['https://images.unsplash.com/photo-1542272604-787c3835535d?w=800'],
   },
   // Fashion - Women
   {
@@ -182,9 +170,7 @@ const DEMO_PRODUCTS = [
     inventory: 40,
     category: 'Women',
     featured: true,
-    images: [
-      'https://images.unsplash.com/photo-1590243735654-f1c7a9f00b2e?w=800',
-    ],
+    images: ['https://images.unsplash.com/photo-1590243735654-f1c7a9f00b2e?w=800'],
   },
   {
     name: 'Designer Handbag',
@@ -196,9 +182,7 @@ const DEMO_PRODUCTS = [
     inventory: 20,
     category: 'Women',
     isNew: true,
-    images: [
-      'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=800',
-    ],
+    images: ['https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=800'],
   },
   // Home & Garden - Furniture
   {
@@ -210,9 +194,7 @@ const DEMO_PRODUCTS = [
     inventory: 5,
     category: 'Furniture',
     featured: true,
-    images: [
-      'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=800',
-    ],
+    images: ['https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=800'],
   },
   {
     name: 'Dining Table',
@@ -222,9 +204,7 @@ const DEMO_PRODUCTS = [
     price: 350,
     inventory: 8,
     category: 'Furniture',
-    images: [
-      'https://images.unsplash.com/photo-1617806118233-18e1de247200?w=800',
-    ],
+    images: ['https://images.unsplash.com/photo-1617806118233-18e1de247200?w=800'],
   },
   // Home & Garden - Decor
   {
@@ -235,9 +215,7 @@ const DEMO_PRODUCTS = [
     price: 45,
     inventory: 30,
     category: 'Decor',
-    images: [
-      'https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=800',
-    ],
+    images: ['https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=800'],
   },
 ];
 
@@ -457,10 +435,25 @@ async function seedDemoCustomers(storeId: string) {
 
   const customers = [
     { firstName: 'Ahmed', lastName: 'Al-Sabah', email: 'ahmed@example.com', phone: '+96599001234' },
-    { firstName: 'Fatima', lastName: 'Al-Rashid', email: 'fatima@example.com', phone: '+96599002345' },
-    { firstName: 'Mohammed', lastName: 'Al-Mutawa', email: 'mohammed@example.com', phone: '+96599003456' },
+    {
+      firstName: 'Fatima',
+      lastName: 'Al-Rashid',
+      email: 'fatima@example.com',
+      phone: '+96599002345',
+    },
+    {
+      firstName: 'Mohammed',
+      lastName: 'Al-Mutawa',
+      email: 'mohammed@example.com',
+      phone: '+96599003456',
+    },
     { firstName: 'Sara', lastName: 'Al-Essa', email: 'sara@example.com', phone: '+96599004567' },
-    { firstName: 'Khalid', lastName: 'Al-Fahad', email: 'khalid@example.com', phone: '+96599005678' },
+    {
+      firstName: 'Khalid',
+      lastName: 'Al-Fahad',
+      email: 'khalid@example.com',
+      phone: '+96599005678',
+    },
   ];
 
   for (const customer of customers) {
@@ -598,7 +591,7 @@ async function main() {
 }
 
 main()
-  .catch((e) => {
+  .catch(e => {
     console.error(e);
     process.exit(1);
   })

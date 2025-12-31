@@ -77,29 +77,36 @@ function formatPrice(fils: number) {
 export default function CheckoutPage() {
   const router = useRouter();
   const { store } = useStore();
-  const { items: cartContextItems, total: cartContextTotal, itemCount: cartContextItemCount } = useCart();
+  const {
+    items: cartContextItems,
+    total: cartContextTotal,
+    itemCount: cartContextItemCount,
+  } = useCart();
   const [step, setStep] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   // Convert CartContext items to the format checkout expects
-  const cart: Cart | null = cartContextItems.length > 0 ? {
-    id: 'local-cart',
-    items: cartContextItems.map(item => ({
-      id: item.id,
-      productId: item.id,
-      quantity: item.quantity,
-      price: item.price,
-      product: {
-        id: item.id,
-        name: item.name,
-        slug: item.slug,
-        images: item.image ? [{ id: '1', url: item.image, alt: item.name }] : [],
-      },
-    })),
-    subtotal: cartContextTotal,
-    total: cartContextTotal,
-  } : null;
+  const cart: Cart | null =
+    cartContextItems.length > 0
+      ? {
+          id: 'local-cart',
+          items: cartContextItems.map(item => ({
+            id: item.id,
+            productId: item.id,
+            quantity: item.quantity,
+            price: item.price,
+            product: {
+              id: item.id,
+              name: item.name,
+              slug: item.slug,
+              images: item.image ? [{ id: '1', url: item.image, alt: item.name }] : [],
+            },
+          })),
+          subtotal: cartContextTotal,
+          total: cartContextTotal,
+        }
+      : null;
   const [, setShippingZones] = useState<ShippingZone[]>([]);
   const [paymentProviders, setPaymentProviders] = useState<PaymentProvider[]>([]);
 
@@ -371,7 +378,7 @@ export default function CheckoutPage() {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
             orderId: order.id,
@@ -396,9 +403,7 @@ export default function CheckoutPage() {
     } catch (error) {
       console.error('Checkout error:', error);
       setCheckoutError(
-        error instanceof Error
-          ? error.message
-          : 'An unexpected error occurred. Please try again.'
+        error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.'
       );
       setIsProcessing(false);
     }
@@ -433,14 +438,25 @@ export default function CheckoutPage() {
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <Link href="/" className="flex items-center gap-2">
             {store?.logo ? (
-              <Image src={store.logo} alt={store.name} width={40} height={30} className="object-contain" />
+              <Image
+                src={store.logo}
+                alt={store.name}
+                width={40}
+                height={30}
+                className="object-contain"
+              />
             ) : (
               <span className="text-xl font-bold text-orange-500">{store?.name || 'Store'}</span>
             )}
           </Link>
           <div className="flex items-center gap-2 text-sm text-gray-500">
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+              />
             </svg>
             Secure Checkout
           </div>
@@ -452,19 +468,27 @@ export default function CheckoutPage() {
         <div className="mb-8">
           <div className="flex items-center justify-center">
             <div className="flex items-center">
-              <div className={`flex h-8 w-8 items-center justify-center rounded-full ${step >= 1 ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-600'}`}>
+              <div
+                className={`flex h-8 w-8 items-center justify-center rounded-full ${step >= 1 ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-600'}`}
+              >
                 1
               </div>
-              <span className={`ml-2 text-sm font-medium ${step >= 1 ? 'text-gray-900' : 'text-gray-500'}`}>
+              <span
+                className={`ml-2 text-sm font-medium ${step >= 1 ? 'text-gray-900' : 'text-gray-500'}`}
+              >
                 Shipping
               </span>
             </div>
             <div className={`mx-4 h-0.5 w-16 ${step >= 2 ? 'bg-orange-500' : 'bg-gray-200'}`} />
             <div className="flex items-center">
-              <div className={`flex h-8 w-8 items-center justify-center rounded-full ${step >= 2 ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-600'}`}>
+              <div
+                className={`flex h-8 w-8 items-center justify-center rounded-full ${step >= 2 ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-600'}`}
+              >
                 2
               </div>
-              <span className={`ml-2 text-sm font-medium ${step >= 2 ? 'text-gray-900' : 'text-gray-500'}`}>
+              <span
+                className={`ml-2 text-sm font-medium ${step >= 2 ? 'text-gray-900' : 'text-gray-500'}`}
+              >
                 Payment
               </span>
             </div>
@@ -486,7 +510,11 @@ export default function CheckoutPage() {
                         type="email"
                         value={formData.email}
                         onChange={e => updateField('email', e.target.value)}
-                        className={formErrors.email ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
+                        className={
+                          formErrors.email
+                            ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                            : ''
+                        }
                       />
                       {formErrors.email && (
                         <p className="mt-1 text-sm text-red-500">{formErrors.email}</p>
@@ -499,7 +527,11 @@ export default function CheckoutPage() {
                           label="First name"
                           value={formData.firstName}
                           onChange={e => updateField('firstName', e.target.value)}
-                          className={formErrors.firstName ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
+                          className={
+                            formErrors.firstName
+                              ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                              : ''
+                          }
                         />
                         {formErrors.firstName && (
                           <p className="mt-1 text-sm text-red-500">{formErrors.firstName}</p>
@@ -510,7 +542,11 @@ export default function CheckoutPage() {
                           label="Last name"
                           value={formData.lastName}
                           onChange={e => updateField('lastName', e.target.value)}
-                          className={formErrors.lastName ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
+                          className={
+                            formErrors.lastName
+                              ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                              : ''
+                          }
                         />
                         {formErrors.lastName && (
                           <p className="mt-1 text-sm text-red-500">{formErrors.lastName}</p>
@@ -525,7 +561,11 @@ export default function CheckoutPage() {
                         placeholder="+965 XXXX XXXX"
                         value={formData.phone}
                         onChange={e => updateField('phone', e.target.value)}
-                        className={formErrors.phone ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
+                        className={
+                          formErrors.phone
+                            ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                            : ''
+                        }
                       />
                       {formErrors.phone && (
                         <p className="mt-1 text-sm text-red-500">{formErrors.phone}</p>
@@ -541,7 +581,11 @@ export default function CheckoutPage() {
                           { value: '', label: 'Select area...' },
                           ...KUWAIT_AREAS.map(a => ({ value: a.en, label: `${a.en} / ${a.ar}` })),
                         ]}
-                        className={formErrors.area ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
+                        className={
+                          formErrors.area
+                            ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                            : ''
+                        }
                       />
                       {formErrors.area && (
                         <p className="mt-1 text-sm text-red-500">{formErrors.area}</p>
@@ -553,7 +597,11 @@ export default function CheckoutPage() {
                         label="Block & Street"
                         value={formData.address}
                         onChange={e => updateField('address', e.target.value)}
-                        className={formErrors.address ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
+                        className={
+                          formErrors.address
+                            ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                            : ''
+                        }
                       />
                       {formErrors.address && (
                         <p className="mt-1 text-sm text-red-500">{formErrors.address}</p>
@@ -572,7 +620,11 @@ export default function CheckoutPage() {
                         value={formData.city}
                         onChange={e => updateField('city', e.target.value)}
                         placeholder="e.g., Kuwait City"
-                        className={formErrors.city ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
+                        className={
+                          formErrors.city
+                            ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                            : ''
+                        }
                       />
                       {formErrors.city && (
                         <p className="mt-1 text-sm text-red-500">{formErrors.city}</p>
@@ -580,7 +632,9 @@ export default function CheckoutPage() {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Order Notes (optional)</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Order Notes (optional)
+                      </label>
                       <textarea
                         value={formData.notes}
                         onChange={e => updateField('notes', e.target.value)}
@@ -595,9 +649,7 @@ export default function CheckoutPage() {
                     <Link href="/cart" className="text-sm text-orange-500 hover:underline">
                       &larr; Return to cart
                     </Link>
-                    <Button type="submit">
-                      Continue to Payment
-                    </Button>
+                    <Button type="submit">Continue to Payment</Button>
                   </div>
                 </div>
               )}
@@ -608,8 +660,18 @@ export default function CheckoutPage() {
                   {checkoutError && (
                     <div className="rounded-xl border border-red-200 bg-red-50 p-4">
                       <div className="flex items-start gap-3">
-                        <svg className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        <svg
+                          className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                          />
                         </svg>
                         <div className="flex-1">
                           <h3 className="text-sm font-medium text-red-800">Checkout Error</h3>
@@ -620,8 +682,18 @@ export default function CheckoutPage() {
                           onClick={() => setCheckoutError(null)}
                           className="text-red-500 hover:text-red-700"
                         >
-                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          <svg
+                            className="h-4 w-4"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M6 18L18 6M6 6l12 12"
+                            />
                           </svg>
                         </button>
                       </div>
@@ -641,10 +713,15 @@ export default function CheckoutPage() {
                       </button>
                     </div>
                     <p className="mt-2 text-sm text-gray-600">
-                      {formData.firstName} {formData.lastName}<br />
-                      {formData.address}{formData.apartment && `, ${formData.apartment}`}<br />
-                      {formData.area}, {formData.city}<br />
-                      {formData.phone}<br />
+                      {formData.firstName} {formData.lastName}
+                      <br />
+                      {formData.address}
+                      {formData.apartment && `, ${formData.apartment}`}
+                      <br />
+                      {formData.area}, {formData.city}
+                      <br />
+                      {formData.phone}
+                      <br />
                       {formData.email}
                     </p>
                   </div>
@@ -652,15 +729,23 @@ export default function CheckoutPage() {
                   {/* Payment Methods */}
                   <div className="rounded-xl border bg-white p-6 shadow-sm">
                     <h2 className="text-lg font-semibold text-gray-900">Payment Method</h2>
-                    <p className="mt-1 text-sm text-gray-500">Select your preferred payment method</p>
+                    <p className="mt-1 text-sm text-gray-500">
+                      Select your preferred payment method
+                    </p>
 
                     <div className="mt-6 space-y-3">
                       {/* Render payment providers dynamically */}
-                      {(paymentProviders.length > 0 ? paymentProviders : DEFAULT_PAYMENT_PROVIDERS).map((provider) => {
+                      {(paymentProviders.length > 0
+                        ? paymentProviders
+                        : DEFAULT_PAYMENT_PROVIDERS
+                      ).map(provider => {
                         // Get display info - use API data or fallback to defaults
-                        const defaultInfo = DEFAULT_PAYMENT_PROVIDERS.find(p => p.id === provider.id);
+                        const defaultInfo = DEFAULT_PAYMENT_PROVIDERS.find(
+                          p => p.id === provider.id
+                        );
                         const displayName = provider.name || defaultInfo?.name || provider.id;
-                        const displayDescription = provider.description || defaultInfo?.description || '';
+                        const displayDescription =
+                          provider.description || defaultInfo?.description || '';
 
                         return (
                           <label
@@ -713,8 +798,17 @@ export default function CheckoutPage() {
                     >
                       &larr; Return to shipping
                     </button>
-                    <Button type="submit" size="lg" isLoading={isProcessing} disabled={!selectedProvider}>
-                      {isProcessing ? 'Processing...' : selectedProvider === 'cod' ? 'Place Order' : `Pay ${formatPrice(total)}`}
+                    <Button
+                      type="submit"
+                      size="lg"
+                      isLoading={isProcessing}
+                      disabled={!selectedProvider}
+                    >
+                      {isProcessing
+                        ? 'Processing...'
+                        : selectedProvider === 'cod'
+                          ? 'Place Order'
+                          : `Pay ${formatPrice(total)}`}
                     </Button>
                   </div>
                 </div>
@@ -740,8 +834,18 @@ export default function CheckoutPage() {
                         />
                       ) : (
                         <div className="flex h-full items-center justify-center">
-                          <svg className="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                          <svg
+                            className="h-6 w-6 text-gray-400"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={1.5}
+                              d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                            />
                           </svg>
                         </div>
                       )}
@@ -764,16 +868,30 @@ export default function CheckoutPage() {
                 {appliedCoupon ? (
                   <div className="flex items-center justify-between bg-green-50 p-3 rounded-lg">
                     <div>
-                      <span className="text-sm font-medium text-green-700">{appliedCoupon.code}</span>
+                      <span className="text-sm font-medium text-green-700">
+                        {appliedCoupon.code}
+                      </span>
                       <span className="text-sm text-green-600 ml-2">
-                        {appliedCoupon.type === 'percentage' ? `${appliedCoupon.value}% off` :
-                         appliedCoupon.type === 'free_shipping' ? 'Free shipping' :
-                         `${formatPrice(appliedCoupon.value)} off`}
+                        {appliedCoupon.type === 'percentage'
+                          ? `${appliedCoupon.value}% off`
+                          : appliedCoupon.type === 'free_shipping'
+                            ? 'Free shipping'
+                            : `${formatPrice(appliedCoupon.value)} off`}
                       </span>
                     </div>
                     <button onClick={removeCoupon} className="text-green-600 hover:text-green-800">
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      <svg
+                        className="h-4 w-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
                       </svg>
                     </button>
                   </div>

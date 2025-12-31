@@ -6,10 +6,34 @@ import { Header, Footer } from '../components';
 
 export default function HomePage() {
   const categories = [
-    { name: 'Electronics', nameAr: 'إلكترونيات', count: 156, color: 'from-blue-500 to-blue-600', icon: '📱' },
-    { name: 'Fashion', nameAr: 'أزياء', count: 342, color: 'from-pink-500 to-rose-600', icon: '👗' },
-    { name: 'Home & Living', nameAr: 'المنزل', count: 89, color: 'from-amber-500 to-orange-600', icon: '🏠' },
-    { name: 'Beauty', nameAr: 'الجمال', count: 124, color: 'from-purple-500 to-violet-600', icon: '💄' },
+    {
+      name: 'Electronics',
+      nameAr: 'إلكترونيات',
+      count: 156,
+      color: 'from-blue-500 to-blue-600',
+      icon: '📱',
+    },
+    {
+      name: 'Fashion',
+      nameAr: 'أزياء',
+      count: 342,
+      color: 'from-pink-500 to-rose-600',
+      icon: '👗',
+    },
+    {
+      name: 'Home & Living',
+      nameAr: 'المنزل',
+      count: 89,
+      color: 'from-amber-500 to-orange-600',
+      icon: '🏠',
+    },
+    {
+      name: 'Beauty',
+      nameAr: 'الجمال',
+      count: 124,
+      color: 'from-purple-500 to-violet-600',
+      icon: '💄',
+    },
   ];
 
   const features = [
@@ -26,7 +50,12 @@ export default function HomePage() {
     {
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={1.5}
+            d="M13 10V3L4 14h7v7l9-11h-7z"
+          />
         </svg>
       ),
       title: 'Fast Delivery',
@@ -36,7 +65,12 @@ export default function HomePage() {
     {
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={1.5}
+            d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+          />
         </svg>
       ),
       title: 'Secure Payment',
@@ -46,7 +80,12 @@ export default function HomePage() {
     {
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={1.5}
+            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+          />
         </svg>
       ),
       title: 'Easy Returns',
@@ -80,14 +119,19 @@ export default function HomePage() {
                 </span>
               </h1>
               <p className="mx-auto mt-6 max-w-xl text-lg text-muted-foreground lg:mx-0">
-                Discover Kuwait&apos;s premier online shopping destination. Premium products,
-                fast delivery, and secure payments with KNET and local payment providers.
+                Discover Kuwait&apos;s premier online shopping destination. Premium products, fast
+                delivery, and secure payments with KNET and local payment providers.
               </p>
               <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:justify-center lg:justify-start">
                 <Link href="/products">
                   <Button size="lg" className="w-full gap-2 shadow-lg shadow-primary/25 sm:w-auto">
                     <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
+                      />
                     </svg>
                     Shop Now
                   </Button>
@@ -96,7 +140,12 @@ export default function HomePage() {
                   <Button variant="outline" size="lg" className="w-full gap-2 sm:w-auto">
                     Browse Categories
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 5l7 7-7 7"
+                      />
                     </svg>
                   </Button>
                 </Link>
@@ -106,19 +155,31 @@ export default function HomePage() {
               <div className="mt-10 flex flex-wrap items-center justify-center gap-6 lg:justify-start">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <svg className="h-5 w-5 text-emerald-500" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    <path
+                      fillRule="evenodd"
+                      d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                      clipRule="evenodd"
+                    />
                   </svg>
                   Free Shipping
                 </div>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <svg className="h-5 w-5 text-emerald-500" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    <path
+                      fillRule="evenodd"
+                      d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                      clipRule="evenodd"
+                    />
                   </svg>
                   Secure Checkout
                 </div>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <svg className="h-5 w-5 text-emerald-500" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    <path
+                      fillRule="evenodd"
+                      d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                      clipRule="evenodd"
+                    />
                   </svg>
                   24/7 Support
                 </div>
@@ -134,11 +195,23 @@ export default function HomePage() {
                     <div className="flex h-full items-center justify-center">
                       <div className="text-center">
                         <div className="mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-full bg-primary/20">
-                          <svg className="h-12 w-12 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                          <svg
+                            className="h-12 w-12 text-primary"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={1.5}
+                              d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                            />
                           </svg>
                         </div>
-                        <span className="text-lg font-medium text-muted-foreground">Featured Products</span>
+                        <span className="text-lg font-medium text-muted-foreground">
+                          Featured Products
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -193,13 +266,16 @@ export default function HomePage() {
               <h2 className="text-2xl font-bold text-foreground lg:text-3xl">Shop by Category</h2>
               <p className="mt-2 text-muted-foreground">Find what you&apos;re looking for</p>
             </div>
-            <Link href="/categories" className="hidden text-sm font-medium text-primary hover:text-primary/80 sm:block">
+            <Link
+              href="/categories"
+              className="hidden text-sm font-medium text-primary hover:text-primary/80 sm:block"
+            >
               View all categories →
             </Link>
           </div>
 
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 stagger-animation">
-            {categories.map((category) => (
+            {categories.map(category => (
               <Link
                 key={category.name}
                 href={`/products?category=${category.name.toLowerCase()}`}
@@ -228,26 +304,41 @@ export default function HomePage() {
               <h2 className="text-2xl font-bold text-foreground lg:text-3xl">Featured Products</h2>
               <p className="mt-2 text-muted-foreground">Check out our latest arrivals</p>
             </div>
-            <Link href="/products" className="text-sm font-medium text-primary hover:text-primary/80">
+            <Link
+              href="/products"
+              className="text-sm font-medium text-primary hover:text-primary/80"
+            >
               View all products →
             </Link>
           </div>
 
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 stagger-animation">
-            {[1, 2, 3, 4].map((i) => (
+            {[1, 2, 3, 4].map(i => (
               <div key={i} className="product-card group">
                 {/* Product Badge */}
                 {i === 1 && <span className="product-badge product-badge-new">New</span>}
                 {i === 2 && <span className="product-badge product-badge-sale">-20%</span>}
-                {i === 3 && <span className="product-badge product-badge-bestseller">Bestseller</span>}
+                {i === 3 && (
+                  <span className="product-badge product-badge-bestseller">Bestseller</span>
+                )}
 
                 {/* Product Image */}
                 <div className="aspect-square overflow-hidden bg-gradient-to-br from-orange-50 to-orange-100">
                   <div className="product-image flex h-full items-center justify-center">
                     <div className="text-center">
                       <div className="mx-auto mb-2 flex h-16 w-16 items-center justify-center rounded-full bg-primary/20">
-                        <svg className="h-8 w-8 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                        <svg
+                          className="h-8 w-8 text-primary"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={1.5}
+                            d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                          />
                         </svg>
                       </div>
                       <span className="text-sm text-muted-foreground">Product {i}</span>
@@ -259,7 +350,7 @@ export default function HomePage() {
                 <div className="p-4">
                   {/* Rating */}
                   <div className="mb-2 flex items-center gap-1">
-                    {[1, 2, 3, 4, 5].map((star) => (
+                    {[1, 2, 3, 4, 5].map(star => (
                       <svg
                         key={star}
                         className={`rating-star ${star <= 4 ? 'rating-star-filled' : 'rating-star-empty'}`}
@@ -281,7 +372,9 @@ export default function HomePage() {
 
                   <div className="mt-4 flex items-center justify-between">
                     <div>
-                      <span className="text-lg font-bold text-primary">{(i * 5.500).toFixed(3)} KD</span>
+                      <span className="text-lg font-bold text-primary">
+                        {(i * 5.5).toFixed(3)} KD
+                      </span>
                       {i === 2 && (
                         <span className="ml-2 text-sm text-muted-foreground line-through">
                           6.875 KD
@@ -289,8 +382,18 @@ export default function HomePage() {
                       )}
                     </div>
                     <button className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-white shadow-md transition-all hover:scale-105 hover:shadow-lg">
-                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      <svg
+                        className="h-5 w-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 4v16m8-8H4"
+                        />
                       </svg>
                     </button>
                   </div>
@@ -307,8 +410,8 @@ export default function HomePage() {
           <div className="mx-auto max-w-2xl">
             <h2 className="text-3xl font-bold text-white lg:text-4xl">Ready to Start Shopping?</h2>
             <p className="mx-auto mt-4 max-w-xl text-lg text-orange-100">
-              Join thousands of satisfied customers and discover our amazing products.
-              Subscribe to our newsletter for exclusive deals.
+              Join thousands of satisfied customers and discover our amazing products. Subscribe to
+              our newsletter for exclusive deals.
             </p>
 
             <form className="newsletter-form mt-8">
@@ -317,7 +420,11 @@ export default function HomePage() {
                 placeholder="Enter your email address"
                 className="newsletter-input"
               />
-              <Button size="lg" variant="secondary" className="bg-white text-primary hover:bg-orange-50 shadow-lg">
+              <Button
+                size="lg"
+                variant="secondary"
+                className="bg-white text-primary hover:bg-orange-50 shadow-lg"
+              >
                 Subscribe
               </Button>
             </form>
@@ -342,8 +449,18 @@ export default function HomePage() {
           <div className="mt-12 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
             <div className="text-center">
               <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-100">
-                <svg className="h-8 w-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <svg
+                  className="h-8 w-8 text-blue-600"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
                 </svg>
               </div>
               <h3 className="text-lg font-semibold text-foreground">Best Prices</h3>
@@ -354,8 +471,18 @@ export default function HomePage() {
 
             <div className="text-center">
               <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-100">
-                <svg className="h-8 w-8 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                <svg
+                  className="h-8 w-8 text-emerald-600"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                  />
                 </svg>
               </div>
               <h3 className="text-lg font-semibold text-foreground">100% Authentic</h3>
@@ -366,8 +493,18 @@ export default function HomePage() {
 
             <div className="text-center sm:col-span-2 lg:col-span-1">
               <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-purple-100">
-                <svg className="h-8 w-8 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" />
+                <svg
+                  className="h-8 w-8 text-purple-600"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z"
+                  />
                 </svg>
               </div>
               <h3 className="text-lg font-semibold text-foreground">24/7 Support</h3>

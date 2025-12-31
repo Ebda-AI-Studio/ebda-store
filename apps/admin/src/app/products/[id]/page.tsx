@@ -126,7 +126,11 @@ export default function ProductDetailPage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'active':
-        return <Badge variant="default" className="bg-green-100 text-green-700">Active</Badge>;
+        return (
+          <Badge variant="default" className="bg-green-100 text-green-700">
+            Active
+          </Badge>
+        );
       case 'draft':
         return <Badge variant="secondary">Draft</Badge>;
       case 'archived':
@@ -150,11 +154,23 @@ export default function ProductDetailPage() {
     return (
       <AdminLayout title="Product Not Found" subtitle="">
         <div className="rounded-xl border bg-white p-8 text-center">
-          <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+          <svg
+            className="mx-auto h-12 w-12 text-gray-400"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.5}
+              d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+            />
           </svg>
           <h3 className="mt-4 text-lg font-medium text-gray-900">{error || 'Product not found'}</h3>
-          <p className="mt-2 text-sm text-gray-500">The product you&apos;re looking for doesn&apos;t exist or has been removed.</p>
+          <p className="mt-2 text-sm text-gray-500">
+            The product you&apos;re looking for doesn&apos;t exist or has been removed.
+          </p>
           <Link href="/products">
             <Button className="mt-6">Back to Products</Button>
           </Link>
@@ -172,14 +188,24 @@ export default function ProductDetailPage() {
           <Link href={`/stores/${product.storeId}/products/${product.id}/variants`}>
             <Button variant="outline" size="sm">
               <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 6h16M4 10h16M4 14h16M4 18h16"
+                />
               </svg>
               Manage Variants
             </Button>
           </Link>
           <Button variant="destructive" size="sm" onClick={() => setIsDeleteModalOpen(true)}>
             <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+              />
             </svg>
             Delete
           </Button>
@@ -201,7 +227,9 @@ export default function ProductDetailPage() {
               {product.nameAr && (
                 <div>
                   <label className="text-sm font-medium text-gray-500">Name (Arabic)</label>
-                  <p className="mt-1 text-gray-900 font-arabic" dir="rtl">{product.nameAr}</p>
+                  <p className="mt-1 text-gray-900 font-arabic" dir="rtl">
+                    {product.nameAr}
+                  </p>
                 </div>
               )}
               <div>
@@ -229,12 +257,16 @@ export default function ProductDetailPage() {
             <div className="grid gap-4 sm:grid-cols-3">
               <div>
                 <label className="text-sm font-medium text-gray-500">Price</label>
-                <p className="mt-1 text-2xl font-bold text-gray-900">{formatPrice(product.price)}</p>
+                <p className="mt-1 text-2xl font-bold text-gray-900">
+                  {formatPrice(product.price)}
+                </p>
               </div>
               {product.compareAtPrice && (
                 <div>
                   <label className="text-sm font-medium text-gray-500">Compare at Price</label>
-                  <p className="mt-1 text-lg text-gray-500 line-through">{formatPrice(product.compareAtPrice)}</p>
+                  <p className="mt-1 text-lg text-gray-500 line-through">
+                    {formatPrice(product.compareAtPrice)}
+                  </p>
                 </div>
               )}
               {product.costPrice && (
@@ -261,11 +293,15 @@ export default function ProductDetailPage() {
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-500">Stock</label>
-                <p className={`mt-1 text-lg font-semibold ${
-                  product.inventory === 0 ? 'text-red-600' :
-                  product.inventory <= product.lowStockThreshold ? 'text-yellow-600' :
-                  'text-green-600'
-                }`}>
+                <p
+                  className={`mt-1 text-lg font-semibold ${
+                    product.inventory === 0
+                      ? 'text-red-600'
+                      : product.inventory <= product.lowStockThreshold
+                        ? 'text-yellow-600'
+                        : 'text-green-600'
+                  }`}
+                >
                   {product.inventory} in stock
                 </p>
               </div>
@@ -277,8 +313,11 @@ export default function ProductDetailPage() {
             <div className="rounded-xl border bg-white p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Images</h2>
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                {product.images.map((image) => (
-                  <div key={image.id} className="aspect-square rounded-lg overflow-hidden border bg-gray-50">
+                {product.images.map(image => (
+                  <div
+                    key={image.id}
+                    className="aspect-square rounded-lg overflow-hidden border bg-gray-50"
+                  >
                     <img
                       src={image.url}
                       alt={image.alt || product.name}
@@ -296,7 +335,10 @@ export default function ProductDetailPage() {
           {/* Store Info */}
           <div className="rounded-xl border bg-white p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Store</h2>
-            <Link href={`/stores/${product.store.id}`} className="flex items-center gap-3 hover:bg-gray-50 -mx-2 px-2 py-2 rounded-lg transition">
+            <Link
+              href={`/stores/${product.store.id}`}
+              className="flex items-center gap-3 hover:bg-gray-50 -mx-2 px-2 py-2 rounded-lg transition"
+            >
               <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-primary to-orange-400 flex items-center justify-center text-white font-bold">
                 {product.store.name.charAt(0)}
               </div>
@@ -312,7 +354,7 @@ export default function ProductDetailPage() {
             <div className="rounded-xl border bg-white p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Categories</h2>
               <div className="flex flex-wrap gap-2">
-                {product.categories.map((category) => (
+                {product.categories.map(category => (
                   <Badge key={category.id} variant="secondary">
                     {category.name}
                   </Badge>
@@ -326,7 +368,7 @@ export default function ProductDetailPage() {
             <div className="rounded-xl border bg-white p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Tags</h2>
               <div className="flex flex-wrap gap-2">
-                {product.tags.map((tag) => (
+                {product.tags.map(tag => (
                   <Badge key={tag} variant="outline">
                     {tag}
                   </Badge>
@@ -402,7 +444,8 @@ export default function ProductDetailPage() {
         title="Delete Product"
       >
         <p className="text-sm text-gray-600">
-          Are you sure you want to delete <strong>{product.name}</strong>? This action cannot be undone.
+          Are you sure you want to delete <strong>{product.name}</strong>? This action cannot be
+          undone.
         </p>
         <div className="mt-6 flex justify-end gap-3">
           <Button variant="outline" onClick={() => setIsDeleteModalOpen(false)} disabled={deleting}>

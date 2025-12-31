@@ -248,9 +248,10 @@ export class LoyaltyService {
           type: 'earn_signup',
           points: signupBonus,
           description: 'Welcome bonus for joining loyalty program',
-          expiresAt: settings.expirationMonths > 0
-            ? new Date(Date.now() + settings.expirationMonths * 30 * 24 * 60 * 60 * 1000)
-            : null,
+          expiresAt:
+            settings.expirationMonths > 0
+              ? new Date(Date.now() + settings.expirationMonths * 30 * 24 * 60 * 60 * 1000)
+              : null,
         },
       });
     }
@@ -344,9 +345,10 @@ export class LoyaltyService {
         type: 'earn_purchase',
         points: pointsEarned,
         description: `Points earned from order (${tierInfo.multiplier}x multiplier)`,
-        expiresAt: settings.expirationMonths > 0
-          ? new Date(Date.now() + settings.expirationMonths * 30 * 24 * 60 * 60 * 1000)
-          : null,
+        expiresAt:
+          settings.expirationMonths > 0
+            ? new Date(Date.now() + settings.expirationMonths * 30 * 24 * 60 * 60 * 1000)
+            : null,
       },
     });
 
@@ -503,9 +505,10 @@ export class LoyaltyService {
         type,
         points,
         description,
-        expiresAt: isPositive && settings.expirationMonths > 0
-          ? new Date(Date.now() + settings.expirationMonths * 30 * 24 * 60 * 60 * 1000)
-          : null,
+        expiresAt:
+          isPositive && settings.expirationMonths > 0
+            ? new Date(Date.now() + settings.expirationMonths * 30 * 24 * 60 * 60 * 1000)
+            : null,
       },
     });
 
@@ -623,10 +626,13 @@ export class LoyaltyService {
       }),
     ]);
 
-    const tierBreakdown = tierCounts.reduce((acc, { tier, _count }) => {
-      acc[tier] = _count;
-      return acc;
-    }, {} as Record<string, number>);
+    const tierBreakdown = tierCounts.reduce(
+      (acc, { tier, _count }) => {
+        acc[tier] = _count;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
 
     return {
       totalMembers,
@@ -638,7 +644,8 @@ export class LoyaltyService {
       },
       totalPointsIssued: totalPointsIssued._sum.totalEarned || 0,
       totalPointsRedeemed: totalPointsRedeemed._sum.totalRedeemed || 0,
-      outstandingPoints: (totalPointsIssued._sum.totalEarned || 0) - (totalPointsRedeemed._sum.totalRedeemed || 0),
+      outstandingPoints:
+        (totalPointsIssued._sum.totalEarned || 0) - (totalPointsRedeemed._sum.totalRedeemed || 0),
     };
   }
 
@@ -659,9 +666,7 @@ export class LoyaltyService {
       }
     }
 
-    const pointsToNext = nextTier
-      ? settings.tiers[nextTier].minPoints - totalEarned
-      : 0;
+    const pointsToNext = nextTier ? settings.tiers[nextTier].minPoints - totalEarned : 0;
 
     return {
       tier: currentTier,

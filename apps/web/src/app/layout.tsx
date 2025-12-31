@@ -36,7 +36,8 @@ export async function generateMetadata(): Promise<Metadata> {
       default: store.metaTitle || `${store.name} - Online Shopping in Kuwait`,
       template: `%s | ${store.name}`,
     },
-    description: store.metaDescription || `Shop online at ${store.name}. Free delivery on orders over 20 KWD.`,
+    description:
+      store.metaDescription || `Shop online at ${store.name}. Free delivery on orders over 20 KWD.`,
     keywords: ['e-commerce', 'online store', 'shopping', 'Kuwait', 'KWD', 'delivery', store.name],
     authors: [{ name: store.name }],
     creator: store.name,
@@ -61,26 +62,20 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default async function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
   // Fetch store data server-side
   const store = await getStore();
 
   return (
     <html lang="en" dir="ltr" suppressHydrationWarning>
-      <head>
-        {store.favicon && <link rel="icon" href={store.favicon} />}
-      </head>
-      <body className={`${plusJakarta.variable} ${ibmPlexArabic.variable} font-sans antialiased bg-background text-foreground`}>
+      <head>{store.favicon && <link rel="icon" href={store.favicon} />}</head>
+      <body
+        className={`${plusJakarta.variable} ${ibmPlexArabic.variable} font-sans antialiased bg-background text-foreground`}
+      >
         <StoreProvider initialStore={store}>
           <LanguageProvider>
             <CartProvider>
-              <ToastProvider>
-                {children}
-              </ToastProvider>
+              <ToastProvider>{children}</ToastProvider>
             </CartProvider>
           </LanguageProvider>
         </StoreProvider>

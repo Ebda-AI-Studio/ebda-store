@@ -37,10 +37,16 @@ export default function ElegantHeader({
             </span>
           </div>
           <div className="flex items-center gap-6">
-            <Link href="/contact" className="text-muted-foreground hover:text-primary transition-colors">
+            <Link
+              href="/contact"
+              className="text-muted-foreground hover:text-primary transition-colors"
+            >
               {isRtl ? 'تواصل معنا' : 'Contact'}
             </Link>
-            <Link href="/wishlist" className="text-muted-foreground hover:text-primary transition-colors">
+            <Link
+              href="/wishlist"
+              className="text-muted-foreground hover:text-primary transition-colors"
+            >
               {isRtl ? 'المفضلة' : 'Wishlist'}
             </Link>
           </div>
@@ -56,16 +62,26 @@ export default function ElegantHeader({
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               {isMenuOpen ? (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M6 18L18 6M6 6l12 12" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               ) : (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 6h16M4 12h16M4 18h16" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1}
+                  d="M4 6h16M4 12h16M4 18h16"
+                />
               )}
             </svg>
           </button>
 
           {/* Desktop Navigation - Left */}
           <nav className="hidden md:flex items-center gap-8 flex-1">
-            {navigation.slice(0, 3).map((item) => (
+            {navigation.slice(0, 3).map(item => (
               <Link
                 key={item.href}
                 href={item.href}
@@ -92,8 +108,18 @@ export default function ElegantHeader({
               className="hidden md:block text-muted-foreground hover:text-primary transition-colors"
               aria-label="Search"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                strokeWidth={1}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
               </svg>
             </button>
             <Link
@@ -101,13 +127,37 @@ export default function ElegantHeader({
               className="hidden md:block text-muted-foreground hover:text-primary transition-colors"
               aria-label="Account"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                strokeWidth={1}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                />
               </svg>
             </Link>
-            <Link href="/cart" className="relative text-muted-foreground hover:text-primary transition-colors" aria-label="Cart">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+            <Link
+              href="/cart"
+              className="relative text-muted-foreground hover:text-primary transition-colors"
+              aria-label="Cart"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                strokeWidth={1}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
+                />
               </svg>
               {cartItemCount > 0 && (
                 <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-[10px] w-4 h-4 rounded-full flex items-center justify-center">
@@ -120,7 +170,7 @@ export default function ElegantHeader({
 
         {/* Desktop Navigation - Bottom */}
         <nav className="hidden md:flex items-center justify-center gap-8 pb-4 border-b border-border/30">
-          {navigation.slice(3).map((item) => (
+          {navigation.slice(3).map(item => (
             <Link
               key={item.href}
               href={item.href}
@@ -138,7 +188,7 @@ export default function ElegantHeader({
               <input
                 type="text"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={e => setSearchQuery(e.target.value)}
                 placeholder={isRtl ? 'ما الذي تبحث عنه؟' : 'What are you looking for?'}
                 className="w-full px-0 py-3 bg-transparent border-b border-border focus:outline-none focus:border-primary text-center text-sm tracking-wide transition-colors"
                 dir={isRtl ? 'rtl' : 'ltr'}
@@ -152,7 +202,7 @@ export default function ElegantHeader({
         {isMenuOpen && (
           <nav className="md:hidden py-6 border-t border-border/30">
             <ul className="space-y-4 text-center">
-              {navigation.map((item) => (
+              {navigation.map(item => (
                 <li key={item.href}>
                   <Link
                     href={item.href}

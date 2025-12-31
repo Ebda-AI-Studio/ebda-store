@@ -14,20 +14,23 @@ export default function ElegantHero({
   ctaLink = '/products',
   isRtl = false,
 }: HeroProps) {
-  const displayTitle = isRtl && titleAr ? titleAr : title || (isRtl ? 'مجموعة حصرية' : 'Exclusive Edit');
-  const displaySubtitle = isRtl && subtitleAr ? subtitleAr : subtitle || (isRtl ? 'أناقة استثنائية' : 'Curated for the discerning');
+  const displayTitle =
+    isRtl && titleAr ? titleAr : title || (isRtl ? 'مجموعة حصرية' : 'Exclusive Edit');
+  const displaySubtitle =
+    isRtl && subtitleAr
+      ? subtitleAr
+      : subtitle || (isRtl ? 'أناقة استثنائية' : 'Curated for the discerning');
   const displayCta = isRtl && ctaTextAr ? ctaTextAr : ctaText || (isRtl ? 'استكشف' : 'Discover');
 
   return (
-    <section className="relative min-h-screen bg-background overflow-hidden" dir={isRtl ? 'rtl' : 'ltr'}>
+    <section
+      className="relative min-h-screen bg-background overflow-hidden"
+      dir={isRtl ? 'rtl' : 'ltr'}
+    >
       {/* Full-bleed image */}
       <div className="absolute inset-0">
         {image ? (
-          <img
-            src={image}
-            alt={displayTitle}
-            className="w-full h-full object-cover"
-          />
+          <img src={image} alt={displayTitle} className="w-full h-full object-cover" />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-muted via-muted/50 to-background" />
         )}
@@ -77,7 +80,12 @@ export default function ElegantHero({
               stroke="currentColor"
               viewBox="0 0 24 24"
             >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1}
+                d="M17 8l4 4m0 0l-4 4m4-4H3"
+              />
             </svg>
           </Link>
         </div>
@@ -91,7 +99,9 @@ export default function ElegantHero({
             <span>·</span>
             <span>{isRtl ? 'إرجاع سهل' : 'Easy Returns'}</span>
             <span className="hidden md:inline">·</span>
-            <span className="hidden md:inline">{isRtl ? 'خدمة متميزة' : 'White Glove Service'}</span>
+            <span className="hidden md:inline">
+              {isRtl ? 'خدمة متميزة' : 'White Glove Service'}
+            </span>
           </div>
         </div>
       </div>

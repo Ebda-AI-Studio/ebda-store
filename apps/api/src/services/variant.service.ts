@@ -302,7 +302,11 @@ export class VariantService {
 
     // Prevent deleting last value
     if (optionValue.option.values.length <= 1) {
-      throw new AppError(400, 'LAST_VALUE', 'Cannot delete the last value. Delete the option instead.');
+      throw new AppError(
+        400,
+        'LAST_VALUE',
+        'Cannot delete the last value. Delete the option instead.'
+      );
     }
 
     // Delete any variants using this value
@@ -374,10 +378,11 @@ export class VariantService {
     });
 
     const title = optionValues.map(v => v.value).join(' / ');
-    const titleAr = optionValues
-      .filter(v => v.valueAr)
-      .map(v => v.valueAr)
-      .join(' / ') || null;
+    const titleAr =
+      optionValues
+        .filter(v => v.valueAr)
+        .map(v => v.valueAr)
+        .join(' / ') || null;
 
     // Create variant
     const variant = await prisma.productVariant.create({
@@ -506,19 +511,32 @@ export class VariantService {
     // Filter out existing variants
     const existingCombinations = new Set(
       product.variants.map(v =>
-        v.options.map(o => o.valueId).sort().join(',')
+        v.options
+          .map(o => o.valueId)
+          .sort()
+          .join(',')
       )
     );
 
     const newCombinations = combinations.filter(
-      combo => !existingCombinations.has(combo.map(v => v.id).sort().join(','))
+      combo =>
+        !existingCombinations.has(
+          combo
+            .map(v => v.id)
+            .sort()
+            .join(',')
+        )
     );
 
     // Create new variants
     const created: string[] = [];
     for (const combo of newCombinations) {
       const title = combo.map(v => v.value).join(' / ');
-      const titleAr = combo.filter(v => v.valueAr).map(v => v.valueAr).join(' / ') || null;
+      const titleAr =
+        combo
+          .filter(v => v.valueAr)
+          .map(v => v.valueAr)
+          .join(' / ') || null;
 
       const variant = await prisma.productVariant.create({
         data: {

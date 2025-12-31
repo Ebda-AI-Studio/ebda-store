@@ -55,16 +55,24 @@ const actionColors: Record<string, 'default' | 'secondary' | 'destructive'> = {
 };
 
 const entityIcons: Record<string, string> = {
-  store: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4',
+  store:
+    'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4',
   user: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z',
   product: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4',
-  order: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2',
-  setting: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z',
+  order:
+    'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2',
+  setting:
+    'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z',
 };
 
 export default function AuditLogsPage() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
-  const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 20, total: 0, totalPages: 0 });
+  const [pagination, setPagination] = useState<Pagination>({
+    page: 1,
+    limit: 20,
+    total: 0,
+    totalPages: 0,
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [entityFilter, setEntityFilter] = useState<string>('all');
   const [actionFilter, setActionFilter] = useState<string>('all');
@@ -80,9 +88,12 @@ export default function AuditLogsPage() {
       if (entityFilter !== 'all') params.append('entityType', entityFilter);
       if (actionFilter !== 'all') params.append('action', actionFilter);
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/admin/audit-logs?${params}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/admin/audit-logs?${params}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
       if (response.ok) {
         const data = await response.json();
         setLogs(data.data.logs || []);
@@ -114,7 +125,12 @@ export default function AuditLogsPage() {
       actions={
         <Button variant="outline" size="sm" onClick={() => fetchLogs()}>
           <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+            />
           </svg>
           Refresh
         </Button>
@@ -124,7 +140,7 @@ export default function AuditLogsPage() {
       <div className="mb-6 flex flex-wrap gap-4">
         <select
           value={entityFilter}
-          onChange={(e) => setEntityFilter(e.target.value)}
+          onChange={e => setEntityFilter(e.target.value)}
           className="rounded-lg border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
         >
           <option value="all">All Entities</option>
@@ -137,7 +153,7 @@ export default function AuditLogsPage() {
 
         <select
           value={actionFilter}
-          onChange={(e) => setActionFilter(e.target.value)}
+          onChange={e => setActionFilter(e.target.value)}
           className="rounded-lg border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
         >
           <option value="all">All Actions</option>
@@ -164,35 +180,51 @@ export default function AuditLogsPage() {
               </div>
             ))
           ) : logs.length > 0 ? (
-            logs.map((log) => (
+            logs.map(log => (
               <div key={log.id} className="p-4">
                 <div className="flex items-start gap-4">
                   {/* Entity Icon */}
                   <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100">
-                    <svg className="h-5 w-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={entityIcons[log.entityType] || entityIcons.setting} />
+                    <svg
+                      className="h-5 w-5 text-gray-600"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1.5}
+                        d={entityIcons[log.entityType] || entityIcons.setting}
+                      />
                     </svg>
                   </div>
 
                   {/* Log Content */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <Badge variant={getActionColor(log.action)}>
-                        {log.action}
-                      </Badge>
+                      <Badge variant={getActionColor(log.action)}>{log.action}</Badge>
                       <span className="text-sm text-gray-500 capitalize">{log.entityType}</span>
                       {log.store && (
-                        <Link href={`/stores/${log.store.id}`} className="text-sm text-primary hover:underline">
+                        <Link
+                          href={`/stores/${log.store.id}`}
+                          className="text-sm text-primary hover:underline"
+                        >
                           {log.store.name}
                         </Link>
                       )}
                     </div>
                     <p className="mt-1 text-sm text-gray-900">
-                      <Link href={`/users/${log.user.id}`} className="font-medium hover:text-primary">
+                      <Link
+                        href={`/users/${log.user.id}`}
+                        className="font-medium hover:text-primary"
+                      >
                         {log.user.firstName} {log.user.lastName}
-                      </Link>
-                      {' '}{log.action.toLowerCase()} {log.entityType}
-                      {log.entityId && <span className="text-gray-500"> (ID: {log.entityId.slice(0, 8)}...)</span>}
+                      </Link>{' '}
+                      {log.action.toLowerCase()} {log.entityType}
+                      {log.entityId && (
+                        <span className="text-gray-500"> (ID: {log.entityId.slice(0, 8)}...)</span>
+                      )}
                     </p>
                     <p className="mt-1 text-xs text-gray-400">
                       {log.ipAddress} | {log.userAgent?.slice(0, 50)}...
@@ -223,8 +255,18 @@ export default function AuditLogsPage() {
             ))
           ) : (
             <div className="p-12 text-center">
-              <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              <svg
+                className="mx-auto h-12 w-12 text-gray-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1}
+                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                />
               </svg>
               <p className="mt-4 text-gray-500">No audit logs found</p>
             </div>
@@ -235,7 +277,9 @@ export default function AuditLogsPage() {
         {pagination.totalPages > 1 && (
           <div className="flex items-center justify-between border-t px-6 py-3">
             <p className="text-sm text-gray-500">
-              Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} logs
+              Showing {(pagination.page - 1) * pagination.limit + 1} to{' '}
+              {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total}{' '}
+              logs
             </p>
             <div className="flex gap-2">
               <Button

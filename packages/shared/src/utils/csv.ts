@@ -86,12 +86,7 @@ export function parseCsv<T extends Record<string, string>>(
   csvString: string,
   options: CsvParseOptions = {}
 ): { headers: string[]; rows: T[] } {
-  const {
-    delimiter = ',',
-    hasHeader = true,
-    skipEmptyLines = true,
-    trimValues = true,
-  } = options;
+  const { delimiter = ',', hasHeader = true, skipEmptyLines = true, trimValues = true } = options;
 
   const lines = csvString.split(/\r?\n/);
   const result: T[] = [];
@@ -174,11 +169,11 @@ export function generateCsv<T extends Record<string, unknown>>(
   const lines: string[] = [];
 
   if (includeHeader) {
-    lines.push(columns.map((col) => escapeCsvValue(col.header, delimiter)).join(delimiter));
+    lines.push(columns.map(col => escapeCsvValue(col.header, delimiter)).join(delimiter));
   }
 
   for (const row of data) {
-    const values = columns.map((col) => {
+    const values = columns.map(col => {
       const value = row[col.key];
       return escapeCsvValue(formatCsvValue(value), delimiter);
     });
@@ -242,7 +237,7 @@ export const PRODUCT_IMPORT_COLUMNS = [
  * Generate empty product import template
  */
 export function generateProductImportTemplate(): string {
-  const headers = PRODUCT_IMPORT_COLUMNS.map((col) => col.header);
+  const headers = PRODUCT_IMPORT_COLUMNS.map(col => col.header);
 
   // Add sample row
   const sampleRow = [
@@ -267,7 +262,7 @@ export function generateProductImportTemplate(): string {
     '0.5',
   ];
 
-  return [headers.join(','), sampleRow.map((v) => escapeCsvValue(v, ',')).join(',')].join('\n');
+  return [headers.join(','), sampleRow.map(v => escapeCsvValue(v, ',')).join(',')].join('\n');
 }
 
 /**
@@ -446,13 +441,15 @@ export function transformImportRowToProduct(row: ProductImportRow, storeId: stri
     .replace(/(^-|-$)/g, '');
 
   // Collect image URLs
-  const imageUrls = [row.imageUrl1, row.imageUrl2, row.imageUrl3, row.imageUrl4].filter(Boolean) as string[];
+  const imageUrls = [row.imageUrl1, row.imageUrl2, row.imageUrl3, row.imageUrl4].filter(
+    Boolean
+  ) as string[];
 
   // Parse tags
   const tags = row.tags
     ? row.tags
         .split(';')
-        .map((t) => t.trim())
+        .map(t => t.trim())
         .filter(Boolean)
     : [];
 
@@ -484,10 +481,26 @@ export function transformImportRowToProduct(row: ProductImportRow, storeId: stri
 
 // Generic types for browser APIs (without DOM lib dependency)
 type GenericBlob = { new (parts: unknown[], options: { type: string }): unknown };
-type GenericURL = { createObjectURL: (blob: unknown) => string; revokeObjectURL: (url: string) => void };
-type GenericElement = { setAttribute: (name: string, value: string) => void; style: { visibility: string }; click: () => void };
-type GenericDocument = { createElement: (tag: string) => GenericElement; body: { appendChild: (el: unknown) => void; removeChild: (el: unknown) => void } };
-type GenericFileReader = { onload: (() => void) | null; onerror: (() => void) | null; error: unknown; result: string | ArrayBuffer | null; readAsText: (blob: unknown) => void };
+type GenericURL = {
+  createObjectURL: (blob: unknown) => string;
+  revokeObjectURL: (url: string) => void;
+};
+type GenericElement = {
+  setAttribute: (name: string, value: string) => void;
+  style: { visibility: string };
+  click: () => void;
+};
+type GenericDocument = {
+  createElement: (tag: string) => GenericElement;
+  body: { appendChild: (el: unknown) => void; removeChild: (el: unknown) => void };
+};
+type GenericFileReader = {
+  onload: (() => void) | null;
+  onerror: (() => void) | null;
+  error: unknown;
+  result: string | ArrayBuffer | null;
+  readAsText: (blob: unknown) => void;
+};
 
 /**
  * Download CSV file in browser

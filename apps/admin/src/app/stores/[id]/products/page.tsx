@@ -178,13 +178,20 @@ export default function StoreProductsPage() {
           <Link href={`/stores/${storeId}/bulk`}>
             <Button variant="outline" size="sm">
               <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+                />
               </svg>
               Bulk Import
             </Button>
           </Link>
           <Link href={`/stores/${storeId}`}>
-            <Button variant="outline" size="sm">Back to Store</Button>
+            <Button variant="outline" size="sm">
+              Back to Store
+            </Button>
           </Link>
         </div>
       }
@@ -195,16 +202,21 @@ export default function StoreProductsPage() {
           <Input
             placeholder="Search products..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={e => setSearch(e.target.value)}
             className="w-64"
           />
-          <Button type="submit" variant="outline">Search</Button>
+          <Button type="submit" variant="outline">
+            Search
+          </Button>
         </form>
 
         <div className="flex gap-2">
           <select
             value={statusFilter}
-            onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+            onChange={e => {
+              setStatusFilter(e.target.value);
+              setPage(1);
+            }}
             className="rounded-md border border-input bg-background px-3 py-2 text-sm"
           >
             <option value="all">All Status</option>
@@ -245,7 +257,7 @@ export default function StoreProductsPage() {
                 </td>
               </tr>
             ) : (
-              products.map((product) => (
+              products.map(product => (
                 <tr key={product.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
@@ -258,8 +270,18 @@ export default function StoreProductsPage() {
                           />
                         ) : (
                           <div className="h-full w-full flex items-center justify-center text-gray-400">
-                            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            <svg
+                              className="h-5 w-5"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={1.5}
+                                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                              />
                             </svg>
                           </div>
                         )}
@@ -275,30 +297,34 @@ export default function StoreProductsPage() {
                   <td className="px-4 py-3 text-sm text-gray-500 font-mono">
                     {product.sku || '-'}
                   </td>
-                  <td className="px-4 py-3 text-sm font-medium">
-                    {formatPrice(product.price)}
-                  </td>
+                  <td className="px-4 py-3 text-sm font-medium">{formatPrice(product.price)}</td>
                   <td className="px-4 py-3">
-                    <span className={`text-sm font-medium ${
-                      product.inventory === 0 ? 'text-red-600' :
-                      product.inventory < 10 ? 'text-yellow-600' :
-                      'text-green-600'
-                    }`}>
+                    <span
+                      className={`text-sm font-medium ${
+                        product.inventory === 0
+                          ? 'text-red-600'
+                          : product.inventory < 10
+                            ? 'text-yellow-600'
+                            : 'text-green-600'
+                      }`}
+                    >
                       {product.inventory}
                     </span>
                   </td>
-                  <td className="px-4 py-3">
-                    {getStatusBadge(product.status)}
-                  </td>
+                  <td className="px-4 py-3">{getStatusBadge(product.status)}</td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-2">
                       {product.hasVariants && (
                         <Link href={`/stores/${storeId}/products/${product.id}/variants`}>
-                          <Button variant="outline" size="sm">Variants</Button>
+                          <Button variant="outline" size="sm">
+                            Variants
+                          </Button>
                         </Link>
                       )}
                       <Link href={`/products/${product.id}`}>
-                        <Button variant="outline" size="sm">View</Button>
+                        <Button variant="outline" size="sm">
+                          View
+                        </Button>
                       </Link>
                       <Button
                         variant="destructive"
@@ -323,7 +349,8 @@ export default function StoreProductsPage() {
       {pagination && pagination.totalPages > 1 && (
         <div className="mt-4 flex items-center justify-between">
           <p className="text-sm text-gray-500">
-            Showing {((page - 1) * pagination.limit) + 1} to {Math.min(page * pagination.limit, pagination.total)} of {pagination.total} products
+            Showing {(page - 1) * pagination.limit + 1} to{' '}
+            {Math.min(page * pagination.limit, pagination.total)} of {pagination.total} products
           </p>
           <div className="flex gap-2">
             <Button
@@ -353,7 +380,8 @@ export default function StoreProductsPage() {
         title="Delete Product"
       >
         <p className="text-sm text-gray-600">
-          Are you sure you want to delete <strong>{productToDelete?.name}</strong>? This action cannot be undone.
+          Are you sure you want to delete <strong>{productToDelete?.name}</strong>? This action
+          cannot be undone.
         </p>
         <div className="mt-6 flex justify-end gap-3">
           <Button variant="outline" onClick={() => setIsDeleteModalOpen(false)} disabled={deleting}>

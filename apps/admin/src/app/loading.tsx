@@ -3,10 +3,7 @@ import { AdminLayout } from '../components/AdminLayout';
 
 export default function DashboardLoading() {
   return (
-    <AdminLayout
-      title="Dashboard"
-      subtitle="Loading..."
-    >
+    <AdminLayout title="Dashboard" subtitle="Loading...">
       {/* Stats Grid Skeleton */}
       <SkeletonDashboardStats count={4} className="mb-8" />
 

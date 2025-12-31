@@ -61,9 +61,7 @@ export class TapPaymentProvider implements IPaymentProvider {
   initialize(config: PaymentProviderConfig): void {
     this.config = {
       ...config,
-      baseUrl: config.isTestMode
-        ? 'https://api.tap.company/v2'
-        : 'https://api.tap.company/v2',
+      baseUrl: config.isTestMode ? 'https://api.tap.company/v2' : 'https://api.tap.company/v2',
     };
   }
 
@@ -75,13 +73,13 @@ export class TapPaymentProvider implements IPaymentProvider {
     const response = await fetch(`${this.config.baseUrl}${endpoint}`, {
       method,
       headers: {
-        'Authorization': `Bearer ${this.config.apiKey}`,
+        Authorization: `Bearer ${this.config.apiKey}`,
         'Content-Type': 'application/json',
       },
       body: body ? JSON.stringify(body) : undefined,
     });
 
-    const data = await response.json() as { errors?: { description: string }[] };
+    const data = (await response.json()) as { errors?: { description: string }[] };
 
     if (!response.ok) {
       console.error('[TAP ERROR]', data);
@@ -114,18 +112,22 @@ export class TapPaymentProvider implements IPaymentProvider {
         first_name: request.customer.name.split(' ')[0],
         last_name: request.customer.name.split(' ').slice(1).join(' ') || '',
         email: request.customer.email,
-        phone: request.customer.phone ? {
-          country_code: '965', // Kuwait
-          number: request.customer.phone.replace(/^\+965/, ''),
-        } : undefined,
+        phone: request.customer.phone
+          ? {
+              country_code: '965', // Kuwait
+              number: request.customer.phone.replace(/^\+965/, ''),
+            }
+          : undefined,
       },
       source: { id: 'src_all' }, // Allow all payment methods
       redirect: {
         url: request.callbackUrl,
       },
-      post: request.webhookUrl ? {
-        url: request.webhookUrl,
-      } : undefined,
+      post: request.webhookUrl
+        ? {
+            url: request.webhookUrl,
+          }
+        : undefined,
     };
 
     const charge = await this.request<TapChargeResponse>('/charges', 'POST', chargeData);
@@ -202,10 +204,7 @@ export class TapPaymentProvider implements IPaymentProvider {
       .update(payloadString)
       .digest('hex');
 
-    return crypto.timingSafeEqual(
-      Buffer.from(signature),
-      Buffer.from(expectedSignature)
-    );
+    return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature));
   }
 
   parseWebhook(payload: unknown): WebhookPayload {

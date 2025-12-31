@@ -58,7 +58,6 @@ interface CustomerStats {
   }[];
 }
 
-
 export class AnalyticsService {
   /**
    * Get dashboard overview stats
@@ -74,41 +73,51 @@ export class AnalyticsService {
     const prevEndDate = new Date(startDate.getTime() - 1);
 
     // Current period stats
-    const [currentStats, prevStats, totalCustomers, totalProducts, customerCount] = await Promise.all([
-      this.getPeriodStats(storeId, startDate, endDate),
-      this.getPeriodStats(storeId, prevStartDate, prevEndDate),
-      prisma.user.count({
-        where: {
-          orders: { some: { storeId } },
-        },
-      }),
-      prisma.product.count({
-        where: { storeId, status: 'active' },
-      }),
-      prisma.user.count({
-        where: {
-          orders: {
-            some: {
-              storeId,
-              createdAt: { gte: startDate, lte: endDate },
+    const [currentStats, prevStats, totalCustomers, totalProducts, customerCount] =
+      await Promise.all([
+        this.getPeriodStats(storeId, startDate, endDate),
+        this.getPeriodStats(storeId, prevStartDate, prevEndDate),
+        prisma.user.count({
+          where: {
+            orders: { some: { storeId } },
+          },
+        }),
+        prisma.product.count({
+          where: { storeId, status: 'active' },
+        }),
+        prisma.user.count({
+          where: {
+            orders: {
+              some: {
+                storeId,
+                createdAt: { gte: startDate, lte: endDate },
+              },
             },
           },
-        },
-      }),
-    ]);
+        }),
+      ]);
 
     // Calculate changes
-    const revenueChange = prevStats.revenue > 0
-      ? ((currentStats.revenue - prevStats.revenue) / prevStats.revenue) * 100
-      : currentStats.revenue > 0 ? 100 : 0;
+    const revenueChange =
+      prevStats.revenue > 0
+        ? ((currentStats.revenue - prevStats.revenue) / prevStats.revenue) * 100
+        : currentStats.revenue > 0
+          ? 100
+          : 0;
 
-    const ordersChange = prevStats.orders > 0
-      ? ((currentStats.orders - prevStats.orders) / prevStats.orders) * 100
-      : currentStats.orders > 0 ? 100 : 0;
+    const ordersChange =
+      prevStats.orders > 0
+        ? ((currentStats.orders - prevStats.orders) / prevStats.orders) * 100
+        : currentStats.orders > 0
+          ? 100
+          : 0;
 
-    const customersChange = prevStats.customers > 0
-      ? ((customerCount - prevStats.customers) / prevStats.customers) * 100
-      : customerCount > 0 ? 100 : 0;
+    const customersChange =
+      prevStats.customers > 0
+        ? ((customerCount - prevStats.customers) / prevStats.customers) * 100
+        : customerCount > 0
+          ? 100
+          : 0;
 
     return {
       totalRevenue: currentStats.revenue,
@@ -243,7 +252,11 @@ export class AnalyticsService {
   /**
    * Get top selling products
    */
-  static async getTopProducts(storeId: string, limit = 10, dateRange?: DateRange): Promise<TopProduct[]> {
+  static async getTopProducts(
+    storeId: string,
+    limit = 10,
+    dateRange?: DateRange
+  ): Promise<TopProduct[]> {
     const now = new Date();
     const startDate = dateRange?.startDate || new Date(now.getFullYear(), now.getMonth(), 1);
     const endDate = dateRange?.endDate || now;
@@ -298,7 +311,11 @@ export class AnalyticsService {
   /**
    * Get top categories by revenue
    */
-  static async getTopCategories(storeId: string, limit = 5, dateRange?: DateRange): Promise<TopCategory[]> {
+  static async getTopCategories(
+    storeId: string,
+    limit = 5,
+    dateRange?: DateRange
+  ): Promise<TopCategory[]> {
     const now = new Date();
     const startDate = dateRange?.startDate || new Date(now.getFullYear(), now.getMonth(), 1);
     const endDate = dateRange?.endDate || now;
@@ -355,7 +372,10 @@ export class AnalyticsService {
   /**
    * Get orders by status
    */
-  static async getOrdersByStatus(storeId: string, dateRange?: DateRange): Promise<OrdersByStatus[]> {
+  static async getOrdersByStatus(
+    storeId: string,
+    dateRange?: DateRange
+  ): Promise<OrdersByStatus[]> {
     const now = new Date();
     const startDate = dateRange?.startDate || new Date(now.getFullYear(), now.getMonth(), 1);
     const endDate = dateRange?.endDate || now;

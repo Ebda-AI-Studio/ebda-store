@@ -95,102 +95,111 @@ router.get('/methods', async (req: Request, res: Response, next: NextFunction) =
  * POST /payments/create
  * Create a payment for an order
  */
-router.post('/create', authenticate, paymentLimiter, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const data = createPaymentSchema.parse(req.body);
-    const user = getUserFromRequest(req);
+router.post(
+  '/create',
+  authenticate,
+  paymentLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const data = createPaymentSchema.parse(req.body);
+      const user = getUserFromRequest(req);
 
-    // Verify the order belongs to the user
-    const storeId = await getDefaultStoreId();
-    const order = await prisma.order.findFirst({
-      where: { id: data.orderId, storeId, customerId: user.userId },
-      include: {
-        items: { include: { product: true } },
-        customer: true,
-      },
-    });
-
-    if (!order) {
-      res.status(404).json({
-        success: false,
-        error: { code: 'NOT_FOUND', message: 'Order not found' },
-      });
-      return;
-    }
-
-    // Create payment
-    const result = await PaymentService.createPayment(
-      {
-        orderId: order.id,
-        orderNumber: order.orderNumber,
-        amount: order.total,
-        currency: order.currency as Currency,
-        customer: {
-          id: user.userId,
-          name: `${order.customer.firstName} ${order.customer.lastName}`,
-          email: order.customer.email,
+      // Verify the order belongs to the user
+      const storeId = await getDefaultStoreId();
+      const order = await prisma.order.findFirst({
+        where: { id: data.orderId, storeId, customerId: user.userId },
+        include: {
+          items: { include: { product: true } },
+          customer: true,
         },
-        items: order.items.map(item => ({
-          name: item.productName,
-          quantity: item.quantity,
-          unitPrice: item.price,
-          sku: item.sku || undefined,
-        })),
-        callbackUrl: data.successUrl || `${config.webUrl}/checkout/success`,
-        errorUrl: data.errorUrl || `${config.webUrl}/checkout/error`,
-        webhookUrl: `${config.apiUrl}/webhooks/payment`,
-      },
-      data.provider
-    );
+      });
 
-    // Audit log
-    await auditLog({
-      action: 'payment.created',
-      userId: user.userId,
-      resourceType: 'payment',
-      resourceId: result.transactionId,
-      details: {
-        orderId: order.id,
-        amount: order.total,
-        provider: result.provider,
-      },
-      ip: req.ip,
-      userAgent: req.headers['user-agent'],
-    });
+      if (!order) {
+        res.status(404).json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'Order not found' },
+        });
+        return;
+      }
 
-    res.json({
-      success: true,
-      data: {
-        transactionId: result.transactionId,
-        paymentUrl: result.paymentUrl,
-        provider: result.provider,
-        paymentMethods: result.paymentMethods,
-      },
-    });
-  } catch (error) {
-    next(error);
+      // Create payment
+      const result = await PaymentService.createPayment(
+        {
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          amount: order.total,
+          currency: order.currency as Currency,
+          customer: {
+            id: user.userId,
+            name: `${order.customer.firstName} ${order.customer.lastName}`,
+            email: order.customer.email,
+          },
+          items: order.items.map(item => ({
+            name: item.productName,
+            quantity: item.quantity,
+            unitPrice: item.price,
+            sku: item.sku || undefined,
+          })),
+          callbackUrl: data.successUrl || `${config.webUrl}/checkout/success`,
+          errorUrl: data.errorUrl || `${config.webUrl}/checkout/error`,
+          webhookUrl: `${config.apiUrl}/webhooks/payment`,
+        },
+        data.provider
+      );
+
+      // Audit log
+      await auditLog({
+        action: 'payment.created',
+        userId: user.userId,
+        resourceType: 'payment',
+        resourceId: result.transactionId,
+        details: {
+          orderId: order.id,
+          amount: order.total,
+          provider: result.provider,
+        },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+
+      res.json({
+        success: true,
+        data: {
+          transactionId: result.transactionId,
+          paymentUrl: result.paymentUrl,
+          provider: result.provider,
+          paymentMethods: result.paymentMethods,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 /**
  * GET /payments/status/:transactionId
  * Get payment status
  */
-router.get('/status/:transactionId', authenticate, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { transactionId } = req.params;
-    const provider = req.query.provider as PaymentProvider | undefined;
+router.get(
+  '/status/:transactionId',
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { transactionId } = req.params;
+      const provider = req.query.provider as PaymentProvider | undefined;
 
-    const status = await PaymentService.getPaymentStatus(transactionId, provider);
+      const status = await PaymentService.getPaymentStatus(transactionId, provider);
 
-    res.json({
-      success: true,
-      data: status,
-    });
-  } catch (error) {
-    next(error);
+      res.json({
+        success: true,
+        data: status,
+      });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 /**
  * POST /payments/refund
@@ -240,77 +249,90 @@ router.post(
  * POST /payments/retry/:paymentId
  * Retry a failed payment
  */
-router.post('/retry/:paymentId', authenticate, paymentLimiter, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { paymentId } = req.params;
-    const user = getUserFromRequest(req);
-    const provider = req.body.provider as PaymentProvider | undefined;
+router.post(
+  '/retry/:paymentId',
+  authenticate,
+  paymentLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { paymentId } = req.params;
+      const user = getUserFromRequest(req);
+      const provider = req.body.provider as PaymentProvider | undefined;
 
-    // Verify the payment belongs to user's order
-    const payment = await prisma.payment.findUnique({
-      where: { id: paymentId },
-      include: { order: true },
-    });
-
-    if (!payment || payment.order.customerId !== user.userId) {
-      res.status(404).json({
-        success: false,
-        error: { code: 'NOT_FOUND', message: 'Payment not found' },
+      // Verify the payment belongs to user's order
+      const payment = await prisma.payment.findUnique({
+        where: { id: paymentId },
+        include: { order: true },
       });
-      return;
+
+      if (!payment || payment.order.customerId !== user.userId) {
+        res.status(404).json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'Payment not found' },
+        });
+        return;
+      }
+
+      const result = await PaymentService.retryPayment(paymentId, provider);
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
     }
-
-    const result = await PaymentService.retryPayment(paymentId, provider);
-
-    res.json({
-      success: true,
-      data: result,
-    });
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 /**
  * GET /payments/order/:orderId
  * Get payment for an order
  */
-router.get('/order/:orderId', authenticate, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { orderId } = req.params;
-    const user = getUserFromRequest(req);
+router.get(
+  '/order/:orderId',
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { orderId } = req.params;
+      const user = getUserFromRequest(req);
 
-    // Verify the order belongs to the user (or user is admin)
-    const storeId = await getDefaultStoreId();
-    const order = await prisma.order.findFirst({
-      where: { id: orderId, storeId },
-    });
-
-    if (!order) {
-      res.status(404).json({
-        success: false,
-        error: { code: 'NOT_FOUND', message: 'Order not found' },
+      // Verify the order belongs to the user (or user is admin)
+      const storeId = await getDefaultStoreId();
+      const order = await prisma.order.findFirst({
+        where: { id: orderId, storeId },
       });
-      return;
-    }
 
-    if (order.customerId !== user.userId && user.role !== 'admin' && user.role !== 'super_admin') {
-      res.status(403).json({
-        success: false,
-        error: { code: 'FORBIDDEN', message: 'Not authorized' },
+      if (!order) {
+        res.status(404).json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'Order not found' },
+        });
+        return;
+      }
+
+      if (
+        order.customerId !== user.userId &&
+        user.role !== 'admin' &&
+        user.role !== 'super_admin'
+      ) {
+        res.status(403).json({
+          success: false,
+          error: { code: 'FORBIDDEN', message: 'Not authorized' },
+        });
+        return;
+      }
+
+      const payment = await PaymentService.getPaymentByOrderId(orderId);
+
+      res.json({
+        success: true,
+        data: { payment },
       });
-      return;
+    } catch (error) {
+      next(error);
     }
-
-    const payment = await PaymentService.getPaymentByOrderId(orderId);
-
-    res.json({
-      success: true,
-      data: { payment },
-    });
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 export default router;

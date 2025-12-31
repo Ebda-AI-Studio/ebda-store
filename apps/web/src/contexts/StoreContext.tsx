@@ -1,13 +1,6 @@
 'use client';
 
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  useCallback,
-  type ReactNode,
-} from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react';
 import {
   type StoreTheme,
   type StoreSocialLinks,
@@ -146,7 +139,9 @@ export function StoreProvider({ children, initialStore }: StoreProviderProps) {
   // Apply favicon
   useEffect(() => {
     if (store.favicon && typeof document !== 'undefined') {
-      const link = document.querySelector("link[rel*='icon']") as HTMLLinkElement || document.createElement('link');
+      const link =
+        (document.querySelector("link[rel*='icon']") as HTMLLinkElement) ||
+        document.createElement('link');
       link.type = 'image/x-icon';
       link.rel = 'shortcut icon';
       link.href = store.favicon;

@@ -6,9 +6,7 @@ export default function ProductsLoading() {
     <AdminLayout
       title="Products"
       subtitle="Loading..."
-      actions={
-        <div className="h-9 w-32 animate-pulse rounded-lg bg-gray-200" />
-      }
+      actions={<div className="h-9 w-32 animate-pulse rounded-lg bg-gray-200" />}
     >
       {/* Filters Skeleton */}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

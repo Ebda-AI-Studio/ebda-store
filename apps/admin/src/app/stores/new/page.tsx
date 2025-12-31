@@ -50,14 +50,25 @@ const plans = [
     name: 'Professional',
     price: 79,
     description: 'For growing businesses',
-    features: ['Unlimited products', 'Full analytics suite', '24/7 support', 'Custom domain', 'API access'],
+    features: [
+      'Unlimited products',
+      'Full analytics suite',
+      '24/7 support',
+      'Custom domain',
+      'API access',
+    ],
   },
   {
     id: 'enterprise',
     name: 'Enterprise',
     price: -1,
     description: 'For large organizations',
-    features: ['Everything in Professional', 'Dedicated support', 'Custom integrations', 'SLA guarantee'],
+    features: [
+      'Everything in Professional',
+      'Dedicated support',
+      'Custom integrations',
+      'SLA guarantee',
+    ],
   },
 ];
 
@@ -158,14 +169,17 @@ export default function CreateStorePage() {
         plan: formData.plan,
         domain: formData.customDomain || undefined,
       };
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/admin/stores`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/admin/stores`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
+        }
+      );
 
       const data = await response.json();
 
@@ -193,8 +207,18 @@ export default function CreateStorePage() {
         <div className="mx-auto max-w-2xl">
           <div className="rounded-xl border bg-white p-8 shadow-sm text-center">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
-              <svg className="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              <svg
+                className="h-8 w-8 text-green-600"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 13l4 4L19 7"
+                />
               </svg>
             </div>
             <h2 className="mt-4 text-2xl font-bold text-gray-900">Store Created Successfully!</h2>
@@ -207,12 +231,16 @@ export default function CreateStorePage() {
               <dl className="mt-2 space-y-1 text-sm">
                 <div className="flex justify-between">
                   <dt className="text-gray-500">Store URL:</dt>
-                  <dd className="font-medium">{success.store.domain || `${success.store.slug}.forcemediakw.com`}</dd>
+                  <dd className="font-medium">
+                    {success.store.domain || `${success.store.slug}.forcemediakw.com`}
+                  </dd>
                 </div>
                 {success.store.domain && (
                   <div className="flex justify-between">
                     <dt className="text-gray-500">Default URL:</dt>
-                    <dd className="font-medium text-gray-400">{success.store.slug}.forcemediakw.com</dd>
+                    <dd className="font-medium text-gray-400">
+                      {success.store.slug}.forcemediakw.com
+                    </dd>
                   </div>
                 )}
                 <div className="flex justify-between">
@@ -222,7 +250,9 @@ export default function CreateStorePage() {
                 {success.owner.temporaryPassword && (
                   <div className="flex justify-between">
                     <dt className="text-gray-500">Temporary Password:</dt>
-                    <dd className="font-mono font-medium text-primary">{success.owner.temporaryPassword}</dd>
+                    <dd className="font-mono font-medium text-primary">
+                      {success.owner.temporaryPassword}
+                    </dd>
                   </div>
                 )}
               </dl>
@@ -248,7 +278,9 @@ export default function CreateStorePage() {
       subtitle="Set up a new store on the platform"
       actions={
         <Link href="/stores">
-          <Button variant="outline" size="sm">Cancel</Button>
+          <Button variant="outline" size="sm">
+            Cancel
+          </Button>
         </Link>
       }
     >
@@ -257,7 +289,10 @@ export default function CreateStorePage() {
         <nav className="mb-8">
           <ol className="flex items-center">
             {steps.map((step, index) => (
-              <li key={step.id} className={`flex items-center ${index < steps.length - 1 ? 'flex-1' : ''}`}>
+              <li
+                key={step.id}
+                className={`flex items-center ${index < steps.length - 1 ? 'flex-1' : ''}`}
+              >
                 <button
                   onClick={() => index < currentStepIndex && setCurrentStep(step.id)}
                   disabled={index > currentStepIndex}
@@ -268,28 +303,36 @@ export default function CreateStorePage() {
                       index < currentStepIndex
                         ? 'border-primary bg-primary text-white'
                         : index === currentStepIndex
-                        ? 'border-primary text-primary'
-                        : 'border-gray-300 text-gray-500'
+                          ? 'border-primary text-primary'
+                          : 'border-gray-300 text-gray-500'
                     }`}
                   >
                     {index < currentStepIndex ? (
                       <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        <path
+                          fillRule="evenodd"
+                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                          clipRule="evenodd"
+                        />
                       </svg>
                     ) : (
                       index + 1
                     )}
                   </span>
-                  <span className={`ml-3 text-sm font-medium hidden sm:block ${
-                    index <= currentStepIndex ? 'text-gray-900' : 'text-gray-500'
-                  }`}>
+                  <span
+                    className={`ml-3 text-sm font-medium hidden sm:block ${
+                      index <= currentStepIndex ? 'text-gray-900' : 'text-gray-500'
+                    }`}
+                  >
                     {step.name}
                   </span>
                 </button>
                 {index < steps.length - 1 && (
-                  <div className={`ml-4 flex-1 border-t-2 ${
-                    index < currentStepIndex ? 'border-primary' : 'border-gray-200'
-                  }`} />
+                  <div
+                    className={`ml-4 flex-1 border-t-2 ${
+                      index < currentStepIndex ? 'border-primary' : 'border-gray-200'
+                    }`}
+                  />
                 )}
               </li>
             ))}
@@ -302,7 +345,9 @@ export default function CreateStorePage() {
           {currentStep === 'store' && (
             <div className="p-6">
               <h2 className="text-lg font-semibold text-gray-900">Store Details</h2>
-              <p className="mt-1 text-sm text-gray-500">Enter the basic information for the new store</p>
+              <p className="mt-1 text-sm text-gray-500">
+                Enter the basic information for the new store
+              </p>
 
               <div className="mt-6 space-y-4">
                 <div>
@@ -312,7 +357,7 @@ export default function CreateStorePage() {
                   <Input
                     id="storeName"
                     value={formData.storeName}
-                    onChange={(e) => handleNameChange(e.target.value)}
+                    onChange={e => handleNameChange(e.target.value)}
                     placeholder="My Awesome Store"
                     className={`mt-1 ${validationErrors.storeName ? 'border-red-500' : ''}`}
                   />
@@ -325,7 +370,9 @@ export default function CreateStorePage() {
                   <label htmlFor="storeSlug" className="block text-sm font-medium text-gray-700">
                     Store URL <span className="text-red-500">*</span>
                   </label>
-                  <div className={`mt-1 flex rounded-lg border overflow-hidden ${validationErrors.storeSlug ? 'border-red-500' : ''}`}>
+                  <div
+                    className={`mt-1 flex rounded-lg border overflow-hidden ${validationErrors.storeSlug ? 'border-red-500' : ''}`}
+                  >
                     <span className="flex items-center bg-gray-50 px-3 text-sm text-gray-500 border-r">
                       https://
                     </span>
@@ -333,7 +380,7 @@ export default function CreateStorePage() {
                       id="storeSlug"
                       type="text"
                       value={formData.storeSlug}
-                      onChange={(e) => {
+                      onChange={e => {
                         setFormData(prev => ({ ...prev, storeSlug: e.target.value.toLowerCase() }));
                         setValidationErrors(prev => ({ ...prev, storeSlug: '' }));
                       }}
@@ -356,12 +403,15 @@ export default function CreateStorePage() {
                   <Input
                     id="customDomain"
                     value={formData.customDomain}
-                    onChange={(e) => setFormData(prev => ({ ...prev, customDomain: e.target.value.toLowerCase() }))}
+                    onChange={e =>
+                      setFormData(prev => ({ ...prev, customDomain: e.target.value.toLowerCase() }))
+                    }
                     placeholder="store.example.com"
                     className="mt-1"
                   />
                   <p className="mt-1 text-xs text-gray-500">
-                    Leave empty to use the default subdomain. Custom domains require DNS configuration.
+                    Leave empty to use the default subdomain. Custom domains require DNS
+                    configuration.
                   </p>
                 </div>
               </div>
@@ -382,7 +432,7 @@ export default function CreateStorePage() {
                   <Input
                     id="ownerName"
                     value={formData.ownerName}
-                    onChange={(e) => {
+                    onChange={e => {
                       setFormData(prev => ({ ...prev, ownerName: e.target.value }));
                       setValidationErrors(prev => ({ ...prev, ownerName: '' }));
                     }}
@@ -402,7 +452,7 @@ export default function CreateStorePage() {
                     id="ownerEmail"
                     type="email"
                     value={formData.ownerEmail}
-                    onChange={(e) => {
+                    onChange={e => {
                       setFormData(prev => ({ ...prev, ownerEmail: e.target.value }));
                       setValidationErrors(prev => ({ ...prev, ownerEmail: '' }));
                     }}
@@ -415,14 +465,17 @@ export default function CreateStorePage() {
                 </div>
 
                 <div>
-                  <label htmlFor="ownerPassword" className="block text-sm font-medium text-gray-700">
+                  <label
+                    htmlFor="ownerPassword"
+                    className="block text-sm font-medium text-gray-700"
+                  >
                     Temporary Password <span className="text-red-500">*</span>
                   </label>
                   <Input
                     id="ownerPassword"
                     type="password"
                     value={formData.ownerPassword}
-                    onChange={(e) => {
+                    onChange={e => {
                       setFormData(prev => ({ ...prev, ownerPassword: e.target.value }));
                       setValidationErrors(prev => ({ ...prev, ownerPassword: '' }));
                     }}
@@ -444,10 +497,12 @@ export default function CreateStorePage() {
           {currentStep === 'plan' && (
             <div className="p-6">
               <h2 className="text-lg font-semibold text-gray-900">Select a Plan</h2>
-              <p className="mt-1 text-sm text-gray-500">Choose the subscription plan for this store</p>
+              <p className="mt-1 text-sm text-gray-500">
+                Choose the subscription plan for this store
+              </p>
 
               <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                {plans.map((plan) => (
+                {plans.map(plan => (
                   <button
                     key={plan.id}
                     type="button"
@@ -458,27 +513,43 @@ export default function CreateStorePage() {
                         : 'border-gray-200 hover:border-gray-300'
                     }`}
                   >
-                    {plan.popular && (
-                      <Badge className="absolute -top-2 right-4">Popular</Badge>
-                    )}
+                    {plan.popular && <Badge className="absolute -top-2 right-4">Popular</Badge>}
                     <div className="flex items-baseline justify-between">
                       <h3 className="font-semibold text-gray-900">{plan.name}</h3>
                       {formData.plan === plan.id && (
-                        <svg className="h-5 w-5 text-primary" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        <svg
+                          className="h-5 w-5 text-primary"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                            clipRule="evenodd"
+                          />
                         </svg>
                       )}
                     </div>
                     <p className="mt-1 text-2xl font-bold text-gray-900">
                       {plan.price === -1 ? 'Custom' : plan.price === 0 ? 'Free' : `$${plan.price}`}
-                      {plan.price > 0 && <span className="text-sm font-normal text-gray-500">/month</span>}
+                      {plan.price > 0 && (
+                        <span className="text-sm font-normal text-gray-500">/month</span>
+                      )}
                     </p>
                     <p className="mt-1 text-sm text-gray-500">{plan.description}</p>
                     <ul className="mt-4 space-y-2">
-                      {plan.features.map((feature) => (
+                      {plan.features.map(feature => (
                         <li key={feature} className="flex items-center text-sm text-gray-600">
-                          <svg className="mr-2 h-4 w-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          <svg
+                            className="mr-2 h-4 w-4 text-green-500"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                              clipRule="evenodd"
+                            />
                           </svg>
                           {feature}
                         </li>
@@ -494,13 +565,18 @@ export default function CreateStorePage() {
           {currentStep === 'review' && (
             <div className="p-6">
               <h2 className="text-lg font-semibold text-gray-900">Review & Create</h2>
-              <p className="mt-1 text-sm text-gray-500">Please review the details before creating the store</p>
+              <p className="mt-1 text-sm text-gray-500">
+                Please review the details before creating the store
+              </p>
 
               <div className="mt-6 space-y-6">
                 <div className="rounded-lg bg-gray-50 p-4">
                   <h3 className="flex items-center justify-between font-medium text-gray-900">
                     Store Details
-                    <button onClick={() => setCurrentStep('store')} className="text-sm text-primary hover:underline">
+                    <button
+                      onClick={() => setCurrentStep('store')}
+                      className="text-sm text-primary hover:underline"
+                    >
                       Edit
                     </button>
                   </h3>
@@ -525,7 +601,10 @@ export default function CreateStorePage() {
                 <div className="rounded-lg bg-gray-50 p-4">
                   <h3 className="flex items-center justify-between font-medium text-gray-900">
                     Store Owner
-                    <button onClick={() => setCurrentStep('owner')} className="text-sm text-primary hover:underline">
+                    <button
+                      onClick={() => setCurrentStep('owner')}
+                      className="text-sm text-primary hover:underline"
+                    >
                       Edit
                     </button>
                   </h3>
@@ -544,26 +623,29 @@ export default function CreateStorePage() {
                 <div className="rounded-lg bg-gray-50 p-4">
                   <h3 className="flex items-center justify-between font-medium text-gray-900">
                     Selected Plan
-                    <button onClick={() => setCurrentStep('plan')} className="text-sm text-primary hover:underline">
+                    <button
+                      onClick={() => setCurrentStep('plan')}
+                      className="text-sm text-primary hover:underline"
+                    >
                       Edit
                     </button>
                   </h3>
                   <p className="mt-2 text-sm">
-                    <span className="font-medium">{plans.find(p => p.id === formData.plan)?.name}</span>
+                    <span className="font-medium">
+                      {plans.find(p => p.id === formData.plan)?.name}
+                    </span>
                     {' - '}
                     {plans.find(p => p.id === formData.plan)?.price === 0
                       ? 'Free'
                       : plans.find(p => p.id === formData.plan)?.price === -1
-                      ? 'Custom pricing'
-                      : `$${plans.find(p => p.id === formData.plan)?.price}/month`}
+                        ? 'Custom pricing'
+                        : `$${plans.find(p => p.id === formData.plan)?.price}/month`}
                   </p>
                 </div>
               </div>
 
               {error && (
-                <div className="mt-6 rounded-lg bg-red-50 p-4 text-sm text-red-600">
-                  {error}
-                </div>
+                <div className="mt-6 rounded-lg bg-red-50 p-4 text-sm text-red-600">{error}</div>
               )}
             </div>
           )}
@@ -584,8 +666,19 @@ export default function CreateStorePage() {
                 {isSubmitting ? (
                   <>
                     <svg className="mr-2 h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
                     </svg>
                     Creating Store...
                   </>
@@ -594,9 +687,7 @@ export default function CreateStorePage() {
                 )}
               </Button>
             ) : (
-              <Button onClick={nextStep}>
-                Continue
-              </Button>
+              <Button onClick={nextStep}>Continue</Button>
             )}
           </div>
         </div>

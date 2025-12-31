@@ -51,7 +51,10 @@ router.get(
       });
 
       res.setHeader('Content-Type', 'text/csv');
-      res.setHeader('Content-Disposition', `attachment; filename=products_${storeId}_${Date.now()}.csv`);
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename=products_${storeId}_${Date.now()}.csv`
+      );
       res.send(csv);
     } catch (error) {
       next(error);
@@ -175,7 +178,11 @@ router.post(
       const { productIds, status } = bulkStatusSchema.parse(req.body);
       const userId = (req as any).user?.id;
 
-      const result = await BulkService.bulkUpdateStatus(storeId, productIds, status as ProductStatus);
+      const result = await BulkService.bulkUpdateStatus(
+        storeId,
+        productIds,
+        status as ProductStatus
+      );
 
       // Audit log
       await auditLog({

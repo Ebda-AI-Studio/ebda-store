@@ -7,16 +7,18 @@ import { authLimiter, auditLog, generateCsrfToken } from '../middleware/security
 const router = Router();
 
 // Validation schemas
-const registerSchema = z.object({
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
-  name: z.string().min(1).optional(),
-  firstName: z.string().min(1).optional(),
-  lastName: z.string().optional(),
-}).refine(data => data.name || data.firstName, {
-  message: 'Name or firstName is required',
-  path: ['name'],
-});
+const registerSchema = z
+  .object({
+    email: z.string().email('Invalid email address'),
+    password: z.string().min(8, 'Password must be at least 8 characters'),
+    name: z.string().min(1).optional(),
+    firstName: z.string().min(1).optional(),
+    lastName: z.string().optional(),
+  })
+  .refine(data => data.name || data.firstName, {
+    message: 'Name or firstName is required',
+    path: ['name'],
+  });
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -245,65 +247,73 @@ router.get('/me', authenticate, async (req: Request, res: Response, next: NextFu
 });
 
 // POST /auth/forgot-password
-router.post('/forgot-password', authLimiter, async (req: Request, res: Response, _next: NextFunction) => {
-  try {
-    const { email } = req.body;
+router.post(
+  '/forgot-password',
+  authLimiter,
+  async (req: Request, res: Response, _next: NextFunction) => {
+    try {
+      const { email } = req.body;
 
-    if (!email) {
-      res.status(400).json({
-        success: false,
-        error: { code: 'VALIDATION_ERROR', message: 'Email is required' },
+      if (!email) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'VALIDATION_ERROR', message: 'Email is required' },
+        });
+        return;
+      }
+
+      // Always return success to prevent email enumeration
+      await AuthService.requestPasswordReset(email);
+
+      res.json({
+        success: true,
+        data: { message: 'If an account exists with this email, a reset link has been sent.' },
       });
-      return;
+    } catch {
+      // Still return success to prevent enumeration
+      res.json({
+        success: true,
+        data: { message: 'If an account exists with this email, a reset link has been sent.' },
+      });
     }
-
-    // Always return success to prevent email enumeration
-    await AuthService.requestPasswordReset(email);
-
-    res.json({
-      success: true,
-      data: { message: 'If an account exists with this email, a reset link has been sent.' },
-    });
-  } catch {
-    // Still return success to prevent enumeration
-    res.json({
-      success: true,
-      data: { message: 'If an account exists with this email, a reset link has been sent.' },
-    });
   }
-});
+);
 
 // POST /auth/reset-password
-router.post('/reset-password', authLimiter, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { token, password } = req.body;
+router.post(
+  '/reset-password',
+  authLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { token, password } = req.body;
 
-    if (!token || !password) {
-      res.status(400).json({
-        success: false,
-        error: { code: 'VALIDATION_ERROR', message: 'Token and password are required' },
+      if (!token || !password) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'VALIDATION_ERROR', message: 'Token and password are required' },
+        });
+        return;
+      }
+
+      if (password.length < 8) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'VALIDATION_ERROR', message: 'Password must be at least 8 characters' },
+        });
+        return;
+      }
+
+      await AuthService.resetPassword(token, password);
+
+      res.json({
+        success: true,
+        data: { message: 'Password reset successfully' },
       });
-      return;
+    } catch (error) {
+      next(error);
     }
-
-    if (password.length < 8) {
-      res.status(400).json({
-        success: false,
-        error: { code: 'VALIDATION_ERROR', message: 'Password must be at least 8 characters' },
-      });
-      return;
-    }
-
-    await AuthService.resetPassword(token, password);
-
-    res.json({
-      success: true,
-      data: { message: 'Password reset successfully' },
-    });
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 // POST /auth/verify-email
 router.post('/verify-email', async (req: Request, res: Response, next: NextFunction) => {
@@ -338,27 +348,31 @@ router.post('/verify-email', async (req: Request, res: Response, next: NextFunct
 });
 
 // POST /auth/resend-verification
-router.post('/resend-verification', authLimiter, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { email } = req.body;
+router.post(
+  '/resend-verification',
+  authLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { email } = req.body;
 
-    if (!email) {
-      res.status(400).json({
-        success: false,
-        error: { code: 'VALIDATION_ERROR', message: 'Email is required' },
+      if (!email) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'VALIDATION_ERROR', message: 'Email is required' },
+        });
+        return;
+      }
+
+      const result = await AuthService.resendVerificationEmail(email);
+
+      res.json({
+        success: true,
+        data: result,
       });
-      return;
+    } catch (error) {
+      next(error);
     }
-
-    const result = await AuthService.resendVerificationEmail(email);
-
-    res.json({
-      success: true,
-      data: result,
-    });
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 export default router;

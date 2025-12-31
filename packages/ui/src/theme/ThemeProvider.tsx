@@ -2,11 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, type ReactNode } from 'react';
 import type { StoreTheme, TemplateId } from '@force/shared';
-import {
-  DEFAULT_THEME,
-  getTemplateTheme,
-  themeToCssVars,
-} from '@force/shared';
+import { DEFAULT_THEME, getTemplateTheme, themeToCssVars } from '@force/shared';
 
 /**
  * Theme context value
@@ -143,11 +139,7 @@ export function ThemeProvider({
     [theme, templateId, isRtl, cssVars]
   );
 
-  return (
-    <ThemeContext.Provider value={contextValue}>
-      {children}
-    </ThemeContext.Provider>
-  );
+  return <ThemeContext.Provider value={contextValue}>{children}</ThemeContext.Provider>;
 }
 
 /**

@@ -215,11 +215,14 @@ export class CouponService {
   /**
    * Calculate discount for an order
    */
-  static calculateDiscount(coupon: {
-    type: string;
-    value: number;
-    maxDiscount: number | null;
-  }, orderTotal: number): number {
+  static calculateDiscount(
+    coupon: {
+      type: string;
+      value: number;
+      maxDiscount: number | null;
+    },
+    orderTotal: number
+  ): number {
     let discount = 0;
 
     if (coupon.type === 'percentage') {
