@@ -170,7 +170,7 @@ export default function MarketingPixelsPage() {
     try {
       const token = localStorage.getItem('authToken');
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/admin/stores/${storeId}`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -193,7 +193,7 @@ export default function MarketingPixelsPage() {
     try {
       const token = localStorage.getItem('authToken');
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/admin/stores/${storeId}/marketing-pixels`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/marketing-pixels`,
         {
           method: 'PUT',
           headers: {
