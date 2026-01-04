@@ -46,6 +46,9 @@ model User {
   loyaltyPoints       LoyaltyPoints[]
   loyaltyTransactions LoyaltyTransaction[]
 
+  @@index([role])
+  @@index([status])
+  @@index([createdAt])
   @@map("users")
 }
 
@@ -70,6 +73,8 @@ model RefreshToken {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
+  @@index([expiresAt])
   @@map("refresh_tokens")
 }
 
@@ -189,6 +194,10 @@ model Store {
   inventoryHistory InventoryHistory[]
   tags           Tag[]
 
+  @@index([ownerId])
+  @@index([status])
+  @@index([plan])
+  @@index([createdAt])
   @@map("stores")
 }
 
@@ -208,6 +217,9 @@ model Customer {
   store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
   @@unique([storeId, email])
+  @@index([storeId])
+  @@index([email])
+  @@index([createdAt])
   @@map("customers")
 }
 
@@ -259,6 +271,9 @@ model Category {
   products ProductCategory[]
 
   @@unique([storeId, slug])
+  @@index([storeId])
+  @@index([parentId])
+  @@index([isActive])
   @@map("categories")
 }
 
@@ -310,8 +325,12 @@ model Product {
   variants         ProductVariant[]
 
   @@unique([storeId, slug])
+  @@index([storeId])
   @@index([status])
   @@index([featured])
+  @@index([price])
+  @@index([createdAt])
+  @@index([storeId, status])  // Composite: products by store and status
   @@map("products")
 }
 
@@ -369,6 +388,7 @@ model ProductImage {
 
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
+  @@index([productId])
   @@map("product_images")
 }
 
@@ -502,6 +522,10 @@ model Cart {
   items    CartItem[]
 
   @@unique([storeId, sessionId])
+  @@index([storeId])
+  @@index([customerId])
+  @@index([sessionId])
+  @@index([updatedAt])
   @@map("carts")
 }
 
@@ -519,6 +543,8 @@ model CartItem {
   variant ProductVariant? @relation(fields: [variantId], references: [id])
 
   @@unique([cartId, productId, variantId])
+  @@index([cartId])
+  @@index([productId])
   @@map("cart_items")
 }
 
@@ -564,9 +590,13 @@ model Order {
   returns             Return[]
   loyaltyTransactions LoyaltyTransaction[]
 
+  @@index([storeId])
+  @@index([customerId])
   @@index([status])
   @@index([paymentStatus])
   @@index([createdAt])
+  @@index([storeId, customerId])  // Composite: customer orders in a store
+  @@index([storeId, status])      // Composite: orders by store and status
   @@map("orders")
 }
 
@@ -605,6 +635,8 @@ model OrderItem {
   variant     ProductVariant? @relation(fields: [variantId], references: [id])
   returnItems ReturnItem[]
 
+  @@index([orderId])
+  @@index([productId])
   @@map("order_items")
 }
 
@@ -629,8 +661,11 @@ model Payment {
 
   order Order @relation(fields: [orderId], references: [id])
 
+  @@index([orderId])
   @@index([transactionId])
   @@index([invoiceId])
+  @@index([status])
+  @@index([createdAt])
   @@map("payments")
 }
 
@@ -769,6 +804,9 @@ model PaymentConfig {
   store Store? @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
   @@unique([storeId, provider])
+  @@index([storeId])
+  @@index([provider])
+  @@index([isEnabled])
   @@map("payment_configs")
 }
 
@@ -858,6 +896,8 @@ model Address {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
+  @@index([type])
   @@map("addresses")
 }
 
@@ -879,6 +919,8 @@ model Wishlist {
   items WishlistItem[]
 
   @@unique([userId, storeId])
+  @@index([userId])
+  @@index([storeId])
   @@map("wishlists")
 }
 
@@ -1062,6 +1104,8 @@ model NewsletterSubscriber {
   store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
   @@unique([storeId, email])
+  @@index([storeId])
+  @@index([isActive])
   @@map("newsletter_subscribers")
 }
 

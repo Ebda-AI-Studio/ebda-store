@@ -14,6 +14,12 @@ export interface EmailOptions {
   replyTo?: string;
 }
 
+export interface EmailRetryOptions {
+  maxAttempts?: number;
+  delayMs?: number;
+  backoffMultiplier?: number;
+}
+
 export interface OrderEmailData {
   orderNumber: string;
   customerName: string;
@@ -52,10 +58,70 @@ export class EmailService {
       : undefined,
   });
 
+  private static readonly DEFAULT_RETRY_OPTIONS: Required<EmailRetryOptions> = {
+    maxAttempts: 3,
+    delayMs: 1000,
+    backoffMultiplier: 2,
+  };
+
   /**
-   * Send an email
+   * Sleep helper for retry delays
    */
-  static async send(options: EmailOptions): Promise<void> {
+  private static sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Send an email with automatic retry on failure
+   */
+  static async send(options: EmailOptions, retryOptions?: EmailRetryOptions): Promise<void> {
+    const { to, subject, html, text, replyTo } = options;
+    const { maxAttempts, delayMs, backoffMultiplier } = {
+      ...this.DEFAULT_RETRY_OPTIONS,
+      ...retryOptions,
+    };
+
+    let lastError: Error | null = null;
+    let currentDelay = delayMs;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        await this.transporter.sendMail({
+          from: `"${config.smtpFromName}" <${config.smtpFromEmail}>`,
+          to: Array.isArray(to) ? to.join(', ') : to,
+          subject,
+          html,
+          text: text || this.htmlToText(html),
+          replyTo,
+        });
+
+        if (config.nodeEnv === 'development') {
+          console.log(`[EMAIL] Sent to ${to}: ${subject}`);
+        }
+        return; // Success - exit the retry loop
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+
+        if (attempt < maxAttempts) {
+          console.warn(
+            `[EMAIL] Failed to send to ${to} (attempt ${attempt}/${maxAttempts}), retrying in ${currentDelay}ms...`,
+            lastError.message
+          );
+          await this.sleep(currentDelay);
+          currentDelay *= backoffMultiplier; // Exponential backoff
+        }
+      }
+    }
+
+    // All attempts failed
+    console.error(`[EMAIL ERROR] Failed to send to ${to} after ${maxAttempts} attempts`, lastError);
+    throw lastError;
+  }
+
+  /**
+   * Send an email without retry (for cases where you want immediate failure)
+   */
+  static async sendImmediate(options: EmailOptions): Promise<void> {
     const { to, subject, html, text, replyTo } = options;
 
     try {

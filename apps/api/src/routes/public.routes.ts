@@ -4,8 +4,17 @@ import { CartService } from '../services/cart.service';
 import { OrderService } from '../services/order.service';
 import { prisma } from '@force/database';
 import { authenticate } from '../middleware/auth';
+import {
+  publicLimiter,
+  storeResolveLimiter,
+  cartLimiter,
+  writeLimiter,
+} from '../middleware/security';
 
 const router = Router();
+
+// Apply public rate limiter to all routes
+router.use(publicLimiter);
 
 // GET /health - Health check endpoint
 router.get('/health', async (_req: Request, res: Response) => {
@@ -102,7 +111,7 @@ router.get('/categories', async (_req: Request, res: Response, next: NextFunctio
 
 // Cart endpoints (using default store)
 // GET /cart - Get current cart
-router.get('/cart', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/cart', cartLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const sessionId = req.headers['x-session-id'] as string;
     if (!sessionId) {
@@ -126,7 +135,7 @@ router.get('/cart', async (req: Request, res: Response, next: NextFunction) => {
 });
 
 // POST /cart/items - Add item to cart
-router.post('/cart/items', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/cart/items', cartLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const sessionId = req.headers['x-session-id'] as string;
     if (!sessionId) {
@@ -151,58 +160,66 @@ router.post('/cart/items', async (req: Request, res: Response, next: NextFunctio
 });
 
 // PUT /cart/items/:itemId - Update cart item
-router.put('/cart/items/:itemId', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const sessionId = req.headers['x-session-id'] as string;
-    if (!sessionId) {
-      res.status(400).json({
-        success: false,
-        error: { code: 'MISSING_SESSION', message: 'Session ID required' },
+router.put(
+  '/cart/items/:itemId',
+  cartLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const sessionId = req.headers['x-session-id'] as string;
+      if (!sessionId) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'MISSING_SESSION', message: 'Session ID required' },
+        });
+        return;
+      }
+
+      const { itemId } = req.params;
+      const { quantity } = req.body;
+      const storeId = await getDefaultStoreId();
+      const cart = await CartService.updateItem(storeId, sessionId, itemId, quantity);
+
+      res.json({
+        success: true,
+        data: { cart },
       });
-      return;
+    } catch (error) {
+      next(error);
     }
-
-    const { itemId } = req.params;
-    const { quantity } = req.body;
-    const storeId = await getDefaultStoreId();
-    const cart = await CartService.updateItem(storeId, sessionId, itemId, quantity);
-
-    res.json({
-      success: true,
-      data: { cart },
-    });
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 // DELETE /cart/items/:itemId - Remove item from cart
-router.delete('/cart/items/:itemId', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const sessionId = req.headers['x-session-id'] as string;
-    if (!sessionId) {
-      res.status(400).json({
-        success: false,
-        error: { code: 'MISSING_SESSION', message: 'Session ID required' },
+router.delete(
+  '/cart/items/:itemId',
+  cartLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const sessionId = req.headers['x-session-id'] as string;
+      if (!sessionId) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'MISSING_SESSION', message: 'Session ID required' },
+        });
+        return;
+      }
+
+      const { itemId } = req.params;
+      const storeId = await getDefaultStoreId();
+      const cart = await CartService.removeItem(storeId, sessionId, itemId);
+
+      res.json({
+        success: true,
+        data: { cart },
       });
-      return;
+    } catch (error) {
+      next(error);
     }
-
-    const { itemId } = req.params;
-    const storeId = await getDefaultStoreId();
-    const cart = await CartService.removeItem(storeId, sessionId, itemId);
-
-    res.json({
-      success: true,
-      data: { cart },
-    });
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 // DELETE /cart - Clear cart
-router.delete('/cart', async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/cart', cartLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const sessionId = req.headers['x-session-id'] as string;
     if (!sessionId) {
@@ -227,28 +244,33 @@ router.delete('/cart', async (req: Request, res: Response, next: NextFunction) =
 
 // Order endpoints
 // POST /orders - Create order (requires auth)
-router.post('/orders', authenticate, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const sessionId = req.headers['x-session-id'] as string;
-    if (!sessionId) {
-      res.status(400).json({
-        success: false,
-        error: { code: 'MISSING_SESSION', message: 'Session ID required' },
+router.post(
+  '/orders',
+  authenticate,
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const sessionId = req.headers['x-session-id'] as string;
+      if (!sessionId) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'MISSING_SESSION', message: 'Session ID required' },
+        });
+        return;
+      }
+
+      const storeId = await getDefaultStoreId();
+      const order = await OrderService.create(storeId, req.user!.userId, sessionId, req.body);
+
+      res.status(201).json({
+        success: true,
+        data: { order },
       });
-      return;
+    } catch (error) {
+      next(error);
     }
-
-    const storeId = await getDefaultStoreId();
-    const order = await OrderService.create(storeId, req.user!.userId, sessionId, req.body);
-
-    res.status(201).json({
-      success: true,
-      data: { order },
-    });
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 // GET /orders - Get user's orders (requires auth)
 router.get('/orders', authenticate, async (req: Request, res: Response, next: NextFunction) => {
@@ -410,66 +432,70 @@ router.get('/store', async (_req: Request, res: Response, next: NextFunction) =>
 });
 
 // GET /store/resolve - Resolve store by domain header (for multi-tenant)
-router.get('/store/resolve', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const domain = req.headers['x-store-domain'] as string;
+router.get(
+  '/store/resolve',
+  storeResolveLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const domain = req.headers['x-store-domain'] as string;
 
-    if (!domain) {
-      res.status(400).json({
-        success: false,
-        error: { code: 'MISSING_DOMAIN', message: 'x-store-domain header is required' },
+      if (!domain) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'MISSING_DOMAIN', message: 'x-store-domain header is required' },
+        });
+        return;
+      }
+
+      // Find store by domain
+      const store = await prisma.store.findFirst({
+        where: {
+          domain,
+          status: 'active',
+        },
+        select: {
+          id: true,
+          name: true,
+          nameAr: true,
+          slug: true,
+          domain: true,
+          logo: true,
+          logoAr: true,
+          favicon: true,
+          template: true,
+          theme: true,
+          socialLinks: true,
+          email: true,
+          phone: true,
+          phoneAr: true,
+          whatsapp: true,
+          address: true,
+          addressAr: true,
+          announcementBar: true,
+          metaTitle: true,
+          metaTitleAr: true,
+          metaDescription: true,
+          metaDescriptionAr: true,
+          settings: true,
+        },
       });
-      return;
-    }
 
-    // Find store by domain
-    const store = await prisma.store.findFirst({
-      where: {
-        domain,
-        status: 'active',
-      },
-      select: {
-        id: true,
-        name: true,
-        nameAr: true,
-        slug: true,
-        domain: true,
-        logo: true,
-        logoAr: true,
-        favicon: true,
-        template: true,
-        theme: true,
-        socialLinks: true,
-        email: true,
-        phone: true,
-        phoneAr: true,
-        whatsapp: true,
-        address: true,
-        addressAr: true,
-        announcementBar: true,
-        metaTitle: true,
-        metaTitleAr: true,
-        metaDescription: true,
-        metaDescriptionAr: true,
-        settings: true,
-      },
-    });
+      if (!store) {
+        res.status(404).json({
+          success: false,
+          error: { code: 'STORE_NOT_FOUND', message: `No store found for domain: ${domain}` },
+        });
+        return;
+      }
 
-    if (!store) {
-      res.status(404).json({
-        success: false,
-        error: { code: 'STORE_NOT_FOUND', message: `No store found for domain: ${domain}` },
+      res.json({
+        success: true,
+        data: { store },
       });
-      return;
+    } catch (error) {
+      next(error);
     }
-
-    res.json({
-      success: true,
-      data: { store },
-    });
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 export default router;

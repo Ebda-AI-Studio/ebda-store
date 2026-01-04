@@ -188,6 +188,47 @@ export const dailyUploadLimiter = rateLimit({
   },
 });
 
+// Public API rate limiter - protect public endpoints from abuse
+export const publicLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 60, // 60 requests per minute per IP
+  message: {
+    success: false,
+    error: { code: 'RATE_LIMITED', message: 'Too many requests, please slow down.' },
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Store resolver rate limiter - stricter for domain resolution
+export const storeResolveLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 30, // 30 requests per minute
+  message: {
+    success: false,
+    error: { code: 'RATE_LIMITED', message: 'Too many store resolution requests.' },
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Cart rate limiter - prevent cart bombing
+export const cartLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 30, // 30 cart operations per minute
+  message: {
+    success: false,
+    error: { code: 'RATE_LIMITED', message: 'Too many cart operations, please slow down.' },
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: req => {
+    // Use session ID if available, otherwise IP
+    const sessionId = req.headers['x-session-id'] as string;
+    return sessionId || req.ip || 'anonymous';
+  },
+});
+
 // ==========================================
 // Audit Logging
 // ==========================================

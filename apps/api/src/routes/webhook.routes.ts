@@ -8,6 +8,48 @@ import { auditLog } from '../middleware/security';
 const router = Router();
 
 /**
+ * Webhook signature verification middleware
+ * Ensures webhook requests are authentic from payment providers
+ */
+function verifyWebhookSignature(req: Request, res: Response, next: NextFunction): void {
+  const provider = req.params.provider as PaymentProvider;
+  const signature =
+    (req.headers['x-signature'] as string) ||
+    (req.headers['x-tap-signature'] as string) ||
+    (req.headers['x-myfatoorah-signature'] as string) ||
+    (req.headers['x-hesabe-signature'] as string) ||
+    (req.headers['x-upayments-signature'] as string) ||
+    (req.headers['tap-signature'] as string) ||
+    '';
+
+  // In production, require signature for all webhooks
+  if (config.nodeEnv === 'production' && !signature) {
+    console.warn(`[WEBHOOK] Missing signature for ${provider} webhook`);
+
+    auditLog({
+      action: 'WEBHOOK_NO_SIGNATURE',
+      resourceType: 'payment',
+      details: {
+        provider,
+        headers: Object.keys(req.headers).join(', '),
+      },
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
+    res.status(401).json({
+      success: false,
+      error: { code: 'MISSING_SIGNATURE', message: 'Webhook signature is required' },
+    });
+    return;
+  }
+
+  // Store signature for later use
+  (req as any).webhookSignature = signature;
+  next();
+}
+
+/**
  * Check if a webhook has already been processed (idempotency check)
  */
 async function checkIdempotency(
@@ -66,94 +108,92 @@ function generateIdempotencyKey(provider: PaymentProvider, payload: any): string
  * POST /webhooks/payment/:provider
  * Handle payment provider webhooks with idempotency
  */
-router.post('/payment/:provider', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const provider = req.params.provider as PaymentProvider;
-    const signature =
-      (req.headers['x-signature'] as string) ||
-      (req.headers['x-tap-signature'] as string) ||
-      (req.headers['x-myfatoorah-signature'] as string) ||
-      (req.headers['x-hesabe-signature'] as string) ||
-      (req.headers['x-upayments-signature'] as string) ||
-      '';
+router.post(
+  '/payment/:provider',
+  verifyWebhookSignature,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const provider = req.params.provider as PaymentProvider;
+      const signature = (req as any).webhookSignature || '';
 
-    // Validate provider
-    const validProviders: PaymentProvider[] = ['tap', 'myfatoorah', 'hesabe', 'upayments'];
-    if (!validProviders.includes(provider)) {
-      res.status(400).json({
-        success: false,
-        error: { code: 'INVALID_PROVIDER', message: 'Invalid payment provider' },
-      });
-      return;
-    }
+      // Validate provider
+      const validProviders: PaymentProvider[] = ['tap', 'myfatoorah', 'hesabe', 'upayments'];
+      if (!validProviders.includes(provider)) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'INVALID_PROVIDER', message: 'Invalid payment provider' },
+        });
+        return;
+      }
 
-    // Generate idempotency key from payload
-    const idempotencyKey = generateIdempotencyKey(provider, req.body);
+      // Generate idempotency key from payload
+      const idempotencyKey = generateIdempotencyKey(provider, req.body);
 
-    // Check for duplicate webhook
-    const { alreadyProcessed, order } = await checkIdempotency(idempotencyKey);
+      // Check for duplicate webhook
+      const { alreadyProcessed, order } = await checkIdempotency(idempotencyKey);
 
-    if (alreadyProcessed) {
-      console.log(`[WEBHOOK] Duplicate webhook detected: ${idempotencyKey}`);
+      if (alreadyProcessed) {
+        console.log(`[WEBHOOK] Duplicate webhook detected: ${idempotencyKey}`);
+
+        await auditLog({
+          action: 'WEBHOOK_DUPLICATE',
+          resourceType: 'payment',
+          resourceId: order?.id,
+          details: {
+            provider,
+            idempotencyKey,
+            orderNumber: order?.orderNumber,
+            previousStatus: order?.paymentStatus,
+          },
+          ip: req.ip,
+          userAgent: req.headers['user-agent'],
+        });
+
+        // Return success to prevent provider retries
+        res.json({
+          success: true,
+          data: {
+            message: 'Webhook already processed',
+            orderId: order?.id,
+            orderNumber: order?.orderNumber,
+          },
+        });
+        return;
+      }
+
+      // Handle webhook
+      const result = await PaymentService.handleWebhook(provider, req.body, signature);
+
+      // Mark as processed if we have an order
+      if (result.orderId) {
+        await markWebhookProcessed(result.orderId, idempotencyKey);
+      }
+
+      console.log(`[WEBHOOK] ${provider}: ${JSON.stringify(result)}`);
 
       await auditLog({
-        action: 'WEBHOOK_DUPLICATE',
+        action: 'WEBHOOK_PROCESSED',
         resourceType: 'payment',
-        resourceId: order?.id,
+        resourceId: result.orderId,
         details: {
           provider,
           idempotencyKey,
-          orderNumber: order?.orderNumber,
-          previousStatus: order?.paymentStatus,
+          status: result.status || 'unknown',
         },
         ip: req.ip,
         userAgent: req.headers['user-agent'],
       });
 
-      // Return success to prevent provider retries
       res.json({
         success: true,
-        data: {
-          message: 'Webhook already processed',
-          orderId: order?.id,
-          orderNumber: order?.orderNumber,
-        },
+        data: result,
       });
-      return;
+    } catch (error) {
+      console.error('[WEBHOOK ERROR]', error);
+      next(error);
     }
-
-    // Handle webhook
-    const result = await PaymentService.handleWebhook(provider, req.body, signature);
-
-    // Mark as processed if we have an order
-    if (result.orderId) {
-      await markWebhookProcessed(result.orderId, idempotencyKey);
-    }
-
-    console.log(`[WEBHOOK] ${provider}: ${JSON.stringify(result)}`);
-
-    await auditLog({
-      action: 'WEBHOOK_PROCESSED',
-      resourceType: 'payment',
-      resourceId: result.orderId,
-      details: {
-        provider,
-        idempotencyKey,
-        status: result.status || 'unknown',
-      },
-      ip: req.ip,
-      userAgent: req.headers['user-agent'],
-    });
-
-    res.json({
-      success: true,
-      data: result,
-    });
-  } catch (error) {
-    console.error('[WEBHOOK ERROR]', error);
-    next(error);
   }
-});
+);
 
 /**
  * POST /webhooks/payment
