@@ -1,6 +1,34 @@
 import dotenv from 'dotenv';
+import crypto from 'crypto';
 
 dotenv.config();
+
+// Generate a random secret for development only - this is NOT secure for production
+const generateDevSecret = () => {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('JWT_SECRET must be set in production environment');
+  }
+  console.warn(
+    '[CONFIG] WARNING: Using auto-generated JWT secret. Set JWT_SECRET in .env for persistence.'
+  );
+  return crypto.randomBytes(32).toString('hex');
+};
+
+// Validate required secrets
+const getRequiredSecret = (envVar: string, name: string): string => {
+  const value = process.env[envVar];
+  if (!value) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(`${name} (${envVar}) is required in production`);
+    }
+    if (envVar === 'JWT_SECRET') {
+      return generateDevSecret();
+    }
+    console.warn(`[CONFIG] WARNING: ${name} is not set. Some features may not work.`);
+    return '';
+  }
+  return value;
+};
 
 export const config = {
   // Server
@@ -15,18 +43,18 @@ export const config = {
   apiUrl: process.env.API_URL || 'http://localhost:4000',
 
   // Database
-  databaseUrl: process.env.DATABASE_URL || '',
+  databaseUrl: getRequiredSecret('DATABASE_URL', 'Database URL'),
 
   // Redis
   redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
 
-  // JWT
-  jwtSecret: process.env.JWT_SECRET || 'development-secret-change-in-production',
+  // JWT - No fallback in production
+  jwtSecret: getRequiredSecret('JWT_SECRET', 'JWT Secret'),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
   refreshTokenExpiresIn: process.env.REFRESH_TOKEN_EXPIRES_IN || '30d',
 
   // Encryption
-  encryptionKey: process.env.ENCRYPTION_KEY || '',
+  encryptionKey: getRequiredSecret('ENCRYPTION_KEY', 'Encryption Key'),
 
   // ==========================================
   // Kuwait Payment Providers
@@ -92,15 +120,8 @@ export const config = {
   backupS3Bucket: process.env.BACKUP_S3_BUCKET || '',
 } as const;
 
-// Validate required config in production
+// Additional production validations (core secrets already validated above)
 if (config.nodeEnv === 'production') {
-  const required = ['databaseUrl', 'jwtSecret', 'encryptionKey'] as const;
-  for (const key of required) {
-    if (!config[key]) {
-      throw new Error(`Missing required config: ${key}`);
-    }
-  }
-
   // Warn if no payment provider is configured
   if (
     !config.tapApiKey &&
@@ -109,5 +130,15 @@ if (config.nodeEnv === 'production') {
     !config.upaymentsApiKey
   ) {
     console.warn('[CONFIG] Warning: No payment provider configured!');
+  }
+
+  // Validate JWT secret strength
+  if (config.jwtSecret.length < 32) {
+    throw new Error('JWT_SECRET must be at least 32 characters for production');
+  }
+
+  // Validate encryption key strength
+  if (config.encryptionKey.length < 32) {
+    throw new Error('ENCRYPTION_KEY must be at least 32 characters for production');
   }
 }

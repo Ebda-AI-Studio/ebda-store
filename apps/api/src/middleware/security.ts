@@ -301,15 +301,44 @@ function sanitizeObject(obj: Record<string, unknown>): Record<string, unknown> {
 // ==========================================
 
 export function securityHeaders(_req: Request, res: Response, next: NextFunction) {
+  // HSTS - Strict Transport Security (1 year, include subdomains, preload ready)
+  if (process.env.NODE_ENV === 'production') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+  }
+
   // Additional security headers beyond helmet
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+  res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=(), payment=()');
+
+  // Content Security Policy
+  res.setHeader(
+    'Content-Security-Policy',
+    [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://connect.facebook.net",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "font-src 'self' https://fonts.gstatic.com",
+      "img-src 'self' data: https: blob:",
+      "connect-src 'self' https://api.anthropic.com https://*.supabase.co wss://*.supabase.co",
+      "frame-ancestors 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+    ].join('; ')
+  );
 
   // Remove server identification
   res.removeHeader('X-Powered-By');
+  res.removeHeader('Server');
+
+  // Prevent MIME type sniffing
+  res.setHeader('X-Download-Options', 'noopen');
+
+  // Cross-Origin policies
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+  res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
 
   next();
 }

@@ -597,7 +597,7 @@ export class PaymentService {
     payload: unknown,
     signature?: string,
     storeId?: string
-  ): Promise<{ success: boolean; status?: string }> {
+  ): Promise<{ success: boolean; status?: string; orderId?: string }> {
     const p = await factory.getProvider(provider, storeId);
 
     // Verify signature if provided
@@ -618,7 +618,7 @@ export class PaymentService {
 
     if (!payment) {
       console.error('[PAYMENT WEBHOOK] Payment not found:', webhookData.transactionId);
-      return { success: true }; // Acknowledge webhook even if payment not found
+      return { success: true, orderId: undefined }; // Acknowledge webhook even if payment not found
     }
 
     // Map status to our payment status
@@ -667,7 +667,7 @@ export class PaymentService {
       });
     }
 
-    return { success: true, status: webhookData.status };
+    return { success: true, status: webhookData.status, orderId: payment.orderId };
   }
 
   /**

@@ -187,6 +187,7 @@ model Store {
   reviews        Review[]
   returns        Return[]
   inventoryHistory InventoryHistory[]
+  tags           Tag[]
 
   @@map("stores")
 }
@@ -384,9 +385,14 @@ model ProductCategory {
 
 model Tag {
   id       String       @id @default(uuid())
-  name     String       @unique
+  storeId  String       @map("store_id")
+  name     String
   products ProductTag[]
 
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, name])
+  @@index([storeId])
   @@map("tags")
 }
 
@@ -544,6 +550,10 @@ model Order {
   createdAt       DateTime           @default(now()) @map("created_at")
   updatedAt       DateTime           @updatedAt @map("updated_at")
   deletedAt       DateTime?          @map("deleted_at") // Soft delete support
+
+  // Webhook idempotency - prevents duplicate processing
+  idempotencyKey  String?            @unique @map("idempotency_key")
+  webhookProcessedAt DateTime?       @map("webhook_processed_at")
 
   // Relations
   store               Store       @relation(fields: [storeId], references: [id])

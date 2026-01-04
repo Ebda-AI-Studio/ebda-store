@@ -323,7 +323,7 @@ export class BulkService {
 
           // Update tags if provided
           if (row.tags) {
-            await this.updateProductTags(existingProduct.id, row.tags, tagCache);
+            await this.updateProductTags(existingProduct.id, storeId, row.tags, tagCache);
           }
 
           // Update images if provided
@@ -345,7 +345,7 @@ export class BulkService {
 
           // Add tags
           if (row.tags) {
-            await this.updateProductTags(product.id, row.tags, tagCache);
+            await this.updateProductTags(product.id, storeId, row.tags, tagCache);
           }
 
           // Add images
@@ -629,6 +629,7 @@ export class BulkService {
 
   private static async updateProductTags(
     productId: string,
+    storeId: string,
     tagsStr: string,
     cache: Map<string, string>
   ): Promise<void> {
@@ -641,22 +642,23 @@ export class BulkService {
     await prisma.productTag.deleteMany({ where: { productId } });
 
     for (const name of tagNames) {
-      let tagId = cache.get(name);
+      const cacheKey = `${storeId}:${name}`;
+      let tagId = cache.get(cacheKey);
 
       if (!tagId) {
-        // Find or create tag
+        // Find or create tag for this store (tags are now store-scoped)
         let tag = await prisma.tag.findFirst({
-          where: { name },
+          where: { storeId, name },
         });
 
         if (!tag) {
           tag = await prisma.tag.create({
-            data: { name },
+            data: { storeId, name },
           });
         }
 
         tagId = tag.id;
-        cache.set(name, tagId);
+        cache.set(cacheKey, tagId);
       }
 
       await prisma.productTag.create({

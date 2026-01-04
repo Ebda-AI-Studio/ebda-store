@@ -1,0 +1,283 @@
+/**
+ * Store Management E2E Tests
+ * Tests critical store flows: CRUD, multi-tenancy isolation
+ */
+
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import request from 'supertest';
+import express from 'express';
+import { prisma } from '@force/database';
+import storeRoutes from '@api/routes/store.routes';
+import authRoutes from '@api/routes/auth.routes';
+import { errorHandler } from '@api/middleware/error-handler';
+import { authenticate } from '@api/middleware/auth';
+
+const app = express();
+app.use(express.json());
+app.use('/auth', authRoutes);
+app.use('/stores', authenticate, storeRoutes);
+app.use(errorHandler);
+
+// Test data
+const superAdminUser = {
+  email: `superadmin-${Date.now()}@example.com`,
+  password: 'Admin123!@#',
+  firstName: 'Super',
+  lastName: 'Admin',
+};
+
+const storeAdminUser = {
+  email: `storeadmin-${Date.now()}@example.com`,
+  password: 'Store123!@#',
+  firstName: 'Store',
+  lastName: 'Admin',
+};
+
+let superAdminToken: string | null = null;
+let storeAdminToken: string | null = null;
+let createdStoreId: string | null = null;
+let superAdminId: string | null = null;
+let storeAdminId: string | null = null;
+
+describe('Store Management', () => {
+  beforeAll(async () => {
+    // Create super admin user directly in database
+    const hashedPassword = await import('bcryptjs').then(bcrypt =>
+      bcrypt.hash(superAdminUser.password, 12)
+    );
+
+    const superAdmin = await prisma.user.create({
+      data: {
+        email: superAdminUser.email,
+        password: hashedPassword,
+        firstName: superAdminUser.firstName,
+        lastName: superAdminUser.lastName,
+        role: 'super_admin',
+        status: 'active',
+      },
+    });
+    superAdminId = superAdmin.id;
+
+    // Create store admin user
+    const storeAdmin = await prisma.user.create({
+      data: {
+        email: storeAdminUser.email,
+        password: hashedPassword,
+        firstName: storeAdminUser.firstName,
+        lastName: storeAdminUser.lastName,
+        role: 'store_admin',
+        status: 'active',
+      },
+    });
+    storeAdminId = storeAdmin.id;
+
+    // Login both users
+    const superAdminLogin = await request(app).post('/auth/login').send({
+      email: superAdminUser.email,
+      password: superAdminUser.password,
+    });
+    superAdminToken = superAdminLogin.body.data?.accessToken;
+
+    const storeAdminLogin = await request(app).post('/auth/login').send({
+      email: storeAdminUser.email,
+      password: storeAdminUser.password,
+    });
+    storeAdminToken = storeAdminLogin.body.data?.accessToken;
+  });
+
+  afterAll(async () => {
+    // Cleanup
+    if (createdStoreId) {
+      await prisma.store.delete({ where: { id: createdStoreId } }).catch(() => {});
+    }
+    if (superAdminId) {
+      await prisma.user.delete({ where: { id: superAdminId } }).catch(() => {});
+    }
+    if (storeAdminId) {
+      await prisma.user.delete({ where: { id: storeAdminId } }).catch(() => {});
+    }
+    await prisma.$disconnect();
+  });
+
+  describe('POST /stores', () => {
+    it('should create a store as super admin', async () => {
+      if (!superAdminToken) {
+        throw new Error('Super admin token not available');
+      }
+
+      const storeData = {
+        name: 'Test Store E2E',
+        slug: `test-store-e2e-${Date.now()}`,
+        ownerId: storeAdminId,
+      };
+
+      const res = await request(app)
+        .post('/stores')
+        .set('Authorization', `Bearer ${superAdminToken}`)
+        .send(storeData);
+
+      expect(res.status).toBe(201);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.name).toBe(storeData.name);
+      expect(res.body.data.slug).toBe(storeData.slug);
+
+      createdStoreId = res.body.data.id;
+    });
+
+    it('should reject duplicate store slug', async () => {
+      if (!superAdminToken || !createdStoreId) {
+        throw new Error('Prerequisites not met');
+      }
+
+      // Get the existing store slug
+      const store = await prisma.store.findUnique({ where: { id: createdStoreId } });
+
+      const res = await request(app)
+        .post('/stores')
+        .set('Authorization', `Bearer ${superAdminToken}`)
+        .send({
+          name: 'Another Store',
+          slug: store?.slug,
+          ownerId: storeAdminId,
+        });
+
+      expect(res.status).toBe(409);
+      expect(res.body.success).toBe(false);
+    });
+  });
+
+  describe('GET /stores/:id', () => {
+    it('should allow super admin to access any store', async () => {
+      if (!superAdminToken || !createdStoreId) {
+        throw new Error('Prerequisites not met');
+      }
+
+      const res = await request(app)
+        .get(`/stores/${createdStoreId}`)
+        .set('Authorization', `Bearer ${superAdminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.id).toBe(createdStoreId);
+    });
+
+    it('should allow store owner to access their store', async () => {
+      if (!storeAdminToken || !createdStoreId) {
+        throw new Error('Prerequisites not met');
+      }
+
+      const res = await request(app)
+        .get(`/stores/${createdStoreId}`)
+        .set('Authorization', `Bearer ${storeAdminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+    });
+
+    it('should return 404 for non-existent store', async () => {
+      if (!superAdminToken) {
+        throw new Error('Super admin token not available');
+      }
+
+      const res = await request(app)
+        .get('/stores/non-existent-id')
+        .set('Authorization', `Bearer ${superAdminToken}`);
+
+      expect(res.status).toBe(404);
+      expect(res.body.success).toBe(false);
+    });
+  });
+
+  describe('PUT /stores/:id', () => {
+    it('should update store name', async () => {
+      if (!superAdminToken || !createdStoreId) {
+        throw new Error('Prerequisites not met');
+      }
+
+      const res = await request(app)
+        .put(`/stores/${createdStoreId}`)
+        .set('Authorization', `Bearer ${superAdminToken}`)
+        .send({ name: 'Updated Store Name' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.name).toBe('Updated Store Name');
+    });
+
+    it('should update store theme', async () => {
+      if (!superAdminToken || !createdStoreId) {
+        throw new Error('Prerequisites not met');
+      }
+
+      const theme = {
+        primaryColor: '26 100% 50%',
+        fontFamily: 'modern',
+      };
+
+      const res = await request(app)
+        .put(`/stores/${createdStoreId}/theme`)
+        .set('Authorization', `Bearer ${superAdminToken}`)
+        .send({ theme });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+    });
+  });
+
+  describe('Multi-tenancy Isolation', () => {
+    let otherStoreId: string | null = null;
+    let otherUserId: string | null = null;
+
+    beforeAll(async () => {
+      // Create another store admin and store
+      const hashedPassword = await import('bcryptjs').then(bcrypt =>
+        bcrypt.hash('Other123!@#', 12)
+      );
+
+      const otherUser = await prisma.user.create({
+        data: {
+          email: `other-${Date.now()}@example.com`,
+          password: hashedPassword,
+          firstName: 'Other',
+          lastName: 'Admin',
+          role: 'store_admin',
+          status: 'active',
+        },
+      });
+      otherUserId = otherUser.id;
+
+      const otherStore = await prisma.store.create({
+        data: {
+          name: 'Other Store',
+          slug: `other-store-${Date.now()}`,
+          ownerId: otherUser.id,
+          status: 'active',
+        },
+      });
+      otherStoreId = otherStore.id;
+    });
+
+    afterAll(async () => {
+      if (otherStoreId) {
+        await prisma.store.delete({ where: { id: otherStoreId } }).catch(() => {});
+      }
+      if (otherUserId) {
+        await prisma.user.delete({ where: { id: otherUserId } }).catch(() => {});
+      }
+    });
+
+    it('should prevent store admin from accessing other stores', async () => {
+      if (!storeAdminToken || !otherStoreId) {
+        throw new Error('Prerequisites not met');
+      }
+
+      const res = await request(app)
+        .put(`/stores/${otherStoreId}`)
+        .set('Authorization', `Bearer ${storeAdminToken}`)
+        .send({ name: 'Hacked Name' });
+
+      expect(res.status).toBe(403);
+      expect(res.body.success).toBe(false);
+    });
+  });
+});

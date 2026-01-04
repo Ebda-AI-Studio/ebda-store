@@ -1,9 +1,61 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { prisma } from '@force/database';
 import { PaymentService } from '../services/payment-providers/payment.factory';
 import { PaymentProvider } from '../services/payment-providers/types';
 import { config } from '../config';
+import { auditLog } from '../middleware/security';
 
 const router = Router();
+
+/**
+ * Check if a webhook has already been processed (idempotency check)
+ */
+async function checkIdempotency(
+  idempotencyKey: string
+): Promise<{ alreadyProcessed: boolean; order?: any }> {
+  const order = await prisma.order.findUnique({
+    where: { idempotencyKey },
+    select: { id: true, orderNumber: true, webhookProcessedAt: true, paymentStatus: true },
+  });
+
+  if (order && order.webhookProcessedAt) {
+    return { alreadyProcessed: true, order };
+  }
+
+  return { alreadyProcessed: false, order };
+}
+
+/**
+ * Mark a webhook as processed
+ */
+async function markWebhookProcessed(orderId: string, idempotencyKey: string): Promise<void> {
+  await prisma.order.update({
+    where: { id: orderId },
+    data: {
+      idempotencyKey,
+      webhookProcessedAt: new Date(),
+    },
+  });
+}
+
+/**
+ * Generate idempotency key from webhook payload
+ */
+function generateIdempotencyKey(provider: PaymentProvider, payload: any): string {
+  // Use provider-specific transaction ID for idempotency
+  switch (provider) {
+    case 'tap':
+      return `tap_${payload.id || payload.charge?.id || payload.reference?.id}`;
+    case 'myfatoorah':
+      return `mf_${payload.InvoiceId || payload.Data?.InvoiceId}`;
+    case 'hesabe':
+      return `hesabe_${payload.paymentId || payload.transaction_id}`;
+    case 'upayments':
+      return `up_${payload.invoice_id || payload.transaction_id}`;
+    default:
+      return `unknown_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+}
 
 // ==========================================
 // Kuwait Payment Provider Webhooks
@@ -12,7 +64,7 @@ const router = Router();
 
 /**
  * POST /webhooks/payment/:provider
- * Handle payment provider webhooks
+ * Handle payment provider webhooks with idempotency
  */
 router.post('/payment/:provider', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -35,10 +87,63 @@ router.post('/payment/:provider', async (req: Request, res: Response, next: Next
       return;
     }
 
+    // Generate idempotency key from payload
+    const idempotencyKey = generateIdempotencyKey(provider, req.body);
+
+    // Check for duplicate webhook
+    const { alreadyProcessed, order } = await checkIdempotency(idempotencyKey);
+
+    if (alreadyProcessed) {
+      console.log(`[WEBHOOK] Duplicate webhook detected: ${idempotencyKey}`);
+
+      await auditLog({
+        action: 'WEBHOOK_DUPLICATE',
+        resourceType: 'payment',
+        resourceId: order?.id,
+        details: {
+          provider,
+          idempotencyKey,
+          orderNumber: order?.orderNumber,
+          previousStatus: order?.paymentStatus,
+        },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+
+      // Return success to prevent provider retries
+      res.json({
+        success: true,
+        data: {
+          message: 'Webhook already processed',
+          orderId: order?.id,
+          orderNumber: order?.orderNumber,
+        },
+      });
+      return;
+    }
+
     // Handle webhook
     const result = await PaymentService.handleWebhook(provider, req.body, signature);
 
+    // Mark as processed if we have an order
+    if (result.orderId) {
+      await markWebhookProcessed(result.orderId, idempotencyKey);
+    }
+
     console.log(`[WEBHOOK] ${provider}: ${JSON.stringify(result)}`);
+
+    await auditLog({
+      action: 'WEBHOOK_PROCESSED',
+      resourceType: 'payment',
+      resourceId: result.orderId,
+      details: {
+        provider,
+        idempotencyKey,
+        status: result.status || 'unknown',
+      },
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
 
     res.json({
       success: true,

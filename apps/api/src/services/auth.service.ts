@@ -5,6 +5,7 @@ import { prisma } from '@force/database';
 import { config } from '../config';
 import { AppError } from '../middleware/error-handler';
 import { EmailService } from './email.service';
+import { accountLockout } from './account-lockout.service';
 
 interface TokenPayload {
   userId: string;
@@ -232,21 +233,52 @@ export class AuthService {
     return { success: true, message: 'Verification email sent' };
   }
 
-  static async login(email: string, password: string) {
+  static async login(email: string, password: string, ip?: string) {
+    // Check if account is locked
+    const lockStatus = await accountLockout.isLocked(email);
+    if (lockStatus.locked) {
+      const remainingMinutes = Math.ceil((lockStatus.remainingMs || 0) / 60000);
+      throw new AppError(
+        429,
+        'ACCOUNT_LOCKED',
+        `Account is temporarily locked due to too many failed attempts. Please try again in ${remainingMinutes} minutes.`
+      );
+    }
+
     // Find user
     const user = await prisma.user.findUnique({
       where: { email },
     });
 
     if (!user) {
+      // Record failed attempt even for non-existent users (prevent enumeration)
+      await accountLockout.recordFailedAttempt(email, ip);
       throw new AppError(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
     }
 
     // Verify password
     const isValidPassword = await bcrypt.compare(password, user.passwordHash);
     if (!isValidPassword) {
-      throw new AppError(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
+      const result = await accountLockout.recordFailedAttempt(email, ip);
+
+      if (result.locked) {
+        const remainingMinutes = Math.ceil((result.lockoutDurationMs || 0) / 60000);
+        throw new AppError(
+          429,
+          'ACCOUNT_LOCKED',
+          `Account has been locked due to too many failed attempts. Please try again in ${remainingMinutes} minutes.`
+        );
+      }
+
+      throw new AppError(
+        401,
+        'INVALID_CREDENTIALS',
+        `Invalid email or password. ${result.attemptsRemaining} attempts remaining.`
+      );
     }
+
+    // Successful login - reset lockout
+    await accountLockout.recordSuccessfulLogin(email, ip);
 
     // Generate tokens
     const tokens = await this.generateTokens({

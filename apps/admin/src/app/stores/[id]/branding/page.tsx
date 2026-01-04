@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { useToast } from '@force/ui';
 
 interface StoreTheme {
   primaryColor: string;
@@ -80,6 +81,7 @@ const colorPresets = [
 export default function StoreBrandingPage() {
   const params = useParams();
   const storeId = params?.id as string;
+  const toast = useToast();
 
   const [branding, setBranding] = useState<StoreBranding | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -102,6 +104,14 @@ export default function StoreBrandingPage() {
         }
       );
       const data = await response.json();
+
+      if (!response.ok) {
+        toast.error(
+          'Failed to load branding',
+          data.error?.message || `Server error: ${response.status}`
+        );
+        return;
+      }
 
       if (data.success && data.data?.store) {
         const store = data.data.store;
@@ -126,6 +136,7 @@ export default function StoreBrandingPage() {
       }
     } catch (error) {
       console.error('Failed to fetch branding:', error);
+      toast.error('Connection error', 'Failed to connect to the server');
     } finally {
       setIsLoading(false);
     }
@@ -165,12 +176,27 @@ export default function StoreBrandingPage() {
         }
       );
 
-      if (response.ok) {
-        alert('Branding saved successfully!');
+      const data = await response.json();
+
+      if (!response.ok) {
+        // Handle specific error codes
+        if (response.status === 403) {
+          toast.error('Access denied', 'You do not have permission to update this store');
+        } else if (response.status === 401) {
+          toast.error('Session expired', 'Please log in again');
+        } else {
+          toast.error(
+            'Failed to save branding',
+            data.error?.message || `Server error: ${response.status}`
+          );
+        }
+        return;
       }
+
+      toast.success('Branding saved', 'Your changes have been saved successfully');
     } catch (error) {
       console.error('Failed to save branding:', error);
-      alert('Failed to save branding');
+      toast.error('Connection error', 'Failed to connect to the server. Please try again.');
     } finally {
       setIsSaving(false);
     }
