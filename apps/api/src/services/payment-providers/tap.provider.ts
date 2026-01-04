@@ -204,6 +204,11 @@ export class TapPaymentProvider implements IPaymentProvider {
       .update(payloadString)
       .digest('hex');
 
+    // Signatures must be same length for timingSafeEqual
+    if (signature.length !== expectedSignature.length) {
+      return false;
+    }
+
     return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature));
   }
 
