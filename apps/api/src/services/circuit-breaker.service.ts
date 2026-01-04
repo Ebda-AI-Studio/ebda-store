@@ -27,7 +27,7 @@ const DEFAULT_OPTIONS: CircuitBreakerOptions = {
   resetTimeout: 60000, // 1 minute
 };
 
-class CircuitBreakerRegistry {
+export class CircuitBreakerRegistry {
   private circuits: Map<string, CircuitBreakerState> = new Map();
   private options: Map<string, CircuitBreakerOptions> = new Map();
 
@@ -158,6 +158,28 @@ class CircuitBreakerRegistry {
       states[name] = { ...state };
     });
     return states;
+  }
+
+  /**
+   * Reset a specific circuit to closed state (for testing)
+   */
+  reset(name: string): void {
+    const circuit = this.circuits.get(name);
+    if (circuit) {
+      circuit.state = 'CLOSED';
+      circuit.failures = 0;
+      circuit.successes = 0;
+      circuit.lastFailure = 0;
+      circuit.nextAttempt = 0;
+    }
+  }
+
+  /**
+   * Clear all circuits (for testing)
+   */
+  clear(): void {
+    this.circuits.clear();
+    this.options.clear();
   }
 }
 
