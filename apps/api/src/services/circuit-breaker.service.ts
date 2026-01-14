@@ -229,7 +229,7 @@ export async function withCircuitBreaker<T>(
  * Circuit breaker middleware for Express
  */
 export function circuitBreakerMiddleware(name: string) {
-  return (req: any, res: any, next: any) => {
+  return (_req: any, res: any, next: any) => {
     if (!circuitBreaker.canRequest(name)) {
       return res.status(503).json({
         success: false,

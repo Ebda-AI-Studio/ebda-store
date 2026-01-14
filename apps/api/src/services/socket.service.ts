@@ -257,6 +257,18 @@ class SocketService {
       totalSockets: this.io?.sockets.sockets.size || 0,
     };
   }
+
+  /**
+   * Close all socket connections
+   */
+  close(): void {
+    if (this.io) {
+      this.io.close();
+      this.io = null;
+      this.userSockets.clear();
+      this.storeSockets.clear();
+    }
+  }
 }
 
 // Export singleton instance

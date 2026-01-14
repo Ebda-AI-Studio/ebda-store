@@ -173,7 +173,7 @@ class EmailQueueService {
     const client = redis.getClient();
     const emails = await client?.lrange(FAILED_KEY, 0, limit - 1);
 
-    return (emails || []).map(e => JSON.parse(e));
+    return (emails || []).map((e: string) => JSON.parse(e));
   }
 
   /**

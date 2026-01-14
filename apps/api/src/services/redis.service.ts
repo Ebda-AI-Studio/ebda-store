@@ -61,6 +61,10 @@ class RedisService {
     return this.isConnected && this.client !== null;
   }
 
+  getClient(): Redis | null {
+    return this.client;
+  }
+
   // ==========================================
   // CSRF Token Management
   // ==========================================

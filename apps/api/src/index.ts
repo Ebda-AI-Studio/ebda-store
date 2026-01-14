@@ -33,16 +33,17 @@ emailQueue.startProcessing();
 app.use(requestId);
 
 // Graceful shutdown middleware
-app.use((req, res, next) => {
+app.use((_req, res, next) => {
   if (isShuttingDown) {
     res.setHeader('Connection', 'close');
-    return res.status(503).json({
+    res.status(503).json({
       success: false,
       error: {
         code: 'SERVER_SHUTTING_DOWN',
         message: 'Server is shutting down. Please retry.',
       },
     });
+    return;
   }
   next();
 });
