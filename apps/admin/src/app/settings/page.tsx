@@ -52,7 +52,7 @@ export default function SettingsPage() {
     setIsSaving(true);
     await new Promise(resolve => setTimeout(resolve, 1000));
     setIsSaving(false);
-    alert('Settings saved successfully!');
+    // Settings saved
   };
 
   const tabs = [

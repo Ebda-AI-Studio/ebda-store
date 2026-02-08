@@ -1,6 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
-import { config } from '../config';
 
 export class AppError extends Error {
   constructor(
@@ -58,7 +57,7 @@ export function errorHandler(err: Error, _req: Request, res: Response, _next: Ne
     success: false,
     error: {
       code: 'INTERNAL_ERROR',
-      message: config.nodeEnv === 'production' ? 'Internal server error' : err.message,
+      message: 'Internal server error',
     },
   });
 }

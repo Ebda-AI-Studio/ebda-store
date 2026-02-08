@@ -226,6 +226,14 @@ const DEMO_PRODUCTS = [
 async function seedSuperAdmin() {
   console.log('Creating super admin user...');
 
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  if (!adminPassword) {
+    throw new Error(
+      'ADMIN_PASSWORD environment variable is required for seeding. Set it before running the seed script.'
+    );
+  }
+  const adminEmail = process.env.ADMIN_EMAIL || 'admin@forcemedia.com';
+
   const existingAdmin = await prisma.user.findFirst({
     where: { role: 'super_admin' },
   });
@@ -237,8 +245,8 @@ async function seedSuperAdmin() {
 
   const admin = await prisma.user.create({
     data: {
-      email: 'admin@forcemedia.com',
-      passwordHash: await hashPassword('Admin@123'),
+      email: adminEmail,
+      passwordHash: await hashPassword(adminPassword),
       firstName: 'Super',
       lastName: 'Admin',
       role: 'super_admin',
@@ -580,9 +588,7 @@ async function main() {
     await seedCoupons(store.id);
 
     console.log('\n✅ Database seeded successfully!');
-    console.log('\n📝 Login credentials:');
-    console.log('   Email: admin@forcemedia.com');
-    console.log('   Password: Admin@123');
+    console.log('\n📝 Super admin created with ADMIN_EMAIL and ADMIN_PASSWORD from environment.');
     console.log('\n🏪 Demo store: demo-store');
   } catch (error) {
     console.error('❌ Seed failed:', error);

@@ -75,11 +75,15 @@ class SocketService {
     // Join user's room
     socket.join(`user:${user.userId}`);
 
-    // Handle store subscription
+    // Handle store subscription (only admins can subscribe to store events)
     socket.on('subscribe:store', (storeId: string) => {
+      const role = user.role;
+      if (role !== 'admin' && role !== 'super_admin' && role !== 'store_admin') {
+        socket.emit('error', { message: 'Insufficient permissions to subscribe to store events' });
+        return;
+      }
       socket.join(`store:${storeId}`);
       this.addStoreSocket(storeId, socket.id);
-      console.log(`Socket ${socket.id} subscribed to store:${storeId}`);
     });
 
     socket.on('unsubscribe:store', (storeId: string) => {

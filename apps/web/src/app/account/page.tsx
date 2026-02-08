@@ -46,11 +46,11 @@ export default function AccountDashboard() {
     });
   }
 
-  function formatPrice(cents: number) {
-    return new Intl.NumberFormat('en-US', {
+  function formatPrice(fils: number) {
+    return new Intl.NumberFormat('en-KW', {
       style: 'currency',
-      currency: 'USD',
-    }).format(cents / 100);
+      currency: 'KWD',
+    }).format(fils / 1000);
   }
 
   const statusColors: Record<string, string> = {

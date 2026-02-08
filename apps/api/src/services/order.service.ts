@@ -156,12 +156,16 @@ export class OrderService {
 
     // Calculate totals
     const subtotal = cart.items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
-    const tax = Math.round(subtotal * 0.1); // 10% tax (simplified)
+    // Calculate tax using store's configured tax rates
+    const taxRates = await prisma.taxRate.findMany({ where: { storeId, isActive: true } });
+    const taxRate = taxRates.length > 0 ? Number(taxRates[0].rate) / 100 : 0;
+    const tax = Math.round(subtotal * taxRate);
     const shipping = 0; // Free shipping (simplified)
     const total = subtotal + tax + shipping;
 
     // Generate order number
-    const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+    const crypto = require('crypto');
+    const orderNumber = `ORD-${Date.now()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
 
     // Create order in transaction
     const order = await prisma.$transaction(async tx => {
@@ -291,7 +295,7 @@ export class OrderService {
     }
 
     const updatedOrder = await prisma.order.update({
-      where: { id: orderId },
+      where: { id: orderId, storeId },
       data: { status },
       include: {
         items: true,

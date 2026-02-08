@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Button, Input, Textarea, Select } from '@force/ui';
 import { AdminLayout } from '../../../components/AdminLayout';
 
@@ -19,6 +20,7 @@ const statuses = [
 ];
 
 export default function NewProductPage() {
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -51,8 +53,7 @@ export default function NewProductPage() {
     try {
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 1000));
-      alert('Product created successfully!');
-      window.location.href = '/products';
+      router.push('/products');
     } catch (error) {
       console.error('Failed to create product:', error);
     } finally {

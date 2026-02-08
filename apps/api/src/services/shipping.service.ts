@@ -98,7 +98,7 @@ export class ShippingService {
     await this.getById(storeId, zoneId);
 
     const zone = await prisma.shippingZone.update({
-      where: { id: zoneId },
+      where: { id: zoneId, storeId },
       data: {
         name: data.name,
         nameAr: data.nameAr,
@@ -121,7 +121,7 @@ export class ShippingService {
     await this.getById(storeId, zoneId);
 
     await prisma.shippingZone.delete({
-      where: { id: zoneId },
+      where: { id: zoneId, storeId },
     });
   }
 

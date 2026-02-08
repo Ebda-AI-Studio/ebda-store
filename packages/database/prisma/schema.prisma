@@ -724,6 +724,9 @@ model Return {
   customer  User         @relation(fields: [customerId], references: [id])
   items     ReturnItem[]
 
+  @@index([storeId])
+  @@index([orderId])
+  @@index([customerId])
   @@index([status])
   @@index([createdAt])
   @@map("returns")
@@ -743,6 +746,8 @@ model ReturnItem {
   orderItem   OrderItem  @relation(fields: [orderItemId], references: [id])
   product     Product    @relation(fields: [productId], references: [id])
 
+  @@index([returnId])
+  @@index([productId])
   @@map("return_items")
 }
 
@@ -1138,5 +1143,6 @@ model Review {
   @@index([storeId])
   @@index([customerId])
   @@index([rating])
+  @@index([storeId, productId])  // Composite: reviews by store and product
   @@map("reviews")
 }

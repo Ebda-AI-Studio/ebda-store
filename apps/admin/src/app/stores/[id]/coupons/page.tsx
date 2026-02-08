@@ -141,11 +141,10 @@ export default function CouponsPage() {
         fetchCoupons();
       } else {
         const data = await response.json();
-        alert(data.error?.message || 'Failed to save coupon');
+        console.error('Failed to save coupon:', data.error?.message);
       }
     } catch (error) {
       console.error('Failed to save coupon:', error);
-      alert('Failed to save coupon');
     }
   }
 

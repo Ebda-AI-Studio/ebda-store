@@ -31,11 +31,12 @@ export class ReturnService {
   /**
    * Generate unique return number
    */
-  private static async generateReturnNumber(storeId: string): Promise<string> {
-    const count = await prisma.return.count({ where: { storeId } });
+  private static async generateReturnNumber(_storeId: string): Promise<string> {
+    const crypto = require('crypto');
     const prefix = 'RET';
-    const number = String(count + 1).padStart(6, '0');
-    return `${prefix}-${number}`;
+    const timestamp = Date.now().toString(36).toUpperCase();
+    const random = crypto.randomBytes(3).toString('hex').toUpperCase();
+    return `${prefix}-${timestamp}-${random}`;
   }
 
   /**
@@ -266,7 +267,7 @@ export class ReturnService {
     }
 
     const updatedReturn = await prisma.return.update({
-      where: { id: returnId },
+      where: { id: returnId, storeId },
       data: updateData,
       include: {
         customer: {
@@ -336,7 +337,7 @@ export class ReturnService {
     }
 
     const updatedReturn = await prisma.return.update({
-      where: { id: returnId },
+      where: { id: returnId, storeId },
       data: {
         status: 'completed',
         refundMethod,
@@ -364,7 +365,7 @@ export class ReturnService {
     await this.getById(storeId, returnId);
 
     return prisma.return.update({
-      where: { id: returnId },
+      where: { id: returnId, storeId },
       data: { trackingNumber },
     });
   }

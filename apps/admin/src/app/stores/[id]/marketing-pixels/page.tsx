@@ -204,14 +204,11 @@ export default function MarketingPixelsPage() {
         }
       );
 
-      if (response.ok) {
-        alert('Marketing pixels saved successfully!');
-      } else {
+      if (!response.ok) {
         throw new Error('Failed to save');
       }
     } catch (error) {
       console.error('Failed to save marketing pixels:', error);
-      alert('Failed to save marketing pixels');
     } finally {
       setIsSaving(false);
     }

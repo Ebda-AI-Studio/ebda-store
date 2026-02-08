@@ -201,7 +201,7 @@ export class ProductService {
     }
 
     const updatedProduct = await prisma.product.update({
-      where: { id: productId },
+      where: { id: productId, storeId },
       data: {
         name: data.name,
         slug: data.slug,
@@ -224,8 +224,9 @@ export class ProductService {
   static async delete(storeId: string, productId: string) {
     await this.getById(storeId, productId);
 
-    await prisma.product.delete({
-      where: { id: productId },
+    await prisma.product.update({
+      where: { id: productId, storeId },
+      data: { deletedAt: new Date() },
     });
   }
 
@@ -239,11 +240,15 @@ export class ProductService {
   }
 
   // Public methods (no store scope required)
-  static async listPublic(options: ListProductsOptions = {}) {
+  static async listPublic(storeId: string, options: ListProductsOptions = {}) {
     const { page = 1, limit = 20, status = 'active', category, search, featured } = options;
     const skip = (page - 1) * limit;
 
-    const where: Prisma.ProductWhereInput = { status: status as ProductStatus };
+    const where: Prisma.ProductWhereInput = {
+      storeId,
+      status: status as ProductStatus,
+      deletedAt: null,
+    };
 
     if (featured !== undefined) {
       where.featured = featured;
@@ -288,9 +293,9 @@ export class ProductService {
     };
   }
 
-  static async getPublicBySlug(slug: string) {
+  static async getPublicBySlug(storeId: string, slug: string) {
     const product = await prisma.product.findFirst({
-      where: { slug, status: 'active' },
+      where: { storeId, slug, status: 'active', deletedAt: null },
       include: {
         images: { orderBy: { position: 'asc' } },
         categories: { include: { category: true } },
@@ -305,9 +310,9 @@ export class ProductService {
     return product;
   }
 
-  static async getPublicById(productId: string) {
+  static async getPublicById(storeId: string, productId: string) {
     const product = await prisma.product.findFirst({
-      where: { id: productId, status: 'active' },
+      where: { storeId, id: productId, status: 'active', deletedAt: null },
       include: {
         images: { orderBy: { position: 'asc' } },
         categories: { include: { category: true } },
@@ -322,8 +327,9 @@ export class ProductService {
     return product;
   }
 
-  static async getCategories() {
+  static async getCategories(storeId: string) {
     const categories = await prisma.category.findMany({
+      where: { storeId },
       orderBy: { name: 'asc' },
     });
     return categories;

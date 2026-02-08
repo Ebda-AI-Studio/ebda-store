@@ -45,10 +45,34 @@ export type Permission =
 // Role Definitions
 // ==========================================
 
-export type Role = 'customer' | 'admin' | 'super_admin';
+export type Role = 'customer' | 'store_admin' | 'admin' | 'super_admin';
 
 const rolePermissions: Record<Role, Permission[]> = {
   customer: ['products:read', 'orders:read', 'ai:use'],
+  store_admin: [
+    // All customer permissions
+    'products:read',
+    'orders:read',
+    'ai:use',
+    // Store admin permissions (same as admin)
+    'users:read',
+    'users:write',
+    'products:write',
+    'products:delete',
+    'orders:write',
+    'orders:manage',
+    'orders:refund',
+    'store:read',
+    'store:write',
+    'store:settings',
+    'analytics:read',
+    'payments:read',
+    'payments:refund',
+    'audit:read',
+    'ai:manage',
+    'returns:read',
+    'returns:write',
+  ],
   admin: [
     // All customer permissions
     'products:read',

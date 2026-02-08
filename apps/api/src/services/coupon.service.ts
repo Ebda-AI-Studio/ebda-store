@@ -164,7 +164,7 @@ export class CouponService {
     }
 
     const coupon = await prisma.coupon.update({
-      where: { id: couponId },
+      where: { id: couponId, storeId },
       data: {
         code: data.code?.toUpperCase(),
         name: data.name,
@@ -190,7 +190,7 @@ export class CouponService {
     await this.getById(storeId, couponId);
 
     await prisma.coupon.delete({
-      where: { id: couponId },
+      where: { id: couponId, storeId },
     });
   }
 

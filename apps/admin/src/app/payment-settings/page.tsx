@@ -199,11 +199,6 @@ export default function PaymentSettingsPage() {
       const data = await response.json();
       if (data.success) {
         await fetchConfigs();
-        alert(
-          data.data.test.success
-            ? `Connection successful! Latency: ${data.data.test.latency}ms`
-            : `Connection failed: ${data.data.test.message}`
-        );
       }
     } catch (err) {
       setError('Failed to test connection');
@@ -326,7 +321,9 @@ export default function PaymentSettingsPage() {
                         <div>
                           <span className="text-gray-500">API Key:</span>
                           <span className="ml-2 font-mono text-xs">
-                            {config!.apiKey || 'Not set'}
+                            {config!.apiKey
+                              ? `${config!.apiKey.substring(0, 4)}${'*'.repeat(Math.max(0, config!.apiKey.length - 8))}${config!.apiKey.length > 8 ? config!.apiKey.substring(config!.apiKey.length - 4) : ''}`
+                              : 'Not set'}
                           </span>
                         </div>
                         <div>

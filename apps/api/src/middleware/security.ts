@@ -9,7 +9,19 @@ import { redis } from '../services/redis.service';
 // ==========================================
 
 // In-memory fallback when Redis is unavailable
+const MAX_CSRF_TOKENS = 10000;
 const csrfTokensMemory = new Map<string, { token: string; expiresAt: Date }>();
+
+// Periodic cleanup of expired CSRF tokens
+setInterval(
+  () => {
+    const now = new Date();
+    for (const [key, value] of csrfTokensMemory) {
+      if (value.expiresAt < now) csrfTokensMemory.delete(key);
+    }
+  },
+  5 * 60 * 1000
+); // Every 5 minutes
 
 export async function generateCsrfToken(sessionId: string): Promise<string> {
   const token = uuidv4();
@@ -19,7 +31,15 @@ export async function generateCsrfToken(sessionId: string): Promise<string> {
   if (redis.isAvailable()) {
     await redis.setCsrfToken(sessionId, token, ttlSeconds);
   } else {
-    // Fallback to in-memory
+    // Fallback to in-memory with size limit
+    if (csrfTokensMemory.size >= MAX_CSRF_TOKENS) {
+      // Evict oldest entries
+      const iterator = csrfTokensMemory.keys();
+      for (let i = 0; i < 1000; i++) {
+        const key = iterator.next().value;
+        if (key) csrfTokensMemory.delete(key);
+      }
+    }
     const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
     csrfTokensMemory.set(sessionId, { token, expiresAt });
   }
@@ -69,9 +89,15 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
   const sessionId = req.headers['x-session-id'] as string;
   const csrfToken = req.headers['x-csrf-token'] as string;
 
-  // If no session, skip CSRF (will fail auth later anyway for protected routes)
+  // Require session ID for state-changing requests
   if (!sessionId) {
-    return next();
+    return res.status(403).json({
+      success: false,
+      error: {
+        code: 'CSRF_MISSING_SESSION',
+        message: 'Session ID required for state-changing requests',
+      },
+    });
   }
 
   // For authenticated routes, verify CSRF token asynchronously
@@ -88,8 +114,11 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
         next();
       })
       .catch(() => {
-        // On error, allow request (fail open for availability)
-        next();
+        // Fail closed - reject request on CSRF verification error
+        res.status(403).json({
+          success: false,
+          error: { code: 'CSRF_ERROR', message: 'CSRF validation failed' },
+        });
       });
     return;
   }
@@ -313,18 +342,25 @@ function sanitizeObject(obj: Record<string, unknown>): Record<string, unknown> {
 
   for (const [key, value] of Object.entries(obj)) {
     if (typeof value === 'string') {
-      // Remove potential XSS vectors
+      // Remove potential XSS vectors - strip all HTML tags and dangerous patterns
       sanitized[key] = value
-        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-        .replace(/javascript:/gi, '')
-        .replace(/on\w+=/gi, '')
+        .replace(/<[^>]*>/g, '')
+        .replace(/javascript\s*:/gi, '')
+        .replace(/on\w+\s*=/gi, '')
+        .replace(/data\s*:/gi, '')
+        .replace(/&#/g, '&amp;#')
+        .replace(/\\u/g, '\\\\u')
         .trim();
     } else if (Array.isArray(value)) {
       sanitized[key] = value.map(item =>
         typeof item === 'object' && item !== null
           ? sanitizeObject(item as Record<string, unknown>)
           : typeof item === 'string'
-            ? item.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '').trim()
+            ? item
+                .replace(/<[^>]*>/g, '')
+                .replace(/javascript\s*:/gi, '')
+                .replace(/on\w+\s*=/gi, '')
+                .trim()
             : item
       );
     } else if (value && typeof value === 'object') {
@@ -359,7 +395,7 @@ export function securityHeaders(_req: Request, res: Response, next: NextFunction
     'Content-Security-Policy',
     [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://connect.facebook.net",
+      "script-src 'self' https://www.googletagmanager.com https://connect.facebook.net",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: https: blob:",
@@ -389,7 +425,9 @@ export function securityHeaders(_req: Request, res: Response, next: NextFunction
 // ==========================================
 
 export function requestId(req: Request, res: Response, next: NextFunction) {
-  const id = (req.headers['x-request-id'] as string) || uuidv4();
+  const clientId = req.headers['x-request-id'] as string;
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const id = clientId && uuidRegex.test(clientId) ? clientId : uuidv4();
   req.headers['x-request-id'] = id;
   res.setHeader('X-Request-Id', id);
   next();

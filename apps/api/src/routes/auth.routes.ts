@@ -10,7 +10,13 @@ const router = Router();
 const registerSchema = z
   .object({
     email: z.string().email('Invalid email address'),
-    password: z.string().min(8, 'Password must be at least 8 characters'),
+    password: z
+      .string()
+      .min(8, 'Password must be at least 8 characters')
+      .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
+      .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
+      .regex(/[0-9]/, 'Password must contain at least one number')
+      .regex(/[^A-Za-z0-9]/, 'Password must contain at least one special character'),
     name: z.string().min(1).optional(),
     firstName: z.string().min(1).optional(),
     lastName: z.string().optional(),
@@ -191,7 +197,7 @@ router.post('/login', authLimiter, async (req: Request, res: Response, next: Nex
 });
 
 // POST /auth/refresh
-router.post('/refresh', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/refresh', authLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { refreshToken } = req.body;
 
@@ -295,10 +301,20 @@ router.post(
         return;
       }
 
-      if (password.length < 8) {
+      if (
+        password.length < 8 ||
+        !/[A-Z]/.test(password) ||
+        !/[a-z]/.test(password) ||
+        !/[0-9]/.test(password) ||
+        !/[^A-Za-z0-9]/.test(password)
+      ) {
         res.status(400).json({
           success: false,
-          error: { code: 'VALIDATION_ERROR', message: 'Password must be at least 8 characters' },
+          error: {
+            code: 'VALIDATION_ERROR',
+            message:
+              'Password must be at least 8 characters with uppercase, lowercase, number, and special character',
+          },
         });
         return;
       }

@@ -105,9 +105,9 @@ export class StoreService {
         domain: data.domain,
         ownerId,
         settings: data.settings || {
-          currency: 'USD',
-          timezone: 'UTC',
-          locale: 'en-US',
+          currency: 'KWD',
+          timezone: 'Asia/Kuwait',
+          locale: 'en-KW',
         },
       },
       include: {
@@ -166,8 +166,9 @@ export class StoreService {
   static async delete(storeId: string) {
     await this.getById(storeId);
 
-    await prisma.store.delete({
+    await prisma.store.update({
       where: { id: storeId },
+      data: { deletedAt: new Date() },
     });
   }
 

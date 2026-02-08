@@ -153,7 +153,7 @@ export default function CheckoutPage() {
         // Fetch shipping zones
         if (store?.id) {
           const shippingRes = await fetch(
-            `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/stores/public/${store.id}/shipping`
+            `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/public/${store.id}/shipping`
           );
           if (shippingRes.ok) {
             const shippingData = await shippingRes.json();
@@ -163,7 +163,7 @@ export default function CheckoutPage() {
 
         // Fetch payment config
         const paymentRes = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/payments/config`
+          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/payments/config`
         );
         if (paymentRes.ok) {
           const paymentData = await paymentRes.json();
@@ -190,7 +190,7 @@ export default function CheckoutPage() {
 
     try {
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/stores/public/${store.id}/shipping/calculate`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/public/${store.id}/shipping/calculate`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -287,7 +287,7 @@ export default function CheckoutPage() {
     setCouponError('');
     try {
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/stores/public/${store.id}/coupons/validate`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/public/${store.id}/coupons/validate`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -369,7 +369,7 @@ export default function CheckoutPage() {
       // Create payment
       const token = localStorage.getItem('accessToken');
       const paymentRes = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/payments/create`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/payments/create`,
         {
           method: 'POST',
           headers: {

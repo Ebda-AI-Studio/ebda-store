@@ -8,6 +8,8 @@ import { config } from './config';
 import { errorHandler } from './middleware/error-handler';
 import { requestLogger } from './middleware/request-logger';
 import { securityHeaders, requestId, sanitizeInput, csrfProtection } from './middleware/security';
+import { authenticate } from './middleware/auth';
+import { requireRole } from './middleware/rbac';
 import routes from './routes';
 import webhookRoutes from './routes/webhook.routes';
 import { socketService } from './services/socket.service';
@@ -120,69 +122,74 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Comprehensive health check with dependency status
-app.get('/api/v1/health', async (_req, res) => {
-  const checks: Record<string, { status: string; latency?: number; error?: string }> = {};
+// Comprehensive health check with dependency status (requires auth)
+app.get(
+  '/api/v1/health',
+  authenticate,
+  requireRole(['admin', 'super_admin']),
+  async (_req: any, res: any) => {
+    const checks: Record<string, { status: string; latency?: number; error?: string }> = {};
 
-  // Check database
-  const dbStart = Date.now();
-  try {
-    await prisma.$queryRaw`SELECT 1`;
-    checks.database = { status: 'connected', latency: Date.now() - dbStart };
-  } catch (error) {
-    checks.database = {
-      status: 'disconnected',
-      error: error instanceof Error ? error.message : 'Unknown error',
-    };
-  }
-
-  // Check Redis
-  const redisStart = Date.now();
-  try {
-    if (redis.isAvailable()) {
-      await redis.getClient()?.ping();
-      checks.redis = { status: 'connected', latency: Date.now() - redisStart };
-    } else {
-      checks.redis = { status: 'unavailable' };
+    // Check database
+    const dbStart = Date.now();
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      checks.database = { status: 'connected', latency: Date.now() - dbStart };
+    } catch (error) {
+      checks.database = {
+        status: 'disconnected',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
     }
-  } catch (error) {
-    checks.redis = {
-      status: 'disconnected',
-      error: error instanceof Error ? error.message : 'Unknown error',
-    };
+
+    // Check Redis
+    const redisStart = Date.now();
+    try {
+      if (redis.isAvailable()) {
+        await redis.getClient()?.ping();
+        checks.redis = { status: 'connected', latency: Date.now() - redisStart };
+      } else {
+        checks.redis = { status: 'unavailable' };
+      }
+    } catch (error) {
+      checks.redis = {
+        status: 'disconnected',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+
+    // Get circuit breaker states
+    const circuits = circuitBreaker.getAllStates();
+
+    // Get email queue stats
+    const emailStats = await emailQueue.getStats();
+
+    // Determine overall status
+    const isHealthy = checks.database.status === 'connected';
+    const status = isHealthy ? 'healthy' : 'degraded';
+
+    res.status(isHealthy ? 200 : 503).json({
+      success: true,
+      data: {
+        status,
+        timestamp: new Date().toISOString(),
+        version: config.appVersion,
+        environment: config.nodeEnv,
+        uptime: process.uptime(),
+        memory: process.memoryUsage(),
+        checks,
+        circuits: Object.entries(circuits).reduce(
+          (acc, [name, state]) => {
+            acc[name] = state.state;
+            return acc;
+          },
+          {} as Record<string, string>
+        ),
+        emailQueue: emailStats,
+      },
+    });
   }
-
-  // Get circuit breaker states
-  const circuits = circuitBreaker.getAllStates();
-
-  // Get email queue stats
-  const emailStats = await emailQueue.getStats();
-
-  // Determine overall status
-  const isHealthy = checks.database.status === 'connected';
-  const status = isHealthy ? 'healthy' : 'degraded';
-
-  res.status(isHealthy ? 200 : 503).json({
-    success: true,
-    data: {
-      status,
-      timestamp: new Date().toISOString(),
-      version: config.appVersion,
-      environment: config.nodeEnv,
-      uptime: process.uptime(),
-      memory: process.memoryUsage(),
-      checks,
-      circuits: Object.entries(circuits).reduce(
-        (acc, [name, state]) => {
-          acc[name] = state.state;
-          return acc;
-        },
-        {} as Record<string, string>
-      ),
-      emailQueue: emailStats,
-    },
-  });
-});
+);
 
 // API Documentation (Swagger)
 setupSwagger(app);

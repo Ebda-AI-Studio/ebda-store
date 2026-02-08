@@ -233,8 +233,6 @@ export default function ProductVariantsPage() {
       );
 
       if (response.ok) {
-        const data = await response.json();
-        alert(`Created ${data.data.result.created} new variants. Total: ${data.data.result.total}`);
         fetchVariants();
       }
     } catch (error) {

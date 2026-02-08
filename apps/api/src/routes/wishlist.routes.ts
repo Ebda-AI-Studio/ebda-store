@@ -1,9 +1,8 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@force/database';
 import { authenticate } from '../middleware/auth';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // Helper to get store ID from request header
 function getStoreIdFromHeader(req: Request): string | null {

@@ -154,27 +154,16 @@ export class ReviewService {
           product: {
             select: { id: true, name: true, slug: true },
           },
+          customer: {
+            select: { id: true, email: true, firstName: true, lastName: true },
+          },
         },
       }),
       prisma.review.count({ where }),
     ]);
 
-    // Get customer info for each review
-    const reviewsWithCustomers = await Promise.all(
-      reviews.map(async review => {
-        let customer = null;
-        if (review.customerId) {
-          customer = await prisma.user.findUnique({
-            where: { id: review.customerId },
-            select: { id: true, email: true, firstName: true, lastName: true },
-          });
-        }
-        return { ...review, customer };
-      })
-    );
-
     return {
-      reviews: reviewsWithCustomers,
+      reviews,
       meta: {
         page,
         limit,
@@ -284,7 +273,7 @@ export class ReviewService {
     }
 
     return prisma.review.update({
-      where: { id: reviewId },
+      where: { id: reviewId, storeId },
       data: {
         rating: data.rating,
         title: data.title,
@@ -343,7 +332,7 @@ export class ReviewService {
     }
 
     await prisma.review.delete({
-      where: { id: reviewId },
+      where: { id: reviewId, storeId },
     });
 
     return { success: true };

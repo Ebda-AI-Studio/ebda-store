@@ -416,7 +416,11 @@ export function AdminLayout({
             <NotificationBell />
 
             {/* View Store */}
-            <Link href="http://localhost:3000" target="_blank" className="hidden sm:block">
+            <Link
+              href={process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000'}
+              target="_blank"
+              className="hidden sm:block"
+            >
               <Button variant="outline" size="sm" className="gap-2 rounded-xl">
                 <svg
                   className="h-4 w-4"

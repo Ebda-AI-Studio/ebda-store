@@ -56,8 +56,9 @@ async function getDefaultStoreId(): Promise<string> {
 router.get('/products', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { page, limit, category, search, featured } = req.query;
+    const storeId = await getDefaultStoreId();
 
-    const result = await ProductService.listPublic({
+    const result = await ProductService.listPublic(storeId, {
       page: page ? parseInt(page as string) : undefined,
       limit: limit ? parseInt(limit as string) : undefined,
       category: category as string,
@@ -82,9 +83,10 @@ router.get('/products/:slugOrId', async (req: Request, res: Response, next: Next
     // Check if it's a UUID (ID) or slug
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slugOrId);
 
+    const storeId = await getDefaultStoreId();
     const product = isUuid
-      ? await ProductService.getPublicById(slugOrId)
-      : await ProductService.getPublicBySlug(slugOrId);
+      ? await ProductService.getPublicById(storeId, slugOrId)
+      : await ProductService.getPublicBySlug(storeId, slugOrId);
 
     res.json({
       success: true,
@@ -98,7 +100,8 @@ router.get('/products/:slugOrId', async (req: Request, res: Response, next: Next
 // GET /categories - List all categories
 router.get('/categories', async (_req: Request, res: Response, next: NextFunction) => {
   try {
-    const categories = await ProductService.getCategories();
+    const storeId = await getDefaultStoreId();
+    const categories = await ProductService.getCategories(storeId);
 
     res.json({
       success: true,
@@ -483,7 +486,7 @@ router.get(
       if (!store) {
         res.status(404).json({
           success: false,
-          error: { code: 'STORE_NOT_FOUND', message: `No store found for domain: ${domain}` },
+          error: { code: 'STORE_NOT_FOUND', message: 'No store found for the specified domain' },
         });
         return;
       }

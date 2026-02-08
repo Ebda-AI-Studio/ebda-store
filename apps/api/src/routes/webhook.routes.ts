@@ -22,8 +22,8 @@ function verifyWebhookSignature(req: Request, res: Response, next: NextFunction)
     (req.headers['tap-signature'] as string) ||
     '';
 
-  // In production, require signature for all webhooks
-  if (config.nodeEnv === 'production' && !signature) {
+  // Require signature for all webhooks
+  if (!signature) {
     console.warn(`[WEBHOOK] Missing signature for ${provider} webhook`);
 
     auditLog({
@@ -247,13 +247,17 @@ router.get('/payment/callback', async (req: Request, res: Response) => {
     const status = await PaymentService.getPaymentStatus(transactionId);
 
     if (status.status === 'completed') {
-      res.redirect(`${config.webUrl}/checkout/success?transaction=${transactionId}`);
+      res.redirect(
+        `${config.webUrl}/checkout/success?transaction=${encodeURIComponent(transactionId)}`
+      );
     } else if (status.status === 'failed' || status.status === 'cancelled') {
       res.redirect(
-        `${config.webUrl}/checkout/error?reason=${status.failureReason || status.status}`
+        `${config.webUrl}/checkout/error?reason=${encodeURIComponent(status.failureReason || status.status)}`
       );
     } else {
-      res.redirect(`${config.webUrl}/checkout/pending?transaction=${transactionId}`);
+      res.redirect(
+        `${config.webUrl}/checkout/pending?transaction=${encodeURIComponent(transactionId)}`
+      );
     }
   } catch (error) {
     console.error('[CALLBACK ERROR]', error);

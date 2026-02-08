@@ -133,12 +133,10 @@ export default function StoreTemplatePage() {
       );
 
       if (response.ok) {
-        alert('Template updated successfully!');
         router.push(`/stores/${storeId}`);
       }
     } catch (error) {
       console.error('Failed to update template:', error);
-      alert('Failed to update template');
     } finally {
       setIsSaving(false);
     }

@@ -301,9 +301,11 @@ export class AuthService {
   }
 
   static async refreshTokens(refreshToken: string): Promise<AuthTokens> {
-    // Verify refresh token
+    // Hash the token to look it up
+    const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
+
     const storedToken = await prisma.refreshToken.findUnique({
-      where: { token: refreshToken },
+      where: { token: tokenHash },
       include: { user: true },
     });
 
@@ -328,8 +330,9 @@ export class AuthService {
   }
 
   static async logout(refreshToken: string): Promise<void> {
+    const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
     await prisma.refreshToken.deleteMany({
-      where: { token: refreshToken },
+      where: { token: tokenHash },
     });
   }
 
@@ -438,13 +441,14 @@ export class AuthService {
       expiresIn: '30d',
     });
 
-    // Store refresh token in database
+    // Store hashed refresh token in database
+    const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 30); // 30 days
 
     await prisma.refreshToken.create({
       data: {
-        token: refreshToken,
+        token: tokenHash,
         userId: payload.userId,
         expiresAt,
       },

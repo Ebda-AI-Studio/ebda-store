@@ -139,7 +139,7 @@ export class TaxService {
     await this.getRate(storeId, rateId);
 
     const rate = await prisma.taxRate.update({
-      where: { id: rateId },
+      where: { id: rateId, storeId },
       data: {
         name: data.name,
         nameAr: data.nameAr,
@@ -163,7 +163,7 @@ export class TaxService {
    */
   static async deleteRate(storeId: string, rateId: string) {
     await this.getRate(storeId, rateId);
-    await prisma.taxRate.delete({ where: { id: rateId } });
+    await prisma.taxRate.delete({ where: { id: rateId, storeId } });
   }
 
   /**
