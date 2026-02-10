@@ -373,11 +373,15 @@ export class ReturnService {
   /**
    * Get customer returns
    */
-  static async getCustomerReturns(customerId: string, options: ListReturnsOptions = {}) {
+  static async getCustomerReturns(
+    storeId: string,
+    customerId: string,
+    options: ListReturnsOptions = {}
+  ) {
     const { page = 1, limit = 20, status } = options;
     const skip = (page - 1) * limit;
 
-    const where: Prisma.ReturnWhereInput = { customerId };
+    const where: Prisma.ReturnWhereInput = { storeId, customerId };
 
     if (status) {
       where.status = status as ReturnStatus;

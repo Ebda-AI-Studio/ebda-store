@@ -198,7 +198,7 @@ export class CouponService {
     const coupon = await this.getById(storeId, couponId);
 
     const updatedCoupon = await prisma.coupon.update({
-      where: { id: couponId },
+      where: { id: couponId, storeId },
       data: { isActive: !coupon.isActive },
     });
 

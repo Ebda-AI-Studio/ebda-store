@@ -33,9 +33,10 @@ const createReturnSchema = z.object({
 // GET /stores/:storeId/returns - List customer returns
 router.get('/', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const { storeId } = req.params;
     const { page, limit, status } = req.query;
 
-    const result = await ReturnService.getCustomerReturns(req.user!.userId, {
+    const result = await ReturnService.getCustomerReturns(storeId, req.user!.userId, {
       page: page ? parseInt(page as string) : undefined,
       limit: limit ? parseInt(limit as string) : undefined,
       status: status as string,

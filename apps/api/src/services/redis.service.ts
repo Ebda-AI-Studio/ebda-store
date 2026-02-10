@@ -100,7 +100,12 @@ class RedisService {
   async getSession(sessionId: string): Promise<Record<string, unknown> | null> {
     if (!this.isAvailable()) return null;
     const data = await this.client!.get(`session:${sessionId}`);
-    return data ? JSON.parse(data) : null;
+    if (!data) return null;
+    try {
+      return JSON.parse(data);
+    } catch {
+      return null;
+    }
   }
 
   async deleteSession(sessionId: string): Promise<void> {
@@ -131,7 +136,14 @@ class RedisService {
     if (!this.isAvailable()) return null;
     const data = await this.client!.get(`cache:${key}`);
     if (!data) return null;
-    return parseJson ? JSON.parse(data) : (data as T);
+    if (parseJson) {
+      try {
+        return JSON.parse(data);
+      } catch {
+        return null;
+      }
+    }
+    return data as T;
   }
 
   async delete(key: string): Promise<void> {

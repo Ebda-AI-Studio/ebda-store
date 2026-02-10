@@ -79,7 +79,7 @@ export default function InventoryPage() {
     try {
       const token = localStorage.getItem('authToken');
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/stores/${storeId}`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -97,7 +97,7 @@ export default function InventoryPage() {
     try {
       const token = localStorage.getItem('authToken');
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/stores/${storeId}/inventory/stats`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}/inventory/stats`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (res.ok) {
@@ -119,7 +119,7 @@ export default function InventoryPage() {
       params.set('sortOrder', 'asc');
 
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/stores/${storeId}/inventory/products?${params}`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}/inventory/products?${params}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (res.ok) {
@@ -135,7 +135,7 @@ export default function InventoryPage() {
     try {
       const token = localStorage.getItem('authToken');
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/stores/${storeId}/inventory/history?limit=50`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}/inventory/history?limit=50`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (res.ok) {
@@ -151,7 +151,7 @@ export default function InventoryPage() {
     try {
       const token = localStorage.getItem('authToken');
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/stores/${storeId}/inventory/alerts`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}/inventory/alerts`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (res.ok) {
@@ -200,7 +200,7 @@ export default function InventoryPage() {
       }
 
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/stores/${storeId}/inventory/adjust`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}/inventory/adjust`,
         {
           method: 'POST',
           headers: {

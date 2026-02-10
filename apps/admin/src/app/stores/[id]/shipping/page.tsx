@@ -70,7 +70,7 @@ export default function ShippingSettingsPage() {
     try {
       const token = localStorage.getItem('authToken');
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/stores/${storeId}`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -93,7 +93,7 @@ export default function ShippingSettingsPage() {
       if (filter === 'inactive') params.set('isActive', 'false');
 
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/stores/${storeId}/shipping?${params}`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}/shipping?${params}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (res.ok) {
@@ -175,8 +175,8 @@ export default function ShippingSettingsPage() {
       };
 
       const url = editingZone
-        ? `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/stores/${storeId}/shipping/${editingZone.id}`
-        : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/stores/${storeId}/shipping`;
+        ? `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}/shipping/${editingZone.id}`
+        : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}/shipping`;
 
       const res = await fetch(url, {
         method: editingZone ? 'PUT' : 'POST',
@@ -202,7 +202,7 @@ export default function ShippingSettingsPage() {
     try {
       const token = localStorage.getItem('authToken');
       await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/stores/${storeId}/shipping/${zone.id}/toggle`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}/shipping/${zone.id}/toggle`,
         {
           method: 'PATCH',
           headers: { Authorization: `Bearer ${token}` },
@@ -215,12 +215,10 @@ export default function ShippingSettingsPage() {
   };
 
   const handleDelete = async (zone: ShippingZone) => {
-    if (!confirm(`Delete shipping zone "${zone.name}"? This cannot be undone.`)) return;
-
     try {
       const token = localStorage.getItem('authToken');
       await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/stores/${storeId}/shipping/${zone.id}`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}/shipping/${zone.id}`,
         {
           method: 'DELETE',
           headers: { Authorization: `Bearer ${token}` },

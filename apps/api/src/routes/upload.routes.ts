@@ -59,7 +59,7 @@ router.post(
         return;
       }
 
-      const folder = (req.query.folder as string) || 'products';
+      const folder = ((req.query.folder as string) || 'products').replace(/[^a-zA-Z0-9_-]/g, '');
 
       const result = await StorageService.upload(req.file.buffer, req.file.originalname, {
         folder,
@@ -112,7 +112,7 @@ router.post(
         return;
       }
 
-      const folder = (req.query.folder as string) || 'products';
+      const folder = ((req.query.folder as string) || 'products').replace(/[^a-zA-Z0-9_-]/g, '');
 
       const results = await StorageService.uploadMultiple(
         files.map(f => ({ buffer: f.buffer, filename: f.originalname })),
@@ -161,7 +161,21 @@ router.post(
         return;
       }
 
-      const result = await StorageService.getUploadUrl(filename, contentType, folder || 'products');
+      // Validate content type against allowed types
+      const allowedContentTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+      if (!allowedContentTypes.includes(contentType)) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'INVALID_TYPE',
+            message: `Invalid content type: ${contentType}. Allowed: ${allowedContentTypes.join(', ')}`,
+          },
+        });
+        return;
+      }
+
+      const sanitizedFolder = (folder || 'products').replace(/[^a-zA-Z0-9_-]/g, '');
+      const result = await StorageService.getUploadUrl(filename, contentType, sanitizedFolder);
 
       res.json({
         success: true,
@@ -184,6 +198,33 @@ router.delete(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { key } = req.params;
+
+      // Validate key doesn't contain path traversal
+      if (key.includes('..') || key.startsWith('/')) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'INVALID_KEY', message: 'Invalid file key' },
+        });
+        return;
+      }
+
+      // Validate key belongs to the requesting store to prevent cross-store deletion
+      const storeId = req.headers['x-store-id'] as string;
+      if (!storeId) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'MISSING_STORE', message: 'Store ID is required' },
+        });
+        return;
+      }
+
+      if (!key.includes(storeId)) {
+        res.status(403).json({
+          success: false,
+          error: { code: 'FORBIDDEN', message: 'Cannot delete files from another store' },
+        });
+        return;
+      }
 
       await StorageService.delete(key);
 

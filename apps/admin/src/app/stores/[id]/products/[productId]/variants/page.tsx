@@ -155,8 +155,6 @@ export default function ProductVariantsPage() {
   }
 
   async function handleDeleteOption(optionId: string) {
-    if (!confirm('Delete this option? This will also delete all variants.')) return;
-
     try {
       const token = localStorage.getItem('authToken');
       await fetch(
@@ -204,8 +202,6 @@ export default function ProductVariantsPage() {
   }
 
   async function handleDeleteValue(valueId: string) {
-    if (!confirm('Delete this value? Related variants will also be deleted.')) return;
-
     try {
       const token = localStorage.getItem('authToken');
       await fetch(
@@ -277,8 +273,6 @@ export default function ProductVariantsPage() {
   }
 
   async function handleDeleteVariant(variantId: string) {
-    if (!confirm('Delete this variant?')) return;
-
     try {
       const token = localStorage.getItem('authToken');
       await fetch(

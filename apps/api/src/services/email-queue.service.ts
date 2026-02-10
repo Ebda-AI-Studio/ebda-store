@@ -30,7 +30,8 @@ class EmailQueueService {
    * Add email to queue
    */
   async enqueue(options: EmailOptions): Promise<string> {
-    const id = `email_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const crypto = require('crypto');
+    const id = `email_${Date.now()}_${crypto.randomBytes(5).toString('hex')}`;
 
     const queuedEmail: QueuedEmail = {
       id,

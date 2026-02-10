@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { authenticate, optionalAuthenticate } from '../middleware/auth';
+import { authenticate } from '../middleware/auth';
 import { requireStore } from '../middleware/store';
 import { ReviewService } from '../services/review.service';
 
@@ -70,15 +70,15 @@ router.get(
   }
 );
 
-// POST /reviews - Create a review
+// POST /reviews - Create a review (requires authentication)
 router.post(
   '/',
   requireStore,
-  optionalAuthenticate,
+  authenticate,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const data = createReviewSchema.parse(req.body);
-      const customerId = req.user?.userId || null;
+      const customerId = req.user!.userId;
 
       const review = await ReviewService.create(req.storeId!, customerId, data);
 

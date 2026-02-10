@@ -95,7 +95,7 @@ function generateIdempotencyKey(provider: PaymentProvider, payload: any): string
     case 'upayments':
       return `up_${payload.invoice_id || payload.transaction_id}`;
     default:
-      return `unknown_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      return `unknown_${Date.now()}_${require('crypto').randomBytes(5).toString('hex')}`;
   }
 }
 
@@ -214,7 +214,24 @@ router.post('/payment', async (req: Request, res: Response, next: NextFunction) 
       provider = 'tap';
     }
 
-    const signature = (req.headers['x-signature'] as string) || '';
+    const signature =
+      (req.headers['x-signature'] as string) ||
+      (req.headers['x-tap-signature'] as string) ||
+      (req.headers['x-myfatoorah-signature'] as string) ||
+      (req.headers['x-hesabe-signature'] as string) ||
+      (req.headers['x-upayments-signature'] as string) ||
+      (req.headers['tap-signature'] as string) ||
+      '';
+
+    if (!signature) {
+      console.warn(`[WEBHOOK] Missing signature for auto-detected ${provider} webhook`);
+      res.status(401).json({
+        success: false,
+        error: { code: 'MISSING_SIGNATURE', message: 'Webhook signature is required' },
+      });
+      return;
+    }
+
     const result = await PaymentService.handleWebhook(provider, req.body, signature);
 
     console.log(`[WEBHOOK] Auto-detected ${provider}: ${JSON.stringify(result)}`);

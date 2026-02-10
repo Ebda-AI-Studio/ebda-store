@@ -83,6 +83,30 @@ export default function SettingsPage() {
       return;
     }
 
+    if (!/[A-Z]/.test(passwordData.newPassword)) {
+      setMessage({ type: 'error', text: 'Password must contain at least one uppercase letter' });
+      setIsSaving(false);
+      return;
+    }
+
+    if (!/[a-z]/.test(passwordData.newPassword)) {
+      setMessage({ type: 'error', text: 'Password must contain at least one lowercase letter' });
+      setIsSaving(false);
+      return;
+    }
+
+    if (!/[0-9]/.test(passwordData.newPassword)) {
+      setMessage({ type: 'error', text: 'Password must contain at least one number' });
+      setIsSaving(false);
+      return;
+    }
+
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(passwordData.newPassword)) {
+      setMessage({ type: 'error', text: 'Password must contain at least one special character' });
+      setIsSaving(false);
+      return;
+    }
+
     // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 1000));
 

@@ -29,6 +29,9 @@ export function Modal({ isOpen, onClose, children, title, className, size = 'md'
       {/* Modal */}
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={title ? 'modal-title' : undefined}
           className={cn(
             'relative w-full rounded-lg bg-white shadow-xl',
             sizeClasses[size],
@@ -38,7 +41,9 @@ export function Modal({ isOpen, onClose, children, title, className, size = 'md'
         >
           {title && (
             <div className="flex items-center justify-between border-b px-6 py-4">
-              <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+              <h2 id="modal-title" className="text-lg font-semibold text-gray-900">
+                {title}
+              </h2>
               <button
                 onClick={onClose}
                 className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"

@@ -337,30 +337,68 @@ export function sanitizeInput(req: Request, _res: Response, next: NextFunction) 
   next();
 }
 
+function sanitizeString(str: string): string {
+  // First, strip null bytes and non-printable control characters (except newline, tab, carriage return)
+  let cleaned = str.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+
+  // Normalize unicode escape sequences that could bypass filters
+  // Remove zero-width characters and other invisible unicode
+  cleaned = cleaned.replace(/[\u200B-\u200F\u2028-\u202F\uFEFF\uFFF9-\uFFFB]/g, '');
+
+  // Strip HTML comments which can be used to break up keywords
+  cleaned = cleaned.replace(/<!--[\s\S]*?-->/g, '');
+
+  // Remove javascript/vbscript protocol handlers (case insensitive, accounting for whitespace/encoding tricks)
+  // Match with optional whitespace, tabs, newlines between characters
+  cleaned = cleaned.replace(
+    /j[\s\t\r\n]*a[\s\t\r\n]*v[\s\t\r\n]*a[\s\t\r\n]*s[\s\t\r\n]*c[\s\t\r\n]*r[\s\t\r\n]*i[\s\t\r\n]*p[\s\t\r\n]*t[\s\t\r\n]*:/gi,
+    ''
+  );
+  cleaned = cleaned.replace(
+    /v[\s\t\r\n]*b[\s\t\r\n]*s[\s\t\r\n]*c[\s\t\r\n]*r[\s\t\r\n]*i[\s\t\r\n]*p[\s\t\r\n]*t[\s\t\r\n]*:/gi,
+    ''
+  );
+
+  // Remove data: URIs that could contain executable content
+  cleaned = cleaned.replace(
+    /data\s*:\s*[^\s,;]*(text\/html|application\/xhtml|text\/xml|image\/svg)[^\s,;]*/gi,
+    ''
+  );
+
+  // Remove event handlers more thoroughly (on* attributes with various whitespace tricks)
+  cleaned = cleaned.replace(/\bon[a-z]{2,}\s*=/gi, '');
+
+  // Remove expression() used in CSS-based XSS
+  cleaned = cleaned.replace(/expression\s*\(/gi, '');
+
+  // Remove url() with javascript/data in CSS context
+  cleaned = cleaned.replace(/url\s*\(\s*(javascript|data)\s*:/gi, '');
+
+  // HTML entity encode dangerous characters
+  cleaned = cleaned
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+    .replace(/\//g, '&#x2F;')
+    .replace(/`/g, '&#96;');
+
+  return cleaned.trim();
+}
+
 function sanitizeObject(obj: Record<string, unknown>): Record<string, unknown> {
   const sanitized: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(obj)) {
     if (typeof value === 'string') {
-      // Remove potential XSS vectors - strip all HTML tags and dangerous patterns
-      sanitized[key] = value
-        .replace(/<[^>]*>/g, '')
-        .replace(/javascript\s*:/gi, '')
-        .replace(/on\w+\s*=/gi, '')
-        .replace(/data\s*:/gi, '')
-        .replace(/&#/g, '&amp;#')
-        .replace(/\\u/g, '\\\\u')
-        .trim();
+      sanitized[key] = sanitizeString(value);
     } else if (Array.isArray(value)) {
       sanitized[key] = value.map(item =>
         typeof item === 'object' && item !== null
           ? sanitizeObject(item as Record<string, unknown>)
           : typeof item === 'string'
-            ? item
-                .replace(/<[^>]*>/g, '')
-                .replace(/javascript\s*:/gi, '')
-                .replace(/on\w+\s*=/gi, '')
-                .trim()
+            ? sanitizeString(item)
             : item
       );
     } else if (value && typeof value === 'object') {
@@ -395,7 +433,7 @@ export function securityHeaders(_req: Request, res: Response, next: NextFunction
     'Content-Security-Policy',
     [
       "default-src 'self'",
-      "script-src 'self' https://www.googletagmanager.com https://connect.facebook.net",
+      "script-src 'self' 'strict-dynamic' https://www.googletagmanager.com https://connect.facebook.net",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: https: blob:",

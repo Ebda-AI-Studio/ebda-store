@@ -18,7 +18,8 @@ const DEFAULT_CONFIG: LockoutConfig = {
   attemptWindowMs: 15 * 60 * 1000, // 15 minutes
 };
 
-// In-memory fallback when Redis is unavailable
+// In-memory fallback when Redis is unavailable (with size limit)
+const MAX_LOCKOUT_ENTRIES = 10000;
 const memoryStore = new Map<string, { attempts: number; lockedUntil?: number }>();
 
 class AccountLockoutService {
@@ -90,6 +91,14 @@ class AccountLockoutService {
         await client!.pexpire(`${key}:attempts`, this.config.attemptWindowMs);
       }
     } else {
+      // Evict oldest entries if at capacity
+      if (memoryStore.size >= MAX_LOCKOUT_ENTRIES) {
+        const iterator = memoryStore.keys();
+        for (let i = 0; i < 1000; i++) {
+          const k = iterator.next().value;
+          if (k) memoryStore.delete(k);
+        }
+      }
       const data = memoryStore.get(key) || { attempts: 0 };
       data.attempts++;
       attempts = data.attempts;

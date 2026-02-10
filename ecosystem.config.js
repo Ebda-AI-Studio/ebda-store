@@ -18,6 +18,7 @@ module.exports = {
       autorestart: true,
       watch: false,
       max_memory_restart: '1G',
+      max_restarts: 10,
       env: {
         NODE_ENV: 'development',
         PORT: 4000,
@@ -32,6 +33,8 @@ module.exports = {
       time: true,
       merge_logs: true,
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      max_size: '50M',
+      retain: 10,
     },
     {
       name: 'force-web',
@@ -41,6 +44,7 @@ module.exports = {
       autorestart: true,
       watch: false,
       max_memory_restart: '500M',
+      max_restarts: 10,
       env: {
         NODE_ENV: 'development',
         PORT: 3000,
@@ -55,6 +59,8 @@ module.exports = {
       time: true,
       merge_logs: true,
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      max_size: '50M',
+      retain: 10,
     },
     {
       name: 'force-admin',
@@ -64,6 +70,7 @@ module.exports = {
       autorestart: true,
       watch: false,
       max_memory_restart: '500M',
+      max_restarts: 10,
       env: {
         NODE_ENV: 'development',
         PORT: 3001,
@@ -78,6 +85,8 @@ module.exports = {
       time: true,
       merge_logs: true,
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      max_size: '50M',
+      retain: 10,
     },
   ],
 

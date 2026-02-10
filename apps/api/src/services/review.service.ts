@@ -296,7 +296,7 @@ export class ReviewService {
     }
 
     return prisma.review.update({
-      where: { id: reviewId },
+      where: { id: reviewId, storeId },
       data: { isApproved: true },
     });
   }
@@ -314,7 +314,7 @@ export class ReviewService {
     }
 
     return prisma.review.update({
-      where: { id: reviewId },
+      where: { id: reviewId, storeId },
       data: { isApproved: false },
     });
   }
@@ -351,7 +351,7 @@ export class ReviewService {
     }
 
     return prisma.review.update({
-      where: { id: reviewId },
+      where: { id: reviewId, storeId },
       data: { helpfulCount: { increment: 1 } },
     });
   }

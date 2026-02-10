@@ -13,7 +13,8 @@ type UpdateStoreData = Partial<CreateStoreData>;
 
 export class StoreService {
   static async list(options: { page?: number; limit?: number } = {}) {
-    const { page = 1, limit = 20 } = options;
+    const page = Math.max(1, options.page || 1);
+    const limit = Math.min(100, Math.max(1, options.limit || 20));
     const skip = (page - 1) * limit;
 
     const [stores, total] = await Promise.all([

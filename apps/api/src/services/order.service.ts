@@ -45,7 +45,9 @@ export class OrderService {
       customerId?: string;
     } = {}
   ) {
-    const { page = 1, limit = 20, status, customerId } = options;
+    const { status, customerId } = options;
+    const page = Math.max(1, options.page || 1);
+    const limit = Math.min(100, Math.max(1, options.limit || 20));
     const skip = (page - 1) * limit;
 
     const where: Prisma.OrderWhereInput = { storeId };

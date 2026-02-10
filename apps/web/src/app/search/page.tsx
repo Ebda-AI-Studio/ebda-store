@@ -162,10 +162,12 @@ function SearchContent() {
                       {product.name}
                     </h3>
                     <div className="mt-2 flex items-center gap-2">
-                      <span className="font-bold text-lg">${product.price.toFixed(2)}</span>
+                      <span className="font-bold text-lg">
+                        {(product.price / 1000).toFixed(3)} KWD
+                      </span>
                       {product.compareAtPrice && product.compareAtPrice > product.price && (
                         <span className="text-gray-400 line-through text-sm">
-                          ${product.compareAtPrice.toFixed(2)}
+                          {(product.compareAtPrice / 1000).toFixed(3)} KWD
                         </span>
                       )}
                     </div>

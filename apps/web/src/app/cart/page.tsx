@@ -57,8 +57,8 @@ export default function CartPage() {
     }
   };
 
-  // Convert from cents to KWD (price is stored in cents)
-  const subtotal = cartTotal / 100;
+  // Convert from fils to KWD (price is stored in fils, 1 KWD = 1000 fils)
+  const subtotal = cartTotal / 1000;
   const discount = promoApplied ? subtotal * 0.1 : 0;
   const shipping = subtotal >= 20 ? 0 : 2.5; // Free shipping over 20 KWD
   const total = subtotal - discount + shipping;
@@ -206,7 +206,7 @@ export default function CartPage() {
                           )}
                           <h3 className="mt-0.5 font-semibold text-foreground">{item.name}</h3>
                           <p className="mt-1 text-sm text-muted-foreground">
-                            {formatPrice(item.price / 100)} each
+                            {formatPrice(item.price / 1000)} each
                           </p>
                         </div>
                         <button
@@ -278,7 +278,7 @@ export default function CartPage() {
 
                         {/* Item Total */}
                         <p className="text-lg font-bold text-primary">
-                          {formatPrice((item.price * item.quantity) / 100)}
+                          {formatPrice((item.price * item.quantity) / 1000)}
                         </p>
                       </div>
                     </div>

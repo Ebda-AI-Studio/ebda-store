@@ -160,6 +160,7 @@ export default function MarketingPixelsPage() {
   const [pixels, setPixels] = useState<MarketingPixels>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [expandedPlatform, setExpandedPlatform] = useState<string | null>(null);
 
   useEffect(() => {
@@ -190,6 +191,7 @@ export default function MarketingPixelsPage() {
 
   async function handleSave() {
     setIsSaving(true);
+    setSaveMessage(null);
     try {
       const token = localStorage.getItem('authToken');
       const response = await fetch(
@@ -207,8 +209,10 @@ export default function MarketingPixelsPage() {
       if (!response.ok) {
         throw new Error('Failed to save');
       }
+      setSaveMessage('Marketing pixels saved successfully.');
     } catch (error) {
       console.error('Failed to save marketing pixels:', error);
+      setSaveMessage('Failed to save marketing pixels. Please try again.');
     } finally {
       setIsSaving(false);
     }
@@ -259,13 +263,22 @@ export default function MarketingPixelsPage() {
       title="Marketing Pixels"
       subtitle="Configure tracking pixels to measure ad performance and conversions"
       actions={
-        <button
-          onClick={handleSave}
-          disabled={isSaving}
-          className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 font-medium"
-        >
-          {isSaving ? 'Saving...' : 'Save Changes'}
-        </button>
+        <div className="flex items-center gap-3">
+          {saveMessage && (
+            <span
+              className={`text-sm ${saveMessage.includes('Failed') ? 'text-red-600' : 'text-green-600'}`}
+            >
+              {saveMessage}
+            </span>
+          )}
+          <button
+            onClick={handleSave}
+            disabled={isSaving}
+            className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 font-medium"
+          >
+            {isSaving ? 'Saving...' : 'Save Changes'}
+          </button>
+        </div>
       }
     >
       <div className="space-y-6">

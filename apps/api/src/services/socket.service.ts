@@ -2,6 +2,7 @@ import { Server as HttpServer } from 'http';
 import { Server, Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import { config } from '../config';
+import { prisma } from '@force/database';
 
 interface AuthPayload {
   userId: string;
@@ -76,12 +77,30 @@ class SocketService {
     socket.join(`user:${user.userId}`);
 
     // Handle store subscription (only admins can subscribe to store events)
-    socket.on('subscribe:store', (storeId: string) => {
+    socket.on('subscribe:store', async (storeId: string) => {
       const role = user.role;
       if (role !== 'admin' && role !== 'super_admin' && role !== 'store_admin') {
         socket.emit('error', { message: 'Insufficient permissions to subscribe to store events' });
         return;
       }
+
+      // store_admin can only subscribe to their own store
+      if (role === 'store_admin') {
+        try {
+          const store = await prisma.store.findFirst({
+            where: { id: storeId, ownerId: user.userId },
+            select: { id: true },
+          });
+          if (!store) {
+            socket.emit('error', { message: 'You do not have access to this store' });
+            return;
+          }
+        } catch {
+          socket.emit('error', { message: 'Failed to verify store access' });
+          return;
+        }
+      }
+
       socket.join(`store:${storeId}`);
       this.addStoreSocket(storeId, socket.id);
     });

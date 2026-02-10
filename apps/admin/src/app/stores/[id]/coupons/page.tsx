@@ -23,7 +23,7 @@ interface Coupon {
   createdAt: string;
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 export default function CouponsPage() {
   const params = useParams();
@@ -62,7 +62,7 @@ export default function CouponsPage() {
   async function fetchStoreName() {
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`${API_URL}/stores/${storeId}`, {
+      const response = await fetch(`${API_URL}/api/v1/stores/${storeId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await response.json();
@@ -82,7 +82,7 @@ export default function CouponsPage() {
       if (filterActive !== 'all')
         params.append('isActive', filterActive === 'active' ? 'true' : 'false');
 
-      const response = await fetch(`${API_URL}/stores/${storeId}/coupons?${params}`, {
+      const response = await fetch(`${API_URL}/api/v1/stores/${storeId}/coupons?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await response.json();
@@ -103,8 +103,8 @@ export default function CouponsPage() {
     try {
       const token = localStorage.getItem('authToken');
       const url = editingCoupon
-        ? `${API_URL}/stores/${storeId}/coupons/${editingCoupon.id}`
-        : `${API_URL}/stores/${storeId}/coupons`;
+        ? `${API_URL}/api/v1/stores/${storeId}/coupons/${editingCoupon.id}`
+        : `${API_URL}/api/v1/stores/${storeId}/coupons`;
 
       const body = {
         code: formData.code,
@@ -149,11 +149,9 @@ export default function CouponsPage() {
   }
 
   async function handleDelete(couponId: string) {
-    if (!confirm('Are you sure you want to delete this coupon?')) return;
-
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`${API_URL}/stores/${storeId}/coupons/${couponId}`, {
+      const response = await fetch(`${API_URL}/api/v1/stores/${storeId}/coupons/${couponId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -169,10 +167,13 @@ export default function CouponsPage() {
   async function handleToggleActive(couponId: string) {
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`${API_URL}/stores/${storeId}/coupons/${couponId}/toggle`, {
-        method: 'PATCH',
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await fetch(
+        `${API_URL}/api/v1/stores/${storeId}/coupons/${couponId}/toggle`,
+        {
+          method: 'PATCH',
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
 
       if (response.ok) {
         fetchCoupons();

@@ -78,13 +78,12 @@ jobs:
       - name: Deploy notification
         run: echo "Deploying to staging environment..."
 
-      # Add your staging deployment steps here
-      # e.g., SSH to server, kubectl apply, etc.
+      # TODO: Configure deployment commands for your staging infrastructure
+      # Examples: kubectl apply, docker compose pull && up, ssh deploy, etc.
       - name: Deploy to staging server
         run: |
-          echo "TODO: Add staging deployment commands"
-          echo "Images built and pushed to registry"
-          echo "Ready for deployment: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-api:${{ github.sha }}"
+          echo "Deploying to staging environment"
+          echo "Images pushed to registry - configure deployment commands for your infrastructure"
 
   # Deploy to production
   deploy-production:
@@ -99,12 +98,12 @@ jobs:
       - name: Deploy notification
         run: echo "Deploying to production environment..."
 
-      # Add your production deployment steps here
+      # TODO: Configure deployment commands for your production infrastructure
+      # Examples: kubectl apply, docker compose pull && up, ssh deploy, etc.
       - name: Deploy to production server
         run: |
-          echo "TODO: Add production deployment commands"
-          echo "Images built and pushed to registry"
-          echo "Ready for deployment: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-api:${{ github.sha }}"
+          echo "Deploying to production environment"
+          echo "Images pushed to registry - configure deployment commands for your infrastructure"
 
   # Run database migrations
   migrate:
@@ -126,9 +125,7 @@ jobs:
         run: npm ci --legacy-peer-deps
 
       - name: Run migrations
-        run: |
-          echo "TODO: Run database migrations"
-          echo "npx prisma migrate deploy --schema=packages/database/prisma/schema.prisma"
+        run: npx prisma migrate deploy --schema=packages/database/prisma/schema.prisma
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 

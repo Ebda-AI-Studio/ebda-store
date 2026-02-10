@@ -21,6 +21,51 @@ const createStoreSchema = z.object({
 
 const updateStoreSchema = createStoreSchema.partial();
 
+const themeSchema = z.record(z.unknown()).refine(
+  data => {
+    // Validate known string fields have reasonable lengths
+    const stringFields = [
+      'primaryColor',
+      'secondaryColor',
+      'accentColor',
+      'backgroundColor',
+      'textColor',
+      'buttonStyle',
+    ];
+    for (const field of stringFields) {
+      if (field in data && typeof data[field] === 'string' && (data[field] as string).length > 50)
+        return false;
+    }
+    const longStringFields = ['fontFamily', 'headingFontFamily'];
+    for (const field of longStringFields) {
+      if (field in data && typeof data[field] === 'string' && (data[field] as string).length > 100)
+        return false;
+    }
+    return true;
+  },
+  { message: 'Theme field values exceed maximum length' }
+);
+
+const seoSchema = z
+  .object({
+    metaTitle: z.string().max(200).optional(),
+    metaTitleAr: z.string().max(200).optional(),
+    metaDescription: z.string().max(500).optional(),
+    metaDescriptionAr: z.string().max(500).optional(),
+  })
+  .strip();
+
+const contactSchema = z
+  .object({
+    email: z.string().email().max(255).optional(),
+    phone: z.string().max(50).optional(),
+    phoneAr: z.string().max(50).optional(),
+    whatsapp: z.string().max(50).optional(),
+    address: z.string().max(500).optional(),
+    addressAr: z.string().max(500).optional(),
+  })
+  .strip();
+
 /**
  * @swagger
  * /stores:
@@ -273,9 +318,9 @@ router.put(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
-      const theme = req.body;
+      const theme = themeSchema.parse(req.body);
 
-      const store = await StoreService.updateTheme(id, theme);
+      const store = await StoreService.updateTheme(id, theme as any);
 
       res.json({
         success: true,
@@ -342,7 +387,7 @@ router.put(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
-      const contact = req.body;
+      const contact = contactSchema.parse(req.body);
 
       const store = await StoreService.updateContactInfo(id, contact);
 
@@ -388,7 +433,7 @@ router.put(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
-      const seo = req.body;
+      const seo = seoSchema.parse(req.body);
 
       const store = await StoreService.updateSeo(id, seo);
 

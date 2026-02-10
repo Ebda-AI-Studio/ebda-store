@@ -193,6 +193,7 @@ model Store {
   returns        Return[]
   inventoryHistory InventoryHistory[]
   tags           Tag[]
+  auditLogs      AuditLog[]
 
   @@index([ownerId])
   @@index([status])
@@ -795,7 +796,7 @@ model PaymentConfig {
 
   // Fees configuration
   fixedFee            Int                 @default(0) @map("fixed_fee") // in fils
-  percentageFee       Float               @default(0) @map("percentage_fee") // e.g., 2.5 for 2.5%
+  percentageFee       Decimal             @default(0) @map("percentage_fee") @db.Decimal(5, 2) // e.g., 2.5 for 2.5%
 
   // Status
   lastHealthCheck     DateTime?           @map("last_health_check")
@@ -854,6 +855,7 @@ model AuditLog {
   id           String   @id @default(uuid())
   action       String
   userId       String?  @map("user_id")
+  storeId      String?  @map("store_id")
   resourceType String   @map("resource_type")
   resourceId   String?  @map("resource_id")
   details      Json     @default("{}")
@@ -862,9 +864,11 @@ model AuditLog {
   createdAt    DateTime @default(now()) @map("created_at")
 
   // Relations
-  user User? @relation(fields: [userId], references: [id])
+  user  User?  @relation(fields: [userId], references: [id])
+  store Store? @relation(fields: [storeId], references: [id])
 
   @@index([userId])
+  @@index([storeId])
   @@index([action])
   @@index([resourceType])
   @@index([createdAt])
@@ -1076,6 +1080,7 @@ model LoyaltyTransaction {
   @@index([storeId])
   @@index([customerId])
   @@index([orderId])
+  @@index([storeId, customerId])
   @@map("loyalty_transactions")
 }
 

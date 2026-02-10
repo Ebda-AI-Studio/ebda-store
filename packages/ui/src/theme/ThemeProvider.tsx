@@ -107,7 +107,7 @@ export function ThemeProvider({
     root.dir = isRtl ? 'rtl' : 'ltr';
     root.lang = isRtl ? 'ar' : 'en';
 
-    // Apply custom CSS if provided
+    // Apply custom CSS if provided (sanitized to prevent injection)
     if (theme.customCss) {
       const styleId = 'force-theme-custom';
       let styleEl = document.getElementById(styleId) as HTMLStyleElement;
@@ -116,7 +116,18 @@ export function ThemeProvider({
         styleEl.id = styleId;
         document.head.appendChild(styleEl);
       }
-      styleEl.textContent = theme.customCss;
+      // Sanitize CSS: strip dangerous patterns like expressions, imports, urls with javascript:
+      const sanitizedCss = theme.customCss
+        .replace(/expression\s*\(/gi, '')
+        .replace(/@import\b/gi, '')
+        .replace(/javascript\s*:/gi, '')
+        .replace(/behavior\s*:/gi, '')
+        .replace(/-moz-binding\s*:/gi, '')
+        .replace(/url\s*\(\s*['"]?\s*javascript:/gi, 'url(')
+        .replace(/<\/?script[^>]*>/gi, '')
+        .replace(/<\/?style[^>]*>/gi, '')
+        .replace(/\/\*[\s\S]*?\*\//g, '');
+      styleEl.textContent = sanitizedCss;
     }
 
     // Cleanup

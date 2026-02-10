@@ -40,7 +40,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       return;
     }
 
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
     socketRef.current = io(apiUrl, {
       auth: { token },

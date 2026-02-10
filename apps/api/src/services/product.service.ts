@@ -51,10 +51,12 @@ interface AdvancedSearchOptions {
 
 export class ProductService {
   static async list(storeId: string, options: ListProductsOptions = {}) {
-    const { page = 1, limit = 20, status, category, search, featured } = options;
+    const { status, category, search, featured } = options;
+    const page = Math.max(1, options.page || 1);
+    const limit = Math.min(100, Math.max(1, options.limit || 20));
     const skip = (page - 1) * limit;
 
-    const where: Prisma.ProductWhereInput = { storeId };
+    const where: Prisma.ProductWhereInput = { storeId, deletedAt: null };
 
     if (status) {
       where.status = status as ProductStatus;
@@ -234,14 +236,16 @@ export class ProductService {
     await this.getById(storeId, productId);
 
     return prisma.product.update({
-      where: { id: productId },
+      where: { id: productId, storeId },
       data: { inventory: quantity },
     });
   }
 
   // Public methods (no store scope required)
   static async listPublic(storeId: string, options: ListProductsOptions = {}) {
-    const { page = 1, limit = 20, status = 'active', category, search, featured } = options;
+    const { status = 'active', category, search, featured } = options;
+    const page = Math.max(1, options.page || 1);
+    const limit = Math.min(100, Math.max(1, options.limit || 20));
     const skip = (page - 1) * limit;
 
     const where: Prisma.ProductWhereInput = {
@@ -340,8 +344,6 @@ export class ProductService {
    */
   static async advancedSearch(storeId: string, options: AdvancedSearchOptions = {}) {
     const {
-      page = 1,
-      limit = 20,
       query,
       categories,
       tags,
@@ -353,12 +355,15 @@ export class ProductService {
       featured,
       sortBy = 'newest',
     } = options;
+    const page = Math.max(1, options.page || 1);
+    const limit = Math.min(100, Math.max(1, options.limit || 20));
     const skip = (page - 1) * limit;
 
     // Build where clause
     const where: Prisma.ProductWhereInput = {
       storeId,
       status: 'active',
+      deletedAt: null,
     };
 
     // Text search

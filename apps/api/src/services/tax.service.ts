@@ -173,7 +173,7 @@ export class TaxService {
     const rate = await this.getRate(storeId, rateId);
 
     const updated = await prisma.taxRate.update({
-      where: { id: rateId },
+      where: { id: rateId, storeId },
       data: { isActive: !rate.isActive },
     });
 

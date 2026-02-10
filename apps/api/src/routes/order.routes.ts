@@ -42,7 +42,11 @@ const updateStatusSchema = z.object({
 
 // Helper to get session ID
 const getSessionId = (req: Request): string => {
-  return (req.headers['x-session-id'] as string) || 'anonymous';
+  const sessionId = req.headers['x-session-id'] as string;
+  if (!sessionId) {
+    throw Object.assign(new Error('Session ID required'), { statusCode: 400 });
+  }
+  return sessionId;
 };
 
 // GET /stores/:storeId/orders - List orders

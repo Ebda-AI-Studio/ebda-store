@@ -177,10 +177,12 @@ export default function ComparePage() {
                 <td className="p-4 font-medium text-gray-600">Price</td>
                 {products.map(product => (
                   <td key={product.id} className="p-4 text-center">
-                    <span className="font-bold text-lg">${product.price.toFixed(2)}</span>
+                    <span className="font-bold text-lg">
+                      {(product.price / 1000).toFixed(3)} KWD
+                    </span>
                     {product.compareAtPrice && product.compareAtPrice > product.price && (
                       <span className="block text-gray-400 line-through text-sm">
-                        ${product.compareAtPrice.toFixed(2)}
+                        {(product.compareAtPrice / 1000).toFixed(3)} KWD
                       </span>
                     )}
                   </td>

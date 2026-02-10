@@ -79,7 +79,7 @@ export default function PWASettingsPage() {
     try {
       const token = localStorage.getItem('authToken');
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/stores/${storeId}`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -97,7 +97,7 @@ export default function PWASettingsPage() {
     try {
       const token = localStorage.getItem('authToken');
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/stores/${storeId}/pwa/settings`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}/pwa/settings`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (res.ok) {
@@ -125,7 +125,7 @@ export default function PWASettingsPage() {
     try {
       const token = localStorage.getItem('authToken');
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/stores/${storeId}/pwa/settings`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}/pwa/settings`,
         {
           method: 'PUT',
           headers: {
@@ -150,7 +150,7 @@ export default function PWASettingsPage() {
     try {
       const token = localStorage.getItem('authToken');
       await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/stores/${storeId}/pwa/settings`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}/pwa/settings`,
         {
           method: 'PUT',
           headers: {

@@ -75,7 +75,7 @@ export default function TaxSettingsPage() {
     try {
       const token = localStorage.getItem('authToken');
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/stores/${storeId}`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -93,7 +93,7 @@ export default function TaxSettingsPage() {
     try {
       const token = localStorage.getItem('authToken');
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/stores/${storeId}/tax/settings`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}/tax/settings`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (res.ok) {
@@ -120,7 +120,7 @@ export default function TaxSettingsPage() {
       }
 
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/stores/${storeId}/tax/rates?${params}`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}/tax/rates?${params}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (res.ok) {
@@ -155,7 +155,7 @@ export default function TaxSettingsPage() {
     try {
       const token = localStorage.getItem('authToken');
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/stores/${storeId}/tax/settings`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}/tax/settings`,
         {
           method: 'PUT',
           headers: {
@@ -220,8 +220,8 @@ export default function TaxSettingsPage() {
       };
 
       const url = editingRate
-        ? `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/stores/${storeId}/tax/rates/${editingRate.id}`
-        : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/stores/${storeId}/tax/rates`;
+        ? `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}/tax/rates/${editingRate.id}`
+        : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}/tax/rates`;
 
       const res = await fetch(url, {
         method: editingRate ? 'PUT' : 'POST',
@@ -247,7 +247,7 @@ export default function TaxSettingsPage() {
     try {
       const token = localStorage.getItem('authToken');
       await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/stores/${storeId}/tax/rates/${rate.id}/toggle`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}/tax/rates/${rate.id}/toggle`,
         {
           method: 'PATCH',
           headers: { Authorization: `Bearer ${token}` },
@@ -260,12 +260,10 @@ export default function TaxSettingsPage() {
   };
 
   const handleDelete = async (rate: TaxRate) => {
-    if (!confirm(`Delete tax rate "${rate.name}"? This cannot be undone.`)) return;
-
     try {
       const token = localStorage.getItem('authToken');
       await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/stores/${storeId}/tax/rates/${rate.id}`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}/tax/rates/${rate.id}`,
         {
           method: 'DELETE',
           headers: { Authorization: `Bearer ${token}` },

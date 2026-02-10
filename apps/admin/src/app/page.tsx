@@ -51,6 +51,8 @@ function formatNumber(num: number) {
   return new Intl.NumberFormat('en-US').format(num);
 }
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+
 export default function DashboardPage() {
   const [stats, setStats] = useState<PlatformStats | null>(null);
   const [recentStores, setRecentStores] = useState<RecentStore[]>([]);
@@ -61,7 +63,7 @@ export default function DashboardPage() {
     async function fetchData() {
       try {
         const token = localStorage.getItem('authToken');
-        const response = await fetch('http://localhost:4000/api/v1/admin/dashboard', {
+        const response = await fetch(`${API_URL}/api/v1/admin/dashboard`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (response.ok) {

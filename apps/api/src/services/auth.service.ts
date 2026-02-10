@@ -270,11 +270,7 @@ export class AuthService {
         );
       }
 
-      throw new AppError(
-        401,
-        'INVALID_CREDENTIALS',
-        `Invalid email or password. ${result.attemptsRemaining} attempts remaining.`
-      );
+      throw new AppError(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
     }
 
     // Successful login - reset lockout

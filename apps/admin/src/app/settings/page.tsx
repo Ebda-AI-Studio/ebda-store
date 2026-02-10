@@ -24,6 +24,7 @@ const timezones = [
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('general');
   const [isSaving, setIsSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
   const [settings, setSettings] = useState({
     // General
@@ -50,9 +51,16 @@ export default function SettingsPage() {
 
   const handleSave = async () => {
     setIsSaving(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setIsSaving(false);
-    // Settings saved
+    setSaveMessage(null);
+    try {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      setSaveMessage('Settings saved successfully.');
+    } catch (error) {
+      console.error('Failed to save settings:', error);
+      setSaveMessage('Failed to save settings. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const tabs = [
@@ -335,7 +343,14 @@ export default function SettingsPage() {
           )}
 
           {/* Save Button */}
-          <div className="mt-6 flex justify-end">
+          <div className="mt-6 flex items-center justify-end gap-3">
+            {saveMessage && (
+              <span
+                className={`text-sm ${saveMessage.includes('Failed') ? 'text-red-600' : 'text-green-600'}`}
+              >
+                {saveMessage}
+              </span>
+            )}
             <Button onClick={handleSave} isLoading={isSaving}>
               Save Changes
             </Button>

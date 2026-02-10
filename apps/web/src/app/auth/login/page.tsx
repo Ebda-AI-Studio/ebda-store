@@ -1,12 +1,14 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Button, Input } from '@force/ui';
 import { api } from '@/lib/api';
 
 export default function LoginPage() {
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [formData, setFormData] = useState({
@@ -27,7 +29,7 @@ export default function LoginPage() {
       }
 
       // Redirect to home or account
-      window.location.href = '/';
+      router.push('/');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to login');
     } finally {

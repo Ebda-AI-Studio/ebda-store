@@ -19,6 +19,13 @@ const router = Router();
 router.use(authenticate);
 router.use(requireRole('super_admin'));
 
+// Pagination helper to bound inputs
+function parsePagination(page?: string | unknown, limit?: string | unknown) {
+  const p = Math.max(1, parseInt(String(page || '1')) || 1);
+  const l = Math.min(100, Math.max(1, parseInt(String(limit || '10')) || 10));
+  return { page: p, limit: l, skip: (p - 1) * l };
+}
+
 // Validation schemas
 const provisionStoreSchema = z.object({
   storeName: z.string().min(1).max(100),
@@ -80,11 +87,12 @@ router.post('/stores', async (req: Request, res: Response, next: NextFunction) =
  */
 router.get('/stores', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { page, limit, status, search } = req.query;
+    const { page: pageStr, limit: limitStr, status, search } = req.query;
+    const { page, limit } = parsePagination(pageStr, limitStr);
 
     const result = await ProvisioningService.listStores({
-      page: page ? parseInt(page as string) : undefined,
-      limit: limit ? parseInt(limit as string) : undefined,
+      page,
+      limit,
       status: status as string,
       search: search as string,
     });
@@ -181,6 +189,34 @@ router.put('/stores/:id', async (req: Request, res: Response, next: NextFunction
     const { id } = req.params;
     const { name, slug, plan, status } = req.body;
 
+    // Validate plan and status against allowed values
+    const validPlans = ['free', 'basic', 'professional', 'enterprise'];
+    const validStatuses = ['active', 'inactive', 'suspended', 'pending'];
+    if (plan && !validPlans.includes(plan)) {
+      res
+        .status(400)
+        .json({
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: `Invalid plan. Allowed: ${validPlans.join(', ')}`,
+          },
+        });
+      return;
+    }
+    if (status && !validStatuses.includes(status)) {
+      res
+        .status(400)
+        .json({
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: `Invalid status. Allowed: ${validStatuses.join(', ')}`,
+          },
+        });
+      return;
+    }
+
     const store = await prisma.store.update({
       where: { id },
       data: {
@@ -221,8 +257,8 @@ router.put('/stores/:id', async (req: Request, res: Response, next: NextFunction
  */
 router.get('/users', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { page = '1', limit = '10', role, search } = req.query;
-    const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
+    const { page: pageStr, limit: limitStr, role, search } = req.query;
+    const { page, limit, skip } = parsePagination(pageStr, limitStr);
 
     const where: Prisma.UserWhereInput = {};
     if (role && role !== 'all') where.role = role as UserRole;
@@ -238,7 +274,7 @@ router.get('/users', async (req: Request, res: Response, next: NextFunction) => 
       prisma.user.findMany({
         where,
         skip,
-        take: parseInt(limit as string),
+        take: limit,
         orderBy: { createdAt: 'desc' },
         select: {
           id: true,
@@ -262,10 +298,10 @@ router.get('/users', async (req: Request, res: Response, next: NextFunction) => 
       data: {
         users,
         pagination: {
-          page: parseInt(page as string),
-          limit: parseInt(limit as string),
+          page,
+          limit,
           total,
-          totalPages: Math.ceil(total / parseInt(limit as string)),
+          totalPages: Math.ceil(total / limit),
         },
       },
     });
@@ -330,8 +366,8 @@ router.get('/dashboard', async (_req: Request, res: Response, next: NextFunction
  */
 router.get('/products', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { page = '1', limit = '10', storeId, status, search } = req.query;
-    const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
+    const { page: pageStr, limit: limitStr, storeId, status, search } = req.query;
+    const { page, limit, skip } = parsePagination(pageStr, limitStr);
 
     const where: Prisma.ProductWhereInput = {};
     if (storeId) where.storeId = storeId as string;
@@ -347,7 +383,7 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
       prisma.product.findMany({
         where,
         skip,
-        take: parseInt(limit as string),
+        take: limit,
         orderBy: { createdAt: 'desc' },
         include: {
           store: { select: { id: true, name: true } },
@@ -362,10 +398,10 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
       data: {
         products,
         pagination: {
-          page: parseInt(page as string),
-          limit: parseInt(limit as string),
+          page,
+          limit,
           total,
-          totalPages: Math.ceil(total / parseInt(limit as string)),
+          totalPages: Math.ceil(total / limit),
         },
       },
     });
@@ -433,8 +469,8 @@ router.get('/products/:id', async (req: Request, res: Response, next: NextFuncti
  */
 router.get('/orders', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { page = '1', limit = '10', storeId, status, paymentStatus } = req.query;
-    const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
+    const { page: pageStr, limit: limitStr, storeId, status, paymentStatus } = req.query;
+    const { page, limit, skip } = parsePagination(pageStr, limitStr);
 
     const where: Prisma.OrderWhereInput = {};
     if (storeId) where.storeId = storeId as string;
@@ -445,7 +481,7 @@ router.get('/orders', async (req: Request, res: Response, next: NextFunction) =>
       prisma.order.findMany({
         where,
         skip,
-        take: parseInt(limit as string),
+        take: limit,
         orderBy: { createdAt: 'desc' },
         include: {
           store: { select: { id: true, name: true } },
@@ -461,10 +497,10 @@ router.get('/orders', async (req: Request, res: Response, next: NextFunction) =>
       data: {
         orders,
         pagination: {
-          page: parseInt(page as string),
-          limit: parseInt(limit as string),
+          page,
+          limit,
           total,
-          totalPages: Math.ceil(total / parseInt(limit as string)),
+          totalPages: Math.ceil(total / limit),
         },
       },
     });
@@ -479,8 +515,8 @@ router.get('/orders', async (req: Request, res: Response, next: NextFunction) =>
  */
 router.get('/customers', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { page = '1', limit = '10', storeId, search } = req.query;
-    const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
+    const { page: pageStr, limit: limitStr, storeId, search } = req.query;
+    const { page, limit, skip } = parsePagination(pageStr, limitStr);
 
     const where: Prisma.CustomerWhereInput = {};
     if (storeId) where.storeId = storeId as string;
@@ -496,7 +532,7 @@ router.get('/customers', async (req: Request, res: Response, next: NextFunction)
       prisma.customer.findMany({
         where,
         skip,
-        take: parseInt(limit as string),
+        take: limit,
         orderBy: { createdAt: 'desc' },
         include: {
           store: { select: { id: true, name: true } },
@@ -510,10 +546,10 @@ router.get('/customers', async (req: Request, res: Response, next: NextFunction)
       data: {
         customers,
         pagination: {
-          page: parseInt(page as string),
-          limit: parseInt(limit as string),
+          page,
+          limit,
           total,
-          totalPages: Math.ceil(total / parseInt(limit as string)),
+          totalPages: Math.ceil(total / limit),
         },
       },
     });
@@ -528,20 +564,19 @@ router.get('/customers', async (req: Request, res: Response, next: NextFunction)
  */
 router.get('/audit-logs', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { page = '1', limit = '50', action, userId, resourceType } = req.query;
+    const { page: pageStr, limit: limitStr, action, userId, resourceType } = req.query;
+    const { page, limit, skip } = parsePagination(pageStr, limitStr);
 
     const where: Prisma.AuditLogWhereInput = {};
     if (action) where.action = { contains: action as string };
     if (userId) where.userId = userId as string;
     if (resourceType) where.resourceType = resourceType as string;
 
-    const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
-
     const [logs, total] = await Promise.all([
       prisma.auditLog.findMany({
         where,
         skip,
-        take: parseInt(limit as string),
+        take: limit,
         orderBy: { createdAt: 'desc' },
         include: {
           user: {
@@ -557,10 +592,10 @@ router.get('/audit-logs', async (req: Request, res: Response, next: NextFunction
       data: {
         logs,
         meta: {
-          page: parseInt(page as string),
-          limit: parseInt(limit as string),
+          page,
+          limit,
           total,
-          totalPages: Math.ceil(total / parseInt(limit as string)),
+          totalPages: Math.ceil(total / limit),
         },
       },
     });

@@ -120,7 +120,6 @@ export default function ReviewsPage() {
   }
 
   async function handleDelete(reviewId: string) {
-    if (!confirm('Are you sure you want to delete this review?')) return;
     try {
       const token = localStorage.getItem('authToken');
       await fetch(

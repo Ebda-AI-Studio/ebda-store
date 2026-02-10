@@ -291,10 +291,12 @@ export class ProvisioningService {
    * Generate temporary password
    */
   private static generateTempPassword(): string {
+    const crypto = require('crypto');
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%';
+    const randomBytes = crypto.randomBytes(12);
     let password = '';
     for (let i = 0; i < 12; i++) {
-      password += chars.charAt(Math.floor(Math.random() * chars.length));
+      password += chars.charAt(randomBytes[i] % chars.length);
     }
     return password;
   }
