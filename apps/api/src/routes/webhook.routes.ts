@@ -52,9 +52,15 @@ function verifyWebhookSignature(req: Request, res: Response, next: NextFunction)
 /**
  * Check if a webhook has already been processed (idempotency check)
  */
-async function checkIdempotency(
-  idempotencyKey: string
-): Promise<{ alreadyProcessed: boolean; order?: any }> {
+async function checkIdempotency(idempotencyKey: string): Promise<{
+  alreadyProcessed: boolean;
+  order?: {
+    id: string;
+    orderNumber: string;
+    webhookProcessedAt: Date | null;
+    paymentStatus: string;
+  } | null;
+}> {
   const order = await prisma.order.findUnique({
     where: { idempotencyKey },
     select: { id: true, orderNumber: true, webhookProcessedAt: true, paymentStatus: true },
@@ -83,19 +89,28 @@ async function markWebhookProcessed(orderId: string, idempotencyKey: string): Pr
 /**
  * Generate idempotency key from webhook payload
  */
-function generateIdempotencyKey(provider: PaymentProvider, payload: any): string {
+function generateIdempotencyKey(
+  provider: PaymentProvider,
+  payload: Record<string, unknown>
+): string {
   // Use provider-specific transaction ID for idempotency
+  const charge = payload.charge as Record<string, unknown> | undefined;
+  const reference = payload.reference as Record<string, unknown> | undefined;
+  const data = payload.Data as Record<string, unknown> | undefined;
+
   switch (provider) {
     case 'tap':
-      return `tap_${payload.id || payload.charge?.id || payload.reference?.id}`;
+      return `tap_${payload.id || charge?.id || reference?.id}`;
     case 'myfatoorah':
-      return `mf_${payload.InvoiceId || payload.Data?.InvoiceId}`;
+      return `mf_${payload.InvoiceId || data?.InvoiceId}`;
     case 'hesabe':
       return `hesabe_${payload.paymentId || payload.transaction_id}`;
     case 'upayments':
       return `up_${payload.invoice_id || payload.transaction_id}`;
-    default:
-      return `unknown_${Date.now()}_${require('crypto').randomBytes(5).toString('hex')}`;
+    default: {
+      const crypto = require('crypto') as typeof import('crypto');
+      return `unknown_${Date.now()}_${crypto.randomBytes(5).toString('hex')}`;
+    }
   }
 }
 

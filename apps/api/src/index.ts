@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import { createServer } from 'http';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -127,19 +127,16 @@ app.get(
   '/api/v1/health',
   authenticate,
   requireRole(['admin', 'super_admin']),
-  async (_req: any, res: any) => {
-    const checks: Record<string, { status: string; latency?: number; error?: string }> = {};
+  async (_req: Request, res: Response) => {
+    const checks: Record<string, { status: string; latency?: number }> = {};
 
     // Check database
     const dbStart = Date.now();
     try {
       await prisma.$queryRaw`SELECT 1`;
       checks.database = { status: 'connected', latency: Date.now() - dbStart };
-    } catch (error) {
-      checks.database = {
-        status: 'disconnected',
-        error: error instanceof Error ? error.message : 'Unknown error',
-      };
+    } catch {
+      checks.database = { status: 'disconnected' };
     }
 
     // Check Redis
@@ -151,11 +148,8 @@ app.get(
       } else {
         checks.redis = { status: 'unavailable' };
       }
-    } catch (error) {
-      checks.redis = {
-        status: 'disconnected',
-        error: error instanceof Error ? error.message : 'Unknown error',
-      };
+    } catch {
+      checks.redis = { status: 'disconnected' };
     }
 
     // Get circuit breaker states

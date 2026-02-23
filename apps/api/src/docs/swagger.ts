@@ -369,6 +369,11 @@ All errors follow this format:
 const swaggerSpec = swaggerJsdoc(options);
 
 export function setupSwagger(app: Express) {
+  // Disable Swagger UI in production to avoid exposing API surface
+  if (process.env.NODE_ENV === 'production') {
+    return;
+  }
+
   // Serve Swagger UI
   app.use(
     '/docs',

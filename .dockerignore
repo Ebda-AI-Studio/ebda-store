@@ -4,6 +4,9 @@ node_modules
 *.md
 .env
 .env.*
+.env.local
+.env.development
+.env.production
 !.env.example
 tests
 coverage
@@ -13,3 +16,8 @@ coverage
 .tsbuildinfo
 *.tsbuildinfo
 test-db.js
+docker/data
+*.pem
+*.key
+*.crt
+.claude

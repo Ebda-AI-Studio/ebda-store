@@ -1,8 +1,6 @@
 # Force Website Builder - Docker Compose
 # Development and Production environment setup
 
-version: '3.8'
-
 services:
   # PostgreSQL Database
   postgres:

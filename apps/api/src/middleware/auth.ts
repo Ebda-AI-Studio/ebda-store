@@ -25,7 +25,11 @@ export function authenticate(req: Request, _res: Response, next: NextFunction): 
   const token = authHeader.split(' ')[1];
 
   try {
-    const payload = jwt.verify(token, config.jwtSecret) as AuthPayload;
+    const payload = jwt.verify(token, config.jwtSecret, {
+      algorithms: ['HS256'],
+      issuer: 'force-api',
+      audience: 'force-app',
+    }) as AuthPayload;
     req.user = payload;
     next();
   } catch {
@@ -48,7 +52,11 @@ export function optionalAuthenticate(req: Request, _res: Response, next: NextFun
   const token = authHeader.split(' ')[1];
 
   try {
-    const payload = jwt.verify(token, config.jwtSecret) as AuthPayload;
+    const payload = jwt.verify(token, config.jwtSecret, {
+      algorithms: ['HS256'],
+      issuer: 'force-api',
+      audience: 'force-app',
+    }) as AuthPayload;
     req.user = payload;
   } catch {
     // Invalid token, continue without user

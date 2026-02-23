@@ -40,7 +40,7 @@ export class AIService {
   private static readonly API_ENDPOINT =
     config.aiApiEndpoint || 'https://api.anthropic.com/v1/messages';
   private static readonly API_KEY = config.aiApiKey || '';
-  private static readonly MODEL = 'claude-3-haiku-20240307';
+  private static readonly MODEL = 'claude-3-5-haiku-20241022';
 
   /**
    * Check if AI service is available

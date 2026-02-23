@@ -429,12 +429,20 @@ export class AuthService {
   private static async generateTokens(payload: TokenPayload): Promise<AuthTokens> {
     // Generate access token (15 minutes)
     const accessToken = jwt.sign(payload, config.jwtSecret, {
+      algorithm: 'HS256',
       expiresIn: '15m',
+      issuer: 'force-api',
+      audience: 'force-app',
+      subject: payload.userId,
     });
 
     // Generate refresh token (30 days)
     const refreshToken = jwt.sign({ ...payload, type: 'refresh' }, config.jwtSecret, {
+      algorithm: 'HS256',
       expiresIn: '30d',
+      issuer: 'force-api',
+      audience: 'force-app',
+      subject: payload.userId,
     });
 
     // Store hashed refresh token in database

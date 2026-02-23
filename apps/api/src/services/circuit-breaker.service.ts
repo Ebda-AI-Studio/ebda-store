@@ -3,6 +3,8 @@
  * Prevents cascade failures when external services are down
  */
 
+import { Request, Response, NextFunction } from 'express';
+
 export type CircuitState = 'CLOSED' | 'OPEN' | 'HALF_OPEN';
 
 export interface CircuitBreakerOptions {
@@ -229,7 +231,7 @@ export async function withCircuitBreaker<T>(
  * Circuit breaker middleware for Express
  */
 export function circuitBreakerMiddleware(name: string) {
-  return (_req: any, res: any, next: any) => {
+  return (_req: Request, res: Response, next: NextFunction) => {
     if (!circuitBreaker.canRequest(name)) {
       return res.status(503).json({
         success: false,
