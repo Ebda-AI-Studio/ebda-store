@@ -20,24 +20,36 @@ COPY packages/shared/package.json ./packages/shared/
 COPY packages/ui/package.json ./packages/ui/
 COPY packages/config/package.json ./packages/config/
 
-# Install dependencies
-RUN npm ci --only=production
+# Install all dependencies (including dev for build stage)
+RUN npm ci
 
 # ============================================
-# Stage 2: Builder
+# Stage 2a: API Builder
+# ============================================
+FROM node:20-alpine AS api-builder
+
+WORKDIR /app
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+RUN npx prisma generate --schema=packages/database/prisma/schema.prisma
+
+ENV NODE_ENV=production
+RUN npm run build -w @force/shared && npm run build -w apps/api
+
+# ============================================
+# Stage 2b: Full Builder (for web + admin)
 # ============================================
 FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy dependencies from deps stage
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Generate Prisma client
 RUN npx prisma generate --schema=packages/database/prisma/schema.prisma
 
-# Build all applications
 ENV NODE_ENV=production
 RUN npm run build
 
@@ -50,16 +62,14 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
-# Create non-root user
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 api
 
-# Copy necessary files
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/apps/api/dist ./apps/api/dist
-COPY --from=builder /app/apps/api/package.json ./apps/api/
-COPY --from=builder /app/packages/database ./packages/database
-COPY --from=builder /app/package.json ./
+COPY --from=api-builder /app/node_modules ./node_modules
+COPY --from=api-builder /app/apps/api/dist ./apps/api/dist
+COPY --from=api-builder /app/apps/api/package.json ./apps/api/
+COPY --from=api-builder /app/packages/database ./packages/database
+COPY --from=api-builder /app/package.json ./
 
 USER api
 
@@ -80,11 +90,9 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Create non-root user
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# Copy Next.js standalone build
 COPY --from=builder /app/apps/web/.next/standalone ./
 COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=builder /app/apps/web/public ./apps/web/public
@@ -108,11 +116,9 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Create non-root user
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# Copy Next.js standalone build
 COPY --from=builder /app/apps/admin/.next/standalone ./
 COPY --from=builder /app/apps/admin/.next/static ./apps/admin/.next/static
 COPY --from=builder /app/apps/admin/public ./apps/admin/public
