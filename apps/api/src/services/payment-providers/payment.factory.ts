@@ -137,8 +137,8 @@ class PaymentFactory {
               displayNameAr: dbConfig.displayNameAr || undefined,
               supportedMethods: dbConfig.supportedMethods,
               supportedCurrencies: dbConfig.supportedCurrencies,
-              fixedFee: dbConfig.fixedFee,
-              percentageFee: dbConfig.percentageFee,
+              fixedFee: Number(dbConfig.fixedFee),
+              percentageFee: Number(dbConfig.percentageFee),
             };
 
             if (!providerConfig.apiKey) {

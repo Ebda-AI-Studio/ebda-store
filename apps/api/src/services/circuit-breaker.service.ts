@@ -231,15 +231,16 @@ export async function withCircuitBreaker<T>(
  * Circuit breaker middleware for Express
  */
 export function circuitBreakerMiddleware(name: string) {
-  return (_req: Request, res: Response, next: NextFunction) => {
+  return (_req: Request, res: Response, next: NextFunction): void => {
     if (!circuitBreaker.canRequest(name)) {
-      return res.status(503).json({
+      res.status(503).json({
         success: false,
         error: {
           code: 'SERVICE_UNAVAILABLE',
           message: 'Service temporarily unavailable. Please try again later.',
         },
       });
+      return;
     }
     next();
   };

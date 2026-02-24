@@ -157,8 +157,8 @@ router.post(
           details: {
             provider,
             idempotencyKey,
-            orderNumber: order?.orderNumber,
-            previousStatus: order?.paymentStatus,
+            orderNumber: order?.orderNumber ?? null,
+            previousStatus: order?.paymentStatus ?? null,
           },
           ip: req.ip,
           userAgent: req.headers['user-agent'],
