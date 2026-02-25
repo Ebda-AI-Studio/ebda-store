@@ -1,7 +1,7 @@
 import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
 import { prisma, Prisma, StoreStatus } from '@force/database';
 import { AppError } from '../middleware/error-handler';
-import { AuthService } from './auth.service';
 import { EmailService } from './email.service';
 import { VercelDomainService } from './vercel-domain.service';
 import logger from '../lib/logger';
@@ -97,34 +97,40 @@ export class ProvisioningService {
       }
     }
 
-    // Check if owner email exists
-    const existingUser = await prisma.user.findUnique({
-      where: { email: ownerEmail },
-    });
-
     // Generate temporary password if not provided
     const tempPassword = ownerPassword || this.generateTempPassword();
 
-    // Create store and owner in transaction
+    // Hash password before entering transaction
+    const passwordHash = await bcrypt.hash(tempPassword, 12);
+
+    // Create store, owner, and default category in a single transaction
     const result = await prisma.$transaction(async tx => {
+      // Check if owner email exists
+      const existingUser = await tx.user.findUnique({
+        where: { email: ownerEmail },
+      });
+
       let owner;
+      const isNewUser = !existingUser;
 
       if (existingUser) {
-        // Use existing user as owner
         owner = existingUser;
       } else {
-        // Create new owner account
-        const authResult = await AuthService.register({
-          email: ownerEmail,
-          name: ownerName,
-          password: tempPassword,
-        });
-        owner = authResult.user;
+        // Parse name into first/last
+        const nameParts = ownerName.trim().split(' ');
+        const firstName = nameParts[0];
+        const lastName = nameParts.slice(1).join(' ') || '';
 
-        // Upgrade to store_admin role
-        await tx.user.update({
-          where: { id: owner.id },
-          data: { role: 'store_admin' },
+        // Create owner directly inside the transaction
+        owner = await tx.user.create({
+          data: {
+            email: ownerEmail,
+            passwordHash,
+            firstName,
+            lastName,
+            role: 'store_admin',
+            emailVerified: false,
+          },
         });
       }
 
@@ -157,11 +163,11 @@ export class ProvisioningService {
         },
       });
 
-      return { store, owner, isNewUser: !existingUser };
+      return { store, owner, isNewUser };
     });
 
     // Send welcome email to new owner
-    if (!existingUser) {
+    if (result.isNewUser) {
       try {
         await EmailService.sendWelcome({
           email: ownerEmail,
@@ -185,7 +191,7 @@ export class ProvisioningService {
       owner: {
         id: result.owner.id,
         email: result.owner.email,
-        temporaryPassword: !existingUser ? tempPassword : undefined,
+        temporaryPassword: result.isNewUser ? tempPassword : undefined,
       },
       urls: {
         storefront: domain ? `https://${domain}` : `${process.env.WEB_URL}/${result.store.slug}`,
