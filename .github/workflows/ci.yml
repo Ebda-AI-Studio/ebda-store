@@ -77,6 +77,9 @@ jobs:
       - name: Generate Prisma Client
         run: npm run db:generate
 
+      - name: Build database package
+        run: npm run build -w packages/database
+
       - name: Build all packages
         run: npm run build
         env:

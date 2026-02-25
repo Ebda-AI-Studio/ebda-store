@@ -18,8 +18,8 @@
     "npm": ">=9.0.0"
   },
   "workspaces": [
-    "apps/*",
-    "packages/*"
+    "packages/*",
+    "apps/*"
   ],
   "scripts": {
     "dev": "npm run dev --workspaces --if-present",
