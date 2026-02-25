@@ -77,14 +77,20 @@ export class AuthService {
       role: user.role,
     });
 
-    // Send verification email
-    await this.sendVerificationEmail(
-      user.id,
-      user.email,
-      `${user.firstName} ${user.lastName}`.trim() || user.email
-    );
+    // Send verification email (non-blocking — don't fail registration if email fails)
+    let emailVerificationSent = false;
+    try {
+      await this.sendVerificationEmail(
+        user.id,
+        user.email,
+        `${user.firstName} ${user.lastName}`.trim() || user.email
+      );
+      emailVerificationSent = true;
+    } catch {
+      // Email sending failed — user is still registered, they can request verification later
+    }
 
-    return { user, ...tokens, emailVerificationSent: true };
+    return { user, ...tokens, emailVerificationSent };
   }
 
   /**
