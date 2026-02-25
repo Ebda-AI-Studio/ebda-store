@@ -104,6 +104,9 @@ jobs:
       - name: Generate Prisma Client
         run: npm run db:generate
 
+      - name: Build database package
+        run: npm run build -w packages/database
+
       - name: Run unit tests
         run: npx vitest run tests/unit --reporter=verbose
 
@@ -153,16 +156,19 @@ jobs:
         run: npx prisma migrate deploy --schema=packages/database/prisma/schema.prisma
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/force_test
+          DIRECT_URL: postgresql://test:test@localhost:5432/force_test
 
       - name: Seed test data
         run: npm run db:seed --if-present
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/force_test
+          DIRECT_URL: postgresql://test:test@localhost:5432/force_test
 
       - name: Run integration tests
         run: npx vitest run tests/integration --reporter=verbose
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/force_test
+          DIRECT_URL: postgresql://test:test@localhost:5432/force_test
           REDIS_URL: redis://localhost:6379
           JWT_SECRET: test-jwt-secret-for-ci-only-32chars
           ENCRYPTION_KEY: test-encryption-key-for-ci-32ch
@@ -214,11 +220,13 @@ jobs:
         run: npx prisma migrate deploy --schema=packages/database/prisma/schema.prisma
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/force_test
+          DIRECT_URL: postgresql://test:test@localhost:5432/force_test
 
       - name: Run E2E tests
         run: npm run test:e2e
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/force_test
+          DIRECT_URL: postgresql://test:test@localhost:5432/force_test
           REDIS_URL: redis://localhost:6379
           JWT_SECRET: test-jwt-secret-for-ci-only-32chars
           ENCRYPTION_KEY: test-encryption-key-for-ci-32ch
