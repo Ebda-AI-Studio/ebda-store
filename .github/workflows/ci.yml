@@ -49,8 +49,14 @@ jobs:
       - name: Generate Prisma Client
         run: npm run db:generate
 
-      - name: Type check
-        run: npx tsc --noEmit
+      - name: Build database package
+        run: npm run build -w packages/database
+
+      - name: Type check API
+        run: npx tsc --noEmit -p apps/api/tsconfig.json
+
+      - name: Type check shared packages
+        run: npx tsc --noEmit -p packages/shared/tsconfig.json
 
   build:
     name: Build
