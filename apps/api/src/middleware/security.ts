@@ -87,6 +87,13 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
     return next();
   }
 
+  // Skip for auth routes (login, register, password reset, verify-email)
+  // These endpoints issue JWT tokens and don't use session cookies, so they
+  // are not vulnerable to CSRF. A session doesn't exist yet at login time.
+  if (req.path.match(/\/auth\/(login|register|forgot-password|reset-password|verify-email)/)) {
+    return next();
+  }
+
   const sessionId = req.headers['x-session-id'] as string;
   const csrfToken = req.headers['x-csrf-token'] as string;
 
