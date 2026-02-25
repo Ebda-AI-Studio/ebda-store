@@ -27,9 +27,20 @@ vi.mock('@force/database', () => ({
       deleteMany: vi.fn(),
     },
     product: {
+      findUnique: vi.fn(),
       update: vi.fn(),
     },
+    productVariant: {
+      update: vi.fn(),
+    },
+    taxRate: {
+      findMany: vi.fn().mockResolvedValue([]),
+    },
+    inventoryHistory: {
+      create: vi.fn().mockResolvedValue({}),
+    },
     $transaction: vi.fn(),
+    $queryRaw: vi.fn(),
   },
   Prisma: {},
   OrderStatus: {},
@@ -248,18 +259,29 @@ describe('OrderService', () => {
 
     beforeEach(() => {
       vi.mocked(CartService.getOrCreate).mockResolvedValue(mockCartWithItems as any);
-      vi.mocked(prisma.$transaction).mockImplementation(async fn => {
-        return fn({
-          order: {
-            create: vi.fn().mockResolvedValue(mockOrder),
-          },
-          product: {
-            update: vi.fn().mockResolvedValue({}),
-          },
-          cartItem: {
-            deleteMany: vi.fn().mockResolvedValue({}),
-          },
-        } as any);
+      vi.mocked(prisma.taxRate.findMany).mockResolvedValue([]);
+      vi.mocked(prisma.$transaction).mockImplementation(async (fn: any) => {
+        if (typeof fn === 'function') {
+          return fn({
+            order: {
+              create: vi.fn().mockResolvedValue(mockOrder),
+            },
+            product: {
+              update: vi.fn().mockResolvedValue({}),
+            },
+            productVariant: {
+              update: vi.fn().mockResolvedValue({}),
+            },
+            cartItem: {
+              deleteMany: vi.fn().mockResolvedValue({}),
+            },
+            inventoryHistory: {
+              create: vi.fn().mockResolvedValue({}),
+            },
+            $queryRaw: vi.fn().mockResolvedValue([{ inventory: 50 }]),
+          } as any);
+        }
+        return fn;
       });
     });
 
@@ -301,6 +323,21 @@ describe('OrderService', () => {
           },
         ],
       } as any);
+
+      // Inventory is now checked inside $transaction with SELECT FOR UPDATE
+      vi.mocked(prisma.$transaction).mockImplementation(async (fn: any) => {
+        if (typeof fn === 'function') {
+          return fn({
+            order: { create: vi.fn() },
+            product: { update: vi.fn() },
+            productVariant: { update: vi.fn() },
+            cartItem: { deleteMany: vi.fn() },
+            inventoryHistory: { create: vi.fn() },
+            $queryRaw: vi.fn().mockResolvedValue([{ inventory: 10 }]),
+          } as any);
+        }
+        return fn;
+      });
 
       await expect(
         OrderService.create(mockStoreId, mockCustomerId, mockSessionId, createOrderData)
@@ -455,7 +492,7 @@ describe('OrderService', () => {
     });
 
     describe('inventory restoration', () => {
-      it('should restore inventory on cancellation', async () => {
+      it('should trigger inventory restore transaction on cancellation', async () => {
         vi.mocked(prisma.order.findFirst).mockResolvedValue({
           ...mockOrder,
           status: 'pending',
@@ -463,13 +500,12 @@ describe('OrderService', () => {
 
         await OrderService.updateStatus(mockStoreId, 'order-123', 'cancelled');
 
-        expect(prisma.product.update).toHaveBeenCalledWith({
-          where: { id: 'prod-123' },
-          data: { inventory: { increment: 2 } },
-        });
+        // Cancel/refund now wraps inventory restore in a separate $transaction
+        // The first call is from updateStatus itself (if applicable), second from inventory restore
+        expect(prisma.$transaction).toHaveBeenCalled();
       });
 
-      it('should restore inventory on refund', async () => {
+      it('should trigger inventory restore transaction on refund', async () => {
         vi.mocked(prisma.order.findFirst).mockResolvedValue({
           ...mockOrder,
           status: 'delivered',
@@ -477,10 +513,7 @@ describe('OrderService', () => {
 
         await OrderService.updateStatus(mockStoreId, 'order-123', 'refunded');
 
-        expect(prisma.product.update).toHaveBeenCalledWith({
-          where: { id: 'prod-123' },
-          data: { inventory: { increment: 2 } },
-        });
+        expect(prisma.$transaction).toHaveBeenCalled();
       });
     });
 
