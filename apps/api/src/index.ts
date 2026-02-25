@@ -98,6 +98,14 @@ app.use(
       const platformOrigins = [config.webUrl, config.adminUrl].filter(Boolean);
       if (platformOrigins.includes(origin)) return callback(null, true);
 
+      // Allow Vercel preview/production deployments for the project
+      if (
+        origin.endsWith('.vercel.app') &&
+        (origin.includes('force-web') || origin.includes('force-admin'))
+      ) {
+        return callback(null, true);
+      }
+
       // Allow localhost in development
       if (config.nodeEnv !== 'production' && origin.includes('localhost')) {
         return callback(null, true);
