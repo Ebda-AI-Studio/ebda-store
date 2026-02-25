@@ -152,6 +152,9 @@ jobs:
       - name: Generate Prisma Client
         run: npm run db:generate
 
+      - name: Build database package
+        run: npm run build -w packages/database
+
       - name: Run database migrations
         run: npx prisma migrate deploy --schema=packages/database/prisma/schema.prisma
         env:
@@ -163,6 +166,7 @@ jobs:
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/force_test
           DIRECT_URL: postgresql://test:test@localhost:5432/force_test
+          ADMIN_PASSWORD: test-admin-password-ci
 
       - name: Run integration tests
         run: npx vitest run tests/integration --reporter=verbose
@@ -215,6 +219,9 @@ jobs:
 
       - name: Generate Prisma Client
         run: npm run db:generate
+
+      - name: Build database package
+        run: npm run build -w packages/database
 
       - name: Run database migrations
         run: npx prisma migrate deploy --schema=packages/database/prisma/schema.prisma
