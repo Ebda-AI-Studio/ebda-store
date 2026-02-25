@@ -2,6 +2,7 @@ import { prisma, Prisma, StoreStatus } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import { AuthService } from './auth.service';
 import { EmailService } from './email.service';
+import { VercelDomainService } from './vercel-domain.service';
 
 // ==========================================
 // Store Provisioning Service
@@ -82,6 +83,18 @@ export class ProvisioningService {
 
       if (existingDomain) {
         throw new AppError(400, 'DOMAIN_TAKEN', 'Domain is already in use');
+      }
+    }
+
+    // Add domain to Vercel (non-blocking — don't fail store creation)
+    if (domain) {
+      try {
+        await VercelDomainService.addDomain(domain);
+      } catch (error) {
+        console.error(
+          '[PROVISIONING] Failed to add domain to Vercel:',
+          error instanceof Error ? error.message : 'Unknown error'
+        );
       }
     }
 

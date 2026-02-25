@@ -113,6 +113,11 @@ export const config = {
   aiApiKey: process.env.AI_API_KEY || process.env.ANTHROPIC_API_KEY || '',
   aiApiEndpoint: process.env.AI_API_ENDPOINT || 'https://api.anthropic.com/v1/messages',
 
+  // Vercel (for custom domain provisioning)
+  vercelApiToken: process.env.VERCEL_API_TOKEN || '',
+  vercelProjectId: process.env.VERCEL_PROJECT_ID || '',
+  vercelTeamId: process.env.VERCEL_TEAM_ID || '',
+
   // Backup
   backupEnabled: process.env.BACKUP_ENABLED === 'true',
   backupSchedule: process.env.BACKUP_SCHEDULE || '0 3 * * *', // Daily at 3 AM

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { StoreService } from '../services/store.service';
+import { VercelDomainService } from '../services/vercel-domain.service';
 
 const router = Router();
 
@@ -463,6 +464,130 @@ router.put(
       res.json({
         success: true,
         data: { store },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// GET /stores/:id/domain - Get domain verification status
+router.get(
+  '/:id/domain',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const store = await StoreService.getById(id);
+
+      if (!store.domain) {
+        res.json({
+          success: true,
+          data: { domain: null, verified: false, dnsRecords: [] },
+        });
+        return;
+      }
+
+      const status = await VercelDomainService.getDomain(store.domain);
+
+      res.json({
+        success: true,
+        data: status || {
+          domain: store.domain,
+          verified: false,
+          misconfigured: true,
+          dnsRecords: [{ type: 'CNAME', name: store.domain, value: 'cname.vercel-dns.com' }],
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// PUT /stores/:id/domain - Update store custom domain
+router.put(
+  '/:id/domain',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const { domain } = req.body as { domain: string | null };
+
+      const store = await StoreService.getById(id);
+      const oldDomain = store.domain;
+
+      // Remove old domain from Vercel
+      if (oldDomain && oldDomain !== domain) {
+        try {
+          await VercelDomainService.removeDomain(oldDomain);
+        } catch (error) {
+          console.error(
+            '[STORE] Failed to remove old domain from Vercel:',
+            error instanceof Error ? error.message : 'Unknown error'
+          );
+        }
+      }
+
+      // Add new domain to Vercel
+      if (domain && domain !== oldDomain) {
+        // Check uniqueness
+        const existingStore = await StoreService.getByDomain(domain).catch(() => null);
+        if (existingStore && existingStore.id !== id) {
+          res.status(400).json({
+            success: false,
+            error: { code: 'DOMAIN_TAKEN', message: 'Domain is already in use by another store' },
+          });
+          return;
+        }
+
+        try {
+          await VercelDomainService.addDomain(domain);
+        } catch (error) {
+          console.error(
+            '[STORE] Failed to add domain to Vercel:',
+            error instanceof Error ? error.message : 'Unknown error'
+          );
+        }
+      }
+
+      // Update domain in DB (use prisma directly for null clearing)
+      const { prisma } = await import('@force/database');
+      const updated = domain
+        ? await StoreService.update(id, { domain })
+        : await prisma.store.update({
+            where: { id },
+            data: { domain: null },
+            include: {
+              owner: { select: { id: true, email: true, firstName: true, lastName: true } },
+            },
+          });
+
+      // Get verification status
+      let domainStatus = null;
+      if (domain) {
+        domainStatus = await VercelDomainService.getDomain(domain);
+      }
+
+      res.json({
+        success: true,
+        data: {
+          store: updated,
+          domainStatus:
+            domainStatus ||
+            (domain
+              ? {
+                  domain,
+                  verified: false,
+                  misconfigured: true,
+                  dnsRecords: [{ type: 'CNAME', name: domain, value: 'cname.vercel-dns.com' }],
+                }
+              : null),
+        },
       });
     } catch (error) {
       next(error);

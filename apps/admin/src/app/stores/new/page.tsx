@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import { Button, Input, Badge } from '@force/ui';
 import { AdminLayout } from '../../../components/AdminLayout';
@@ -200,6 +200,39 @@ export default function CreateStorePage() {
 
   const currentStepIndex = steps.findIndex(s => s.id === currentStep);
 
+  // Domain verification polling
+  const [domainStatus, setDomainStatus] = useState<{
+    verified: boolean;
+    dnsRecords: Array<{ type: string; name: string; value: string }>;
+  } | null>(null);
+  const [isCheckingDns, setIsCheckingDns] = useState(false);
+
+  const checkDomainStatus = useCallback(async (storeId: string) => {
+    setIsCheckingDns(true);
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/domain`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setDomainStatus(data.data);
+      }
+    } catch {
+      // Silently fail — DNS check is non-critical
+    } finally {
+      setIsCheckingDns(false);
+    }
+  }, []);
+
+  // Auto-check DNS on success if domain was provided
+  useEffect(() => {
+    if (success?.store.domain) {
+      checkDomainStatus(success.store.id);
+    }
+  }, [success, checkDomainStatus]);
+
   // Success Screen
   if (success) {
     return (
@@ -257,6 +290,60 @@ export default function CreateStorePage() {
                 )}
               </dl>
             </div>
+
+            {/* DNS Instructions (shown when custom domain was provided) */}
+            {success.store.domain && (
+              <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-left">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-amber-900">DNS Configuration Required</h3>
+                  <Badge variant={domainStatus?.verified ? 'default' : 'secondary'}>
+                    {domainStatus?.verified ? 'Verified' : 'Pending'}
+                  </Badge>
+                </div>
+                <p className="mt-2 text-sm text-amber-800">
+                  Add the following DNS record to your domain provider to complete setup:
+                </p>
+                <div className="mt-3 overflow-hidden rounded-md border border-amber-200 bg-white">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-amber-50">
+                        <th className="px-3 py-2 text-left font-medium text-amber-900">Type</th>
+                        <th className="px-3 py-2 text-left font-medium text-amber-900">Name</th>
+                        <th className="px-3 py-2 text-left font-medium text-amber-900">Value</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {domainStatus?.dnsRecords?.map((record, i) => (
+                        <tr key={i} className="border-b last:border-0">
+                          <td className="px-3 py-2 font-mono text-xs">{record.type}</td>
+                          <td className="px-3 py-2 font-mono text-xs">{record.name}</td>
+                          <td className="px-3 py-2 font-mono text-xs">{record.value}</td>
+                        </tr>
+                      )) || (
+                        <tr>
+                          <td className="px-3 py-2 font-mono text-xs">CNAME</td>
+                          <td className="px-3 py-2 font-mono text-xs">{success.store.domain}</td>
+                          <td className="px-3 py-2 font-mono text-xs">cname.vercel-dns.com</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="mt-3 flex items-center justify-between">
+                  <p className="text-xs text-amber-700">
+                    DNS changes can take up to 48 hours to propagate.
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => checkDomainStatus(success.store.id)}
+                    disabled={isCheckingDns}
+                  >
+                    {isCheckingDns ? 'Checking...' : 'Check DNS'}
+                  </Button>
+                </div>
+              </div>
+            )}
 
             <div className="mt-8 flex justify-center gap-4">
               <Link href={`/stores/${success.store.id}`}>
