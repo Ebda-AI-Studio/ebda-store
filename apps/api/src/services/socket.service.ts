@@ -30,7 +30,29 @@ class SocketService {
   initialize(httpServer: HttpServer) {
     this.io = new Server(httpServer, {
       cors: {
-        origin: [config.webUrl, config.adminUrl],
+        origin: (origin, callback) => {
+          // Allow requests with no origin
+          if (!origin) return callback(null, true);
+
+          // Always allow platform URLs
+          const platformOrigins = [config.webUrl, config.adminUrl].filter(Boolean);
+          if (platformOrigins.includes(origin)) return callback(null, true);
+
+          // Allow Vercel preview/production deployments
+          if (
+            origin.endsWith('.vercel.app') &&
+            (origin.includes('force-web') || origin.includes('force-admin'))
+          ) {
+            return callback(null, true);
+          }
+
+          // Allow localhost in development
+          if (config.nodeEnv !== 'production' && origin.includes('localhost')) {
+            return callback(null, true);
+          }
+
+          callback(new Error('Not allowed by CORS'));
+        },
         credentials: true,
       },
       pingTimeout: 60000,
