@@ -335,6 +335,7 @@ export class ProductService {
     const categories = await prisma.category.findMany({
       where: { storeId },
       orderBy: { name: 'asc' },
+      take: 100, // Guard against stores with unbounded category growth
     });
     return categories;
   }

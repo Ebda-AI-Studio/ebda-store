@@ -1,61 +1,20 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button, Badge, useToast } from '@force/ui';
+import { api, type Product } from '@/lib/api';
 import { useCart } from '../../../contexts/CartContext';
+import { useStore } from '../../../contexts/StoreContext';
 import { Header, Footer } from '../../../components';
-
-// Demo product data
-const product = {
-  id: '1',
-  name: 'Premium Wireless Headphones',
-  slug: 'premium-wireless-headphones',
-  price: 29900,
-  compareAtPrice: 34900,
-  description:
-    'Experience premium sound quality with our wireless headphones. Featuring active noise cancellation, 30-hour battery life, and ultra-comfortable ear cushions for extended listening sessions.',
-  features: [
-    'Active Noise Cancellation',
-    '30-hour battery life',
-    'Premium drivers for rich sound',
-    'Comfortable memory foam cushions',
-    'Bluetooth 5.0 connectivity',
-    'Built-in microphone for calls',
-  ],
-  category: 'Electronics',
-  inventory: 50,
-  sku: 'HEADPHONES-001',
-  images: [
-    { url: '/placeholder.svg', alt: 'Headphones front view' },
-    { url: '/placeholder.svg', alt: 'Headphones side view' },
-    { url: '/placeholder.svg', alt: 'Headphones detail' },
-  ],
-};
-
-const relatedProducts = [
-  {
-    id: '2',
-    name: 'Smart Watch Pro',
-    slug: 'smart-watch-pro',
-    price: 39900,
-    category: 'Wearables',
-  },
-  {
-    id: '3',
-    name: 'Wireless Mechanical Keyboard',
-    slug: 'wireless-mechanical-keyboard',
-    price: 14900,
-    category: 'Accessories',
-  },
-  {
-    id: '4',
-    name: 'Portable Bluetooth Speaker',
-    slug: 'portable-bluetooth-speaker',
-    price: 12900,
-    category: 'Electronics',
-  },
-];
+import { trackViewContent, trackAddToCart } from '../../../components/MarketingPixels';
+import {
+  VariantSelector,
+  type ProductVariant,
+  type ProductOption,
+} from '../../../components/VariantSelector';
+import ReviewSection from '../../../components/ReviewSection';
 
 function formatPrice(fils: number) {
   return new Intl.NumberFormat('en-KW', {
@@ -64,31 +23,200 @@ function formatPrice(fils: number) {
   }).format(fils / 1000);
 }
 
+function ProductSkeleton() {
+  return (
+    <div className="grid gap-8 lg:grid-cols-2 animate-pulse">
+      <div className="space-y-4">
+        <div className="aspect-square rounded-2xl bg-muted" />
+        <div className="grid grid-cols-3 gap-4">
+          {[0, 1, 2].map(i => (
+            <div key={i} className="aspect-square rounded-lg bg-muted" />
+          ))}
+        </div>
+      </div>
+      <div className="space-y-4">
+        <div className="h-6 w-24 rounded bg-muted" />
+        <div className="h-8 w-3/4 rounded bg-muted" />
+        <div className="h-10 w-40 rounded bg-muted" />
+        <div className="h-20 w-full rounded bg-muted" />
+        <div className="h-12 w-full rounded bg-muted" />
+      </div>
+    </div>
+  );
+}
+
 export default function ProductDetailPage() {
+  const params = useParams();
+  const slug = params?.slug as string;
+
+  const [product, setProduct] = useState<Product | null>(null);
+  const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [selectedImage, setSelectedImage] = useState(0);
   const [isAdding, setIsAdding] = useState(false);
-  const { success } = useToast();
+  const [isWishlisted, setIsWishlisted] = useState(false);
+  const [isTogglingWishlist, setIsTogglingWishlist] = useState(false);
+  // Selected variant from VariantSelector (null = no variant chosen or invalid combo)
+  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
+  const { success: toastSuccess } = useToast();
   const { addItem } = useCart();
+  const { store } = useStore();
+
+  useEffect(() => {
+    if (!slug) return;
+
+    async function fetchProduct() {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const response = await api.getProduct(slug);
+        if (response.success && response.data) {
+          const loadedProduct = response.data.product;
+          setProduct(loadedProduct);
+
+          // Fire ViewContent pixel event when product data is ready
+          trackViewContent({
+            contentId: loadedProduct.id,
+            contentName: loadedProduct.name,
+            contentCategory: loadedProduct.categories?.[0]?.name,
+            value: loadedProduct.price / 1000,
+            currency: 'KWD',
+          });
+
+          // Fetch related products from the same category
+          const categories = response.data.product.categories;
+          if (categories && categories.length > 0) {
+            const cat0 = categories[0] as unknown as Record<string, unknown>;
+            const catId = cat0.category
+              ? (cat0.category as { id: string }).id
+              : (cat0 as { id: string }).id;
+            if (catId) {
+              const relResponse = await api.getProducts({ category: catId, limit: '3' });
+              if (relResponse.success && relResponse.data) {
+                setRelatedProducts(
+                  relResponse.data.products
+                    .filter((p: Product) => p.id !== response.data!.product.id)
+                    .slice(0, 3)
+                );
+              }
+            }
+          }
+        } else {
+          setError(response.error?.message || 'Product not found');
+        }
+      } catch {
+        setError('Unable to load product. Please check your connection.');
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    fetchProduct();
+  }, [slug]);
+
+  const handleToggleWishlist = async () => {
+    if (!product) return;
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+      toastSuccess('Sign in required', 'Please sign in to add items to your wishlist');
+      return;
+    }
+    setIsTogglingWishlist(true);
+    try {
+      if (isWishlisted) {
+        await api.delete(`/wishlist/${product.id}`);
+        setIsWishlisted(false);
+        toastSuccess('Removed from wishlist', `${product.name} removed from your wishlist`);
+      } else {
+        await api.post('/wishlist', { productId: product.id });
+        setIsWishlisted(true);
+        toastSuccess('Added to wishlist', `${product.name} added to your wishlist`);
+      }
+    } catch {
+      toastSuccess('Error', 'Failed to update wishlist. Please try again.');
+    } finally {
+      setIsTogglingWishlist(false);
+    }
+  };
 
   const handleAddToCart = async () => {
+    if (!product) return;
+
+    // If this product has variants and no variant is selected yet, prompt the user
+    const productVariants = (product as unknown as { variants?: ProductVariant[] }).variants ?? [];
+    if (productVariants.length > 0 && !selectedVariant) {
+      toastSuccess('Select options', 'Please select all options before adding to cart');
+      return;
+    }
+
     setIsAdding(true);
-    // Simulate API call delay for UX
     await new Promise(resolve => setTimeout(resolve, 300));
     addItem(
       {
         id: product.id,
         name: product.name,
-        price: product.price,
+        // Use variant price when a variant is selected
+        price: selectedVariant ? selectedVariant.price : product.price,
         slug: product.slug,
-        image: product.images[0]?.url,
-        category: product.category,
+        image: product.images?.[0]?.url,
+        category: product.categories?.[0]?.name,
+        // Pass the variantId so the backend can track the correct SKU
+        variantId: selectedVariant?.id,
       },
       quantity
     );
+    // Fire AddToCart pixel event
+    trackAddToCart({
+      contentId: product.id,
+      contentName: product.name,
+      quantity,
+      value: (selectedVariant ? selectedVariant.price : product.price) / 1000,
+      currency: 'KWD',
+    });
+
     setIsAdding(false);
-    success('Added to cart!', `${quantity}x ${product.name} added to your cart`);
+    toastSuccess('Added to cart!', `${quantity}x ${product.name} added to your cart`);
   };
+
+  if (isLoading) {
+    return (
+      <main className="min-h-screen bg-background flex flex-col">
+        <Header />
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 flex-1">
+          <ProductSkeleton />
+        </div>
+        <Footer />
+      </main>
+    );
+  }
+
+  if (error || !product) {
+    return (
+      <main className="min-h-screen bg-background flex flex-col">
+        <Header />
+        <div className="mx-auto max-w-7xl px-4 py-16 text-center flex-1">
+          <h1 className="text-2xl font-bold text-foreground">{error || 'Product not found'}</h1>
+          <p className="mt-2 text-muted-foreground">
+            The product you&apos;re looking for may have been removed or doesn&apos;t exist.
+          </p>
+          <Link href="/products">
+            <Button className="mt-6">Browse Products</Button>
+          </Link>
+        </div>
+        <Footer />
+      </main>
+    );
+  }
+
+  const images = product.images || [];
+  const cat0Raw = product.categories?.[0] as unknown as Record<string, unknown> | undefined;
+  const categoryName = cat0Raw
+    ? cat0Raw.category
+      ? (cat0Raw.category as { name: string }).name
+      : (cat0Raw as unknown as { name: string }).name
+    : undefined;
 
   return (
     <main className="min-h-screen bg-background flex flex-col">
@@ -96,7 +224,7 @@ export default function ProductDetailPage() {
 
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 flex-1">
         {/* Breadcrumb */}
-        <nav className="mb-8 flex items-center gap-2 text-sm text-gray-500">
+        <nav className="mb-8 flex items-center gap-2 text-sm text-muted-foreground">
           <Link href="/" className="hover:text-primary">
             Home
           </Link>
@@ -105,7 +233,7 @@ export default function ProductDetailPage() {
             Products
           </Link>
           <span>/</span>
-          <span className="text-gray-900">{product.name}</span>
+          <span className="text-foreground">{product.name}</span>
         </nav>
 
         {/* Product Details */}
@@ -113,89 +241,17 @@ export default function ProductDetailPage() {
           {/* Images */}
           <div className="space-y-4">
             <div className="aspect-square overflow-hidden rounded-2xl bg-gradient-to-br from-orange-50 to-orange-100">
-              <div className="flex h-full items-center justify-center">
-                <div className="mx-auto flex h-40 w-40 items-center justify-center rounded-full bg-primary/20">
-                  <svg
-                    className="h-20 w-20 text-primary"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                    />
-                  </svg>
-                </div>
-              </div>
-            </div>
-            <div className="grid grid-cols-3 gap-4">
-              {product.images.map((_, index) => (
-                <button
-                  key={index}
-                  onClick={() => setSelectedImage(index)}
-                  className={`aspect-square overflow-hidden rounded-lg bg-gradient-to-br from-orange-50 to-orange-100 transition ${
-                    selectedImage === index
-                      ? 'ring-2 ring-primary'
-                      : 'hover:ring-2 hover:ring-gray-300'
-                  }`}
-                >
-                  <div className="flex h-full items-center justify-center">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/20">
-                      <svg
-                        className="h-5 w-5 text-primary"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={1.5}
-                          d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                        />
-                      </svg>
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Product Info */}
-          <div>
-            <div className="mb-4 flex items-center gap-2">
-              <Badge variant="secondary">{product.category}</Badge>
-              {product.compareAtPrice && (
-                <Badge variant="destructive">
-                  {Math.round((1 - product.price / product.compareAtPrice) * 100)}% OFF
-                </Badge>
-              )}
-            </div>
-
-            <h1 className="text-3xl font-bold text-gray-900">{product.name}</h1>
-
-            <div className="mt-4 flex items-baseline gap-3">
-              <span className="text-3xl font-bold text-primary">{formatPrice(product.price)}</span>
-              {product.compareAtPrice && (
-                <span className="text-xl text-gray-400 line-through">
-                  {formatPrice(product.compareAtPrice)}
-                </span>
-              )}
-            </div>
-
-            <p className="mt-6 text-gray-600 leading-relaxed">{product.description}</p>
-
-            {/* Features */}
-            <div className="mt-6">
-              <h3 className="font-semibold text-gray-900">Features</h3>
-              <ul className="mt-3 space-y-2">
-                {product.features.map((feature, index) => (
-                  <li key={index} className="flex items-center gap-2 text-sm text-gray-600">
+              {images[selectedImage]?.url ? (
+                <img
+                  src={images[selectedImage].url}
+                  alt={images[selectedImage].alt || product.name}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div className="flex h-full items-center justify-center">
+                  <div className="mx-auto flex h-40 w-40 items-center justify-center rounded-full bg-primary/20">
                     <svg
-                      className="h-4 w-4 text-primary"
+                      className="h-20 w-20 text-primary"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -203,44 +259,165 @@ export default function ProductDetailPage() {
                       <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M5 13l4 4L19 7"
+                        strokeWidth={1.5}
+                        d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
                       />
                     </svg>
-                    {feature}
-                  </li>
-                ))}
-              </ul>
+                  </div>
+                </div>
+              )}
             </div>
+            {images.length > 1 && (
+              <div className="grid grid-cols-4 gap-4">
+                {images.map((img, index) => (
+                  <button
+                    key={img.id || index}
+                    onClick={() => setSelectedImage(index)}
+                    className={`aspect-square overflow-hidden rounded-lg transition ${
+                      selectedImage === index
+                        ? 'ring-2 ring-primary'
+                        : 'hover:ring-2 hover:ring-gray-300'
+                    }`}
+                  >
+                    <img
+                      src={img.url}
+                      alt={img.alt || `${product.name} ${index + 1}`}
+                      className="h-full w-full object-cover"
+                    />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Product Info */}
+          <div>
+            <div className="mb-4 flex items-center gap-2">
+              {categoryName && <Badge variant="secondary">{categoryName}</Badge>}
+              {product.compareAtPrice && product.compareAtPrice > product.price && (
+                <Badge variant="destructive">
+                  {Math.round((1 - product.price / product.compareAtPrice) * 100)}% OFF
+                </Badge>
+              )}
+              {product.status === 'draft' && <Badge variant="outline">Draft</Badge>}
+            </div>
+
+            <h1 className="text-3xl font-bold text-foreground">{product.name}</h1>
+
+            {/* Price — shows variant price when a variant is selected */}
+            {(() => {
+              const displayPrice = selectedVariant ? selectedVariant.price : product.price;
+              const displayCompare = selectedVariant
+                ? selectedVariant.compareAtPrice
+                : product.compareAtPrice;
+              return (
+                <div className="mt-4 flex items-baseline gap-3">
+                  <span className="text-3xl font-bold text-primary">
+                    {formatPrice(displayPrice)}
+                  </span>
+                  {displayCompare && displayCompare > displayPrice && (
+                    <span className="text-xl text-muted-foreground line-through">
+                      {formatPrice(displayCompare)}
+                    </span>
+                  )}
+                </div>
+              );
+            })()}
+
+            {product.description && (
+              <p className="mt-6 text-muted-foreground leading-relaxed">{product.description}</p>
+            )}
+
+            {/* Variant Selector — rendered when the API returns variants and options */}
+            {(() => {
+              const productVariants =
+                (product as unknown as { variants?: ProductVariant[] }).variants ?? [];
+              const productOptions =
+                (product as unknown as { options?: ProductOption[] }).options ?? [];
+              if (productVariants.length === 0 || productOptions.length === 0) return null;
+              return (
+                <VariantSelector
+                  variants={productVariants}
+                  options={productOptions}
+                  onVariantSelect={setSelectedVariant}
+                />
+              );
+            })()}
 
             {/* Quantity & Add to Cart */}
             <div className="mt-8 space-y-4">
-              <div className="flex items-center gap-4">
-                <span className="text-sm font-medium text-gray-700">Quantity:</span>
-                <div className="flex items-center rounded-lg border">
-                  <button
-                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    className="px-4 py-2 text-gray-600 hover:bg-gray-100"
-                  >
-                    -
-                  </button>
-                  <span className="w-12 text-center font-medium">{quantity}</span>
-                  <button
-                    onClick={() => setQuantity(quantity + 1)}
-                    className="px-4 py-2 text-gray-600 hover:bg-gray-100"
-                  >
-                    +
-                  </button>
-                </div>
-                <span className="text-sm text-gray-500">{product.inventory} in stock</span>
-              </div>
+              {(() => {
+                // Use variant inventory when a variant is selected; fall back to product-level
+                const effectiveInventory = selectedVariant
+                  ? selectedVariant.inventory
+                  : product.inventory;
+                return (
+                  <div className="flex items-center gap-4">
+                    <span className="text-sm font-medium text-foreground">Quantity:</span>
+                    <div className="flex items-center rounded-lg border border-border">
+                      <button
+                        onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                        className="px-4 py-2 text-muted-foreground hover:bg-muted"
+                      >
+                        -
+                      </button>
+                      <span className="w-12 text-center font-medium">{quantity}</span>
+                      <button
+                        onClick={() => setQuantity(quantity + 1)}
+                        className="px-4 py-2 text-muted-foreground hover:bg-muted"
+                      >
+                        +
+                      </button>
+                    </div>
+                    {effectiveInventory !== undefined && effectiveInventory !== null && (
+                      <span className="text-sm text-muted-foreground">
+                        {effectiveInventory > 0 ? `${effectiveInventory} in stock` : 'Out of stock'}
+                      </span>
+                    )}
+                  </div>
+                );
+              })()}
 
               <div className="flex gap-4">
-                <Button size="lg" className="flex-1" onClick={handleAddToCart} isLoading={isAdding}>
-                  Add to Cart
-                </Button>
-                <Button size="lg" variant="outline">
-                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                {(() => {
+                  const productVariants =
+                    (product as unknown as { variants?: ProductVariant[] }).variants ?? [];
+                  const effectiveInventory = selectedVariant
+                    ? selectedVariant.inventory
+                    : product.inventory;
+                  // Disable "Add to Cart" if the product requires a variant but none is selected
+                  const variantRequired = productVariants.length > 0 && !selectedVariant;
+                  const outOfStock = effectiveInventory === 0;
+                  return (
+                    <Button
+                      size="lg"
+                      className="flex-1"
+                      onClick={handleAddToCart}
+                      isLoading={isAdding}
+                      disabled={outOfStock || variantRequired}
+                    >
+                      {outOfStock
+                        ? 'Out of Stock'
+                        : variantRequired
+                          ? 'Select Options'
+                          : 'Add to Cart'}
+                    </Button>
+                  );
+                })()}
+
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={handleToggleWishlist}
+                  disabled={isTogglingWishlist}
+                  aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+                >
+                  <svg
+                    className="h-5 w-5"
+                    fill={isWishlisted ? 'currentColor' : 'none'}
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -253,52 +430,68 @@ export default function ProductDetailPage() {
             </div>
 
             {/* SKU */}
-            <div className="mt-6 border-t pt-6">
-              <p className="text-sm text-gray-500">SKU: {product.sku}</p>
-            </div>
+            {product.sku && (
+              <div className="mt-6 border-t border-border pt-6">
+                <p className="text-sm text-muted-foreground">SKU: {product.sku}</p>
+              </div>
+            )}
           </div>
         </div>
 
+        {/* Product Reviews */}
+        {product && store.id && store.id !== 'demo' && (
+          <ReviewSection storeId={store.id} productId={product.id} />
+        )}
+
         {/* Related Products */}
-        <div className="mt-16">
-          <h2 className="text-2xl font-bold text-gray-900">Related Products</h2>
-          <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-3">
-            {relatedProducts.map(item => (
-              <Link
-                key={item.id}
-                href={`/products/${item.slug}`}
-                className="group rounded-xl border bg-white p-4 shadow-sm transition hover:shadow-lg"
-              >
-                <div className="aspect-square overflow-hidden rounded-lg bg-gradient-to-br from-orange-50 to-orange-100">
-                  <div className="flex h-full items-center justify-center">
-                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/20">
-                      <svg
-                        className="h-8 w-8 text-primary"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={1.5}
-                          d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                        />
-                      </svg>
-                    </div>
+        {relatedProducts.length > 0 && (
+          <div className="mt-16">
+            <h2 className="text-2xl font-bold text-foreground">Related Products</h2>
+            <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-3">
+              {relatedProducts.map(item => (
+                <Link
+                  key={item.id}
+                  href={`/products/${item.slug}`}
+                  className="group rounded-xl border border-border bg-card p-4 shadow-sm transition hover:shadow-lg"
+                >
+                  <div className="aspect-square overflow-hidden rounded-lg bg-gradient-to-br from-orange-50 to-orange-100">
+                    {item.images?.[0]?.url ? (
+                      <img
+                        src={item.images[0].url}
+                        alt={item.name}
+                        className="h-full w-full object-cover group-hover:scale-105 transition-transform"
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center">
+                        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/20">
+                          <svg
+                            className="h-8 w-8 text-primary"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={1.5}
+                              d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                            />
+                          </svg>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-                <div className="mt-4">
-                  <p className="text-xs text-gray-500">{item.category}</p>
-                  <h3 className="mt-1 font-medium text-gray-900 group-hover:text-primary">
-                    {item.name}
-                  </h3>
-                  <p className="mt-2 font-bold text-primary">{formatPrice(item.price)}</p>
-                </div>
-              </Link>
-            ))}
+                  <div className="mt-4">
+                    <h3 className="mt-1 font-medium text-foreground group-hover:text-primary">
+                      {item.name}
+                    </h3>
+                    <p className="mt-2 font-bold text-primary">{formatPrice(item.price)}</p>
+                  </div>
+                </Link>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       <Footer />

@@ -3,6 +3,7 @@ import rateLimit from 'express-rate-limit';
 import { v4 as uuidv4 } from 'uuid';
 import { prisma } from '@force/database';
 import { redis } from '../services/redis.service';
+import logger from '../lib/logger';
 
 // ==========================================
 // CSRF Protection with Redis + In-Memory Fallback
@@ -81,7 +82,7 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
     return next();
   }
 
-  // Skip for webhook routes (they use signature verification)
+  // Skip for webhook routes (they use HMAC signature verification instead)
   if (req.path.includes('/webhooks/')) {
     return next();
   }
@@ -89,7 +90,9 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
   const sessionId = req.headers['x-session-id'] as string;
   const csrfToken = req.headers['x-csrf-token'] as string;
 
-  // Require session ID for state-changing requests
+  // Require session ID for ALL state-changing requests regardless of auth header.
+  // A missing auth header does not exempt a request — a CSRF attack may target
+  // an endpoint that sets its own auth via cookies or query params.
   if (!sessionId) {
     return res.status(403).json({
       success: false,
@@ -100,30 +103,27 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
     });
   }
 
-  // For authenticated routes, verify CSRF token asynchronously
-  if (req.headers.authorization) {
-    verifyCsrfToken(sessionId, csrfToken)
-      .then(valid => {
-        if (!valid) {
-          res.status(403).json({
-            success: false,
-            error: { code: 'CSRF_INVALID', message: 'Invalid CSRF token' },
-          });
-          return;
-        }
-        next();
-      })
-      .catch(() => {
-        // Fail closed - reject request on CSRF verification error
+  // Always verify the CSRF token for state-changing requests (POST/PUT/PATCH/DELETE).
+  // Previously this check was only applied when an Authorization header was present,
+  // which left unauthenticated state-changing endpoints unprotected.
+  verifyCsrfToken(sessionId, csrfToken)
+    .then(valid => {
+      if (!valid) {
         res.status(403).json({
           success: false,
-          error: { code: 'CSRF_ERROR', message: 'CSRF validation failed' },
+          error: { code: 'CSRF_INVALID', message: 'Invalid CSRF token' },
         });
+        return;
+      }
+      next();
+    })
+    .catch(() => {
+      // Fail closed - reject the request when CSRF verification itself errors
+      res.status(403).json({
+        success: false,
+        error: { code: 'CSRF_ERROR', message: 'CSRF validation failed' },
       });
-    return;
-  }
-
-  next();
+    });
 }
 
 // ==========================================
@@ -274,9 +274,9 @@ export interface AuditLogEntry {
 
 export async function auditLog(entry: AuditLogEntry) {
   try {
-    // Log to console in development
+    // Log to structured logger in development
     if (process.env.NODE_ENV !== 'production') {
-      console.log('[AUDIT]', JSON.stringify(entry, null, 2));
+      logger.info({ audit: entry }, '[AUDIT]');
     }
 
     // Store in database
@@ -293,7 +293,7 @@ export async function auditLog(entry: AuditLogEntry) {
     });
   } catch (error) {
     // Don't fail the request if audit logging fails
-    console.error('[AUDIT ERROR]', error);
+    logger.error({ err: error }, '[AUDIT ERROR] Failed to write audit log');
   }
 }
 
@@ -337,52 +337,24 @@ export function sanitizeInput(req: Request, _res: Response, next: NextFunction) 
   next();
 }
 
+// Maximum allowed length for any single input string before it is truncated.
+const MAX_INPUT_STRING_LENGTH = 10_000;
+
 function sanitizeString(str: string): string {
-  // First, strip null bytes and non-printable control characters (except newline, tab, carriage return)
+  // Strip null bytes and non-printable control characters (preserve newline \n, tab \t, carriage return \r)
   let cleaned = str.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
 
-  // Normalize unicode escape sequences that could bypass filters
-  // Remove zero-width characters and other invisible unicode
+  // Remove zero-width and invisible unicode characters that can be used to bypass filters
   cleaned = cleaned.replace(/[\u200B-\u200F\u2028-\u202F\uFEFF\uFFF9-\uFFFB]/g, '');
 
-  // Strip HTML comments which can be used to break up keywords
-  cleaned = cleaned.replace(/<!--[\s\S]*?-->/g, '');
+  // Enforce maximum length to prevent excessively large payloads slipping through body parsers
+  if (cleaned.length > MAX_INPUT_STRING_LENGTH) {
+    cleaned = cleaned.slice(0, MAX_INPUT_STRING_LENGTH);
+  }
 
-  // Remove javascript/vbscript protocol handlers (case insensitive, accounting for whitespace/encoding tricks)
-  // Match with optional whitespace, tabs, newlines between characters
-  cleaned = cleaned.replace(
-    /j[\s\t\r\n]*a[\s\t\r\n]*v[\s\t\r\n]*a[\s\t\r\n]*s[\s\t\r\n]*c[\s\t\r\n]*r[\s\t\r\n]*i[\s\t\r\n]*p[\s\t\r\n]*t[\s\t\r\n]*:/gi,
-    ''
-  );
-  cleaned = cleaned.replace(
-    /v[\s\t\r\n]*b[\s\t\r\n]*s[\s\t\r\n]*c[\s\t\r\n]*r[\s\t\r\n]*i[\s\t\r\n]*p[\s\t\r\n]*t[\s\t\r\n]*:/gi,
-    ''
-  );
-
-  // Remove data: URIs that could contain executable content
-  cleaned = cleaned.replace(
-    /data\s*:\s*[^\s,;]*(text\/html|application\/xhtml|text\/xml|image\/svg)[^\s,;]*/gi,
-    ''
-  );
-
-  // Remove event handlers more thoroughly (on* attributes with various whitespace tricks)
-  cleaned = cleaned.replace(/\bon[a-z]{2,}\s*=/gi, '');
-
-  // Remove expression() used in CSS-based XSS
-  cleaned = cleaned.replace(/expression\s*\(/gi, '');
-
-  // Remove url() with javascript/data in CSS context
-  cleaned = cleaned.replace(/url\s*\(\s*(javascript|data)\s*:/gi, '');
-
-  // HTML entity encode dangerous characters
-  cleaned = cleaned
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#x27;')
-    .replace(/\//g, '&#x2F;')
-    .replace(/`/g, '&#96;');
+  // NOTE: HTML encoding is intentionally NOT done here. Encoding at storage time corrupts
+  // URLs, descriptions, and causes double-encoding issues. Output escaping must happen at
+  // render time (template layer / invoice generation), not at input time.
 
   return cleaned.trim();
 }

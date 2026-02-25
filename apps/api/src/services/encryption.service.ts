@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { config } from '../config';
+import logger from '../lib/logger';
 
 // ==========================================
 // Encryption Service
@@ -87,7 +88,7 @@ class EncryptionService {
 
       return decrypted.toString('utf8');
     } catch (error) {
-      console.error('[ENCRYPTION] Decryption failed:', error);
+      logger.error({ err: error }, 'Decryption failed');
       throw new Error('Failed to decrypt data');
     }
   }

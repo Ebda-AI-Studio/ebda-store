@@ -7,6 +7,7 @@ import { requirePermission } from '../middleware/rbac';
 import { prisma } from '@force/database';
 import { paymentLimiter, auditLog } from '../middleware/security';
 import { config } from '../config';
+import { getDefaultStoreId } from '../utils/store-helpers';
 
 const router = Router();
 
@@ -14,11 +15,40 @@ const router = Router();
 // Validation Schemas
 // ==========================================
 
+// Validate that a URL is either a relative path or an absolute URL whose origin
+// matches the platform's web URL. This prevents open-redirect attacks where an
+// attacker supplies an external domain as a callback URL.
+function platformUrlOrRelative(url: string): boolean {
+  // Allow relative paths (must start with /)
+  if (url.startsWith('/')) return true;
+
+  // For absolute URLs, only permit those pointing to our own web origin
+  try {
+    const parsed = new URL(url);
+    const allowed = new URL(config.webUrl);
+    return parsed.origin === allowed.origin;
+  } catch {
+    return false;
+  }
+}
+
 const createPaymentSchema = z.object({
   orderId: z.string().uuid(),
   provider: z.enum(['tap', 'myfatoorah', 'hesabe', 'upayments']).optional(),
-  successUrl: z.string().url().optional(),
-  errorUrl: z.string().url().optional(),
+  successUrl: z
+    .string()
+    .url()
+    .optional()
+    .refine(val => val === undefined || platformUrlOrRelative(val), {
+      message: 'successUrl must be a relative path or a URL on the platform domain',
+    }),
+  errorUrl: z
+    .string()
+    .url()
+    .optional()
+    .refine(val => val === undefined || platformUrlOrRelative(val), {
+      message: 'errorUrl must be a relative path or a URL on the platform domain',
+    }),
 });
 
 const refundSchema = z.object({
@@ -30,14 +60,6 @@ const refundSchema = z.object({
 // ==========================================
 // Helper Functions
 // ==========================================
-
-async function getDefaultStoreId(): Promise<string> {
-  const store = await prisma.store.findFirst({ orderBy: { createdAt: 'asc' } });
-  if (!store) {
-    throw new Error('No store configured');
-  }
-  return store.id;
-}
 
 function getUserFromRequest(req: Request): { userId: string; email: string; role: string } {
   if (!req.user) {
@@ -313,7 +335,7 @@ router.get(
 
       if (
         order.customerId !== user.userId &&
-        user.role !== 'admin' &&
+        user.role !== 'store_admin' &&
         user.role !== 'super_admin'
       ) {
         res.status(403).json({

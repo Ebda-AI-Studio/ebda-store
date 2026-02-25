@@ -2,23 +2,28 @@
 
 import Link from 'next/link';
 import { Header, Footer } from '../../components';
+import { useStore } from '../../contexts/StoreContext';
 
 export default function AboutPage() {
+  const { store } = useStore();
+
+  // Prefer a dedicated about/description field; fall back to a generic message
+  const headingText = store.name || 'Our Store';
+  const descriptionText =
+    store.description ||
+    `Welcome to ${store.name || 'our store'}! We are passionate about providing high-quality products and exceptional customer service.`;
+
   return (
     <main className="flex min-h-screen flex-col bg-background">
       <Header />
       <div className="container mx-auto px-4 py-8 flex-1">
         <div className="max-w-4xl mx-auto">
-          <h1 className="text-4xl font-bold mb-8">About Us</h1>
+          <h1 className="text-4xl font-bold mb-8">{headingText}</h1>
 
           <div className="prose prose-lg max-w-none">
             <section className="mb-12">
               <h2 className="text-2xl font-semibold mb-4">Our Story</h2>
-              <p className="text-gray-600 mb-4">
-                Welcome to our store! We are passionate about providing high-quality products and
-                exceptional customer service. Our journey began with a simple mission: to make
-                shopping easy, enjoyable, and accessible to everyone.
-              </p>
+              <p className="text-gray-600 mb-4">{descriptionText}</p>
               <p className="text-gray-600">
                 Today, we continue to grow and evolve, always keeping our customers at the heart of
                 everything we do.
@@ -102,6 +107,36 @@ export default function AboutPage() {
                 </div>
               </div>
             </section>
+
+            {/* Show store contact details if available */}
+            {(store.email || store.phone || store.address) && (
+              <section className="mb-12">
+                <h2 className="text-2xl font-semibold mb-4">Get In Touch</h2>
+                <ul className="space-y-2 text-gray-600">
+                  {store.email && (
+                    <li>
+                      <span className="font-medium">Email:</span>{' '}
+                      <a href={`mailto:${store.email}`} className="text-primary hover:underline">
+                        {store.email}
+                      </a>
+                    </li>
+                  )}
+                  {store.phone && (
+                    <li>
+                      <span className="font-medium">Phone:</span>{' '}
+                      <a href={`tel:${store.phone}`} className="text-primary hover:underline">
+                        {store.phone}
+                      </a>
+                    </li>
+                  )}
+                  {store.address && (
+                    <li>
+                      <span className="font-medium">Address:</span> {store.address}
+                    </li>
+                  )}
+                </ul>
+              </section>
+            )}
 
             <section className="mb-12">
               <h2 className="text-2xl font-semibold mb-4">Contact Us</h2>

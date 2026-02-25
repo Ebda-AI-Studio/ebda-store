@@ -67,12 +67,16 @@ function formatDateTime(dateString: string) {
   });
 }
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+
 const statusConfig = {
   pending: { bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-500', icon: '⏳' },
+  confirmed: { bg: 'bg-cyan-50', text: 'text-cyan-700', dot: 'bg-cyan-500', icon: '✓' },
   processing: { bg: 'bg-blue-50', text: 'text-blue-700', dot: 'bg-blue-500', icon: '⚙️' },
   shipped: { bg: 'bg-violet-50', text: 'text-violet-700', dot: 'bg-violet-500', icon: '📦' },
   delivered: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500', icon: '✓' },
   cancelled: { bg: 'bg-red-50', text: 'text-red-700', dot: 'bg-red-500', icon: '✗' },
+  refunded: { bg: 'bg-gray-100', text: 'text-gray-600', dot: 'bg-gray-400', icon: '↩' },
 } as const;
 
 const paymentConfig = {
@@ -82,15 +86,24 @@ const paymentConfig = {
   failed: { bg: 'bg-red-50', text: 'text-red-700' },
 } as const;
 
-// Status options for future dropdown filter
-const _statusOptions = [
+const statusOptions = [
   { value: 'pending', label: 'Pending' },
+  { value: 'confirmed', label: 'Confirmed' },
   { value: 'processing', label: 'Processing' },
   { value: 'shipped', label: 'Shipped' },
   { value: 'delivered', label: 'Delivered' },
   { value: 'cancelled', label: 'Cancelled' },
+  { value: 'refunded', label: 'Refunded' },
 ];
-void _statusOptions; // Suppress unused warning
+
+// Valid status transitions
+const validTransitions: Record<string, string[]> = {
+  pending: ['confirmed', 'cancelled'],
+  confirmed: ['processing', 'cancelled'],
+  processing: ['shipped', 'cancelled'],
+  shipped: ['delivered'],
+  delivered: ['refunded'],
+};
 
 export default function OrdersPage() {
   const { token } = useAuth();
@@ -107,6 +120,11 @@ export default function OrdersPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<{
+    type: 'success' | 'error';
+    text: string;
+  } | null>(null);
 
   const fetchOrders = useCallback(async () => {
     if (!token) return;
@@ -120,14 +138,11 @@ export default function OrdersPage() {
       });
       if (statusFilter !== 'all') params.append('status', statusFilter);
 
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/admin/orders?${params}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      const response = await fetch(`${API_URL}/api/v1/admin/orders?${params}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
       if (response.ok) {
         const data = await response.json();
@@ -166,6 +181,44 @@ export default function OrdersPage() {
   const viewOrderDetails = (order: Order) => {
     setSelectedOrder(order);
     setIsDetailModalOpen(true);
+    setStatusMessage(null);
+  };
+
+  const handleStatusChange = async (order: Order, newStatus: string) => {
+    if (!token || !order.store?.id) return;
+
+    setIsUpdatingStatus(true);
+    setStatusMessage(null);
+
+    try {
+      const response = await fetch(
+        `${API_URL}/api/v1/stores/${order.store.id}/orders/${order.id}/status`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ status: newStatus }),
+        }
+      );
+
+      if (response.ok) {
+        setStatusMessage({ type: 'success', text: `Status updated to ${newStatus}` });
+        setSelectedOrder(prev => (prev ? { ...prev, status: newStatus } : null));
+        fetchOrders();
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        setStatusMessage({
+          type: 'error',
+          text: errorData.error?.message || 'Failed to update status',
+        });
+      }
+    } catch {
+      setStatusMessage({ type: 'error', text: 'Unable to connect to the server' });
+    } finally {
+      setIsUpdatingStatus(false);
+    }
   };
 
   // Calculate stats from orders
@@ -253,22 +306,24 @@ export default function OrdersPage() {
       {/* Filters */}
       <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-1 rounded-xl bg-muted/50 p-1 overflow-x-auto">
-          {['all', 'pending', 'processing', 'shipped', 'delivered', 'cancelled'].map(status => (
-            <button
-              key={status}
-              onClick={() => {
-                setStatusFilter(status);
-                setPagination(prev => ({ ...prev, page: 1 }));
-              }}
-              className={`whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium transition-all ${
-                statusFilter === status
-                  ? 'bg-white text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {status === 'all' ? 'All Orders' : status.charAt(0).toUpperCase() + status.slice(1)}
-            </button>
-          ))}
+          {['all', 'pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'].map(
+            status => (
+              <button
+                key={status}
+                onClick={() => {
+                  setStatusFilter(status);
+                  setPagination(prev => ({ ...prev, page: 1 }));
+                }}
+                className={`whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium transition-all ${
+                  statusFilter === status
+                    ? 'bg-white text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {status === 'all' ? 'All Orders' : status.charAt(0).toUpperCase() + status.slice(1)}
+              </button>
+            )
+          )}
         </div>
         <div className="relative w-full sm:w-72">
           <svg
@@ -544,6 +599,51 @@ export default function OrdersPage() {
               })()}
             </div>
 
+            {/* Status Change */}
+            {validTransitions[selectedOrder.status] &&
+              validTransitions[selectedOrder.status].length > 0 && (
+                <div className="rounded-xl bg-muted/30 p-4">
+                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                    Update Status
+                  </h4>
+                  <div className="flex items-center gap-3">
+                    <select
+                      className="force-input flex-1 rounded-xl"
+                      defaultValue=""
+                      disabled={isUpdatingStatus || !selectedOrder.store?.id}
+                      onChange={e => {
+                        if (e.target.value) {
+                          handleStatusChange(selectedOrder, e.target.value);
+                          e.target.value = '';
+                        }
+                      }}
+                    >
+                      <option value="" disabled>
+                        {!selectedOrder.store?.id ? 'Store info missing' : 'Select new status...'}
+                      </option>
+                      {(validTransitions[selectedOrder.status] || []).map(status => {
+                        const opt = statusOptions.find(o => o.value === status);
+                        return (
+                          <option key={status} value={status}>
+                            {opt?.label || status}
+                          </option>
+                        );
+                      })}
+                    </select>
+                    {isUpdatingStatus && (
+                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                    )}
+                  </div>
+                  {statusMessage && (
+                    <p
+                      className={`mt-2 text-sm ${statusMessage.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}
+                    >
+                      {statusMessage.text}
+                    </p>
+                  )}
+                </div>
+              )}
+
             {/* Customer Info */}
             <div className="rounded-xl bg-muted/30 p-4">
               <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
@@ -625,7 +725,16 @@ export default function OrdersPage() {
               >
                 Close
               </Button>
-              <Button className="rounded-xl shadow-lg shadow-primary/25">
+              <Button
+                className="rounded-xl shadow-lg shadow-primary/25"
+                disabled={!selectedOrder.store?.id}
+                onClick={() =>
+                  window.open(
+                    `${API_URL}/api/v1/stores/${selectedOrder.store!.id}/orders/${selectedOrder.id}/invoice`,
+                    '_blank'
+                  )
+                }
+              >
                 <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path
                     strokeLinecap="round"

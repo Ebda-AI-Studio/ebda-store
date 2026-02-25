@@ -1,6 +1,11 @@
+'use client';
+
 import { Header, Footer } from '../../components';
+import { useStoreContact } from '../../contexts/StoreContext';
 
 export default function TermsPage() {
+  const { email } = useStoreContact();
+  const legalEmail = email || 'our support team';
   return (
     <main className="flex min-h-screen flex-col bg-gray-50">
       <Header />
@@ -75,7 +80,7 @@ export default function TermsPage() {
                 <li>You are authorized to use the payment method provided</li>
                 <li>Payment information is accurate and complete</li>
                 <li>You will pay all charges at the prices in effect when incurred</li>
-                <li>All payments are processed securely through Stripe</li>
+                <li>All payments are processed securely through our payment gateway</li>
               </ul>
             </section>
 
@@ -133,7 +138,7 @@ export default function TermsPage() {
                 For questions about these Terms of Service, please contact us at:
               </p>
               <p className="mt-2 text-gray-600">
-                Email: legal@forcemedia.com
+                Email: {legalEmail}
                 <br />
                 Address: Kuwait City, Kuwait
               </p>

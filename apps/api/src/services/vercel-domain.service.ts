@@ -1,4 +1,5 @@
 import { config } from '../config';
+import logger from '../lib/logger';
 
 // ==========================================
 // Vercel Domain Service
@@ -56,7 +57,7 @@ export class VercelDomainService {
    */
   static async addDomain(domain: string): Promise<VercelDomainResponse | null> {
     if (!this.isConfigured()) {
-      console.warn('[VERCEL] Vercel API not configured. Skipping domain addition for:', domain);
+      logger.warn({ domain }, 'Vercel API not configured, skipping domain addition');
       return null;
     }
 
@@ -71,25 +72,17 @@ export class VercelDomainService {
       const data = (await response.json()) as VercelDomainResponse;
 
       if (!response.ok) {
-        console.error(
-          '[VERCEL] Failed to add domain:',
-          domain,
-          'Status:',
-          response.status,
-          'Code:',
-          data.error?.code
+        logger.error(
+          { domain, status: response.status, code: data.error?.code },
+          'Failed to add domain to Vercel'
         );
         return null;
       }
 
-      console.log('[VERCEL] Domain added successfully:', domain);
+      logger.info({ domain }, 'Domain added successfully to Vercel');
       return data;
     } catch (error) {
-      console.error(
-        '[VERCEL] Error adding domain:',
-        domain,
-        error instanceof Error ? error.message : 'Unknown error'
-      );
+      logger.error({ err: error, domain }, 'Error adding domain to Vercel');
       return null;
     }
   }
@@ -99,7 +92,7 @@ export class VercelDomainService {
    */
   static async removeDomain(domain: string): Promise<boolean> {
     if (!this.isConfigured()) {
-      console.warn('[VERCEL] Vercel API not configured. Skipping domain removal for:', domain);
+      logger.warn({ domain }, 'Vercel API not configured, skipping domain removal');
       return false;
     }
 
@@ -112,25 +105,17 @@ export class VercelDomainService {
 
       if (!response.ok) {
         const data = (await response.json()) as VercelDomainResponse;
-        console.error(
-          '[VERCEL] Failed to remove domain:',
-          domain,
-          'Status:',
-          response.status,
-          'Code:',
-          data.error?.code
+        logger.error(
+          { domain, status: response.status, code: data.error?.code },
+          'Failed to remove domain from Vercel'
         );
         return false;
       }
 
-      console.log('[VERCEL] Domain removed successfully:', domain);
+      logger.info({ domain }, 'Domain removed successfully from Vercel');
       return true;
     } catch (error) {
-      console.error(
-        '[VERCEL] Error removing domain:',
-        domain,
-        error instanceof Error ? error.message : 'Unknown error'
-      );
+      logger.error({ err: error, domain }, 'Error removing domain from Vercel');
       return false;
     }
   }
@@ -140,7 +125,7 @@ export class VercelDomainService {
    */
   static async getDomain(domain: string): Promise<DomainStatus | null> {
     if (!this.isConfigured()) {
-      console.warn('[VERCEL] Vercel API not configured. Skipping domain check for:', domain);
+      logger.warn({ domain }, 'Vercel API not configured, skipping domain check');
       return null;
     }
 
@@ -158,7 +143,7 @@ export class VercelDomainService {
 
       if (!domainRes.ok) {
         const data = (await domainRes.json()) as VercelDomainResponse;
-        console.error('[VERCEL] Failed to get domain:', domain, 'Code:', data.error?.code);
+        logger.error({ domain, code: data.error?.code }, 'Failed to get domain from Vercel');
         return null;
       }
 
@@ -185,11 +170,7 @@ export class VercelDomainService {
         dnsRecords,
       };
     } catch (error) {
-      console.error(
-        '[VERCEL] Error checking domain:',
-        domain,
-        error instanceof Error ? error.message : 'Unknown error'
-      );
+      logger.error({ err: error, domain }, 'Error checking domain on Vercel');
       return null;
     }
   }
@@ -199,7 +180,7 @@ export class VercelDomainService {
    */
   static async listDomains(): Promise<VercelDomainResponse[]> {
     if (!this.isConfigured()) {
-      console.warn('[VERCEL] Vercel API not configured. Skipping domain list.');
+      logger.warn('Vercel API not configured, skipping domain list');
       return [];
     }
 
@@ -208,17 +189,14 @@ export class VercelDomainService {
       const response = await fetch(url, { headers: this.getHeaders() });
 
       if (!response.ok) {
-        console.error('[VERCEL] Failed to list domains. Status:', response.status);
+        logger.error({ status: response.status }, 'Failed to list domains from Vercel');
         return [];
       }
 
       const data = (await response.json()) as VercelDomainsListResponse;
       return data.domains || [];
     } catch (error) {
-      console.error(
-        '[VERCEL] Error listing domains:',
-        error instanceof Error ? error.message : 'Unknown error'
-      );
+      logger.error({ err: error }, 'Error listing domains from Vercel');
       return [];
     }
   }
@@ -228,7 +206,7 @@ export class VercelDomainService {
    */
   static async verifyDomain(domain: string): Promise<DomainStatus | null> {
     if (!this.isConfigured()) {
-      console.warn('[VERCEL] Vercel API not configured. Skipping domain verify for:', domain);
+      logger.warn({ domain }, 'Vercel API not configured, skipping domain verify');
       return null;
     }
 
@@ -241,16 +219,12 @@ export class VercelDomainService {
 
       if (!response.ok) {
         const data = (await response.json()) as VercelDomainResponse;
-        console.error('[VERCEL] Failed to verify domain:', domain, 'Code:', data.error?.code);
+        logger.error({ domain, code: data.error?.code }, 'Failed to verify domain on Vercel');
       }
 
       return this.getDomain(domain);
     } catch (error) {
-      console.error(
-        '[VERCEL] Error verifying domain:',
-        domain,
-        error instanceof Error ? error.message : 'Unknown error'
-      );
+      logger.error({ err: error, domain }, 'Error verifying domain on Vercel');
       return null;
     }
   }

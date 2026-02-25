@@ -90,48 +90,64 @@ export default function ReviewsPage() {
   async function handleApprove(reviewId: string) {
     try {
       const token = localStorage.getItem('authToken');
-      await fetch(
+      const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/reviews/admin/${reviewId}/approve`,
         {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}` },
         }
       );
+      if (!res.ok) {
+        alert('Failed to approve review. Please try again.');
+        return;
+      }
       fetchReviews();
     } catch (error) {
       console.error('Failed to approve review:', error);
+      alert('Failed to approve review. Please try again.');
     }
   }
 
   async function handleReject(reviewId: string) {
     try {
       const token = localStorage.getItem('authToken');
-      await fetch(
+      const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/reviews/admin/${reviewId}/reject`,
         {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}` },
         }
       );
+      if (!res.ok) {
+        alert('Failed to unapprove review. Please try again.');
+        return;
+      }
       fetchReviews();
     } catch (error) {
       console.error('Failed to reject review:', error);
+      alert('Failed to unapprove review. Please try again.');
     }
   }
 
   async function handleDelete(reviewId: string) {
+    if (!window.confirm('Delete this review? This action cannot be undone.')) return;
     try {
       const token = localStorage.getItem('authToken');
-      await fetch(
+      const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/reviews/admin/${reviewId}`,
         {
           method: 'DELETE',
           headers: { Authorization: `Bearer ${token}` },
         }
       );
+      if (!res.ok) {
+        alert('Failed to delete review. Please try again.');
+        return;
+      }
       fetchReviews();
     } catch (error) {
       console.error('Failed to delete review:', error);
+      alert('Failed to delete review. Please try again.');
     }
   }
 

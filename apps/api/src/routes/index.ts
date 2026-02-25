@@ -10,7 +10,6 @@ import returnRoutes from './return.routes';
 import publicRoutes from './public.routes';
 import paymentRoutes from './payment.routes';
 import paymentSettingsRoutes from './payment-settings.routes';
-import aiRoutes from './ai.routes';
 import uploadRoutes from './upload.routes';
 import adminRoutes from './admin.routes';
 import couponRoutes from './coupon.routes';
@@ -22,6 +21,7 @@ import inventoryRoutes from './inventory.routes';
 import bulkRoutes from './bulk.routes';
 import variantRoutes from './variant.routes';
 import wishlistRoutes from './wishlist.routes';
+import addressRoutes from './address.routes';
 
 const router = Router();
 
@@ -34,9 +34,6 @@ router.use('/payments', paymentRoutes);
 
 // Payment settings (super admin)
 router.use('/payment-settings', paymentSettingsRoutes);
-
-// AI routes (Force AI)
-router.use('/ai', aiRoutes);
 
 // Upload routes
 router.use('/uploads', uploadRoutes);
@@ -91,5 +88,8 @@ router.use('/stores', variantRoutes);
 
 // Wishlist routes (user-scoped)
 router.use('/wishlist', wishlistRoutes);
+
+// Address routes (user-scoped)
+router.use('/addresses', addressRoutes);
 
 export default router;

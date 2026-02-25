@@ -4,7 +4,11 @@ import { ToastProvider } from '@force/ui';
 import { LanguageProvider } from '../contexts/LanguageContext';
 import { StoreProvider } from '../contexts/StoreContext';
 import { CartProvider } from '../contexts/CartContext';
+import { AuthProvider } from '../contexts/AuthContext';
 import { getStore } from '../lib/store-resolver';
+import { MarketingPixelsProvider } from '../components/MarketingPixels';
+import { ServiceWorkerRegistration } from '../components/ServiceWorkerRegistration';
+import type { MarketingPixels } from '@force/shared';
 import '../styles/globals.css';
 
 const plusJakarta = Plus_Jakarta_Sans({
@@ -68,16 +72,25 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   return (
     <html lang="en" dir="ltr" suppressHydrationWarning>
-      <head>{store.favicon && <link rel="icon" href={store.favicon} />}</head>
+      <head>
+        {store.favicon && <link rel="icon" href={store.favicon} />}
+        <link rel="manifest" href="/manifest.webmanifest" />
+      </head>
       <body
         className={`${plusJakarta.variable} ${ibmPlexArabic.variable} font-sans antialiased bg-background text-foreground`}
       >
         <StoreProvider initialStore={store}>
-          <LanguageProvider>
-            <CartProvider>
-              <ToastProvider>{children}</ToastProvider>
-            </CartProvider>
-          </LanguageProvider>
+          <AuthProvider>
+            <LanguageProvider>
+              <CartProvider>
+                <ToastProvider>{children}</ToastProvider>
+              </CartProvider>
+            </LanguageProvider>
+          </AuthProvider>
+          {store.marketingPixels && Object.keys(store.marketingPixels).length > 0 && (
+            <MarketingPixelsProvider pixels={store.marketingPixels as MarketingPixels} />
+          )}
+          <ServiceWorkerRegistration />
         </StoreProvider>
       </body>
     </html>

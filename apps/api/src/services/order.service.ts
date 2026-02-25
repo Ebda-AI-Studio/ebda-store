@@ -1,8 +1,10 @@
+import crypto from 'crypto';
 import { prisma, Prisma, OrderStatus } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import { CartService } from './cart.service';
 import { EmailService, type OrderEmailData } from './email.service';
 import { socketService } from './socket.service';
+import logger from '../lib/logger';
 
 interface CreateOrderData {
   shippingAddress: {
@@ -145,18 +147,7 @@ export class OrderService {
       throw new AppError(400, 'EMPTY_CART', 'Cart is empty');
     }
 
-    // Validate inventory
-    for (const item of cart.items) {
-      if (item.product.trackInventory && item.product.inventory < item.quantity) {
-        throw new AppError(
-          400,
-          'INSUFFICIENT_INVENTORY',
-          `Not enough inventory for ${item.product.name}`
-        );
-      }
-    }
-
-    // Calculate totals
+    // Calculate totals (done before the transaction — no locks needed here)
     const subtotal = cart.items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
     // Calculate tax using store's configured tax rates
     const taxRates = await prisma.taxRate.findMany({ where: { storeId, isActive: true } });
@@ -166,11 +157,51 @@ export class OrderService {
     const total = subtotal + tax + shipping;
 
     // Generate order number
-    const crypto = require('crypto');
     const orderNumber = `ORD-${Date.now()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
 
-    // Create order in transaction
+    // Create order in transaction.
+    //
+    // DB-006: Inventory is validated with a row-level lock (SELECT ... FOR UPDATE)
+    // *inside* the transaction so that two concurrent checkouts cannot both read
+    // the same stale inventory count and both succeed when only one unit remains.
     const order = await prisma.$transaction(async tx => {
+      // Lock and re-validate inventory for each tracked item before decrementing.
+      // FOR UPDATE prevents any concurrent transaction from reading or updating
+      // the same Product row until this transaction commits or rolls back.
+      for (const item of cart.items) {
+        if (item.product.trackInventory) {
+          if ((item as { variantId?: string }).variantId) {
+            // Variant-level lock
+            const [lockedVariant] = await tx.$queryRaw<Array<{ inventory: number }>>`
+              SELECT inventory FROM "product_variants"
+              WHERE id = ${(item as { variantId: string }).variantId}
+              FOR UPDATE
+            `;
+            if (!lockedVariant || lockedVariant.inventory < item.quantity) {
+              throw new AppError(
+                400,
+                'INSUFFICIENT_INVENTORY',
+                `Not enough inventory for ${item.product.name} (variant)`
+              );
+            }
+          } else {
+            // Product-level lock
+            const [lockedProduct] = await tx.$queryRaw<Array<{ inventory: number }>>`
+              SELECT inventory FROM "products"
+              WHERE id = ${item.productId}
+              FOR UPDATE
+            `;
+            if (!lockedProduct || lockedProduct.inventory < item.quantity) {
+              throw new AppError(
+                400,
+                'INSUFFICIENT_INVENTORY',
+                `Not enough inventory for ${item.product.name}`
+              );
+            }
+          }
+        }
+      }
+
       // Create order
       const newOrder = await tx.order.create({
         data: {
@@ -204,13 +235,20 @@ export class OrderService {
         },
       });
 
-      // Update inventory
+      // Decrement inventory (rows already locked above)
       for (const item of cart.items) {
         if (item.product.trackInventory) {
           await tx.product.update({
             where: { id: item.productId },
             data: { inventory: { decrement: item.quantity } },
           });
+          // Also decrement variant inventory if applicable
+          if ((item as { variantId?: string }).variantId) {
+            await tx.productVariant.update({
+              where: { id: (item as { variantId: string }).variantId },
+              data: { inventory: { decrement: item.quantity } },
+            });
+          }
         }
       }
 
@@ -219,6 +257,32 @@ export class OrderService {
 
       return newOrder;
     });
+
+    // Record inventory history (non-blocking — stock already decremented in transaction)
+    for (const item of cart.items) {
+      if (item.product.trackInventory) {
+        try {
+          const prevStock = item.product.inventory;
+          await prisma.inventoryHistory.create({
+            data: {
+              productId: item.productId,
+              storeId,
+              type: 'sale',
+              quantity: -item.quantity,
+              previousStock: prevStock,
+              newStock: Math.max(0, prevStock - item.quantity),
+              reason: 'Sold via order',
+              reference: order.id,
+            },
+          });
+        } catch (err) {
+          logger.error(
+            { err, productId: item.productId, orderId: order.id },
+            'Failed to record inventory history'
+          );
+        }
+      }
+    }
 
     // Send order confirmation email
     try {
@@ -244,7 +308,7 @@ export class OrderService {
         EmailService.sendAdminNewOrder(emailData),
       ]);
     } catch (emailError) {
-      console.error('Failed to send order confirmation email:', emailError);
+      logger.error({ err: emailError }, 'Failed to send order confirmation email');
       // Don't throw - order was created successfully
     }
 
@@ -257,7 +321,7 @@ export class OrderService {
           `${order.customer.firstName} ${order.customer.lastName}`.trim() || order.customer.email,
       });
     } catch (notifyError) {
-      console.error('Failed to send order notification:', notifyError);
+      logger.error({ err: notifyError }, 'Failed to send order notification');
     }
 
     return order;
@@ -307,14 +371,53 @@ export class OrderService {
       },
     });
 
-    // If cancelled or refunded, restore inventory
+    // DB-003: restore inventory atomically so that all stock increments and
+    // history records either all succeed or all roll back together.
     if (status === 'cancelled' || status === 'refunded') {
-      for (const item of order.items) {
-        await prisma.product.update({
-          where: { id: item.productId },
-          data: { inventory: { increment: item.quantity } },
-        });
-      }
+      await prisma.$transaction(async tx => {
+        for (const item of order.items) {
+          // Lock the product row to get an accurate previous-stock value
+          const [lockedProduct] = await tx.$queryRaw<
+            Array<{ id: string; inventory: number; track_inventory: boolean }>
+          >`
+            SELECT id, inventory, track_inventory FROM "products"
+            WHERE id = ${item.productId}
+            FOR UPDATE
+          `;
+
+          if (!lockedProduct?.track_inventory) continue;
+
+          const prevStock = lockedProduct.inventory;
+
+          await tx.product.update({
+            where: { id: item.productId },
+            data: { inventory: { increment: item.quantity } },
+          });
+
+          // Restore variant stock if the order item was for a specific variant
+          if ((item as { variantId?: string }).variantId) {
+            await tx.productVariant.update({
+              where: { id: (item as { variantId: string }).variantId },
+              data: { inventory: { increment: item.quantity } },
+            });
+          }
+
+          // Record inventory history inside the same transaction so the audit
+          // record is guaranteed to exist if and only if the stock was restored
+          await tx.inventoryHistory.create({
+            data: {
+              productId: item.productId,
+              storeId,
+              type: 'return_stock',
+              quantity: item.quantity,
+              previousStock: prevStock,
+              newStock: prevStock + item.quantity,
+              reason: `Order ${status}`,
+              reference: orderId,
+            },
+          });
+        }
+      });
     }
 
     // Send status update emails
@@ -366,7 +469,7 @@ export class OrderService {
         });
       }
     } catch (emailError) {
-      console.error('Failed to send order status email:', emailError);
+      logger.error({ err: emailError }, 'Failed to send order status email');
       // Don't throw - status was updated successfully
     }
 
@@ -377,7 +480,7 @@ export class OrderService {
         status,
       });
     } catch (notifyError) {
-      console.error('Failed to send order status notification:', notifyError);
+      logger.error({ err: notifyError }, 'Failed to send order status notification');
     }
 
     return updatedOrder;

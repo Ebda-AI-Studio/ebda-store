@@ -1,9 +1,11 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import crypto from 'crypto';
 import { prisma } from '@force/database';
 import { PaymentService } from '../services/payment-providers/payment.factory';
 import { PaymentProvider } from '../services/payment-providers/types';
 import { config } from '../config';
 import { auditLog } from '../middleware/security';
+import logger from '../lib/logger';
 
 const router = Router();
 
@@ -24,7 +26,7 @@ function verifyWebhookSignature(req: Request, res: Response, next: NextFunction)
 
   // Require signature for all webhooks
   if (!signature) {
-    console.warn(`[WEBHOOK] Missing signature for ${provider} webhook`);
+    logger.warn({ provider }, '[WEBHOOK] Missing signature for webhook');
 
     auditLog({
       action: 'WEBHOOK_NO_SIGNATURE',
@@ -107,10 +109,8 @@ function generateIdempotencyKey(
       return `hesabe_${payload.paymentId || payload.transaction_id}`;
     case 'upayments':
       return `up_${payload.invoice_id || payload.transaction_id}`;
-    default: {
-      const crypto = require('crypto') as typeof import('crypto');
+    default:
       return `unknown_${Date.now()}_${crypto.randomBytes(5).toString('hex')}`;
-    }
   }
 }
 
@@ -131,6 +131,12 @@ router.post(
       const provider = req.params.provider as PaymentProvider;
       const signature = (req as any).webhookSignature || '';
 
+      // req.body is a raw Buffer (from express.raw). Parse it here so handlers
+      // can access properties while the raw Buffer is preserved for signature
+      // verification inside PaymentService.handleWebhook.
+      const rawBody: Buffer = req.body as Buffer;
+      const payload = JSON.parse(rawBody.toString()) as Record<string, unknown>;
+
       // Validate provider
       const validProviders: PaymentProvider[] = ['tap', 'myfatoorah', 'hesabe', 'upayments'];
       if (!validProviders.includes(provider)) {
@@ -141,14 +147,14 @@ router.post(
         return;
       }
 
-      // Generate idempotency key from payload
-      const idempotencyKey = generateIdempotencyKey(provider, req.body);
+      // Generate idempotency key from parsed payload
+      const idempotencyKey = generateIdempotencyKey(provider, payload);
 
       // Check for duplicate webhook
       const { alreadyProcessed, order } = await checkIdempotency(idempotencyKey);
 
       if (alreadyProcessed) {
-        console.log(`[WEBHOOK] Duplicate webhook detected: ${idempotencyKey}`);
+        logger.info({ idempotencyKey }, '[WEBHOOK] Duplicate webhook detected');
 
         await auditLog({
           action: 'WEBHOOK_DUPLICATE',
@@ -176,15 +182,22 @@ router.post(
         return;
       }
 
-      // Handle webhook
-      const result = await PaymentService.handleWebhook(provider, req.body, signature);
+      // Pass the parsed payload for business logic and the raw body string for
+      // HMAC signature verification so providers compute the correct digest.
+      const result = await PaymentService.handleWebhook(
+        provider,
+        payload,
+        signature,
+        undefined,
+        rawBody.toString()
+      );
 
       // Mark as processed if we have an order
       if (result.orderId) {
         await markWebhookProcessed(result.orderId, idempotencyKey);
       }
 
-      console.log(`[WEBHOOK] ${provider}: ${JSON.stringify(result)}`);
+      logger.info({ provider, result }, '[WEBHOOK] Processed');
 
       await auditLog({
         action: 'WEBHOOK_PROCESSED',
@@ -204,7 +217,7 @@ router.post(
         data: result,
       });
     } catch (error) {
-      console.error('[WEBHOOK ERROR]', error);
+      logger.error({ err: error }, '[WEBHOOK ERROR] Failed to process webhook');
       next(error);
     }
   }
@@ -216,16 +229,21 @@ router.post(
  */
 router.post('/payment', async (req: Request, res: Response, next: NextFunction) => {
   try {
+    // req.body is a raw Buffer (from express.raw). Parse it so we can inspect
+    // payload fields for provider auto-detection.
+    const rawBody: Buffer = req.body as Buffer;
+    const payload = JSON.parse(rawBody.toString()) as Record<string, unknown>;
+
     // Try to detect provider from payload
     let provider: PaymentProvider = 'tap';
 
-    if (req.body.InvoiceId !== undefined) {
+    if (payload.InvoiceId !== undefined) {
       provider = 'myfatoorah';
-    } else if (req.body.paymentId && req.body.resultCode) {
+    } else if (payload.paymentId && payload.resultCode) {
       provider = 'hesabe';
-    } else if (req.body.invoice_id) {
+    } else if (payload.invoice_id) {
       provider = 'upayments';
-    } else if (req.body.id && req.body.object === 'charge') {
+    } else if (payload.id && payload.object === 'charge') {
       provider = 'tap';
     }
 
@@ -239,7 +257,7 @@ router.post('/payment', async (req: Request, res: Response, next: NextFunction) 
       '';
 
     if (!signature) {
-      console.warn(`[WEBHOOK] Missing signature for auto-detected ${provider} webhook`);
+      logger.warn({ provider }, '[WEBHOOK] Missing signature for auto-detected webhook');
       res.status(401).json({
         success: false,
         error: { code: 'MISSING_SIGNATURE', message: 'Webhook signature is required' },
@@ -247,16 +265,24 @@ router.post('/payment', async (req: Request, res: Response, next: NextFunction) 
       return;
     }
 
-    const result = await PaymentService.handleWebhook(provider, req.body, signature);
+    // Pass the parsed payload for business logic and the raw body string for
+    // HMAC signature verification so providers compute the correct digest.
+    const result = await PaymentService.handleWebhook(
+      provider,
+      payload,
+      signature,
+      undefined,
+      rawBody.toString()
+    );
 
-    console.log(`[WEBHOOK] Auto-detected ${provider}: ${JSON.stringify(result)}`);
+    logger.info({ provider, result }, '[WEBHOOK] Auto-detected provider processed');
 
     res.json({
       success: true,
       data: result,
     });
   } catch (error) {
-    console.error('[WEBHOOK ERROR]', error);
+    logger.error({ err: error }, '[WEBHOOK ERROR] Failed to process auto-detected webhook');
     next(error);
   }
 });
@@ -292,7 +318,7 @@ router.get('/payment/callback', async (req: Request, res: Response) => {
       );
     }
   } catch (error) {
-    console.error('[CALLBACK ERROR]', error);
+    logger.error({ err: error }, '[CALLBACK ERROR] Failed to process payment callback');
     res.redirect(`${config.webUrl}/checkout/error?reason=unknown`);
   }
 });
@@ -304,7 +330,10 @@ router.get('/payment/callback', async (req: Request, res: Response) => {
 router.get('/payment/error', async (req: Request, res: Response) => {
   const { error, message, transaction_id } = req.query;
 
-  console.error('[PAYMENT ERROR CALLBACK]', { error, message, transaction_id });
+  logger.error(
+    { error, message, transaction_id },
+    '[PAYMENT ERROR CALLBACK] Payment error callback received'
+  );
 
   res.redirect(
     `${config.webUrl}/checkout/error?reason=${encodeURIComponent(String(message || error || 'payment_failed'))}`

@@ -1,41 +1,59 @@
-import { prisma } from '@force/database';
+import { prisma, Prisma } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 
 export class CartService {
   static async getOrCreate(storeId: string, sessionId: string, customerId?: string) {
+    // Shared include fragment to avoid repetition
+    const cartInclude = {
+      items: {
+        include: {
+          product: {
+            include: { images: { take: 1, orderBy: { position: 'asc' } } },
+          },
+        },
+      },
+    } as const;
+
+    // Try to find an existing cart for this session (or customer)
     let cart = await prisma.cart.findFirst({
       where: {
         storeId,
         OR: [{ sessionId }, ...(customerId ? [{ customerId }] : [])],
       },
-      include: {
-        items: {
-          include: {
-            product: {
-              include: { images: { take: 1, orderBy: { position: 'asc' } } },
-            },
-          },
-        },
-      },
+      include: cartInclude,
     });
 
     if (!cart) {
-      cart = await prisma.cart.create({
-        data: {
-          storeId,
-          sessionId,
-          customerId,
-        },
-        include: {
-          items: {
-            include: {
-              product: {
-                include: { images: { take: 1, orderBy: { position: 'asc' } } },
-              },
-            },
+      try {
+        // Attempt to create — a concurrent request may have already created one,
+        // in which case we catch the unique constraint violation and fall back to
+        // a findFirst so we never return two carts for the same session.
+        cart = await prisma.cart.create({
+          data: {
+            storeId,
+            sessionId,
+            customerId,
           },
-        },
-      });
+          include: cartInclude,
+        });
+      } catch (err) {
+        // P2002 = Prisma unique constraint violation
+        if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+          const existing = await prisma.cart.findFirst({
+            where: {
+              storeId,
+              OR: [{ sessionId }, ...(customerId ? [{ customerId }] : [])],
+            },
+            include: cartInclude,
+          });
+          if (!existing) {
+            throw err; // Unexpected — re-throw
+          }
+          cart = existing;
+        } else {
+          throw err;
+        }
+      }
     }
 
     // Calculate totals

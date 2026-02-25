@@ -12,6 +12,7 @@ import {
   Currency,
   PaymentStatus,
 } from './types';
+import logger from '../../lib/logger';
 
 // ==========================================
 // Hesabe Payment Provider
@@ -115,7 +116,10 @@ export class HesabePaymentProvider implements IPaymentProvider {
     const result = (await response.json()) as HesabeCheckoutResponse;
 
     if (!response.ok || !result.status) {
-      console.error('[HESABE ERROR]', result);
+      logger.error(
+        { statusCode: response.status, code: result.code, message: result.message },
+        'Hesabe API request failed'
+      );
       throw new Error(result.message || 'Hesabe API request failed');
     }
 

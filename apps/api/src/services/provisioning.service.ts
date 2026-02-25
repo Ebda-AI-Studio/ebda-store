@@ -1,8 +1,10 @@
+import crypto from 'crypto';
 import { prisma, Prisma, StoreStatus } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import { AuthService } from './auth.service';
 import { EmailService } from './email.service';
 import { VercelDomainService } from './vercel-domain.service';
+import logger from '../lib/logger';
 
 // ==========================================
 // Store Provisioning Service
@@ -91,10 +93,7 @@ export class ProvisioningService {
       try {
         await VercelDomainService.addDomain(domain);
       } catch (error) {
-        console.error(
-          '[PROVISIONING] Failed to add domain to Vercel:',
-          error instanceof Error ? error.message : 'Unknown error'
-        );
+        logger.error({ err: error, domain }, 'Failed to add domain to Vercel during provisioning');
       }
     }
 
@@ -169,7 +168,10 @@ export class ProvisioningService {
           name: ownerName,
         });
       } catch (error) {
-        console.error('[PROVISIONING] Failed to send welcome email:', error);
+        logger.error(
+          { err: error, email: ownerEmail },
+          'Failed to send welcome email during provisioning'
+        );
       }
     }
 
@@ -304,7 +306,6 @@ export class ProvisioningService {
    * Generate temporary password
    */
   private static generateTempPassword(): string {
-    const crypto = require('crypto');
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%';
     const randomBytes = crypto.randomBytes(12);
     let password = '';

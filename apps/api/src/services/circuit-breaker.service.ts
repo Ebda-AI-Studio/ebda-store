@@ -4,6 +4,7 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
+import logger from '../lib/logger';
 
 export type CircuitState = 'CLOSED' | 'OPEN' | 'HALF_OPEN';
 
@@ -101,7 +102,7 @@ export class CircuitBreakerRegistry {
           circuit.state = 'CLOSED';
           circuit.failures = 0;
           circuit.successes = 0;
-          console.log(`[CIRCUIT] ${name}: HALF_OPEN -> CLOSED`);
+          logger.info({ circuit: name }, '[CIRCUIT] HALF_OPEN -> CLOSED');
         }
         break;
 
@@ -136,8 +137,9 @@ export class CircuitBreakerRegistry {
           // Transition to open
           circuit.state = 'OPEN';
           circuit.nextAttempt = now + opts.timeout;
-          console.log(
-            `[CIRCUIT] ${name}: CLOSED -> OPEN (next attempt at ${new Date(circuit.nextAttempt).toISOString()})`
+          logger.warn(
+            { circuit: name, nextAttempt: new Date(circuit.nextAttempt).toISOString() },
+            '[CIRCUIT] CLOSED -> OPEN'
           );
         }
         break;
@@ -146,7 +148,7 @@ export class CircuitBreakerRegistry {
         // Any failure in half-open goes back to open
         circuit.state = 'OPEN';
         circuit.nextAttempt = now + opts.timeout;
-        console.log(`[CIRCUIT] ${name}: HALF_OPEN -> OPEN`);
+        logger.warn({ circuit: name }, '[CIRCUIT] HALF_OPEN -> OPEN');
         break;
     }
   }
@@ -206,7 +208,7 @@ export async function withCircuitBreaker<T>(
   fallback?: () => T | Promise<T>
 ): Promise<T> {
   if (!circuitBreaker.canRequest(name)) {
-    console.warn(`[CIRCUIT] ${name}: Circuit is OPEN, request blocked`);
+    logger.warn({ circuit: name }, '[CIRCUIT] Circuit is OPEN, request blocked');
     if (fallback) {
       return fallback();
     }
@@ -220,7 +222,7 @@ export async function withCircuitBreaker<T>(
   } catch (error) {
     circuitBreaker.recordFailure(name);
     if (fallback) {
-      console.warn(`[CIRCUIT] ${name}: Operation failed, using fallback`);
+      logger.warn({ circuit: name }, '[CIRCUIT] Operation failed, using fallback');
       return fallback();
     }
     throw error;

@@ -3,27 +3,25 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Header, Footer } from '../../components';
+import { useStore } from '../../contexts/StoreContext';
 
+// Generic FAQs — no store-specific content here.
+// Payment methods reference the store's configured options; adjust if needed.
 const faqs = [
   {
     question: 'How do I place an order?',
     answer:
-      'Simply browse our products, add items to your cart, and proceed to checkout. You can pay securely using your credit card through our Stripe integration.',
+      'Simply browse our products, add items to your cart, and proceed to checkout. You can pay securely using your preferred payment method.',
   },
   {
     question: 'What payment methods do you accept?',
     answer:
-      'We accept all major credit cards (Visa, MasterCard, American Express) through our secure Stripe payment gateway.',
+      'We accept a variety of payment methods including debit and credit cards and Cash on Delivery. All online payments are processed through a secure payment gateway.',
   },
   {
     question: 'How long does shipping take?',
     answer:
-      'Standard shipping typically takes 5-7 business days. Express shipping is available for 2-3 business day delivery.',
-  },
-  {
-    question: 'Do you offer international shipping?',
-    answer:
-      'Yes! We ship to over 50 countries worldwide. Shipping costs and delivery times vary by location.',
+      'Delivery times depend on your location and the shipping option selected at checkout. Please visit our Shipping page for full details.',
   },
   {
     question: 'What is your return policy?',
@@ -33,7 +31,7 @@ const faqs = [
   {
     question: 'How can I track my order?',
     answer:
-      "Once your order ships, you'll receive an email with a tracking number. You can use this to track your package on the carrier's website.",
+      "Once your order ships, you'll receive an email with a tracking number. You can use this to track your package on the carrier's website or through your account order history.",
   },
   {
     question: 'Can I cancel or modify my order?',
@@ -43,11 +41,17 @@ const faqs = [
   {
     question: 'Do you offer gift wrapping?',
     answer:
-      'Yes! Gift wrapping is available at checkout for a small additional fee. You can also include a personalized message.',
+      'Gift wrapping may be available at checkout for a small additional fee. You can also include a personalized message.',
+  },
+  {
+    question: 'How do I contact customer support?',
+    answer:
+      'You can reach us through the Contact page on our website. We aim to respond to all enquiries as quickly as possible.',
   },
 ];
 
 export default function FAQPage() {
+  const { store } = useStore();
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   return (
@@ -57,7 +61,9 @@ export default function FAQPage() {
       <div className="mx-auto w-full max-w-3xl flex-1 px-4 py-12 sm:px-6 lg:px-8">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-gray-900">Frequently Asked Questions</h1>
-          <p className="mt-2 text-gray-500">Find answers to common questions about our store</p>
+          <p className="mt-2 text-gray-500">
+            Find answers to common questions about {store.name || 'our store'}
+          </p>
         </div>
 
         <div className="mt-12 space-y-4">

@@ -29,7 +29,7 @@ export const PRODUCT_STATUSES = {
 // User Roles
 export const USER_ROLES = {
   CUSTOMER: 'customer',
-  ADMIN: 'admin',
+  STORE_ADMIN: 'store_admin',
   SUPER_ADMIN: 'super_admin',
 } as const;
 

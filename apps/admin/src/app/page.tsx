@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Button, Badge } from '@force/ui';
 import { AdminLayout } from '../components/AdminLayout';
+import { formatPrice, formatDate, formatNumber } from '../lib/format';
 
 interface PlatformStats {
   stores: number;
@@ -29,26 +30,6 @@ interface RecentOrder {
   createdAt: string;
   customer: { email: string; firstName: string; lastName: string };
   store: { name: string };
-}
-
-function formatPrice(cents: number) {
-  return new Intl.NumberFormat('en-KW', {
-    style: 'currency',
-    currency: 'KWD',
-    minimumFractionDigits: 3,
-  }).format(cents / 1000);
-}
-
-function formatDate(date: string) {
-  return new Date(date).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-}
-
-function formatNumber(num: number) {
-  return new Intl.NumberFormat('en-US').format(num);
 }
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
@@ -98,8 +79,6 @@ export default function DashboardPage() {
       color: 'from-blue-500 to-blue-600',
       bgColor: 'bg-blue-50',
       iconBg: 'bg-blue-500',
-      trend: '+12%',
-      trendUp: true,
     },
     {
       name: 'Total Users',
@@ -117,8 +96,6 @@ export default function DashboardPage() {
       color: 'from-emerald-500 to-emerald-600',
       bgColor: 'bg-emerald-50',
       iconBg: 'bg-emerald-500',
-      trend: '+8%',
-      trendUp: true,
     },
     {
       name: 'Total Orders',
@@ -136,8 +113,6 @@ export default function DashboardPage() {
       color: 'from-violet-500 to-violet-600',
       bgColor: 'bg-violet-50',
       iconBg: 'bg-violet-500',
-      trend: '+23%',
-      trendUp: true,
     },
     {
       name: 'Total Revenue',
@@ -155,8 +130,6 @@ export default function DashboardPage() {
       color: 'from-primary to-orange-600',
       bgColor: 'bg-orange-50',
       iconBg: 'bg-primary',
-      trend: '+15%',
-      trendUp: true,
       isRevenue: true,
     },
   ];
@@ -254,48 +227,11 @@ export default function DashboardPage() {
             <div className="flex items-start justify-between">
               <div className="flex-1">
                 <p className="text-sm font-medium text-muted-foreground">{stat.name}</p>
-                <div className="mt-2 flex items-baseline gap-2">
+                <div className="mt-2">
                   <p className="text-3xl font-bold tracking-tight text-foreground">
                     {stat.isRevenue ? stat.value : formatNumber(stat.value as number)}
                   </p>
-                  {stat.trend && (
-                    <span
-                      className={`inline-flex items-center gap-0.5 text-xs font-semibold ${stat.trendUp ? 'text-emerald-600' : 'text-red-600'}`}
-                    >
-                      {stat.trendUp ? (
-                        <svg
-                          className="h-3 w-3"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M5 10l7-7m0 0l7 7m-7-7v18"
-                          />
-                        </svg>
-                      ) : (
-                        <svg
-                          className="h-3 w-3"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M19 14l-7 7m0 0l-7-7m7 7V3"
-                          />
-                        </svg>
-                      )}
-                      {stat.trend}
-                    </span>
-                  )}
                 </div>
-                <p className="mt-1 text-xs text-muted-foreground">vs last month</p>
               </div>
               <div
                 className={`flex h-12 w-12 items-center justify-center rounded-2xl ${stat.iconBg} text-white shadow-lg transition-transform group-hover:scale-110`}
@@ -525,51 +461,6 @@ export default function DashboardPage() {
               </div>
             </Link>
           ))}
-        </div>
-      </div>
-
-      {/* Platform Health */}
-      <div className="mt-8 animate-slide-up" style={{ animationDelay: '0.6s' }}>
-        <div className="force-card">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-lg font-semibold text-foreground">Platform Health</h2>
-              <p className="text-sm text-muted-foreground">System status and performance</p>
-            </div>
-            <Badge variant="default" className="bg-emerald-100 text-emerald-700 border-0">
-              <span className="mr-1.5 h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-              All Systems Operational
-            </Badge>
-          </div>
-          <div className="grid gap-6 sm:grid-cols-3">
-            <div className="rounded-xl border bg-muted/30 p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-muted-foreground">API Response Time</span>
-                <span className="text-sm font-bold text-emerald-600">45ms</span>
-              </div>
-              <div className="force-progress">
-                <div className="force-progress-bar bg-emerald-500" style={{ width: '15%' }} />
-              </div>
-            </div>
-            <div className="rounded-xl border bg-muted/30 p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-muted-foreground">Database Usage</span>
-                <span className="text-sm font-bold text-blue-600">32%</span>
-              </div>
-              <div className="force-progress">
-                <div className="force-progress-bar bg-blue-500" style={{ width: '32%' }} />
-              </div>
-            </div>
-            <div className="rounded-xl border bg-muted/30 p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-muted-foreground">Storage Used</span>
-                <span className="text-sm font-bold text-violet-600">18%</span>
-              </div>
-              <div className="force-progress">
-                <div className="force-progress-bar bg-violet-500" style={{ width: '18%' }} />
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </AdminLayout>

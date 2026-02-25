@@ -39,7 +39,7 @@ exports.PRODUCT_STATUSES = {
 // User Roles
 exports.USER_ROLES = {
   CUSTOMER: 'customer',
-  ADMIN: 'admin',
+  STORE_ADMIN: 'store_admin',
   SUPER_ADMIN: 'super_admin',
 };
 // Store Statuses

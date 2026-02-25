@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button, Input } from '@force/ui';
 import { api } from '@/lib/api';
 
@@ -13,9 +14,11 @@ interface User {
 }
 
 export default function SettingsPage() {
+  const router = useRouter();
   const [, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const [profileData, setProfileData] = useState({
@@ -59,11 +62,27 @@ export default function SettingsPage() {
     setIsSaving(true);
     setMessage(null);
 
-    // Simulate API call - in production, call actual API
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    try {
+      const result = await api.updateProfile({
+        firstName: profileData.firstName,
+        lastName: profileData.lastName,
+        phone: profileData.phone,
+      });
 
-    setMessage({ type: 'success', text: 'Profile updated successfully!' });
-    setIsSaving(false);
+      if (result.success && result.data) {
+        setUser(result.data.user);
+        setMessage({ type: 'success', text: 'Profile updated successfully!' });
+      } else {
+        setMessage({
+          type: 'error',
+          text: result.error?.message || 'Failed to update profile',
+        });
+      }
+    } catch {
+      setMessage({ type: 'error', text: 'Failed to update profile. Please try again.' });
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   async function handlePasswordSubmit(e: React.FormEvent) {
@@ -107,12 +126,58 @@ export default function SettingsPage() {
       return;
     }
 
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    try {
+      const result = await api.changePassword(
+        passwordData.currentPassword,
+        passwordData.newPassword
+      );
 
-    setMessage({ type: 'success', text: 'Password updated successfully!' });
-    setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
-    setIsSaving(false);
+      if (result.success) {
+        setMessage({ type: 'success', text: 'Password updated successfully!' });
+        setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      } else {
+        setMessage({
+          type: 'error',
+          text: result.error?.message || 'Failed to update password',
+        });
+      }
+    } catch {
+      setMessage({ type: 'error', text: 'Failed to update password. Please try again.' });
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleDeleteAccount() {
+    const confirmed = window.confirm(
+      'Are you sure you want to permanently delete your account? This action cannot be undone and all your data will be lost.'
+    );
+    if (!confirmed) return;
+
+    setIsDeleting(true);
+    setMessage(null);
+
+    try {
+      const result = await api.delete<{ message: string }>('/auth/me');
+      if (result.success) {
+        // Clear all auth tokens from localStorage
+        api.setToken(null);
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('refreshToken');
+        }
+        // Redirect to home after account deletion
+        router.push('/');
+      } else {
+        setMessage({
+          type: 'error',
+          text: result.error?.message || 'Failed to delete account. Please try again.',
+        });
+      }
+    } catch {
+      setMessage({ type: 'error', text: 'Failed to delete account. Please try again.' });
+    } finally {
+      setIsDeleting(false);
+    }
   }
 
   if (isLoading) {
@@ -244,7 +309,9 @@ export default function SettingsPage() {
                 Permanently delete your account and all associated data
               </p>
             </div>
-            <Button variant="destructive">Delete Account</Button>
+            <Button variant="destructive" onClick={handleDeleteAccount} isLoading={isDeleting}>
+              Delete Account
+            </Button>
           </div>
         </div>
       </div>

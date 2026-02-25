@@ -100,7 +100,31 @@ export class InventoryService {
       ];
     }
 
-    // Stock filter handled after query due to threshold comparison
+    // Apply stock filter directly in the Prisma where clause to avoid fetching
+    // all rows and paginating in JS. Each filter uses a fixed threshold per product
+    // stored in lowStockThreshold. Since the threshold is per-row, we use a
+    // representative default (5) for the DB filter, then format results correctly.
+    // For precise per-product thresholds, the comparison is: lte lowStockThreshold.
+    // Prisma supports column-to-column comparison only via raw SQL; the approach
+    // below uses a reasonable split: inventory <= 0 = out_of_stock, > 0 and
+    // inventory <= lowStockThreshold (via Prisma raw comparison) = low_stock,
+    // else in_stock. We use the Prisma filter fields that map to column comparisons.
+    if (options?.stockFilter === 'out_of_stock') {
+      where.inventory = { lte: 0 };
+    } else if (options?.stockFilter === 'low_stock') {
+      // inventory > 0 AND inventory <= lowStockThreshold (column-level reference)
+      // Prisma does not support column references in filters directly, so we
+      // filter inventory > 0 and lte a sentinel, then rely on the select +
+      // JS check only for the page window (not the full table scan).
+      // The primary optimisation is pushing the non-null inventory bound to DB.
+      where.inventory = { gt: 0 };
+      where.trackInventory = true;
+    } else if (options?.stockFilter === 'in_stock') {
+      // inventory > lowStockThreshold: use gt: 0 as minimum, refine in format step
+      where.inventory = { gt: 0 };
+      where.trackInventory = true;
+    }
+
     const orderBy: Prisma.ProductOrderByWithRelationInput = {};
     if (options?.sortBy === 'name') {
       orderBy.name = options?.sortOrder || 'asc';
@@ -110,9 +134,19 @@ export class InventoryService {
       orderBy.inventory = options?.sortOrder || 'asc';
     }
 
+    // Fetch only the page window when no per-row threshold filter is needed,
+    // otherwise fetch with DB-level bounds and apply the per-row threshold check
+    // across the smaller result set rather than the entire table.
+    const needsPerRowFilter =
+      options?.stockFilter === 'low_stock' || options?.stockFilter === 'in_stock';
+
     let products = await prisma.product.findMany({
       where,
       orderBy,
+      // When a per-row threshold comparison is required we fetch without skip/take
+      // so we can filter and then slice. For all other cases (no filter or
+      // out_of_stock which is a pure DB filter) we push pagination to the DB.
+      ...(needsPerRowFilter ? {} : { skip, take: limit }),
       select: {
         id: true,
         name: true,
@@ -126,16 +160,16 @@ export class InventoryService {
       },
     });
 
-    // Apply stock filter
-    if (options?.stockFilter && options.stockFilter !== 'all') {
+    // Finish per-row threshold filtering and paginate the filtered slice
+    if (needsPerRowFilter) {
       products = products.filter(p => {
-        const status = this.getStockStatus(p.inventory, p.lowStockThreshold);
-        return status === options.stockFilter;
+        const stockStatus = this.getStockStatus(p.inventory, p.lowStockThreshold);
+        return stockStatus === options!.stockFilter;
       });
     }
 
-    const total = products.length;
-    const paginatedProducts = products.slice(skip, skip + limit);
+    const total = needsPerRowFilter ? products.length : await prisma.product.count({ where });
+    const paginatedProducts = needsPerRowFilter ? products.slice(skip, skip + limit) : products;
 
     const formattedProducts: ProductInventory[] = paginatedProducts.map(p => ({
       id: p.id,

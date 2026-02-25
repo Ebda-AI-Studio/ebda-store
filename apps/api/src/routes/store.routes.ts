@@ -2,8 +2,12 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
+import { requireRole } from '../middleware/rbac';
+import { Prisma, prisma, StoreStatus } from '@force/database';
 import { StoreService } from '../services/store.service';
 import { VercelDomainService } from '../services/vercel-domain.service';
+import { AppError } from '../middleware/error-handler';
+import logger from '../lib/logger';
 
 const router = Router();
 
@@ -66,6 +70,41 @@ const contactSchema = z
     addressAr: z.string().max(500).optional(),
   })
   .strip();
+
+const brandingSchema = z
+  .object({
+    logo: z.string().url().max(500).optional(),
+    logoAr: z.string().url().max(500).optional(),
+    favicon: z.string().url().max(500).optional(),
+    description: z.string().max(1000).optional(),
+    descriptionAr: z.string().max(1000).optional(),
+  })
+  .strip();
+
+const socialSchema = z
+  .object({
+    facebook: z.string().url().max(500).optional(),
+    instagram: z.string().url().max(500).optional(),
+    twitter: z.string().url().max(500).optional(),
+    tiktok: z.string().url().max(500).optional(),
+    youtube: z.string().url().max(500).optional(),
+    snapchat: z.string().url().max(500).optional(),
+    whatsapp: z.string().max(50).optional(),
+  })
+  .strip();
+
+const announcementSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    text: z.string().max(500).optional(),
+    textAr: z.string().max(500).optional(),
+    bgColor: z.string().max(50).optional(),
+    textColor: z.string().max(50).optional(),
+    link: z.string().url().max(500).optional().or(z.literal('')),
+  })
+  .strip();
+
+const marketingPixelsSchema = z.record(z.unknown());
 
 /**
  * @swagger
@@ -134,21 +173,26 @@ router.get(
   }
 );
 
-// GET /stores/:id - Get store by ID
-router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { id } = req.params;
+// GET /stores/:id - Get store by ID (requires store_admin or super_admin)
+router.get(
+  '/:id',
+  authenticate,
+  requireRole(['store_admin', 'super_admin']),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
 
-    const store = await StoreService.getById(id);
+      const store = await StoreService.getById(id);
 
-    res.json({
-      success: true,
-      data: { store },
-    });
-  } catch (error) {
-    next(error);
+      res.json({
+        success: true,
+        data: { store },
+      });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 // GET /stores/:id/stats - Get store stats
 router.get('/:id/stats', authenticate, async (req: Request, res: Response, next: NextFunction) => {
@@ -279,6 +323,31 @@ router.delete(
   }
 );
 
+// PATCH /stores/:id/status - Suspend or activate a store (super_admin only)
+router.patch(
+  '/:id/status',
+  authenticate,
+  requireRole(['super_admin']),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { status } = req.body as { status: StoreStatus };
+
+      if (!['active', 'suspended'].includes(status)) {
+        throw new AppError(400, 'INVALID_STATUS', 'Status must be active or suspended');
+      }
+
+      const store = await prisma.store.update({
+        where: { id: req.params.id },
+        data: { status: status as StoreStatus },
+      });
+
+      res.json({ success: true, data: store });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // PUT /stores/:id/template - Update store template
 router.put(
   '/:id/template',
@@ -321,7 +390,7 @@ router.put(
       const { id } = req.params;
       const theme = themeSchema.parse(req.body);
 
-      const store = await StoreService.updateTheme(id, theme as any);
+      const store = await StoreService.updateTheme(id, theme as Prisma.InputJsonValue);
 
       res.json({
         success: true,
@@ -342,7 +411,7 @@ router.put(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
-      const branding = req.body;
+      const branding = brandingSchema.parse(req.body);
 
       const store = await StoreService.updateBranding(id, branding);
 
@@ -365,7 +434,7 @@ router.put(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
-      const socialLinks = req.body;
+      const socialLinks = socialSchema.parse(req.body);
 
       const store = await StoreService.updateSocialLinks(id, socialLinks);
 
@@ -402,6 +471,27 @@ router.put(
   }
 );
 
+// GET /stores/:id/announcement - Get store announcement bar settings
+router.get(
+  '/:id/announcement',
+  authenticate,
+  requireRole(['store_admin', 'super_admin']),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const store = await prisma.store.findFirst({
+        where: { id: req.params.id },
+        select: { announcementBar: true },
+      });
+
+      if (!store) throw new AppError(404, 'NOT_FOUND', 'Store not found');
+
+      res.json({ success: true, data: store.announcementBar ?? {} });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // PUT /stores/:id/announcement - Update store announcement bar
 router.put(
   '/:id/announcement',
@@ -411,7 +501,7 @@ router.put(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
-      const announcementBar = req.body;
+      const announcementBar = announcementSchema.parse(req.body);
 
       const store = await StoreService.updateAnnouncementBar(id, announcementBar);
 
@@ -419,6 +509,32 @@ router.put(
         success: true,
         data: { store },
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// GET /stores/:id/seo - Get store SEO settings
+router.get(
+  '/:id/seo',
+  authenticate,
+  requireRole(['store_admin', 'super_admin']),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const store = await prisma.store.findFirst({
+        where: { id: req.params.id },
+        select: {
+          metaTitle: true,
+          metaTitleAr: true,
+          metaDescription: true,
+          metaDescriptionAr: true,
+        },
+      });
+
+      if (!store) throw new AppError(404, 'NOT_FOUND', 'Store not found');
+
+      res.json({ success: true, data: store });
     } catch (error) {
       next(error);
     }
@@ -457,9 +573,14 @@ router.put(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
-      const { marketingPixels } = req.body;
+      const { marketingPixels } = z
+        .object({ marketingPixels: marketingPixelsSchema })
+        .parse(req.body);
 
-      const store = await StoreService.updateMarketingPixels(id, marketingPixels);
+      const store = await StoreService.updateMarketingPixels(
+        id,
+        marketingPixels as Prisma.InputJsonValue
+      );
 
       res.json({
         success: true,
@@ -526,9 +647,9 @@ router.put(
         try {
           await VercelDomainService.removeDomain(oldDomain);
         } catch (error) {
-          console.error(
-            '[STORE] Failed to remove old domain from Vercel:',
-            error instanceof Error ? error.message : 'Unknown error'
+          logger.error(
+            { err: error instanceof Error ? error.message : 'Unknown error', oldDomain },
+            '[STORE] Failed to remove old domain from Vercel'
           );
         }
       }
@@ -548,9 +669,9 @@ router.put(
         try {
           await VercelDomainService.addDomain(domain);
         } catch (error) {
-          console.error(
-            '[STORE] Failed to add domain to Vercel:',
-            error instanceof Error ? error.message : 'Unknown error'
+          logger.error(
+            { err: error instanceof Error ? error.message : 'Unknown error', domain },
+            '[STORE] Failed to add domain to Vercel'
           );
         }
       }

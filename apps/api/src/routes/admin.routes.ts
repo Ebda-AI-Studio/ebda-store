@@ -27,6 +27,17 @@ function parsePagination(page?: string | unknown, limit?: string | unknown) {
 }
 
 // Validation schemas
+const updateStoreAdminSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  slug: z
+    .string()
+    .regex(/^[a-z0-9-]+$/)
+    .max(100)
+    .optional(),
+  plan: z.enum(['free', 'starter', 'professional', 'enterprise']).optional(),
+  status: z.enum(['active', 'suspended']).optional(),
+});
+
 const provisionStoreSchema = z.object({
   storeName: z.string().min(1).max(100),
   storeSlug: z
@@ -187,43 +198,15 @@ router.patch('/stores/:id/status', async (req: Request, res: Response, next: Nex
 router.put('/stores/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const { name, slug, plan, status } = req.body;
-
-    // Validate plan and status against allowed values
-    const validPlans = ['free', 'basic', 'professional', 'enterprise'];
-    const validStatuses = ['active', 'inactive', 'suspended', 'pending'];
-    if (plan && !validPlans.includes(plan)) {
-      res
-        .status(400)
-        .json({
-          success: false,
-          error: {
-            code: 'VALIDATION_ERROR',
-            message: `Invalid plan. Allowed: ${validPlans.join(', ')}`,
-          },
-        });
-      return;
-    }
-    if (status && !validStatuses.includes(status)) {
-      res
-        .status(400)
-        .json({
-          success: false,
-          error: {
-            code: 'VALIDATION_ERROR',
-            message: `Invalid status. Allowed: ${validStatuses.join(', ')}`,
-          },
-        });
-      return;
-    }
+    const { name, slug, plan, status } = updateStoreAdminSchema.parse(req.body);
 
     const store = await prisma.store.update({
       where: { id },
       data: {
-        ...(name && { name }),
-        ...(slug && { slug }),
-        ...(plan && { plan }),
-        ...(status && { status }),
+        ...(name !== undefined && { name }),
+        ...(slug !== undefined && { slug }),
+        ...(plan !== undefined && { plan }),
+        ...(status !== undefined && { status }),
       },
       include: {
         owner: {
@@ -237,7 +220,12 @@ router.put('/stores/:id', async (req: Request, res: Response, next: NextFunction
       userId: req.user!.userId,
       resourceType: 'store',
       resourceId: id,
-      details: { name, slug, plan, status },
+      details: {
+        ...(name !== undefined && { name }),
+        ...(slug !== undefined && { slug }),
+        ...(plan !== undefined && { plan }),
+        ...(status !== undefined && { status }),
+      },
       ip: req.ip,
       userAgent: req.headers['user-agent'],
     });

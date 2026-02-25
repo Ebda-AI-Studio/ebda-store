@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { api } from '@/lib/api';
 
 export interface CartItem {
   id: string;
@@ -11,6 +12,8 @@ export interface CartItem {
   image?: string;
   slug: string;
   category?: string;
+  /** Optional variant id — present when the product has variants and one is selected */
+  variantId?: string;
 }
 
 interface CartContextType {
@@ -19,6 +22,7 @@ interface CartContextType {
   removeItem: (id: string) => void;
   updateQuantity: (id: string, quantity: number) => void;
   clearCart: () => void;
+  syncCartToBackend: () => Promise<void>;
   itemCount: number;
   total: number;
 }
@@ -88,6 +92,19 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setItems([]);
   }, []);
 
+  // Sync local cart items to the backend (call after login)
+  const syncCartToBackend = useCallback(async () => {
+    if (items.length === 0) return;
+    try {
+      for (const item of items) {
+        await api.addToCart(item.id, item.quantity);
+      }
+    } catch {
+      // Non-critical — local cart still works as fallback
+      console.error('Failed to sync cart to backend');
+    }
+  }, [items]);
+
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
   const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
@@ -99,6 +116,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         removeItem,
         updateQuantity,
         clearCart,
+        syncCartToBackend,
         itemCount,
         total,
       }}

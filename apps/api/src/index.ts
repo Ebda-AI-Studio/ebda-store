@@ -18,6 +18,11 @@ import { prisma } from '@force/database';
 import { redis } from './services/redis.service';
 import { circuitBreaker } from './services/circuit-breaker.service';
 import { emailQueue } from './services/email-queue.service';
+import { SentryService } from './services/sentry.service';
+import logger from './lib/logger';
+
+// Initialize Sentry before anything else
+SentryService.init();
 
 const app = express();
 const httpServer = createServer(app);
@@ -79,9 +84,55 @@ app.use(
   })
 );
 
+// Cache for custom-domain CORS lookups: hostname -> { allowed, expiresAt }
+const corsDomainCache = new Map<string, { allowed: boolean; expiresAt: number }>();
+const CORS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
 app.use(
   cors({
-    origin: [config.webUrl, config.adminUrl],
+    origin: (origin, callback) => {
+      // Allow requests with no origin (mobile apps, curl, Postman, etc.)
+      if (!origin) return callback(null, true);
+
+      // Always allow platform URLs
+      const platformOrigins = [config.webUrl, config.adminUrl].filter(Boolean);
+      if (platformOrigins.includes(origin)) return callback(null, true);
+
+      // Allow localhost in development
+      if (config.nodeEnv !== 'production' && origin.includes('localhost')) {
+        return callback(null, true);
+      }
+
+      // For other HTTPS origins, check if they match a store's custom domain in the DB.
+      // We cache results briefly to avoid a DB hit on every request.
+      if (origin.startsWith('https://')) {
+        let hostname: string;
+        try {
+          hostname = new URL(origin).hostname;
+        } catch {
+          return callback(new Error('Not allowed by CORS'));
+        }
+
+        // Return cached result if still fresh
+        const cached = corsDomainCache.get(hostname);
+        if (cached && cached.expiresAt > Date.now()) {
+          return cached.allowed ? callback(null, true) : callback(new Error('Not allowed by CORS'));
+        }
+
+        // Async DB lookup — only allow if a store with this custom domain exists
+        prisma.store
+          .findFirst({ where: { domain: hostname }, select: { id: true } })
+          .then(store => {
+            const allowed = store !== null;
+            corsDomainCache.set(hostname, { allowed, expiresAt: Date.now() + CORS_CACHE_TTL_MS });
+            return allowed ? callback(null, true) : callback(new Error('Not allowed by CORS'));
+          })
+          .catch(() => callback(new Error('Not allowed by CORS')));
+        return;
+      }
+
+      callback(new Error('Not allowed by CORS'));
+    },
     credentials: true,
     exposedHeaders: ['X-Request-Id', 'X-CSRF-Token'],
   })
@@ -126,7 +177,7 @@ app.get('/health', (_req, res) => {
 app.get(
   '/api/v1/health',
   authenticate,
-  requireRole(['admin', 'super_admin']),
+  requireRole(['store_admin', 'super_admin']),
   async (_req: Request, res: Response) => {
     const checks: Record<string, { status: string; latency?: number }> = {};
 
@@ -191,54 +242,48 @@ setupSwagger(app);
 // API Routes
 app.use('/api/v1', routes);
 
+// Sentry error handler (must be before errorHandler)
+app.use(SentryService.errorHandler());
+
 // Error handling
 app.use(errorHandler);
 
 // Start server
 const server = httpServer.listen(config.port, () => {
-  console.log(`🚀 API Server running on http://${config.host}:${config.port}`);
-  console.log(`📝 Environment: ${config.nodeEnv}`);
-  console.log(`🔌 WebSocket enabled`);
-  console.log(`📚 API Docs: http://${config.host}:${config.port}/docs`);
+  logger.info({ host: config.host, port: config.port, env: config.nodeEnv }, 'API server started');
+  logger.info(
+    { docs: `http://${config.host}:${config.port}/docs` },
+    'WebSocket enabled, API docs available'
+  );
 });
 
 // Graceful shutdown handler
 async function gracefulShutdown(signal: string) {
-  console.log(`\n${signal} received. Starting graceful shutdown...`);
+  logger.info({ signal }, 'Starting graceful shutdown');
   isShuttingDown = true;
 
   // Stop accepting new connections
   server.close(async () => {
-    console.log('HTTP server closed');
+    logger.info('HTTP server closed');
 
     try {
-      // Stop email queue
       emailQueue.stopProcessing();
-      console.log('Email queue stopped');
-
-      // Close socket connections
       socketService.close();
-      console.log('WebSocket connections closed');
-
-      // Close database connection
       await prisma.$disconnect();
-      console.log('Database connection closed');
-
-      // Close Redis connection
       await redis.disconnect();
-      console.log('Redis connection closed');
+      await SentryService.close();
 
-      console.log('Graceful shutdown completed');
+      logger.info('Graceful shutdown completed');
       process.exit(0);
     } catch (error) {
-      console.error('Error during shutdown:', error);
+      logger.error({ err: error }, 'Error during shutdown');
       process.exit(1);
     }
   });
 
   // Force close after 30 seconds
   setTimeout(() => {
-    console.error('Forced shutdown after timeout');
+    logger.fatal('Forced shutdown after timeout');
     process.exit(1);
   }, 30000);
 }
@@ -249,13 +294,16 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // Handle uncaught errors
 process.on('uncaughtException', error => {
-  console.error('Uncaught Exception:', error);
+  logger.fatal({ err: error }, 'Uncaught exception');
+  SentryService.captureException(error, { tags: { type: 'uncaughtException' } });
   gracefulShutdown('uncaughtException');
 });
 
 process.on('unhandledRejection', reason => {
-  console.error('Unhandled Rejection:', reason);
-  // Don't shutdown for unhandled rejections, just log
+  logger.error({ err: reason }, 'Unhandled rejection');
+  if (reason instanceof Error) {
+    SentryService.captureException(reason, { tags: { type: 'unhandledRejection' } });
+  }
 });
 
 export default app;

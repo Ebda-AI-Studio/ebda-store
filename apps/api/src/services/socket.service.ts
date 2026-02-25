@@ -3,6 +3,7 @@ import { Server, Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import { config } from '../config';
 import { prisma } from '@force/database';
+import logger from '../lib/logger';
 
 interface AuthPayload {
   userId: string;
@@ -58,7 +59,7 @@ class SocketService {
       this.handleConnection(socket);
     });
 
-    console.log('🔌 Socket.io initialized');
+    logger.info('Socket.io initialized');
     return this.io;
   }
 
@@ -71,7 +72,7 @@ class SocketService {
     // Add socket to user's sockets
     this.addUserSocket(user.userId, socket.id);
 
-    console.log(`User ${user.email} connected (socket: ${socket.id})`);
+    logger.info({ email: user.email, socketId: socket.id }, 'User connected');
 
     // Join user's room
     socket.join(`user:${user.userId}`);
@@ -79,7 +80,7 @@ class SocketService {
     // Handle store subscription (only admins can subscribe to store events)
     socket.on('subscribe:store', async (storeId: string) => {
       const role = user.role;
-      if (role !== 'admin' && role !== 'super_admin' && role !== 'store_admin') {
+      if (role !== 'store_admin' && role !== 'super_admin') {
         socket.emit('error', { message: 'Insufficient permissions to subscribe to store events' });
         return;
       }
@@ -114,12 +115,12 @@ class SocketService {
     socket.on('disconnect', () => {
       this.removeUserSocket(user.userId, socket.id);
       this.removeAllStoreSockets(socket.id);
-      console.log(`User ${user.email} disconnected (socket: ${socket.id})`);
+      logger.info({ email: user.email, socketId: socket.id }, 'User disconnected');
     });
 
     // Handle errors
     socket.on('error', error => {
-      console.error(`Socket error for user ${user.userId}:`, error);
+      logger.error({ userId: user.userId, err: error }, 'Socket error');
     });
   }
 

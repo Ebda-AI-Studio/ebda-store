@@ -1,0 +1,381 @@
+'use client';
+
+import { useEffect, useState, useCallback } from 'react';
+import { useParams } from 'next/navigation';
+import Link from 'next/link';
+import { AdminLayout } from '../../../components/AdminLayout';
+
+interface UserDetail {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: 'super_admin' | 'store_admin' | 'customer';
+  status: 'active' | 'inactive' | 'suspended';
+  isActive: boolean;
+  createdAt: string;
+  lastLoginAt: string | null;
+  stores?: { id: string; name: string; slug: string }[];
+}
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+
+const ROLE_LABELS: Record<string, string> = {
+  super_admin: 'Super Admin',
+  store_admin: 'Store Admin',
+  customer: 'Customer',
+};
+
+const STATUS_STYLES: Record<string, { bg: string; text: string; dot: string }> = {
+  active: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
+  inactive: { bg: 'bg-gray-100', text: 'text-gray-600', dot: 'bg-gray-400' },
+  suspended: { bg: 'bg-red-50', text: 'text-red-700', dot: 'bg-red-500' },
+};
+
+function formatDate(dateString: string | null) {
+  if (!dateString) return 'Never';
+  return new Date(dateString).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+export default function UserDetailPage() {
+  const params = useParams();
+  const userId = params?.id as string;
+
+  const [user, setUser] = useState<UserDetail | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saveMessage, setSaveMessage] = useState<{
+    type: 'success' | 'error';
+    text: string;
+  } | null>(null);
+
+  // Edit form state
+  const [editRole, setEditRole] = useState<string>('customer');
+  const [editStatus, setEditStatus] = useState<string>('active');
+
+  const fetchUser = useCallback(async () => {
+    if (!userId) return;
+    setIsLoading(true);
+    setError(null);
+    try {
+      const token = localStorage.getItem('authToken');
+      const res = await fetch(`${API_URL}/api/v1/admin/users/${userId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const u = data.data?.user || data.data;
+        setUser(u);
+        setEditRole(u.role);
+        setEditStatus(u.status || (u.isActive ? 'active' : 'inactive'));
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        setError(errData.error?.message || 'Failed to fetch user');
+      }
+    } catch {
+      setError('Unable to connect to the server. Please check your connection and try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    fetchUser();
+  }, [fetchUser]);
+
+  const handleSave = async () => {
+    if (!user) return;
+    setIsSaving(true);
+    setSaveMessage(null);
+    try {
+      const token = localStorage.getItem('authToken');
+      const res = await fetch(`${API_URL}/api/v1/admin/users/${userId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          role: editRole,
+          status: editStatus,
+          isActive: editStatus === 'active',
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const u = data.data?.user || data.data;
+        setUser(u);
+        setEditRole(u.role);
+        setEditStatus(u.status || (u.isActive ? 'active' : 'inactive'));
+        setSaveMessage({ type: 'success', text: 'User updated successfully' });
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        setSaveMessage({
+          type: 'error',
+          text: errData.error?.message || 'Failed to update user',
+        });
+      }
+    } catch {
+      setSaveMessage({ type: 'error', text: 'Unable to connect to the server' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <AdminLayout title="Loading..." subtitle="Please wait">
+        <div className="animate-pulse space-y-6">
+          <div className="h-40 bg-gray-200 rounded-xl" />
+          <div className="h-64 bg-gray-200 rounded-xl" />
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  if (error || !user) {
+    return (
+      <AdminLayout title="User Not Found" subtitle="The requested user could not be found">
+        <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
+          <p className="text-red-700">{error || 'User not found'}</p>
+          <Link href="/users" className="mt-4 inline-block text-primary hover:underline">
+            Back to Users
+          </Link>
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  const statusStyle =
+    STATUS_STYLES[user.status || (user.isActive ? 'active' : 'inactive')] ?? STATUS_STYLES.inactive;
+  const hasChanges =
+    editRole !== user.role ||
+    editStatus !== (user.status || (user.isActive ? 'active' : 'inactive'));
+
+  return (
+    <AdminLayout
+      title={`${user.firstName} ${user.lastName}`}
+      subtitle={user.email}
+      actions={
+        <Link href="/users">
+          <button className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 font-medium">
+            Back to Users
+          </button>
+        </Link>
+      }
+    >
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* User Profile Card */}
+        <div className="lg:col-span-1">
+          <div className="rounded-xl border bg-white shadow-sm">
+            <div className="border-b p-4">
+              <h2 className="font-semibold text-gray-900">Profile</h2>
+            </div>
+            <div className="p-6 text-center">
+              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <span className="text-2xl font-bold">
+                  {user.firstName[0]}
+                  {user.lastName[0]}
+                </span>
+              </div>
+              <h3 className="mt-4 text-lg font-semibold text-gray-900">
+                {user.firstName} {user.lastName}
+              </h3>
+              <p className="text-sm text-gray-500">{user.email}</p>
+
+              <div className="mt-4 flex justify-center">
+                <span
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium ${statusStyle.bg} ${statusStyle.text}`}
+                >
+                  <span className={`h-1.5 w-1.5 rounded-full ${statusStyle.dot}`} />
+                  {user.status || (user.isActive ? 'Active' : 'Inactive')}
+                </span>
+              </div>
+
+              <div className="mt-6 space-y-3 text-left">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wider text-gray-400">Role</p>
+                  <p className="mt-1 font-medium text-gray-900">
+                    {ROLE_LABELS[user.role] || user.role}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wider text-gray-400">
+                    Member Since
+                  </p>
+                  <p className="mt-1 text-sm text-gray-700">{formatDate(user.createdAt)}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wider text-gray-400">
+                    Last Login
+                  </p>
+                  <p className="mt-1 text-sm text-gray-700">{formatDate(user.lastLoginAt)}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Stores */}
+          {user.stores && user.stores.length > 0 && (
+            <div className="mt-6 rounded-xl border bg-white shadow-sm">
+              <div className="border-b p-4">
+                <h2 className="font-semibold text-gray-900">Stores ({user.stores.length})</h2>
+              </div>
+              <div className="divide-y">
+                {user.stores.map(store => (
+                  <div key={store.id} className="flex items-center justify-between p-4">
+                    <div>
+                      <p className="font-medium text-gray-900">{store.name}</p>
+                      <p className="text-xs text-gray-500">{store.slug}</p>
+                    </div>
+                    <Link
+                      href={`/stores/${store.id}`}
+                      className="text-sm text-primary hover:underline"
+                    >
+                      View
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Edit Form */}
+        <div className="lg:col-span-2">
+          <div className="rounded-xl border bg-white shadow-sm">
+            <div className="border-b p-4">
+              <h2 className="font-semibold text-gray-900">Edit User</h2>
+            </div>
+            <div className="p-6 space-y-6">
+              {/* Read-only info */}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+                  <input
+                    type="text"
+                    value={user.firstName}
+                    disabled
+                    className="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-500 cursor-not-allowed"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+                  <input
+                    type="text"
+                    value={user.lastName}
+                    disabled
+                    className="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-500 cursor-not-allowed"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  value={user.email}
+                  disabled
+                  className="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-500 cursor-not-allowed"
+                />
+                <p className="mt-1 text-xs text-gray-400">
+                  Email cannot be changed from admin panel
+                </p>
+              </div>
+
+              {/* Editable fields */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                <select
+                  value={editRole}
+                  onChange={e => setEditRole(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                >
+                  <option value="customer">Customer</option>
+                  <option value="store_admin">Store Admin</option>
+                  <option value="super_admin">Super Admin</option>
+                </select>
+                <p className="mt-1 text-xs text-gray-500">
+                  Changing to super_admin grants full platform access.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Account Status
+                </label>
+                <select
+                  value={editStatus}
+                  onChange={e => setEditStatus(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                >
+                  <option value="active">Active — User can log in and use the platform</option>
+                  <option value="inactive">Inactive — Account disabled, cannot log in</option>
+                  <option value="suspended">
+                    Suspended — Account suspended for policy violation
+                  </option>
+                </select>
+              </div>
+
+              {/* Status toggle as toggle switch for quick active/inactive */}
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-gray-900">Active Status</p>
+                    <p className="text-sm text-gray-500">
+                      Toggle to quickly enable or disable this account
+                    </p>
+                  </div>
+                  <label className="relative inline-flex cursor-pointer items-center">
+                    <input
+                      type="checkbox"
+                      checked={editStatus === 'active'}
+                      onChange={e => setEditStatus(e.target.checked ? 'active' : 'inactive')}
+                      className="sr-only peer"
+                    />
+                    <div className="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/20" />
+                  </label>
+                </div>
+              </div>
+
+              {/* Save message */}
+              {saveMessage && (
+                <div
+                  className={`rounded-lg p-4 text-sm ${
+                    saveMessage.type === 'success'
+                      ? 'bg-emerald-50 text-emerald-700'
+                      : 'bg-red-50 text-red-700'
+                  }`}
+                >
+                  {saveMessage.text}
+                </div>
+              )}
+
+              <div className="flex items-center justify-between border-t border-gray-200 pt-6">
+                <p className="text-xs text-gray-400">
+                  User ID: <span className="font-mono">{user.id}</span>
+                </p>
+                <button
+                  onClick={handleSave}
+                  disabled={isSaving || !hasChanges}
+                  className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed font-medium text-sm"
+                >
+                  {isSaving ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </AdminLayout>
+  );
+}

@@ -1,198 +1,169 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { api, type Product, type Category, type PaginationMeta } from '@/lib/api';
+import { useCart } from '../../contexts/CartContext';
 import { Header, Footer } from '../../components';
-
-// Demo products data with KWD prices
-const products = [
-  {
-    id: '1',
-    name: 'Premium Wireless Headphones',
-    slug: 'premium-wireless-headphones',
-    price: 29.9,
-    compareAtPrice: 34.9,
-    category: 'Electronics',
-    rating: 4.8,
-    reviews: 124,
-    badge: 'Sale',
-  },
-  {
-    id: '2',
-    name: 'Smart Watch Pro',
-    slug: 'smart-watch-pro',
-    price: 39.9,
-    compareAtPrice: 44.9,
-    category: 'Wearables',
-    rating: 4.9,
-    reviews: 89,
-    badge: 'New',
-  },
-  {
-    id: '3',
-    name: 'USB-C Hub 7-in-1',
-    slug: 'usb-c-hub-7-in-1',
-    price: 7.9,
-    category: 'Accessories',
-    rating: 4.5,
-    reviews: 56,
-  },
-  {
-    id: '4',
-    name: 'Wireless Mechanical Keyboard',
-    slug: 'wireless-mechanical-keyboard',
-    price: 14.9,
-    compareAtPrice: 17.9,
-    category: 'Accessories',
-    rating: 4.7,
-    reviews: 203,
-    badge: 'Bestseller',
-  },
-  {
-    id: '5',
-    name: 'Portable Bluetooth Speaker',
-    slug: 'portable-bluetooth-speaker',
-    price: 12.9,
-    category: 'Electronics',
-    rating: 4.6,
-    reviews: 78,
-  },
-  {
-    id: '6',
-    name: 'Fitness Tracker Band',
-    slug: 'fitness-tracker-band',
-    price: 9.9,
-    compareAtPrice: 12.9,
-    category: 'Wearables',
-    rating: 4.4,
-    reviews: 145,
-    badge: 'Sale',
-  },
-  {
-    id: '7',
-    name: '4K Webcam Pro',
-    slug: '4k-webcam-pro',
-    price: 19.9,
-    category: 'Electronics',
-    rating: 4.8,
-    reviews: 67,
-  },
-  {
-    id: '8',
-    name: 'Ergonomic Mouse',
-    slug: 'ergonomic-mouse',
-    price: 8.9,
-    category: 'Accessories',
-    rating: 4.3,
-    reviews: 92,
-  },
-  {
-    id: '9',
-    name: 'Noise Cancelling Earbuds',
-    slug: 'noise-cancelling-earbuds',
-    price: 24.9,
-    compareAtPrice: 29.9,
-    category: 'Electronics',
-    rating: 4.7,
-    reviews: 156,
-    badge: 'Sale',
-  },
-  {
-    id: '10',
-    name: 'Smart Home Hub',
-    slug: 'smart-home-hub',
-    price: 35.5,
-    category: 'Electronics',
-    rating: 4.5,
-    reviews: 43,
-    badge: 'New',
-  },
-  {
-    id: '11',
-    name: 'Leather Watch Band',
-    slug: 'leather-watch-band',
-    price: 6.5,
-    category: 'Accessories',
-    rating: 4.6,
-    reviews: 87,
-  },
-  {
-    id: '12',
-    name: 'Smart Scale Pro',
-    slug: 'smart-scale-pro',
-    price: 15.9,
-    category: 'Wearables',
-    rating: 4.4,
-    reviews: 112,
-  },
-];
-
-const categories = [
-  { name: 'All', count: products.length },
-  { name: 'Electronics', count: products.filter(p => p.category === 'Electronics').length },
-  { name: 'Accessories', count: products.filter(p => p.category === 'Accessories').length },
-  { name: 'Wearables', count: products.filter(p => p.category === 'Wearables').length },
-];
+import { toggleCompare } from '@/lib/compare';
 
 const sortOptions = [
   { value: 'featured', label: 'Featured' },
   { value: 'newest', label: 'Newest' },
   { value: 'price-asc', label: 'Price: Low to High' },
   { value: 'price-desc', label: 'Price: High to Low' },
-  { value: 'rating', label: 'Top Rated' },
 ];
 
-function formatPrice(kwd: number) {
+function formatPrice(fils: number) {
   return new Intl.NumberFormat('en-KW', {
     style: 'currency',
     currency: 'KWD',
-    minimumFractionDigits: 3,
-  }).format(kwd);
+  }).format(fils / 1000);
 }
 
-function StarRating({ rating }: { rating: number }) {
+function ProductSkeleton() {
   return (
-    <div className="flex items-center gap-0.5">
-      {[1, 2, 3, 4, 5].map(star => (
-        <svg
-          key={star}
-          className={`h-3.5 w-3.5 ${star <= rating ? 'text-amber-400' : 'text-gray-200'}`}
-          fill="currentColor"
-          viewBox="0 0 20 20"
-        >
-          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-        </svg>
-      ))}
+    <div className="animate-pulse rounded-2xl border border-border bg-card overflow-hidden">
+      <div className="aspect-square bg-muted" />
+      <div className="p-4 space-y-3">
+        <div className="h-3 w-16 rounded bg-muted" />
+        <div className="h-4 w-3/4 rounded bg-muted" />
+        <div className="h-3 w-20 rounded bg-muted" />
+        <div className="h-5 w-24 rounded bg-muted" />
+      </div>
     </div>
   );
 }
 
 export default function ProductsPage() {
   const [search, setSearch] = useState('');
-  const [category, setCategory] = useState('All');
+  const [categoryFilter, setCategoryFilter] = useState('');
   const [sortBy, setSortBy] = useState('featured');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [page, setPage] = useState(1);
 
-  const filteredProducts = products
-    .filter(product => {
-      const matchesSearch = product.name.toLowerCase().includes(search.toLowerCase());
-      const matchesCategory = category === 'All' || product.category === category;
-      return matchesSearch && matchesCategory;
-    })
-    .sort((a, b) => {
-      switch (sortBy) {
-        case 'price-asc':
-          return a.price - b.price;
-        case 'price-desc':
-          return b.price - a.price;
-        case 'rating':
-          return b.rating - a.rating;
-        case 'newest':
-          return parseInt(b.id) - parseInt(a.id);
-        default:
-          return 0;
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [meta, setMeta] = useState<PaginationMeta | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  // Track which product ids are in the compare list so buttons re-render on change
+  const [compareIds, setCompareIds] = useState<Set<string>>(new Set());
+  const { addItem } = useCart();
+
+  // Sync compare state from localStorage on mount (client-only)
+  useEffect(() => {
+    const ids = new Set(
+      (() => {
+        try {
+          const raw = localStorage.getItem('compareProducts');
+          return raw ? (JSON.parse(raw) as Array<{ id: string }>).map(p => p.id) : [];
+        } catch {
+          return [];
+        }
+      })()
+    );
+    setCompareIds(ids);
+  }, []);
+
+  const fetchProducts = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const params: Record<string, string> = {
+        page: String(page),
+        limit: '12',
+      };
+      if (search) params.search = search;
+      if (categoryFilter) params.category = categoryFilter;
+      if (sortBy === 'newest') params.sort = 'newest';
+      if (sortBy === 'price-asc') params.sort = 'price_asc';
+      if (sortBy === 'price-desc') params.sort = 'price_desc';
+      if (sortBy === 'featured') params.featured = 'true';
+
+      const response = await api.getProducts(params);
+      if (response.success && response.data) {
+        setProducts(response.data.products || []);
+        setMeta(response.data.meta || null);
+      } else {
+        setError(response.error?.message || 'Failed to load products');
       }
+    } catch {
+      setError('Unable to load products. Please check your connection.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [page, search, categoryFilter, sortBy]);
+
+  const fetchCategories = useCallback(async () => {
+    try {
+      const response = await api.getCategories();
+      if (response.success && response.data) {
+        setCategories(response.data.categories || []);
+      }
+    } catch {
+      // Categories are non-critical, fail silently
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchCategories();
+  }, [fetchCategories]);
+
+  useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [search, categoryFilter, sortBy]);
+
+  const handleAddToCart = (product: Product, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    addItem({
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      slug: product.slug,
+      image: product.images?.[0]?.url,
+      category: product.categories?.[0]?.name,
     });
+  };
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPage(1);
+    fetchProducts();
+  };
+
+  const handleToggleCompare = (product: Product, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const result = toggleCompare({
+      id: product.id,
+      name: product.name,
+      slug: product.slug,
+      price: product.price,
+      compareAtPrice: product.compareAtPrice,
+      images: product.images?.map(img => img.url) ?? [],
+    });
+    if (result === 'max_reached') {
+      alert('You can compare up to 4 products at a time. Remove one to add another.');
+      return;
+    }
+    // Update local state to reflect the new compare list
+    setCompareIds(prev => {
+      const next = new Set(prev);
+      if (result === 'added') {
+        next.add(product.id);
+      } else {
+        next.delete(product.id);
+      }
+      return next;
+    });
+  };
 
   return (
     <main className="flex min-h-screen flex-col bg-background">
@@ -223,7 +194,7 @@ export default function ProductsPage() {
           <aside className="w-full shrink-0 lg:w-64">
             <div className="sticky top-24 space-y-6">
               {/* Search */}
-              <div>
+              <form onSubmit={handleSearch}>
                 <label className="mb-2 block text-sm font-medium text-foreground">Search</label>
                 <div className="search-box">
                   <svg
@@ -247,61 +218,53 @@ export default function ProductsPage() {
                     className="search-input"
                   />
                 </div>
-              </div>
+              </form>
 
               {/* Categories */}
               <div>
                 <h3 className="mb-3 text-sm font-medium text-foreground">Categories</h3>
                 <div className="space-y-2">
+                  <button
+                    onClick={() => setCategoryFilter('')}
+                    className={`flex w-full items-center justify-between rounded-xl px-4 py-2.5 text-sm transition-all ${
+                      !categoryFilter
+                        ? 'bg-primary text-white shadow-md shadow-primary/25'
+                        : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground'
+                    }`}
+                  >
+                    <span>All</span>
+                    {meta && (
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs ${
+                          !categoryFilter ? 'bg-white/20' : 'bg-background'
+                        }`}
+                      >
+                        {meta.total}
+                      </span>
+                    )}
+                  </button>
                   {categories.map(cat => (
                     <button
-                      key={cat.name}
-                      onClick={() => setCategory(cat.name)}
+                      key={cat.id}
+                      onClick={() => setCategoryFilter(cat.id)}
                       className={`flex w-full items-center justify-between rounded-xl px-4 py-2.5 text-sm transition-all ${
-                        category === cat.name
+                        categoryFilter === cat.id
                           ? 'bg-primary text-white shadow-md shadow-primary/25'
                           : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground'
                       }`}
                     >
                       <span>{cat.name}</span>
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-xs ${
-                          category === cat.name ? 'bg-white/20' : 'bg-background'
-                        }`}
-                      >
-                        {cat.count}
-                      </span>
+                      {cat.productCount !== undefined && (
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-xs ${
+                            categoryFilter === cat.id ? 'bg-white/20' : 'bg-background'
+                          }`}
+                        >
+                          {cat.productCount}
+                        </span>
+                      )}
                     </button>
                   ))}
-                </div>
-              </div>
-
-              {/* Price Range */}
-              <div>
-                <h3 className="mb-3 text-sm font-medium text-foreground">Price Range</h3>
-                <div className="space-y-3">
-                  <div className="flex gap-2">
-                    <input
-                      type="number"
-                      placeholder="Min"
-                      className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                    />
-                    <input
-                      type="number"
-                      placeholder="Max"
-                      className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                    />
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {['Under 10 KWD', '10-25 KWD', '25-50 KWD', 'Over 50 KWD'].map(range => (
-                      <button
-                        key={range}
-                        className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary hover:text-primary"
-                      >
-                        {range}
-                      </button>
-                    ))}
-                  </div>
                 </div>
               </div>
 
@@ -309,7 +272,8 @@ export default function ProductsPage() {
               <button
                 onClick={() => {
                   setSearch('');
-                  setCategory('All');
+                  setCategoryFilter('');
+                  setSortBy('featured');
                 }}
                 className="w-full rounded-xl border border-border py-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted"
               >
@@ -323,9 +287,14 @@ export default function ProductsPage() {
             {/* Toolbar */}
             <div className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-xl bg-muted/30 p-4">
               <p className="text-sm text-muted-foreground">
-                Showing{' '}
-                <span className="font-medium text-foreground">{filteredProducts.length}</span>{' '}
-                products
+                {isLoading ? (
+                  'Loading...'
+                ) : (
+                  <>
+                    Showing <span className="font-medium text-foreground">{products.length}</span>{' '}
+                    {meta ? `of ${meta.total}` : ''} products
+                  </>
+                )}
               </p>
               <div className="flex items-center gap-4">
                 {/* Sort */}
@@ -376,10 +345,47 @@ export default function ProductsPage() {
               </div>
             </div>
 
-            {/* Grid View */}
-            {viewMode === 'grid' && (
+            {/* Error State */}
+            {error && (
+              <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4">
+                <div className="flex items-center gap-3">
+                  <svg
+                    className="h-5 w-5 text-red-500 flex-shrink-0"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                    />
+                  </svg>
+                  <p className="text-red-700 flex-1">{error}</p>
+                  <button
+                    onClick={fetchProducts}
+                    className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200"
+                  >
+                    Retry
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Loading State */}
+            {isLoading && (
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
-                {filteredProducts.map((product, index) => (
+                {[...Array(6)].map((_, i) => (
+                  <ProductSkeleton key={i} />
+                ))}
+              </div>
+            )}
+
+            {/* Grid View */}
+            {!isLoading && !error && viewMode === 'grid' && (
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
+                {products.map((product, index) => (
                   <Link
                     key={product.id}
                     href={`/products/${product.slug}`}
@@ -387,18 +393,8 @@ export default function ProductsPage() {
                     style={{ animationDelay: `${index * 50}ms` }}
                   >
                     {/* Badge */}
-                    {product.badge && (
-                      <span
-                        className={`product-badge ${
-                          product.badge === 'Sale'
-                            ? 'bg-red-500'
-                            : product.badge === 'New'
-                              ? 'bg-emerald-500'
-                              : 'bg-primary'
-                        }`}
-                      >
-                        {product.badge}
-                      </span>
+                    {product.compareAtPrice && product.compareAtPrice > product.price && (
+                      <span className="product-badge bg-red-500">Sale</span>
                     )}
 
                     {/* Wishlist Button */}
@@ -423,33 +419,68 @@ export default function ProductsPage() {
                       </svg>
                     </button>
 
+                    {/* Compare Button */}
+                    <button
+                      aria-label={
+                        compareIds.has(product.id) ? 'Remove from compare' : 'Add to compare'
+                      }
+                      title={compareIds.has(product.id) ? 'Remove from compare' : 'Add to compare'}
+                      className={`absolute left-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full shadow-md backdrop-blur-sm transition-all opacity-0 group-hover:opacity-100 ${
+                        compareIds.has(product.id)
+                          ? 'bg-primary text-white'
+                          : 'bg-white/90 text-muted-foreground hover:bg-primary hover:text-white'
+                      }`}
+                      onClick={e => handleToggleCompare(product, e)}
+                    >
+                      {/* Bar-chart compare icon */}
+                      <svg
+                        className="h-4 w-4"
+                        fill={compareIds.has(product.id) ? 'currentColor' : 'none'}
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={compareIds.has(product.id) ? 0 : 1.75}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                        />
+                      </svg>
+                    </button>
+
                     {/* Image */}
                     <div className="relative aspect-square overflow-hidden bg-gradient-to-br from-orange-50 to-orange-100">
-                      <div className="flex h-full items-center justify-center transition-transform duration-300 group-hover:scale-110">
-                        <div className="flex h-24 w-24 items-center justify-center rounded-full bg-primary/10">
-                          <svg
-                            className="h-12 w-12 text-primary"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={1}
-                              d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                            />
-                          </svg>
+                      {product.images?.[0]?.url ? (
+                        <img
+                          src={product.images[0].url}
+                          alt={product.images[0].alt || product.name}
+                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
+                        />
+                      ) : (
+                        <div className="flex h-full items-center justify-center transition-transform duration-300 group-hover:scale-110">
+                          <div className="flex h-24 w-24 items-center justify-center rounded-full bg-primary/10">
+                            <svg
+                              className="h-12 w-12 text-primary"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={1}
+                                d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                              />
+                            </svg>
+                          </div>
                         </div>
-                      </div>
+                      )}
 
                       {/* Quick Actions */}
                       <div className="absolute inset-x-0 bottom-0 translate-y-full p-3 transition-transform duration-300 group-hover:translate-y-0">
                         <button
                           className="add-to-cart-btn"
-                          onClick={e => {
-                            e.preventDefault();
-                          }}
+                          onClick={e => handleAddToCart(product, e)}
                         >
                           <svg
                             className="h-5 w-5"
@@ -471,25 +502,21 @@ export default function ProductsPage() {
 
                     {/* Content */}
                     <div className="p-4">
-                      <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                        {product.category}
-                      </p>
+                      {product.categories?.[0] && (
+                        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                          {product.categories[0].name}
+                        </p>
+                      )}
                       <h3 className="mt-1 line-clamp-2 font-semibold text-foreground transition-colors group-hover:text-primary">
                         {product.name}
                       </h3>
-
-                      {/* Rating */}
-                      <div className="mt-2 flex items-center gap-2">
-                        <StarRating rating={product.rating} />
-                        <span className="text-xs text-muted-foreground">({product.reviews})</span>
-                      </div>
 
                       {/* Price */}
                       <div className="mt-3 flex items-center gap-2">
                         <span className="text-lg font-bold text-primary">
                           {formatPrice(product.price)}
                         </span>
-                        {product.compareAtPrice && (
+                        {product.compareAtPrice && product.compareAtPrice > product.price && (
                           <span className="text-sm text-muted-foreground line-through">
                             {formatPrice(product.compareAtPrice)}
                           </span>
@@ -502,9 +529,9 @@ export default function ProductsPage() {
             )}
 
             {/* List View */}
-            {viewMode === 'list' && (
+            {!isLoading && !error && viewMode === 'list' && (
               <div className="space-y-4">
-                {filteredProducts.map(product => (
+                {products.map(product => (
                   <Link
                     key={product.id}
                     href={`/products/${product.slug}`}
@@ -512,86 +539,112 @@ export default function ProductsPage() {
                   >
                     {/* Image */}
                     <div className="relative h-32 w-32 flex-shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-orange-50 to-orange-100">
-                      {product.badge && (
-                        <span
-                          className={`absolute left-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase text-white ${
-                            product.badge === 'Sale'
-                              ? 'bg-red-500'
-                              : product.badge === 'New'
-                                ? 'bg-emerald-500'
-                                : 'bg-primary'
-                          }`}
-                        >
-                          {product.badge}
+                      {product.compareAtPrice && product.compareAtPrice > product.price && (
+                        <span className="absolute left-2 top-2 rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold uppercase text-white">
+                          Sale
                         </span>
                       )}
-                      <div className="flex h-full items-center justify-center">
-                        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-                          <svg
-                            className="h-8 w-8 text-primary"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={1}
-                              d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                            />
-                          </svg>
+                      {product.images?.[0]?.url ? (
+                        <img
+                          src={product.images[0].url}
+                          alt={product.images[0].alt || product.name}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full items-center justify-center">
+                          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+                            <svg
+                              className="h-8 w-8 text-primary"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={1}
+                                d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                              />
+                            </svg>
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </div>
 
                     {/* Content */}
                     <div className="flex flex-1 flex-col justify-between">
                       <div>
-                        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                          {product.category}
-                        </p>
+                        {product.categories?.[0] && (
+                          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                            {product.categories[0].name}
+                          </p>
+                        )}
                         <h3 className="mt-1 text-lg font-semibold text-foreground">
                           {product.name}
                         </h3>
-                        <div className="mt-1 flex items-center gap-2">
-                          <StarRating rating={product.rating} />
-                          <span className="text-xs text-muted-foreground">
-                            ({product.reviews} reviews)
-                          </span>
-                        </div>
                       </div>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <span className="text-xl font-bold text-primary">
                             {formatPrice(product.price)}
                           </span>
-                          {product.compareAtPrice && (
+                          {product.compareAtPrice && product.compareAtPrice > product.price && (
                             <span className="text-sm text-muted-foreground line-through">
                               {formatPrice(product.compareAtPrice)}
                             </span>
                           )}
                         </div>
-                        <button
-                          className="flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-medium text-white transition-colors hover:bg-primary/90"
-                          onClick={e => {
-                            e.preventDefault();
-                          }}
-                        >
-                          <svg
-                            className="h-4 w-4"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
+                        <div className="flex items-center gap-2">
+                          {/* Compare button for list view */}
+                          <button
+                            aria-label={
+                              compareIds.has(product.id) ? 'Remove from compare' : 'Add to compare'
+                            }
+                            title={
+                              compareIds.has(product.id) ? 'Remove from compare' : 'Add to compare'
+                            }
+                            className={`flex h-10 w-10 items-center justify-center rounded-xl border transition-colors ${
+                              compareIds.has(product.id)
+                                ? 'border-primary bg-primary text-white'
+                                : 'border-border bg-background text-muted-foreground hover:border-primary hover:text-primary'
+                            }`}
+                            onClick={e => handleToggleCompare(product, e)}
                           >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
-                            />
-                          </svg>
-                          Add to Cart
-                        </button>
+                            <svg
+                              className="h-4 w-4"
+                              fill={compareIds.has(product.id) ? 'currentColor' : 'none'}
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={compareIds.has(product.id) ? 0 : 1.75}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                              />
+                            </svg>
+                          </button>
+
+                          <button
+                            className="flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-medium text-white transition-colors hover:bg-primary/90"
+                            onClick={e => handleAddToCart(product, e)}
+                          >
+                            <svg
+                              className="h-4 w-4"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
+                              />
+                            </svg>
+                            Add to Cart
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </Link>
@@ -600,7 +653,7 @@ export default function ProductsPage() {
             )}
 
             {/* No Results */}
-            {filteredProducts.length === 0 && (
+            {!isLoading && !error && products.length === 0 && (
               <div className="py-16 text-center">
                 <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-muted">
                   <svg
@@ -624,11 +677,51 @@ export default function ProductsPage() {
                 <button
                   onClick={() => {
                     setSearch('');
-                    setCategory('All');
+                    setCategoryFilter('');
                   }}
                   className="mt-4 rounded-xl bg-primary px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary/90"
                 >
                   Clear Filters
+                </button>
+              </div>
+            )}
+
+            {/* Pagination */}
+            {meta && meta.totalPages > 1 && (
+              <div className="mt-8 flex items-center justify-center gap-2">
+                <button
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="rounded-lg border border-border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                {Array.from({ length: meta.totalPages }, (_, i) => i + 1)
+                  .filter(p => p === 1 || p === meta.totalPages || Math.abs(p - page) <= 1)
+                  .map((p, i, arr) => {
+                    const showEllipsis = i > 0 && p - arr[i - 1] > 1;
+                    return (
+                      <span key={p} className="flex items-center gap-2">
+                        {showEllipsis && <span className="px-1 text-muted-foreground">...</span>}
+                        <button
+                          onClick={() => setPage(p)}
+                          className={`flex h-10 w-10 items-center justify-center rounded-lg text-sm font-medium transition-colors ${
+                            page === p
+                              ? 'bg-primary text-white'
+                              : 'border border-border hover:bg-muted'
+                          }`}
+                        >
+                          {p}
+                        </button>
+                      </span>
+                    );
+                  })}
+                <button
+                  onClick={() => setPage(p => Math.min(meta.totalPages, p + 1))}
+                  disabled={page === meta.totalPages}
+                  className="rounded-lg border border-border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
                 </button>
               </div>
             )}

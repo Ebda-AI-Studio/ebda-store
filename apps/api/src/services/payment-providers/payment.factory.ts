@@ -1,6 +1,7 @@
 import { prisma } from '@force/database';
 import { config } from '../../config';
 import { AppError } from '../../middleware/error-handler';
+import logger from '../../lib/logger';
 import { encryption } from '../encryption.service';
 import {
   IPaymentProvider,
@@ -116,7 +117,7 @@ class PaymentFactory {
 
       // Fall back to environment variables if no database config
       if (dbConfigs.length === 0) {
-        console.log('[PAYMENT] No database config found, using environment variables');
+        logger.info('[PAYMENT] No database config found, using environment variables');
         this.initializeFromEnv(providers, configs);
       } else {
         // Initialize from database config
@@ -142,7 +143,10 @@ class PaymentFactory {
             };
 
             if (!providerConfig.apiKey) {
-              console.warn(`[PAYMENT] Skipping ${dbConfig.provider}: No API key configured`);
+              logger.warn(
+                { provider: dbConfig.provider },
+                '[PAYMENT] Skipping provider: No API key configured'
+              );
               continue;
             }
 
@@ -156,7 +160,10 @@ class PaymentFactory {
               }
             }
           } catch (error) {
-            console.error(`[PAYMENT] Failed to initialize ${dbConfig.provider}:`, error);
+            logger.error(
+              { err: error, provider: dbConfig.provider },
+              '[PAYMENT] Failed to initialize provider'
+            );
           }
         }
       }
@@ -166,10 +173,14 @@ class PaymentFactory {
         defaultProvider = providers.keys().next().value || null;
       }
 
-      console.log(
-        `[PAYMENT] Initialized ${storeId ? `store ${storeId}` : 'global'} providers: ${Array.from(providers.keys()).join(', ') || 'none'}`
+      logger.info(
+        {
+          storeId,
+          providers: Array.from(providers.keys()).join(', ') || 'none',
+          defaultProvider: defaultProvider || 'none',
+        },
+        '[PAYMENT] Initialized providers'
       );
-      console.log(`[PAYMENT] Default provider: ${defaultProvider || 'none'}`);
 
       this.cache.set(storeId, {
         providers,
@@ -178,7 +189,7 @@ class PaymentFactory {
         timestamp: Date.now(),
       });
     } catch (error) {
-      console.error('[PAYMENT] Failed to initialize providers:', error);
+      logger.error({ err: error }, '[PAYMENT] Failed to initialize providers');
 
       // Initialize from env as fallback
       this.initializeFromEnv(providers, configs);
@@ -230,6 +241,7 @@ class PaymentFactory {
       const providerConfig: ProviderConfig = {
         provider: 'myfatoorah',
         apiKey: config.myfatoorahApiKey,
+        webhookSecret: config.myfatoorahWebhookSecret || undefined,
         isTestMode: config.paymentTestMode,
         isEnabled: true,
         isDefault: false,
@@ -317,6 +329,7 @@ class PaymentFactory {
             apiKey: config.apiKey,
             baseUrl: '',
             isTestMode: config.isTestMode,
+            webhookSecret: config.webhookSecret,
           });
           break;
 
@@ -345,13 +358,16 @@ class PaymentFactory {
           break;
 
         default:
-          console.warn(`[PAYMENT] Unknown provider: ${config.provider}`);
+          logger.warn({ provider: config.provider }, '[PAYMENT] Unknown provider');
           return null;
       }
 
       return provider;
     } catch (error) {
-      console.error(`[PAYMENT] Failed to create provider ${config.provider}:`, error);
+      logger.error(
+        { err: error, provider: config.provider },
+        '[PAYMENT] Failed to create provider'
+      );
       return null;
     }
   }
@@ -470,7 +486,10 @@ export class PaymentService {
         const providerConfig = await factory.getProviderConfig(p, storeId);
         results.push({ provider: p, methods, config: providerConfig });
       } catch (error) {
-        console.error(`[PAYMENT] Failed to get methods from ${p}:`, error);
+        logger.error(
+          { err: error, provider: p },
+          '[PAYMENT] Failed to get payment methods from provider'
+        );
       }
     }
 
@@ -596,16 +615,22 @@ export class PaymentService {
     provider: PaymentProvider,
     payload: unknown,
     signature?: string,
-    storeId?: string
+    storeId?: string,
+    rawBody?: string
   ): Promise<{ success: boolean; status?: string; orderId?: string }> {
     const p = await factory.getProvider(provider, storeId);
 
-    // Verify signature if provided
-    if (signature && !p.verifyWebhook(payload, signature)) {
-      throw new AppError(400, 'INVALID_SIGNATURE', 'Invalid webhook signature');
+    // Verify signature against the raw body string when available (required for
+    // correct HMAC calculation). Fall back to the payload object for providers
+    // that do not use raw-body HMAC.
+    if (signature) {
+      const verifyTarget: unknown = rawBody !== undefined ? rawBody : payload;
+      if (!p.verifyWebhook(verifyTarget, signature)) {
+        throw new AppError(400, 'INVALID_SIGNATURE', 'Invalid webhook signature');
+      }
     }
 
-    // Parse webhook
+    // Parse webhook using the structured payload object
     const webhookData = p.parseWebhook(payload);
 
     // Find and update payment
@@ -617,7 +642,10 @@ export class PaymentService {
     });
 
     if (!payment) {
-      console.error('[PAYMENT WEBHOOK] Payment not found:', webhookData.transactionId);
+      logger.error(
+        { transactionId: webhookData.transactionId },
+        '[PAYMENT WEBHOOK] Payment not found'
+      );
       return { success: true, orderId: undefined }; // Acknowledge webhook even if payment not found
     }
 

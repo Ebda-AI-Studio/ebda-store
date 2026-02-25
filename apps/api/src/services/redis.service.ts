@@ -1,5 +1,6 @@
 import Redis from 'ioredis';
 import { config } from '../config';
+import logger from '../lib/logger';
 
 // ==========================================
 // Redis Service
@@ -18,7 +19,7 @@ class RedisService {
         maxRetriesPerRequest: 3,
         retryStrategy(times: number) {
           if (times > 3) {
-            console.warn('[REDIS] Max retries reached, falling back to in-memory');
+            logger.warn('[REDIS] Max retries reached, falling back to in-memory');
             return null;
           }
           return Math.min(times * 100, 3000);
@@ -28,22 +29,22 @@ class RedisService {
 
       this.client.on('connect', () => {
         this.isConnected = true;
-        console.log('[REDIS] Connected successfully');
+        logger.info('[REDIS] Connected successfully');
       });
 
       this.client.on('error', (err: Error) => {
-        console.error('[REDIS] Connection error:', err.message);
+        logger.error({ err: err.message }, '[REDIS] Connection error');
         this.isConnected = false;
       });
 
       this.client.on('close', () => {
         this.isConnected = false;
-        console.log('[REDIS] Connection closed');
+        logger.info('[REDIS] Connection closed');
       });
 
       await this.client.connect();
     } catch {
-      console.warn('[REDIS] Failed to connect, using in-memory fallback');
+      logger.warn('[REDIS] Failed to connect, using in-memory fallback');
       this.client = null;
       this.isConnected = false;
     }

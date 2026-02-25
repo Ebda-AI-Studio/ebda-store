@@ -193,12 +193,21 @@ export default function OrdersPage() {
               </div>
 
               <div className="flex justify-end gap-2 border-t bg-gray-50 p-4">
-                <button className="rounded-lg border bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
-                  Track Order
-                </button>
-                <button className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90">
+                {order.status === 'shipped' || order.status === 'delivered' ? (
+                  <button
+                    className="rounded-lg border bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    title="Tracking info not available yet"
+                    disabled
+                  >
+                    Track Order
+                  </button>
+                ) : null}
+                <Link
+                  href={`/account/orders/${order.id}`}
+                  className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90"
+                >
                   View Details
-                </button>
+                </Link>
               </div>
             </div>
           ))}

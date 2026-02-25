@@ -42,7 +42,7 @@ router.get(
       // Audit log
       await auditLog({
         action: 'bulk.export',
-        userId: (req as any).user?.id,
+        userId: req.user!.userId,
         resourceType: 'product',
         resourceId: storeId,
         details: { type: 'products_csv' },
@@ -96,7 +96,7 @@ router.post(
       }
 
       const parsedOptions = importOptionsSchema.parse(options || {});
-      const userId = (req as any).user?.id;
+      const userId = req.user!.userId;
 
       const result = await BulkService.importProducts(storeId, csvData, parsedOptions, userId);
 
@@ -136,7 +136,7 @@ router.post(
     try {
       const { storeId } = req.params;
       const { productIds, permanent } = bulkDeleteSchema.parse(req.body);
-      const userId = (req as any).user?.id;
+      const userId = req.user!.userId;
 
       const result = await BulkService.bulkDelete(storeId, productIds, permanent);
 
@@ -176,7 +176,7 @@ router.post(
     try {
       const { storeId } = req.params;
       const { productIds, status } = bulkStatusSchema.parse(req.body);
-      const userId = (req as any).user?.id;
+      const userId = req.user!.userId;
 
       const result = await BulkService.bulkUpdateStatus(
         storeId,

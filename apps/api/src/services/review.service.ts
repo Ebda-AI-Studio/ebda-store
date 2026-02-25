@@ -1,6 +1,7 @@
 import { prisma, Prisma } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import { socketService } from './socket.service';
+import logger from '../lib/logger';
 
 interface CreateReviewData {
   productId: string;
@@ -254,7 +255,7 @@ export class ReviewService {
         customerName: 'Customer', // Anonymized for privacy
       });
     } catch (notifyError) {
-      console.error('Failed to send review notification:', notifyError);
+      logger.error({ err: notifyError }, 'Failed to send review notification');
     }
 
     return review;

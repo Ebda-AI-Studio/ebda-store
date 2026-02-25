@@ -3,9 +3,11 @@
  * Async email processing with Redis queue
  */
 
+import crypto from 'crypto';
 import { redis } from './redis.service';
 import { EmailService, EmailOptions } from './email.service';
 import { withCircuitBreaker } from './circuit-breaker.service';
+import logger from '../lib/logger';
 
 export interface QueuedEmail {
   id: string;
@@ -30,7 +32,6 @@ class EmailQueueService {
    * Add email to queue
    */
   async enqueue(options: EmailOptions): Promise<string> {
-    const crypto = require('crypto');
     const id = `email_${Date.now()}_${crypto.randomBytes(5).toString('hex')}`;
 
     const queuedEmail: QueuedEmail = {
@@ -45,7 +46,7 @@ class EmailQueueService {
       await redis.getClient()?.lpush(QUEUE_KEY, JSON.stringify(queuedEmail));
     } else {
       // Fallback: send immediately if Redis is not available
-      console.warn('[EMAIL QUEUE] Redis unavailable, sending immediately');
+      logger.warn('[EMAIL QUEUE] Redis unavailable, sending immediately');
       await this.sendEmail(queuedEmail);
     }
 
@@ -58,7 +59,7 @@ class EmailQueueService {
   startProcessing(intervalMs: number = 1000): void {
     if (this.intervalId) return;
 
-    console.log('[EMAIL QUEUE] Starting queue processor');
+    logger.info('[EMAIL QUEUE] Starting queue processor');
     this.intervalId = setInterval(() => this.processQueue(), intervalMs);
   }
 
@@ -69,7 +70,7 @@ class EmailQueueService {
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = undefined;
-      console.log('[EMAIL QUEUE] Stopped queue processor');
+      logger.info('[EMAIL QUEUE] Stopped queue processor');
     }
   }
 
@@ -95,7 +96,7 @@ class EmailQueueService {
       const email: QueuedEmail = JSON.parse(emailJson);
       await this.sendEmail(email);
     } catch (error) {
-      console.error('[EMAIL QUEUE] Error processing queue:', error);
+      logger.error({ err: error }, '[EMAIL QUEUE] Error processing queue');
     } finally {
       this.processing = false;
     }
@@ -113,14 +114,15 @@ class EmailQueueService {
         await EmailService.send(email.options);
       });
 
-      console.log(`[EMAIL QUEUE] Sent email ${email.id} to ${email.options.to}`);
+      logger.info({ emailId: email.id, to: email.options.to }, '[EMAIL QUEUE] Sent email');
     } catch (error) {
       email.error = error instanceof Error ? error.message : 'Unknown error';
 
       if (email.attempts < email.maxAttempts) {
         // Re-queue for retry with delay
-        console.warn(
-          `[EMAIL QUEUE] Email ${email.id} failed, attempt ${email.attempts}/${email.maxAttempts}, retrying...`
+        logger.warn(
+          { emailId: email.id, attempt: email.attempts, maxAttempts: email.maxAttempts },
+          '[EMAIL QUEUE] Email failed, retrying'
         );
 
         setTimeout(async () => {
@@ -130,8 +132,9 @@ class EmailQueueService {
         }, RETRY_DELAY_MS * email.attempts);
       } else {
         // Move to failed queue
-        console.error(
-          `[EMAIL QUEUE] Email ${email.id} failed permanently after ${email.attempts} attempts`
+        logger.error(
+          { emailId: email.id, attempts: email.attempts },
+          '[EMAIL QUEUE] Email failed permanently'
         );
         if (redis.isAvailable()) {
           await redis.getClient()?.lpush(FAILED_KEY, JSON.stringify(email));
@@ -198,7 +201,7 @@ class EmailQueueService {
       retried++;
     }
 
-    console.log(`[EMAIL QUEUE] Retrying ${retried} failed emails`);
+    logger.info({ retried }, '[EMAIL QUEUE] Retrying failed emails');
     return retried;
   }
 }

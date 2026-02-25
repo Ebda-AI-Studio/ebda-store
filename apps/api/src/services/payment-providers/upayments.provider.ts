@@ -12,6 +12,7 @@ import {
   Currency,
   PaymentStatus,
 } from './types';
+import logger from '../../lib/logger';
 
 // ==========================================
 // UPayments Provider
@@ -85,7 +86,10 @@ export class UPaymentsProvider implements IPaymentProvider {
     const data = (await response.json()) as { status?: string; message?: string };
 
     if (!response.ok || data.status === 'error') {
-      console.error('[UPAYMENTS ERROR]', data);
+      logger.error(
+        { statusCode: response.status, message: data.message },
+        'UPayments API request failed'
+      );
       throw new Error(data.message || 'UPayments API request failed');
     }
 

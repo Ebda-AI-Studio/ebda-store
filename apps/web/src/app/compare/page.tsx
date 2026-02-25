@@ -2,7 +2,9 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useToast } from '@force/ui';
 import { Header, Footer } from '../../components';
+import { useCart } from '../../contexts/CartContext';
 
 interface CompareProduct {
   id: string;
@@ -32,6 +34,19 @@ function loadInitialProducts(): CompareProduct[] {
 export default function ComparePage() {
   const [products, setProducts] = useState<CompareProduct[]>(() => loadInitialProducts());
   const [isLoading] = useState(false);
+  const { addItem } = useCart();
+  const { success: toastSuccess } = useToast();
+
+  function handleAddToCart(product: CompareProduct) {
+    addItem({
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      slug: product.slug,
+      image: product.images?.[0],
+    });
+    toastSuccess('Added to cart!', `${product.name} added to your cart`);
+  }
 
   function removeProduct(productId: string) {
     const updated = products.filter(p => p.id !== productId);
@@ -214,7 +229,10 @@ export default function ComparePage() {
                 <td className="p-4"></td>
                 {products.map(product => (
                   <td key={product.id} className="p-4 text-center">
-                    <button className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    <button
+                      onClick={() => handleAddToCart(product)}
+                      className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    >
                       Add to Cart
                     </button>
                   </td>

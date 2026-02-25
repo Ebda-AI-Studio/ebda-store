@@ -2,7 +2,8 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { authenticate } from '../middleware/auth';
 import { OrderService } from '../services/order.service';
-import { requirePermission } from '../middleware/rbac';
+import { InvoiceService } from '../services/invoice.service';
+import { requirePermission, requireRole } from '../middleware/rbac';
 import { auditLog, writeLimiter } from '../middleware/security';
 
 const router = Router({ mergeParams: true });
@@ -56,7 +57,7 @@ router.get('/', authenticate, async (req: Request, res: Response, next: NextFunc
     const { page, limit, status } = req.query;
 
     // Check if admin or getting own orders
-    const isAdmin = ['store_admin', 'admin', 'super_admin'].includes(req.user?.role || '');
+    const isAdmin = ['store_admin', 'super_admin'].includes(req.user?.role || '');
 
     const result = await OrderService.list(storeId, {
       page: page ? parseInt(page as string) : undefined,
@@ -82,7 +83,7 @@ router.get('/:id', authenticate, async (req: Request, res: Response, next: NextF
     const order = await OrderService.getById(storeId, id);
 
     // Check authorization
-    const isAdmin = ['store_admin', 'admin', 'super_admin'].includes(req.user?.role || '');
+    const isAdmin = ['store_admin', 'super_admin'].includes(req.user?.role || '');
     if (!isAdmin && order.customerId !== req.user?.userId) {
       res.status(403).json({
         success: false,
@@ -147,6 +148,26 @@ router.put(
         success: true,
         data: { order },
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// GET /stores/:storeId/orders/:orderId/invoice - Generate order invoice (admin only)
+// Customers access their own invoices via the public routes which enforce ownership checks.
+// This route is restricted to store admins to prevent IDOR — any authenticated user
+// should not be able to retrieve another customer's invoice by guessing an orderId.
+router.get(
+  '/:orderId/invoice',
+  authenticate,
+  requireRole(['store_admin', 'super_admin']),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, orderId } = req.params;
+      const html = await InvoiceService.generateInvoice(storeId, orderId);
+      res.setHeader('Content-Type', 'text/html');
+      res.send(html);
     } catch (error) {
       next(error);
     }

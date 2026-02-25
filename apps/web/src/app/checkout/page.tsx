@@ -9,6 +9,7 @@ import { useStore } from '../../contexts/StoreContext';
 import { useCart } from '../../contexts/CartContext';
 import { api } from '../../lib/api';
 import { getPaymentIcon, DEFAULT_PAYMENT_PROVIDERS } from '../../components/PaymentIcons';
+import { trackInitiateCheckout } from '../../components/MarketingPixels';
 
 interface CartItem {
   id: string;
@@ -81,6 +82,29 @@ export default function CheckoutPage() {
   const [step, setStep] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Auth guard: redirect to login if no token present
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('accessToken');
+      if (!token) {
+        router.push('/auth/login?redirect=/checkout');
+      }
+    }
+  }, [router]);
+
+  // Fire InitiateCheckout pixel event once cart items are available
+  useEffect(() => {
+    if (cartContextItems.length > 0) {
+      trackInitiateCheckout({
+        contentIds: cartContextItems.map(item => item.id),
+        numItems: cartContextItems.reduce((sum, item) => sum + item.quantity, 0),
+        value: cartContextTotal / 1000,
+        currency: 'KWD',
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run once on mount
 
   // Convert CartContext items to the format checkout expects
   const cart: Cart | null =

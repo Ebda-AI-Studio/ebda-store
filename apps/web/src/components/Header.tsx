@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Button } from '@force/ui';
 import { useLanguage, translations } from '../contexts/LanguageContext';
 import { useCart } from '../contexts/CartContext';
@@ -13,11 +14,24 @@ interface HeaderProps {
 }
 
 export function Header({ cartCount: cartCountProp }: HeaderProps) {
+  const router = useRouter();
   const { itemCount } = useCart();
   const cartCount = cartCountProp ?? itemCount;
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const { t } = useLanguage();
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    const q = searchQuery.trim();
+    if (q) {
+      router.push(`/search?q=${encodeURIComponent(q)}`);
+      setSearchQuery('');
+      setIsSearchOpen(false);
+      setIsMobileMenuOpen(false);
+    }
+  };
 
   const navigation = [
     { name: t('Products', translations['Products']), href: '/products' },
@@ -98,7 +112,7 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
 
             {/* Search Bar - Desktop */}
             <div className="hidden flex-1 max-w-md lg:block">
-              <div className="search-box">
+              <form onSubmit={handleSearch} className="search-box">
                 <svg
                   className="h-5 w-5 text-muted-foreground"
                   fill="none"
@@ -112,11 +126,17 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
                     d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                   />
                 </svg>
-                <input type="text" placeholder="Search products..." className="search-input" />
+                <input
+                  type="text"
+                  placeholder="Search products..."
+                  className="search-input"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                />
                 <kbd className="hidden rounded bg-muted px-2 py-1 text-xs font-medium text-muted-foreground sm:block">
                   ⌘K
                 </kbd>
-              </div>
+              </form>
             </div>
 
             {/* Right Actions */}
@@ -250,7 +270,7 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
 
           {/* Search */}
           <div className="border-b px-4 py-4">
-            <div className="search-box">
+            <form onSubmit={handleSearch} className="search-box">
               <svg
                 className="h-5 w-5 text-muted-foreground"
                 fill="none"
@@ -264,8 +284,14 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
                   d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                 />
               </svg>
-              <input type="text" placeholder="Search products..." className="search-input" />
-            </div>
+              <input
+                type="text"
+                placeholder="Search products..."
+                className="search-input"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+              />
+            </form>
           </div>
 
           {/* Navigation */}
@@ -363,7 +389,7 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
           />
           <div className="fixed inset-x-0 top-0 z-50 bg-white p-4 shadow-lg lg:hidden animate-slide-down">
             <div className="flex items-center gap-3">
-              <div className="search-box flex-1">
+              <form onSubmit={handleSearch} className="search-box flex-1">
                 <svg
                   className="h-5 w-5 text-muted-foreground"
                   fill="none"
@@ -381,9 +407,11 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
                   type="text"
                   placeholder="Search products..."
                   className="search-input"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
                   autoFocus
                 />
-              </div>
+              </form>
               <button
                 onClick={() => setIsSearchOpen(false)}
                 className="flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground"

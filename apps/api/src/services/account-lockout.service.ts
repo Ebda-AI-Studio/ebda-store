@@ -5,6 +5,7 @@
 
 import { redis } from './redis.service';
 import { prisma } from '@force/database';
+import logger from '../lib/logger';
 
 export interface LockoutConfig {
   maxAttempts: number;
@@ -157,7 +158,7 @@ class AccountLockoutService {
       memoryStore.set(key, data);
     }
 
-    console.warn(`[LOCKOUT] Account locked: ${email}`);
+    logger.warn({ email }, 'Account locked due to too many failed attempts');
   }
 
   /**
@@ -173,7 +174,7 @@ class AccountLockoutService {
       memoryStore.delete(key);
     }
 
-    console.log(`[LOCKOUT] Account unlocked: ${email}`);
+    logger.info({ email }, 'Account unlocked');
   }
 
   /**
@@ -205,7 +206,7 @@ class AccountLockoutService {
       });
     } catch (error) {
       // Don't fail login for audit logging errors
-      console.error('[LOCKOUT] Failed to log attempt:', error);
+      logger.error({ err: error }, 'Failed to write login attempt audit log');
     }
   }
 }

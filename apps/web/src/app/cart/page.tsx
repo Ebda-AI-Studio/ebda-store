@@ -1,10 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Button, useToast } from '@force/ui';
 import { Header, Footer } from '../../components';
 import { useCart } from '../../contexts/CartContext';
+import { useStore } from '../../contexts/StoreContext';
+import { api } from '@/lib/api';
 
 function formatPrice(kwd: number) {
   return new Intl.NumberFormat('en-KW', {
@@ -22,9 +24,18 @@ export default function CartPage() {
     itemCount,
     total: cartTotal,
   } = useCart();
+  const { store } = useStore();
   const [promoCode, setPromoCode] = useState('');
   const [promoApplied, setPromoApplied] = useState(false);
-  const { info, success } = useToast();
+  const [promoDiscount, setPromoDiscount] = useState(0);
+  const [promoName, setPromoName] = useState('');
+  const [promoType, setPromoType] = useState('');
+  const [promoValue, setPromoValue] = useState(0);
+  const [isValidating, setIsValidating] = useState(false);
+  const [shippingFee, setShippingFee] = useState(2500); // default 2.5 KWD in fils
+  const [freeShippingThreshold, setFreeShippingThreshold] = useState(20000); // default 20 KWD in fils
+  const [shippingLoaded, setShippingLoaded] = useState(false);
+  const { info, success, error: errorToast } = useToast();
 
   const handleUpdateQuantity = (itemId: string, newQuantity: number) => {
     const item = cartItems.find(i => i.id === itemId);
@@ -48,19 +59,73 @@ export default function CartPage() {
     }
   };
 
-  const applyPromoCode = () => {
-    if (promoCode.toUpperCase() === 'FORCE10') {
-      setPromoApplied(true);
-      success('Promo applied', '10% discount has been applied');
-    } else {
-      info('Invalid code', 'The promo code is not valid');
+  const applyPromoCode = useCallback(async () => {
+    if (!promoCode.trim() || isValidating) return;
+    setIsValidating(true);
+    try {
+      const result = await api.post<{
+        coupon: { id: string; code: string; name: string; type: string; value: number };
+        discount: number;
+      }>(`/stores/public/${store.id}/coupons/validate`, {
+        code: promoCode,
+        orderTotal: cartTotal,
+      });
+      if (result.success && result.data) {
+        setPromoApplied(true);
+        setPromoDiscount(result.data.discount);
+        setPromoName(result.data.coupon.name);
+        setPromoType(result.data.coupon.type);
+        setPromoValue(result.data.coupon.value);
+        success('Promo applied', `${result.data.coupon.name} discount has been applied`);
+      } else {
+        const message = result.error?.message || 'The promo code is not valid';
+        info('Invalid code', message);
+      }
+    } catch {
+      errorToast('Error', 'Failed to validate promo code. Please try again.');
+    } finally {
+      setIsValidating(false);
     }
-  };
+  }, [promoCode, isValidating, store.id, cartTotal, success, info, errorToast]);
+
+  // Fetch shipping zones on mount
+  useEffect(() => {
+    async function fetchShipping() {
+      try {
+        const result = await api.get<{
+          zones: Array<{
+            deliveryFee: number;
+            freeShippingThreshold: number;
+            name: string;
+            isActive?: boolean;
+          }>;
+        }>(`/stores/public/${store.id}/shipping`);
+        if (result.success && result.data?.zones?.length) {
+          const activeZone =
+            result.data.zones.find(z => z.isActive !== false) || result.data.zones[0];
+          setShippingFee(activeZone.deliveryFee);
+          setFreeShippingThreshold(activeZone.freeShippingThreshold);
+          setShippingLoaded(true);
+        }
+      } catch {
+        // Fall back to default shipping values
+      }
+    }
+    if (store.id) {
+      fetchShipping();
+    }
+  }, [store.id]);
 
   // Convert from fils to KWD (price is stored in fils, 1 KWD = 1000 fils)
   const subtotal = cartTotal / 1000;
-  const discount = promoApplied ? subtotal * 0.1 : 0;
-  const shipping = subtotal >= 20 ? 0 : 2.5; // Free shipping over 20 KWD
+  const discount = promoApplied ? promoDiscount / 1000 : 0;
+  const shipping = shippingLoaded
+    ? cartTotal >= freeShippingThreshold
+      ? 0
+      : shippingFee / 1000
+    : subtotal >= 20
+      ? 0
+      : 2.5;
   const total = subtotal - discount + shipping;
   const cartCount = itemCount;
 
@@ -122,45 +187,22 @@ export default function CartPage() {
               </Button>
             </Link>
 
-            {/* Suggested Products */}
-            <div className="mt-16 w-full">
-              <h3 className="mb-6 text-center text-lg font-semibold text-foreground">
-                Popular Products
-              </h3>
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                {[
-                  { name: 'Wireless Headphones', price: 29.9 },
-                  { name: 'Smart Watch', price: 39.9 },
-                  { name: 'USB-C Hub', price: 7.9 },
-                  { name: 'Keyboard', price: 14.9 },
-                ].map(product => (
-                  <Link
-                    key={product.name}
-                    href="/products"
-                    className="group rounded-2xl border border-border bg-card p-4 text-center transition-all hover:border-primary/30 hover:shadow-lg"
-                  >
-                    <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-                      <svg
-                        className="h-8 w-8 text-primary"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={1}
-                          d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                        />
-                      </svg>
-                    </div>
-                    <p className="text-sm font-medium text-foreground group-hover:text-primary">
-                      {product.name}
-                    </p>
-                    <p className="mt-1 text-sm text-primary">{formatPrice(product.price)}</p>
-                  </Link>
-                ))}
-              </div>
+            {/* Browse Products */}
+            <div className="mt-12">
+              <Link
+                href="/products"
+                className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                  />
+                </svg>
+                Browse all products
+              </Link>
             </div>
           </div>
         ) : (
@@ -326,10 +368,10 @@ export default function CartPage() {
                       />
                       <button
                         onClick={applyPromoCode}
-                        disabled={promoApplied || !promoCode}
+                        disabled={promoApplied || !promoCode || isValidating}
                         className="h-10 rounded-lg bg-muted px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        {promoApplied ? 'Applied' : 'Apply'}
+                        {promoApplied ? 'Applied' : isValidating ? 'Validating...' : 'Apply'}
                       </button>
                     </div>
                     {promoApplied && (
@@ -347,7 +389,7 @@ export default function CartPage() {
                             d="M5 13l4 4L19 7"
                           />
                         </svg>
-                        FORCE10 - 10% discount applied
+                        {promoCode.toUpperCase()} - {promoName} ({formatPrice(discount)} off)
                       </p>
                     )}
                   </div>
@@ -360,7 +402,9 @@ export default function CartPage() {
                     </div>
                     {promoApplied && (
                       <div className="flex justify-between text-sm">
-                        <span className="text-emerald-600">Discount (10%)</span>
+                        <span className="text-emerald-600">
+                          Discount ({promoType === 'percentage' ? `${promoValue}%` : promoName})
+                        </span>
                         <span className="font-medium text-emerald-600">
                           -{formatPrice(discount)}
                         </span>
@@ -376,7 +420,7 @@ export default function CartPage() {
                     </div>
                     {shipping === 0 && (
                       <p className="text-xs text-muted-foreground">
-                        Free shipping on orders over 20 KWD
+                        Free shipping on orders over {formatPrice(freeShippingThreshold / 1000)}
                       </p>
                     )}
                     <div className="border-t border-border pt-3">
@@ -461,7 +505,11 @@ export default function CartPage() {
                     </div>
                     <div>
                       <p className="text-sm font-medium text-foreground">Need Help?</p>
-                      <p className="text-xs text-muted-foreground">Contact us at +965 1234 5678</p>
+                      <p className="text-xs text-muted-foreground">
+                        {store.phone
+                          ? `Contact us at ${store.phone}`
+                          : 'Visit our contact page for help'}
+                      </p>
                     </div>
                   </div>
                 </div>

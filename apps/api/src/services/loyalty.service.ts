@@ -326,31 +326,31 @@ export class LoyaltyService {
     const basePoints = Math.floor(orderTotalKWD * settings.pointsPerDinar);
     const pointsEarned = Math.floor(basePoints * tierInfo.multiplier);
 
-    // Update balance
-    const updated = await prisma.loyaltyPoints.update({
-      where: { id: loyalty.id },
-      data: {
-        points: { increment: pointsEarned },
-        totalEarned: { increment: pointsEarned },
-        tier: this.calculateTier(loyalty.totalEarned + pointsEarned, settings),
-      },
-    });
-
-    // Log transaction
-    await prisma.loyaltyTransaction.create({
-      data: {
-        storeId,
-        customerId,
-        orderId,
-        type: 'earn_purchase',
-        points: pointsEarned,
-        description: `Points earned from order (${tierInfo.multiplier}x multiplier)`,
-        expiresAt:
-          settings.expirationMonths > 0
-            ? new Date(Date.now() + settings.expirationMonths * 30 * 24 * 60 * 60 * 1000)
-            : null,
-      },
-    });
+    // Update balance and log transaction atomically
+    const [updated] = await prisma.$transaction([
+      prisma.loyaltyPoints.update({
+        where: { id: loyalty.id },
+        data: {
+          points: { increment: pointsEarned },
+          totalEarned: { increment: pointsEarned },
+          tier: this.calculateTier(loyalty.totalEarned + pointsEarned, settings),
+        },
+      }),
+      prisma.loyaltyTransaction.create({
+        data: {
+          storeId,
+          customerId,
+          orderId,
+          type: 'earn_purchase',
+          points: pointsEarned,
+          description: `Points earned from order (${tierInfo.multiplier}x multiplier)`,
+          expiresAt:
+            settings.expirationMonths > 0
+              ? new Date(Date.now() + settings.expirationMonths * 30 * 24 * 60 * 60 * 1000)
+              : null,
+        },
+      }),
+    ]);
 
     return {
       pointsEarned,
@@ -410,26 +410,26 @@ export class LoyaltyService {
     // Calculate discount value
     const discountFils = pointsToRedeem * settings.pointsValue;
 
-    // Update balance
-    const updated = await prisma.loyaltyPoints.update({
-      where: { id: loyalty.id },
-      data: {
-        points: { decrement: pointsToRedeem },
-        totalRedeemed: { increment: pointsToRedeem },
-      },
-    });
-
-    // Log transaction
-    await prisma.loyaltyTransaction.create({
-      data: {
-        storeId,
-        customerId,
-        orderId,
-        type: 'redeem_discount',
-        points: -pointsToRedeem,
-        description: `Redeemed ${pointsToRedeem} points for ${(discountFils / 1000).toFixed(3)} KWD discount`,
-      },
-    });
+    // Update balance and log transaction atomically
+    const [updated] = await prisma.$transaction([
+      prisma.loyaltyPoints.update({
+        where: { id: loyalty.id },
+        data: {
+          points: { decrement: pointsToRedeem },
+          totalRedeemed: { increment: pointsToRedeem },
+        },
+      }),
+      prisma.loyaltyTransaction.create({
+        data: {
+          storeId,
+          customerId,
+          orderId,
+          type: 'redeem_discount',
+          points: -pointsToRedeem,
+          description: `Redeemed ${pointsToRedeem} points for ${(discountFils / 1000).toFixed(3)} KWD discount`,
+        },
+      }),
+    ]);
 
     return {
       discountFils,
@@ -483,34 +483,34 @@ export class LoyaltyService {
       });
     }
 
-    // Update balance
+    // Update balance and log transaction atomically
     const isPositive = points > 0;
-    const updated = await prisma.loyaltyPoints.update({
-      where: { id: loyalty.id },
-      data: {
-        points: { increment: points },
-        totalEarned: isPositive ? { increment: points } : undefined,
-        totalRedeemed: !isPositive ? { increment: Math.abs(points) } : undefined,
-        tier: isPositive
-          ? this.calculateTier(loyalty.totalEarned + points, settings)
-          : loyalty.tier,
-      },
-    });
-
-    // Log transaction
-    await prisma.loyaltyTransaction.create({
-      data: {
-        storeId,
-        customerId,
-        type,
-        points,
-        description,
-        expiresAt:
-          isPositive && settings.expirationMonths > 0
-            ? new Date(Date.now() + settings.expirationMonths * 30 * 24 * 60 * 60 * 1000)
-            : null,
-      },
-    });
+    const [updated] = await prisma.$transaction([
+      prisma.loyaltyPoints.update({
+        where: { id: loyalty.id },
+        data: {
+          points: { increment: points },
+          totalEarned: isPositive ? { increment: points } : undefined,
+          totalRedeemed: !isPositive ? { increment: Math.abs(points) } : undefined,
+          tier: isPositive
+            ? this.calculateTier(loyalty.totalEarned + points, settings)
+            : loyalty.tier,
+        },
+      }),
+      prisma.loyaltyTransaction.create({
+        data: {
+          storeId,
+          customerId,
+          type,
+          points,
+          description,
+          expiresAt:
+            isPositive && settings.expirationMonths > 0
+              ? new Date(Date.now() + settings.expirationMonths * 30 * 24 * 60 * 60 * 1000)
+              : null,
+        },
+      }),
+    ]);
 
     return { newBalance: updated.points };
   }

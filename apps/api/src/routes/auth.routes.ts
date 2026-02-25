@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
+import { prisma } from '@force/database';
 import { authenticate } from '../middleware/auth';
 import { AuthService } from '../services/auth.service';
 import { authLimiter, auditLog, generateCsrfToken } from '../middleware/security';
@@ -251,6 +252,87 @@ router.get('/me', authenticate, async (req: Request, res: Response, next: NextFu
     next(error);
   }
 });
+
+// DELETE /auth/me - Soft-delete (deactivate) the authenticated user's account
+router.delete('/me', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Soft-delete: set deletedAt timestamp so data is preserved but account is deactivated
+    await prisma.user.update({
+      where: { id: userId },
+      data: { deletedAt: new Date() },
+    });
+
+    // Audit log
+    await auditLog({
+      action: 'user.account.deleted',
+      userId,
+      resourceType: 'user',
+      resourceId: userId,
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
+    res.json({
+      success: true,
+      data: { message: 'Account deleted successfully' },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PUT /auth/me - Update profile
+router.put('/me', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const updateSchema = z.object({
+      firstName: z.string().min(1, 'First name is required').optional(),
+      lastName: z.string().optional(),
+      phone: z.string().optional(),
+    });
+
+    const data = updateSchema.parse(req.body);
+    const user = await AuthService.updateProfile(req.user!.userId, data);
+
+    res.json({
+      success: true,
+      data: { user },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /auth/change-password
+router.post(
+  '/change-password',
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const changePasswordSchema = z.object({
+        currentPassword: z.string().min(1, 'Current password is required'),
+        newPassword: z
+          .string()
+          .min(8, 'Password must be at least 8 characters')
+          .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
+          .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
+          .regex(/[0-9]/, 'Password must contain at least one number')
+          .regex(/[^A-Za-z0-9]/, 'Password must contain at least one special character'),
+      });
+
+      const data = changePasswordSchema.parse(req.body);
+      await AuthService.changePassword(req.user!.userId, data.currentPassword, data.newPassword);
+
+      res.json({
+        success: true,
+        data: { message: 'Password changed successfully' },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 // POST /auth/forgot-password
 router.post(

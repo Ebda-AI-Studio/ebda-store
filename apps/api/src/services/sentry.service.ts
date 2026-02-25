@@ -2,6 +2,7 @@ import * as Sentry from '@sentry/node';
 import { nodeProfilingIntegration } from '@sentry/profiling-node';
 import { Request, Response, NextFunction } from 'express';
 import { config } from '../config';
+import logger from '../lib/logger';
 
 // ==========================================
 // Sentry Error Monitoring Service (v8 API)
@@ -19,7 +20,7 @@ export class SentryService {
     }
 
     if (!config.sentryDsn) {
-      console.log('[SENTRY] DSN not configured, skipping initialization');
+      logger.info('[SENTRY] DSN not configured, skipping initialization');
       return;
     }
 
@@ -42,7 +43,7 @@ export class SentryService {
     });
 
     this.isInitialized = true;
-    console.log('[SENTRY] Initialized');
+    logger.info('[SENTRY] Initialized');
   }
 
   /**
@@ -75,7 +76,7 @@ export class SentryService {
     }
   ): string {
     if (!this.isInitialized) {
-      console.error('[SENTRY] Not initialized, logging error:', error);
+      logger.error({ err: error }, '[SENTRY] Not initialized, logging error');
       return '';
     }
 
@@ -98,7 +99,7 @@ export class SentryService {
     }
   ): string {
     if (!this.isInitialized) {
-      console.log(`[SENTRY] ${level.toUpperCase()}: ${message}`);
+      logger.info({ level, message }, '[SENTRY] Not initialized, logging message');
       return '';
     }
 

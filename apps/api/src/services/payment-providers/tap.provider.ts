@@ -12,6 +12,7 @@ import {
   Currency,
   PaymentStatus,
 } from './types';
+import logger from '../../lib/logger';
 
 // ==========================================
 // Tap Payments Provider
@@ -82,7 +83,7 @@ export class TapPaymentProvider implements IPaymentProvider {
     const data = (await response.json()) as { errors?: { description: string }[] };
 
     if (!response.ok) {
-      console.error('[TAP ERROR]', data);
+      logger.error({ statusCode: response.status, errors: data.errors }, 'Tap API request failed');
       throw new Error(data.errors?.[0]?.description || 'Tap API request failed');
     }
 

@@ -8,8 +8,9 @@ const generateDevSecret = () => {
   if (process.env.NODE_ENV === 'production') {
     throw new Error('JWT_SECRET must be set in production environment');
   }
-  console.warn(
-    '[CONFIG] WARNING: Using auto-generated JWT secret. Set JWT_SECRET in .env for persistence.'
+  // Logger is not yet ready at this point in startup — write directly to stderr
+  process.stderr.write(
+    '[CONFIG] WARNING: Using auto-generated JWT secret. Set JWT_SECRET in .env for persistence.\n'
   );
   return crypto.randomBytes(32).toString('hex');
 };
@@ -24,7 +25,8 @@ const getRequiredSecret = (envVar: string, name: string): string => {
     if (envVar === 'JWT_SECRET') {
       return generateDevSecret();
     }
-    console.warn(`[CONFIG] WARNING: ${name} is not set. Some features may not work.`);
+    // Logger is not yet ready at this point in startup — write directly to stderr
+    process.stderr.write(`[CONFIG] WARNING: ${name} is not set. Some features may not work.\n`);
     return '';
   }
   return value;
@@ -75,6 +77,7 @@ export const config = {
   myfatoorahApiKey: process.env.MYFATOORAH_API_KEY || '',
   myfatoorahTestMode: process.env.MYFATOORAH_TEST_MODE === 'true',
   myfatoorahCountryCode: process.env.MYFATOORAH_COUNTRY_CODE || 'KWT',
+  myfatoorahWebhookSecret: process.env.MYFATOORAH_WEBHOOK_SECRET || '',
 
   // Hesabe (https://hesabe.com)
   hesabeApiKey: process.env.HESABE_API_KEY || '',
@@ -109,10 +112,6 @@ export const config = {
   sentryDsn: process.env.SENTRY_DSN || '',
   sentryDebug: process.env.SENTRY_DEBUG === 'true',
 
-  // AI (Force AI)
-  aiApiKey: process.env.AI_API_KEY || process.env.ANTHROPIC_API_KEY || '',
-  aiApiEndpoint: process.env.AI_API_ENDPOINT || 'https://api.anthropic.com/v1/messages',
-
   // Vercel (for custom domain provisioning)
   vercelApiToken: process.env.VERCEL_API_TOKEN || '',
   vercelProjectId: process.env.VERCEL_PROJECT_ID || '',
@@ -134,12 +133,26 @@ if (config.nodeEnv === 'production') {
     !config.hesabeApiKey &&
     !config.upaymentsApiKey
   ) {
-    console.warn('[CONFIG] Warning: No payment provider configured!');
+    // Logger cannot be used here (it depends on config) — write directly to stderr
+    process.stderr.write('[CONFIG] Warning: No payment provider configured!\n');
   }
 
   // Validate JWT secret strength
   if (config.jwtSecret.length < 32) {
     throw new Error('JWT_SECRET must be at least 32 characters for production');
+  }
+
+  // Reject well-known placeholder values that developers might accidentally leave in production
+  const jwtSecretLower = config.jwtSecret.toLowerCase();
+  if (
+    jwtSecretLower.includes('change-in-production') ||
+    jwtSecretLower.includes('your-super-secret') ||
+    jwtSecretLower.includes('changeme') ||
+    jwtSecretLower.includes('placeholder')
+  ) {
+    throw new Error(
+      'JWT_SECRET contains a placeholder value and must be replaced with a cryptographically random secret before running in production'
+    );
   }
 
   // Validate encryption key strength

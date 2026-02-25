@@ -111,7 +111,7 @@ All errors follow this format:
             email: { type: 'string', format: 'email' },
             firstName: { type: 'string' },
             lastName: { type: 'string' },
-            role: { type: 'string', enum: ['customer', 'admin', 'super_admin'] },
+            role: { type: 'string', enum: ['customer', 'store_admin', 'super_admin'] },
             isVerified: { type: 'boolean' },
             createdAt: { type: 'string', format: 'date-time' },
           },

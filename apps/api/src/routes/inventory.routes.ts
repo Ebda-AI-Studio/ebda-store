@@ -113,7 +113,7 @@ router.post(
     try {
       const { storeId } = req.params;
       const data = adjustInventorySchema.parse(req.body);
-      const userId = (req as any).user?.id;
+      const userId = req.user!.userId;
 
       const result = await InventoryService.adjustInventory(
         storeId,
@@ -146,7 +146,7 @@ router.post(
     try {
       const { storeId } = req.params;
       const { adjustments } = bulkAdjustSchema.parse(req.body);
-      const userId = (req as any).user?.id;
+      const userId = req.user!.userId;
 
       const result = await InventoryService.bulkAdjustInventory(
         storeId,
@@ -179,7 +179,7 @@ router.put(
     try {
       const { storeId, productId } = req.params;
       const { quantity, reason } = setInventorySchema.parse(req.body);
-      const userId = (req as any).user?.id;
+      const userId = req.user!.userId;
 
       const result = await InventoryService.setInventory(
         storeId,

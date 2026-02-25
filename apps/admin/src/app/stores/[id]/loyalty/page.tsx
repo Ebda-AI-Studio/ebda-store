@@ -176,6 +176,13 @@ export default function LoyaltySettingsPage() {
   }, [tierFilter]);
 
   const handleToggleEnabled = async () => {
+    // Confirm before disabling to prevent accidental deactivation
+    if (loyaltyEnabled) {
+      const confirmed = window.confirm(
+        'Disable the loyalty program? Customers will no longer earn or redeem points until you re-enable it.'
+      );
+      if (!confirmed) return;
+    }
     setSaving(true);
     try {
       const token = localStorage.getItem('authToken');
@@ -192,9 +199,12 @@ export default function LoyaltySettingsPage() {
       );
       if (res.ok) {
         setLoyaltyEnabled(!loyaltyEnabled);
+      } else {
+        alert('Failed to update loyalty program status. Please try again.');
       }
     } catch (err) {
       console.error('Failed to toggle loyalty:', err);
+      alert('Failed to update loyalty program status. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -204,7 +214,7 @@ export default function LoyaltySettingsPage() {
     setSaving(true);
     try {
       const token = localStorage.getItem('authToken');
-      await fetch(
+      const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}/loyalty/settings`,
         {
           method: 'PUT',
@@ -215,8 +225,12 @@ export default function LoyaltySettingsPage() {
           body: JSON.stringify({ settings }),
         }
       );
+      if (!res.ok) {
+        alert('Failed to save loyalty settings. Please try again.');
+      }
     } catch (err) {
       console.error('Failed to save settings:', err);
+      alert('Failed to save loyalty settings. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -251,9 +265,12 @@ export default function LoyaltySettingsPage() {
         setAwardReason('');
         fetchMembers();
         fetchStats();
+      } else {
+        alert('Failed to award points. Please try again.');
       }
     } catch (err) {
       console.error('Failed to award points:', err);
+      alert('Failed to award points. Please try again.');
     } finally {
       setSaving(false);
     }

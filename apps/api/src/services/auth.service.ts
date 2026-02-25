@@ -340,6 +340,7 @@ export class AuthService {
         email: true,
         firstName: true,
         lastName: true,
+        phone: true,
         role: true,
         avatar: true,
         emailVerified: true,
@@ -353,6 +354,62 @@ export class AuthService {
     }
 
     return user;
+  }
+
+  static async updateProfile(
+    userId: string,
+    data: { firstName?: string; lastName?: string; phone?: string }
+  ) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new AppError(404, 'NOT_FOUND', 'User not found');
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(data.firstName !== undefined && { firstName: data.firstName }),
+        ...(data.lastName !== undefined && { lastName: data.lastName }),
+        ...(data.phone !== undefined && { phone: data.phone }),
+      },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        role: true,
+        avatar: true,
+        emailVerified: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    return updated;
+  }
+
+  static async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new AppError(404, 'NOT_FOUND', 'User not found');
+    }
+
+    const isValid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!isValid) {
+      throw new AppError(400, 'INVALID_PASSWORD', 'Current password is incorrect');
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, this.SALT_ROUNDS);
+    await prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash },
+    });
+
+    // Invalidate all refresh tokens to force re-login on other devices
+    await prisma.refreshToken.deleteMany({
+      where: { userId },
+    });
   }
 
   static async requestPasswordReset(email: string): Promise<void> {

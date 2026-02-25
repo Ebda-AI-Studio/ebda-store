@@ -1,20 +1,22 @@
 import { Request, Response, NextFunction } from 'express';
+import logger from '../lib/logger';
 
 export function requestLogger(req: Request, res: Response, next: NextFunction): void {
   const start = Date.now();
 
   res.on('finish', () => {
     const duration = Date.now() - start;
+    const statusCode = res.statusCode;
 
-    // Color code based on status
-    const statusColor =
-      res.statusCode >= 500
-        ? '\x1b[31m' // Red
-        : res.statusCode >= 400
-          ? '\x1b[33m' // Yellow
-          : '\x1b[32m'; // Green
+    // Use appropriate pino log level based on HTTP status code
+    const logFn =
+      statusCode >= 500
+        ? logger.error.bind(logger)
+        : statusCode >= 400
+          ? logger.warn.bind(logger)
+          : logger.info.bind(logger);
 
-    console.log(`${statusColor}${req.method}\x1b[0m ${req.path} ${res.statusCode} - ${duration}ms`);
+    logFn({ method: req.method, path: req.path, statusCode, durationMs: duration }, 'request');
   });
 
   next();

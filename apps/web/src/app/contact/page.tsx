@@ -3,9 +3,12 @@
 import { useState } from 'react';
 import { Button, Input, Textarea, useToast } from '@force/ui';
 import { Header, Footer } from '../../components';
+import { useStore } from '../../contexts/StoreContext';
+import { api } from '@/lib/api';
 
 export default function ContactPage() {
-  const { success } = useToast();
+  const { store } = useStore();
+  const { success, error: showError } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -17,11 +20,21 @@ export default function ContactPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setIsSubmitting(false);
-    success('Message sent!', "We'll get back to you as soon as possible.");
-    setFormData({ name: '', email: '', subject: '', message: '' });
+
+    try {
+      const result = await api.submitContact(formData);
+
+      if (result.success) {
+        success('Message sent!', "We'll get back to you as soon as possible.");
+        setFormData({ name: '', email: '', subject: '', message: '' });
+      } else {
+        showError('Failed to send message', result.error?.message || 'Please try again later.');
+      }
+    } catch {
+      showError('Failed to send message', 'Please try again later.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -90,7 +103,7 @@ export default function ContactPage() {
               </svg>
             </div>
             <h3 className="mt-4 font-semibold text-gray-900">Email</h3>
-            <p className="mt-1 text-sm text-gray-500">support@forcemedia.com</p>
+            <p className="mt-1 text-sm text-gray-500">{store.email || 'Not available'}</p>
           </div>
           <div className="text-center">
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
@@ -109,7 +122,7 @@ export default function ContactPage() {
               </svg>
             </div>
             <h3 className="mt-4 font-semibold text-gray-900">Phone</h3>
-            <p className="mt-1 text-sm text-gray-500">+1 (555) 123-4567</p>
+            <p className="mt-1 text-sm text-gray-500">{store.phone || 'Not available'}</p>
           </div>
           <div className="text-center">
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
@@ -134,7 +147,7 @@ export default function ContactPage() {
               </svg>
             </div>
             <h3 className="mt-4 font-semibold text-gray-900">Location</h3>
-            <p className="mt-1 text-sm text-gray-500">Kuwait City, Kuwait</p>
+            <p className="mt-1 text-sm text-gray-500">{store.address || 'Not available'}</p>
           </div>
         </div>
       </div>

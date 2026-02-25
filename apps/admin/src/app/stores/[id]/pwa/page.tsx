@@ -137,9 +137,12 @@ export default function PWASettingsPage() {
       );
       if (res.ok) {
         setPwaEnabled(!pwaEnabled);
+      } else {
+        alert('Failed to update PWA status. Please try again.');
       }
     } catch (err) {
       console.error('Failed to toggle PWA:', err);
+      alert('Failed to update PWA status. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -149,7 +152,7 @@ export default function PWASettingsPage() {
     setSaving(true);
     try {
       const token = localStorage.getItem('authToken');
-      await fetch(
+      const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}/pwa/settings`,
         {
           method: 'PUT',
@@ -160,8 +163,12 @@ export default function PWASettingsPage() {
           body: JSON.stringify({ settings }),
         }
       );
+      if (!res.ok) {
+        alert('Failed to save PWA settings. Please try again.');
+      }
     } catch (err) {
       console.error('Failed to save settings:', err);
+      alert('Failed to save PWA settings. Please try again.');
     } finally {
       setSaving(false);
     }

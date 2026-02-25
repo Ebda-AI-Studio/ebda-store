@@ -283,11 +283,21 @@ export default function WishlistPage() {
                     </h3>
                   </Link>
                   <div className="flex items-center gap-2 mt-1">
-                    <span className="font-bold">${item.product.price.toFixed(2)}</span>
+                    <span className="font-bold">
+                      {new Intl.NumberFormat('en-KW', {
+                        style: 'currency',
+                        currency: 'KWD',
+                        minimumFractionDigits: 3,
+                      }).format(item.product.price / 1000)}
+                    </span>
                     {item.product.compareAtPrice &&
                       item.product.compareAtPrice > item.product.price && (
                         <span className="text-gray-400 line-through text-sm">
-                          ${item.product.compareAtPrice.toFixed(2)}
+                          {new Intl.NumberFormat('en-KW', {
+                            style: 'currency',
+                            currency: 'KWD',
+                            minimumFractionDigits: 3,
+                          }).format(item.product.compareAtPrice / 1000)}
                         </span>
                       )}
                   </div>

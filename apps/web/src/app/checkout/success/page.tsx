@@ -1,15 +1,64 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Button } from '@force/ui';
+import { api, type Order } from '@/lib/api';
+import { useStore } from '../../../contexts/StoreContext';
+import { useCart } from '../../../contexts/CartContext';
+import { trackPurchase } from '../../../components/MarketingPixels';
 
-// Generate order number outside component to avoid impure function in render
-const generateOrderNumber = () => `ORD-${Date.now().toString(36).toUpperCase()}`;
+function formatPrice(fils: number) {
+  return `${(fils / 1000).toFixed(3)} KWD`;
+}
 
-export default function CheckoutSuccessPage() {
-  const [orderNumber] = useState(generateOrderNumber);
+function SuccessContent() {
+  const searchParams = useSearchParams();
+  const orderId = searchParams?.get('orderId');
+  const { store } = useStore();
+  const { clearCart } = useCart();
+
+  const [order, setOrder] = useState<Order | null>(null);
+  const [, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // Clear cart on successful checkout
+    clearCart();
+  }, [clearCart]);
+
+  useEffect(() => {
+    if (!orderId) {
+      setIsLoading(false);
+      return;
+    }
+
+    async function fetchOrder() {
+      try {
+        const result = await api.getOrder(orderId!);
+        if (result.success && result.data) {
+          const fetchedOrder = result.data.order;
+          setOrder(fetchedOrder);
+
+          // Fire Purchase pixel event with real order data
+          trackPurchase({
+            orderId: fetchedOrder.id,
+            contentIds: fetchedOrder.items.map(item => item.productId),
+            numItems: fetchedOrder.items.reduce((sum, item) => sum + item.quantity, 0),
+            value: fetchedOrder.total / 1000,
+            currency: 'KWD',
+          });
+        }
+      } catch {
+        // Non-critical - page still works without order details
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    fetchOrder();
+  }, [orderId]);
 
   return (
     <main className="min-h-screen bg-gray-50">
@@ -17,11 +66,20 @@ export default function CheckoutSuccessPage() {
       <nav className="border-b bg-white">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-center px-4 sm:px-6 lg:px-8">
           <Link href="/" className="flex items-center gap-2">
-            <Image src="/logo.svg" alt="Force Media" width={40} height={30} />
-            <span className="text-xl font-bold">
-              <span className="text-primary">Force</span>
-              <span className="text-gray-700"> Store</span>
-            </span>
+            {store?.logo ? (
+              <Image
+                src={store.logo}
+                alt={store.name}
+                width={40}
+                height={30}
+                className="object-contain"
+              />
+            ) : (
+              <span className="text-xl font-bold">
+                <span className="text-primary">{store?.name || 'Force'}</span>
+                <span className="text-gray-700"> Store</span>
+              </span>
+            )}
           </Link>
         </div>
       </nav>
@@ -50,24 +108,57 @@ export default function CheckoutSuccessPage() {
             Your order has been confirmed and will be shipped soon.
           </p>
 
-          <div className="mt-8 rounded-xl border bg-white p-6 shadow-sm">
+          <div className="mt-8 rounded-xl border bg-white p-6 shadow-sm text-left">
             <div className="flex items-center justify-between border-b pb-4">
               <div>
                 <p className="text-sm text-gray-500">Order number</p>
-                <p className="text-lg font-semibold text-gray-900">{orderNumber}</p>
+                <p className="text-lg font-semibold text-gray-900">
+                  {order
+                    ? `#${order.orderNumber}`
+                    : orderId
+                      ? `#${orderId.slice(0, 8)}...`
+                      : 'Processing'}
+                </p>
               </div>
               <div className="text-right">
                 <p className="text-sm text-gray-500">Date</p>
-                <p className="text-gray-900">{new Date().toLocaleDateString()}</p>
+                <p className="text-gray-900">
+                  {order?.createdAt
+                    ? new Date(order.createdAt).toLocaleDateString()
+                    : new Date().toLocaleDateString()}
+                </p>
               </div>
             </div>
 
-            <div className="py-4">
-              <p className="text-sm text-gray-500">
-                We&apos;ll send you a confirmation email with your order details and tracking
-                information once your order ships.
-              </p>
-            </div>
+            {/* Order Items */}
+            {order?.items && order.items.length > 0 && (
+              <div className="divide-y py-4">
+                {order.items.map(item => (
+                  <div key={item.id} className="flex items-center justify-between py-3">
+                    <div>
+                      <p className="font-medium text-gray-900">{item.product?.name || 'Product'}</p>
+                      <p className="text-sm text-gray-500">Qty: {item.quantity}</p>
+                    </div>
+                    <p className="font-medium text-gray-900">
+                      {formatPrice(item.price * item.quantity)}
+                    </p>
+                  </div>
+                ))}
+                <div className="flex items-center justify-between pt-3">
+                  <p className="font-semibold text-gray-900">Total</p>
+                  <p className="font-bold text-primary">{formatPrice(order.total)}</p>
+                </div>
+              </div>
+            )}
+
+            {!order?.items && (
+              <div className="py-4">
+                <p className="text-sm text-gray-500">
+                  We&apos;ll send you a confirmation email with your order details and tracking
+                  information once your order ships.
+                </p>
+              </div>
+            )}
 
             <div className="border-t pt-4">
               <h3 className="font-medium text-gray-900">What&apos;s next?</h3>
@@ -153,12 +244,26 @@ export default function CheckoutSuccessPage() {
 
           <p className="mt-8 text-sm text-gray-500">
             Questions about your order?{' '}
-            <a href="mailto:support@forcemedia.com" className="text-primary hover:underline">
+            <Link href="/contact" className="text-primary hover:underline">
               Contact Support
-            </a>
+            </Link>
           </p>
         </div>
       </div>
     </main>
+  );
+}
+
+export default function CheckoutSuccessPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500" />
+        </main>
+      }
+    >
+      <SuccessContent />
+    </Suspense>
   );
 }

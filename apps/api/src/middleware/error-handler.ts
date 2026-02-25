@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
+import logger from '../lib/logger';
 
 export class AppError extends Error {
   constructor(
@@ -14,8 +15,8 @@ export class AppError extends Error {
 }
 
 export function errorHandler(err: Error, _req: Request, res: Response, _next: NextFunction): void {
-  // Log error (safely handle circular refs)
-  console.error('[Error]', err.message, err.stack);
+  // Log error
+  logger.error({ err }, 'Unhandled error');
 
   // Handle known errors
   if (err instanceof AppError) {

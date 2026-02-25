@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import { config } from '../config';
+import logger from '../lib/logger';
 
 // ==========================================
 // Email Service
@@ -96,16 +97,16 @@ export class EmailService {
         });
 
         if (config.nodeEnv === 'development') {
-          console.log(`[EMAIL] Sent to ${to}: ${subject}`);
+          logger.info(`[EMAIL] Sent to ${to}: ${subject}`);
         }
         return; // Success - exit the retry loop
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
 
         if (attempt < maxAttempts) {
-          console.warn(
-            `[EMAIL] Failed to send to ${to} (attempt ${attempt}/${maxAttempts}), retrying in ${currentDelay}ms...`,
-            lastError.message
+          logger.warn(
+            { err: lastError.message, to, attempt, maxAttempts, retryDelayMs: currentDelay },
+            '[EMAIL] Failed to send, retrying'
           );
           await this.sleep(currentDelay);
           currentDelay *= backoffMultiplier; // Exponential backoff
@@ -114,7 +115,10 @@ export class EmailService {
     }
 
     // All attempts failed
-    console.error(`[EMAIL ERROR] Failed to send to ${to} after ${maxAttempts} attempts`, lastError);
+    logger.error(
+      { err: lastError, to, maxAttempts },
+      '[EMAIL ERROR] Failed to send after all attempts'
+    );
     throw lastError;
   }
 
@@ -135,10 +139,10 @@ export class EmailService {
       });
 
       if (config.nodeEnv === 'development') {
-        console.log(`[EMAIL] Sent to ${to}: ${subject}`);
+        logger.info(`[EMAIL] Sent to ${to}: ${subject}`);
       }
     } catch (error) {
-      console.error('[EMAIL ERROR]', error);
+      logger.error({ err: error }, '[EMAIL ERROR] sendImmediate failed');
       throw error;
     }
   }
@@ -342,6 +346,10 @@ export class EmailService {
       'admin-new-order': d => this.adminNewOrderTemplate(d as OrderEmailData),
       'admin-refund': d =>
         this.adminRefundTemplate(d as { orderNumber: string; amount: number; reason?: string }),
+      'contact-form': d =>
+        this.contactFormTemplate(
+          d as { name: string; email: string; subject: string; message: string }
+        ),
     };
 
     const template = templates[templateName];
@@ -405,7 +413,7 @@ export class EmailService {
       <tr>
         <td>${item.name}</td>
         <td style="text-align: center;">${item.quantity}</td>
-        <td style="text-align: right;">$${(item.price / 100).toFixed(2)}</td>
+        <td style="text-align: right;">${(item.price / 1000).toFixed(3)} KWD</td>
       </tr>
     `
       )
@@ -432,19 +440,19 @@ export class EmailService {
         <tfoot>
           <tr>
             <td colspan="2">Subtotal</td>
-            <td style="text-align: right;">$${(d.subtotal / 100).toFixed(2)}</td>
+            <td style="text-align: right;">${(d.subtotal / 1000).toFixed(3)} KWD</td>
           </tr>
           <tr>
             <td colspan="2">Tax</td>
-            <td style="text-align: right;">$${(d.tax / 100).toFixed(2)}</td>
+            <td style="text-align: right;">${(d.tax / 1000).toFixed(3)} KWD</td>
           </tr>
           <tr>
             <td colspan="2">Shipping</td>
-            <td style="text-align: right;">$${(d.shipping / 100).toFixed(2)}</td>
+            <td style="text-align: right;">${(d.shipping / 1000).toFixed(3)} KWD</td>
           </tr>
           <tr class="total-row">
             <td colspan="2">Total</td>
-            <td style="text-align: right;">$${(d.total / 100).toFixed(2)}</td>
+            <td style="text-align: right;">${(d.total / 1000).toFixed(3)} KWD</td>
           </tr>
         </tfoot>
       </table>
@@ -469,7 +477,7 @@ export class EmailService {
     return EmailService.baseTemplate(`
       <h2>Payment Received</h2>
       <p>Hi ${d.customerName},</p>
-      <p>We've successfully processed your payment of <strong>$${(d.total / 100).toFixed(2)}</strong> for order #${d.orderNumber}.</p>
+      <p>We've successfully processed your payment of <strong>${(d.total / 1000).toFixed(3)} KWD</strong> for order #${d.orderNumber}.</p>
       <p>Your order is now being prepared for shipment.</p>
       <p>Thank you for shopping with us!</p>
     `);
@@ -626,7 +634,7 @@ export class EmailService {
       <h2>New Order Received</h2>
       <p><strong>Order #${d.orderNumber}</strong></p>
       <p><strong>Customer:</strong> ${d.customerName} (${d.customerEmail})</p>
-      <p><strong>Total:</strong> $${(d.total / 100).toFixed(2)}</p>
+      <p><strong>Total:</strong> ${(d.total / 1000).toFixed(3)} KWD</p>
       <p><strong>Items:</strong> ${d.items.length}</p>
       <p style="text-align: center; margin: 24px 0;">
         <a href="${config.adminUrl}/orders" class="button">View Order</a>
@@ -645,7 +653,7 @@ export class EmailService {
     return EmailService.baseTemplate(`
       <h2>Refund Processed</h2>
       <p><strong>Order #${d.orderNumber}</strong></p>
-      <p><strong>Amount:</strong> $${(d.amount / 100).toFixed(2)}</p>
+      <p><strong>Amount:</strong> ${(d.amount / 1000).toFixed(3)} KWD</p>
       ${d.reason ? `<p><strong>Reason:</strong> ${d.reason}</p>` : ''}
       <p style="text-align: center; margin: 24px 0;">
         <a href="${config.adminUrl}/orders" class="button">View Details</a>
@@ -714,6 +722,44 @@ export class EmailService {
       </p>
       <p>Best regards,<br>${d.storeName} Team</p>
     `);
+  }
+
+  /**
+   * Contact Form Template
+   */
+  private static contactFormTemplate(d: {
+    name: string;
+    email: string;
+    subject: string;
+    message: string;
+  }): string {
+    return EmailService.baseTemplate(`
+      <h2>New Contact Form Submission</h2>
+      <p><strong>From:</strong> ${d.name} (${d.email})</p>
+      <p><strong>Subject:</strong> ${d.subject}</p>
+      <div style="background: #f9f9f9; padding: 16px; border-radius: 4px; margin: 16px 0; white-space: pre-wrap;">${d.message}</div>
+      <p style="font-size: 14px; color: #666;">You can reply directly to this email to respond to the sender.</p>
+    `);
+  }
+
+  /**
+   * Send Contact Form Email to Admin
+   */
+  static async sendContactForm(data: {
+    name: string;
+    email: string;
+    subject: string;
+    message: string;
+  }): Promise<void> {
+    const html = this.renderTemplate('contact-form', data);
+
+    await this.send({
+      to: config.smtpFromEmail,
+      subject: `Contact Form: ${data.subject}`,
+      html,
+      text: this.htmlToText(html),
+      replyTo: data.email,
+    });
   }
 
   /**

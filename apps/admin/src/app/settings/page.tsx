@@ -1,8 +1,24 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button, Input, Textarea, Select } from '@force/ui';
 import { AdminLayout } from '../../components/AdminLayout';
+import { useAuth } from '../../lib/auth';
+import { apiGet, apiPut, getApiUrl } from '../../lib/api';
+
+interface Store {
+  id: string;
+  name: string;
+  slug: string;
+  domain?: string;
+  email?: string;
+  phone?: string;
+  phoneAr?: string;
+  whatsapp?: string;
+  address?: string;
+  addressAr?: string;
+  settings?: Record<string, unknown>;
+}
 
 const currencies = [
   { value: 'USD', label: 'US Dollar (USD)' },
@@ -22,44 +38,194 @@ const timezones = [
 ];
 
 export default function SettingsPage() {
+  const { token } = useAuth();
   const [activeTab, setActiveTab] = useState('general');
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [storeId, setStoreId] = useState<string | null>(null);
+
+  // Payment settings state
+  const [taxRate, setTaxRate] = useState('10');
+  const [taxCalculation, setTaxCalculation] = useState('inclusive');
+  const [codEnabled, setCodEnabled] = useState(true);
+  const [paymentSaveMessage, setPaymentSaveMessage] = useState<string | null>(null);
 
   const [settings, setSettings] = useState({
-    // General
-    storeName: 'Force Store',
-    storeEmail: 'support@forcemedia.com',
-    storePhone: '+965 1234 5678',
-    storeAddress: 'Kuwait City, Kuwait',
+    storeName: '',
+    storeEmail: '',
+    storePhone: '',
+    storeAddress: '',
     currency: 'KWD',
     timezone: 'Asia/Kuwait',
-    // Notifications
     orderNotifications: true,
     customerNotifications: true,
     inventoryAlerts: true,
     marketingEmails: false,
-    // Shipping
-    freeShippingThreshold: '50',
-    flatRateShipping: '5.99',
-    expressShipping: '15.99',
+    freeShippingThreshold: '',
+    flatRateShipping: '',
+    expressShipping: '',
   });
+
+  // Load store data
+  useEffect(() => {
+    async function loadStore() {
+      try {
+        // Get the first store for this admin
+        const { data: storesData } = await apiGet<{ stores: Store[] }>('/api/v1/admin/stores');
+        if (!storesData?.stores?.length) {
+          setIsLoading(false);
+          return;
+        }
+
+        const store = storesData.stores[0];
+        setStoreId(store.id);
+
+        // Fetch full store details
+        const response = await fetch(`${getApiUrl()}/api/v1/stores/${store.id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const result = await response.json();
+
+        if (result.success && result.data?.store) {
+          const s = result.data.store;
+          const storeSettings = s.settings || {};
+
+          setSettings({
+            storeName: s.name || '',
+            storeEmail: s.email || '',
+            storePhone: s.phone || '',
+            storeAddress: s.address || '',
+            currency: (storeSettings.currency as string) || 'KWD',
+            timezone: (storeSettings.timezone as string) || 'Asia/Kuwait',
+            orderNotifications: storeSettings.orderNotifications !== false,
+            customerNotifications: storeSettings.customerNotifications !== false,
+            inventoryAlerts: storeSettings.inventoryAlerts !== false,
+            marketingEmails: storeSettings.marketingEmails === true,
+            freeShippingThreshold: String(storeSettings.freeShippingThreshold || ''),
+            flatRateShipping: String(storeSettings.flatRateShipping || ''),
+            expressShipping: String(storeSettings.expressShipping || ''),
+          });
+
+          // Load payment settings
+          if (storeSettings.taxRate !== undefined) {
+            setTaxRate(String(storeSettings.taxRate));
+          }
+          if (storeSettings.taxCalculation !== undefined) {
+            setTaxCalculation(storeSettings.taxCalculation as string);
+          }
+          if (storeSettings.codEnabled !== undefined) {
+            setCodEnabled(storeSettings.codEnabled as boolean);
+          }
+        }
+      } catch {
+        // Will show with default values
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    if (token) loadStore();
+  }, [token]);
 
   const updateSetting = (key: string, value: string | boolean) => {
     setSettings(prev => ({ ...prev, [key]: value }));
   };
 
   const handleSave = async () => {
+    if (!storeId) {
+      setSaveMessage('No store found. Please create a store first.');
+      return;
+    }
+
     setIsSaving(true);
     setSaveMessage(null);
+
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Update store name
+      const { error: nameError } = await apiPut(`/api/v1/stores/${storeId}`, {
+        name: settings.storeName,
+        settings: {
+          currency: settings.currency,
+          timezone: settings.timezone,
+          orderNotifications: settings.orderNotifications,
+          customerNotifications: settings.customerNotifications,
+          inventoryAlerts: settings.inventoryAlerts,
+          marketingEmails: settings.marketingEmails,
+          freeShippingThreshold: settings.freeShippingThreshold || undefined,
+          flatRateShipping: settings.flatRateShipping || undefined,
+          expressShipping: settings.expressShipping || undefined,
+        },
+      });
+
+      if (nameError) {
+        setSaveMessage(`Failed to save: ${nameError.message}`);
+        return;
+      }
+
+      // Update contact info
+      const { error: contactError } = await apiPut(`/api/v1/stores/${storeId}/contact`, {
+        email: settings.storeEmail || undefined,
+        phone: settings.storePhone || undefined,
+        address: settings.storeAddress || undefined,
+      });
+
+      if (contactError) {
+        setSaveMessage(`Settings saved but contact update failed: ${contactError.message}`);
+        return;
+      }
+
       setSaveMessage('Settings saved successfully.');
-    } catch (error) {
-      console.error('Failed to save settings:', error);
+    } catch {
       setSaveMessage('Failed to save settings. Please try again.');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handlePaymentSave = async () => {
+    if (!storeId) {
+      setPaymentSaveMessage('No store found.');
+      return;
+    }
+
+    setIsSaving(true);
+    setPaymentSaveMessage(null);
+
+    try {
+      const { error } = await apiPut(`/api/v1/stores/${storeId}`, {
+        settings: {
+          taxRate: taxRate || undefined,
+          taxCalculation,
+          codEnabled,
+        },
+      });
+
+      if (error) {
+        setPaymentSaveMessage(`Failed to save: ${error.message}`);
+      } else {
+        setPaymentSaveMessage('Payment settings saved.');
+      }
+    } catch {
+      setPaymentSaveMessage('Failed to save payment settings. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCodToggle = async (enabled: boolean) => {
+    setCodEnabled(enabled);
+
+    if (!storeId) return;
+
+    try {
+      await apiPut(`/api/v1/stores/${storeId}`, {
+        settings: { codEnabled: enabled },
+      });
+    } catch {
+      // Revert on failure
+      setCodEnabled(!enabled);
+      setPaymentSaveMessage('Failed to update Cash on Delivery setting. Please try again.');
     }
   };
 
@@ -85,6 +251,16 @@ export default function SettingsPage() {
       icon: 'M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z',
     },
   ];
+
+  if (isLoading) {
+    return (
+      <AdminLayout title="Settings" subtitle="Manage your store configuration">
+        <div className="flex justify-center py-12">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        </div>
+      </AdminLayout>
+    );
+  }
 
   return (
     <AdminLayout title="Settings" subtitle="Manage your store configuration">
@@ -223,22 +399,23 @@ export default function SettingsPage() {
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Shipping Options</h2>
               <div className="space-y-4">
                 <Input
-                  label="Free Shipping Threshold ($)"
+                  label="Free Shipping Threshold (KWD)"
                   type="number"
+                  step="0.001"
                   value={settings.freeShippingThreshold}
                   onChange={e => updateSetting('freeShippingThreshold', e.target.value)}
                 />
                 <Input
-                  label="Flat Rate Shipping ($)"
+                  label="Flat Rate Shipping (KWD)"
                   type="number"
-                  step="0.01"
+                  step="0.001"
                   value={settings.flatRateShipping}
                   onChange={e => updateSetting('flatRateShipping', e.target.value)}
                 />
                 <Input
-                  label="Express Shipping ($)"
+                  label="Express Shipping (KWD)"
                   type="number"
-                  step="0.01"
+                  step="0.001"
                   value={settings.expressShipping}
                   onChange={e => updateSetting('expressShipping', e.target.value)}
                 />
@@ -263,7 +440,15 @@ export default function SettingsPage() {
                         </p>
                       </div>
                     </div>
-                    <Button variant="outline" size="sm">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        storeId
+                          ? (window.location.href = `/stores/${storeId}/payment-settings`)
+                          : alert('Configure in Store Settings')
+                      }
+                    >
                       Configure
                     </Button>
                   </div>
@@ -277,7 +462,15 @@ export default function SettingsPage() {
                         <p className="text-sm text-gray-500">Credit cards, Apple Pay, Google Pay</p>
                       </div>
                     </div>
-                    <Button variant="outline" size="sm">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        storeId
+                          ? (window.location.href = `/stores/${storeId}/payment-settings`)
+                          : alert('Configure in Store Settings')
+                      }
+                    >
                       Configure
                     </Button>
                   </div>
@@ -291,7 +484,15 @@ export default function SettingsPage() {
                         <p className="text-sm text-gray-500">Kuwait payment gateway</p>
                       </div>
                     </div>
-                    <Button variant="outline" size="sm">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        storeId
+                          ? (window.location.href = `/stores/${storeId}/payment-settings`)
+                          : alert('Configure in Store Settings')
+                      }
+                    >
                       Connect
                     </Button>
                   </div>
@@ -318,7 +519,12 @@ export default function SettingsPage() {
                       </div>
                     </div>
                     <label className="relative inline-flex cursor-pointer items-center">
-                      <input type="checkbox" defaultChecked className="peer sr-only" />
+                      <input
+                        type="checkbox"
+                        checked={codEnabled}
+                        onChange={e => handleCodToggle(e.target.checked)}
+                        className="peer sr-only"
+                      />
                       <div className="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-white"></div>
                     </label>
                   </div>
@@ -328,15 +534,34 @@ export default function SettingsPage() {
               <div className="rounded-xl border bg-white p-6 shadow-sm">
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">Tax Settings</h2>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Input label="Tax Rate (%)" type="number" step="0.01" defaultValue="10" />
+                  <Input
+                    label="Tax Rate (%)"
+                    type="number"
+                    step="0.01"
+                    value={taxRate}
+                    onChange={e => setTaxRate(e.target.value)}
+                  />
                   <Select
                     label="Tax Calculation"
-                    defaultValue="inclusive"
+                    value={taxCalculation}
+                    onChange={e => setTaxCalculation(e.target.value)}
                     options={[
                       { value: 'inclusive', label: 'Tax Inclusive' },
                       { value: 'exclusive', label: 'Tax Exclusive' },
                     ]}
                   />
+                </div>
+                <div className="mt-4 flex items-center gap-3">
+                  {paymentSaveMessage && (
+                    <span
+                      className={`text-sm ${paymentSaveMessage.includes('Failed') ? 'text-red-600' : 'text-green-600'}`}
+                    >
+                      {paymentSaveMessage}
+                    </span>
+                  )}
+                  <Button onClick={handlePaymentSave} isLoading={isSaving} size="sm">
+                    Save Tax Settings
+                  </Button>
                 </div>
               </div>
             </div>

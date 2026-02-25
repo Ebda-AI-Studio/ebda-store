@@ -148,18 +148,23 @@ export default function ReturnsPage() {
   async function handleApprove(returnId: string) {
     try {
       const token = localStorage.getItem('authToken');
-      await fetch(
+      const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/returns/admin/${returnId}/approve`,
         {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}` },
         }
       );
+      if (!res.ok) {
+        alert('Failed to approve return. Please try again.');
+        return;
+      }
       fetchReturns();
       fetchStats();
       setShowDetails(false);
     } catch (error) {
       console.error('Failed to approve return:', error);
+      alert('Failed to approve return. Please try again.');
     }
   }
 
@@ -168,7 +173,7 @@ export default function ReturnsPage() {
     if (!reason) return;
     try {
       const token = localStorage.getItem('authToken');
-      await fetch(
+      const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/returns/admin/${returnId}/reject`,
         {
           method: 'POST',
@@ -179,29 +184,39 @@ export default function ReturnsPage() {
           body: JSON.stringify({ reason }),
         }
       );
+      if (!res.ok) {
+        alert('Failed to reject return. Please try again.');
+        return;
+      }
       fetchReturns();
       fetchStats();
       setShowDetails(false);
     } catch (error) {
       console.error('Failed to reject return:', error);
+      alert('Failed to reject return. Please try again.');
     }
   }
 
   async function handleReceived(returnId: string) {
     try {
       const token = localStorage.getItem('authToken');
-      await fetch(
+      const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/returns/admin/${returnId}/received`,
         {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}` },
         }
       );
+      if (!res.ok) {
+        alert('Failed to mark return as received. Please try again.');
+        return;
+      }
       fetchReturns();
       fetchStats();
       setShowDetails(false);
     } catch (error) {
       console.error('Failed to mark as received:', error);
+      alert('Failed to mark return as received. Please try again.');
     }
   }
 
@@ -210,7 +225,7 @@ export default function ReturnsPage() {
     if (!refundMethod) return;
     try {
       const token = localStorage.getItem('authToken');
-      await fetch(
+      const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/returns/admin/${returnId}/complete`,
         {
           method: 'POST',
@@ -221,11 +236,16 @@ export default function ReturnsPage() {
           body: JSON.stringify({ refundMethod }),
         }
       );
+      if (!res.ok) {
+        alert('Failed to complete return. Please try again.');
+        return;
+      }
       fetchReturns();
       fetchStats();
       setShowDetails(false);
     } catch (error) {
       console.error('Failed to complete return:', error);
+      alert('Failed to complete return. Please try again.');
     }
   }
 

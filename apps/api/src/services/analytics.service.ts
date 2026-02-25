@@ -1,4 +1,4 @@
-import { prisma } from '@force/database';
+import { prisma, Prisma } from '@force/database';
 
 interface DateRange {
   startDate: Date;
@@ -133,25 +133,30 @@ export class AnalyticsService {
   }
 
   private static async getPeriodStats(storeId: string, startDate: Date, endDate: Date) {
-    const orders = await prisma.order.findMany({
-      where: {
-        storeId,
-        createdAt: { gte: startDate, lte: endDate },
-        status: { notIn: ['cancelled', 'refunded'] },
-      },
-      select: {
-        total: true,
-        customerId: true,
-      },
-    });
+    const where: Prisma.OrderWhereInput = {
+      storeId,
+      createdAt: { gte: startDate, lte: endDate },
+      status: { notIn: ['cancelled', 'refunded'] },
+    };
 
-    const revenue = orders.reduce((sum, order) => sum + order.total, 0);
-    const uniqueCustomers = new Set(orders.map(o => o.customerId).filter(Boolean)).size;
+    // Use aggregate for revenue and order count — avoids loading all rows into JS
+    const [aggregate, customerGroups] = await Promise.all([
+      prisma.order.aggregate({
+        where,
+        _sum: { total: true },
+        _count: { id: true },
+      }),
+      // Count distinct customers by grouping on customerId
+      prisma.order.groupBy({
+        by: ['customerId'],
+        where,
+      }),
+    ]);
 
     return {
-      revenue,
-      orders: orders.length,
-      customers: uniqueCustomers,
+      revenue: aggregate._sum.total ?? 0,
+      orders: aggregate._count.id,
+      customers: customerGroups.length,
     };
   }
 
@@ -251,6 +256,9 @@ export class AnalyticsService {
 
   /**
    * Get top selling products
+   *
+   * Uses groupBy + _sum at the database level to avoid loading every order
+   * item row into JavaScript memory.
    */
   static async getTopProducts(
     storeId: string,
@@ -261,7 +269,9 @@ export class AnalyticsService {
     const startDate = dateRange?.startDate || new Date(now.getFullYear(), now.getMonth(), 1);
     const endDate = dateRange?.endDate || now;
 
-    const orderItems = await prisma.orderItem.findMany({
+    // Aggregate quantity sold and revenue per product at the DB level
+    const grouped = await prisma.orderItem.groupBy({
+      by: ['productId'],
       where: {
         order: {
           storeId,
@@ -269,47 +279,50 @@ export class AnalyticsService {
           status: { notIn: ['cancelled', 'refunded'] },
         },
       },
-      include: {
-        product: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-            images: { take: 1, orderBy: { position: 'asc' } },
-          },
-        },
+      _sum: { quantity: true, total: true },
+      orderBy: { _sum: { total: 'desc' } },
+      take: limit,
+    });
+
+    if (grouped.length === 0) return [];
+
+    // Fetch product details for the top productIds in a single query
+    const productIds = grouped.map(g => g.productId);
+    const products = await prisma.product.findMany({
+      where: { id: { in: productIds } },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        images: { take: 1, orderBy: { position: 'asc' } },
       },
     });
 
-    // Aggregate by product
-    const productMap = new Map<string, TopProduct>();
+    const productById = new Map(products.map(p => [p.id, p]));
 
-    orderItems.forEach(item => {
-      if (!item.product) return;
-
-      const existing = productMap.get(item.productId);
-      if (existing) {
-        existing.revenue += item.price * item.quantity;
-        existing.quantity += item.quantity;
-      } else {
-        productMap.set(item.productId, {
-          id: item.product.id,
-          name: item.product.name,
-          slug: item.product.slug,
-          revenue: item.price * item.quantity,
-          quantity: item.quantity,
-          image: item.product.images[0]?.url,
-        });
-      }
-    });
-
-    return Array.from(productMap.values())
-      .sort((a, b) => b.revenue - a.revenue)
-      .slice(0, limit);
+    const results: TopProduct[] = [];
+    for (const g of grouped) {
+      const product = productById.get(g.productId);
+      if (!product) continue;
+      results.push({
+        id: product.id,
+        name: product.name,
+        slug: product.slug,
+        revenue: g._sum.total ?? 0,
+        quantity: g._sum.quantity ?? 0,
+        image: product.images[0]?.url,
+      });
+    }
+    return results;
   }
 
   /**
    * Get top categories by revenue
+   *
+   * Aggregates revenue per product at the DB level using groupBy, then
+   * resolves category membership with a single targeted query — avoiding the
+   * previous pattern that fetched every order item row with full product and
+   * category joins into JavaScript memory.
    */
   static async getTopCategories(
     storeId: string,
@@ -320,7 +333,9 @@ export class AnalyticsService {
     const startDate = dateRange?.startDate || new Date(now.getFullYear(), now.getMonth(), 1);
     const endDate = dateRange?.endDate || now;
 
-    const orderItems = await prisma.orderItem.findMany({
+    // Step 1: aggregate revenue per product at the DB level
+    const grouped = await prisma.orderItem.groupBy({
+      by: ['productId'],
       where: {
         order: {
           storeId,
@@ -328,43 +343,43 @@ export class AnalyticsService {
           status: { notIn: ['cancelled', 'refunded'] },
         },
       },
-      include: {
-        product: {
-          include: {
-            categories: {
-              include: { category: true },
-            },
-          },
-        },
-      },
+      _sum: { total: true },
     });
 
-    // Aggregate by category
-    const categoryMap = new Map<string, TopCategory>();
+    if (grouped.length === 0) return [];
 
-    orderItems.forEach(item => {
-      if (!item.product) return;
+    // Step 2: resolve category memberships for the aggregated products in one query
+    const productIds = grouped.map(g => g.productId);
+    const productRevenueMap = new Map(grouped.map(g => [g.productId, g._sum.total ?? 0]));
 
-      item.product.categories.forEach(pc => {
-        const category = pc.category;
-        const existing = categoryMap.get(category.id);
-        const revenue = item.price * item.quantity;
+    const productCategories = await prisma.productCategory.findMany({
+      where: { productId: { in: productIds } },
+      include: { category: true },
+    });
 
-        if (existing) {
-          existing.revenue += revenue;
-        } else {
-          categoryMap.set(category.id, {
-            id: category.id,
-            name: category.name,
-            slug: category.slug,
-            revenue,
-            productCount: 1,
-          });
-        }
-      });
+    // Step 3: accumulate revenue per category in JS (small result set)
+    const categoryMap = new Map<string, TopCategory & { productIds: Set<string> }>();
+
+    productCategories.forEach(pc => {
+      const revenue = productRevenueMap.get(pc.productId) ?? 0;
+      const existing = categoryMap.get(pc.categoryId);
+      if (existing) {
+        existing.revenue += revenue;
+        existing.productIds.add(pc.productId);
+      } else {
+        categoryMap.set(pc.categoryId, {
+          id: pc.category.id,
+          name: pc.category.name,
+          slug: pc.category.slug,
+          revenue,
+          productCount: 1,
+          productIds: new Set([pc.productId]),
+        });
+      }
     });
 
     return Array.from(categoryMap.values())
+      .map(({ productIds: ids, ...rest }) => ({ ...rest, productCount: ids.size }))
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, limit);
   }
@@ -400,57 +415,83 @@ export class AnalyticsService {
 
   /**
    * Get customer statistics
+   *
+   * Replaces the previous unbounded findMany (which loaded every customer with
+   * all their orders) with targeted aggregate queries that run entirely in the
+   * database.
    */
   static async getCustomerStats(storeId: string, dateRange?: DateRange): Promise<CustomerStats> {
     const now = new Date();
     const startDate = dateRange?.startDate || new Date(now.getFullYear(), now.getMonth(), 1);
     const endDate = dateRange?.endDate || now;
 
-    // Get new customers (first order in this period)
-    const customersWithOrders = await prisma.user.findMany({
-      where: {
-        orders: { some: { storeId } },
-      },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        orders: {
-          where: { storeId },
-          orderBy: { createdAt: 'asc' },
-          select: {
-            total: true,
-            createdAt: true,
+    // New customers: those whose very first order for this store falls inside the period
+    const [newCustomers, returningCustomers, topOrderGroups] = await Promise.all([
+      // Customers with at least one order in the period who had no earlier orders
+      prisma.user.count({
+        where: {
+          orders: {
+            some: { storeId, createdAt: { gte: startDate, lte: endDate } },
+          },
+          NOT: {
+            orders: {
+              some: { storeId, createdAt: { lt: startDate } },
+            },
           },
         },
-      },
+      }),
+
+      // Customers with more than one order in this store (returning buyers)
+      prisma.user.count({
+        where: {
+          orders: {
+            some: { storeId },
+          },
+          AND: [
+            // At least two orders exist: one before or at endDate and one more
+            // We approximate "returning" as having orders both before and after startDate
+            { orders: { some: { storeId, createdAt: { lt: startDate } } } },
+            { orders: { some: { storeId, createdAt: { gte: startDate, lte: endDate } } } },
+          ],
+        },
+      }),
+
+      // Top customers by total spend — aggregate at DB level, return top 10
+      prisma.order.groupBy({
+        by: ['customerId'],
+        where: {
+          storeId,
+          status: { notIn: ['cancelled', 'refunded'] },
+        },
+        _sum: { total: true },
+        _count: true,
+        orderBy: { _sum: { total: 'desc' } },
+        take: 10,
+      }),
+    ]);
+
+    // Resolve customer details for the top spenders in a single query
+    const topCustomerIds = topOrderGroups.map(g => g.customerId);
+    const customerDetails = await prisma.user.findMany({
+      where: { id: { in: topCustomerIds } },
+      select: { id: true, email: true, firstName: true, lastName: true },
     });
 
-    let newCustomers = 0;
-    let returningCustomers = 0;
+    const customerById = new Map(customerDetails.map(c => [c.id, c]));
 
-    customersWithOrders.forEach(customer => {
-      const firstOrderDate = customer.orders[0]?.createdAt;
-      if (firstOrderDate && firstOrderDate >= startDate && firstOrderDate <= endDate) {
-        newCustomers++;
-      }
-      if (customer.orders.length > 1) {
-        returningCustomers++;
-      }
-    });
-
-    // Get top customers
-    const topCustomers = customersWithOrders
-      .map(customer => ({
-        id: customer.id,
-        name: `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || 'Anonymous',
-        email: customer.email,
-        totalSpent: customer.orders.reduce((sum, o) => sum + o.total, 0),
-        orderCount: customer.orders.length,
-      }))
-      .sort((a, b) => b.totalSpent - a.totalSpent)
-      .slice(0, 10);
+    const topCustomers = topOrderGroups
+      .map(g => {
+        const customer = customerById.get(g.customerId);
+        if (!customer) return null;
+        return {
+          id: customer.id,
+          name: `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || 'Anonymous',
+          email: customer.email,
+          totalSpent: g._sum.total ?? 0,
+          orderCount: g._count,
+        };
+      })
+      .filter((c): c is NonNullable<typeof c> => c !== null);
 
     return {
       newCustomers,

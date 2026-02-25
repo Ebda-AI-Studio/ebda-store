@@ -227,6 +227,27 @@ class ApiClient {
     return this.request<{ user: User }>('/auth/me');
   }
 
+  async updateProfile(data: { firstName?: string; lastName?: string; phone?: string }) {
+    return this.request<{ user: User }>('/auth/me', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async changePassword(currentPassword: string, newPassword: string) {
+    return this.request<{ message: string }>('/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
+  }
+
+  async submitContact(data: { name: string; email: string; subject: string; message: string }) {
+    return this.request<{ message: string }>('/public/contact', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   async forgotPassword(email: string) {
     return this.request<{ message: string }>('/auth/forgot-password', {
       method: 'POST',

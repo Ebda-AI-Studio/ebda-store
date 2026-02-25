@@ -35,7 +35,7 @@ export interface User {
   updatedAt: Date;
 }
 
-export type UserRole = 'customer' | 'admin' | 'super_admin';
+export type UserRole = 'customer' | 'store_admin' | 'super_admin';
 
 // Store Types
 export interface Store {

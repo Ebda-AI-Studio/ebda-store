@@ -1,60 +1,163 @@
 'use client';
 
-import { useState } from 'react';
-import { Button, Input } from '@force/ui';
+import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import { Button, Input, useToast } from '@force/ui';
+import { api } from '@/lib/api';
+import { useAuth } from '../../../contexts/AuthContext';
 
 interface Address {
   id: string;
-  name: string;
-  street: string;
+  firstName: string;
+  lastName: string;
+  address1: string;
+  address2?: string;
   city: string;
   state: string;
-  postalCode: string;
+  area?: string;
+  postalCode?: string;
   country: string;
-  phone: string;
+  phone?: string;
   isDefault: boolean;
 }
 
+const EMPTY_FORM = {
+  firstName: '',
+  lastName: '',
+  address1: '',
+  address2: '',
+  city: '',
+  state: '',
+  area: '',
+  postalCode: '',
+  country: 'Kuwait',
+  phone: '',
+  isDefault: false,
+};
+
 export default function AddressesPage() {
+  const router = useRouter();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { success, error: toastError } = useToast();
+
   const [addresses, setAddresses] = useState<Address[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
-  const [formData, setFormData] = useState({
-    name: '',
-    street: '',
-    city: '',
-    state: '',
-    postalCode: '',
-    country: 'Kuwait',
-    phone: '',
-    isDefault: false,
-  });
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [formData, setFormData] = useState(EMPTY_FORM);
 
-  function handleSubmit(e: React.FormEvent) {
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      router.push('/auth/login?redirect=/account/addresses');
+    }
+  }, [isAuthenticated, authLoading, router]);
+
+  const fetchAddresses = useCallback(async () => {
+    try {
+      const result = await api.get<{ addresses: Address[] }>('/addresses');
+      if (result.success && result.data) {
+        setAddresses(result.data.addresses || []);
+      }
+    } catch {
+      // Silently fail - user may not have any addresses yet
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchAddresses();
+    }
+  }, [isAuthenticated, fetchAddresses]);
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const newAddress: Address = {
-      id: `addr_${Date.now()}`,
-      ...formData,
-    };
-    setAddresses([...addresses, newAddress]);
-    setIsAdding(false);
+    setIsSaving(true);
+
+    try {
+      const endpoint = editingId ? `/addresses/${editingId}` : '/addresses';
+      const method = editingId ? 'put' : 'post';
+
+      const result = await api[method]<{ address: Address }>(endpoint, formData);
+
+      if (result.success) {
+        success(
+          editingId ? 'Address updated' : 'Address added',
+          editingId ? 'Your address has been updated.' : 'New address has been saved.'
+        );
+        fetchAddresses();
+        resetForm();
+      } else {
+        toastError('Error', result.error?.message || 'Failed to save address');
+      }
+    } catch {
+      toastError('Error', 'An unexpected error occurred.');
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleDelete(id: string) {
+    try {
+      const result = await api.delete(`/addresses/${id}`);
+      if (result.success) {
+        setAddresses(prev => prev.filter(a => a.id !== id));
+        success('Address deleted', 'The address has been removed.');
+      } else {
+        toastError('Error', 'Failed to delete address');
+      }
+    } catch {
+      toastError('Error', 'An unexpected error occurred.');
+    }
+  }
+
+  async function handleSetDefault(id: string) {
+    try {
+      const result = await api.put(`/addresses/${id}`, { isDefault: true });
+      if (result.success) {
+        setAddresses(prev => prev.map(a => ({ ...a, isDefault: a.id === id })));
+        success('Default updated', 'Default address has been changed.');
+      }
+    } catch {
+      toastError('Error', 'Failed to update default address');
+    }
+  }
+
+  function startEdit(address: Address) {
+    setEditingId(address.id);
     setFormData({
-      name: '',
-      street: '',
-      city: '',
-      state: '',
-      postalCode: '',
-      country: 'Kuwait',
-      phone: '',
-      isDefault: false,
+      firstName: address.firstName,
+      lastName: address.lastName,
+      address1: address.address1,
+      address2: address.address2 || '',
+      city: address.city,
+      state: address.state,
+      area: address.area || '',
+      postalCode: address.postalCode || '',
+      country: address.country,
+      phone: address.phone || '',
+      isDefault: address.isDefault,
     });
+    setIsAdding(true);
   }
 
-  function handleDelete(id: string) {
-    setAddresses(addresses.filter(a => a.id !== id));
+  function resetForm() {
+    setIsAdding(false);
+    setEditingId(null);
+    setFormData(EMPTY_FORM);
   }
 
-  function handleSetDefault(id: string) {
-    setAddresses(addresses.map(a => ({ ...a, isDefault: a.id === id })));
+  if (isLoading || authLoading) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-2xl font-bold text-gray-900">Saved Addresses</h1>
+        <div className="flex justify-center py-12">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -81,29 +184,44 @@ export default function AddressesPage() {
 
       {isAdding && (
         <div className="rounded-xl border bg-white p-6 shadow-sm">
-          <h2 className="mb-4 text-lg font-semibold text-gray-900">Add New Address</h2>
+          <h2 className="mb-4 text-lg font-semibold text-gray-900">
+            {editingId ? 'Edit Address' : 'Add New Address'}
+          </h2>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <Input
-                label="Full Name"
-                value={formData.name}
-                onChange={e => setFormData({ ...formData, name: e.target.value })}
+                label="First Name"
+                value={formData.firstName}
+                onChange={e => setFormData({ ...formData, firstName: e.target.value })}
                 required
               />
               <Input
-                label="Phone Number"
-                type="tel"
-                value={formData.phone}
-                onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                label="Last Name"
+                value={formData.lastName}
+                onChange={e => setFormData({ ...formData, lastName: e.target.value })}
                 required
               />
             </div>
 
             <Input
+              label="Phone Number"
+              type="tel"
+              value={formData.phone}
+              onChange={e => setFormData({ ...formData, phone: e.target.value })}
+              placeholder="+965 XXXX XXXX"
+            />
+
+            <Input
               label="Street Address"
-              value={formData.street}
-              onChange={e => setFormData({ ...formData, street: e.target.value })}
+              value={formData.address1}
+              onChange={e => setFormData({ ...formData, address1: e.target.value })}
               required
+            />
+
+            <Input
+              label="Apt / Suite / Building (optional)"
+              value={formData.address2}
+              onChange={e => setFormData({ ...formData, address2: e.target.value })}
             />
 
             <div className="grid gap-4 sm:grid-cols-3">
@@ -123,7 +241,6 @@ export default function AddressesPage() {
                 label="Postal Code"
                 value={formData.postalCode}
                 onChange={e => setFormData({ ...formData, postalCode: e.target.value })}
-                required
               />
             </div>
 
@@ -154,8 +271,10 @@ export default function AddressesPage() {
             </label>
 
             <div className="flex gap-2 pt-4">
-              <Button type="submit">Save Address</Button>
-              <Button type="button" variant="outline" onClick={() => setIsAdding(false)}>
+              <Button type="submit" isLoading={isSaving}>
+                {editingId ? 'Update Address' : 'Save Address'}
+              </Button>
+              <Button type="button" variant="outline" onClick={resetForm}>
                 Cancel
               </Button>
             </div>
@@ -177,15 +296,24 @@ export default function AddressesPage() {
                   Default
                 </span>
               )}
-              <p className="font-medium text-gray-900">{address.name}</p>
-              <p className="mt-1 text-sm text-gray-600">{address.street}</p>
+              <p className="font-medium text-gray-900">
+                {address.firstName} {address.lastName}
+              </p>
+              <p className="mt-1 text-sm text-gray-600">{address.address1}</p>
+              {address.address2 && <p className="text-sm text-gray-600">{address.address2}</p>}
               <p className="text-sm text-gray-600">
                 {address.city}, {address.state} {address.postalCode}
               </p>
               <p className="text-sm text-gray-600">{address.country}</p>
-              <p className="mt-2 text-sm text-gray-500">{address.phone}</p>
+              {address.phone && <p className="mt-2 text-sm text-gray-500">{address.phone}</p>}
 
-              <div className="mt-4 flex gap-2">
+              <div className="mt-4 flex gap-3">
+                <button
+                  onClick={() => startEdit(address)}
+                  className="text-sm text-primary hover:underline"
+                >
+                  Edit
+                </button>
                 {!address.isDefault && (
                   <button
                     onClick={() => handleSetDefault(address.id)}

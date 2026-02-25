@@ -1,7 +1,9 @@
+import crypto from 'crypto';
 import { prisma, Prisma, ReturnStatus, ReturnType } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import { EmailService } from './email.service';
 import { socketService } from './socket.service';
+import logger from '../lib/logger';
 
 interface CreateReturnData {
   orderId: string;
@@ -32,7 +34,6 @@ export class ReturnService {
    * Generate unique return number
    */
   private static async generateReturnNumber(_storeId: string): Promise<string> {
-    const crypto = require('crypto');
     const prefix = 'RET';
     const timestamp = Date.now().toString(36).toUpperCase();
     const random = crypto.randomBytes(3).toString('hex').toUpperCase();
@@ -220,7 +221,7 @@ export class ReturnService {
         customerName: `${order.customer.firstName} ${order.customer.lastName}`.trim(),
       });
     } catch (notifyError) {
-      console.error('Failed to send return notification:', notifyError);
+      logger.error({ err: notifyError }, 'Failed to send return notification');
     }
 
     return returnRequest;
@@ -299,7 +300,7 @@ export class ReturnService {
         status,
       });
     } catch (notifyError) {
-      console.error('Failed to send return status notification:', notifyError);
+      logger.error({ err: notifyError }, 'Failed to send return status notification');
     }
 
     return updatedReturn;

@@ -1,6 +1,11 @@
+'use client';
+
 import { Header, Footer } from '../../components';
+import { useStoreContact } from '../../contexts/StoreContext';
 
 export default function PrivacyPage() {
+  const { email } = useStoreContact();
+  const privacyEmail = email || 'our support team';
   return (
     <main className="flex min-h-screen flex-col bg-gray-50">
       <Header />
@@ -28,7 +33,7 @@ export default function PrivacyPage() {
               <ul className="mt-2 list-disc space-y-1 pl-5 text-gray-600">
                 <li>Name, email address, and contact information</li>
                 <li>Billing and shipping addresses</li>
-                <li>Payment information (processed securely via Stripe)</li>
+                <li>Payment information (processed securely via our payment gateway)</li>
                 <li>Order history and preferences</li>
                 <li>Communications with our support team</li>
               </ul>
@@ -70,7 +75,7 @@ export default function PrivacyPage() {
               </p>
               <ul className="mt-2 list-disc space-y-1 pl-5 text-gray-600">
                 <li>SSL encryption for all data transmission</li>
-                <li>Secure payment processing through Stripe</li>
+                <li>Secure payment processing through our payment providers</li>
                 <li>Regular security audits and updates</li>
                 <li>Limited access to personal information by employees</li>
               </ul>
@@ -105,7 +110,7 @@ export default function PrivacyPage() {
                 If you have any questions about this Privacy Policy, please contact us at:
               </p>
               <p className="mt-2 text-gray-600">
-                Email: privacy@forcemedia.com
+                Email: {privacyEmail}
                 <br />
                 Address: Kuwait City, Kuwait
               </p>

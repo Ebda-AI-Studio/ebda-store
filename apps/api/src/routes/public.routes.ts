@@ -1,7 +1,10 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { z } from 'zod';
 import { ProductService } from '../services/product.service';
 import { CartService } from '../services/cart.service';
 import { OrderService } from '../services/order.service';
+import { InvoiceService } from '../services/invoice.service';
+import { EmailService } from '../services/email.service';
 import { prisma } from '@force/database';
 import { authenticate } from '../middleware/auth';
 import {
@@ -10,6 +13,7 @@ import {
   cartLimiter,
   writeLimiter,
 } from '../middleware/security';
+import { getDefaultStoreId } from '../utils/store-helpers';
 
 const router = Router();
 
@@ -43,14 +47,37 @@ router.get('/health', async (_req: Request, res: Response) => {
   }
 });
 
-// Helper to get default store
-async function getDefaultStoreId(): Promise<string> {
-  const store = await prisma.store.findFirst({ orderBy: { createdAt: 'asc' } });
-  if (!store) {
-    throw new Error('No store configured');
-  }
-  return store.id;
-}
+// ==========================================
+// Validation Schemas
+// ==========================================
+
+const addCartItemSchema = z.object({
+  productId: z.string().uuid(),
+  quantity: z.number().int().min(1).default(1),
+  variantId: z.string().uuid().optional(),
+});
+
+const updateCartItemSchema = z.object({
+  quantity: z.number().int().min(1),
+});
+
+const shippingAddressSchema = z.object({
+  firstName: z.string().min(1),
+  lastName: z.string().min(1),
+  address1: z.string().min(1),
+  address2: z.string().optional(),
+  city: z.string().min(1),
+  state: z.string().min(1),
+  postalCode: z.string().min(1),
+  country: z.string().min(1),
+});
+
+const createOrderSchema = z.object({
+  shippingAddress: shippingAddressSchema,
+  billingAddress: shippingAddressSchema.optional(),
+  paymentMethod: z.string().min(1),
+  notes: z.string().optional(),
+});
 
 // GET /products - List all public products
 router.get('/products', async (req: Request, res: Response, next: NextFunction) => {
@@ -149,7 +176,7 @@ router.post('/cart/items', cartLimiter, async (req: Request, res: Response, next
       return;
     }
 
-    const { productId, quantity = 1 } = req.body;
+    const { productId, quantity } = addCartItemSchema.parse(req.body);
     const storeId = await getDefaultStoreId();
     const cart = await CartService.addItem(storeId, sessionId, productId, quantity);
 
@@ -178,7 +205,7 @@ router.put(
       }
 
       const { itemId } = req.params;
-      const { quantity } = req.body;
+      const { quantity } = updateCartItemSchema.parse(req.body);
       const storeId = await getDefaultStoreId();
       const cart = await CartService.updateItem(storeId, sessionId, itemId, quantity);
 
@@ -263,7 +290,8 @@ router.post(
       }
 
       const storeId = await getDefaultStoreId();
-      const order = await OrderService.create(storeId, req.user!.userId, sessionId, req.body);
+      const orderData = createOrderSchema.parse(req.body);
+      const order = await OrderService.create(storeId, req.user!.userId, sessionId, orderData);
 
       res.status(201).json({
         success: true,
@@ -314,6 +342,34 @@ router.get('/orders/:id', authenticate, async (req: Request, res: Response, next
     next(error);
   }
 });
+
+// GET /orders/:id/invoice - Get invoice for customer's own order (requires auth)
+router.get(
+  '/orders/:id/invoice',
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const storeId = await getDefaultStoreId();
+      const order = await OrderService.getById(storeId, id);
+
+      // Ensure user owns this order
+      if (order.customerId !== req.user!.userId) {
+        res.status(403).json({
+          success: false,
+          error: { code: 'FORBIDDEN', message: 'Not authorized to view this invoice' },
+        });
+        return;
+      }
+
+      const html = await InvoiceService.generateInvoice(storeId, id);
+      res.setHeader('Content-Type', 'text/html');
+      res.send(html);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 // GET /stores - List all public stores
 router.get('/stores', async (req: Request, res: Response, next: NextFunction) => {
@@ -480,6 +536,7 @@ router.get(
           metaDescription: true,
           metaDescriptionAr: true,
           settings: true,
+          marketingPixels: true,
         },
       });
 
@@ -500,5 +557,34 @@ router.get(
     }
   }
 );
+
+// POST /contact - Submit contact form
+router.post('/contact', writeLimiter, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const contactSchema = z.object({
+      name: z.string().min(1, 'Name is required').max(100),
+      email: z.string().email('Invalid email address'),
+      subject: z.string().min(1, 'Subject is required').max(200),
+      message: z.string().min(1, 'Message is required').max(5000),
+    });
+
+    const data = contactSchema.parse(req.body);
+
+    // Send notification email to admin
+    await EmailService.sendContactForm({
+      name: data.name,
+      email: data.email,
+      subject: data.subject,
+      message: data.message,
+    });
+
+    res.json({
+      success: true,
+      data: { message: 'Message sent successfully' },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 
 export default router;

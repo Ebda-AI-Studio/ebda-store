@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import {
   IPaymentProvider,
   PaymentProviderConfig,
@@ -11,6 +12,7 @@ import {
   Currency,
   PaymentStatus,
 } from './types';
+import logger from '../../lib/logger';
 
 // ==========================================
 // MyFatoorah Payment Provider
@@ -109,7 +111,14 @@ export class MyFatoorahPaymentProvider implements IPaymentProvider {
     };
 
     if (!response.ok || !data.IsSuccess) {
-      console.error('[MYFATOORAH ERROR]', data);
+      logger.error(
+        {
+          statusCode: response.status,
+          message: data.Message,
+          validationErrors: data.ValidationErrors,
+        },
+        'MyFatoorah API request failed'
+      );
       throw new Error(
         data.Message || data.ValidationErrors?.[0]?.Error || 'MyFatoorah API request failed'
       );
@@ -249,10 +258,35 @@ export class MyFatoorahPaymentProvider implements IPaymentProvider {
     };
   }
 
-  verifyWebhook(_payload: unknown, _signature: string): boolean {
-    // MyFatoorah uses callback verification through the payment status API
-    // There's no signature verification for webhooks
-    return true;
+  verifyWebhook(payload: unknown, signature: string): boolean {
+    const secret = this.config.webhookSecret;
+
+    // Reject if no webhook secret is configured — cannot verify without it
+    if (!secret) {
+      logger.warn('MYFATOORAH_WEBHOOK_SECRET is not configured; rejecting webhook');
+      return false;
+    }
+
+    // Reject if no signature was supplied by the caller
+    if (!signature) {
+      return false;
+    }
+
+    // Compute HMAC-SHA256 over the raw JSON body string
+    const rawBody = typeof payload === 'string' ? payload : JSON.stringify(payload);
+
+    const expected = crypto.createHmac('sha256', secret).update(rawBody, 'utf8').digest('hex');
+
+    // Constant-time comparison to prevent timing attacks
+    try {
+      return crypto.timingSafeEqual(
+        Buffer.from(signature.toLowerCase(), 'hex'),
+        Buffer.from(expected, 'hex')
+      );
+    } catch {
+      // Buffers of different lengths (or non-hex input) will throw — treat as mismatch
+      return false;
+    }
   }
 
   parseWebhook(payload: unknown): WebhookPayload {

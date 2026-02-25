@@ -1,27 +1,38 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button, Input, Textarea, Select } from '@force/ui';
 import { AdminLayout } from '../../../components/AdminLayout';
+import { useAuth } from '../../../lib/auth';
+import { apiGet, apiPost, getApiUrl } from '../../../lib/api';
 
-const categories = [
-  { value: 'electronics', label: 'Electronics' },
-  { value: 'wearables', label: 'Wearables' },
-  { value: 'accessories', label: 'Accessories' },
-  { value: 'clothing', label: 'Clothing' },
-  { value: 'home', label: 'Home & Living' },
-];
+interface Store {
+  id: string;
+  name: string;
+}
+
+interface Category {
+  id: string;
+  name: string;
+}
 
 const statuses = [
-  { value: 'active', label: 'Active' },
   { value: 'draft', label: 'Draft' },
+  { value: 'active', label: 'Active' },
 ];
 
 export default function NewProductPage() {
   const router = useRouter();
+  const { token } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [stores, setStores] = useState<Store[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [selectedStoreId, setSelectedStoreId] = useState('');
+
   const [formData, setFormData] = useState({
     name: '',
     slug: '',
@@ -30,13 +41,51 @@ export default function NewProductPage() {
     compareAtPrice: '',
     sku: '',
     inventory: '',
-    category: 'electronics',
+    category: '',
     status: 'draft',
   });
 
+  // Fetch stores on mount
+  useEffect(() => {
+    async function fetchStores() {
+      const { data } = await apiGet<{ stores: Store[] }>('/api/v1/admin/stores');
+      if (data?.stores) {
+        setStores(data.stores);
+        if (data.stores.length === 1) {
+          setSelectedStoreId(data.stores[0].id);
+        }
+      }
+    }
+    if (token) fetchStores();
+  }, [token]);
+
+  // Fetch categories when store changes
+  useEffect(() => {
+    if (!selectedStoreId) {
+      setCategories([]);
+      return;
+    }
+
+    async function fetchCategories() {
+      try {
+        const response = await fetch(`${getApiUrl()}/api/v1/stores/${selectedStoreId}/categories`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const result = await response.json();
+        if (result.success && result.data?.categories) {
+          setCategories(result.data.categories);
+        }
+      } catch {
+        // Categories may not exist yet for this store
+        setCategories([]);
+      }
+    }
+
+    fetchCategories();
+  }, [selectedStoreId, token]);
+
   const updateField = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    // Auto-generate slug from name
     if (field === 'name') {
       const slug = value
         .toLowerCase()
@@ -48,22 +97,68 @@ export default function NewProductPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
+
+    if (!selectedStoreId) {
+      setError('Please select a store.');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      router.push('/products');
-    } catch (error) {
-      console.error('Failed to create product:', error);
+      // Convert price from KWD to fils (1 KWD = 1000 fils)
+      const priceInFils = Math.round(parseFloat(formData.price) * 1000);
+      const compareAtPriceInFils = formData.compareAtPrice
+        ? Math.round(parseFloat(formData.compareAtPrice) * 1000)
+        : undefined;
+
+      const body: Record<string, unknown> = {
+        name: formData.name,
+        slug: formData.slug,
+        description: formData.description || undefined,
+        price: priceInFils,
+        compareAtPrice: compareAtPriceInFils,
+        sku: formData.sku || undefined,
+        inventory: formData.inventory ? parseInt(formData.inventory, 10) : 0,
+        status: formData.status,
+      };
+
+      if (formData.category) {
+        body.categories = [formData.category];
+      }
+
+      const { data, error: apiError } = await apiPost(
+        `/api/v1/stores/${selectedStoreId}/products`,
+        body
+      );
+
+      if (apiError) {
+        setError(apiError.message);
+        return;
+      }
+
+      if (data) {
+        router.push('/products');
+      }
+    } catch {
+      setError('Failed to create product. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
+  const storeOptions = stores.map(s => ({ value: s.id, label: s.name }));
+  const categoryOptions = [
+    { value: '', label: 'No category' },
+    ...categories.map(c => ({ value: c.id, label: c.name })),
+  ];
+
   return (
     <AdminLayout title="Add New Product" subtitle="Create a new product for your store">
       <form onSubmit={handleSubmit}>
+        {error && <div className="mb-6 rounded-lg bg-red-50 p-4 text-sm text-red-600">{error}</div>}
+
         <div className="grid gap-6 lg:grid-cols-3">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
@@ -126,25 +221,25 @@ export default function NewProductPage() {
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Pricing</h2>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Input
-                  label="Price"
+                  label="Price (KWD)"
                   type="number"
-                  step="0.01"
+                  step="0.001"
                   value={formData.price}
                   onChange={e => updateField('price', e.target.value)}
-                  placeholder="0.00"
+                  placeholder="0.000"
                   required
                 />
                 <Input
-                  label="Compare at Price"
+                  label="Compare at Price (KWD)"
                   type="number"
-                  step="0.01"
+                  step="0.001"
                   value={formData.compareAtPrice}
                   onChange={e => updateField('compareAtPrice', e.target.value)}
-                  placeholder="0.00"
+                  placeholder="0.000"
                 />
               </div>
               <p className="mt-2 text-xs text-gray-500">
-                Enter prices in dollars. Compare at price is used to show a crossed-out price.
+                Enter prices in KWD. Compare at price is used to show a crossed-out price.
               </p>
             </div>
 
@@ -171,6 +266,19 @@ export default function NewProductPage() {
 
           {/* Sidebar */}
           <div className="space-y-6">
+            {/* Store Selection */}
+            {stores.length > 1 && (
+              <div className="rounded-xl border bg-white p-6 shadow-sm">
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">Store</h2>
+                <Select
+                  label="Select Store"
+                  value={selectedStoreId}
+                  onChange={e => setSelectedStoreId(e.target.value)}
+                  options={[{ value: '', label: 'Choose a store...' }, ...storeOptions]}
+                />
+              </div>
+            )}
+
             {/* Status */}
             <div className="rounded-xl border bg-white p-6 shadow-sm">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Status</h2>
@@ -189,7 +297,7 @@ export default function NewProductPage() {
                 label="Category"
                 value={formData.category}
                 onChange={e => updateField('category', e.target.value)}
-                options={categories}
+                options={categoryOptions}
               />
             </div>
 

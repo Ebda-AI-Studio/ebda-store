@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button, Badge, Input, Label } from '@force/ui';
 import { AdminLayout } from '../../../components/AdminLayout';
+import { formatPrice, formatDate } from '../../../lib/format';
 
 interface Store {
   id: string;
@@ -30,21 +31,6 @@ interface Store {
     revenue: number;
     ordersThisMonth: number;
   };
-}
-
-function formatDate(date: string) {
-  return new Date(date).toLocaleDateString('en-US', {
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  });
-}
-
-function formatPrice(cents: number) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(cents / 100);
 }
 
 const statusColors = {
@@ -663,9 +649,6 @@ export default function StoreDetailPage() {
                   View Profile
                 </Button>
               </Link>
-              <Button variant="outline" size="sm" className="w-full">
-                Transfer Ownership
-              </Button>
             </div>
           </div>
         </div>

@@ -69,3 +69,5 @@ public/uploads/
 .eslintcache
 .prettiercache
 *.tsbuildinfo
+.vercel
+.env*.local

@@ -228,7 +228,7 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
-      const customerId = (req as any).user.id;
+      const customerId = req.user!.userId;
 
       const points = await LoyaltyService.getCustomerPoints(storeId, customerId);
 
@@ -249,7 +249,7 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
-      const customerId = (req as any).user.id;
+      const customerId = req.user!.userId;
       const { page, limit } = req.query;
 
       const result = await LoyaltyService.getTransactionHistory(storeId, customerId, {
@@ -274,7 +274,7 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
-      const customerId = (req as any).user.id;
+      const customerId = req.user!.userId;
 
       const points = await LoyaltyService.initializeCustomerPoints(storeId, customerId, true);
 

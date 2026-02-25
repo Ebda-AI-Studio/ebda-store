@@ -398,41 +398,25 @@ export class BulkService {
     productIds: string[],
     permanent: boolean = false
   ): Promise<{ deleted: number; failed: number; errors: string[] }> {
-    let deleted = 0;
-    let failed = 0;
-    const errors: string[] = [];
-
-    for (const productId of productIds) {
-      try {
-        const product = await prisma.product.findFirst({
-          where: { id: productId, storeId },
-        });
-
-        if (!product) {
-          failed++;
-          errors.push(`Product ${productId} not found`);
-          continue;
-        }
-
-        if (permanent) {
-          await prisma.product.delete({ where: { id: productId } });
-        } else {
-          await prisma.product.update({
-            where: { id: productId },
-            data: { deletedAt: new Date() },
-          });
-        }
-
-        deleted++;
-      } catch (error) {
-        failed++;
-        errors.push(
-          `Product ${productId}: ${error instanceof Error ? error.message : 'Unknown error'}`
-        );
-      }
+    if (productIds.length === 0) {
+      return { deleted: 0, failed: 0, errors: [] };
     }
 
-    return { deleted, failed, errors };
+    if (permanent) {
+      // Hard delete: remove rows that belong to this store in one query
+      const result = await prisma.product.deleteMany({
+        where: { id: { in: productIds }, storeId },
+      });
+      return { deleted: result.count, failed: productIds.length - result.count, errors: [] };
+    }
+
+    // Soft delete: stamp deletedAt on all matching rows in one query
+    const result = await prisma.product.updateMany({
+      where: { id: { in: productIds }, storeId },
+      data: { deletedAt: new Date() },
+    });
+
+    return { deleted: result.count, failed: productIds.length - result.count, errors: [] };
   }
 
   /**
@@ -443,37 +427,17 @@ export class BulkService {
     productIds: string[],
     status: ProductStatus
   ): Promise<{ updated: number; failed: number; errors: string[] }> {
-    let updated = 0;
-    let failed = 0;
-    const errors: string[] = [];
-
-    for (const productId of productIds) {
-      try {
-        const product = await prisma.product.findFirst({
-          where: { id: productId, storeId, deletedAt: null },
-        });
-
-        if (!product) {
-          failed++;
-          errors.push(`Product ${productId} not found`);
-          continue;
-        }
-
-        await prisma.product.update({
-          where: { id: productId },
-          data: { status },
-        });
-
-        updated++;
-      } catch (error) {
-        failed++;
-        errors.push(
-          `Product ${productId}: ${error instanceof Error ? error.message : 'Unknown error'}`
-        );
-      }
+    if (productIds.length === 0) {
+      return { updated: 0, failed: 0, errors: [] };
     }
 
-    return { updated, failed, errors };
+    // Update all matching rows for this store in one query
+    const result = await prisma.product.updateMany({
+      where: { id: { in: productIds }, storeId, deletedAt: null },
+      data: { status },
+    });
+
+    return { updated: result.count, failed: productIds.length - result.count, errors: [] };
   }
 
   // Helper methods

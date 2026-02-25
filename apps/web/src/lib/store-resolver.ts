@@ -48,6 +48,9 @@ export interface ResolvedStore {
   metaTitleAr?: string;
   metaDescription?: string;
   metaDescriptionAr?: string;
+
+  // Marketing Pixels
+  marketingPixels?: Record<string, unknown>;
 }
 
 /**
@@ -143,6 +146,8 @@ async function fetchStoreByDomain(domain: string): Promise<ResolvedStore | null>
       metaTitleAr: storeData.metaTitleAr,
       metaDescription: storeData.metaDescription,
       metaDescriptionAr: storeData.metaDescriptionAr,
+      marketingPixels:
+        typeof storeData.marketingPixels === 'object' ? storeData.marketingPixels : undefined,
     };
   } catch (error) {
     console.error(`Error fetching store for domain ${domain}:`, error);
@@ -252,6 +257,8 @@ export async function getStoreById(storeId: string): Promise<ResolvedStore | nul
       metaTitleAr: storeData.metaTitleAr,
       metaDescription: storeData.metaDescription,
       metaDescriptionAr: storeData.metaDescriptionAr,
+      marketingPixels:
+        typeof storeData.marketingPixels === 'object' ? storeData.marketingPixels : undefined,
     };
   } catch (error) {
     console.error(`Error fetching store ${storeId}:`, error);

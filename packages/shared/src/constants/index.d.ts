@@ -18,7 +18,7 @@ export declare const PRODUCT_STATUSES: {
 };
 export declare const USER_ROLES: {
   readonly CUSTOMER: 'customer';
-  readonly ADMIN: 'admin';
+  readonly STORE_ADMIN: 'store_admin';
   readonly SUPER_ADMIN: 'super_admin';
 };
 export declare const STORE_STATUSES: {
