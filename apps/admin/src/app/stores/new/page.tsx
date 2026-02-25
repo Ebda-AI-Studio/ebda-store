@@ -20,56 +20,12 @@ interface CreatedOwner {
   temporaryPassword?: string;
 }
 
-type Step = 'store' | 'owner' | 'plan' | 'review';
+type Step = 'store' | 'owner' | 'review';
 
 const steps: { id: Step; name: string; description: string }[] = [
   { id: 'store', name: 'Store Details', description: 'Basic store information' },
   { id: 'owner', name: 'Store Owner', description: 'Owner account setup' },
-  { id: 'plan', name: 'Select Plan', description: 'Choose a subscription plan' },
   { id: 'review', name: 'Review & Create', description: 'Confirm and create store' },
-];
-
-const plans = [
-  {
-    id: 'free',
-    name: 'Free',
-    price: 0,
-    description: 'Perfect for testing',
-    features: ['Up to 10 products', 'Basic analytics', 'Email support'],
-  },
-  {
-    id: 'starter',
-    name: 'Starter',
-    price: 29,
-    description: 'For small businesses',
-    features: ['Up to 100 products', 'Advanced analytics', 'Priority support', 'Custom domain'],
-    popular: true,
-  },
-  {
-    id: 'professional',
-    name: 'Professional',
-    price: 79,
-    description: 'For growing businesses',
-    features: [
-      'Unlimited products',
-      'Full analytics suite',
-      '24/7 support',
-      'Custom domain',
-      'API access',
-    ],
-  },
-  {
-    id: 'enterprise',
-    name: 'Enterprise',
-    price: -1,
-    description: 'For large organizations',
-    features: [
-      'Everything in Professional',
-      'Dedicated support',
-      'Custom integrations',
-      'SLA guarantee',
-    ],
-  },
 ];
 
 export default function CreateStorePage() {
@@ -85,7 +41,6 @@ export default function CreateStorePage() {
     ownerEmail: '',
     ownerName: '',
     ownerPassword: '',
-    plan: 'starter',
   });
 
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
@@ -166,7 +121,6 @@ export default function CreateStorePage() {
         ownerEmail: formData.ownerEmail,
         ownerName: formData.ownerName,
         ownerPassword: formData.ownerPassword,
-        plan: formData.plan,
         domain: formData.customDomain || undefined,
       };
       const response = await fetch(
@@ -580,75 +534,7 @@ export default function CreateStorePage() {
             </div>
           )}
 
-          {/* Step 3: Plan Selection */}
-          {currentStep === 'plan' && (
-            <div className="p-6">
-              <h2 className="text-lg font-semibold text-gray-900">Select a Plan</h2>
-              <p className="mt-1 text-sm text-gray-500">
-                Choose the subscription plan for this store
-              </p>
-
-              <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                {plans.map(plan => (
-                  <button
-                    key={plan.id}
-                    type="button"
-                    onClick={() => setFormData(prev => ({ ...prev, plan: plan.id }))}
-                    className={`relative rounded-xl border-2 p-4 text-left transition ${
-                      formData.plan === plan.id
-                        ? 'border-primary bg-primary/5'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    {plan.popular && <Badge className="absolute -top-2 right-4">Popular</Badge>}
-                    <div className="flex items-baseline justify-between">
-                      <h3 className="font-semibold text-gray-900">{plan.name}</h3>
-                      {formData.plan === plan.id && (
-                        <svg
-                          className="h-5 w-5 text-primary"
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                      )}
-                    </div>
-                    <p className="mt-1 text-2xl font-bold text-gray-900">
-                      {plan.price === -1 ? 'Custom' : plan.price === 0 ? 'Free' : `$${plan.price}`}
-                      {plan.price > 0 && (
-                        <span className="text-sm font-normal text-gray-500">/month</span>
-                      )}
-                    </p>
-                    <p className="mt-1 text-sm text-gray-500">{plan.description}</p>
-                    <ul className="mt-4 space-y-2">
-                      {plan.features.map(feature => (
-                        <li key={feature} className="flex items-center text-sm text-gray-600">
-                          <svg
-                            className="mr-2 h-4 w-4 text-green-500"
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
-                          >
-                            <path
-                              fillRule="evenodd"
-                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                              clipRule="evenodd"
-                            />
-                          </svg>
-                          {feature}
-                        </li>
-                      ))}
-                    </ul>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Step 4: Review */}
+          {/* Step 3: Review */}
           {currentStep === 'review' && (
             <div className="p-6">
               <h2 className="text-lg font-semibold text-gray-900">Review & Create</h2>
@@ -705,29 +591,6 @@ export default function CreateStorePage() {
                       <dd className="font-medium">{formData.ownerEmail}</dd>
                     </div>
                   </dl>
-                </div>
-
-                <div className="rounded-lg bg-gray-50 p-4">
-                  <h3 className="flex items-center justify-between font-medium text-gray-900">
-                    Selected Plan
-                    <button
-                      onClick={() => setCurrentStep('plan')}
-                      className="text-sm text-primary hover:underline"
-                    >
-                      Edit
-                    </button>
-                  </h3>
-                  <p className="mt-2 text-sm">
-                    <span className="font-medium">
-                      {plans.find(p => p.id === formData.plan)?.name}
-                    </span>
-                    {' - '}
-                    {plans.find(p => p.id === formData.plan)?.price === 0
-                      ? 'Free'
-                      : plans.find(p => p.id === formData.plan)?.price === -1
-                        ? 'Custom pricing'
-                        : `$${plans.find(p => p.id === formData.plan)?.price}/month`}
-                  </p>
                 </div>
               </div>
 

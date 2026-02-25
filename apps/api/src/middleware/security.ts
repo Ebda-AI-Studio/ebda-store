@@ -94,12 +94,20 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
     return next();
   }
 
+  // Skip for Bearer token authenticated requests. CSRF attacks exploit
+  // cookies that the browser attaches automatically. Bearer tokens in the
+  // Authorization header are never sent automatically by the browser, so
+  // these requests are inherently immune to CSRF.
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return next();
+  }
+
   const sessionId = req.headers['x-session-id'] as string;
   const csrfToken = req.headers['x-csrf-token'] as string;
 
-  // Require session ID for ALL state-changing requests regardless of auth header.
-  // A missing auth header does not exempt a request — a CSRF attack may target
-  // an endpoint that sets its own auth via cookies or query params.
+  // Require session ID for state-changing requests without Bearer auth.
+  // This protects cookie-based or session-based endpoints from CSRF.
   if (!sessionId) {
     return res.status(403).json({
       success: false,
