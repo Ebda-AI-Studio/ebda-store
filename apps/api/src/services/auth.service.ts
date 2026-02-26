@@ -493,7 +493,8 @@ export class AuthService {
     // Generate access token
     const accessToken = jwt.sign(payload, config.jwtSecret, {
       algorithm: 'HS256',
-      expiresIn: config.jwtExpiresIn as unknown as number,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expiresIn: config.jwtExpiresIn as any,
       issuer: 'force-api',
       audience: 'force-app',
       subject: payload.userId,

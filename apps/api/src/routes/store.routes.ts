@@ -60,17 +60,7 @@ const seoSchema = z
   })
   .strip();
 
-const contactSchema = z
-  .object({
-    email: z.string().email().max(255).optional(),
-    phone: z.string().max(50).optional(),
-    phoneAr: z.string().max(50).optional(),
-    whatsapp: z.string().max(50).optional(),
-    address: z.string().max(500).optional(),
-    addressAr: z.string().max(500).optional(),
-  })
-  .strip();
-
+// Helpers that coerce empty strings and nulls to undefined before validation
 const optionalStr = (maxLen: number) =>
   z.preprocess(v => (v === '' || v === null ? undefined : v), z.string().max(maxLen).optional());
 
@@ -78,6 +68,22 @@ const optionalUrl = z.preprocess(
   v => (v === '' || v === null ? undefined : v),
   z.string().url().max(500).optional()
 );
+
+const optionalEmail = z.preprocess(
+  v => (v === '' || v === null ? undefined : v),
+  z.string().email().max(255).optional()
+);
+
+const contactSchema = z
+  .object({
+    email: optionalEmail,
+    phone: optionalStr(50),
+    phoneAr: optionalStr(50),
+    whatsapp: optionalStr(50),
+    address: optionalStr(500),
+    addressAr: optionalStr(500),
+  })
+  .strip();
 
 const brandingSchema = z
   .object({
@@ -93,13 +99,13 @@ const brandingSchema = z
 
 const socialSchema = z
   .object({
-    facebook: z.string().url().max(500).optional(),
-    instagram: z.string().url().max(500).optional(),
-    twitter: z.string().url().max(500).optional(),
-    tiktok: z.string().url().max(500).optional(),
-    youtube: z.string().url().max(500).optional(),
-    snapchat: z.string().url().max(500).optional(),
-    whatsapp: z.string().max(50).optional(),
+    facebook: optionalUrl,
+    instagram: optionalUrl,
+    twitter: optionalUrl,
+    tiktok: optionalUrl,
+    youtube: optionalUrl,
+    snapchat: optionalUrl,
+    whatsapp: optionalStr(50),
   })
   .strip();
 
@@ -110,7 +116,7 @@ const announcementSchema = z
     textAr: z.string().max(500).optional(),
     bgColor: z.string().max(50).optional(),
     textColor: z.string().max(50).optional(),
-    link: z.string().url().max(500).optional().or(z.literal('')),
+    link: optionalUrl,
   })
   .strip();
 
