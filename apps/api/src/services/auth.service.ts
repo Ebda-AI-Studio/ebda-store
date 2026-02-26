@@ -490,10 +490,10 @@ export class AuthService {
   }
 
   private static async generateTokens(payload: TokenPayload): Promise<AuthTokens> {
-    // Generate access token (15 minutes)
+    // Generate access token
     const accessToken = jwt.sign(payload, config.jwtSecret, {
       algorithm: 'HS256',
-      expiresIn: '15m',
+      expiresIn: config.jwtExpiresIn as unknown as number,
       issuer: 'force-api',
       audience: 'force-app',
       subject: payload.userId,
