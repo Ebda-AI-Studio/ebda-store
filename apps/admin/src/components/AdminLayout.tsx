@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Button } from '@force/ui';
 import { useAuth } from '../lib/auth';
+import { getApiUrl } from '../lib/api';
 import { NotificationBell } from './NotificationBell';
 
 // Super Admin navigation (Force Media platform admin)
@@ -127,6 +128,9 @@ interface AdminLayoutProps {
   storeBranding?: StoreBranding;
   /** Required when mode is 'store_admin' — used to build store-scoped nav links. */
   storeId?: string;
+  /** Store's custom domain (e.g. 'mystore.com') or slug for the View Store button */
+  storeDomain?: string;
+  storeSlug?: string;
 }
 
 export function AdminLayout({
@@ -137,10 +141,46 @@ export function AdminLayout({
   mode = 'super_admin',
   storeBranding,
   storeId,
+  storeDomain,
+  storeSlug,
 }: AdminLayoutProps) {
   const pathname = usePathname();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { user, logout, isLoading } = useAuth();
+
+  // Extract store ID from pathname (e.g. /stores/:id/branding)
+  const currentStoreId = useMemo(() => {
+    if (storeId) return storeId;
+    const match = pathname.match(/\/stores\/([^/]+)/);
+    return match?.[1] || null;
+  }, [storeId, pathname]);
+
+  // Fetch store domain/slug for "View Store" button
+  const [storeInfo, setStoreInfo] = useState<{ domain?: string; slug?: string } | null>(null);
+  useEffect(() => {
+    if (!currentStoreId || storeDomain || storeSlug) return;
+    const token = localStorage.getItem('authToken');
+    if (!token) return;
+    fetch(`${getApiUrl()}/api/v1/stores/${currentStoreId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(r => (r.ok ? r.json() : null))
+      .then(data => {
+        const s = data?.data?.store || data?.data;
+        if (s) setStoreInfo({ domain: s.domain || undefined, slug: s.slug });
+      })
+      .catch(() => {});
+  }, [currentStoreId, storeDomain, storeSlug]);
+
+  const viewStoreUrl = useMemo(() => {
+    const domain = storeDomain || storeInfo?.domain;
+    const slug = storeSlug || storeInfo?.slug;
+    if (domain) return `https://${domain}`;
+    const webBase = process.env.NEXT_PUBLIC_WEB_URL;
+    if (webBase && slug) return `${webBase}/${slug}`;
+    if (webBase) return webBase;
+    return null;
+  }, [storeDomain, storeSlug, storeInfo]);
 
   // Store admin nav is computed dynamically so that Customers and Analytics
   // resolve to store-scoped URLs (/stores/:id/customers, /stores/:id/analytics)
@@ -425,13 +465,9 @@ export function AdminLayout({
             {/* Notifications */}
             <NotificationBell />
 
-            {/* View Store — only show when storefront URL is configured */}
-            {process.env.NEXT_PUBLIC_WEB_URL && (
-              <Link
-                href={process.env.NEXT_PUBLIC_WEB_URL}
-                target="_blank"
-                className="hidden sm:block"
-              >
+            {/* View Store — links to the storefront for the current store */}
+            {viewStoreUrl && (
+              <Link href={viewStoreUrl} target="_blank" className="hidden sm:block">
                 <Button variant="outline" size="sm" className="gap-2 rounded-xl">
                   <svg
                     className="h-4 w-4"
