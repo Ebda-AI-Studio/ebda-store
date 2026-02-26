@@ -15,7 +15,15 @@ const upload = multer({
     files: 10, // Max 10 files at once
   },
   fileFilter: (_req, file, cb) => {
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    const allowedTypes = [
+      'image/jpeg',
+      'image/png',
+      'image/gif',
+      'image/webp',
+      'image/svg+xml',
+      'image/x-icon',
+      'image/vnd.microsoft.icon',
+    ];
 
     if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
@@ -162,7 +170,15 @@ router.post(
       }
 
       // Validate content type against allowed types
-      const allowedContentTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+      const allowedContentTypes = [
+        'image/jpeg',
+        'image/png',
+        'image/gif',
+        'image/webp',
+        'image/svg+xml',
+        'image/x-icon',
+        'image/vnd.microsoft.icon',
+      ];
       if (!allowedContentTypes.includes(contentType)) {
         res.status(400).json({
           success: false,

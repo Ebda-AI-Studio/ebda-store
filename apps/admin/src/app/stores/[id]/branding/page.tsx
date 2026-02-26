@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { ImageUpload } from '../../../../components/ImageUpload';
 import { useToast } from '@force/ui';
 
 interface StoreTheme {
@@ -285,45 +286,42 @@ export default function StoreBrandingPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Logo URL</label>
-                <input
-                  type="url"
-                  value={branding.logo || ''}
-                  onChange={e => setBranding({ ...branding, logo: e.target.value })}
-                  placeholder="https://example.com/logo.png"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                <label className="block text-sm font-medium text-gray-700 mb-2">Logo</label>
+                <ImageUpload
+                  value={branding.logo}
+                  onUpload={url => setBranding({ ...branding, logo: url })}
+                  onRemove={() => setBranding({ ...branding, logo: '' })}
+                  folder="branding"
+                  label="Upload Logo"
+                  accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml"
                 />
-                {branding.logo && (
-                  <div className="mt-2 p-4 bg-gray-50 rounded-lg">
-                    <img src={branding.logo} alt="Logo preview" className="h-12 object-contain" />
-                  </div>
-                )}
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Logo URL (Arabic)
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Logo (Arabic)
                 </label>
-                <input
-                  type="url"
-                  value={branding.logoAr || ''}
-                  onChange={e => setBranding({ ...branding, logoAr: e.target.value })}
-                  placeholder="https://example.com/logo-ar.png"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                <ImageUpload
+                  value={branding.logoAr}
+                  onUpload={url => setBranding({ ...branding, logoAr: url })}
+                  onRemove={() => setBranding({ ...branding, logoAr: '' })}
+                  folder="branding"
+                  label="Upload Arabic Logo"
+                  accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml"
                 />
               </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Favicon URL</label>
-              <input
-                type="url"
-                value={branding.favicon || ''}
-                onChange={e => setBranding({ ...branding, favicon: e.target.value })}
-                placeholder="https://example.com/favicon.ico"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
-              />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Favicon</label>
+                <ImageUpload
+                  value={branding.favicon}
+                  onUpload={url => setBranding({ ...branding, favicon: url })}
+                  onRemove={() => setBranding({ ...branding, favicon: '' })}
+                  folder="branding"
+                  label="Upload Favicon"
+                  accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml,image/x-icon,image/vnd.microsoft.icon"
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

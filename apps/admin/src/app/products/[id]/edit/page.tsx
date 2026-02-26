@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { Button, Input, Textarea, Select } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { MultiImageUpload } from '../../../../components/ImageUpload';
 import { useAuth } from '../../../../lib/auth';
 import { apiPut, getApiUrl } from '../../../../lib/api';
 
@@ -54,6 +55,7 @@ export default function EditProductPage() {
 
   const [product, setProduct] = useState<Product | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [images, setImages] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -101,6 +103,11 @@ export default function EditProductPage() {
         const data = await response.json();
         const p = data.data.product as Product;
         setProduct(p);
+
+        // Pre-fill images sorted by position
+        if (p.images?.length) {
+          setImages([...p.images].sort((a, b) => a.position - b.position).map(img => img.url));
+        }
 
         // Pre-fill form with product data; convert price from fils to KWD
         setFormData({
@@ -181,6 +188,7 @@ export default function EditProductPage() {
         status: formData.status,
         isFeatured: formData.isFeatured,
         isNew: formData.isNew,
+        images: images.map((url, i) => ({ url, position: i })),
       };
 
       if (formData.category) {
@@ -296,6 +304,18 @@ export default function EditProductPage() {
                   dir="rtl"
                 />
               </div>
+            </div>
+
+            {/* Media */}
+            <div className="rounded-xl border bg-white p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Media</h2>
+              <MultiImageUpload
+                values={images}
+                onChange={setImages}
+                folder="products"
+                label="Drag and drop images here, or click to select"
+                max={10}
+              />
             </div>
 
             {/* Pricing */}

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button, Input, Textarea, Select } from '@force/ui';
 import { AdminLayout } from '../../../components/AdminLayout';
+import { MultiImageUpload } from '../../../components/ImageUpload';
 import { useAuth } from '../../../lib/auth';
 import { apiGet, apiPost, getApiUrl } from '../../../lib/api';
 
@@ -32,6 +33,8 @@ export default function NewProductPage() {
   const [stores, setStores] = useState<Store[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedStoreId, setSelectedStoreId] = useState('');
+
+  const [images, setImages] = useState<string[]>([]);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -122,6 +125,7 @@ export default function NewProductPage() {
         sku: formData.sku || undefined,
         inventory: formData.inventory ? parseInt(formData.inventory, 10) : 0,
         status: formData.status,
+        images: images.map((url, i) => ({ url, position: i })),
       };
 
       if (formData.category) {
@@ -193,27 +197,13 @@ export default function NewProductPage() {
             {/* Media */}
             <div className="rounded-xl border bg-white p-6 shadow-sm">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Media</h2>
-              <div className="rounded-lg border-2 border-dashed border-gray-300 p-8 text-center">
-                <svg
-                  className="mx-auto h-12 w-12 text-gray-400"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.5}
-                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                  />
-                </svg>
-                <p className="mt-2 text-sm text-gray-600">
-                  Drag and drop images here, or click to select
-                </p>
-                <Button type="button" variant="outline" size="sm" className="mt-4">
-                  Upload Images
-                </Button>
-              </div>
+              <MultiImageUpload
+                values={images}
+                onChange={setImages}
+                folder="products"
+                label="Drag and drop images here, or click to select"
+                max={10}
+              />
             </div>
 
             {/* Pricing */}
