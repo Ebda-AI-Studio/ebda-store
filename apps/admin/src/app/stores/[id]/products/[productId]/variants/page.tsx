@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button, Badge, Input, Label } from '@force/ui';
 import { AdminLayout } from '../../../../../../components/AdminLayout';
+import { getApiUrl } from '../../../../../../lib/api';
 
 interface OptionValue {
   id: string;
@@ -93,7 +94,7 @@ export default function ProductVariantsPage() {
     try {
       const token = localStorage.getItem('authToken');
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/products/${productId}/variants`,
+        `${getApiUrl()}/api/v1/stores/${storeId}/products/${productId}/variants`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
@@ -127,7 +128,7 @@ export default function ProductVariantsPage() {
     try {
       const token = localStorage.getItem('authToken');
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/products/${productId}/options`,
+        `${getApiUrl()}/api/v1/stores/${storeId}/products/${productId}/options`,
         {
           method: 'POST',
           headers: {
@@ -158,7 +159,7 @@ export default function ProductVariantsPage() {
     try {
       const token = localStorage.getItem('authToken');
       await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/products/${productId}/options/${optionId}`,
+        `${getApiUrl()}/api/v1/stores/${storeId}/products/${productId}/options/${optionId}`,
         {
           method: 'DELETE',
           headers: { Authorization: `Bearer ${token}` },
@@ -176,7 +177,7 @@ export default function ProductVariantsPage() {
     try {
       const token = localStorage.getItem('authToken');
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/products/${productId}/options/${optionId}/values`,
+        `${getApiUrl()}/api/v1/stores/${storeId}/products/${productId}/options/${optionId}/values`,
         {
           method: 'POST',
           headers: {
@@ -205,7 +206,7 @@ export default function ProductVariantsPage() {
     try {
       const token = localStorage.getItem('authToken');
       await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/products/${productId}/option-values/${valueId}`,
+        `${getApiUrl()}/api/v1/stores/${storeId}/products/${productId}/option-values/${valueId}`,
         {
           method: 'DELETE',
           headers: { Authorization: `Bearer ${token}` },
@@ -221,7 +222,7 @@ export default function ProductVariantsPage() {
     try {
       const token = localStorage.getItem('authToken');
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/products/${productId}/variants/generate`,
+        `${getApiUrl()}/api/v1/stores/${storeId}/products/${productId}/variants/generate`,
         {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}` },
@@ -242,7 +243,7 @@ export default function ProductVariantsPage() {
     try {
       const token = localStorage.getItem('authToken');
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/products/${productId}/variants/${editingVariant.id}`,
+        `${getApiUrl()}/api/v1/stores/${storeId}/products/${productId}/variants/${editingVariant.id}`,
         {
           method: 'PUT',
           headers: {
@@ -276,7 +277,7 @@ export default function ProductVariantsPage() {
     try {
       const token = localStorage.getItem('authToken');
       await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/products/${productId}/variants/${variantId}`,
+        `${getApiUrl()}/api/v1/stores/${storeId}/products/${productId}/variants/${variantId}`,
         {
           method: 'DELETE',
           headers: { Authorization: `Bearer ${token}` },

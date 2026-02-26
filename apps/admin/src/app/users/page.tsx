@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Button, Badge } from '@force/ui';
 import { AdminLayout } from '../../components/AdminLayout';
 import { ErrorState } from '../../components/ErrorState';
+import { getApiUrl } from '../../lib/api';
 
 interface User {
   id: string;
@@ -70,12 +71,9 @@ export default function UsersPage() {
       if (roleFilter !== 'all') params.append('role', roleFilter);
       if (search) params.append('search', search);
 
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/admin/users?${params}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const response = await fetch(`${getApiUrl()}/api/v1/admin/users?${params}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (response.ok) {
         const data = await response.json();
         setUsers(data.data.users || []);

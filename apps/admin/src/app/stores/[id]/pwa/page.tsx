@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { getApiUrl } from '../../../../lib/api';
 
 interface PWASettings {
   appName: string;
@@ -78,12 +79,9 @@ export default function PWASettingsPage() {
   const fetchStoreName = useCallback(async () => {
     try {
       const token = localStorage.getItem('authToken');
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const res = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (res.ok) {
         const data = await res.json();
         setStoreName(data.data?.store?.name || '');
@@ -96,10 +94,9 @@ export default function PWASettingsPage() {
   const fetchSettings = useCallback(async () => {
     try {
       const token = localStorage.getItem('authToken');
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}/pwa/settings`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const res = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/pwa/settings`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (res.ok) {
         const data = await res.json();
         setPwaEnabled(data.data?.pwaEnabled || false);
@@ -124,17 +121,14 @@ export default function PWASettingsPage() {
     setSaving(true);
     try {
       const token = localStorage.getItem('authToken');
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}/pwa/settings`,
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ pwaEnabled: !pwaEnabled }),
-        }
-      );
+      const res = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/pwa/settings`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ pwaEnabled: !pwaEnabled }),
+      });
       if (res.ok) {
         setPwaEnabled(!pwaEnabled);
       } else {
@@ -152,17 +146,14 @@ export default function PWASettingsPage() {
     setSaving(true);
     try {
       const token = localStorage.getItem('authToken');
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}/pwa/settings`,
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ settings }),
-        }
-      );
+      const res = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/pwa/settings`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ settings }),
+      });
       if (!res.ok) {
         alert('Failed to save PWA settings. Please try again.');
       }

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { getApiUrl } from '../../../../lib/api';
 
 type TemplateId = 'modern' | 'classic' | 'minimal' | 'bold' | 'elegant';
 
@@ -94,12 +95,9 @@ export default function StoreTemplatePage() {
   async function fetchStore() {
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const response = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       const data = await response.json();
 
       if (data.success && data.data?.store) {
@@ -120,17 +118,14 @@ export default function StoreTemplatePage() {
     setIsSaving(true);
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/template`,
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ template: selectedTemplate }),
-        }
-      );
+      const response = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/template`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ template: selectedTemplate }),
+      });
 
       if (response.ok) {
         router.push(`/stores/${storeId}`);

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Button, Input, Badge, Modal } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { useAuth } from '../../../../lib/auth';
+import { getApiUrl } from '../../../../lib/api';
 
 interface Product {
   id: string;
@@ -69,12 +70,9 @@ export default function StoreProductsPage() {
   async function fetchStore() {
     if (!token) return;
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const response = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (response.ok) {
         const data = await response.json();
         setStore(data.data.store);
@@ -97,7 +95,7 @@ export default function StoreProductsPage() {
       if (search) queryParams.append('search', search);
 
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/products?${queryParams}`,
+        `${getApiUrl()}/api/v1/stores/${storeId}/products?${queryParams}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -127,7 +125,7 @@ export default function StoreProductsPage() {
     try {
       setDeleting(true);
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/products/${productToDelete.id}`,
+        `${getApiUrl()}/api/v1/stores/${storeId}/products/${productToDelete.id}`,
         {
           method: 'DELETE',
           headers: { Authorization: `Bearer ${token}` },

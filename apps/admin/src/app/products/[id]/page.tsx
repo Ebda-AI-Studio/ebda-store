@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Button, Badge, Modal } from '@force/ui';
 import { AdminLayout } from '../../../components/AdminLayout';
 import { useAuth } from '../../../lib/auth';
+import { getApiUrl } from '../../../lib/api';
 
 interface Product {
   id: string;
@@ -63,14 +64,11 @@ export default function ProductDetailPage() {
         setLoading(true);
         // First, we need to find which store this product belongs to
         // Call admin endpoint to get product by ID across all stores
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/admin/products/${productId}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
+        const response = await fetch(`${getApiUrl()}/api/v1/admin/products/${productId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
 
         if (!response.ok) {
           if (response.status === 404) {
@@ -100,7 +98,7 @@ export default function ProductDetailPage() {
     try {
       setDeleting(true);
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/stores/${product.storeId}/products/${product.id}`,
+        `${getApiUrl()}/api/v1/stores/${product.storeId}/products/${product.id}`,
         {
           method: 'DELETE',
           headers: {

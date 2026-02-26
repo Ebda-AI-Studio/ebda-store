@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { Button, Badge } from '@force/ui';
 import { AdminLayout } from '../../components/AdminLayout';
+import { getApiUrl } from '../../lib/api';
 
 interface AuditLog {
   id: string;
@@ -88,12 +89,9 @@ export default function AuditLogsPage() {
       if (entityFilter !== 'all') params.append('entityType', entityFilter);
       if (actionFilter !== 'all') params.append('action', actionFilter);
 
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/admin/audit-logs?${params}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const response = await fetch(`${getApiUrl()}/api/v1/admin/audit-logs?${params}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (response.ok) {
         const data = await response.json();
         setLogs(data.data.logs || []);

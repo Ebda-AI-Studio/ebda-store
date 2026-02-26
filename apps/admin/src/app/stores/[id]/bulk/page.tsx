@@ -4,6 +4,7 @@ import { useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button, Input, Label } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { getApiUrl } from '../../../../lib/api';
 
 interface ImportResult {
   total: number;
@@ -35,12 +36,9 @@ export default function BulkOperationsPage() {
   async function handleDownloadTemplate() {
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/bulk/template`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const response = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/bulk/template`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
       if (response.ok) {
         const blob = await response.blob();
@@ -78,20 +76,17 @@ export default function BulkOperationsPage() {
 
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/bulk/import`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            csvData: csvContent,
-            options: { updateExisting },
-          }),
-        }
-      );
+      const response = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/bulk/import`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          csvData: csvContent,
+          options: { updateExisting },
+        }),
+      });
 
       if (response.ok) {
         const data = await response.json();
@@ -130,7 +125,7 @@ export default function BulkOperationsPage() {
       if (exportFilters.includeDeleted) queryParams.append('includeDeleted', 'true');
 
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/bulk/export?${queryParams}`,
+        `${getApiUrl()}/api/v1/stores/${storeId}/bulk/export?${queryParams}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
 

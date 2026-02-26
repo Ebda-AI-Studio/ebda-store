@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { Button, Badge } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { getApiUrl } from '../../../../lib/api';
 
 interface Review {
   id: string;
@@ -66,7 +67,7 @@ export default function ReviewsPage() {
     try {
       const token = localStorage.getItem('authToken');
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/reviews/admin?status=${filter}&page=${meta.page}&limit=${meta.limit}`,
+        `${getApiUrl()}/api/v1/stores/${storeId}/reviews/admin?status=${filter}&page=${meta.page}&limit=${meta.limit}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -91,7 +92,7 @@ export default function ReviewsPage() {
     try {
       const token = localStorage.getItem('authToken');
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/reviews/admin/${reviewId}/approve`,
+        `${getApiUrl()}/api/v1/stores/${storeId}/reviews/admin/${reviewId}/approve`,
         {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}` },
@@ -112,7 +113,7 @@ export default function ReviewsPage() {
     try {
       const token = localStorage.getItem('authToken');
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/reviews/admin/${reviewId}/reject`,
+        `${getApiUrl()}/api/v1/stores/${storeId}/reviews/admin/${reviewId}/reject`,
         {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}` },
@@ -133,13 +134,10 @@ export default function ReviewsPage() {
     if (!window.confirm('Delete this review? This action cannot be undone.')) return;
     try {
       const token = localStorage.getItem('authToken');
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/reviews/admin/${reviewId}`,
-        {
-          method: 'DELETE',
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const res = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/reviews/admin/${reviewId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (!res.ok) {
         alert('Failed to delete review. Please try again.');
         return;

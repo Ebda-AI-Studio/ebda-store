@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { getApiUrl } from '../../../../lib/api';
 
 interface TaxSettings {
   taxEnabled: boolean;
@@ -74,12 +75,9 @@ export default function TaxSettingsPage() {
   const fetchStoreName = useCallback(async () => {
     try {
       const token = localStorage.getItem('authToken');
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const res = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (res.ok) {
         const data = await res.json();
         setStoreName(data.data?.store?.name || '');
@@ -92,10 +90,9 @@ export default function TaxSettingsPage() {
   const fetchSettings = useCallback(async () => {
     try {
       const token = localStorage.getItem('authToken');
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}/tax/settings`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const res = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/tax/settings`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (res.ok) {
         const data = await res.json();
         setSettings(
@@ -119,10 +116,9 @@ export default function TaxSettingsPage() {
         params.set('includeInactive', 'true');
       }
 
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}/tax/rates?${params}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const res = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/tax/rates?${params}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (res.ok) {
         const data = await res.json();
         let allRates = data.data?.rates || [];
@@ -154,17 +150,14 @@ export default function TaxSettingsPage() {
     setSavingSettings(true);
     try {
       const token = localStorage.getItem('authToken');
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}/tax/settings`,
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(newSettings),
-        }
-      );
+      const res = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/tax/settings`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(newSettings),
+      });
       if (res.ok) {
         const data = await res.json();
         setSettings(data.data?.settings);
@@ -220,8 +213,8 @@ export default function TaxSettingsPage() {
       };
 
       const url = editingRate
-        ? `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}/tax/rates/${editingRate.id}`
-        : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}/tax/rates`;
+        ? `${getApiUrl()}/api/v1/stores/${storeId}/tax/rates/${editingRate.id}`
+        : `${getApiUrl()}/api/v1/stores/${storeId}/tax/rates`;
 
       const res = await fetch(url, {
         method: editingRate ? 'PUT' : 'POST',
@@ -246,13 +239,10 @@ export default function TaxSettingsPage() {
   const handleToggle = async (rate: TaxRate) => {
     try {
       const token = localStorage.getItem('authToken');
-      await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}/tax/rates/${rate.id}/toggle`,
-        {
-          method: 'PATCH',
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/tax/rates/${rate.id}/toggle`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}` },
+      });
       fetchRates();
     } catch (err) {
       console.error('Failed to toggle tax rate:', err);
@@ -262,13 +252,10 @@ export default function TaxSettingsPage() {
   const handleDelete = async (rate: TaxRate) => {
     try {
       const token = localStorage.getItem('authToken');
-      await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}/tax/rates/${rate.id}`,
-        {
-          method: 'DELETE',
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/tax/rates/${rate.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
       fetchRates();
     } catch (err) {
       console.error('Failed to delete tax rate:', err);

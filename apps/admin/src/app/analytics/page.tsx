@@ -3,8 +3,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@force/ui';
 import { AdminLayout } from '../../components/AdminLayout';
+import { getApiUrl } from '../../lib/api';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+const API_URL = getApiUrl();
 
 type DateRange = 'today' | '7d' | '30d' | '90d' | 'year';
 

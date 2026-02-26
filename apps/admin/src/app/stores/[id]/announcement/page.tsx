@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { getApiUrl } from '../../../../lib/api';
 
 interface AnnouncementSettings {
   enabled: boolean;
@@ -16,7 +17,7 @@ interface AnnouncementSettings {
   linkTextAr: string;
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+const API_URL = getApiUrl();
 
 const DEFAULT_SETTINGS: AnnouncementSettings = {
   enabled: false,

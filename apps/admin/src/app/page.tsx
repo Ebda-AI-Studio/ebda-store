@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Button, Badge } from '@force/ui';
 import { AdminLayout } from '../components/AdminLayout';
 import { formatPrice, formatDate, formatNumber } from '../lib/format';
+import { getApiUrl } from '../lib/api';
 
 interface PlatformStats {
   stores: number;
@@ -32,7 +33,7 @@ interface RecentOrder {
   store: { name: string };
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+const API_URL = getApiUrl();
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<PlatformStats | null>(null);

@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { Button, Badge } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { getApiUrl } from '../../../../lib/api';
 
 interface ReturnItem {
   id: string;
@@ -104,7 +105,7 @@ export default function ReturnsPage() {
       const token = localStorage.getItem('authToken');
       const statusFilter = filter === 'all' ? '' : `&status=${filter}`;
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/returns/admin/list?page=${meta.page}&limit=${meta.limit}${statusFilter}`,
+        `${getApiUrl()}/api/v1/stores/${storeId}/returns/admin/list?page=${meta.page}&limit=${meta.limit}${statusFilter}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -125,12 +126,9 @@ export default function ReturnsPage() {
     if (!storeId) return;
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/returns/admin/stats`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const response = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/returns/admin/stats`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (response.ok) {
         const data = await response.json();
         setStats(data.data.stats);
@@ -149,7 +147,7 @@ export default function ReturnsPage() {
     try {
       const token = localStorage.getItem('authToken');
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/returns/admin/${returnId}/approve`,
+        `${getApiUrl()}/api/v1/stores/${storeId}/returns/admin/${returnId}/approve`,
         {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}` },
@@ -174,7 +172,7 @@ export default function ReturnsPage() {
     try {
       const token = localStorage.getItem('authToken');
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/returns/admin/${returnId}/reject`,
+        `${getApiUrl()}/api/v1/stores/${storeId}/returns/admin/${returnId}/reject`,
         {
           method: 'POST',
           headers: {
@@ -201,7 +199,7 @@ export default function ReturnsPage() {
     try {
       const token = localStorage.getItem('authToken');
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/returns/admin/${returnId}/received`,
+        `${getApiUrl()}/api/v1/stores/${storeId}/returns/admin/${returnId}/received`,
         {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}` },
@@ -226,7 +224,7 @@ export default function ReturnsPage() {
     try {
       const token = localStorage.getItem('authToken');
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/returns/admin/${returnId}/complete`,
+        `${getApiUrl()}/api/v1/stores/${storeId}/returns/admin/${returnId}/complete`,
         {
           method: 'POST',
           headers: {

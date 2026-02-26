@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { getApiUrl } from '../../../../lib/api';
 
 interface ShippingZone {
   id: string;
@@ -69,12 +70,9 @@ export default function ShippingSettingsPage() {
   const fetchStoreName = useCallback(async () => {
     try {
       const token = localStorage.getItem('authToken');
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const res = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (res.ok) {
         const data = await res.json();
         setStoreName(data.data?.store?.name || '');
@@ -92,10 +90,9 @@ export default function ShippingSettingsPage() {
       if (filter === 'active') params.set('isActive', 'true');
       if (filter === 'inactive') params.set('isActive', 'false');
 
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}/shipping?${params}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const res = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/shipping?${params}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (res.ok) {
         const data = await res.json();
         setZones(data.data?.zones || []);
@@ -175,8 +172,8 @@ export default function ShippingSettingsPage() {
       };
 
       const url = editingZone
-        ? `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}/shipping/${editingZone.id}`
-        : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}/shipping`;
+        ? `${getApiUrl()}/api/v1/stores/${storeId}/shipping/${editingZone.id}`
+        : `${getApiUrl()}/api/v1/stores/${storeId}/shipping`;
 
       const res = await fetch(url, {
         method: editingZone ? 'PUT' : 'POST',
@@ -201,13 +198,10 @@ export default function ShippingSettingsPage() {
   const handleToggle = async (zone: ShippingZone) => {
     try {
       const token = localStorage.getItem('authToken');
-      await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}/shipping/${zone.id}/toggle`,
-        {
-          method: 'PATCH',
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/shipping/${zone.id}/toggle`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}` },
+      });
       fetchZones();
     } catch (err) {
       console.error('Failed to toggle shipping zone:', err);
@@ -217,13 +211,10 @@ export default function ShippingSettingsPage() {
   const handleDelete = async (zone: ShippingZone) => {
     try {
       const token = localStorage.getItem('authToken');
-      await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}/shipping/${zone.id}`,
-        {
-          method: 'DELETE',
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/shipping/${zone.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
       fetchZones();
     } catch (err) {
       console.error('Failed to delete shipping zone:', err);

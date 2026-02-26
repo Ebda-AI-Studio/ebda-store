@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Button } from '@force/ui';
 import { AdminLayout } from '../../components/AdminLayout';
 import { ErrorState } from '../../components/ErrorState';
+import { getApiUrl } from '../../lib/api';
 
 interface Store {
   id: string;
@@ -94,12 +95,9 @@ export default function StoresPage() {
       if (statusFilter !== 'all') params.append('status', statusFilter);
       if (search) params.append('search', search);
 
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/admin/stores?${params}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const response = await fetch(`${getApiUrl()}/api/v1/admin/stores?${params}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (response.ok) {
         const data = await response.json();
         setStores(data.data.stores || []);

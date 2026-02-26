@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Button, Badge, Input, Label } from '@force/ui';
 import { AdminLayout } from '../../../components/AdminLayout';
 import { formatPrice, formatDate } from '../../../lib/format';
+import { getApiUrl } from '../../../lib/api';
 
 interface Store {
   id: string;
@@ -60,7 +61,7 @@ function DomainSection({
   } | null>(null);
   const [domainError, setDomainError] = useState('');
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+  const apiUrl = getApiUrl();
 
   const checkDns = useCallback(async () => {
     if (!domain) return;
@@ -299,12 +300,9 @@ export default function StoreDetailPage() {
     if (!storeId) return;
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const response = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (response.ok) {
         const data = await response.json();
         setStore(data.data.store);
@@ -361,22 +359,19 @@ export default function StoreDetailPage() {
     setIsSaving(true);
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}`,
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            name: editForm.name.trim(),
-            slug: editForm.slug.trim().toLowerCase(),
-            plan: editForm.plan,
-            status: editForm.status,
-          }),
-        }
-      );
+      const response = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: editForm.name.trim(),
+          slug: editForm.slug.trim().toLowerCase(),
+          plan: editForm.plan,
+          status: editForm.status,
+        }),
+      });
       if (response.ok) {
         const data = await response.json();
         setStore(data.data.store);
@@ -397,17 +392,14 @@ export default function StoreDetailPage() {
 
   async function handleStatusChange(newStatus: string) {
     const token = localStorage.getItem('authToken');
-    await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/status`,
-      {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ status: newStatus }),
-      }
-    );
+    await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/status`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ status: newStatus }),
+    });
     fetchStore();
   }
 

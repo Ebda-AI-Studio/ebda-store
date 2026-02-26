@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { getApiUrl } from '../../../../lib/api';
 
 interface DashboardStats {
   totalRevenue: number;
@@ -181,7 +182,7 @@ export default function AnalyticsPage() {
     try {
       const token = localStorage.getItem('authToken');
       const headers = { Authorization: `Bearer ${token}` };
-      const baseUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/analytics`;
+      const baseUrl = `${getApiUrl()}/api/v1/stores/${storeId}/analytics`;
 
       const [dashboardRes, salesRes, productsRes, ordersRes, stockRes] = await Promise.all([
         fetch(`${baseUrl}/dashboard`, { headers }),

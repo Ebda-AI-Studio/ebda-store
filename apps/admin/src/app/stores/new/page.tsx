@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import { Button, Input, Badge } from '@force/ui';
 import { AdminLayout } from '../../../components/AdminLayout';
+import { getApiUrl } from '../../../lib/api';
 
 interface CreatedStore {
   id: string;
@@ -123,17 +124,14 @@ export default function CreateStorePage() {
         ownerPassword: formData.ownerPassword,
         domain: formData.customDomain || undefined,
       };
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/admin/stores`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
-        }
-      );
+      const response = await fetch(`${getApiUrl()}/api/v1/admin/stores`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
 
       const data = await response.json();
 
@@ -165,10 +163,9 @@ export default function CreateStorePage() {
     setIsCheckingDns(true);
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/domain`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const response = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/domain`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (response.ok) {
         const data = await response.json();
         setDomainStatus(data.data);

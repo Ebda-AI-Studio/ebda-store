@@ -3,8 +3,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { AdminLayout } from '../../components/AdminLayout';
 import { formatPrice, formatNumber } from '../../lib/format';
+import { getApiUrl } from '../../lib/api';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+const API_URL = getApiUrl();
 
 interface Store {
   id: string;

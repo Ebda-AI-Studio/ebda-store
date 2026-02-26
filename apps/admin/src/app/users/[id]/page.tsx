@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AdminLayout } from '../../../components/AdminLayout';
+import { getApiUrl } from '../../../lib/api';
 
 interface UserDetail {
   id: string;
@@ -18,7 +19,7 @@ interface UserDetail {
   stores?: { id: string; name: string; slug: string }[];
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+const API_URL = getApiUrl();
 
 const ROLE_LABELS: Record<string, string> = {
   super_admin: 'Super Admin',

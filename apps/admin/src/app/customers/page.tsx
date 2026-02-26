@@ -5,6 +5,7 @@ import { Button, Input, Modal } from '@force/ui';
 import { AdminLayout } from '../../components/AdminLayout';
 import { ErrorState } from '../../components/ErrorState';
 import { useAuth } from '../../lib/auth';
+import { getApiUrl } from '../../lib/api';
 
 interface Customer {
   id: string;
@@ -71,14 +72,11 @@ export default function CustomersPage() {
       });
       if (search) params.append('search', search);
 
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/admin/customers?${params}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      const response = await fetch(`${getApiUrl()}/api/v1/admin/customers?${params}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
       if (response.ok) {
         const data = await response.json();

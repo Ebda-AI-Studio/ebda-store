@@ -6,6 +6,7 @@ import { Button, Input, Badge, Modal } from '@force/ui';
 import { AdminLayout } from '../../components/AdminLayout';
 import { ErrorState } from '../../components/ErrorState';
 import { useAuth } from '../../lib/auth';
+import { getApiUrl } from '../../lib/api';
 
 interface Product {
   id: string;
@@ -66,14 +67,11 @@ export default function ProductsPage() {
       if (statusFilter !== 'all') params.append('status', statusFilter);
       if (search) params.append('search', search);
 
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/admin/products?${params}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      const response = await fetch(`${getApiUrl()}/api/v1/admin/products?${params}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
       if (response.ok) {
         const data = await response.json();
@@ -126,7 +124,7 @@ export default function ProductsPage() {
     try {
       setDeleting(true);
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/stores/${productToDelete.storeId}/products/${productToDelete.id}`,
+        `${getApiUrl()}/api/v1/stores/${productToDelete.storeId}/products/${productToDelete.id}`,
         {
           method: 'DELETE',
           headers: {
@@ -159,15 +157,12 @@ export default function ProductsPage() {
         const product = products.find(p => p.id === productId);
         if (!product) return;
 
-        return fetch(
-          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${product.storeId}/products/${productId}`,
-          {
-            method: 'DELETE',
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
+        return fetch(`${getApiUrl()}/api/v1/stores/${product.storeId}/products/${productId}`, {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
       });
 
       await Promise.all(deletePromises);
@@ -194,17 +189,14 @@ export default function ProductsPage() {
         const product = products.find(p => p.id === productId);
         if (!product) return;
 
-        return fetch(
-          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${product.storeId}/products/${productId}`,
-          {
-            method: 'PUT',
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ status: selectedBulkStatus }),
-          }
-        );
+        return fetch(`${getApiUrl()}/api/v1/stores/${product.storeId}/products/${productId}`, {
+          method: 'PUT',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ status: selectedBulkStatus }),
+        });
       });
 
       await Promise.all(updatePromises);

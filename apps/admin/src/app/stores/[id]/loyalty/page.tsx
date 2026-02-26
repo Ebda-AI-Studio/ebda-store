@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { getApiUrl } from '../../../../lib/api';
 
 interface LoyaltySettings {
   pointsPerDinar: number;
@@ -92,12 +93,9 @@ export default function LoyaltySettingsPage() {
   const fetchStoreName = useCallback(async () => {
     try {
       const token = localStorage.getItem('authToken');
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const res = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (res.ok) {
         const data = await res.json();
         setStoreName(data.data?.store?.name || '');
@@ -110,10 +108,9 @@ export default function LoyaltySettingsPage() {
   const fetchSettings = useCallback(async () => {
     try {
       const token = localStorage.getItem('authToken');
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}/loyalty/settings`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const res = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/loyalty/settings`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (res.ok) {
         const data = await res.json();
         setLoyaltyEnabled(data.data?.loyaltyEnabled || false);
@@ -127,10 +124,9 @@ export default function LoyaltySettingsPage() {
   const fetchStats = useCallback(async () => {
     try {
       const token = localStorage.getItem('authToken');
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}/loyalty/stats`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const res = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/loyalty/stats`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (res.ok) {
         const data = await res.json();
         setStats(data.data?.stats || null);
@@ -146,10 +142,9 @@ export default function LoyaltySettingsPage() {
       const params = new URLSearchParams();
       if (tierFilter !== 'all') params.set('tier', tierFilter);
 
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}/loyalty/members?${params}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const res = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/loyalty/members?${params}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (res.ok) {
         const data = await res.json();
         setMembers(data.data?.members || []);
@@ -186,17 +181,14 @@ export default function LoyaltySettingsPage() {
     setSaving(true);
     try {
       const token = localStorage.getItem('authToken');
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}/loyalty/settings`,
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ loyaltyEnabled: !loyaltyEnabled }),
-        }
-      );
+      const res = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/loyalty/settings`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ loyaltyEnabled: !loyaltyEnabled }),
+      });
       if (res.ok) {
         setLoyaltyEnabled(!loyaltyEnabled);
       } else {
@@ -214,17 +206,14 @@ export default function LoyaltySettingsPage() {
     setSaving(true);
     try {
       const token = localStorage.getItem('authToken');
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}/loyalty/settings`,
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ settings }),
-        }
-      );
+      const res = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/loyalty/settings`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ settings }),
+      });
       if (!res.ok) {
         alert('Failed to save loyalty settings. Please try again.');
       }
@@ -244,7 +233,7 @@ export default function LoyaltySettingsPage() {
     try {
       const token = localStorage.getItem('authToken');
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/stores/${storeId}/loyalty/members/${selectedMember.customerId}/award`,
+        `${getApiUrl()}/api/v1/stores/${storeId}/loyalty/members/${selectedMember.customerId}/award`,
         {
           method: 'POST',
           headers: {

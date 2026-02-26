@@ -5,6 +5,7 @@ import { Button, Modal } from '@force/ui';
 import { AdminLayout } from '../../components/AdminLayout';
 import { ErrorState } from '../../components/ErrorState';
 import { useAuth } from '../../lib/auth';
+import { getApiUrl } from '../../lib/api';
 
 interface OrderItem {
   id: string;
@@ -67,7 +68,7 @@ function formatDateTime(dateString: string) {
   });
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+const API_URL = getApiUrl();
 
 const statusConfig = {
   pending: { bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-500', icon: '⏳' },
