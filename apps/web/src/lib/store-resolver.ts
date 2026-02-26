@@ -81,6 +81,14 @@ export async function getStoreDomain(): Promise<string | null> {
 }
 
 /**
+ * Get the store slug from request headers (set by middleware on platform domains)
+ */
+export async function getStoreSlug(): Promise<string | null> {
+  const headersList = await headers();
+  return headersList.get('x-store-slug');
+}
+
+/**
  * Check if running on platform domain
  */
 export async function isPlatformDomain(): Promise<boolean> {
@@ -180,27 +188,119 @@ async function resolveStoreByDomain(domain: string): Promise<ResolvedStore | nul
 }
 
 /**
- * Get the current store based on request context
- * This is the main function to use in server components
+ * Fetch store from API by slug
  */
-export async function getStore(): Promise<ResolvedStore> {
-  const domain = await getStoreDomain();
+async function fetchStoreBySlug(slug: string): Promise<ResolvedStore | null> {
+  try {
+    const response = await fetch(`${API_URL}/public/stores/${slug}`, {
+      next: { revalidate: 300 },
+      headers: { 'Content-Type': 'application/json' },
+    });
 
-  if (!domain) {
-    // Platform domain - return demo store
-    return DEFAULT_STORE;
+    if (!response.ok) {
+      console.error(`Failed to fetch store for slug ${slug}: ${response.status}`);
+      return null;
+    }
+
+    const data = await response.json();
+
+    if (!data.success || !data.data?.store) {
+      return null;
+    }
+
+    const storeData = data.data.store;
+    const templateTheme = getTemplateTheme(storeData.template || 'modern');
+    const customTheme = typeof storeData.theme === 'object' ? storeData.theme : {};
+
+    return {
+      id: storeData.id,
+      name: storeData.name,
+      nameAr: storeData.nameAr,
+      slug: storeData.slug,
+      domain: storeData.domain,
+      logo: storeData.logo,
+      logoAr: storeData.logoAr,
+      favicon: storeData.favicon,
+      description: storeData.description,
+      descriptionAr: storeData.descriptionAr,
+      currency: storeData.currency || 'KWD',
+      timezone: storeData.timezone || 'Asia/Kuwait',
+      template: storeData.template || 'modern',
+      theme: { ...templateTheme, ...customTheme },
+      socialLinks: typeof storeData.socialLinks === 'object' ? storeData.socialLinks : {},
+      email: storeData.email,
+      phone: storeData.phone,
+      phoneAr: storeData.phoneAr,
+      whatsapp: storeData.whatsapp,
+      address: storeData.address,
+      addressAr: storeData.addressAr,
+      announcementBar:
+        typeof storeData.announcementBar === 'object' ? storeData.announcementBar : undefined,
+      metaTitle: storeData.metaTitle,
+      metaTitleAr: storeData.metaTitleAr,
+      metaDescription: storeData.metaDescription,
+      metaDescriptionAr: storeData.metaDescriptionAr,
+      marketingPixels:
+        typeof storeData.marketingPixels === 'object' ? storeData.marketingPixels : undefined,
+    };
+  } catch (error) {
+    console.error(`Error fetching store for slug ${slug}:`, error);
+    return null;
+  }
+}
+
+/**
+ * Resolve store by slug from cache or API
+ */
+async function resolveStoreBySlug(slug: string): Promise<ResolvedStore | null> {
+  const cacheKey = `slug:${slug}`;
+  const cached = storeCache.get(cacheKey);
+  if (cached && cached.expires > Date.now()) {
+    return cached.store;
   }
 
-  const store = await resolveStoreByDomain(domain);
+  const store = await fetchStoreBySlug(slug);
 
-  if (!store) {
-    // Domain not found - could show error or redirect
-    // For now, return demo store
+  if (store) {
+    storeCache.set(cacheKey, {
+      store,
+      expires: Date.now() + CACHE_TTL,
+    });
+  }
+
+  return store;
+}
+
+/**
+ * Get the current store based on request context
+ * This is the main function to use in server components
+ *
+ * Resolution order:
+ * 1. Custom domain (x-store-domain header)
+ * 2. Store slug in URL path (x-store-slug header)
+ * 3. Default demo store
+ */
+export async function getStore(): Promise<ResolvedStore> {
+  // 1. Custom domain resolution
+  const domain = await getStoreDomain();
+  if (domain) {
+    const store = await resolveStoreByDomain(domain);
+    if (store) return store;
     console.warn(`Store not found for domain: ${domain}`);
     return DEFAULT_STORE;
   }
 
-  return store;
+  // 2. Slug-based resolution (platform domains)
+  const slug = await getStoreSlug();
+  if (slug) {
+    const store = await resolveStoreBySlug(slug);
+    if (store) return store;
+    console.warn(`Store not found for slug: ${slug}`);
+    return DEFAULT_STORE;
+  }
+
+  // 3. Default demo store
+  return DEFAULT_STORE;
 }
 
 /**
