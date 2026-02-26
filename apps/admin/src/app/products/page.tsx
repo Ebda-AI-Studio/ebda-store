@@ -7,11 +7,7 @@ import { AdminLayout } from '../../components/AdminLayout';
 import { ErrorState } from '../../components/ErrorState';
 import { useAuth } from '../../lib/auth';
 import { getApiUrl } from '../../lib/api';
-
-interface Store {
-  id: string;
-  name: string;
-}
+import { useStore } from '../../contexts/StoreContext';
 
 interface Product {
   id: string;
@@ -42,8 +38,7 @@ function formatPrice(fils: number) {
 
 export default function ProductsPage() {
   const { token } = useAuth();
-  const [stores, setStores] = useState<Store[]>([]);
-  const [selectedStoreId, setSelectedStoreId] = useState('all');
+  const { selectedStoreId } = useStore();
   const [products, setProducts] = useState<Product[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [loading, setLoading] = useState(true);
@@ -61,25 +56,6 @@ export default function ProductsPage() {
   const [bulkStatusUpdating, setBulkStatusUpdating] = useState(false);
   const [selectedBulkStatus, setSelectedBulkStatus] = useState<string>('active');
 
-  // Fetch stores for the selector
-  useEffect(() => {
-    if (!token) return;
-    async function fetchStores() {
-      try {
-        const response = await fetch(`${getApiUrl()}/api/v1/stores`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setStores(data.data?.stores || data.data || []);
-        }
-      } catch {
-        // Stores list is optional
-      }
-    }
-    fetchStores();
-  }, [token]);
-
   const fetchProducts = useCallback(async () => {
     if (!token) return;
 
@@ -92,6 +68,7 @@ export default function ProductsPage() {
       });
       if (statusFilter !== 'all') params.append('status', statusFilter);
       if (search) params.append('search', search);
+      if (selectedStoreId !== 'all') params.append('storeId', selectedStoreId);
 
       const response = await fetch(`${getApiUrl()}/api/v1/admin/products?${params}`, {
         headers: {
@@ -113,7 +90,7 @@ export default function ProductsPage() {
     } finally {
       setLoading(false);
     }
-  }, [token, page, statusFilter, search]);
+  }, [token, page, statusFilter, search, selectedStoreId]);
 
   useEffect(() => {
     fetchProducts();
@@ -125,8 +102,7 @@ export default function ProductsPage() {
     fetchProducts();
   };
 
-  const filteredProducts =
-    selectedStoreId === 'all' ? products : products.filter(p => p.store?.id === selectedStoreId);
+  const filteredProducts = products;
 
   const toggleSelectAll = () => {
     if (selectedProducts.length === filteredProducts.length) {
@@ -288,24 +264,6 @@ export default function ProductsPage() {
         </Link>
       }
     >
-      {/* Store Filter */}
-      {stores.length > 1 && (
-        <div className="mb-4">
-          <select
-            value={selectedStoreId}
-            onChange={e => setSelectedStoreId(e.target.value)}
-            className="rounded-lg border bg-white px-3 py-2 text-sm font-medium shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-          >
-            <option value="all">All Stores</option>
-            {stores.map(store => (
-              <option key={store.id} value={store.id}>
-                {store.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-
       {/* Filters */}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap gap-2">

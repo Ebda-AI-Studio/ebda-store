@@ -4,17 +4,11 @@ import { useEffect, useState, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@force/ui';
 import { AdminLayout } from '../../components/AdminLayout';
 import { getApiUrl } from '../../lib/api';
+import { useStore } from '../../contexts/StoreContext';
 
 const API_URL = getApiUrl();
 
 type DateRange = 'today' | '7d' | '30d' | '90d' | 'year';
-
-interface Store {
-  id: string;
-  name: string;
-  slug: string;
-  status: string;
-}
 
 interface DashboardData {
   totalRevenue: number;
@@ -119,10 +113,10 @@ const dateRangeLabels: Record<DateRange, string> = {
 };
 
 export default function AnalyticsPage() {
-  const [stores, setStores] = useState<Store[]>([]);
-  const [selectedStoreId, setSelectedStoreId] = useState<string>('');
+  const { stores, selectedStoreId: globalStoreId, isLoading: isLoadingStores } = useStore();
+  // Analytics requires a specific store — fall back to first store when "all" is selected
+  const selectedStoreId = globalStoreId !== 'all' ? globalStoreId : stores[0]?.id || '';
   const [dateRange, setDateRange] = useState<DateRange>('30d');
-  const [isLoadingStores, setIsLoadingStores] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -134,33 +128,6 @@ export default function AnalyticsPage() {
   const [ordersByStatus, setOrdersByStatus] = useState<OrdersByStatus[]>([]);
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
   const [lowStock, setLowStock] = useState<LowStockItem[]>([]);
-
-  // Fetch stores list
-  useEffect(() => {
-    async function fetchStores() {
-      try {
-        const token = localStorage.getItem('authToken');
-        const res = await fetch(`${API_URL}/api/v1/stores`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.ok) {
-          const data = await res.json();
-          const storeList = data.data?.stores || data.data || [];
-          setStores(storeList);
-          if (storeList.length > 0) {
-            setSelectedStoreId(storeList[0].id);
-          }
-        } else {
-          setError('Failed to load stores');
-        }
-      } catch {
-        setError('Failed to load stores');
-      } finally {
-        setIsLoadingStores(false);
-      }
-    }
-    fetchStores();
-  }, []);
 
   // Fetch analytics data for selected store
   const fetchAnalytics = useCallback(async () => {
@@ -286,33 +253,17 @@ export default function AnalyticsPage() {
       title="Analytics"
       subtitle="Track your store performance"
       actions={
-        <div className="flex items-center gap-3">
-          {/* Store Selector */}
-          <select
-            value={selectedStoreId}
-            onChange={e => setSelectedStoreId(e.target.value)}
-            className="rounded-lg border bg-white px-3 py-2 text-sm font-medium shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-          >
-            {stores.map(store => (
-              <option key={store.id} value={store.id}>
-                {store.name}
-              </option>
-            ))}
-          </select>
-
-          {/* Date Range Selector */}
-          <select
-            value={dateRange}
-            onChange={e => setDateRange(e.target.value as DateRange)}
-            className="rounded-lg border bg-white px-3 py-2 text-sm font-medium shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-          >
-            {Object.entries(dateRangeLabels).map(([key, label]) => (
-              <option key={key} value={key}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </div>
+        <select
+          value={dateRange}
+          onChange={e => setDateRange(e.target.value as DateRange)}
+          className="rounded-lg border bg-white px-3 py-2 text-sm font-medium shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+        >
+          {Object.entries(dateRangeLabels).map(([key, label]) => (
+            <option key={key} value={key}>
+              {label}
+            </option>
+          ))}
+        </select>
       }
     >
       {error && (

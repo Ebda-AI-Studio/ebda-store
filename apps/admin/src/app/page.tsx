@@ -6,6 +6,7 @@ import { Button, Badge } from '@force/ui';
 import { AdminLayout } from '../components/AdminLayout';
 import { formatPrice, formatDate, formatNumber } from '../lib/format';
 import { getApiUrl } from '../lib/api';
+import { useStore } from '../contexts/StoreContext';
 
 interface PlatformStats {
   stores: number;
@@ -36,6 +37,7 @@ interface RecentOrder {
 const API_URL = getApiUrl();
 
 export default function DashboardPage() {
+  const { selectedStoreId } = useStore();
   const [stats, setStats] = useState<PlatformStats | null>(null);
   const [recentStores, setRecentStores] = useState<RecentStore[]>([]);
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
@@ -44,8 +46,12 @@ export default function DashboardPage() {
   useEffect(() => {
     async function fetchData() {
       try {
+        setIsLoading(true);
         const token = localStorage.getItem('authToken');
-        const response = await fetch(`${API_URL}/api/v1/admin/dashboard`, {
+        const params = new URLSearchParams();
+        if (selectedStoreId !== 'all') params.append('storeId', selectedStoreId);
+        const qs = params.toString() ? `?${params}` : '';
+        const response = await fetch(`${API_URL}/api/v1/admin/dashboard${qs}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (response.ok) {
@@ -61,7 +67,7 @@ export default function DashboardPage() {
       }
     }
     fetchData();
-  }, []);
+  }, [selectedStoreId]);
 
   const statCards = [
     {

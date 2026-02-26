@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Button, Badge } from '@force/ui';
 import { AdminLayout } from '../../components/AdminLayout';
 import { getApiUrl } from '../../lib/api';
+import { useStore } from '../../contexts/StoreContext';
 
 interface AuditLog {
   id: string;
@@ -67,6 +68,7 @@ const entityIcons: Record<string, string> = {
 };
 
 export default function AuditLogsPage() {
+  const { selectedStoreId } = useStore();
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [pagination, setPagination] = useState<Pagination>({
     page: 1,
@@ -88,6 +90,7 @@ export default function AuditLogsPage() {
       });
       if (entityFilter !== 'all') params.append('entityType', entityFilter);
       if (actionFilter !== 'all') params.append('action', actionFilter);
+      if (selectedStoreId !== 'all') params.append('storeId', selectedStoreId);
 
       const response = await fetch(`${getApiUrl()}/api/v1/admin/audit-logs?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -102,7 +105,7 @@ export default function AuditLogsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [pagination.page, pagination.limit, entityFilter, actionFilter]);
+  }, [pagination.page, pagination.limit, entityFilter, actionFilter, selectedStoreId]);
 
   useEffect(() => {
     fetchLogs();

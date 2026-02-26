@@ -4,13 +4,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { AdminLayout } from '../../components/AdminLayout';
 import { formatPrice, formatNumber } from '../../lib/format';
 import { getApiUrl } from '../../lib/api';
+import { useStore } from '../../contexts/StoreContext';
 
 const API_URL = getApiUrl();
-
-interface Store {
-  id: string;
-  name: string;
-}
 
 interface DashboardStats {
   totalOrders: number;
@@ -69,9 +65,10 @@ function getDateRange(range: string) {
 }
 
 export default function ReportsPage() {
+  const { stores, selectedStoreId: globalStoreId } = useStore();
+  // Reports require a specific store — fall back to first store when "all" is selected
+  const selectedStore = globalStoreId !== 'all' ? globalStoreId : stores[0]?.id || '';
   const [dateRange, setDateRange] = useState('last30days');
-  const [selectedStore, setSelectedStore] = useState<string>('');
-  const [stores, setStores] = useState<Store[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
@@ -83,29 +80,6 @@ export default function ReportsPage() {
     const token = localStorage.getItem('authToken');
     return { Authorization: `Bearer ${token}` };
   }, []);
-
-  // Fetch stores list
-  useEffect(() => {
-    async function fetchStores() {
-      try {
-        const response = await fetch(`${API_URL}/api/v1/stores?limit=100`, {
-          headers: getAuthHeaders(),
-        });
-        if (response.ok) {
-          const data = await response.json();
-          const storeList = data.data?.stores || [];
-          setStores(storeList);
-          if (storeList.length > 0 && !selectedStore) {
-            setSelectedStore(storeList[0].id);
-          }
-        }
-      } catch (error) {
-        console.error('Failed to fetch stores:', error);
-        alert('Failed to load stores. Please refresh the page.');
-      }
-    }
-    fetchStores();
-  }, [getAuthHeaders, selectedStore]);
 
   // Fetch analytics data when store or date range changes
   useEffect(() => {
@@ -159,30 +133,17 @@ export default function ReportsPage() {
       title="Reports"
       subtitle="Analytics and insights across all stores"
       actions={
-        <div className="flex items-center gap-3">
-          <select
-            value={selectedStore}
-            onChange={e => setSelectedStore(e.target.value)}
-            className="rounded-xl border border-input bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-          >
-            {stores.map(store => (
-              <option key={store.id} value={store.id}>
-                {store.name}
-              </option>
-            ))}
-          </select>
-          <select
-            value={dateRange}
-            onChange={e => setDateRange(e.target.value)}
-            className="rounded-xl border border-input bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-          >
-            <option value="today">Today</option>
-            <option value="last7days">Last 7 Days</option>
-            <option value="last30days">Last 30 Days</option>
-            <option value="last90days">Last 90 Days</option>
-            <option value="thisYear">This Year</option>
-          </select>
-        </div>
+        <select
+          value={dateRange}
+          onChange={e => setDateRange(e.target.value)}
+          className="rounded-xl border border-input bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+        >
+          <option value="today">Today</option>
+          <option value="last7days">Last 7 Days</option>
+          <option value="last30days">Last 30 Days</option>
+          <option value="last90days">Last 90 Days</option>
+          <option value="thisYear">This Year</option>
+        </select>
       }
     >
       {isLoading ? (

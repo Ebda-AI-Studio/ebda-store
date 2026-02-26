@@ -6,11 +6,7 @@ import { AdminLayout } from '../../components/AdminLayout';
 import { ErrorState } from '../../components/ErrorState';
 import { useAuth } from '../../lib/auth';
 import { getApiUrl } from '../../lib/api';
-
-interface Store {
-  id: string;
-  name: string;
-}
+import { useStore } from '../../contexts/StoreContext';
 
 interface OrderItem {
   id: string;
@@ -113,8 +109,7 @@ const validTransitions: Record<string, string[]> = {
 
 export default function OrdersPage() {
   const { token } = useAuth();
-  const [stores, setStores] = useState<Store[]>([]);
-  const [selectedStoreId, setSelectedStoreId] = useState('all');
+  const { selectedStoreId } = useStore();
   const [orders, setOrders] = useState<Order[]>([]);
   const [pagination, setPagination] = useState<Pagination>({
     page: 1,
@@ -134,25 +129,6 @@ export default function OrdersPage() {
     text: string;
   } | null>(null);
 
-  // Fetch stores for the selector
-  useEffect(() => {
-    if (!token) return;
-    async function fetchStores() {
-      try {
-        const response = await fetch(`${API_URL}/api/v1/stores`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setStores(data.data?.stores || data.data || []);
-        }
-      } catch {
-        // Stores list is optional
-      }
-    }
-    fetchStores();
-  }, [token]);
-
   const fetchOrders = useCallback(async () => {
     if (!token) return;
 
@@ -164,6 +140,7 @@ export default function OrdersPage() {
         limit: pagination.limit.toString(),
       });
       if (statusFilter !== 'all') params.append('status', statusFilter);
+      if (selectedStoreId !== 'all') params.append('storeId', selectedStoreId);
 
       const response = await fetch(`${API_URL}/api/v1/admin/orders?${params}`, {
         headers: {
@@ -187,14 +164,13 @@ export default function OrdersPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [token, pagination.page, pagination.limit, statusFilter]);
+  }, [token, pagination.page, pagination.limit, statusFilter, selectedStoreId]);
 
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
 
   const filteredOrders = orders.filter(order => {
-    if (selectedStoreId !== 'all' && order.store?.id !== selectedStoreId) return false;
     if (!search) return true;
     const searchLower = search.toLowerCase();
     return (
@@ -330,24 +306,6 @@ export default function OrdersPage() {
           </div>
         ))}
       </div>
-
-      {/* Store Filter */}
-      {stores.length > 1 && (
-        <div className="mb-4">
-          <select
-            value={selectedStoreId}
-            onChange={e => setSelectedStoreId(e.target.value)}
-            className="rounded-lg border bg-white px-3 py-2 text-sm font-medium shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-          >
-            <option value="all">All Stores</option>
-            {stores.map(store => (
-              <option key={store.id} value={store.id}>
-                {store.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
 
       {/* Filters */}
       <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">

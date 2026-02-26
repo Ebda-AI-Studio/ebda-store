@@ -8,6 +8,7 @@ import { AdminLayout } from '../../../components/AdminLayout';
 import { MultiImageUpload } from '../../../components/ImageUpload';
 import { useAuth } from '../../../lib/auth';
 import { apiGet, apiPost, getApiUrl } from '../../../lib/api';
+import { useStore } from '../../../contexts/StoreContext';
 
 interface Store {
   id: string;
@@ -28,6 +29,7 @@ export default function NewProductPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { token } = useAuth();
+  const { selectedStoreId: globalStoreId } = useStore();
   const storeIdParam = searchParams.get('storeId');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,6 +60,8 @@ export default function NewProductPage() {
         setStores(data.stores);
         if (storeIdParam && data.stores.some(s => s.id === storeIdParam)) {
           setSelectedStoreId(storeIdParam);
+        } else if (globalStoreId !== 'all' && data.stores.some(s => s.id === globalStoreId)) {
+          setSelectedStoreId(globalStoreId);
         } else if (data.stores.length === 1) {
           setSelectedStoreId(data.stores[0].id);
         }

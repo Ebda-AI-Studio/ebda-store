@@ -6,11 +6,7 @@ import { AdminLayout } from '../../components/AdminLayout';
 import { ErrorState } from '../../components/ErrorState';
 import { useAuth } from '../../lib/auth';
 import { getApiUrl } from '../../lib/api';
-
-interface Store {
-  id: string;
-  name: string;
-}
+import { useStore } from '../../contexts/StoreContext';
 
 interface Customer {
   id: string;
@@ -52,8 +48,7 @@ function formatDate(dateString: string) {
 
 export default function CustomersPage() {
   const { token } = useAuth();
-  const [stores, setStores] = useState<Store[]>([]);
-  const [selectedStoreId, setSelectedStoreId] = useState('all');
+  const { selectedStoreId } = useStore();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [pagination, setPagination] = useState<Pagination>({
     page: 1,
@@ -67,25 +62,6 @@ export default function CustomersPage() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
-  // Fetch stores for the selector
-  useEffect(() => {
-    if (!token) return;
-    async function fetchStores() {
-      try {
-        const response = await fetch(`${getApiUrl()}/api/v1/stores`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setStores(data.data?.stores || data.data || []);
-        }
-      } catch {
-        // Stores list is optional
-      }
-    }
-    fetchStores();
-  }, [token]);
-
   const fetchCustomers = useCallback(async () => {
     if (!token) return;
 
@@ -97,6 +73,7 @@ export default function CustomersPage() {
         limit: pagination.limit.toString(),
       });
       if (search) params.append('search', search);
+      if (selectedStoreId !== 'all') params.append('storeId', selectedStoreId);
 
       const response = await fetch(`${getApiUrl()}/api/v1/admin/customers?${params}`, {
         headers: {
@@ -120,7 +97,7 @@ export default function CustomersPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [token, pagination.page, pagination.limit, search]);
+  }, [token, pagination.page, pagination.limit, search, selectedStoreId]);
 
   useEffect(() => {
     fetchCustomers();
@@ -137,8 +114,7 @@ export default function CustomersPage() {
     setIsDetailModalOpen(true);
   };
 
-  const filteredCustomers =
-    selectedStoreId === 'all' ? customers : customers.filter(c => c.store?.id === selectedStoreId);
+  const filteredCustomers = customers;
 
   // Calculate stats from customers
   const stats = {
@@ -178,24 +154,6 @@ export default function CustomersPage() {
           <p className="text-2xl font-bold text-violet-600">{stats.topSpenders}</p>
         </div>
       </div>
-
-      {/* Store Filter */}
-      {stores.length > 1 && (
-        <div className="mb-4">
-          <select
-            value={selectedStoreId}
-            onChange={e => setSelectedStoreId(e.target.value)}
-            className="rounded-lg border bg-white px-3 py-2 text-sm font-medium shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-          >
-            <option value="all">All Stores</option>
-            {stores.map(store => (
-              <option key={store.id} value={store.id}>
-                {store.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
 
       {/* Search */}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

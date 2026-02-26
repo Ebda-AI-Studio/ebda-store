@@ -4,21 +4,8 @@ import { useState, useEffect } from 'react';
 import { Button, Input, Textarea, Select } from '@force/ui';
 import { AdminLayout } from '../../components/AdminLayout';
 import { useAuth } from '../../lib/auth';
-import { apiGet, apiPut, getApiUrl } from '../../lib/api';
-
-interface Store {
-  id: string;
-  name: string;
-  slug: string;
-  domain?: string;
-  email?: string;
-  phone?: string;
-  phoneAr?: string;
-  whatsapp?: string;
-  address?: string;
-  addressAr?: string;
-  settings?: Record<string, unknown>;
-}
+import { apiPut, getApiUrl } from '../../lib/api';
+import { useStore } from '../../contexts/StoreContext';
 
 const currencies = [
   { value: 'USD', label: 'US Dollar (USD)' },
@@ -39,12 +26,14 @@ const timezones = [
 
 export default function SettingsPage() {
   const { token } = useAuth();
+  const { selectedStoreId, stores: globalStores } = useStore();
   const [activeTab, setActiveTab] = useState('general');
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
-  const [storeId, setStoreId] = useState<string | null>(null);
-  const [stores, setStores] = useState<Store[]>([]);
+
+  // Settings are per-store
+  const storeId = selectedStoreId !== 'all' ? selectedStoreId : globalStores[0]?.id || null;
 
   // Payment settings state
   const [taxRate, setTaxRate] = useState('10');
@@ -110,27 +99,16 @@ export default function SettingsPage() {
     }
   }
 
-  // Load store data
+  // Load store details when storeId changes
   useEffect(() => {
-    async function loadStore() {
-      try {
-        const { data: storesData } = await apiGet<{ stores: Store[] }>('/api/v1/admin/stores');
-        if (!storesData?.stores?.length) {
-          setIsLoading(false);
-          return;
-        }
-
-        setStores(storesData.stores);
-        const store = storesData.stores[0];
-        setStoreId(store.id);
-        await loadStoreDetails(store.id);
-      } catch {
-        setIsLoading(false);
-      }
+    if (!token || !storeId) {
+      setIsLoading(false);
+      return;
     }
-
-    if (token) loadStore();
-  }, [token]);
+    setSaveMessage(null);
+    setPaymentSaveMessage(null);
+    loadStoreDetails(storeId);
+  }, [token, storeId]);
 
   const updateSetting = (key: string, value: string | boolean) => {
     setSettings(prev => ({ ...prev, [key]: value }));
@@ -268,29 +246,6 @@ export default function SettingsPage() {
 
   return (
     <AdminLayout title="Settings" subtitle="Manage your store configuration">
-      {/* Store Selector */}
-      {stores.length > 1 && (
-        <div className="mb-6">
-          <select
-            value={storeId || ''}
-            onChange={e => {
-              const newStoreId = e.target.value;
-              setStoreId(newStoreId);
-              setSaveMessage(null);
-              setPaymentSaveMessage(null);
-              loadStoreDetails(newStoreId);
-            }}
-            className="rounded-lg border bg-white px-3 py-2 text-sm font-medium shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-          >
-            {stores.map(store => (
-              <option key={store.id} value={store.id}>
-                {store.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-
       <div className="flex flex-col gap-6 lg:flex-row">
         {/* Tabs */}
         <div className="lg:w-64">

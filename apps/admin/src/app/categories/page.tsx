@@ -5,6 +5,7 @@ import { Button, Modal } from '@force/ui';
 import { AdminLayout } from '../../components/AdminLayout';
 import { apiGet, apiPost, apiPut, apiDelete } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
+import { useStore } from '../../contexts/StoreContext';
 
 interface Category {
   id: string;
@@ -25,11 +26,13 @@ const emptyForm: CategoryFormData = { name: '', slug: '', description: '' };
 
 export default function CategoriesPage() {
   const { token } = useAuth();
+  const { selectedStoreId, stores: globalStores } = useStore();
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [storeId, setStoreId] = useState<string | null>(null);
-  const [stores, setStores] = useState<Array<{ id: string; name: string }>>([]);
+
+  // Categories are per-store, so pick the effective store ID
+  const storeId = selectedStoreId !== 'all' ? selectedStoreId : globalStores[0]?.id || null;
 
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -41,17 +44,6 @@ export default function CategoriesPage() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-
-  const fetchStoreId = useCallback(async (): Promise<string | null> => {
-    const { data, error } = await apiGet<{ stores: Array<{ id: string; name: string }> }>(
-      '/api/v1/admin/stores'
-    );
-    if (error || !data?.stores?.length) {
-      return null;
-    }
-    setStores(data.stores);
-    return data.stores[0].id;
-  }, []);
 
   const fetchCategories = useCallback(
     async (sid: string) => {
@@ -86,21 +78,15 @@ export default function CategoriesPage() {
   );
 
   useEffect(() => {
-    if (!token) return;
-
-    async function init() {
-      const sid = await fetchStoreId();
-      if (sid) {
-        setStoreId(sid);
-        await fetchCategories(sid);
-      } else {
+    if (!token || !storeId) {
+      if (!storeId && token) {
         setError('No store found. Please create a store first.');
         setLoading(false);
       }
+      return;
     }
-
-    init();
-  }, [token, fetchStoreId, fetchCategories]);
+    fetchCategories(storeId);
+  }, [token, storeId, fetchCategories]);
 
   const refetch = useCallback(() => {
     if (storeId) {
@@ -212,27 +198,6 @@ export default function CategoriesPage() {
         </Button>
       }
     >
-      {/* Store Selector */}
-      {stores.length > 1 && (
-        <div className="mb-4">
-          <select
-            value={storeId || ''}
-            onChange={e => {
-              const newStoreId = e.target.value;
-              setStoreId(newStoreId);
-              fetchCategories(newStoreId);
-            }}
-            className="rounded-lg border bg-white px-3 py-2 text-sm font-medium shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-          >
-            {stores.map(store => (
-              <option key={store.id} value={store.id}>
-                {store.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-
       {error && !loading && (
         <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4">
           <p className="text-sm text-red-700">{error}</p>
