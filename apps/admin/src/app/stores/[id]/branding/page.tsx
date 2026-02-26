@@ -123,6 +123,19 @@ function hslToHex(hsl: string): string {
   return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
 }
 
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  const h = hex.replace('#', '');
+  return {
+    r: parseInt(h.substring(0, 2), 16),
+    g: parseInt(h.substring(2, 4), 16),
+    b: parseInt(h.substring(4, 6), 16),
+  };
+}
+
+function rgbToHex(r: number, g: number, b: number): string {
+  return `#${[r, g, b].map(v => Math.max(0, Math.min(255, v)).toString(16).padStart(2, '0')).join('')}`;
+}
+
 const colorPresets = [
   { name: 'Orange', hex: '#FF6600' },
   { name: 'Blue', hex: '#3B82F6' },
@@ -434,7 +447,7 @@ export default function StoreBrandingPage() {
                   );
                 })}
               </div>
-              <div className="mt-3 flex items-center gap-3">
+              <div className="mt-3 flex flex-wrap items-center gap-3">
                 <input
                   type="color"
                   value={hslToHex(branding.theme.primaryColor)}
@@ -446,22 +459,51 @@ export default function StoreBrandingPage() {
                   }
                   className="w-10 h-10 rounded-lg border border-gray-300 cursor-pointer p-0.5"
                 />
-                <input
-                  type="text"
-                  value={hslToHex(branding.theme.primaryColor).toUpperCase()}
-                  onChange={e => {
-                    const v = e.target.value;
-                    if (/^#[0-9A-Fa-f]{6}$/.test(v)) {
-                      setBranding({
-                        ...branding,
-                        theme: { ...branding.theme, primaryColor: hexToHsl(v) },
-                      });
-                    }
-                  }}
-                  placeholder="#FF6600"
-                  maxLength={7}
-                  className="w-32 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary font-mono"
-                />
+                <div>
+                  <label className="block text-[10px] text-gray-400 mb-0.5">HEX</label>
+                  <input
+                    type="text"
+                    value={hslToHex(branding.theme.primaryColor).toUpperCase()}
+                    onChange={e => {
+                      const v = e.target.value;
+                      if (/^#[0-9A-Fa-f]{6}$/.test(v)) {
+                        setBranding({
+                          ...branding,
+                          theme: { ...branding.theme, primaryColor: hexToHsl(v) },
+                        });
+                      }
+                    }}
+                    placeholder="#FF6600"
+                    maxLength={7}
+                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary font-mono text-sm"
+                  />
+                </div>
+                {(['r', 'g', 'b'] as const).map(channel => {
+                  const rgb = hexToRgb(hslToHex(branding.theme.primaryColor));
+                  return (
+                    <div key={channel}>
+                      <label className="block text-[10px] text-gray-400 mb-0.5">
+                        {channel.toUpperCase()}
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={255}
+                        value={rgb[channel]}
+                        onChange={e => {
+                          const val = parseInt(e.target.value, 10) || 0;
+                          const newRgb = { ...rgb, [channel]: val };
+                          const hex = rgbToHex(newRgb.r, newRgb.g, newRgb.b);
+                          setBranding({
+                            ...branding,
+                            theme: { ...branding.theme, primaryColor: hexToHsl(hex) },
+                          });
+                        }}
+                        className="w-16 px-2 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm text-center"
+                      />
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
