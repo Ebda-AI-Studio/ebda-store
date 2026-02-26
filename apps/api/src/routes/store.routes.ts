@@ -71,20 +71,23 @@ const contactSchema = z
   })
   .strip();
 
+const optionalStr = (maxLen: number) =>
+  z.preprocess(v => (v === '' || v === null ? undefined : v), z.string().max(maxLen).optional());
+
 const optionalUrl = z.preprocess(
-  v => (v === '' ? undefined : v),
+  v => (v === '' || v === null ? undefined : v),
   z.string().url().max(500).optional()
 );
 
 const brandingSchema = z
   .object({
-    name: z.string().min(1).max(200).optional(),
-    nameAr: z.string().max(200).optional(),
+    name: z.preprocess(v => (v === null ? undefined : v), z.string().min(1).max(200).optional()),
+    nameAr: optionalStr(200),
     logo: optionalUrl,
     logoAr: optionalUrl,
     favicon: optionalUrl,
-    description: z.string().max(1000).optional(),
-    descriptionAr: z.string().max(1000).optional(),
+    description: optionalStr(1000),
+    descriptionAr: optionalStr(1000),
   })
   .strip();
 
