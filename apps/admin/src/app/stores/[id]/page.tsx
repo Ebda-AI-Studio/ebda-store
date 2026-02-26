@@ -433,11 +433,15 @@ export default function StoreDetailPage() {
   return (
     <AdminLayout
       title={store.name}
-      subtitle={store.domain || `${store.slug}.forcemediakw.com`}
+      subtitle={store.domain || `force-web-sigma.vercel.app/${store.slug}`}
       actions={
         <div className="flex gap-2">
           <a
-            href={`https://${store.domain || `${store.slug}.forcemediakw.com`}`}
+            href={
+              store.domain
+                ? `https://${store.domain}`
+                : `${process.env.NEXT_PUBLIC_WEB_URL || 'https://force-web-sigma.vercel.app'}/${store.slug}`
+            }
             target="_blank"
             rel="noopener noreferrer"
           >
