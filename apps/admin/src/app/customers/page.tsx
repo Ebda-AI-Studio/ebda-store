@@ -7,6 +7,11 @@ import { ErrorState } from '../../components/ErrorState';
 import { useAuth } from '../../lib/auth';
 import { getApiUrl } from '../../lib/api';
 
+interface Store {
+  id: string;
+  name: string;
+}
+
 interface Customer {
   id: string;
   email: string;
@@ -47,6 +52,8 @@ function formatDate(dateString: string) {
 
 export default function CustomersPage() {
   const { token } = useAuth();
+  const [stores, setStores] = useState<Store[]>([]);
+  const [selectedStoreId, setSelectedStoreId] = useState('all');
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [pagination, setPagination] = useState<Pagination>({
     page: 1,
@@ -59,6 +66,25 @@ export default function CustomersPage() {
   const [search, setSearch] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+
+  // Fetch stores for the selector
+  useEffect(() => {
+    if (!token) return;
+    async function fetchStores() {
+      try {
+        const response = await fetch(`${getApiUrl()}/api/v1/stores`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setStores(data.data?.stores || data.data || []);
+        }
+      } catch {
+        // Stores list is optional
+      }
+    }
+    fetchStores();
+  }, [token]);
 
   const fetchCustomers = useCallback(async () => {
     if (!token) return;
@@ -111,6 +137,9 @@ export default function CustomersPage() {
     setIsDetailModalOpen(true);
   };
 
+  const filteredCustomers =
+    selectedStoreId === 'all' ? customers : customers.filter(c => c.store?.id === selectedStoreId);
+
   // Calculate stats from customers
   const stats = {
     total: pagination.total,
@@ -150,6 +179,24 @@ export default function CustomersPage() {
         </div>
       </div>
 
+      {/* Store Filter */}
+      {stores.length > 1 && (
+        <div className="mb-4">
+          <select
+            value={selectedStoreId}
+            onChange={e => setSelectedStoreId(e.target.value)}
+            className="rounded-lg border bg-white px-3 py-2 text-sm font-medium shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          >
+            <option value="all">All Stores</option>
+            {stores.map(store => (
+              <option key={store.id} value={store.id}>
+                {store.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {/* Search */}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <form onSubmit={handleSearch} className="flex gap-2 w-full sm:w-auto">
@@ -187,7 +234,7 @@ export default function CustomersPage() {
             ))}
           </div>
         </div>
-      ) : !error && customers.length > 0 ? (
+      ) : !error && filteredCustomers.length > 0 ? (
         <>
           {/* Customers Table */}
           <div className="force-card p-0 overflow-hidden">
@@ -215,7 +262,7 @@ export default function CustomersPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/50 bg-background">
-                {customers.map(customer => (
+                {filteredCustomers.map(customer => (
                   <tr key={customer.id} className="hover:bg-muted/30 transition-colors">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">

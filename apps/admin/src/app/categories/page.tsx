@@ -29,6 +29,7 @@ export default function CategoriesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [storeId, setStoreId] = useState<string | null>(null);
+  const [stores, setStores] = useState<Array<{ id: string; name: string }>>([]);
 
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -48,6 +49,7 @@ export default function CategoriesPage() {
     if (error || !data?.stores?.length) {
       return null;
     }
+    setStores(data.stores);
     return data.stores[0].id;
   }, []);
 
@@ -210,6 +212,27 @@ export default function CategoriesPage() {
         </Button>
       }
     >
+      {/* Store Selector */}
+      {stores.length > 1 && (
+        <div className="mb-4">
+          <select
+            value={storeId || ''}
+            onChange={e => {
+              const newStoreId = e.target.value;
+              setStoreId(newStoreId);
+              fetchCategories(newStoreId);
+            }}
+            className="rounded-lg border bg-white px-3 py-2 text-sm font-medium shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          >
+            {stores.map(store => (
+              <option key={store.id} value={store.id}>
+                {store.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {error && !loading && (
         <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4">
           <p className="text-sm text-red-700">{error}</p>

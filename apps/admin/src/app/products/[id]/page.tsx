@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button, Badge, Modal } from '@force/ui';
 import { AdminLayout } from '../../../components/AdminLayout';
@@ -47,7 +47,9 @@ function formatPrice(fils: number) {
 export default function ProductDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { token } = useAuth();
+  const storeIdParam = searchParams.get('storeId');
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -108,7 +110,7 @@ export default function ProductDetailPage() {
       );
 
       if (response.ok) {
-        router.push('/products');
+        router.push(storeIdParam ? `/stores/${storeIdParam}/products` : '/products');
       } else {
         setError('Failed to delete product');
       }
@@ -169,7 +171,7 @@ export default function ProductDetailPage() {
           <p className="mt-2 text-sm text-gray-500">
             The product you&apos;re looking for doesn&apos;t exist or has been removed.
           </p>
-          <Link href="/products">
+          <Link href={storeIdParam ? `/stores/${storeIdParam}/products` : '/products'}>
             <Button className="mt-6">Back to Products</Button>
           </Link>
         </div>
@@ -183,7 +185,9 @@ export default function ProductDetailPage() {
       subtitle={`SKU: ${product.sku || 'N/A'} • Store: ${product.store?.name || 'Unknown'}`}
       actions={
         <div className="flex gap-2">
-          <Link href={`/products/${product.id}/edit`}>
+          <Link
+            href={`/products/${product.id}/edit${storeIdParam ? `?storeId=${storeIdParam}` : ''}`}
+          >
             <Button variant="outline" size="sm">
               <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path

@@ -20,7 +20,7 @@ interface AuditLog {
     email: string;
     firstName: string;
     lastName: string;
-  };
+  } | null;
   store?: {
     id: string;
     name: string;
@@ -213,12 +213,16 @@ export default function AuditLogsPage() {
                       )}
                     </div>
                     <p className="mt-1 text-sm text-gray-900">
-                      <Link
-                        href={`/users/${log.user.id}`}
-                        className="font-medium hover:text-primary"
-                      >
-                        {log.user.firstName} {log.user.lastName}
-                      </Link>{' '}
+                      {log.user ? (
+                        <Link
+                          href={`/users/${log.user.id}`}
+                          className="font-medium hover:text-primary"
+                        >
+                          {log.user.firstName} {log.user.lastName}
+                        </Link>
+                      ) : (
+                        <span className="font-medium text-gray-500">System</span>
+                      )}{' '}
                       {log.action.toLowerCase()} {log.entityType}
                       {log.entityId && (
                         <span className="text-gray-500"> (ID: {log.entityId.slice(0, 8)}...)</span>

@@ -173,6 +173,19 @@ export default function StoreProductsPage() {
       subtitle={`Manage products for ${store?.name || 'this store'}`}
       actions={
         <div className="flex gap-2">
+          <Link href={`/products/new?storeId=${storeId}`}>
+            <Button size="sm">
+              <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 4v16m8-8H4"
+                />
+              </svg>
+              Add Product
+            </Button>
+          </Link>
           <Link href={`/stores/${storeId}/bulk`}>
             <Button variant="outline" size="sm">
               <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -319,7 +332,7 @@ export default function StoreProductsPage() {
                           </Button>
                         </Link>
                       )}
-                      <Link href={`/products/${product.id}`}>
+                      <Link href={`/products/${product.id}?storeId=${storeId}`}>
                         <Button variant="outline" size="sm">
                           View
                         </Button>

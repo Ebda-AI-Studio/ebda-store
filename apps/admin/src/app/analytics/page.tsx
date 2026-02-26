@@ -203,37 +203,37 @@ export default function AnalyticsPage() {
       // Process sales
       if (salesRes.status === 'fulfilled' && salesRes.value.ok) {
         const data = await salesRes.value.json();
-        setSales(data.data || []);
+        setSales(Array.isArray(data.data) ? data.data : []);
       }
 
       // Process top products
       if (topProductsRes.status === 'fulfilled' && topProductsRes.value.ok) {
         const data = await topProductsRes.value.json();
-        setTopProducts(data.data || []);
+        setTopProducts(Array.isArray(data.data) ? data.data : []);
       }
 
       // Process top categories
       if (topCategoriesRes.status === 'fulfilled' && topCategoriesRes.value.ok) {
         const data = await topCategoriesRes.value.json();
-        setTopCategories(data.data || []);
+        setTopCategories(Array.isArray(data.data) ? data.data : []);
       }
 
       // Process orders by status
       if (ordersByStatusRes.status === 'fulfilled' && ordersByStatusRes.value.ok) {
         const data = await ordersByStatusRes.value.json();
-        setOrdersByStatus(data.data || []);
+        setOrdersByStatus(Array.isArray(data.data) ? data.data : []);
       }
 
       // Process recent orders
       if (recentOrdersRes.status === 'fulfilled' && recentOrdersRes.value.ok) {
         const data = await recentOrdersRes.value.json();
-        setRecentOrders(data.data || []);
+        setRecentOrders(Array.isArray(data.data) ? data.data : []);
       }
 
       // Process low stock
       if (lowStockRes.status === 'fulfilled' && lowStockRes.value.ok) {
         const data = await lowStockRes.value.json();
-        setLowStock(data.data || []);
+        setLowStock(Array.isArray(data.data) ? data.data : []);
       }
     } catch {
       setError('Failed to load analytics data');

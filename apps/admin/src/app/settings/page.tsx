@@ -44,6 +44,7 @@ export default function SettingsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [storeId, setStoreId] = useState<string | null>(null);
+  const [stores, setStores] = useState<Store[]>([]);
 
   // Payment settings state
   const [taxRate, setTaxRate] = useState('10');
@@ -67,60 +68,63 @@ export default function SettingsPage() {
     expressShipping: '',
   });
 
+  async function loadStoreDetails(sid: string) {
+    try {
+      setIsLoading(true);
+      const response = await fetch(`${getApiUrl()}/api/v1/stores/${sid}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const result = await response.json();
+
+      if (result.success && result.data?.store) {
+        const s = result.data.store;
+        const storeSettings = s.settings || {};
+
+        setSettings({
+          storeName: s.name || '',
+          storeEmail: s.email || '',
+          storePhone: s.phone || '',
+          storeAddress: s.address || '',
+          currency: (storeSettings.currency as string) || 'KWD',
+          timezone: (storeSettings.timezone as string) || 'Asia/Kuwait',
+          orderNotifications: storeSettings.orderNotifications !== false,
+          customerNotifications: storeSettings.customerNotifications !== false,
+          inventoryAlerts: storeSettings.inventoryAlerts !== false,
+          marketingEmails: storeSettings.marketingEmails === true,
+          freeShippingThreshold: String(storeSettings.freeShippingThreshold || ''),
+          flatRateShipping: String(storeSettings.flatRateShipping || ''),
+          expressShipping: String(storeSettings.expressShipping || ''),
+        });
+
+        // Load payment settings
+        setTaxRate(storeSettings.taxRate !== undefined ? String(storeSettings.taxRate) : '10');
+        setTaxCalculation((storeSettings.taxCalculation as string) || 'inclusive');
+        setCodEnabled(
+          storeSettings.codEnabled !== undefined ? (storeSettings.codEnabled as boolean) : true
+        );
+      }
+    } catch {
+      // Will show with default values
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
   // Load store data
   useEffect(() => {
     async function loadStore() {
       try {
-        // Get the first store for this admin
         const { data: storesData } = await apiGet<{ stores: Store[] }>('/api/v1/admin/stores');
         if (!storesData?.stores?.length) {
           setIsLoading(false);
           return;
         }
 
+        setStores(storesData.stores);
         const store = storesData.stores[0];
         setStoreId(store.id);
-
-        // Fetch full store details
-        const response = await fetch(`${getApiUrl()}/api/v1/stores/${store.id}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const result = await response.json();
-
-        if (result.success && result.data?.store) {
-          const s = result.data.store;
-          const storeSettings = s.settings || {};
-
-          setSettings({
-            storeName: s.name || '',
-            storeEmail: s.email || '',
-            storePhone: s.phone || '',
-            storeAddress: s.address || '',
-            currency: (storeSettings.currency as string) || 'KWD',
-            timezone: (storeSettings.timezone as string) || 'Asia/Kuwait',
-            orderNotifications: storeSettings.orderNotifications !== false,
-            customerNotifications: storeSettings.customerNotifications !== false,
-            inventoryAlerts: storeSettings.inventoryAlerts !== false,
-            marketingEmails: storeSettings.marketingEmails === true,
-            freeShippingThreshold: String(storeSettings.freeShippingThreshold || ''),
-            flatRateShipping: String(storeSettings.flatRateShipping || ''),
-            expressShipping: String(storeSettings.expressShipping || ''),
-          });
-
-          // Load payment settings
-          if (storeSettings.taxRate !== undefined) {
-            setTaxRate(String(storeSettings.taxRate));
-          }
-          if (storeSettings.taxCalculation !== undefined) {
-            setTaxCalculation(storeSettings.taxCalculation as string);
-          }
-          if (storeSettings.codEnabled !== undefined) {
-            setCodEnabled(storeSettings.codEnabled as boolean);
-          }
-        }
+        await loadStoreDetails(store.id);
       } catch {
-        // Will show with default values
-      } finally {
         setIsLoading(false);
       }
     }
@@ -264,6 +268,29 @@ export default function SettingsPage() {
 
   return (
     <AdminLayout title="Settings" subtitle="Manage your store configuration">
+      {/* Store Selector */}
+      {stores.length > 1 && (
+        <div className="mb-6">
+          <select
+            value={storeId || ''}
+            onChange={e => {
+              const newStoreId = e.target.value;
+              setStoreId(newStoreId);
+              setSaveMessage(null);
+              setPaymentSaveMessage(null);
+              loadStoreDetails(newStoreId);
+            }}
+            className="rounded-lg border bg-white px-3 py-2 text-sm font-medium shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          >
+            {stores.map(store => (
+              <option key={store.id} value={store.id}>
+                {store.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       <div className="flex flex-col gap-6 lg:flex-row">
         {/* Tabs */}
         <div className="lg:w-64">

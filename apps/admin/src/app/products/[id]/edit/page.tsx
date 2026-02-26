@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Button, Input, Textarea, Select } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { MultiImageUpload } from '../../../../components/ImageUpload';
@@ -49,7 +49,9 @@ const statuses = [
 export default function EditProductPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { token } = useAuth();
+  const storeIdParam = searchParams.get('storeId');
 
   const productId = params.id as string;
 
@@ -204,7 +206,7 @@ export default function EditProductPage() {
         return;
       }
 
-      router.push(`/products/${productId}`);
+      router.push(`/products/${productId}${storeIdParam ? `?storeId=${storeIdParam}` : ''}`);
     } catch {
       setError('Failed to update product. Please try again.');
     } finally {
@@ -418,7 +420,10 @@ export default function EditProductPage() {
                 <Button type="submit" className="w-full" isLoading={saving}>
                   Save Changes
                 </Button>
-                <Link href={`/products/${productId}`} className="block">
+                <Link
+                  href={`/products/${productId}${storeIdParam ? `?storeId=${storeIdParam}` : ''}`}
+                  className="block"
+                >
                   <Button type="button" variant="outline" className="w-full">
                     Cancel
                   </Button>

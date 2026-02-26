@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button, Input, Textarea, Select } from '@force/ui';
 import { AdminLayout } from '../../../components/AdminLayout';
 import { MultiImageUpload } from '../../../components/ImageUpload';
@@ -26,7 +26,9 @@ const statuses = [
 
 export default function NewProductPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { token } = useAuth();
+  const storeIdParam = searchParams.get('storeId');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -54,7 +56,9 @@ export default function NewProductPage() {
       const { data } = await apiGet<{ stores: Store[] }>('/api/v1/admin/stores');
       if (data?.stores) {
         setStores(data.stores);
-        if (data.stores.length === 1) {
+        if (storeIdParam && data.stores.some(s => s.id === storeIdParam)) {
+          setSelectedStoreId(storeIdParam);
+        } else if (data.stores.length === 1) {
           setSelectedStoreId(data.stores[0].id);
         }
       }
@@ -143,7 +147,7 @@ export default function NewProductPage() {
       }
 
       if (data) {
-        router.push('/products');
+        router.push(storeIdParam ? `/stores/${storeIdParam}/products` : '/products');
       }
     } catch {
       setError('Failed to create product. Please try again.');
@@ -159,7 +163,29 @@ export default function NewProductPage() {
   ];
 
   return (
-    <AdminLayout title="Add New Product" subtitle="Create a new product for your store">
+    <AdminLayout
+      title="Add New Product"
+      subtitle="Create a new product for your store"
+      actions={
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() =>
+            router.push(storeIdParam ? `/stores/${storeIdParam}/products` : '/products')
+          }
+        >
+          <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M10 19l-7-7m0 0l7-7m-7 7h18"
+            />
+          </svg>
+          Back
+        </Button>
+      }
+    >
       <form onSubmit={handleSubmit}>
         {error && <div className="mb-6 rounded-lg bg-red-50 p-4 text-sm text-red-600">{error}</div>}
 
@@ -257,7 +283,7 @@ export default function NewProductPage() {
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Store Selection */}
-            {stores.length > 1 && (
+            {stores.length > 1 && !storeIdParam && (
               <div className="rounded-xl border bg-white p-6 shadow-sm">
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">Store</h2>
                 <Select
@@ -297,7 +323,10 @@ export default function NewProductPage() {
                 <Button type="submit" className="w-full" isLoading={isLoading}>
                   Create Product
                 </Button>
-                <Link href="/products" className="block">
+                <Link
+                  href={storeIdParam ? `/stores/${storeIdParam}/products` : '/products'}
+                  className="block"
+                >
                   <Button type="button" variant="outline" className="w-full">
                     Cancel
                   </Button>
