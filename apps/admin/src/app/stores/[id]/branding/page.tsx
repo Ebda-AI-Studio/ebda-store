@@ -217,14 +217,16 @@ export default function StoreBrandingPage() {
     setIsSaving(true);
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}/branding`,
-        {
+      const baseUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${storeId}`;
+      const headers = {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      };
+
+      const [brandingRes, themeRes, contactRes, socialRes] = await Promise.all([
+        fetch(`${baseUrl}/branding`, {
           method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
+          headers,
           body: JSON.stringify({
             name: branding.name,
             nameAr: branding.nameAr,
@@ -233,36 +235,57 @@ export default function StoreBrandingPage() {
             favicon: branding.favicon,
             description: branding.description,
             descriptionAr: branding.descriptionAr,
-            theme: branding.theme,
+          }),
+        }),
+        fetch(`${baseUrl}/theme`, {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify(branding.theme),
+        }),
+        fetch(`${baseUrl}/contact`, {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
             email: branding.email,
             phone: branding.phone,
             phoneAr: branding.phoneAr,
             whatsapp: branding.whatsapp,
             address: branding.address,
             addressAr: branding.addressAr,
-            socialLinks: branding.socialLinks,
           }),
-        }
-      );
+        }),
+        fetch(`${baseUrl}/social`, {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify(branding.socialLinks),
+        }),
+      ]);
 
-      const data = await response.json();
+      // Check for failures
+      const failed = [
+        { name: 'Branding', res: brandingRes },
+        { name: 'Theme', res: themeRes },
+        { name: 'Contact', res: contactRes },
+        { name: 'Social', res: socialRes },
+      ].filter(r => !r.res.ok);
 
-      if (!response.ok) {
-        // Handle specific error codes
-        if (response.status === 403) {
+      if (failed.length > 0) {
+        const first = failed[0];
+        if (first.res.status === 403) {
           toast.error('Access denied', 'You do not have permission to update this store');
-        } else if (response.status === 401) {
+        } else if (first.res.status === 401) {
           toast.error('Session expired', 'Please log in again');
         } else {
+          const data = await first.res.json().catch(() => ({}));
           toast.error(
-            'Failed to save branding',
-            data.error?.message || `Server error: ${response.status}`
+            `Failed to save ${first.name.toLowerCase()}`,
+            data.error?.message || `Server error: ${first.res.status}`
           );
         }
         return;
       }
 
-      toast.success('Branding saved', 'Your changes have been saved successfully');
+      toast.success('Branding saved', 'All changes have been saved successfully');
     } catch (error) {
       console.error('Failed to save branding:', error);
       toast.error('Connection error', 'Failed to connect to the server. Please try again.');
