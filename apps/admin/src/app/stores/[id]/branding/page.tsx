@@ -68,15 +68,70 @@ const borderRadiusOptions = [
   { value: 'xl', label: 'Extra Large', labelAr: 'كبير جداً' },
 ];
 
+// Convert hex to HSL space-separated string (for Tailwind CSS vars)
+function hexToHsl(hex: string): string {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.substring(0, 2), 16) / 255;
+  const g = parseInt(h.substring(2, 4), 16) / 255;
+  const b = parseInt(h.substring(4, 6), 16) / 255;
+
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+
+  if (max === min) return `0 0% ${Math.round(l * 100)}%`;
+
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  let hue = 0;
+  if (max === r) hue = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+  else if (max === g) hue = ((b - r) / d + 2) / 6;
+  else hue = ((r - g) / d + 4) / 6;
+
+  return `${Math.round(hue * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
+}
+
+// Convert HSL space-separated string to hex
+function hslToHex(hsl: string): string {
+  const parts = hsl.match(/[\d.]+/g);
+  if (!parts || parts.length < 3) return '#000000';
+
+  const h = parseFloat(parts[0]) / 360;
+  const s = parseFloat(parts[1]) / 100;
+  const l = parseFloat(parts[2]) / 100;
+
+  if (s === 0) {
+    const v = Math.round(l * 255);
+    return `#${v.toString(16).padStart(2, '0').repeat(3)}`;
+  }
+
+  const hue2rgb = (p: number, q: number, t: number) => {
+    if (t < 0) t += 1;
+    if (t > 1) t -= 1;
+    if (t < 1 / 6) return p + (q - p) * 6 * t;
+    if (t < 1 / 2) return q;
+    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+    return p;
+  };
+
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+  const r = Math.round(hue2rgb(p, q, h + 1 / 3) * 255);
+  const g = Math.round(hue2rgb(p, q, h) * 255);
+  const b = Math.round(hue2rgb(p, q, h - 1 / 3) * 255);
+
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+}
+
 const colorPresets = [
-  { name: 'Orange', color: '26 100% 50%' },
-  { name: 'Blue', color: '221 83% 53%' },
-  { name: 'Green', color: '142 76% 36%' },
-  { name: 'Purple', color: '262 83% 58%' },
-  { name: 'Rose', color: '340 82% 52%' },
-  { name: 'Teal', color: '173 80% 40%' },
-  { name: 'Amber', color: '38 92% 50%' },
-  { name: 'Black', color: '0 0% 9%' },
+  { name: 'Orange', hex: '#FF6600' },
+  { name: 'Blue', hex: '#3B82F6' },
+  { name: 'Green', hex: '#16A34A' },
+  { name: 'Purple', hex: '#7C3AED' },
+  { name: 'Rose', hex: '#E11D48' },
+  { name: 'Teal', hex: '#0D9488' },
+  { name: 'Amber', hex: '#F59E0B' },
+  { name: 'Black', hex: '#171717' },
 ];
 
 export default function StoreBrandingPage() {
@@ -356,37 +411,56 @@ export default function StoreBrandingPage() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-3">Primary Color</label>
               <div className="flex flex-wrap gap-3">
-                {colorPresets.map(preset => (
-                  <button
-                    key={preset.name}
-                    onClick={() =>
-                      setBranding({
-                        ...branding,
-                        theme: { ...branding.theme, primaryColor: preset.color },
-                      })
-                    }
-                    className={`w-10 h-10 rounded-full border-2 transition-all ${
-                      branding.theme.primaryColor === preset.color
-                        ? 'border-gray-900 scale-110'
-                        : 'border-transparent hover:scale-105'
-                    }`}
-                    style={{ backgroundColor: `hsl(${preset.color})` }}
-                    title={preset.name}
-                  />
-                ))}
+                {colorPresets.map(preset => {
+                  const currentHex = hslToHex(branding.theme.primaryColor).toUpperCase();
+                  const isSelected = currentHex === preset.hex.toUpperCase();
+                  return (
+                    <button
+                      key={preset.name}
+                      onClick={() =>
+                        setBranding({
+                          ...branding,
+                          theme: { ...branding.theme, primaryColor: hexToHsl(preset.hex) },
+                        })
+                      }
+                      className={`w-10 h-10 rounded-full border-2 transition-all ${
+                        isSelected
+                          ? 'border-gray-900 scale-110'
+                          : 'border-transparent hover:scale-105'
+                      }`}
+                      style={{ backgroundColor: preset.hex }}
+                      title={`${preset.name} (${preset.hex})`}
+                    />
+                  );
+                })}
               </div>
-              <div className="mt-3">
+              <div className="mt-3 flex items-center gap-3">
                 <input
-                  type="text"
-                  value={branding.theme.primaryColor}
+                  type="color"
+                  value={hslToHex(branding.theme.primaryColor)}
                   onChange={e =>
                     setBranding({
                       ...branding,
-                      theme: { ...branding.theme, primaryColor: e.target.value },
+                      theme: { ...branding.theme, primaryColor: hexToHsl(e.target.value) },
                     })
                   }
-                  placeholder="HSL value (e.g., 26 100% 50%)"
-                  className="w-full max-w-xs px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  className="w-10 h-10 rounded-lg border border-gray-300 cursor-pointer p-0.5"
+                />
+                <input
+                  type="text"
+                  value={hslToHex(branding.theme.primaryColor).toUpperCase()}
+                  onChange={e => {
+                    const v = e.target.value;
+                    if (/^#[0-9A-Fa-f]{6}$/.test(v)) {
+                      setBranding({
+                        ...branding,
+                        theme: { ...branding.theme, primaryColor: hexToHsl(v) },
+                      });
+                    }
+                  }}
+                  placeholder="#FF6600"
+                  maxLength={7}
+                  className="w-32 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary font-mono"
                 />
               </div>
             </div>
