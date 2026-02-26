@@ -71,11 +71,10 @@ const contactSchema = z
   })
   .strip();
 
-const optionalUrl = z
-  .string()
-  .max(500)
-  .transform(v => (v === '' ? undefined : v))
-  .pipe(z.string().url().optional());
+const optionalUrl = z.preprocess(
+  v => (v === '' ? undefined : v),
+  z.string().url().max(500).optional()
+);
 
 const brandingSchema = z
   .object({
