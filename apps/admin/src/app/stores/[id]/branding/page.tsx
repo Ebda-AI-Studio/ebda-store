@@ -530,6 +530,70 @@ export default function StoreBrandingPage() {
               </div>
             </div>
 
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-3">
+                Secondary Color
+              </label>
+              <div className="flex flex-wrap items-center gap-3">
+                <input
+                  type="color"
+                  value={hslToHex(branding.theme.secondaryColor)}
+                  onChange={e =>
+                    setBranding({
+                      ...branding,
+                      theme: { ...branding.theme, secondaryColor: hexToHsl(e.target.value) },
+                    })
+                  }
+                  className="w-10 h-10 rounded-lg border border-gray-300 cursor-pointer p-0.5"
+                />
+                <div>
+                  <label className="block text-[10px] text-gray-400 mb-0.5">HEX</label>
+                  <input
+                    type="text"
+                    value={hslToHex(branding.theme.secondaryColor).toUpperCase()}
+                    onChange={e => {
+                      const v = e.target.value;
+                      if (/^#[0-9A-Fa-f]{6}$/.test(v)) {
+                        setBranding({
+                          ...branding,
+                          theme: { ...branding.theme, secondaryColor: hexToHsl(v) },
+                        });
+                      }
+                    }}
+                    placeholder="#F3F4F6"
+                    maxLength={7}
+                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary font-mono text-sm"
+                  />
+                </div>
+                {(['r', 'g', 'b'] as const).map(channel => {
+                  const rgb = hexToRgb(hslToHex(branding.theme.secondaryColor));
+                  return (
+                    <div key={channel}>
+                      <label className="block text-[10px] text-gray-400 mb-0.5">
+                        {channel.toUpperCase()}
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={255}
+                        value={rgb[channel]}
+                        onChange={e => {
+                          const val = parseInt(e.target.value, 10) || 0;
+                          const newRgb = { ...rgb, [channel]: val };
+                          const hex = rgbToHex(newRgb.r, newRgb.g, newRgb.b);
+                          setBranding({
+                            ...branding,
+                            theme: { ...branding.theme, secondaryColor: hexToHsl(hex) },
+                          });
+                        }}
+                        className="w-16 px-2 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm text-center"
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Font Family</label>
