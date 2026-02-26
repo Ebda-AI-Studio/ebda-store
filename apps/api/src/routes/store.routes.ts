@@ -71,11 +71,19 @@ const contactSchema = z
   })
   .strip();
 
+const optionalUrl = z
+  .string()
+  .max(500)
+  .transform(v => (v === '' ? undefined : v))
+  .pipe(z.string().url().optional());
+
 const brandingSchema = z
   .object({
-    logo: z.string().url().max(500).optional(),
-    logoAr: z.string().url().max(500).optional(),
-    favicon: z.string().url().max(500).optional(),
+    name: z.string().min(1).max(200).optional(),
+    nameAr: z.string().max(200).optional(),
+    logo: optionalUrl,
+    logoAr: optionalUrl,
+    favicon: optionalUrl,
     description: z.string().max(1000).optional(),
     descriptionAr: z.string().max(1000).optional(),
   })

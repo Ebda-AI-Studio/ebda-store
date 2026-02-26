@@ -253,6 +253,8 @@ export class StoreService {
       logo?: string;
       logoAr?: string;
       favicon?: string;
+      description?: string;
+      descriptionAr?: string;
     }
   ) {
     await this.getById(storeId);
@@ -265,6 +267,8 @@ export class StoreService {
         logo: branding.logo,
         logoAr: branding.logoAr,
         favicon: branding.favicon,
+        description: branding.description,
+        descriptionAr: branding.descriptionAr,
       },
     });
 
