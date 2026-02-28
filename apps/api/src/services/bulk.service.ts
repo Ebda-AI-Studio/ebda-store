@@ -488,12 +488,18 @@ export class BulkService {
   }
 
   private static generateSlug(name: string): string {
-    return name
+    let slug = name
       .toLowerCase()
-      .replace(/[^\w\s-]/g, '')
+      .replace(/[^a-z0-9\u0600-\u06FF\s-]+/g, '')
       .replace(/\s+/g, '-')
       .replace(/-+/g, '-')
-      .trim();
+      .replace(/(^-|-$)/g, '');
+
+    if (!slug) {
+      slug = `product-${Date.now()}`;
+    }
+
+    return slug;
   }
 
   private static async ensureUniqueSlug(
