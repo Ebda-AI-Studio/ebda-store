@@ -37,7 +37,9 @@ interface RecentOrder {
 const API_URL = getApiUrl();
 
 export default function DashboardPage() {
-  const { selectedStoreId } = useStore();
+  const { selectedStoreId, stores: globalStores } = useStore();
+  const storeName =
+    selectedStoreId !== 'all' ? globalStores.find(s => s.id === selectedStoreId)?.name : null;
   const [stats, setStats] = useState<PlatformStats | null>(null);
   const [recentStores, setRecentStores] = useState<RecentStore[]>([]);
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
@@ -206,7 +208,9 @@ export default function DashboardPage() {
   return (
     <AdminLayout
       title="Platform Dashboard"
-      subtitle="Overview of all stores and platform metrics"
+      subtitle={
+        storeName ? `Overview for ${storeName}` : 'Overview of all stores and platform metrics'
+      }
       actions={
         <Link href="/stores/new">
           <Button size="sm" className="gap-2 shadow-lg shadow-primary/25">
@@ -344,7 +348,7 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between border-b px-6 py-4">
             <div>
               <h2 className="font-semibold text-foreground">Recent Orders</h2>
-              <p className="text-xs text-muted-foreground">Across all stores</p>
+              <p className="text-xs text-muted-foreground">{storeName || 'Across all stores'}</p>
             </div>
             <Link
               href="/orders"

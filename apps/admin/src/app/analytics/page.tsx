@@ -114,8 +114,9 @@ const dateRangeLabels: Record<DateRange, string> = {
 
 export default function AnalyticsPage() {
   const { stores, selectedStoreId: globalStoreId, isLoading: isLoadingStores } = useStore();
-  // Analytics requires a specific store — fall back to first store when "all" is selected
-  const selectedStoreId = globalStoreId !== 'all' ? globalStoreId : stores[0]?.id || '';
+  // Analytics requires a specific store
+  const selectedStoreId = globalStoreId !== 'all' ? globalStoreId : '';
+  const storeName = stores.find(s => s.id === selectedStoreId)?.name;
   const [dateRange, setDateRange] = useState<DateRange>('30d');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -248,10 +249,36 @@ export default function AnalyticsPage() {
     );
   }
 
+  if (!selectedStoreId) {
+    return (
+      <AdminLayout title="Analytics" subtitle="Track your store performance">
+        <div className="flex flex-col items-center justify-center py-24 text-center">
+          <svg
+            className="mx-auto h-12 w-12 text-gray-400"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.5}
+              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+          <h3 className="mt-4 text-sm font-medium text-gray-900">Select a store</h3>
+          <p className="mt-1 text-sm text-gray-500">
+            Analytics are per-store. Please select a specific store from the sidebar.
+          </p>
+        </div>
+      </AdminLayout>
+    );
+  }
+
   return (
     <AdminLayout
       title="Analytics"
-      subtitle="Track your store performance"
+      subtitle={storeName ? `Performance for ${storeName}` : 'Track your store performance'}
       actions={
         <select
           value={dateRange}

@@ -26,13 +26,14 @@ const emptyForm: CategoryFormData = { name: '', slug: '', description: '' };
 
 export default function CategoriesPage() {
   const { token } = useAuth();
-  const { selectedStoreId, stores: globalStores } = useStore();
+  const { selectedStoreId, stores: globalStores, isLoading: storesLoading } = useStore();
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Categories are per-store, so pick the effective store ID
-  const storeId = selectedStoreId !== 'all' ? selectedStoreId : globalStores[0]?.id || null;
+  // Categories are per-store — require a specific store selection
+  const storeId = selectedStoreId !== 'all' ? selectedStoreId : null;
+  const selectedStoreName = globalStores.find(s => s.id === storeId)?.name;
 
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -78,15 +79,15 @@ export default function CategoriesPage() {
   );
 
   useEffect(() => {
-    if (!token || !storeId) {
-      if (!storeId && token) {
-        setError('No store found. Please create a store first.');
-        setLoading(false);
-      }
+    if (!token || storesLoading) return;
+    if (!storeId) {
+      setCategories([]);
+      setLoading(false);
+      setError(null);
       return;
     }
     fetchCategories(storeId);
-  }, [token, storeId, fetchCategories]);
+  }, [token, storeId, storesLoading, fetchCategories]);
 
   const refetch = useCallback(() => {
     if (storeId) {
@@ -188,9 +189,13 @@ export default function CategoriesPage() {
   return (
     <AdminLayout
       title="Categories"
-      subtitle="Manage product categories across all stores"
+      subtitle={
+        selectedStoreName
+          ? `Manage categories for ${selectedStoreName}`
+          : 'Select a store to manage categories'
+      }
       actions={
-        <Button size="sm" onClick={handleAdd}>
+        <Button size="sm" onClick={handleAdd} disabled={!storeId}>
           <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
@@ -198,7 +203,30 @@ export default function CategoriesPage() {
         </Button>
       }
     >
-      {error && !loading && (
+      {!storeId && !storesLoading && (
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <svg
+            className="mx-auto h-12 w-12 text-gray-400"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.5}
+              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+          <h3 className="mt-4 text-sm font-medium text-gray-900">Select a store</h3>
+          <p className="mt-1 text-sm text-gray-500">
+            Categories are per-store. Please select a specific store from the sidebar to manage its
+            categories.
+          </p>
+        </div>
+      )}
+
+      {error && !loading && storeId && (
         <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4">
           <p className="text-sm text-red-700">{error}</p>
           <Button variant="outline" size="sm" className="mt-2" onClick={refetch}>
@@ -207,7 +235,7 @@ export default function CategoriesPage() {
         </div>
       )}
 
-      {loading ? (
+      {storeId && loading ? (
         <div className="flex items-center justify-center py-12">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
         </div>

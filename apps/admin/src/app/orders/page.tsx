@@ -109,7 +109,9 @@ const validTransitions: Record<string, string[]> = {
 
 export default function OrdersPage() {
   const { token } = useAuth();
-  const { selectedStoreId } = useStore();
+  const { selectedStoreId, stores: globalStores } = useStore();
+  const storeName =
+    selectedStoreId !== 'all' ? globalStores.find(s => s.id === selectedStoreId)?.name : null;
   const [orders, setOrders] = useState<Order[]>([]);
   const [pagination, setPagination] = useState<Pagination>({
     page: 1,
@@ -243,7 +245,10 @@ export default function OrdersPage() {
   };
 
   return (
-    <AdminLayout title="Orders" subtitle={`${stats.total} orders across all stores`}>
+    <AdminLayout
+      title="Orders"
+      subtitle={`${stats.total} orders${storeName ? ` for ${storeName}` : ' across all stores'}`}
+    >
       {/* Stats Cards */}
       <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-5 stagger-animation">
         {[

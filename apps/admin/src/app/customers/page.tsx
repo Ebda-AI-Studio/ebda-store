@@ -48,7 +48,9 @@ function formatDate(dateString: string) {
 
 export default function CustomersPage() {
   const { token } = useAuth();
-  const { selectedStoreId } = useStore();
+  const { selectedStoreId, stores: globalStores } = useStore();
+  const storeName =
+    selectedStoreId !== 'all' ? globalStores.find(s => s.id === selectedStoreId)?.name : null;
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [pagination, setPagination] = useState<Pagination>({
     page: 1,
@@ -133,7 +135,7 @@ export default function CustomersPage() {
   return (
     <AdminLayout
       title="Customers"
-      subtitle={`${pagination.total} registered customers across all stores`}
+      subtitle={`${pagination.total} registered customers${storeName ? ` for ${storeName}` : ' across all stores'}`}
     >
       {/* Stats */}
       <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">

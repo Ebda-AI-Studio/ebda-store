@@ -32,8 +32,9 @@ export default function SettingsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
-  // Settings are per-store
-  const storeId = selectedStoreId !== 'all' ? selectedStoreId : globalStores[0]?.id || null;
+  // Settings are per-store — require specific store selection
+  const storeId = selectedStoreId !== 'all' ? selectedStoreId : null;
+  const storeName = globalStores.find(s => s.id === storeId)?.name;
 
   // Payment settings state
   const [taxRate, setTaxRate] = useState('10');
@@ -234,9 +235,38 @@ export default function SettingsPage() {
     },
   ];
 
+  if (!storeId) {
+    return (
+      <AdminLayout title="Settings" subtitle="Select a store to manage settings">
+        <div className="flex flex-col items-center justify-center py-24 text-center">
+          <svg
+            className="mx-auto h-12 w-12 text-gray-400"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.5}
+              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+          <h3 className="mt-4 text-sm font-medium text-gray-900">Select a store</h3>
+          <p className="mt-1 text-sm text-gray-500">
+            Settings are per-store. Please select a specific store from the sidebar.
+          </p>
+        </div>
+      </AdminLayout>
+    );
+  }
+
   if (isLoading) {
     return (
-      <AdminLayout title="Settings" subtitle="Manage your store configuration">
+      <AdminLayout
+        title="Settings"
+        subtitle={storeName ? `Settings for ${storeName}` : 'Manage your store configuration'}
+      >
         <div className="flex justify-center py-12">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
         </div>
@@ -245,7 +275,10 @@ export default function SettingsPage() {
   }
 
   return (
-    <AdminLayout title="Settings" subtitle="Manage your store configuration">
+    <AdminLayout
+      title="Settings"
+      subtitle={storeName ? `Settings for ${storeName}` : 'Manage your store configuration'}
+    >
       <div className="flex flex-col gap-6 lg:flex-row">
         {/* Tabs */}
         <div className="lg:w-64">

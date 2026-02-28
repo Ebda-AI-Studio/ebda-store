@@ -66,8 +66,9 @@ function getDateRange(range: string) {
 
 export default function ReportsPage() {
   const { stores, selectedStoreId: globalStoreId } = useStore();
-  // Reports require a specific store — fall back to first store when "all" is selected
-  const selectedStore = globalStoreId !== 'all' ? globalStoreId : stores[0]?.id || '';
+  // Reports require a specific store
+  const selectedStore = globalStoreId !== 'all' ? globalStoreId : '';
+  const storeName = stores.find(s => s.id === selectedStore)?.name;
   const [dateRange, setDateRange] = useState('last30days');
   const [isLoading, setIsLoading] = useState(true);
 
@@ -131,7 +132,9 @@ export default function ReportsPage() {
   return (
     <AdminLayout
       title="Reports"
-      subtitle="Analytics and insights across all stores"
+      subtitle={
+        storeName ? `Analytics and insights for ${storeName}` : 'Select a store to view reports'
+      }
       actions={
         <select
           value={dateRange}
@@ -146,7 +149,27 @@ export default function ReportsPage() {
         </select>
       }
     >
-      {isLoading ? (
+      {!selectedStore ? (
+        <div className="flex flex-col items-center justify-center py-24 text-center">
+          <svg
+            className="mx-auto h-12 w-12 text-gray-400"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.5}
+              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+          <h3 className="mt-4 text-sm font-medium text-gray-900">Select a store</h3>
+          <p className="mt-1 text-sm text-gray-500">
+            Reports are per-store. Please select a specific store from the sidebar.
+          </p>
+        </div>
+      ) : isLoading ? (
         <div className="flex items-center justify-center py-20">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
         </div>

@@ -23,6 +23,7 @@ interface Category {
 const statuses = [
   { value: 'draft', label: 'Draft' },
   { value: 'active', label: 'Active' },
+  { value: 'archived', label: 'Archived' },
 ];
 
 export default function NewProductPage() {
@@ -42,7 +43,6 @@ export default function NewProductPage() {
 
   const [formData, setFormData] = useState({
     name: '',
-    slug: '',
     description: '',
     price: '',
     compareAtPrice: '',
@@ -97,13 +97,6 @@ export default function NewProductPage() {
 
   const updateField = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    if (field === 'name') {
-      const slug = value
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/(^-|-$)/g, '');
-      setFormData(prev => ({ ...prev, slug }));
-    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -126,14 +119,13 @@ export default function NewProductPage() {
 
       const body: Record<string, unknown> = {
         name: formData.name,
-        slug: formData.slug,
         description: formData.description || undefined,
         price: priceInFils,
         compareAtPrice: compareAtPriceInFils,
         sku: formData.sku || undefined,
         inventory: formData.inventory ? parseInt(formData.inventory, 10) : 0,
         status: formData.status,
-        images: images.map((url, i) => ({ url, position: i })),
+        images: images.map(url => ({ url })),
       };
 
       if (formData.category) {
@@ -205,13 +197,6 @@ export default function NewProductPage() {
                   value={formData.name}
                   onChange={e => updateField('name', e.target.value)}
                   placeholder="Enter product name"
-                  required
-                />
-                <Input
-                  label="Slug"
-                  value={formData.slug}
-                  onChange={e => updateField('slug', e.target.value)}
-                  placeholder="product-url-slug"
                   required
                 />
                 <Textarea
