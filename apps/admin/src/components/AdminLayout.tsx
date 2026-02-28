@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { Button } from '@force/ui';
 import { useAuth } from '../lib/auth';
 import { getApiUrl } from '../lib/api';
@@ -106,7 +106,6 @@ export function AdminLayout({
   storeSlug,
 }: AdminLayoutProps) {
   const pathname = usePathname();
-  const router = useRouter();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { user, logout, isLoading } = useAuth();
   const {
