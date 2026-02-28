@@ -299,6 +299,114 @@ router.get('/users', async (req: Request, res: Response, next: NextFunction) => 
 });
 
 /**
+ * GET /admin/users/:id
+ * Get a single user by ID
+ */
+router.get('/users/:id', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        status: true,
+        isActive: true,
+        createdAt: true,
+        lastLoginAt: true,
+        stores: {
+          select: { id: true, name: true, slug: true },
+        },
+      },
+    });
+
+    if (!user) {
+      res.status(404).json({
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'User not found' },
+      });
+      return;
+    }
+
+    res.json({
+      success: true,
+      data: { user },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * PUT /admin/users/:id
+ * Update a user's role and status
+ */
+router.put('/users/:id', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const schema = z.object({
+      role: z.enum(['super_admin', 'store_admin', 'customer']).optional(),
+      status: z.enum(['active', 'inactive', 'suspended']).optional(),
+      isActive: z.boolean().optional(),
+    });
+    const data = schema.parse(req.body);
+
+    const existing = await prisma.user.findUnique({ where: { id } });
+    if (!existing) {
+      res.status(404).json({
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'User not found' },
+      });
+      return;
+    }
+
+    const user = await prisma.user.update({
+      where: { id },
+      data: {
+        role: data.role as UserRole | undefined,
+        status: data.status as 'active' | 'inactive' | 'suspended' | undefined,
+        isActive: data.isActive,
+      },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        status: true,
+        isActive: true,
+        createdAt: true,
+        lastLoginAt: true,
+        stores: {
+          select: { id: true, name: true, slug: true },
+        },
+      },
+    });
+
+    await auditLog({
+      action: 'user.updated',
+      userId: req.user!.userId,
+      resourceType: 'user',
+      resourceId: id,
+      details: { changedFields: Object.keys(data).join(', ') },
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
+    res.json({
+      success: true,
+      data: { user },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
  * GET /admin/dashboard
  * Get platform-wide dashboard stats
  */

@@ -154,12 +154,15 @@ export function AdminLayout({
     setSelectedStoreId: setGlobalStoreId,
   } = useStore();
 
-  // Extract store ID from pathname (e.g. /stores/:id/branding)
+  // Extract store ID from prop, URL path, or global store selector
   const currentStoreId = useMemo(() => {
     if (storeId) return storeId;
     const match = pathname.match(/\/stores\/([^/]+)/);
-    return match?.[1] || null;
-  }, [storeId, pathname]);
+    if (match?.[1]) return match[1];
+    // Fall back to global store selector (if a specific store is selected)
+    if (globalStoreId && globalStoreId !== 'all') return globalStoreId;
+    return null;
+  }, [storeId, pathname, globalStoreId]);
 
   // Fetch store domain/slug for "View Store" button
   const [storeInfo, setStoreInfo] = useState<{ domain?: string; slug?: string } | null>(null);
