@@ -315,7 +315,6 @@ router.get('/users/:id', async (req: Request, res: Response, next: NextFunction)
         lastName: true,
         role: true,
         status: true,
-        isActive: true,
         createdAt: true,
         lastLoginAt: true,
         stores: {
@@ -351,7 +350,6 @@ router.put('/users/:id', async (req: Request, res: Response, next: NextFunction)
     const schema = z.object({
       role: z.enum(['super_admin', 'store_admin', 'customer']).optional(),
       status: z.enum(['active', 'inactive', 'suspended']).optional(),
-      isActive: z.boolean().optional(),
     });
     const data = schema.parse(req.body);
 
@@ -369,7 +367,6 @@ router.put('/users/:id', async (req: Request, res: Response, next: NextFunction)
       data: {
         role: data.role as UserRole | undefined,
         status: data.status as 'active' | 'inactive' | 'suspended' | undefined,
-        isActive: data.isActive,
       },
       select: {
         id: true,
@@ -378,7 +375,6 @@ router.put('/users/:id', async (req: Request, res: Response, next: NextFunction)
         lastName: true,
         role: true,
         status: true,
-        isActive: true,
         createdAt: true,
         lastLoginAt: true,
         stores: {
