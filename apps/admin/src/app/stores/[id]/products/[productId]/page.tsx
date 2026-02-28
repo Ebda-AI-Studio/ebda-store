@@ -30,7 +30,7 @@ interface Product {
   weight?: number;
   categories: { id: string; name: string }[];
   images: { id: string; url: string; alt?: string; position: number }[];
-  tags: string[];
+  tags: { productId: string; tagId: string; tag: { id: string; name: string } }[];
   store: { id: string; name: string; slug: string };
   createdAt: string;
   updatedAt: string;
@@ -310,9 +310,9 @@ export default function ProductDetailPage() {
             <div className="rounded-xl border bg-white p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Tags</h2>
               <div className="flex flex-wrap gap-2">
-                {product.tags.map(tag => (
-                  <Badge key={tag} variant="outline">
-                    {tag}
+                {product.tags.map(t => (
+                  <Badge key={t.tagId || t.tag?.id} variant="outline">
+                    {typeof t === 'string' ? t : t.tag?.name || t.tagId}
                   </Badge>
                 ))}
               </div>
