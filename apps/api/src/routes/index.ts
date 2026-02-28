@@ -20,6 +20,7 @@ import pwaRoutes from './pwa.routes';
 import inventoryRoutes from './inventory.routes';
 import bulkRoutes from './bulk.routes';
 import variantRoutes from './variant.routes';
+import categoryRoutes from './category.routes';
 import wishlistRoutes from './wishlist.routes';
 import addressRoutes from './address.routes';
 
@@ -46,6 +47,9 @@ router.use('/stores', storeRoutes);
 
 // Product routes (scoped to store)
 router.use('/stores/:storeId/products', productRoutes);
+
+// Category routes (scoped to store)
+router.use('/stores/:storeId/categories', categoryRoutes);
 
 // Cart routes
 router.use('/stores/:storeId/cart', cartRoutes);
