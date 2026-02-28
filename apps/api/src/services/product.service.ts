@@ -114,6 +114,7 @@ export class ProductService {
         images: { orderBy: { position: 'asc' } },
         categories: { include: { category: true } },
         tags: { include: { tag: true } },
+        store: { select: { id: true, name: true, slug: true } },
       },
     });
 
