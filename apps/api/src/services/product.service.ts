@@ -209,6 +209,34 @@ export class ProductService {
       }
     }
 
+    // If images are provided, replace all existing images
+    if (data.images !== undefined) {
+      await prisma.productImage.deleteMany({ where: { productId } });
+      if (data.images.length > 0) {
+        await prisma.productImage.createMany({
+          data: data.images.map((img, index) => ({
+            productId,
+            url: img.url,
+            alt: img.alt || data.name || product.name,
+            position: index,
+          })),
+        });
+      }
+    }
+
+    // If categories are provided, replace all existing categories
+    if (data.categories !== undefined) {
+      await prisma.productCategory.deleteMany({ where: { productId } });
+      if (data.categories.length > 0) {
+        await prisma.productCategory.createMany({
+          data: data.categories.map(categoryId => ({
+            productId,
+            categoryId,
+          })),
+        });
+      }
+    }
+
     const updatedProduct = await prisma.product.update({
       where: { id: productId, storeId },
       data: {

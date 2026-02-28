@@ -332,6 +332,11 @@ export default function StoreProductsPage() {
                           </Button>
                         </Link>
                       )}
+                      <Link href={`/stores/${storeId}/products/${product.id}/edit`}>
+                        <Button variant="outline" size="sm">
+                          Edit
+                        </Button>
+                      </Link>
                       <Link href={`/stores/${storeId}/products/${product.id}`}>
                         <Button variant="outline" size="sm">
                           View

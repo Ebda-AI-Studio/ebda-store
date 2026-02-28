@@ -159,6 +159,11 @@ export default function ProductDetailPage() {
       subtitle={`SKU: ${product.sku || 'N/A'} • Store: ${product.store?.name || 'Unknown'}`}
       actions={
         <div className="flex gap-2">
+          <Link href={`/stores/${storeId}/products/${product.id}/edit`}>
+            <Button variant="outline" size="sm">
+              Edit
+            </Button>
+          </Link>
           <Link href={`/stores/${storeId}/products/${product.id}/variants`}>
             <Button variant="outline" size="sm">
               Manage Variants
