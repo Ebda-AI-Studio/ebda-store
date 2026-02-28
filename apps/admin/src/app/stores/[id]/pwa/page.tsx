@@ -27,6 +27,20 @@ interface PWASettings {
   splashScreenColor: string;
 }
 
+interface StoreInfo {
+  name: string;
+  nameAr?: string;
+  logo?: string;
+  logoAr?: string;
+  favicon?: string;
+  description?: string;
+  descriptionAr?: string;
+  theme?: {
+    primaryColor?: string;
+    secondaryColor?: string;
+  };
+}
+
 const DEFAULT_SETTINGS: PWASettings = {
   appName: '',
   shortName: '',
@@ -66,17 +80,50 @@ const IOS_STATUS_OPTIONS = [
   { value: 'black-translucent', label: 'Black Translucent' },
 ];
 
+function hslToHex(hsl: string): string {
+  const parts = hsl.match(/[\d.]+/g);
+  if (!parts || parts.length < 3) return '#f97316';
+
+  const h = parseFloat(parts[0]) / 360;
+  const s = parseFloat(parts[1]) / 100;
+  const l = parseFloat(parts[2]) / 100;
+
+  if (s === 0) {
+    const v = Math.round(l * 255);
+    return `#${v.toString(16).padStart(2, '0').repeat(3)}`;
+  }
+
+  const hue2rgb = (p: number, q: number, t: number) => {
+    if (t < 0) t += 1;
+    if (t > 1) t -= 1;
+    if (t < 1 / 6) return p + (q - p) * 6 * t;
+    if (t < 1 / 2) return q;
+    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+    return p;
+  };
+
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+  const r = Math.round(hue2rgb(p, q, h + 1 / 3) * 255);
+  const g = Math.round(hue2rgb(p, q, h) * 255);
+  const b = Math.round(hue2rgb(p, q, h - 1 / 3) * 255);
+
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+}
+
 export default function PWASettingsPage() {
   const params = useParams();
   const storeId = params.id as string;
 
-  const [_storeName, setStoreName] = useState('');
+  const [storeInfo, setStoreInfo] = useState<StoreInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [pwaEnabled, setPwaEnabled] = useState(false);
   const [settings, setSettings] = useState<PWASettings>(DEFAULT_SETTINGS);
+  const [hasExistingSettings, setHasExistingSettings] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const fetchStoreName = useCallback(async () => {
+  const fetchStoreInfo = useCallback(async () => {
     try {
       const token = localStorage.getItem('authToken');
       const res = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}`, {
@@ -84,10 +131,22 @@ export default function PWASettingsPage() {
       });
       if (res.ok) {
         const data = await res.json();
-        setStoreName(data.data?.store?.name || '');
+        const store = data.data?.store || data.data;
+        if (store) {
+          setStoreInfo({
+            name: store.name || '',
+            nameAr: store.nameAr || undefined,
+            logo: store.logo || undefined,
+            logoAr: store.logoAr || undefined,
+            favicon: store.favicon || undefined,
+            description: store.description || undefined,
+            descriptionAr: store.descriptionAr || undefined,
+            theme: store.theme || undefined,
+          });
+        }
       }
     } catch (err) {
-      console.error('Failed to fetch store name:', err);
+      console.error('Failed to fetch store info:', err);
     }
   }, [storeId]);
 
@@ -100,7 +159,10 @@ export default function PWASettingsPage() {
       if (res.ok) {
         const data = await res.json();
         setPwaEnabled(data.data?.pwaEnabled || false);
-        setSettings({ ...DEFAULT_SETTINGS, ...(data.data?.settings || {}) });
+        if (data.data?.settings && Object.keys(data.data.settings).length > 0) {
+          setHasExistingSettings(true);
+          setSettings({ ...DEFAULT_SETTINGS, ...(data.data.settings || {}) });
+        }
       }
     } catch (err) {
       console.error('Failed to fetch PWA settings:', err);
@@ -109,16 +171,62 @@ export default function PWASettingsPage() {
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
-    await Promise.all([fetchStoreName(), fetchSettings()]);
+    await Promise.all([fetchStoreInfo(), fetchSettings()]);
     setLoading(false);
-  }, [fetchStoreName, fetchSettings]);
+  }, [fetchStoreInfo, fetchSettings]);
 
   useEffect(() => {
     fetchAll();
   }, [storeId]);
 
+  // Auto-populate from store branding when no existing PWA settings
+  useEffect(() => {
+    if (!storeInfo || hasExistingSettings) return;
+
+    const themeColor = storeInfo.theme?.primaryColor
+      ? hslToHex(storeInfo.theme.primaryColor)
+      : '#f97316';
+
+    setSettings(prev => ({
+      ...prev,
+      appName: prev.appName || storeInfo.name || '',
+      appNameAr: prev.appNameAr || storeInfo.nameAr || undefined,
+      shortName: prev.shortName || (storeInfo.name || '').slice(0, 12),
+      shortNameAr: prev.shortNameAr || (storeInfo.nameAr || '').slice(0, 12) || undefined,
+      description: prev.description || storeInfo.description || '',
+      descriptionAr: prev.descriptionAr || storeInfo.descriptionAr || undefined,
+      themeColor: themeColor,
+      splashScreenColor: themeColor,
+      icon192: prev.icon192 || storeInfo.favicon || storeInfo.logo || undefined,
+      icon512: prev.icon512 || storeInfo.logo || undefined,
+    }));
+  }, [storeInfo, hasExistingSettings]);
+
+  const handlePopulateFromStore = () => {
+    if (!storeInfo) return;
+    const themeColor = storeInfo.theme?.primaryColor
+      ? hslToHex(storeInfo.theme.primaryColor)
+      : '#f97316';
+    setSettings(prev => ({
+      ...prev,
+      appName: storeInfo.name || prev.appName,
+      appNameAr: storeInfo.nameAr || prev.appNameAr,
+      shortName: (storeInfo.name || '').slice(0, 12) || prev.shortName,
+      shortNameAr: (storeInfo.nameAr || '').slice(0, 12) || prev.shortNameAr,
+      description: storeInfo.description || prev.description,
+      descriptionAr: storeInfo.descriptionAr || prev.descriptionAr,
+      themeColor: themeColor,
+      splashScreenColor: themeColor,
+      icon192: storeInfo.favicon || storeInfo.logo || prev.icon192,
+      icon512: storeInfo.logo || prev.icon512,
+    }));
+    setMessage({ type: 'success', text: 'Populated from store branding' });
+    setTimeout(() => setMessage(null), 3000);
+  };
+
   const handleToggleEnabled = async () => {
     setSaving(true);
+    setMessage(null);
     try {
       const token = localStorage.getItem('authToken');
       const res = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/pwa/settings`, {
@@ -132,11 +240,10 @@ export default function PWASettingsPage() {
       if (res.ok) {
         setPwaEnabled(!pwaEnabled);
       } else {
-        alert('Failed to update PWA status. Please try again.');
+        setMessage({ type: 'error', text: 'Failed to update PWA status' });
       }
-    } catch (err) {
-      console.error('Failed to toggle PWA:', err);
-      alert('Failed to update PWA status. Please try again.');
+    } catch {
+      setMessage({ type: 'error', text: 'Failed to update PWA status' });
     } finally {
       setSaving(false);
     }
@@ -144,6 +251,7 @@ export default function PWASettingsPage() {
 
   const handleSaveSettings = async () => {
     setSaving(true);
+    setMessage(null);
     try {
       const token = localStorage.getItem('authToken');
       const res = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/pwa/settings`, {
@@ -154,12 +262,14 @@ export default function PWASettingsPage() {
         },
         body: JSON.stringify({ settings }),
       });
-      if (!res.ok) {
-        alert('Failed to save PWA settings. Please try again.');
+      if (res.ok) {
+        setMessage({ type: 'success', text: 'PWA settings saved successfully' });
+        setHasExistingSettings(true);
+      } else {
+        setMessage({ type: 'error', text: 'Failed to save PWA settings' });
       }
-    } catch (err) {
-      console.error('Failed to save settings:', err);
-      alert('Failed to save PWA settings. Please try again.');
+    } catch {
+      setMessage({ type: 'error', text: 'Failed to save PWA settings' });
     } finally {
       setSaving(false);
     }
@@ -192,6 +302,35 @@ export default function PWASettingsPage() {
         </div>
       ) : (
         <div className="space-y-6">
+          {/* Auto-populate banner */}
+          {storeInfo && (
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {storeInfo.logo && (
+                  <img
+                    src={storeInfo.logo}
+                    alt="Store logo"
+                    className="w-10 h-10 rounded-lg object-contain bg-white border"
+                  />
+                )}
+                <div>
+                  <p className="font-medium text-gray-900">
+                    {storeInfo.name}
+                    {storeInfo.nameAr && <span className="text-gray-500 mx-2">|</span>}
+                    {storeInfo.nameAr && <span dir="rtl">{storeInfo.nameAr}</span>}
+                  </p>
+                  <p className="text-sm text-gray-600">Use store branding to fill PWA settings</p>
+                </div>
+              </div>
+              <button
+                onClick={handlePopulateFromStore}
+                className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap"
+              >
+                Populate from Store
+              </button>
+            </div>
+          )}
+
           {/* PWA Benefits Info */}
           <div className="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-6">
             <h3 className="font-semibold text-gray-900 mb-3">Why Enable PWA?</h3>
@@ -321,7 +460,7 @@ export default function PWASettingsPage() {
                   disabled={!pwaEnabled}
                 />
               </div>
-              <div className="md:col-span-2">
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
                 <textarea
                   value={settings.description}
@@ -329,6 +468,20 @@ export default function PWASettingsPage() {
                   placeholder="Shop the latest products at amazing prices"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   rows={2}
+                  disabled={!pwaEnabled}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Description (Arabic)
+                </label>
+                <textarea
+                  value={settings.descriptionAr || ''}
+                  onChange={e => setSettings({ ...settings, descriptionAr: e.target.value })}
+                  placeholder="تسوق أحدث المنتجات بأسعار مميزة"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  rows={2}
+                  dir="rtl"
                   disabled={!pwaEnabled}
                 />
               </div>
@@ -435,6 +588,13 @@ export default function PWASettingsPage() {
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   disabled={!pwaEnabled}
                 />
+                {settings.icon192 && (
+                  <img
+                    src={settings.icon192}
+                    alt="Icon 192"
+                    className="mt-2 w-12 h-12 rounded-lg object-contain bg-gray-50 border"
+                  />
+                )}
                 <p className="text-xs text-gray-500 mt-1">Standard icon for app</p>
               </div>
               <div>
@@ -447,6 +607,13 @@ export default function PWASettingsPage() {
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   disabled={!pwaEnabled}
                 />
+                {settings.icon512 && (
+                  <img
+                    src={settings.icon512}
+                    alt="Icon 512"
+                    className="mt-2 w-12 h-12 rounded-lg object-contain bg-gray-50 border"
+                  />
+                )}
                 <p className="text-xs text-gray-500 mt-1">High-res icon for splash screen</p>
               </div>
               <div>
@@ -461,6 +628,13 @@ export default function PWASettingsPage() {
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   disabled={!pwaEnabled}
                 />
+                {settings.maskableIcon && (
+                  <img
+                    src={settings.maskableIcon}
+                    alt="Maskable"
+                    className="mt-2 w-12 h-12 rounded-lg object-contain bg-gray-50 border"
+                  />
+                )}
                 <p className="text-xs text-gray-500 mt-1">Adaptive icon with safe zone</p>
               </div>
             </div>
@@ -584,6 +758,19 @@ export default function PWASettingsPage() {
               </div>
             </div>
           </div>
+
+          {/* Message */}
+          {message && (
+            <div
+              className={`rounded-xl p-4 text-sm ${
+                message.type === 'success'
+                  ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
+                  : 'bg-red-50 border border-red-200 text-red-700'
+              }`}
+            >
+              {message.text}
+            </div>
+          )}
 
           {/* Save Button */}
           {pwaEnabled && (
