@@ -62,24 +62,28 @@ router.post(
       const { storeId } = req.params;
       const data = createCategorySchema.parse(req.body);
 
-      const slug =
+      let baseSlug =
         data.slug ||
         data.name
           .toLowerCase()
-          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/[^a-z0-9\u0600-\u06FF]+/g, '-')
           .replace(/(^-|-$)/g, '');
 
-      // Check for duplicate slug within store
-      const existing = await prisma.category.findFirst({
-        where: { storeId, slug, deletedAt: null },
-      });
+      // If slug is empty (e.g. pure symbols), use a fallback
+      if (!baseSlug) {
+        baseSlug = `category-${Date.now()}`;
+      }
 
-      if (existing) {
-        res.status(409).json({
-          success: false,
-          error: { code: 'DUPLICATE_SLUG', message: 'A category with this slug already exists' },
-        });
-        return;
+      // Auto-deduplicate: append -1, -2, etc. if slug exists
+      let slug = baseSlug;
+      let suffix = 0;
+      while (
+        await prisma.category.findFirst({
+          where: { storeId, slug, deletedAt: null },
+        })
+      ) {
+        suffix++;
+        slug = `${baseSlug}-${suffix}`;
       }
 
       const category = await prisma.category.create({
