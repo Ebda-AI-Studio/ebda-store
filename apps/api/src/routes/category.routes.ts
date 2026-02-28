@@ -14,7 +14,7 @@ const createCategorySchema = z.object({
     .string()
     .min(1)
     .max(255)
-    .regex(/^[a-z0-9-]+$/)
+    .regex(/^[a-z0-9\u0600-\u06FF-]+$/)
     .optional(),
   description: z.string().optional(),
   descriptionAr: z.string().optional(),
@@ -28,7 +28,7 @@ const updateCategorySchema = z.object({
     .string()
     .min(1)
     .max(255)
-    .regex(/^[a-z0-9-]+$/)
+    .regex(/^[a-z0-9\u0600-\u06FF-]+$/)
     .optional(),
   description: z.string().optional().nullable(),
   descriptionAr: z.string().optional().nullable(),

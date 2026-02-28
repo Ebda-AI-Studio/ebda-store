@@ -15,7 +15,7 @@ const createProductSchema = z.object({
     .string()
     .min(1)
     .max(255)
-    .regex(/^[a-z0-9-]+$/)
+    .regex(/^[a-z0-9\u0600-\u06FF-]+$/)
     .optional(),
   description: z.string().optional(),
   descriptionAr: z.string().optional(),
