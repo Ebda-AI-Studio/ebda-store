@@ -82,7 +82,7 @@ export default function PaymentSettingsPage() {
   const fetchConfigs = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_URL}/payment-settings`, {
+      const response = await fetch(`${API_URL}/api/v1/payment-settings`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await response.json();
@@ -126,8 +126,8 @@ export default function PaymentSettingsPage() {
       const existingConfig = configs.find(c => c.provider === editingProvider);
       const method = existingConfig ? 'PUT' : 'POST';
       const url = existingConfig
-        ? `${API_URL}/payment-settings/${editingProvider}`
-        : `${API_URL}/payment-settings`;
+        ? `${API_URL}/api/v1/payment-settings/${editingProvider}`
+        : `${API_URL}/api/v1/payment-settings`;
 
       const response = await fetch(url, {
         method,
@@ -155,7 +155,7 @@ export default function PaymentSettingsPage() {
 
   const handleToggle = async (provider: string, enabled: boolean) => {
     try {
-      const response = await fetch(`${API_URL}/payment-settings/${provider}/toggle`, {
+      const response = await fetch(`${API_URL}/api/v1/payment-settings/${provider}/toggle`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -175,7 +175,7 @@ export default function PaymentSettingsPage() {
 
   const handleSetDefault = async (provider: string) => {
     try {
-      const response = await fetch(`${API_URL}/payment-settings/${provider}/set-default`, {
+      const response = await fetch(`${API_URL}/api/v1/payment-settings/${provider}/set-default`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -192,7 +192,7 @@ export default function PaymentSettingsPage() {
   const handleTest = async (provider: string) => {
     setTesting(provider);
     try {
-      const response = await fetch(`${API_URL}/payment-settings/${provider}/test`, {
+      const response = await fetch(`${API_URL}/api/v1/payment-settings/${provider}/test`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       });

@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { Button } from '@force/ui';
 import { useAuth } from '../lib/auth';
 import { getApiUrl } from '../lib/api';
@@ -146,6 +146,7 @@ export function AdminLayout({
   storeSlug,
 }: AdminLayoutProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { user, logout, isLoading } = useAuth();
   const {
@@ -190,6 +191,20 @@ export function AdminLayout({
     if (webBase) return webBase;
     return null;
   }, [storeDomain, storeSlug, storeInfo]);
+
+  // Compute smart back URL based on current path
+  const backUrl = useMemo(() => {
+    // Root pages — no back button
+    if (pathname === '/' || pathname === '/dashboard') return null;
+    // Store sub-pages (e.g. /stores/:id/products) → back to store
+    const storeSubMatch = pathname.match(/^\/stores\/([^/]+)\/.+/);
+    if (storeSubMatch) return `/stores/${storeSubMatch[1]}`;
+    // Store detail page → back to stores list
+    const storeDetailMatch = pathname.match(/^\/stores\/[^/]+$/);
+    if (storeDetailMatch) return '/stores';
+    // Top-level pages (e.g. /users, /stores, /orders) → back to dashboard
+    return '/';
+  }, [pathname]);
 
   // Store admin nav is computed dynamically so that Customers and Analytics
   // resolve to store-scoped URLs (/stores/:id/customers, /stores/:id/analytics)
@@ -483,6 +498,22 @@ export function AdminLayout({
                 />
               </svg>
             </button>
+            {backUrl && (
+              <Link
+                href={backUrl}
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                aria-label="Go back"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 19l-7-7 7-7"
+                  />
+                </svg>
+              </Link>
+            )}
             <div>
               <h1 className="text-lg font-bold text-foreground">{title}</h1>
               {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
