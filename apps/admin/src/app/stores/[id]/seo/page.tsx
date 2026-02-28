@@ -68,7 +68,15 @@ export default function StoreSeoPage() {
         const data = await res.json();
         const seo = data.data?.seo || data.data;
         if (seo) {
-          setSettings({ ...DEFAULT_SETTINGS, ...seo });
+          setSettings({
+            metaTitle: seo.metaTitle || '',
+            metaTitleAr: seo.metaTitleAr || '',
+            metaDescription: seo.metaDescription || '',
+            metaDescriptionAr: seo.metaDescriptionAr || '',
+            ogImage: seo.ogImage || '',
+            twitterHandle: seo.twitterHandle || '',
+            googleSiteVerification: seo.googleSiteVerification || '',
+          });
         }
       }
       // If 404 or no data, keep defaults
