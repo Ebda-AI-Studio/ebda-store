@@ -173,7 +173,7 @@ export default function StoreProductsPage() {
       subtitle={`Manage products for ${store?.name || 'this store'}`}
       actions={
         <div className="flex gap-2">
-          <Link href={`/products/new?storeId=${storeId}`}>
+          <Link href={`/stores/${storeId}/products/new`}>
             <Button size="sm">
               <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
@@ -332,7 +332,7 @@ export default function StoreProductsPage() {
                           </Button>
                         </Link>
                       )}
-                      <Link href={`/products/${product.id}?storeId=${storeId}`}>
+                      <Link href={`/stores/${storeId}/products/${product.id}`}>
                         <Button variant="outline" size="sm">
                           View
                         </Button>
