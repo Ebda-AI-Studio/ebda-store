@@ -190,14 +190,18 @@ export class ProductService {
   static async update(storeId: string, productId: string, data: UpdateProductData) {
     const product = await this.getById(storeId, productId);
 
-    // Check slug uniqueness if changing
-    if (data.slug && data.slug !== product.slug) {
-      const existingProduct = await prisma.product.findFirst({
-        where: { storeId, slug: data.slug, id: { not: productId } },
-      });
-
-      if (existingProduct) {
-        throw new AppError(409, 'ALREADY_EXISTS', 'Product with this slug already exists');
+    // Auto-deduplicate slug if changing
+    let finalSlug = data.slug;
+    if (finalSlug && finalSlug !== product.slug) {
+      const baseSlug = finalSlug;
+      let suffix = 0;
+      while (
+        await prisma.product.findFirst({
+          where: { storeId, slug: finalSlug, id: { not: productId } },
+        })
+      ) {
+        suffix++;
+        finalSlug = `${baseSlug}-${suffix}`;
       }
     }
 
@@ -205,7 +209,7 @@ export class ProductService {
       where: { id: productId, storeId },
       data: {
         name: data.name,
-        slug: data.slug,
+        slug: finalSlug,
         description: data.description,
         price: data.price,
         compareAtPrice: data.compareAtPrice,

@@ -142,17 +142,17 @@ router.put(
         return;
       }
 
-      // Check slug uniqueness if changing
+      // Auto-deduplicate slug if changing
       if (data.slug && data.slug !== existing.slug) {
-        const duplicate = await prisma.category.findFirst({
-          where: { storeId, slug: data.slug, deletedAt: null, id: { not: categoryId } },
-        });
-        if (duplicate) {
-          res.status(409).json({
-            success: false,
-            error: { code: 'DUPLICATE_SLUG', message: 'A category with this slug already exists' },
-          });
-          return;
+        const baseSlug = data.slug;
+        let suffix = 0;
+        while (
+          await prisma.category.findFirst({
+            where: { storeId, slug: data.slug, deletedAt: null, id: { not: categoryId } },
+          })
+        ) {
+          suffix++;
+          data.slug = `${baseSlug}-${suffix}`;
         }
       }
 

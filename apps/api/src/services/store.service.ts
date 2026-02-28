@@ -77,15 +77,14 @@ export class StoreService {
   }
 
   static async create(ownerId: string, data: CreateStoreData) {
-    const slug = data.slug || slugify(data.name);
+    const baseSlug = data.slug || slugify(data.name);
 
-    // Check if slug exists
-    const existingStore = await prisma.store.findUnique({
-      where: { slug },
-    });
-
-    if (existingStore) {
-      throw new AppError(409, 'ALREADY_EXISTS', 'Store with this slug already exists');
+    // Auto-deduplicate slug
+    let slug = baseSlug;
+    let suffix = 0;
+    while (await prisma.store.findUnique({ where: { slug } })) {
+      suffix++;
+      slug = `${baseSlug}-${suffix}`;
     }
 
     // Check domain uniqueness
@@ -124,14 +123,13 @@ export class StoreService {
   static async update(storeId: string, data: UpdateStoreData) {
     const store = await this.getById(storeId);
 
-    // Check slug uniqueness if changing
+    // Auto-deduplicate slug if changing
     if (data.slug && data.slug !== store.slug) {
-      const existingStore = await prisma.store.findUnique({
-        where: { slug: data.slug },
-      });
-
-      if (existingStore) {
-        throw new AppError(409, 'ALREADY_EXISTS', 'Store with this slug already exists');
+      const baseSlug = data.slug;
+      let suffix = 0;
+      while (await prisma.store.findUnique({ where: { slug: data.slug } })) {
+        suffix++;
+        data.slug = `${baseSlug}-${suffix}`;
       }
     }
 
