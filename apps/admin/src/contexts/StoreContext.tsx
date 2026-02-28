@@ -46,7 +46,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         });
         if (response.ok) {
           const data = await response.json();
-          const storeList: Store[] = data.data?.stores || data.data || [];
+          const raw = data.data?.stores || data.data;
+          const storeList: Store[] = Array.isArray(raw) ? raw : [];
           setStores(storeList);
 
           // Restore from localStorage or pick default

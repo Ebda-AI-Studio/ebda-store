@@ -65,7 +65,10 @@ export default function StorePaymentSettingsPage() {
       });
       if (res.ok) {
         const data = await res.json();
-        const loaded: StorePaymentConfig[] = data.data?.configs || data.data || [];
+        const loaded: StorePaymentConfig[] =
+          data.data?.storeConfigs ||
+          data.data?.configs ||
+          (Array.isArray(data.data) ? data.data : []);
         setConfigs(loaded);
 
         // Initialize form state from loaded configs
