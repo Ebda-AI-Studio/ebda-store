@@ -28,9 +28,9 @@ interface Product {
   isFeatured: boolean;
   isNew: boolean;
   weight?: number;
-  categories: { id: string; name: string }[];
+  categories: { categoryId: string; category: { id: string; name: string } }[];
   images: { id: string; url: string; alt?: string; position: number }[];
-  tags: { productId: string; tagId: string; tag: { id: string; name: string } }[];
+  tags: { tagId: string; tag: { id: string; name: string } }[];
   store: { id: string; name: string; slug: string };
   createdAt: string;
   updatedAt: string;
@@ -297,9 +297,9 @@ export default function ProductDetailPage() {
             <div className="rounded-xl border bg-white p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Categories</h2>
               <div className="flex flex-wrap gap-2">
-                {product.categories.map(category => (
-                  <Badge key={category.id} variant="secondary">
-                    {category.name}
+                {product.categories.map(c => (
+                  <Badge key={c.categoryId || c.category?.id} variant="secondary">
+                    {c.category?.name || c.categoryId}
                   </Badge>
                 ))}
               </div>
@@ -312,7 +312,7 @@ export default function ProductDetailPage() {
               <div className="flex flex-wrap gap-2">
                 {product.tags.map(t => (
                   <Badge key={t.tagId || t.tag?.id} variant="outline">
-                    {typeof t === 'string' ? t : t.tag?.name || t.tagId}
+                    {t.tag?.name || t.tagId}
                   </Badge>
                 ))}
               </div>
