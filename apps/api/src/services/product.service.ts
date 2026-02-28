@@ -140,15 +140,14 @@ export class ProductService {
   }
 
   static async create(storeId: string, data: CreateProductData) {
-    const slug = data.slug || slugify(data.name);
+    const baseSlug = data.slug || slugify(data.name);
 
-    // Check if slug exists
-    const existingProduct = await prisma.product.findFirst({
-      where: { storeId, slug },
-    });
-
-    if (existingProduct) {
-      throw new AppError(409, 'ALREADY_EXISTS', 'Product with this slug already exists');
+    // Auto-deduplicate slug: append -1, -2, etc. if exists
+    let slug = baseSlug;
+    let suffix = 0;
+    while (await prisma.product.findFirst({ where: { storeId, slug } })) {
+      suffix++;
+      slug = `${baseSlug}-${suffix}`;
     }
 
     const product = await prisma.product.create({
