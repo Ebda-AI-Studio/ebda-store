@@ -158,7 +158,7 @@ export class VariantService {
     storeId: string,
     productId: string,
     optionId: string,
-    input: { name?: string; nameAr?: string }
+    input: { name?: string; nameAr?: string | null }
   ) {
     const option = await prisma.productOption.findFirst({
       where: {
@@ -199,19 +199,21 @@ export class VariantService {
       throw new AppError(404, 'NOT_FOUND', 'Option not found');
     }
 
-    // Delete option (cascade will delete values and variant options)
-    await prisma.productOption.delete({ where: { id: optionId } });
+    await prisma.$transaction(async tx => {
+      // Delete all variants since they depend on options
+      await tx.productVariant.deleteMany({ where: { productId } });
 
-    // Delete all variants since they depend on options
-    await prisma.productVariant.deleteMany({ where: { productId } });
+      // Delete option (cascade will delete values and variant option junctions)
+      await tx.productOption.delete({ where: { id: optionId } });
 
-    // If no more options, mark product as not having variants
-    if (option.product.options.length <= 1) {
-      await prisma.product.update({
-        where: { id: productId },
-        data: { hasVariants: false },
-      });
-    }
+      // If no more options, mark product as not having variants
+      if (option.product.options.length <= 1) {
+        await tx.product.update({
+          where: { id: productId },
+          data: { hasVariants: false },
+        });
+      }
+    });
   }
 
   /**
@@ -258,7 +260,7 @@ export class VariantService {
     storeId: string,
     productId: string,
     valueId: string,
-    input: { value?: string; valueAr?: string }
+    input: { value?: string; valueAr?: string | null }
   ) {
     const optionValue = await prisma.productOptionValue.findFirst({
       where: {
@@ -364,7 +366,7 @@ export class VariantService {
 
     for (const existing of existingVariants) {
       const existingValueIds = existing.options.map(o => o.valueId).sort();
-      const newValueIds = input.optionValueIds.sort();
+      const newValueIds = [...input.optionValueIds].sort();
       if (JSON.stringify(existingValueIds) === JSON.stringify(newValueIds)) {
         throw new AppError(400, 'DUPLICATE_VARIANT', 'This variant combination already exists');
       }
@@ -378,11 +380,9 @@ export class VariantService {
     });
 
     const title = optionValues.map(v => v.value).join(' / ');
-    const titleAr =
-      optionValues
-        .filter(v => v.valueAr)
-        .map(v => v.valueAr)
-        .join(' / ') || null;
+    const titleAr = optionValues.every(v => v.valueAr)
+      ? optionValues.map(v => v.valueAr).join(' / ')
+      : null;
 
     // Create variant
     const variant = await prisma.productVariant.create({
@@ -532,11 +532,7 @@ export class VariantService {
     const created: string[] = [];
     for (const combo of newCombinations) {
       const title = combo.map(v => v.value).join(' / ');
-      const titleAr =
-        combo
-          .filter(v => v.valueAr)
-          .map(v => v.valueAr)
-          .join(' / ') || null;
+      const titleAr = combo.every(v => v.valueAr) ? combo.map(v => v.valueAr).join(' / ') : null;
 
       const variant = await prisma.productVariant.create({
         data: {
@@ -580,6 +576,12 @@ export class VariantService {
     const results = await Promise.all(
       updates.map(async update => {
         try {
+          const variant = await prisma.productVariant.findFirst({
+            where: { id: update.variantId, productId },
+          });
+          if (!variant) {
+            return { variantId: update.variantId, success: false };
+          }
           await prisma.productVariant.update({
             where: { id: update.variantId },
             data: { inventory: update.inventory },
@@ -610,6 +612,18 @@ export class VariantService {
       throw new AppError(404, 'NOT_FOUND', 'Product not found');
     }
 
+    // Validate all option IDs belong to this product
+    const validOptionIds = new Set(product.options.map(o => o.id));
+    for (const optionId of optionIds) {
+      if (!validOptionIds.has(optionId)) {
+        throw new AppError(
+          400,
+          'INVALID_OPTION',
+          `Option ${optionId} does not belong to this product`
+        );
+      }
+    }
+
     await Promise.all(
       optionIds.map((optionId, index) =>
         prisma.productOption.update({
@@ -626,10 +640,23 @@ export class VariantService {
   static async reorderVariants(storeId: string, productId: string, variantIds: string[]) {
     const product = await prisma.product.findFirst({
       where: { id: productId, storeId, deletedAt: null },
+      include: { variants: true },
     });
 
     if (!product) {
       throw new AppError(404, 'NOT_FOUND', 'Product not found');
+    }
+
+    // Validate all variant IDs belong to this product
+    const validVariantIds = new Set(product.variants.map(v => v.id));
+    for (const variantId of variantIds) {
+      if (!validVariantIds.has(variantId)) {
+        throw new AppError(
+          400,
+          'INVALID_VARIANT',
+          `Variant ${variantId} does not belong to this product`
+        );
+      }
     }
 
     await Promise.all(

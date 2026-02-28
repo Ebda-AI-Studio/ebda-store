@@ -4,8 +4,10 @@ import { slugify } from '@force/shared';
 
 interface CreateProductData {
   name: string;
+  nameAr?: string;
   slug?: string;
   description?: string;
+  descriptionAr?: string;
   price: number;
   compareAtPrice?: number;
   sku?: string;
@@ -154,8 +156,10 @@ export class ProductService {
       data: {
         storeId,
         name: data.name,
+        nameAr: data.nameAr,
         slug,
         description: data.description,
+        descriptionAr: data.descriptionAr,
         price: data.price,
         compareAtPrice: data.compareAtPrice,
         sku: data.sku,
@@ -209,8 +213,10 @@ export class ProductService {
       where: { id: productId, storeId },
       data: {
         name: data.name,
+        nameAr: data.nameAr,
         slug: finalSlug,
         description: data.description,
+        descriptionAr: data.descriptionAr,
         price: data.price,
         compareAtPrice: data.compareAtPrice,
         sku: data.sku,

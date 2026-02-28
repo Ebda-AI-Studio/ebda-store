@@ -10,6 +10,7 @@ const router = Router({ mergeParams: true });
 // Validation schemas
 const createProductSchema = z.object({
   name: z.string().min(1).max(255),
+  nameAr: z.string().max(255).optional(),
   slug: z
     .string()
     .min(1)
@@ -17,6 +18,7 @@ const createProductSchema = z.object({
     .regex(/^[a-z0-9-]+$/)
     .optional(),
   description: z.string().optional(),
+  descriptionAr: z.string().optional(),
   price: z.number().int().min(0),
   compareAtPrice: z.number().int().min(0).optional(),
   sku: z.string().optional(),

@@ -43,7 +43,9 @@ export default function NewProductPage() {
 
   const [formData, setFormData] = useState({
     name: '',
+    nameAr: '',
     description: '',
+    descriptionAr: '',
     price: '',
     compareAtPrice: '',
     sku: '',
@@ -119,7 +121,9 @@ export default function NewProductPage() {
 
       const body: Record<string, unknown> = {
         name: formData.name,
+        nameAr: formData.nameAr || undefined,
         description: formData.description || undefined,
+        descriptionAr: formData.descriptionAr || undefined,
         price: priceInFils,
         compareAtPrice: compareAtPriceInFils,
         sku: formData.sku || undefined,
@@ -199,12 +203,27 @@ export default function NewProductPage() {
                   placeholder="Enter product name"
                   required
                 />
+                <Input
+                  label="Product Name (Arabic)"
+                  value={formData.nameAr}
+                  onChange={e => updateField('nameAr', e.target.value)}
+                  placeholder="ادخل اسم المنتج"
+                  dir="rtl"
+                />
                 <Textarea
                   label="Description"
                   value={formData.description}
                   onChange={e => updateField('description', e.target.value)}
                   placeholder="Describe your product..."
-                  rows={5}
+                  rows={4}
+                />
+                <Textarea
+                  label="Description (Arabic)"
+                  value={formData.descriptionAr}
+                  onChange={e => updateField('descriptionAr', e.target.value)}
+                  placeholder="وصف المنتج..."
+                  rows={4}
+                  dir="rtl"
                 />
               </div>
             </div>

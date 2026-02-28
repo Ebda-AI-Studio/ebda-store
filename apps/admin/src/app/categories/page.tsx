@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button, Modal } from '@force/ui';
 import { AdminLayout } from '../../components/AdminLayout';
+import { ImageUpload } from '../../components/ImageUpload';
 import { apiGet, apiPost, apiPut, apiDelete } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { useStore } from '../../contexts/StoreContext';
@@ -10,19 +11,32 @@ import { useStore } from '../../contexts/StoreContext';
 interface Category {
   id: string;
   name: string;
+  nameAr: string | null;
   slug: string;
   description: string | null;
+  descriptionAr: string | null;
+  image: string | null;
   productCount: number;
   _count?: { products: number };
 }
 
 interface CategoryFormData {
   name: string;
+  nameAr: string;
   slug: string;
   description: string;
+  descriptionAr: string;
+  image: string;
 }
 
-const emptyForm: CategoryFormData = { name: '', slug: '', description: '' };
+const emptyForm: CategoryFormData = {
+  name: '',
+  nameAr: '',
+  slug: '',
+  description: '',
+  descriptionAr: '',
+  image: '',
+};
 
 export default function CategoriesPage() {
   const { token } = useAuth();
@@ -107,8 +121,11 @@ export default function CategoriesPage() {
     setEditingCategory(category);
     setFormData({
       name: category.name,
+      nameAr: category.nameAr || '',
       slug: category.slug,
       description: category.description || '',
+      descriptionAr: category.descriptionAr || '',
+      image: category.image || '',
     });
     setIsModalOpen(true);
   };
@@ -121,11 +138,14 @@ export default function CategoriesPage() {
     try {
       setIsSaving(true);
 
-      const body: { name: string; slug?: string; description?: string } = {
+      const body: Record<string, string | undefined> = {
         name: formData.name.trim(),
       };
+      if (formData.nameAr.trim()) body.nameAr = formData.nameAr.trim();
       if (formData.slug.trim()) body.slug = formData.slug.trim();
       if (formData.description.trim()) body.description = formData.description.trim();
+      if (formData.descriptionAr.trim()) body.descriptionAr = formData.descriptionAr.trim();
+      if (formData.image) body.image = formData.image;
 
       if (editingCategory) {
         const { error: updateError } = await apiPut(
@@ -245,13 +265,10 @@ export default function CategoriesPage() {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Name
+                  Category
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                   Slug
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Description
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                   Products
@@ -264,11 +281,44 @@ export default function CategoriesPage() {
             <tbody className="bg-white divide-y divide-gray-200">
               {categories.map(category => (
                 <tr key={category.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap font-medium">{category.name}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center gap-3">
+                      {category.image ? (
+                        <img
+                          src={category.image}
+                          alt={category.name}
+                          className="h-10 w-10 rounded-lg object-cover border bg-gray-50"
+                        />
+                      ) : (
+                        <div className="h-10 w-10 rounded-lg bg-gray-100 flex items-center justify-center">
+                          <svg
+                            className="h-5 w-5 text-gray-400"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={1.5}
+                              d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z"
+                            />
+                          </svg>
+                        </div>
+                      )}
+                      <div>
+                        <p className="font-medium text-gray-900">{category.name}</p>
+                        {category.nameAr && (
+                          <p className="text-xs text-gray-500" dir="rtl">
+                            {category.nameAr}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-gray-500 font-mono text-sm">
                     {category.slug}
                   </td>
-                  <td className="px-6 py-4 text-gray-500">{category.description || '-'}</td>
                   <td className="px-6 py-4 whitespace-nowrap">{category.productCount}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <button
@@ -324,6 +374,17 @@ export default function CategoriesPage() {
       >
         <form onSubmit={handleSubmit}>
           <div className="space-y-4">
+            {/* Icon Upload */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Category Icon</label>
+              <ImageUpload
+                value={formData.image || undefined}
+                onUpload={url => setFormData(prev => ({ ...prev, image: url }))}
+                onRemove={() => setFormData(prev => ({ ...prev, image: '' }))}
+                folder="categories"
+                label="Upload icon"
+              />
+            </div>
             <div>
               <label
                 htmlFor="category-name"
@@ -339,6 +400,23 @@ export default function CategoriesPage() {
                 onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
                 className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                 placeholder="e.g. Electronics"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="category-name-ar"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                Name (Arabic)
+              </label>
+              <input
+                id="category-name-ar"
+                type="text"
+                value={formData.nameAr}
+                onChange={e => setFormData(prev => ({ ...prev, nameAr: e.target.value }))}
+                className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                placeholder="مثال: إلكترونيات"
+                dir="rtl"
               />
             </div>
             <div>
@@ -371,6 +449,23 @@ export default function CategoriesPage() {
                 onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
                 className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                 placeholder="Optional description for this category"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="category-description-ar"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                Description (Arabic)
+              </label>
+              <textarea
+                id="category-description-ar"
+                rows={3}
+                value={formData.descriptionAr}
+                onChange={e => setFormData(prev => ({ ...prev, descriptionAr: e.target.value }))}
+                className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                placeholder="وصف اختياري لهذا التصنيف"
+                dir="rtl"
               />
             </div>
           </div>

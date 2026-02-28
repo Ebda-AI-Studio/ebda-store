@@ -9,6 +9,7 @@ const router = Router({ mergeParams: true });
 
 const createCategorySchema = z.object({
   name: z.string().min(1).max(255),
+  nameAr: z.string().max(255).optional(),
   slug: z
     .string()
     .min(1)
@@ -16,17 +17,22 @@ const createCategorySchema = z.object({
     .regex(/^[a-z0-9-]+$/)
     .optional(),
   description: z.string().optional(),
+  descriptionAr: z.string().optional(),
+  image: z.string().url().optional(),
 });
 
 const updateCategorySchema = z.object({
   name: z.string().min(1).max(255).optional(),
+  nameAr: z.string().max(255).optional().nullable(),
   slug: z
     .string()
     .min(1)
     .max(255)
     .regex(/^[a-z0-9-]+$/)
     .optional(),
-  description: z.string().optional(),
+  description: z.string().optional().nullable(),
+  descriptionAr: z.string().optional().nullable(),
+  image: z.string().url().optional().nullable(),
 });
 
 // GET /stores/:storeId/categories
@@ -90,8 +96,11 @@ router.post(
         data: {
           storeId,
           name: data.name,
+          nameAr: data.nameAr,
           slug,
           description: data.description,
+          descriptionAr: data.descriptionAr,
+          image: data.image,
         },
         include: {
           _count: { select: { products: true } },
@@ -160,8 +169,11 @@ router.put(
         where: { id: categoryId },
         data: {
           name: data.name,
+          nameAr: data.nameAr,
           slug: data.slug,
           description: data.description,
+          descriptionAr: data.descriptionAr,
+          image: data.image,
         },
         include: {
           _count: { select: { products: true } },

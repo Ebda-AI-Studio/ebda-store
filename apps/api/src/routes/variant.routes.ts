@@ -117,6 +117,29 @@ router.post(
   }
 );
 
+// PUT /stores/:storeId/products/:productId/options/reorder - Reorder options
+// NOTE: Must be registered BEFORE /:optionId to avoid being shadowed
+router.put(
+  '/:storeId/products/:productId/options/reorder',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, productId } = req.params;
+      const { ids } = reorderSchema.parse(req.body);
+
+      await VariantService.reorderOptions(storeId, productId, ids);
+
+      res.json({
+        success: true,
+        data: { message: 'Options reordered successfully' },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // PUT /stores/:storeId/products/:productId/options/:optionId - Update option
 router.put(
   '/:storeId/products/:productId/options/:optionId',
@@ -129,7 +152,7 @@ router.put(
 
       const option = await VariantService.updateOption(storeId, productId, optionId, {
         name: data.name,
-        nameAr: data.nameAr ?? undefined,
+        nameAr: data.nameAr,
       });
 
       res.json({
@@ -197,7 +220,7 @@ router.put(
 
       const value = await VariantService.updateOptionValue(storeId, productId, valueId, {
         value: data.value,
-        valueAr: data.valueAr ?? undefined,
+        valueAr: data.valueAr,
       });
 
       res.json({
@@ -246,6 +269,29 @@ router.post(
       res.status(201).json({
         success: true,
         data: { variant },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// PUT /stores/:storeId/products/:productId/variants/reorder - Reorder variants
+// NOTE: Must be registered BEFORE /:variantId to avoid being shadowed
+router.put(
+  '/:storeId/products/:productId/variants/reorder',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, productId } = req.params;
+      const { ids } = reorderSchema.parse(req.body);
+
+      await VariantService.reorderVariants(storeId, productId, ids);
+
+      res.json({
+        success: true,
+        data: { message: 'Variants reordered successfully' },
       });
     } catch (error) {
       next(error);
@@ -332,50 +378,6 @@ router.post(
       res.json({
         success: true,
         data: { result },
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
-);
-
-// PUT /stores/:storeId/products/:productId/options/reorder - Reorder options
-router.put(
-  '/:storeId/products/:productId/options/reorder',
-  authenticate,
-  authorize('store_admin', 'super_admin'),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const { storeId, productId } = req.params;
-      const { ids } = reorderSchema.parse(req.body);
-
-      await VariantService.reorderOptions(storeId, productId, ids);
-
-      res.json({
-        success: true,
-        data: { message: 'Options reordered successfully' },
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
-);
-
-// PUT /stores/:storeId/products/:productId/variants/reorder - Reorder variants
-router.put(
-  '/:storeId/products/:productId/variants/reorder',
-  authenticate,
-  authorize('store_admin', 'super_admin'),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const { storeId, productId } = req.params;
-      const { ids } = reorderSchema.parse(req.body);
-
-      await VariantService.reorderVariants(storeId, productId, ids);
-
-      res.json({
-        success: true,
-        data: { message: 'Variants reordered successfully' },
       });
     } catch (error) {
       next(error);
