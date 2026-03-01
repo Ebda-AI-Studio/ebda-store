@@ -243,3 +243,30 @@ export function useAnnouncementBar(): AnnouncementBar | undefined {
   const { store } = useStore();
   return store.announcementBar;
 }
+
+/**
+ * Hook to build store-prefixed URLs.
+ * On platform domains (vercel.app, etc.), URLs are prefixed with /{slug}.
+ * On custom domains, URLs are returned as-is.
+ */
+export function useStoreUrl() {
+  const { store } = useStore();
+
+  const isPlatform =
+    typeof window !== 'undefined' &&
+    (window.location.hostname.includes('vercel.app') ||
+      window.location.hostname.includes('localhost') ||
+      window.location.hostname.includes('127.0.0.1'));
+
+  const prefix = isPlatform && store.slug && store.id !== 'demo' ? `/${store.slug}` : '';
+
+  return useCallback(
+    (path: string) => {
+      if (!prefix) return path;
+      // Don't double-prefix
+      if (path.startsWith(prefix)) return path;
+      return `${prefix}${path.startsWith('/') ? path : `/${path}`}`;
+    },
+    [prefix]
+  );
+}

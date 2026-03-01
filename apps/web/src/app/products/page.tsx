@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { api, type Product, type Category, type PaginationMeta } from '@/lib/api';
 import { useCart } from '../../contexts/CartContext';
 import { Header, Footer } from '../../components';
@@ -36,8 +37,9 @@ function ProductSkeleton() {
 }
 
 export default function ProductsPage() {
+  const searchParams = useSearchParams();
   const [search, setSearch] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState(searchParams.get('category') || '');
   const [sortBy, setSortBy] = useState('newest');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [page, setPage] = useState(1);
@@ -246,9 +248,9 @@ export default function ProductsPage() {
                   {categories.map(cat => (
                     <button
                       key={cat.id}
-                      onClick={() => setCategoryFilter(cat.id)}
+                      onClick={() => setCategoryFilter(cat.slug)}
                       className={`flex w-full items-center justify-between rounded-xl px-4 py-2.5 text-sm transition-all ${
-                        categoryFilter === cat.id
+                        categoryFilter === cat.slug
                           ? 'bg-primary text-white shadow-md shadow-primary/25'
                           : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground'
                       }`}
@@ -257,7 +259,7 @@ export default function ProductsPage() {
                       {cat.productCount !== undefined && (
                         <span
                           className={`rounded-full px-2 py-0.5 text-xs ${
-                            categoryFilter === cat.id ? 'bg-white/20' : 'bg-background'
+                            categoryFilter === cat.slug ? 'bg-white/20' : 'bg-background'
                           }`}
                         >
                           {cat.productCount}
@@ -273,7 +275,7 @@ export default function ProductsPage() {
                 onClick={() => {
                   setSearch('');
                   setCategoryFilter('');
-                  setSortBy('featured');
+                  setSortBy('newest');
                 }}
                 className="w-full rounded-xl border border-border py-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted"
               >

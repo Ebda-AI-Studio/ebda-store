@@ -122,12 +122,20 @@ export function middleware(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = slugInfo.rewrittenPath;
 
-    return NextResponse.rewrite(url, {
+    const response = NextResponse.rewrite(url, {
       request: { headers: requestHeaders },
     });
+    // Persist store slug in cookie so subsequent pages (e.g. /products) keep store context
+    response.cookies.set('x-store-slug', slugInfo.slug, { path: '/', httpOnly: false });
+    return response;
   }
 
-  // No slug — default platform behavior (demo store)
+  // No slug — check cookie for persisted store slug
+  const cookieSlug = request.cookies.get('x-store-slug')?.value;
+  if (cookieSlug) {
+    requestHeaders.set('x-store-slug', cookieSlug);
+  }
+
   return NextResponse.next({
     request: { headers: requestHeaders },
   });

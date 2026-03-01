@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@force/ui';
 import { useLanguage, translations } from '../contexts/LanguageContext';
 import { useCart } from '../contexts/CartContext';
+import { useStoreUrl } from '../contexts/StoreContext';
 import { LanguageSwitcher } from './LanguageSwitcher';
 
 interface HeaderProps {
@@ -21,12 +22,13 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const { t } = useLanguage();
+  const storeUrl = useStoreUrl();
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     const q = searchQuery.trim();
     if (q) {
-      router.push(`/search?q=${encodeURIComponent(q)}`);
+      router.push(storeUrl(`/search?q=${encodeURIComponent(q)}`));
       setSearchQuery('');
       setIsSearchOpen(false);
       setIsMobileMenuOpen(false);
@@ -34,10 +36,10 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
   };
 
   const navigation = [
-    { name: t('Products', translations['Products']), href: '/products' },
-    { name: t('Categories', translations['Categories']), href: '/categories' },
-    { name: t('About', translations['About']), href: '/about' },
-    { name: t('Contact', translations['Contact']), href: '/contact' },
+    { name: t('Products', translations['Products']), href: storeUrl('/products') },
+    { name: t('Categories', translations['Categories']), href: storeUrl('/categories') },
+    { name: t('About', translations['About']), href: storeUrl('/about') },
+    { name: t('Contact', translations['Contact']), href: storeUrl('/contact') },
   ];
 
   return (

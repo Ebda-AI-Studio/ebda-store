@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@force/ui';
 import { api, type Product, type Category } from '@/lib/api';
-import { useStore, useStoreBranding, useStoreContact } from '../contexts/StoreContext';
+import { useStore, useStoreBranding, useStoreContact, useStoreUrl } from '../contexts/StoreContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useCart } from '../contexts/CartContext';
 import { useTemplateComponents } from '../hooks/useTemplateComponents';
@@ -55,6 +55,7 @@ export default function HomePage() {
   const { language } = useLanguage();
   const { itemCount, addItem } = useCart();
   const { components: T, isLoading: templateLoading } = useTemplateComponents();
+  const storeUrl = useStoreUrl();
 
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -114,10 +115,10 @@ export default function HomePage() {
   };
 
   const navigation: NavItem[] = [
-    { label: 'Products', labelAr: 'المنتجات', href: '/products' },
-    { label: 'Categories', labelAr: 'الفئات', href: '/categories' },
-    { label: 'About', labelAr: 'من نحن', href: '/about' },
-    { label: 'Contact', labelAr: 'تواصل معنا', href: '/contact' },
+    { label: 'Products', labelAr: 'المنتجات', href: storeUrl('/products') },
+    { label: 'Categories', labelAr: 'الفئات', href: storeUrl('/categories') },
+    { label: 'About', labelAr: 'من نحن', href: storeUrl('/about') },
+    { label: 'Contact', labelAr: 'تواصل معنا', href: storeUrl('/contact') },
   ];
 
   const templateProducts = featuredProducts.map(toTemplateProduct);
@@ -161,7 +162,7 @@ export default function HomePage() {
           subtitleAr="أفضل المنتجات بأفضل الأسعار في الكويت"
           ctaText="Shop Now"
           ctaTextAr="تسوق الآن"
-          ctaLink="/products"
+          ctaLink={storeUrl('/products')}
           isRtl={isRtl}
         />
 
@@ -225,7 +226,7 @@ export default function HomePage() {
                   : 'Join thousands of satisfied customers and discover our amazing products.'}
               </p>
               <div className="mt-8">
-                <Link href="/products">
+                <Link href={storeUrl('/products')}>
                   <Button
                     size="lg"
                     variant="secondary"
@@ -274,12 +275,12 @@ export default function HomePage() {
                 delivery, and secure payments.
               </p>
               <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:justify-center lg:justify-start">
-                <Link href="/products">
+                <Link href={storeUrl('/products')}>
                   <Button size="lg" className="w-full gap-2 shadow-lg shadow-primary/25 sm:w-auto">
                     Shop Now
                   </Button>
                 </Link>
-                <Link href="/categories">
+                <Link href={storeUrl('/categories')}>
                   <Button variant="outline" size="lg" className="w-full gap-2 sm:w-auto">
                     Browse Categories
                   </Button>
@@ -332,7 +333,7 @@ export default function HomePage() {
                 <p className="mt-2 text-muted-foreground">Find what you&apos;re looking for</p>
               </div>
               <Link
-                href="/categories"
+                href={storeUrl('/categories')}
                 className="hidden text-sm font-medium text-primary hover:text-primary/80 sm:block"
               >
                 View all categories →
@@ -342,7 +343,7 @@ export default function HomePage() {
               {categories.slice(0, 4).map(category => (
                 <Link
                   key={category.id}
-                  href={`/products?category=${category.id}`}
+                  href={storeUrl(`/products?category=${category.slug}`)}
                   className="group relative overflow-hidden rounded-xl border bg-card shadow-sm transition hover:shadow-lg"
                 >
                   <div className="relative h-48 bg-gradient-to-br from-primary/10 to-primary/5 p-6">
@@ -369,7 +370,7 @@ export default function HomePage() {
               <p className="mt-2 text-muted-foreground">Check out our latest arrivals</p>
             </div>
             <Link
-              href="/products"
+              href={storeUrl('/products')}
               className="text-sm font-medium text-primary hover:text-primary/80"
             >
               View all products →
@@ -393,7 +394,7 @@ export default function HomePage() {
               {featuredProducts.slice(0, 8).map(product => (
                 <Link
                   key={product.id}
-                  href={`/products/${product.slug}`}
+                  href={storeUrl(`/products/${product.slug}`)}
                   className="group rounded-xl border bg-card shadow-sm transition hover:shadow-lg overflow-hidden"
                 >
                   <div className="aspect-square overflow-hidden bg-gradient-to-br from-orange-50 to-orange-100">
@@ -444,7 +445,7 @@ export default function HomePage() {
           ) : (
             <div className="text-center py-12">
               <p className="text-muted-foreground">No products available yet.</p>
-              <Link href="/products">
+              <Link href={storeUrl('/products')}>
                 <Button className="mt-4">Browse All Products</Button>
               </Link>
             </div>
@@ -461,7 +462,7 @@ export default function HomePage() {
               Join thousands of satisfied customers and discover our amazing products.
             </p>
             <div className="mt-8">
-              <Link href="/products">
+              <Link href={storeUrl('/products')}>
                 <Button
                   size="lg"
                   variant="secondary"
