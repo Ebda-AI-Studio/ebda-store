@@ -18,17 +18,27 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
+  const url = event.request.url;
+
+  // Only handle http/https requests (skip chrome-extension://, etc.)
+  if (!url.startsWith('http')) return;
+
   // Network-first for API calls, cache-first for assets
-  if (event.request.url.includes('/api/')) {
+  if (url.includes('/api/')) {
     event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
   } else if (event.request.method === 'GET') {
     event.respondWith(
       caches.match(event.request).then(cached => {
-        const fetched = fetch(event.request).then(response => {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
-          return response;
-        });
+        const fetched = fetch(event.request)
+          .then(response => {
+            // Only cache successful responses
+            if (response.ok) {
+              const clone = response.clone();
+              caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+            }
+            return response;
+          })
+          .catch(() => cached);
         return cached || fetched;
       })
     );
