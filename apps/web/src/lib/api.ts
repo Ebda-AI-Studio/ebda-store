@@ -27,8 +27,10 @@ interface Product {
 interface Category {
   id: string;
   name: string;
+  nameAr?: string;
   slug: string;
   description?: string;
+  image?: string;
   productCount?: number;
 }
 

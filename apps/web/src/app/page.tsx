@@ -40,7 +40,9 @@ function toTemplateCategory(c: Category): TemplateCategory {
   return {
     id: c.id,
     name: c.name,
+    nameAr: c.nameAr,
     slug: c.slug || c.name.toLowerCase().replace(/\s+/g, '-'),
+    image: c.image,
     productCount: c.productCount,
   };
 }
