@@ -71,7 +71,15 @@ export default function HomePage() {
         ]);
 
         if (productsRes.success && productsRes.data) {
-          setFeaturedProducts(productsRes.data.products);
+          let products = productsRes.data.products || [];
+          // If no featured products, fetch latest active products instead
+          if (products.length === 0) {
+            const allRes = await api.getProducts({ limit: '8' });
+            if (allRes.success && allRes.data) {
+              products = allRes.data.products || [];
+            }
+          }
+          setFeaturedProducts(products);
         }
         if (categoriesRes.success && categoriesRes.data) {
           setCategories(categoriesRes.data.categories);
