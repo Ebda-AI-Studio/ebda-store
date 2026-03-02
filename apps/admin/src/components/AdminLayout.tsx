@@ -109,11 +109,7 @@ export function AdminLayout({
   const router = useRouter();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { user, logout, isLoading } = useAuth();
-  const {
-    stores: globalStores,
-    selectedStoreId: globalStoreId,
-    setSelectedStoreId: setGlobalStoreId,
-  } = useStore();
+  const { selectedStoreId: globalStoreId } = useStore();
 
   // Extract store ID from prop, URL path, or global store selector
   const currentStoreId = useMemo(() => {
@@ -252,27 +248,6 @@ export function AdminLayout({
           </div>
         )}
 
-        {/* Global Store Selector */}
-        {mode === 'super_admin' && globalStores.length > 1 && (
-          <div className="border-b border-border/50 px-4 py-3">
-            <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 block">
-              Store Filter
-            </label>
-            <select
-              value={globalStoreId}
-              onChange={e => setGlobalStoreId(e.target.value)}
-              className="w-full rounded-xl border border-border/50 bg-muted/50 px-3 py-2 text-sm font-medium text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
-            >
-              <option value="all">All Stores</option>
-              {globalStores.map(store => (
-                <option key={store.id} value={store.id}>
-                  {store.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto px-3 py-4">
           <ul className="space-y-1">
@@ -355,18 +330,7 @@ export function AdminLayout({
         </div>
       </>
     ),
-    [
-      mode,
-      navItems,
-      pathname,
-      user,
-      logout,
-      isStoreAdminWithBranding,
-      storeBranding,
-      globalStores,
-      globalStoreId,
-      setGlobalStoreId,
-    ]
+    [mode, navItems, pathname, user, logout, isStoreAdminWithBranding, storeBranding, globalStoreId]
   );
 
   // Loading state
