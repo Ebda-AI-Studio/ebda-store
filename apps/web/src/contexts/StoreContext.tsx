@@ -131,6 +131,13 @@ export function StoreProvider({ children, initialStore }: StoreProviderProps) {
   const [isLoading, setIsLoading] = useState(!initialStore);
   const [error, setError] = useState<Error | null>(null);
 
+  // Set store ID on API client so all requests include it
+  useEffect(() => {
+    if (store.id && store.id !== 'demo') {
+      import('../lib/api').then(({ api }) => api.setStoreId(store.id));
+    }
+  }, [store.id]);
+
   // Apply theme on mount and when theme changes
   useEffect(() => {
     applyTheme(store.theme || DEFAULT_THEME);

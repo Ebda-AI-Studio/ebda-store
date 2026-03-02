@@ -13,7 +13,7 @@ import {
   cartLimiter,
   writeLimiter,
 } from '../middleware/security';
-import { getDefaultStoreId } from '../utils/store-helpers';
+import { getStoreIdFromRequest } from '../utils/store-helpers';
 
 const router = Router();
 
@@ -83,7 +83,7 @@ const createOrderSchema = z.object({
 router.get('/products', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { page, limit, category, search, featured } = req.query;
-    const storeId = await getDefaultStoreId();
+    const storeId = await getStoreIdFromRequest(req);
 
     const result = await ProductService.listPublic(storeId, {
       page: page ? parseInt(page as string) : undefined,
@@ -110,7 +110,7 @@ router.get('/products/:slugOrId', async (req: Request, res: Response, next: Next
     // Check if it's a UUID (ID) or slug
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slugOrId);
 
-    const storeId = await getDefaultStoreId();
+    const storeId = await getStoreIdFromRequest(req);
     const product = isUuid
       ? await ProductService.getPublicById(storeId, slugOrId)
       : await ProductService.getPublicBySlug(storeId, slugOrId);
@@ -125,9 +125,9 @@ router.get('/products/:slugOrId', async (req: Request, res: Response, next: Next
 });
 
 // GET /categories - List all categories
-router.get('/categories', async (_req: Request, res: Response, next: NextFunction) => {
+router.get('/categories', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const storeId = await getDefaultStoreId();
+    const storeId = await getStoreIdFromRequest(req);
     const categories = await ProductService.getCategories(storeId);
 
     res.json({
@@ -152,7 +152,7 @@ router.get('/cart', cartLimiter, async (req: Request, res: Response, next: NextF
       return;
     }
 
-    const storeId = await getDefaultStoreId();
+    const storeId = await getStoreIdFromRequest(req);
     const cart = await CartService.getOrCreate(storeId, sessionId);
 
     res.json({
@@ -177,7 +177,7 @@ router.post('/cart/items', cartLimiter, async (req: Request, res: Response, next
     }
 
     const { productId, quantity } = addCartItemSchema.parse(req.body);
-    const storeId = await getDefaultStoreId();
+    const storeId = await getStoreIdFromRequest(req);
     const cart = await CartService.addItem(storeId, sessionId, productId, quantity);
 
     res.json({
@@ -206,7 +206,7 @@ router.put(
 
       const { itemId } = req.params;
       const { quantity } = updateCartItemSchema.parse(req.body);
-      const storeId = await getDefaultStoreId();
+      const storeId = await getStoreIdFromRequest(req);
       const cart = await CartService.updateItem(storeId, sessionId, itemId, quantity);
 
       res.json({
@@ -235,7 +235,7 @@ router.delete(
       }
 
       const { itemId } = req.params;
-      const storeId = await getDefaultStoreId();
+      const storeId = await getStoreIdFromRequest(req);
       const cart = await CartService.removeItem(storeId, sessionId, itemId);
 
       res.json({
@@ -260,7 +260,7 @@ router.delete('/cart', cartLimiter, async (req: Request, res: Response, next: Ne
       return;
     }
 
-    const storeId = await getDefaultStoreId();
+    const storeId = await getStoreIdFromRequest(req);
     const cart = await CartService.clear(storeId, sessionId);
 
     res.json({
@@ -289,7 +289,7 @@ router.post(
         return;
       }
 
-      const storeId = await getDefaultStoreId();
+      const storeId = await getStoreIdFromRequest(req);
       const orderData = createOrderSchema.parse(req.body);
       const order = await OrderService.create(storeId, req.user!.userId, sessionId, orderData);
 
@@ -306,7 +306,7 @@ router.post(
 // GET /orders - Get user's orders (requires auth)
 router.get('/orders', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const storeId = await getDefaultStoreId();
+    const storeId = await getStoreIdFromRequest(req);
     const orders = await OrderService.getCustomerOrders(storeId, req.user!.userId);
 
     res.json({
@@ -322,7 +322,7 @@ router.get('/orders', authenticate, async (req: Request, res: Response, next: Ne
 router.get('/orders/:id', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const storeId = await getDefaultStoreId();
+    const storeId = await getStoreIdFromRequest(req);
     const order = await OrderService.getById(storeId, id);
 
     // Ensure user owns this order
@@ -350,7 +350,7 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
-      const storeId = await getDefaultStoreId();
+      const storeId = await getStoreIdFromRequest(req);
       const order = await OrderService.getById(storeId, id);
 
       // Ensure user owns this order

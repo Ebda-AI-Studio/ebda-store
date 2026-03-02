@@ -7,7 +7,7 @@ import { requirePermission } from '../middleware/rbac';
 import { prisma } from '@force/database';
 import { paymentLimiter, auditLog } from '../middleware/security';
 import { config } from '../config';
-import { getDefaultStoreId } from '../utils/store-helpers';
+import { getStoreIdFromRequest } from '../utils/store-helpers';
 
 const router = Router();
 
@@ -127,7 +127,7 @@ router.post(
       const user = getUserFromRequest(req);
 
       // Verify the order belongs to the user
-      const storeId = await getDefaultStoreId();
+      const storeId = await getStoreIdFromRequest(req);
       const order = await prisma.order.findFirst({
         where: { id: data.orderId, storeId, customerId: user.userId },
         include: {
@@ -320,7 +320,7 @@ router.get(
       const user = getUserFromRequest(req);
 
       // Verify the order belongs to the user (or user is admin)
-      const storeId = await getDefaultStoreId();
+      const storeId = await getStoreIdFromRequest(req);
       const order = await prisma.order.findFirst({
         where: { id: orderId, storeId },
       });

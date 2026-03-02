@@ -124,6 +124,7 @@ interface CreateOrderData {
 class ApiClient {
   private baseUrl: string;
   private accessToken: string | null = null;
+  private storeId: string | null = null;
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl;
@@ -141,6 +142,10 @@ class ApiClient {
         localStorage.removeItem('accessToken');
       }
     }
+  }
+
+  setStoreId(storeId: string | null) {
+    this.storeId = storeId;
   }
 
   private getSessionId(): string {
@@ -162,6 +167,9 @@ class ApiClient {
 
     if (this.accessToken) {
       (headers as Record<string, string>)['Authorization'] = `Bearer ${this.accessToken}`;
+    }
+    if (this.storeId) {
+      (headers as Record<string, string>)['X-Store-ID'] = this.storeId;
     }
 
     try {
