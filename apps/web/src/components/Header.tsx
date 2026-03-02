@@ -1,13 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@force/ui';
 import { useLanguage, translations } from '../contexts/LanguageContext';
 import { useCart } from '../contexts/CartContext';
-import { useStoreUrl } from '../contexts/StoreContext';
+import { useStore, useStoreUrl } from '../contexts/StoreContext';
 import { LanguageSwitcher } from './LanguageSwitcher';
 
 interface HeaderProps {
@@ -16,6 +15,7 @@ interface HeaderProps {
 
 export function Header({ cartCount: cartCountProp }: HeaderProps) {
   const router = useRouter();
+  const { store } = useStore();
   const { itemCount } = useCart();
   const cartCount = cartCountProp ?? itemCount;
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -83,19 +83,20 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
             </button>
 
             {/* Logo */}
-            <Link href="/" className="flex items-center gap-2">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-orange-600 shadow-lg shadow-primary/25">
-                <Image
-                  src="/logo.svg"
-                  alt="Force Media"
-                  width={24}
-                  height={18}
-                  className="brightness-0 invert"
+            <Link href={storeUrl('/')} className="flex items-center gap-2">
+              {store.logo ? (
+                <img
+                  src={store.logo}
+                  alt={store.name}
+                  className="h-10 max-h-10 w-auto object-contain"
                 />
-              </div>
-              <span className="hidden text-xl font-bold tracking-tight sm:block">
-                <span className="text-primary">Force</span>
-                <span className="text-foreground"> Store</span>
+              ) : (
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-lg font-bold text-primary-foreground">
+                  {store.name?.charAt(0) || 'S'}
+                </div>
+              )}
+              <span className="hidden text-xl font-bold tracking-tight text-foreground sm:block">
+                {store.name}
               </span>
             </Link>
 
@@ -236,23 +237,22 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
           {/* Menu Header */}
           <div className="flex items-center justify-between border-b px-4 py-4">
             <Link
-              href="/"
+              href={storeUrl('/')}
               className="flex items-center gap-2"
               onClick={() => setIsMobileMenuOpen(false)}
             >
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-orange-600">
-                <Image
-                  src="/logo.svg"
-                  alt="Force Media"
-                  width={20}
-                  height={15}
-                  className="brightness-0 invert"
+              {store.logo ? (
+                <img
+                  src={store.logo}
+                  alt={store.name}
+                  className="h-9 max-h-9 w-auto object-contain"
                 />
-              </div>
-              <span className="text-lg font-bold">
-                <span className="text-primary">Force</span>
-                <span className="text-foreground"> Store</span>
-              </span>
+              ) : (
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-base font-bold text-primary-foreground">
+                  {store.name?.charAt(0) || 'S'}
+                </div>
+              )}
+              <span className="text-lg font-bold text-foreground">{store.name}</span>
             </Link>
             <button
               onClick={() => setIsMobileMenuOpen(false)}

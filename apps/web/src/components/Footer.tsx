@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
 import { useStore } from '../contexts/StoreContext';
 
@@ -38,20 +37,22 @@ export function Footer() {
           {/* Brand Column */}
           <div className="lg:col-span-2">
             <Link href="/" className="inline-flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-orange-600 shadow-lg shadow-primary/25">
-                <Image
-                  src="/logo.svg"
-                  alt="Force Media"
-                  width={24}
-                  height={18}
-                  className="brightness-0 invert"
+              {store.logo ? (
+                <img
+                  src={store.logo}
+                  alt={store.name}
+                  className="h-11 max-h-11 w-auto object-contain"
                 />
-              </div>
+              ) : (
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-lg font-bold text-primary-foreground">
+                  {store.name?.charAt(0) || 'S'}
+                </div>
+              )}
               <span className="text-xl font-bold tracking-tight text-foreground">{store.name}</span>
             </Link>
             <p className="mt-4 max-w-sm text-sm leading-relaxed text-muted-foreground">
-              Your trusted online shopping destination in Kuwait. Quality products, fast delivery,
-              and exceptional customer service.
+              {store.description ||
+                `Your trusted online shopping destination. Quality products, fast delivery, and exceptional customer service.`}
             </p>
 
             {/* Contact Info */}
