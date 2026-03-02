@@ -31,9 +31,16 @@ function formatEstimatedDays(zone: ShippingZone): string {
   return 'Delivery time varies';
 }
 
-/** Format a monetary amount with the store currency. */
-function formatPrice(amount: number, currency: string): string {
-  return `${amount.toFixed(3)} ${currency}`;
+/** Format a monetary amount (stored in fils) with the store currency. */
+function formatPrice(fils: number, currency: string): string {
+  const divisor = currency === 'KWD' ? 1000 : 100;
+  const decimals = currency === 'KWD' ? 3 : 2;
+  return new Intl.NumberFormat('en-KW', {
+    style: 'currency',
+    currency: currency,
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  }).format(fils / divisor);
 }
 
 export default function ShippingPage() {

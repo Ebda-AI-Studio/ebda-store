@@ -9,6 +9,13 @@ export function Footer() {
   const currentYear = new Date().getFullYear();
 
   const socialLinks = store.socialLinks as Record<string, string> | undefined;
+  const storeSettings = store.settings as Record<string, unknown> | undefined;
+  const footerConfig = storeSettings?.footerLinks as
+    | {
+        support?: { name: string; nameAr?: string; href: string; enabled: boolean }[];
+        company?: { name: string; nameAr?: string; href: string; enabled: boolean }[];
+      }
+    | undefined;
 
   const shopLinks = [
     { name: 'All Products', href: storeUrl('/products') },
@@ -18,19 +25,26 @@ export function Footer() {
     { name: 'On Sale', href: storeUrl('/products?sale=true') },
   ];
 
-  const supportLinks = [
-    { name: 'Contact Us', href: storeUrl('/contact') },
-    { name: 'FAQ', href: storeUrl('/faq') },
-    { name: 'Shipping Info', href: storeUrl('/shipping') },
-    { name: 'Returns & Refunds', href: storeUrl('/returns') },
-    { name: 'Track Order', href: storeUrl('/account/orders') },
+  const defaultSupportLinks = [
+    { name: 'Contact Us', href: '/contact' },
+    { name: 'FAQ', href: '/faq' },
+    { name: 'Shipping Info', href: '/shipping' },
+    { name: 'Returns & Refunds', href: '/returns' },
   ];
 
-  const companyLinks = [
-    { name: 'About Us', href: storeUrl('/about') },
-    { name: 'Privacy Policy', href: storeUrl('/privacy') },
-    { name: 'Terms of Service', href: storeUrl('/terms') },
+  const defaultCompanyLinks = [
+    { name: 'About Us', href: '/about' },
+    { name: 'Privacy Policy', href: '/privacy' },
+    { name: 'Terms of Service', href: '/terms' },
   ];
+
+  const supportLinks = (footerConfig?.support ?? defaultSupportLinks)
+    .filter(l => ('enabled' in l ? l.enabled : true))
+    .map(l => ({ name: l.name, href: storeUrl(l.href) }));
+
+  const companyLinks = (footerConfig?.company ?? defaultCompanyLinks)
+    .filter(l => ('enabled' in l ? l.enabled : true))
+    .map(l => ({ name: l.name, href: storeUrl(l.href) }));
 
   return (
     <footer className="bg-gradient-to-b from-muted/30 to-muted/80 border-t border-border/50">

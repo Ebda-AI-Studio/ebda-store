@@ -51,6 +51,9 @@ export interface ResolvedStore {
 
   // Marketing Pixels
   marketingPixels?: Record<string, unknown>;
+
+  // General Settings (footer links, etc.)
+  settings?: Record<string, unknown>;
 }
 
 /**
@@ -156,6 +159,7 @@ async function fetchStoreByDomain(domain: string): Promise<ResolvedStore | null>
       metaDescriptionAr: storeData.metaDescriptionAr,
       marketingPixels:
         typeof storeData.marketingPixels === 'object' ? storeData.marketingPixels : undefined,
+      settings: typeof storeData.settings === 'object' ? storeData.settings : undefined,
     };
   } catch (error) {
     console.error(`Error fetching store for domain ${domain}:`, error);
@@ -242,6 +246,7 @@ async function fetchStoreBySlug(slug: string): Promise<ResolvedStore | null> {
       metaDescriptionAr: storeData.metaDescriptionAr,
       marketingPixels:
         typeof storeData.marketingPixels === 'object' ? storeData.marketingPixels : undefined,
+      settings: typeof storeData.settings === 'object' ? storeData.settings : undefined,
     };
   } catch (error) {
     console.error(`Error fetching store for slug ${slug}:`, error);
@@ -359,6 +364,7 @@ export async function getStoreById(storeId: string): Promise<ResolvedStore | nul
       metaDescriptionAr: storeData.metaDescriptionAr,
       marketingPixels:
         typeof storeData.marketingPixels === 'object' ? storeData.marketingPixels : undefined,
+      settings: typeof storeData.settings === 'object' ? storeData.settings : undefined,
     };
   } catch (error) {
     console.error(`Error fetching store ${storeId}:`, error);
