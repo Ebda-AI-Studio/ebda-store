@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { Header, Footer } from '../../components';
+import { useStoreUrl } from '../../contexts/StoreContext';
 
 interface WishlistItem {
   id: string;
@@ -21,6 +22,7 @@ interface WishlistItem {
 
 export default function WishlistPage() {
   const router = useRouter();
+  const storeUrl = useStoreUrl();
   const [items, setItems] = useState<WishlistItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -86,7 +88,7 @@ export default function WishlistPage() {
     try {
       const response = await api.post('/cart/items', { productId, quantity: 1 });
       if (response.success) {
-        router.push('/cart');
+        router.push(storeUrl('/cart'));
       } else {
         setActionError(response.error?.message || 'Failed to add to cart');
       }
@@ -104,7 +106,7 @@ export default function WishlistPage() {
           <h1 className="text-3xl font-bold mb-8">My Wishlist</h1>
           <div className="space-y-4">
             {[...Array(3)].map((_, i) => (
-              <div key={i} className="bg-gray-100 animate-pulse h-24 rounded-lg"></div>
+              <div key={i} className="bg-muted animate-pulse h-24 rounded-lg"></div>
             ))}
           </div>
         </div>
@@ -136,7 +138,7 @@ export default function WishlistPage() {
             <h2 className="text-xl font-semibold mb-2">Sign in to view your wishlist</h2>
             <p className="text-muted-foreground mb-4">Save your favorite items for later</p>
             <Link
-              href="/auth/login?redirect=/wishlist"
+              href={storeUrl('/auth/login?redirect=/wishlist')}
               className="inline-flex items-center px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90"
             >
               Sign In
@@ -218,9 +220,9 @@ export default function WishlistPage() {
         )}
 
         {!error && items.length === 0 ? (
-          <div className="text-center py-12 bg-gray-50 rounded-lg">
+          <div className="text-center py-12 bg-background rounded-lg">
             <svg
-              className="w-16 h-16 text-gray-400 mx-auto mb-4"
+              className="w-16 h-16 text-muted-foreground/70 mx-auto mb-4"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -233,9 +235,9 @@ export default function WishlistPage() {
               />
             </svg>
             <h2 className="text-xl font-semibold mb-2">Your wishlist is empty</h2>
-            <p className="text-gray-500 mb-4">Start adding products you love!</p>
+            <p className="text-muted-foreground mb-4">Start adding products you love!</p>
             <Link
-              href="/products"
+              href={storeUrl('/products')}
               className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
             >
               Browse Products
@@ -248,8 +250,8 @@ export default function WishlistPage() {
                 key={item.id}
                 className="bg-white rounded-lg shadow-md p-4 flex items-center gap-4"
               >
-                <Link href={`/products/${item.product.slug}`} className="flex-shrink-0">
-                  <div className="w-24 h-24 bg-gray-100 rounded-lg overflow-hidden">
+                <Link href={storeUrl(`/products/${item.product.slug}`)} className="flex-shrink-0">
+                  <div className="w-24 h-24 bg-muted rounded-lg overflow-hidden">
                     {item.product.images?.[0] ? (
                       <img
                         src={item.product.images[0]}
@@ -257,7 +259,7 @@ export default function WishlistPage() {
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-400">
+                      <div className="w-full h-full flex items-center justify-center text-muted-foreground/70">
                         <svg
                           className="w-8 h-8"
                           fill="none"
@@ -277,8 +279,8 @@ export default function WishlistPage() {
                 </Link>
 
                 <div className="flex-1 min-w-0">
-                  <Link href={`/products/${item.product.slug}`}>
-                    <h3 className="font-semibold text-gray-800 hover:text-blue-600 truncate">
+                  <Link href={storeUrl(`/products/${item.product.slug}`)}>
+                    <h3 className="font-semibold text-foreground hover:text-blue-600 truncate">
                       {item.product.name}
                     </h3>
                   </Link>
@@ -292,7 +294,7 @@ export default function WishlistPage() {
                     </span>
                     {item.product.compareAtPrice &&
                       item.product.compareAtPrice > item.product.price && (
-                        <span className="text-gray-400 line-through text-sm">
+                        <span className="text-muted-foreground/70 line-through text-sm">
                           {new Intl.NumberFormat('en-KW', {
                             style: 'currency',
                             currency: 'KWD',
@@ -316,7 +318,7 @@ export default function WishlistPage() {
                   </button>
                   <button
                     onClick={() => removeFromWishlist(item.id)}
-                    className="p-2 text-gray-400 hover:text-red-500"
+                    className="p-2 text-muted-foreground/70 hover:text-red-500"
                     title="Remove from wishlist"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

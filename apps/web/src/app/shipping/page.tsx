@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Header, Footer } from '../../components';
-import { useStore } from '../../contexts/StoreContext';
+import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
 
@@ -38,6 +38,7 @@ function formatPrice(amount: number, currency: string): string {
 
 export default function ShippingPage() {
   const { store } = useStore();
+  const storeUrl = useStoreUrl();
   const [zones, setZones] = useState<ShippingZone[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
@@ -63,24 +64,24 @@ export default function ShippingPage() {
   }, [store.id]);
 
   return (
-    <main className="flex min-h-screen flex-col bg-gray-50">
+    <main className="flex min-h-screen flex-col bg-background">
       <Header />
 
       <div className="mx-auto w-full max-w-3xl flex-1 px-4 py-12 sm:px-6 lg:px-8">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900">Shipping Information</h1>
-          <p className="mt-2 text-gray-500">
+          <h1 className="text-3xl font-bold text-foreground">Shipping Information</h1>
+          <p className="mt-2 text-muted-foreground">
             Everything you need to know about our shipping policies
           </p>
         </div>
 
         <div className="mt-12 space-y-8">
           <section className="rounded-xl border bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-semibold text-gray-900">Shipping Options</h2>
+            <h2 className="text-xl font-semibold text-foreground">Shipping Options</h2>
 
             {/* Loading state */}
             {isLoading && (
-              <div className="mt-4 flex items-center gap-2 text-sm text-gray-500">
+              <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
                 Loading shipping options...
               </div>
@@ -88,14 +89,14 @@ export default function ShippingPage() {
 
             {/* Error / no zones configured */}
             {!isLoading && (fetchError || zones.length === 0) && (
-              <p className="mt-4 text-gray-600">Contact us for shipping rates.</p>
+              <p className="mt-4 text-muted-foreground">Contact us for shipping rates.</p>
             )}
 
             {/* Shipping zones from API */}
             {!isLoading && zones.length > 0 && (
               <div className="mt-4 space-y-4">
                 {zones.map(zone => (
-                  <div key={zone.id} className="flex items-start gap-4 rounded-lg bg-gray-50 p-4">
+                  <div key={zone.id} className="flex items-start gap-4 rounded-lg bg-muted p-4">
                     <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-primary/10">
                       <svg
                         className="h-5 w-5 text-primary"
@@ -112,15 +113,15 @@ export default function ShippingPage() {
                       </svg>
                     </div>
                     <div>
-                      <h3 className="font-medium text-gray-900">{zone.name}</h3>
+                      <h3 className="font-medium text-foreground">{zone.name}</h3>
                       {zone.areas.length > 0 && (
-                        <p className="text-sm text-gray-500">{zone.areas.join(', ')}</p>
+                        <p className="text-sm text-muted-foreground">{zone.areas.join(', ')}</p>
                       )}
-                      <p className="text-sm text-gray-500">{formatEstimatedDays(zone)}</p>
+                      <p className="text-sm text-muted-foreground">{formatEstimatedDays(zone)}</p>
                       {zone.deliveryFee === 0 ? (
                         <p className="mt-1 text-sm font-medium text-primary">Free Shipping</p>
                       ) : (
-                        <p className="mt-1 text-sm font-medium text-gray-700">
+                        <p className="mt-1 text-sm font-medium text-foreground">
                           {formatPrice(zone.deliveryFee, store.currency)}
                         </p>
                       )}
@@ -138,12 +139,12 @@ export default function ShippingPage() {
           </section>
 
           <section className="rounded-xl border bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-semibold text-gray-900">Order Tracking</h2>
-            <p className="mt-2 text-gray-600">
+            <h2 className="text-xl font-semibold text-foreground">Order Tracking</h2>
+            <p className="mt-2 text-muted-foreground">
               Once your order ships, you&apos;ll receive an email with your tracking number. You can
               track your package using:
             </p>
-            <ul className="mt-4 space-y-2 text-gray-600">
+            <ul className="mt-4 space-y-2 text-muted-foreground">
               <li className="flex items-center gap-2">
                 <svg
                   className="h-4 w-4 text-primary"
@@ -197,9 +198,9 @@ export default function ShippingPage() {
         </div>
 
         <div className="mt-8 text-center">
-          <p className="text-gray-500">
+          <p className="text-muted-foreground">
             Have questions about shipping?{' '}
-            <Link href="/contact" className="text-primary hover:underline">
+            <Link href={storeUrl('/contact')} className="text-primary hover:underline">
               Contact us
             </Link>
           </p>

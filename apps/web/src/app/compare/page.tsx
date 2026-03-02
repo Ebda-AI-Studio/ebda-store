@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useToast } from '@force/ui';
 import { Header, Footer } from '../../components';
 import { useCart } from '../../contexts/CartContext';
+import { useStoreUrl } from '../../contexts/StoreContext';
 
 interface CompareProduct {
   id: string;
@@ -35,6 +36,7 @@ export default function ComparePage() {
   const [products, setProducts] = useState<CompareProduct[]>(() => loadInitialProducts());
   const [isLoading] = useState(false);
   const { addItem } = useCart();
+  const storeUrl = useStoreUrl();
   const { success: toastSuccess } = useToast();
 
   function handleAddToCart(product: CompareProduct) {
@@ -65,7 +67,7 @@ export default function ComparePage() {
         <Header />
         <div className="container mx-auto px-4 py-8 flex-1">
           <h1 className="text-3xl font-bold mb-8">Compare Products</h1>
-          <div className="animate-pulse bg-gray-100 h-96 rounded-lg"></div>
+          <div className="animate-pulse bg-muted h-96 rounded-lg"></div>
         </div>
         <Footer />
       </main>
@@ -78,9 +80,9 @@ export default function ComparePage() {
         <Header />
         <div className="container mx-auto px-4 py-8 flex-1">
           <h1 className="text-3xl font-bold mb-8">Compare Products</h1>
-          <div className="text-center py-12 bg-gray-50 rounded-lg">
+          <div className="text-center py-12 bg-muted rounded-lg">
             <svg
-              className="w-16 h-16 text-gray-400 mx-auto mb-4"
+              className="w-16 h-16 text-muted-foreground/70 mx-auto mb-4"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -93,9 +95,9 @@ export default function ComparePage() {
               />
             </svg>
             <h2 className="text-xl font-semibold mb-2">No products to compare</h2>
-            <p className="text-gray-500 mb-4">Add products to compare their features</p>
+            <p className="text-muted-foreground mb-4">Add products to compare their features</p>
             <Link
-              href="/products"
+              href={storeUrl('/products')}
               className="inline-flex items-center px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90"
             >
               Browse Products
@@ -130,9 +132,9 @@ export default function ComparePage() {
           <table className="w-full min-w-[600px]">
             <thead>
               <tr>
-                <th className="text-left p-4 bg-gray-50 w-1/4">Product</th>
+                <th className="text-left p-4 bg-muted w-1/4">Product</th>
                 {products.map(product => (
-                  <th key={product.id} className="p-4 bg-gray-50">
+                  <th key={product.id} className="p-4 bg-muted">
                     <div className="relative">
                       <button
                         onClick={() => removeProduct(product.id)}
@@ -152,8 +154,8 @@ export default function ComparePage() {
                           />
                         </svg>
                       </button>
-                      <Link href={`/products/${product.slug}`}>
-                        <div className="w-32 h-32 mx-auto bg-gray-100 rounded-lg overflow-hidden mb-2">
+                      <Link href={storeUrl(`/products/${product.slug}`)}>
+                        <div className="w-32 h-32 mx-auto bg-muted rounded-lg overflow-hidden mb-2">
                           {product.images?.[0] ? (
                             <img
                               src={product.images[0]}
@@ -161,7 +163,7 @@ export default function ComparePage() {
                               className="w-full h-full object-cover"
                             />
                           ) : (
-                            <div className="w-full h-full flex items-center justify-center text-gray-400">
+                            <div className="w-full h-full flex items-center justify-center text-muted-foreground/70">
                               <svg
                                 className="w-8 h-8"
                                 fill="none"
@@ -189,14 +191,14 @@ export default function ComparePage() {
             </thead>
             <tbody>
               <tr className="border-t">
-                <td className="p-4 font-medium text-gray-600">Price</td>
+                <td className="p-4 font-medium text-muted-foreground">Price</td>
                 {products.map(product => (
                   <td key={product.id} className="p-4 text-center">
                     <span className="font-bold text-lg">
                       {(product.price / 1000).toFixed(3)} KWD
                     </span>
                     {product.compareAtPrice && product.compareAtPrice > product.price && (
-                      <span className="block text-gray-400 line-through text-sm">
+                      <span className="block text-muted-foreground/70 line-through text-sm">
                         {(product.compareAtPrice / 1000).toFixed(3)} KWD
                       </span>
                     )}
@@ -204,23 +206,25 @@ export default function ComparePage() {
                 ))}
               </tr>
               <tr className="border-t">
-                <td className="p-4 font-medium text-gray-600">Description</td>
+                <td className="p-4 font-medium text-muted-foreground">Description</td>
                 {products.map(product => (
-                  <td key={product.id} className="p-4 text-center text-sm text-gray-600">
+                  <td key={product.id} className="p-4 text-center text-sm text-muted-foreground">
                     {product.description ? (
                       <p className="line-clamp-3">{product.description}</p>
                     ) : (
-                      <span className="text-gray-400">-</span>
+                      <span className="text-muted-foreground/70">-</span>
                     )}
                   </td>
                 ))}
               </tr>
               {Array.from(allSpecs).map(spec => (
                 <tr key={spec} className="border-t">
-                  <td className="p-4 font-medium text-gray-600">{spec}</td>
+                  <td className="p-4 font-medium text-muted-foreground">{spec}</td>
                   {products.map(product => (
                     <td key={product.id} className="p-4 text-center text-sm">
-                      {product.specifications?.[spec] || <span className="text-gray-400">-</span>}
+                      {product.specifications?.[spec] || (
+                        <span className="text-muted-foreground/70">-</span>
+                      )}
                     </td>
                   ))}
                 </tr>

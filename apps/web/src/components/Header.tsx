@@ -165,7 +165,7 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
 
               {/* Wishlist */}
               <Link
-                href="/wishlist"
+                href={storeUrl('/wishlist')}
                 className="hidden h-10 w-10 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:flex"
                 aria-label={t('Wishlist', translations['Wishlist'])}
               >
@@ -181,7 +181,7 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
 
               {/* Cart */}
               <Link
-                href="/cart"
+                href={storeUrl('/cart')}
                 className="relative flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 aria-label={`${t('Cart', translations['Cart'])} ${cartCount}`}
               >
@@ -201,7 +201,7 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
               </Link>
 
               {/* User Account / Sign In */}
-              <Link href="/auth/login" className="hidden sm:block">
+              <Link href={storeUrl('/auth/login')} className="hidden sm:block">
                 <Button size="sm" className="gap-2 rounded-xl shadow-md shadow-primary/20">
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path
@@ -312,7 +312,7 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
               ))}
               <li className="border-t pt-2 mt-2">
                 <Link
-                  href="/wishlist"
+                  href={storeUrl('/wishlist')}
                   className="flex items-center gap-3 rounded-xl px-4 py-3 text-base font-medium text-foreground transition-colors hover:bg-muted"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
@@ -334,7 +334,7 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
               </li>
               <li>
                 <Link
-                  href="/account"
+                  href={storeUrl('/account')}
                   className="flex items-center gap-3 rounded-xl px-4 py-3 text-base font-medium text-foreground transition-colors hover:bg-muted"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
@@ -364,13 +364,17 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
 
           {/* Auth Buttons */}
           <div className="border-t p-4 space-y-3">
-            <Link href="/auth/login" className="block" onClick={() => setIsMobileMenuOpen(false)}>
+            <Link
+              href={storeUrl('/auth/login')}
+              className="block"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
               <Button className="w-full" size="lg">
                 {t('Sign In', translations['Sign In'])}
               </Button>
             </Link>
             <Link
-              href="/auth/register"
+              href={storeUrl('/auth/register')}
               className="block"
               onClick={() => setIsMobileMenuOpen(false)}
             >

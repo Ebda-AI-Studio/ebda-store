@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Header, Footer } from '../../components';
-import { useStore } from '../../contexts/StoreContext';
+import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 
 // Generic FAQs — no store-specific content here.
 // Payment methods reference the store's configured options; adjust if needed.
@@ -52,16 +52,17 @@ const faqs = [
 
 export default function FAQPage() {
   const { store } = useStore();
+  const storeUrl = useStoreUrl();
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   return (
-    <main className="flex min-h-screen flex-col bg-gray-50">
+    <main className="flex min-h-screen flex-col bg-background">
       <Header />
 
       <div className="mx-auto w-full max-w-3xl flex-1 px-4 py-12 sm:px-6 lg:px-8">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900">Frequently Asked Questions</h1>
-          <p className="mt-2 text-gray-500">
+          <h1 className="text-3xl font-bold text-foreground">Frequently Asked Questions</h1>
+          <p className="mt-2 text-muted-foreground">
             Find answers to common questions about {store.name || 'our store'}
           </p>
         </div>
@@ -73,9 +74,9 @@ export default function FAQPage() {
                 onClick={() => setOpenIndex(openIndex === index ? null : index)}
                 className="flex w-full items-center justify-between p-6 text-left"
               >
-                <span className="font-medium text-gray-900">{faq.question}</span>
+                <span className="font-medium text-foreground">{faq.question}</span>
                 <svg
-                  className={`h-5 w-5 text-gray-500 transition-transform ${openIndex === index ? 'rotate-180' : ''}`}
+                  className={`h-5 w-5 text-muted-foreground transition-transform ${openIndex === index ? 'rotate-180' : ''}`}
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -90,7 +91,7 @@ export default function FAQPage() {
               </button>
               {openIndex === index && (
                 <div className="border-t px-6 py-4">
-                  <p className="text-gray-600">{faq.answer}</p>
+                  <p className="text-muted-foreground">{faq.answer}</p>
                 </div>
               )}
             </div>
@@ -98,12 +99,12 @@ export default function FAQPage() {
         </div>
 
         <div className="mt-12 rounded-xl border bg-white p-8 text-center shadow-sm">
-          <h2 className="text-xl font-semibold text-gray-900">Still have questions?</h2>
-          <p className="mt-2 text-gray-500">
+          <h2 className="text-xl font-semibold text-foreground">Still have questions?</h2>
+          <p className="mt-2 text-muted-foreground">
             Can&apos;t find the answer you&apos;re looking for? Please contact our support team.
           </p>
           <Link
-            href="/contact"
+            href={storeUrl('/contact')}
             className="mt-4 inline-flex items-center gap-2 text-primary hover:underline"
           >
             Contact Us

@@ -6,12 +6,13 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Button, Input } from '@force/ui';
 import { api } from '@/lib/api';
-import { useStore } from '../../../contexts/StoreContext';
+import { useStore, useStoreUrl } from '../../../contexts/StoreContext';
 
 function ResetPasswordForm() {
   const searchParams = useSearchParams();
   const token = searchParams?.get('token') || '';
   const { store } = useStore();
+  const storeUrl = useStoreUrl();
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -59,22 +60,22 @@ function ResetPasswordForm() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
+    <main className="flex min-h-screen items-center justify-center bg-background px-4 py-12 sm:px-6 lg:px-8">
       <div className="w-full max-w-md space-y-8">
         {/* Header */}
         <div className="text-center">
-          <Link href="/" className="inline-flex items-center gap-2">
+          <Link href={storeUrl('/')} className="inline-flex items-center gap-2">
             {store.logo ? (
               <Image src={store.logo} alt={store.name} width={48} height={36} />
             ) : (
               <Image src="/logo.svg" alt={store.name} width={48} height={36} />
             )}
-            <span className="text-2xl font-bold text-gray-700">{store.name}</span>
+            <span className="text-2xl font-bold text-foreground">{store.name}</span>
           </Link>
-          <h2 className="mt-6 text-3xl font-bold tracking-tight text-gray-900">
+          <h2 className="mt-6 text-3xl font-bold tracking-tight text-foreground">
             Reset your password
           </h2>
-          <p className="mt-2 text-sm text-gray-600">Enter your new password below.</p>
+          <p className="mt-2 text-sm text-muted-foreground">Enter your new password below.</p>
         </div>
 
         {/* Form */}
@@ -96,12 +97,12 @@ function ResetPasswordForm() {
                   />
                 </svg>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900">Password reset successfully</h3>
-              <p className="text-sm text-gray-600">
+              <h3 className="text-lg font-semibold text-foreground">Password reset successfully</h3>
+              <p className="text-sm text-muted-foreground">
                 Your password has been updated. You can now sign in with your new password.
               </p>
               <Link
-                href="/auth/login"
+                href={storeUrl('/auth/login')}
                 className="mt-4 inline-block font-medium text-primary hover:underline"
               >
                 Back to sign in
@@ -152,7 +153,10 @@ function ResetPasswordForm() {
               </form>
 
               <div className="mt-4 text-center">
-                <Link href="/auth/login" className="text-sm text-primary hover:underline">
+                <Link
+                  href={storeUrl('/auth/login')}
+                  className="text-sm text-primary hover:underline"
+                >
                   Back to sign in
                 </Link>
               </div>
@@ -160,9 +164,9 @@ function ResetPasswordForm() {
           )}
         </div>
 
-        <p className="text-center text-xs text-gray-500">
+        <p className="text-center text-xs text-muted-foreground">
           Need a new reset link?{' '}
-          <Link href="/auth/forgot-password" className="text-primary hover:underline">
+          <Link href={storeUrl('/auth/forgot-password')} className="text-primary hover:underline">
             Request password reset
           </Link>
         </p>
@@ -175,7 +179,7 @@ export default function ResetPasswordPage() {
   return (
     <Suspense
       fallback={
-        <main className="flex min-h-screen items-center justify-center bg-gray-50">
+        <main className="flex min-h-screen items-center justify-center bg-background">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
         </main>
       }

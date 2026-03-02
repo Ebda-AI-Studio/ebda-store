@@ -6,7 +6,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Button } from '@force/ui';
 import { api, type Order } from '@/lib/api';
-import { useStore } from '../../../contexts/StoreContext';
+import { useStore, useStoreUrl } from '../../../contexts/StoreContext';
 import { useCart } from '../../../contexts/CartContext';
 import { trackPurchase } from '../../../components/MarketingPixels';
 
@@ -18,6 +18,7 @@ function SuccessContent() {
   const searchParams = useSearchParams();
   const orderId = searchParams?.get('orderId');
   const { store } = useStore();
+  const storeUrl = useStoreUrl();
   const { clearCart } = useCart();
 
   const [order, setOrder] = useState<Order | null>(null);
@@ -61,11 +62,11 @@ function SuccessContent() {
   }, [orderId]);
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="min-h-screen bg-background">
       {/* Navigation */}
       <nav className="border-b bg-white">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-center px-4 sm:px-6 lg:px-8">
-          <Link href="/" className="flex items-center gap-2">
+          <Link href={storeUrl('/')} className="flex items-center gap-2">
             {store?.logo ? (
               <Image
                 src={store.logo}
@@ -77,7 +78,7 @@ function SuccessContent() {
             ) : (
               <span className="text-xl font-bold">
                 <span className="text-primary">{store?.name || 'Force'}</span>
-                <span className="text-gray-700"> Store</span>
+                <span className="text-foreground"> Store</span>
               </span>
             )}
           </Link>
@@ -103,16 +104,16 @@ function SuccessContent() {
             </svg>
           </div>
 
-          <h1 className="mt-6 text-3xl font-bold text-gray-900">Thank you for your order!</h1>
-          <p className="mt-2 text-lg text-gray-600">
+          <h1 className="mt-6 text-3xl font-bold text-foreground">Thank you for your order!</h1>
+          <p className="mt-2 text-lg text-muted-foreground">
             Your order has been confirmed and will be shipped soon.
           </p>
 
           <div className="mt-8 rounded-xl border bg-white p-6 shadow-sm text-left">
             <div className="flex items-center justify-between border-b pb-4">
               <div>
-                <p className="text-sm text-gray-500">Order number</p>
-                <p className="text-lg font-semibold text-gray-900">
+                <p className="text-sm text-muted-foreground">Order number</p>
+                <p className="text-lg font-semibold text-foreground">
                   {order
                     ? `#${order.orderNumber}`
                     : orderId
@@ -121,8 +122,8 @@ function SuccessContent() {
                 </p>
               </div>
               <div className="text-right">
-                <p className="text-sm text-gray-500">Date</p>
-                <p className="text-gray-900">
+                <p className="text-sm text-muted-foreground">Date</p>
+                <p className="text-foreground">
                   {order?.createdAt
                     ? new Date(order.createdAt).toLocaleDateString()
                     : new Date().toLocaleDateString()}
@@ -136,16 +137,18 @@ function SuccessContent() {
                 {order.items.map(item => (
                   <div key={item.id} className="flex items-center justify-between py-3">
                     <div>
-                      <p className="font-medium text-gray-900">{item.product?.name || 'Product'}</p>
-                      <p className="text-sm text-gray-500">Qty: {item.quantity}</p>
+                      <p className="font-medium text-foreground">
+                        {item.product?.name || 'Product'}
+                      </p>
+                      <p className="text-sm text-muted-foreground">Qty: {item.quantity}</p>
                     </div>
-                    <p className="font-medium text-gray-900">
+                    <p className="font-medium text-foreground">
                       {formatPrice(item.price * item.quantity)}
                     </p>
                   </div>
                 ))}
                 <div className="flex items-center justify-between pt-3">
-                  <p className="font-semibold text-gray-900">Total</p>
+                  <p className="font-semibold text-foreground">Total</p>
                   <p className="font-bold text-primary">{formatPrice(order.total)}</p>
                 </div>
               </div>
@@ -153,7 +156,7 @@ function SuccessContent() {
 
             {!order?.items && (
               <div className="py-4">
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-muted-foreground">
                   We&apos;ll send you a confirmation email with your order details and tracking
                   information once your order ships.
                 </p>
@@ -161,8 +164,8 @@ function SuccessContent() {
             )}
 
             <div className="border-t pt-4">
-              <h3 className="font-medium text-gray-900">What&apos;s next?</h3>
-              <ul className="mt-3 space-y-2 text-sm text-gray-600">
+              <h3 className="font-medium text-foreground">What&apos;s next?</h3>
+              <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
                 <li className="flex items-center gap-2">
                   <svg
                     className="h-4 w-4 text-primary"
@@ -181,7 +184,7 @@ function SuccessContent() {
                 </li>
                 <li className="flex items-center gap-2">
                   <svg
-                    className="h-4 w-4 text-gray-400"
+                    className="h-4 w-4 text-muted-foreground/70"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -197,7 +200,7 @@ function SuccessContent() {
                 </li>
                 <li className="flex items-center gap-2">
                   <svg
-                    className="h-4 w-4 text-gray-400"
+                    className="h-4 w-4 text-muted-foreground/70"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -213,7 +216,7 @@ function SuccessContent() {
                 </li>
                 <li className="flex items-center gap-2">
                   <svg
-                    className="h-4 w-4 text-gray-400"
+                    className="h-4 w-4 text-muted-foreground/70"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -232,19 +235,19 @@ function SuccessContent() {
           </div>
 
           <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:justify-center">
-            <Link href="/products">
+            <Link href={storeUrl('/products')}>
               <Button size="lg">Continue Shopping</Button>
             </Link>
-            <Link href="/account/orders">
+            <Link href={storeUrl('/account/orders')}>
               <Button size="lg" variant="outline">
                 View Order Status
               </Button>
             </Link>
           </div>
 
-          <p className="mt-8 text-sm text-gray-500">
+          <p className="mt-8 text-sm text-muted-foreground">
             Questions about your order?{' '}
-            <Link href="/contact" className="text-primary hover:underline">
+            <Link href={storeUrl('/contact')} className="text-primary hover:underline">
               Contact Support
             </Link>
           </p>
@@ -258,7 +261,7 @@ export default function CheckoutSuccessPage() {
   return (
     <Suspense
       fallback={
-        <main className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <main className="min-h-screen bg-background flex items-center justify-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500" />
         </main>
       }

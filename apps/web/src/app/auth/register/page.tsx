@@ -6,11 +6,12 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Button, Input } from '@force/ui';
 import { api } from '@/lib/api';
-import { useStore } from '../../../contexts/StoreContext';
+import { useStore, useStoreUrl } from '../../../contexts/StoreContext';
 
 export default function RegisterPage() {
   const router = useRouter();
   const { store } = useStore();
+  const storeUrl = useStoreUrl();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [formData, setFormData] = useState({
@@ -59,7 +60,7 @@ export default function RegisterPage() {
       }
 
       // Redirect to home
-      router.push('/');
+      router.push(storeUrl('/'));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to register');
     } finally {
@@ -68,24 +69,27 @@ export default function RegisterPage() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
+    <main className="flex min-h-screen items-center justify-center bg-background px-4 py-12 sm:px-6 lg:px-8">
       <div className="w-full max-w-md space-y-8">
         {/* Header */}
         <div className="text-center">
-          <Link href="/" className="inline-flex items-center gap-2">
+          <Link href={storeUrl('/')} className="inline-flex items-center gap-2">
             {store.logo ? (
               <Image src={store.logo} alt={store.name} width={48} height={36} />
             ) : (
               <Image src="/logo.svg" alt={store.name} width={48} height={36} />
             )}
-            <span className="text-2xl font-bold text-gray-700">{store.name}</span>
+            <span className="text-2xl font-bold text-foreground">{store.name}</span>
           </Link>
-          <h2 className="mt-6 text-3xl font-bold tracking-tight text-gray-900">
+          <h2 className="mt-6 text-3xl font-bold tracking-tight text-foreground">
             Create your account
           </h2>
-          <p className="mt-2 text-sm text-gray-600">
+          <p className="mt-2 text-sm text-muted-foreground">
             Already have an account?{' '}
-            <Link href="/auth/login" className="font-medium text-primary hover:underline">
+            <Link
+              href={storeUrl('/auth/login')}
+              className="font-medium text-primary hover:underline"
+            >
               Sign in
             </Link>
           </p>
@@ -146,16 +150,16 @@ export default function RegisterPage() {
               <input
                 id="terms"
                 type="checkbox"
-                className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                className="mt-1 h-4 w-4 rounded border-border text-primary focus:ring-primary"
                 required
               />
-              <label htmlFor="terms" className="text-sm text-gray-600">
+              <label htmlFor="terms" className="text-sm text-muted-foreground">
                 I agree to the{' '}
-                <Link href="/terms" className="text-primary hover:underline">
+                <Link href={storeUrl('/terms')} className="text-primary hover:underline">
                   Terms of Service
                 </Link>{' '}
                 and{' '}
-                <Link href="/privacy" className="text-primary hover:underline">
+                <Link href={storeUrl('/privacy')} className="text-primary hover:underline">
                   Privacy Policy
                 </Link>
               </label>

@@ -5,9 +5,11 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Button } from '@force/ui';
+import { useStoreUrl } from '../../../contexts/StoreContext';
 
 export default function CheckoutErrorPage() {
   const router = useRouter();
+  const storeUrl = useStoreUrl();
   const [isRetrying, setIsRetrying] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
   const [paymentId, setPaymentId] = useState<string | null>(null);
@@ -30,17 +32,17 @@ export default function CheckoutErrorPage() {
 
     const destination = query.toString() ? `/checkout?${query.toString()}` : '/checkout';
 
-    router.push(destination);
+    router.push(storeUrl(destination));
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12">
+    <main className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
       <div className="w-full max-w-md text-center">
-        <Link href="/" className="inline-flex items-center gap-2 mb-8">
+        <Link href={storeUrl('/')} className="inline-flex items-center gap-2 mb-8">
           <Image src="/logo.svg" alt="Force Media" width={48} height={36} />
           <span className="text-2xl font-bold">
             <span className="text-primary">Force</span>
-            <span className="text-gray-700"> Store</span>
+            <span className="text-foreground"> Store</span>
           </span>
         </Link>
 
@@ -61,8 +63,10 @@ export default function CheckoutErrorPage() {
             </svg>
           </div>
 
-          <h1 className="mt-6 text-2xl font-bold text-gray-900">Payment could not be processed</h1>
-          <p className="mt-2 text-gray-500">
+          <h1 className="mt-6 text-2xl font-bold text-foreground">
+            Payment could not be processed
+          </h1>
+          <p className="mt-2 text-muted-foreground">
             Something went wrong during checkout. Please try again or contact support if the problem
             persists.
           </p>
@@ -79,7 +83,7 @@ export default function CheckoutErrorPage() {
               Retry Payment
             </Button>
 
-            <Link href="/cart">
+            <Link href={storeUrl('/cart')}>
               <Button className="w-full" size="lg" variant="outline">
                 Return to Cart
               </Button>

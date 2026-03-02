@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { api } from '@/lib/api';
+import { useStoreUrl } from '../../../../contexts/StoreContext';
 
 interface OrderDetail {
   id: string;
@@ -79,6 +80,7 @@ interface OrderDetail {
 
 export default function OrderDetailPage() {
   const params = useParams();
+  const storeUrl = useStoreUrl();
   const orderId = params.id as string;
 
   const [order, setOrder] = useState<OrderDetail | null>(null);
@@ -143,14 +145,14 @@ export default function OrderDetailPage() {
     shipped: 'bg-purple-100 text-purple-800',
     delivered: 'bg-green-100 text-green-800',
     cancelled: 'bg-red-100 text-red-800',
-    refunded: 'bg-gray-100 text-gray-800',
+    refunded: 'bg-muted text-foreground',
   };
 
   const paymentStatusColors: Record<string, string> = {
     unpaid: 'bg-yellow-100 text-yellow-800',
     paid: 'bg-green-100 text-green-800',
     partially_paid: 'bg-orange-100 text-orange-800',
-    refunded: 'bg-gray-100 text-gray-800',
+    refunded: 'bg-muted text-foreground',
     failed: 'bg-red-100 text-red-800',
   };
 
@@ -163,8 +165,8 @@ export default function OrderDetailPage() {
       <div className="space-y-6">
         <div className="flex items-center gap-3">
           <Link
-            href="/account/orders"
-            className="text-gray-500 hover:text-gray-700 transition-colors"
+            href={storeUrl('/account/orders')}
+            className="text-muted-foreground hover:text-foreground transition-colors"
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
@@ -176,8 +178,8 @@ export default function OrderDetailPage() {
             </svg>
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Order Details</h1>
-            <p className="mt-1 text-gray-500">Loading order information...</p>
+            <h1 className="text-2xl font-bold text-foreground">Order Details</h1>
+            <p className="mt-1 text-muted-foreground">Loading order information...</p>
           </div>
         </div>
         <div className="flex justify-center py-12">
@@ -192,8 +194,8 @@ export default function OrderDetailPage() {
       <div className="space-y-6">
         <div className="flex items-center gap-3">
           <Link
-            href="/account/orders"
-            className="text-gray-500 hover:text-gray-700 transition-colors"
+            href={storeUrl('/account/orders')}
+            className="text-muted-foreground hover:text-foreground transition-colors"
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
@@ -205,7 +207,7 @@ export default function OrderDetailPage() {
             </svg>
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Order Details</h1>
+            <h1 className="text-2xl font-bold text-foreground">Order Details</h1>
           </div>
         </div>
         <div className="rounded-lg border border-red-200 bg-red-50 p-4">
@@ -249,8 +251,8 @@ export default function OrderDetailPage() {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex items-center gap-3">
           <Link
-            href="/account/orders"
-            className="text-gray-500 hover:text-gray-700 transition-colors"
+            href={storeUrl('/account/orders')}
+            className="text-muted-foreground hover:text-foreground transition-colors"
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
@@ -262,18 +264,20 @@ export default function OrderDetailPage() {
             </svg>
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Order #{order.orderNumber}</h1>
-            <p className="mt-1 text-gray-500">Placed on {formatDateTime(order.createdAt)}</p>
+            <h1 className="text-2xl font-bold text-foreground">Order #{order.orderNumber}</h1>
+            <p className="mt-1 text-muted-foreground">
+              Placed on {formatDateTime(order.createdAt)}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <span
-            className={`inline-flex rounded-full px-3 py-1 text-sm font-medium ${orderStatusColors[order.status] || 'bg-gray-100 text-gray-800'}`}
+            className={`inline-flex rounded-full px-3 py-1 text-sm font-medium ${orderStatusColors[order.status] || 'bg-muted text-foreground'}`}
           >
             {formatLabel(order.status)}
           </span>
           <span
-            className={`inline-flex rounded-full px-3 py-1 text-sm font-medium ${paymentStatusColors[order.paymentStatus] || 'bg-gray-100 text-gray-800'}`}
+            className={`inline-flex rounded-full px-3 py-1 text-sm font-medium ${paymentStatusColors[order.paymentStatus] || 'bg-muted text-foreground'}`}
           >
             {formatLabel(order.paymentStatus)}
           </span>
@@ -286,14 +290,14 @@ export default function OrderDetailPage() {
           <div className="flex flex-wrap gap-6 text-sm">
             {order.shippedAt && (
               <div>
-                <span className="text-gray-500">Shipped:</span>{' '}
-                <span className="font-medium text-gray-900">{formatDate(order.shippedAt)}</span>
+                <span className="text-muted-foreground">Shipped:</span>{' '}
+                <span className="font-medium text-foreground">{formatDate(order.shippedAt)}</span>
               </div>
             )}
             {order.deliveredAt && (
               <div>
-                <span className="text-gray-500">Delivered:</span>{' '}
-                <span className="font-medium text-gray-900">{formatDate(order.deliveredAt)}</span>
+                <span className="text-muted-foreground">Delivered:</span>{' '}
+                <span className="font-medium text-foreground">{formatDate(order.deliveredAt)}</span>
               </div>
             )}
           </div>
@@ -302,15 +306,15 @@ export default function OrderDetailPage() {
 
       {/* Order Items */}
       <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
-        <div className="border-b bg-gray-50 px-4 py-3">
-          <h2 className="font-semibold text-gray-900">Order Items ({order.items.length})</h2>
+        <div className="border-b bg-muted px-4 py-3">
+          <h2 className="font-semibold text-foreground">Order Items ({order.items.length})</h2>
         </div>
 
         {/* Desktop table */}
         <div className="hidden sm:block">
           <table className="w-full">
             <thead>
-              <tr className="border-b text-left text-sm text-gray-500">
+              <tr className="border-b text-left text-sm text-muted-foreground">
                 <th className="px-4 py-3 font-medium">Product</th>
                 <th className="px-4 py-3 font-medium text-center">Qty</th>
                 <th className="px-4 py-3 font-medium text-right">Price</th>
@@ -322,7 +326,7 @@ export default function OrderDetailPage() {
                 <tr key={item.id}>
                   <td className="px-4 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="h-12 w-12 flex-shrink-0 rounded-lg bg-gray-100 overflow-hidden">
+                      <div className="h-12 w-12 flex-shrink-0 rounded-lg bg-muted overflow-hidden">
                         {item.product?.images?.[0]?.url ? (
                           <img
                             src={item.product.images[0].url}
@@ -330,7 +334,7 @@ export default function OrderDetailPage() {
                             className="h-full w-full object-cover"
                           />
                         ) : (
-                          <div className="flex h-full w-full items-center justify-center text-gray-400">
+                          <div className="flex h-full w-full items-center justify-center text-muted-foreground/70">
                             <svg
                               className="h-5 w-5"
                               fill="none"
@@ -347,14 +351,16 @@ export default function OrderDetailPage() {
                           </div>
                         )}
                       </div>
-                      <span className="font-medium text-gray-900">
+                      <span className="font-medium text-foreground">
                         {item.product?.name || 'Product'}
                       </span>
                     </div>
                   </td>
-                  <td className="px-4 py-4 text-center text-gray-700">{item.quantity}</td>
-                  <td className="px-4 py-4 text-right text-gray-700">{formatPrice(item.price)}</td>
-                  <td className="px-4 py-4 text-right font-medium text-gray-900">
+                  <td className="px-4 py-4 text-center text-foreground">{item.quantity}</td>
+                  <td className="px-4 py-4 text-right text-foreground">
+                    {formatPrice(item.price)}
+                  </td>
+                  <td className="px-4 py-4 text-right font-medium text-foreground">
                     {formatPrice(item.price * item.quantity)}
                   </td>
                 </tr>
@@ -367,7 +373,7 @@ export default function OrderDetailPage() {
         <div className="sm:hidden divide-y">
           {order.items.map(item => (
             <div key={item.id} className="flex items-center gap-3 p-4">
-              <div className="h-14 w-14 flex-shrink-0 rounded-lg bg-gray-100 overflow-hidden">
+              <div className="h-14 w-14 flex-shrink-0 rounded-lg bg-muted overflow-hidden">
                 {item.product?.images?.[0]?.url ? (
                   <img
                     src={item.product.images[0].url}
@@ -375,7 +381,7 @@ export default function OrderDetailPage() {
                     className="h-full w-full object-cover"
                   />
                 ) : (
-                  <div className="flex h-full w-full items-center justify-center text-gray-400">
+                  <div className="flex h-full w-full items-center justify-center text-muted-foreground/70">
                     <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path
                         strokeLinecap="round"
@@ -388,14 +394,16 @@ export default function OrderDetailPage() {
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-medium text-gray-900 truncate">
+                <p className="font-medium text-foreground truncate">
                   {item.product?.name || 'Product'}
                 </p>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-muted-foreground">
                   {formatPrice(item.price)} x {item.quantity}
                 </p>
               </div>
-              <p className="font-medium text-gray-900">{formatPrice(item.price * item.quantity)}</p>
+              <p className="font-medium text-foreground">
+                {formatPrice(item.price * item.quantity)}
+              </p>
             </div>
           ))}
         </div>
@@ -405,53 +413,53 @@ export default function OrderDetailPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Order Summary */}
         <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
-          <div className="border-b bg-gray-50 px-4 py-3">
-            <h2 className="font-semibold text-gray-900">Order Summary</h2>
+          <div className="border-b bg-muted px-4 py-3">
+            <h2 className="font-semibold text-foreground">Order Summary</h2>
           </div>
           <div className="p-4 space-y-3">
             <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Subtotal</span>
-              <span className="text-gray-900">{formatPrice(order.subtotal)}</span>
+              <span className="text-muted-foreground">Subtotal</span>
+              <span className="text-foreground">{formatPrice(order.subtotal)}</span>
             </div>
             {order.tax > 0 && (
               <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Tax</span>
-                <span className="text-gray-900">{formatPrice(order.tax)}</span>
+                <span className="text-muted-foreground">Tax</span>
+                <span className="text-foreground">{formatPrice(order.tax)}</span>
               </div>
             )}
             {order.shipping > 0 && (
               <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Shipping</span>
-                <span className="text-gray-900">{formatPrice(order.shipping)}</span>
+                <span className="text-muted-foreground">Shipping</span>
+                <span className="text-foreground">{formatPrice(order.shipping)}</span>
               </div>
             )}
             {order.discount > 0 && (
               <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Discount</span>
+                <span className="text-muted-foreground">Discount</span>
                 <span className="text-green-600">-{formatPrice(order.discount)}</span>
               </div>
             )}
             {order.couponCode && order.couponDiscount > 0 && (
               <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Coupon ({order.couponCode})</span>
+                <span className="text-muted-foreground">Coupon ({order.couponCode})</span>
                 <span className="text-green-600">-{formatPrice(order.couponDiscount)}</span>
               </div>
             )}
             <div className="border-t pt-3 flex justify-between">
-              <span className="font-semibold text-gray-900">Total</span>
-              <span className="font-semibold text-gray-900">{formatPrice(order.total)}</span>
+              <span className="font-semibold text-foreground">Total</span>
+              <span className="font-semibold text-foreground">{formatPrice(order.total)}</span>
             </div>
           </div>
         </div>
 
         {/* Shipping Address */}
         <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
-          <div className="border-b bg-gray-50 px-4 py-3">
-            <h2 className="font-semibold text-gray-900">Shipping Address</h2>
+          <div className="border-b bg-muted px-4 py-3">
+            <h2 className="font-semibold text-foreground">Shipping Address</h2>
           </div>
-          <div className="p-4 text-sm text-gray-700 space-y-1">
+          <div className="p-4 text-sm text-foreground space-y-1">
             {(shippingAddr.firstName || shippingAddr.lastName) && (
-              <p className="font-medium text-gray-900">
+              <p className="font-medium text-foreground">
                 {[shippingAddr.firstName, shippingAddr.lastName].filter(Boolean).join(' ')}
               </p>
             )}
@@ -467,7 +475,7 @@ export default function OrderDetailPage() {
             )}
             {shippingAddr.country && <p>{shippingAddr.country}</p>}
             {shippingAddr.phone && (
-              <p className="pt-2 text-gray-500">Phone: {shippingAddr.phone}</p>
+              <p className="pt-2 text-muted-foreground">Phone: {shippingAddr.phone}</p>
             )}
           </div>
         </div>
@@ -476,8 +484,8 @@ export default function OrderDetailPage() {
       {/* Payment Information */}
       {order.payments && order.payments.length > 0 && (
         <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
-          <div className="border-b bg-gray-50 px-4 py-3">
-            <h2 className="font-semibold text-gray-900">Payment Information</h2>
+          <div className="border-b bg-muted px-4 py-3">
+            <h2 className="font-semibold text-foreground">Payment Information</h2>
           </div>
           <div className="p-4">
             <div className="space-y-4">
@@ -488,11 +496,13 @@ export default function OrderDetailPage() {
                 >
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <span className="font-medium text-gray-900">
+                      <span className="font-medium text-foreground">
                         {formatLabel(payment.provider)}
                       </span>
                       {payment.method && (
-                        <span className="text-gray-500">({formatLabel(payment.method)})</span>
+                        <span className="text-muted-foreground">
+                          ({formatLabel(payment.method)})
+                        </span>
                       )}
                       <span
                         className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
@@ -507,22 +517,24 @@ export default function OrderDetailPage() {
                       </span>
                     </div>
                     {payment.transactionId && (
-                      <p className="text-gray-500">
+                      <p className="text-muted-foreground">
                         Transaction ID:{' '}
-                        <span className="font-mono text-gray-700">{payment.transactionId}</span>
+                        <span className="font-mono text-foreground">{payment.transactionId}</span>
                       </p>
                     )}
                     {payment.invoiceId && (
-                      <p className="text-gray-500">
+                      <p className="text-muted-foreground">
                         Invoice ID:{' '}
-                        <span className="font-mono text-gray-700">{payment.invoiceId}</span>
+                        <span className="font-mono text-foreground">{payment.invoiceId}</span>
                       </p>
                     )}
                     {payment.paidAt && (
-                      <p className="text-gray-500">Paid on {formatDateTime(payment.paidAt)}</p>
+                      <p className="text-muted-foreground">
+                        Paid on {formatDateTime(payment.paidAt)}
+                      </p>
                     )}
                   </div>
-                  <span className="font-medium text-gray-900">{formatPrice(payment.amount)}</span>
+                  <span className="font-medium text-foreground">{formatPrice(payment.amount)}</span>
                 </div>
               ))}
             </div>
@@ -533,19 +545,23 @@ export default function OrderDetailPage() {
       {/* Notes */}
       {(order.notes || order.customerNotes) && (
         <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
-          <div className="border-b bg-gray-50 px-4 py-3">
-            <h2 className="font-semibold text-gray-900">Notes</h2>
+          <div className="border-b bg-muted px-4 py-3">
+            <h2 className="font-semibold text-foreground">Notes</h2>
           </div>
-          <div className="p-4 text-sm text-gray-700 space-y-3">
+          <div className="p-4 text-sm text-foreground space-y-3">
             {order.customerNotes && (
               <div>
-                <p className="text-xs font-medium text-gray-500 uppercase mb-1">Your Notes</p>
+                <p className="text-xs font-medium text-muted-foreground uppercase mb-1">
+                  Your Notes
+                </p>
                 <p>{order.customerNotes}</p>
               </div>
             )}
             {order.notes && (
               <div>
-                <p className="text-xs font-medium text-gray-500 uppercase mb-1">Store Notes</p>
+                <p className="text-xs font-medium text-muted-foreground uppercase mb-1">
+                  Store Notes
+                </p>
                 <p>{order.notes}</p>
               </div>
             )}
@@ -556,8 +572,8 @@ export default function OrderDetailPage() {
       {/* Actions */}
       <div className="flex flex-wrap items-center gap-3">
         <Link
-          href="/account/orders"
-          className="rounded-lg border bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+          href={storeUrl('/account/orders')}
+          className="rounded-lg border bg-white px-4 py-2 text-sm font-medium text-foreground hover:bg-muted transition-colors"
         >
           Back to Orders
         </Link>
@@ -591,7 +607,7 @@ export default function OrderDetailPage() {
                 className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
                   canTrack
                     ? 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer'
-                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-muted text-muted-foreground/70 cursor-not-allowed'
                 }`}
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -648,13 +664,13 @@ export default function OrderDetailPage() {
         >
           <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
             <div className="flex items-start justify-between mb-4">
-              <h2 id="tracking-modal-title" className="text-lg font-semibold text-gray-900">
+              <h2 id="tracking-modal-title" className="text-lg font-semibold text-foreground">
                 Tracking Information
               </h2>
               <button
                 onClick={() => setShowTrackingModal(false)}
                 aria-label="Close"
-                className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+                className="rounded-lg p-1 text-muted-foreground/70 hover:bg-muted hover:text-muted-foreground transition-colors"
               >
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path
@@ -667,19 +683,19 @@ export default function OrderDetailPage() {
               </button>
             </div>
 
-            <p className="text-sm text-gray-600 mb-4">
+            <p className="text-sm text-muted-foreground mb-4">
               Use the tracking number below on your carrier&apos;s website to check your shipment
               status.
             </p>
 
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 flex items-center justify-between gap-3">
-              <span className="font-mono text-gray-900 break-all">{order.trackingNumber}</span>
+            <div className="rounded-lg border border-border bg-muted p-3 flex items-center justify-between gap-3">
+              <span className="font-mono text-foreground break-all">{order.trackingNumber}</span>
               <button
                 onClick={() => {
                   navigator.clipboard.writeText(order.trackingNumber!).catch(() => undefined);
                 }}
                 title="Copy to clipboard"
-                className="flex-shrink-0 rounded-md p-1.5 text-gray-500 hover:bg-gray-200 hover:text-gray-800 transition-colors"
+                className="flex-shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-gray-200 hover:text-foreground transition-colors"
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path

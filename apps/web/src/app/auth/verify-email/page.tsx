@@ -3,12 +3,14 @@
 import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useStoreUrl } from '../../../contexts/StoreContext';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
 
 type VerifyState = 'loading' | 'success' | 'error';
 
 export default function VerifyEmailPage() {
+  const storeUrl = useStoreUrl();
   const [state, setState] = useState<VerifyState>('loading');
   const [errorMessage, setErrorMessage] = useState(
     'The verification link is invalid or has expired.'
@@ -58,14 +60,14 @@ export default function VerifyEmailPage() {
   }, []);
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12">
+    <main className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
       <div className="w-full max-w-md text-center">
         {/* Logo */}
-        <Link href="/" className="inline-flex items-center gap-2 mb-8">
+        <Link href={storeUrl('/')} className="inline-flex items-center gap-2 mb-8">
           <Image src="/logo.svg" alt="Force Media" width={48} height={36} />
           <span className="text-2xl font-bold">
             <span className="text-primary">Force</span>
-            <span className="text-gray-700"> Store</span>
+            <span className="text-foreground"> Store</span>
           </span>
         </Link>
 
@@ -75,8 +77,8 @@ export default function VerifyEmailPage() {
               <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-blue-50">
                 <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
               </div>
-              <h1 className="mt-6 text-2xl font-bold text-gray-900">Verifying your email</h1>
-              <p className="mt-2 text-gray-500">
+              <h1 className="mt-6 text-2xl font-bold text-foreground">Verifying your email</h1>
+              <p className="mt-2 text-muted-foreground">
                 Please wait while we verify your email address...
               </p>
             </>
@@ -99,14 +101,14 @@ export default function VerifyEmailPage() {
                   />
                 </svg>
               </div>
-              <h1 className="mt-6 text-2xl font-bold text-gray-900">Email Verified!</h1>
-              <p className="mt-2 text-gray-500">
+              <h1 className="mt-6 text-2xl font-bold text-foreground">Email Verified!</h1>
+              <p className="mt-2 text-muted-foreground">
                 Your email address has been verified successfully. You can now sign in to your
                 account.
               </p>
               <div className="mt-8">
                 <Link
-                  href="/auth/login"
+                  href={storeUrl('/auth/login')}
                   className="inline-flex w-full items-center justify-center rounded-lg bg-primary px-6 py-3 font-medium text-white hover:bg-primary/90 transition"
                 >
                   Go to Login
@@ -132,18 +134,18 @@ export default function VerifyEmailPage() {
                   />
                 </svg>
               </div>
-              <h1 className="mt-6 text-2xl font-bold text-gray-900">Invalid Link</h1>
-              <p className="mt-2 text-gray-500">{errorMessage}</p>
+              <h1 className="mt-6 text-2xl font-bold text-foreground">Invalid Link</h1>
+              <p className="mt-2 text-muted-foreground">{errorMessage}</p>
               <div className="mt-8 flex flex-col gap-3">
                 <Link
-                  href="/auth/login"
+                  href={storeUrl('/auth/login')}
                   className="inline-flex w-full items-center justify-center rounded-lg bg-primary px-6 py-3 font-medium text-white hover:bg-primary/90 transition"
                 >
                   Go to Login
                 </Link>
                 <Link
-                  href="/"
-                  className="inline-flex w-full items-center justify-center rounded-lg border border-gray-300 px-6 py-3 font-medium text-gray-700 hover:bg-gray-50 transition"
+                  href={storeUrl('/')}
+                  className="inline-flex w-full items-center justify-center rounded-lg border border-border px-6 py-3 font-medium text-foreground hover:bg-muted transition"
                 >
                   Back to Home
                 </Link>

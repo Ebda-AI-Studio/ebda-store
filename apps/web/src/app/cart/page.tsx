@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Button, useToast } from '@force/ui';
 import { Header, Footer } from '../../components';
 import { useCart } from '../../contexts/CartContext';
-import { useStore } from '../../contexts/StoreContext';
+import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { api } from '@/lib/api';
 
 function formatPrice(kwd: number) {
@@ -25,6 +25,7 @@ export default function CartPage() {
     total: cartTotal,
   } = useCart();
   const { store } = useStore();
+  const storeUrl = useStoreUrl();
   const [promoCode, setPromoCode] = useState('');
   const [promoApplied, setPromoApplied] = useState(false);
   const [promoDiscount, setPromoDiscount] = useState(0);
@@ -136,7 +137,7 @@ export default function CartPage() {
       <div className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8">
         {/* Breadcrumb */}
         <nav className="mb-6 flex items-center gap-2 text-sm text-muted-foreground">
-          <Link href="/" className="transition-colors hover:text-primary">
+          <Link href={storeUrl('/')} className="transition-colors hover:text-primary">
             Home
           </Link>
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -173,7 +174,7 @@ export default function CartPage() {
             <p className="mt-2 text-muted-foreground">
               Looks like you haven&apos;t added any items yet.
             </p>
-            <Link href="/products">
+            <Link href={storeUrl('/products')}>
               <Button className="mt-8 gap-2 rounded-xl shadow-lg shadow-primary/25" size="lg">
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path
@@ -190,7 +191,7 @@ export default function CartPage() {
             {/* Browse Products */}
             <div className="mt-12">
               <Link
-                href="/products"
+                href={storeUrl('/products')}
                 className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -331,7 +332,7 @@ export default function CartPage() {
               {/* Continue Shopping */}
               <div className="mt-8">
                 <Link
-                  href="/products"
+                  href={storeUrl('/products')}
                   className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
                 >
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -432,7 +433,7 @@ export default function CartPage() {
                   </div>
 
                   {/* Checkout Button */}
-                  <Link href="/checkout" className="mt-6 block">
+                  <Link href={storeUrl('/checkout')} className="mt-6 block">
                     <Button
                       className="w-full gap-2 rounded-xl shadow-lg shadow-primary/25"
                       size="lg"

@@ -5,8 +5,10 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Button, Input } from '@force/ui';
 import { api } from '@/lib/api';
+import { useStoreUrl } from '../../../contexts/StoreContext';
 
 export default function ForgotPasswordPage() {
+  const storeUrl = useStoreUrl();
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [email, setEmail] = useState('');
@@ -34,13 +36,13 @@ export default function ForgotPasswordPage() {
 
   if (isSubmitted) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
+      <main className="flex min-h-screen items-center justify-center bg-background px-4 py-12 sm:px-6 lg:px-8">
         <div className="w-full max-w-md space-y-8 text-center">
-          <Link href="/" className="inline-flex items-center gap-2">
+          <Link href={storeUrl('/')} className="inline-flex items-center gap-2">
             <Image src="/logo.svg" alt="Force Media" width={48} height={36} />
             <span className="text-2xl font-bold">
               <span className="text-primary">Force</span>
-              <span className="text-gray-700"> Store</span>
+              <span className="text-foreground"> Store</span>
             </span>
           </Link>
 
@@ -60,11 +62,11 @@ export default function ForgotPasswordPage() {
                 />
               </svg>
             </div>
-            <h2 className="mt-4 text-xl font-semibold text-gray-900">Check your email</h2>
-            <p className="mt-2 text-sm text-gray-600">
+            <h2 className="mt-4 text-xl font-semibold text-foreground">Check your email</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
               We&apos;ve sent a password reset link to <strong>{email}</strong>
             </p>
-            <p className="mt-4 text-xs text-gray-500">
+            <p className="mt-4 text-xs text-muted-foreground">
               Didn&apos;t receive the email? Check your spam folder or{' '}
               <button
                 onClick={() => setIsSubmitted(false)}
@@ -75,7 +77,10 @@ export default function ForgotPasswordPage() {
             </p>
           </div>
 
-          <Link href="/auth/login" className="inline-block text-sm text-primary hover:underline">
+          <Link
+            href={storeUrl('/auth/login')}
+            className="inline-block text-sm text-primary hover:underline"
+          >
             &larr; Back to sign in
           </Link>
         </div>
@@ -84,19 +89,21 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
+    <main className="flex min-h-screen items-center justify-center bg-background px-4 py-12 sm:px-6 lg:px-8">
       <div className="w-full max-w-md space-y-8">
         {/* Header */}
         <div className="text-center">
-          <Link href="/" className="inline-flex items-center gap-2">
+          <Link href={storeUrl('/')} className="inline-flex items-center gap-2">
             <Image src="/logo.svg" alt="Force Media" width={48} height={36} />
             <span className="text-2xl font-bold">
               <span className="text-primary">Force</span>
-              <span className="text-gray-700"> Store</span>
+              <span className="text-foreground"> Store</span>
             </span>
           </Link>
-          <h2 className="mt-6 text-3xl font-bold tracking-tight text-gray-900">Forgot password?</h2>
-          <p className="mt-2 text-sm text-gray-600">
+          <h2 className="mt-6 text-3xl font-bold tracking-tight text-foreground">
+            Forgot password?
+          </h2>
+          <p className="mt-2 text-sm text-muted-foreground">
             No worries, we&apos;ll send you reset instructions.
           </p>
         </div>
@@ -124,7 +131,7 @@ export default function ForgotPasswordPage() {
         </div>
 
         <p className="text-center text-sm">
-          <Link href="/auth/login" className="text-primary hover:underline">
+          <Link href={storeUrl('/auth/login')} className="text-primary hover:underline">
             &larr; Back to sign in
           </Link>
         </p>

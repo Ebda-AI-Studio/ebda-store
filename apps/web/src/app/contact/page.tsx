@@ -38,13 +38,13 @@ export default function ContactPage() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col bg-gray-50">
+    <main className="flex min-h-screen flex-col bg-background">
       <Header />
 
       <div className="mx-auto w-full max-w-3xl flex-1 px-4 py-12 sm:px-6 lg:px-8">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900">Contact Us</h1>
-          <p className="mt-2 text-gray-500">
+          <h1 className="text-3xl font-bold text-foreground">Contact Us</h1>
+          <p className="mt-2 text-muted-foreground">
             Have a question or need help? We&apos;re here for you.
           </p>
         </div>
@@ -102,8 +102,8 @@ export default function ContactPage() {
                 />
               </svg>
             </div>
-            <h3 className="mt-4 font-semibold text-gray-900">Email</h3>
-            <p className="mt-1 text-sm text-gray-500">{store.email || 'Not available'}</p>
+            <h3 className="mt-4 font-semibold text-foreground">Email</h3>
+            <p className="mt-1 text-sm text-muted-foreground">{store.email || 'Not available'}</p>
           </div>
           <div className="text-center">
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
@@ -121,8 +121,8 @@ export default function ContactPage() {
                 />
               </svg>
             </div>
-            <h3 className="mt-4 font-semibold text-gray-900">Phone</h3>
-            <p className="mt-1 text-sm text-gray-500">{store.phone || 'Not available'}</p>
+            <h3 className="mt-4 font-semibold text-foreground">Phone</h3>
+            <p className="mt-1 text-sm text-muted-foreground">{store.phone || 'Not available'}</p>
           </div>
           <div className="text-center">
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
@@ -146,8 +146,8 @@ export default function ContactPage() {
                 />
               </svg>
             </div>
-            <h3 className="mt-4 font-semibold text-gray-900">Location</h3>
-            <p className="mt-1 text-sm text-gray-500">{store.address || 'Not available'}</p>
+            <h3 className="mt-4 font-semibold text-foreground">Location</h3>
+            <p className="mt-1 text-sm text-muted-foreground">{store.address || 'Not available'}</p>
           </div>
         </div>
       </div>

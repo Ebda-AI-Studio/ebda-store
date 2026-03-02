@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
+import { useStoreUrl } from '../../../contexts/StoreContext';
 
 interface Order {
   id: string;
@@ -23,6 +24,7 @@ interface Order {
 }
 
 export default function OrdersPage() {
+  const storeUrl = useStoreUrl();
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -76,8 +78,8 @@ export default function OrdersPage() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Order History</h1>
-          <p className="mt-1 text-gray-500">View and track your orders</p>
+          <h1 className="text-2xl font-bold text-foreground">Order History</h1>
+          <p className="mt-1 text-muted-foreground">View and track your orders</p>
         </div>
         <div className="flex justify-center py-12">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
@@ -89,8 +91,8 @@ export default function OrdersPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Order History</h1>
-        <p className="mt-1 text-gray-500">View and track your orders</p>
+        <h1 className="text-2xl font-bold text-foreground">Order History</h1>
+        <p className="mt-1 text-muted-foreground">View and track your orders</p>
       </div>
 
       {/* Error Display */}
@@ -125,23 +127,23 @@ export default function OrdersPage() {
         <div className="space-y-4">
           {orders.map(order => (
             <div key={order.id} className="rounded-xl border bg-white shadow-sm overflow-hidden">
-              <div className="flex flex-wrap items-center justify-between gap-4 border-b bg-gray-50 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-4 border-b bg-muted p-4">
                 <div className="flex flex-wrap items-center gap-4">
                   <div>
-                    <p className="text-sm text-gray-500">Order Number</p>
-                    <p className="font-medium text-gray-900">#{order.orderNumber}</p>
+                    <p className="text-sm text-muted-foreground">Order Number</p>
+                    <p className="font-medium text-foreground">#{order.orderNumber}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500">Date</p>
-                    <p className="font-medium text-gray-900">{formatDate(order.createdAt)}</p>
+                    <p className="text-sm text-muted-foreground">Date</p>
+                    <p className="font-medium text-foreground">{formatDate(order.createdAt)}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500">Total</p>
-                    <p className="font-medium text-gray-900">{formatPrice(order.total)}</p>
+                    <p className="text-sm text-muted-foreground">Total</p>
+                    <p className="font-medium text-foreground">{formatPrice(order.total)}</p>
                   </div>
                 </div>
                 <span
-                  className={`inline-flex rounded-full px-3 py-1 text-sm font-medium ${statusColors[order.status] || 'bg-gray-100 text-gray-800'}`}
+                  className={`inline-flex rounded-full px-3 py-1 text-sm font-medium ${statusColors[order.status] || 'bg-muted text-foreground'}`}
                 >
                   {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
                 </span>
@@ -152,7 +154,7 @@ export default function OrdersPage() {
                   <div className="space-y-4">
                     {order.items.map(item => (
                       <div key={item.id} className="flex items-center gap-4">
-                        <div className="h-16 w-16 flex-shrink-0 rounded-lg bg-gray-100">
+                        <div className="h-16 w-16 flex-shrink-0 rounded-lg bg-muted">
                           {item.product?.images?.[0]?.url ? (
                             <img
                               src={item.product.images[0].url}
@@ -160,7 +162,7 @@ export default function OrdersPage() {
                               className="h-full w-full rounded-lg object-cover"
                             />
                           ) : (
-                            <div className="flex h-full w-full items-center justify-center text-gray-400">
+                            <div className="flex h-full w-full items-center justify-center text-muted-foreground/70">
                               <svg
                                 className="h-6 w-6"
                                 fill="none"
@@ -178,24 +180,24 @@ export default function OrdersPage() {
                           )}
                         </div>
                         <div className="flex-1">
-                          <p className="font-medium text-gray-900">
+                          <p className="font-medium text-foreground">
                             {item.product?.name || 'Product'}
                           </p>
-                          <p className="text-sm text-gray-500">Qty: {item.quantity}</p>
+                          <p className="text-sm text-muted-foreground">Qty: {item.quantity}</p>
                         </div>
-                        <p className="font-medium text-gray-900">{formatPrice(item.price)}</p>
+                        <p className="font-medium text-foreground">{formatPrice(item.price)}</p>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-gray-500">No items in this order</p>
+                  <p className="text-sm text-muted-foreground">No items in this order</p>
                 )}
               </div>
 
-              <div className="flex justify-end gap-2 border-t bg-gray-50 p-4">
+              <div className="flex justify-end gap-2 border-t bg-muted p-4">
                 {order.status === 'shipped' || order.status === 'delivered' ? (
                   <button
-                    className="rounded-lg border bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    className="rounded-lg border bg-white px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
                     title="Tracking info not available yet"
                     disabled
                   >
@@ -203,7 +205,7 @@ export default function OrdersPage() {
                   </button>
                 ) : null}
                 <Link
-                  href={`/account/orders/${order.id}`}
+                  href={storeUrl(`/account/orders/${order.id}`)}
                   className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90"
                 >
                   View Details
@@ -215,7 +217,7 @@ export default function OrdersPage() {
       ) : !error ? (
         <div className="rounded-xl border bg-white p-12 text-center shadow-sm">
           <svg
-            className="mx-auto h-12 w-12 text-gray-400"
+            className="mx-auto h-12 w-12 text-muted-foreground/70"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -227,10 +229,12 @@ export default function OrdersPage() {
               d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
             />
           </svg>
-          <h3 className="mt-4 text-lg font-medium text-gray-900">No orders yet</h3>
-          <p className="mt-2 text-gray-500">When you place orders, they will appear here.</p>
+          <h3 className="mt-4 text-lg font-medium text-foreground">No orders yet</h3>
+          <p className="mt-2 text-muted-foreground">
+            When you place orders, they will appear here.
+          </p>
           <Link
-            href="/products"
+            href={storeUrl('/products')}
             className="mt-6 inline-flex items-center rounded-lg bg-primary px-6 py-3 font-medium text-white hover:bg-primary/90"
           >
             Start Shopping

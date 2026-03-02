@@ -7,12 +7,13 @@ import Link from 'next/link';
 import { Button, Input } from '@force/ui';
 import { api } from '@/lib/api';
 import { useCart } from '../../../contexts/CartContext';
-import { useStore } from '../../../contexts/StoreContext';
+import { useStore, useStoreUrl } from '../../../contexts/StoreContext';
 
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { store } = useStore();
+  const storeUrl = useStoreUrl();
   const { syncCartToBackend } = useCart();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -38,7 +39,7 @@ export default function LoginPage() {
 
       // Redirect to the original page or home
       const redirectTo = searchParams.get('redirect') || '/';
-      router.push(redirectTo);
+      router.push(storeUrl(redirectTo));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to login');
     } finally {
@@ -47,22 +48,25 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
+    <main className="flex min-h-screen items-center justify-center bg-background px-4 py-12 sm:px-6 lg:px-8">
       <div className="w-full max-w-md space-y-8">
         {/* Header */}
         <div className="text-center">
-          <Link href="/" className="inline-flex items-center gap-2">
+          <Link href={storeUrl('/')} className="inline-flex items-center gap-2">
             {store.logo ? (
               <Image src={store.logo} alt={store.name} width={48} height={36} />
             ) : (
               <Image src="/logo.svg" alt={store.name} width={48} height={36} />
             )}
-            <span className="text-2xl font-bold text-gray-700">{store.name}</span>
+            <span className="text-2xl font-bold text-foreground">{store.name}</span>
           </Link>
-          <h2 className="mt-6 text-3xl font-bold tracking-tight text-gray-900">Welcome back</h2>
-          <p className="mt-2 text-sm text-gray-600">
+          <h2 className="mt-6 text-3xl font-bold tracking-tight text-foreground">Welcome back</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
             Don&apos;t have an account?{' '}
-            <Link href="/auth/register" className="font-medium text-primary hover:underline">
+            <Link
+              href={storeUrl('/auth/register')}
+              className="font-medium text-primary hover:underline"
+            >
               Sign up
             </Link>
           </p>
@@ -94,7 +98,10 @@ export default function LoginPage() {
                 required
               />
               <div className="mt-2 text-right">
-                <Link href="/auth/forgot-password" className="text-sm text-primary hover:underline">
+                <Link
+                  href={storeUrl('/auth/forgot-password')}
+                  className="text-sm text-primary hover:underline"
+                >
                   Forgot password?
                 </Link>
               </div>
@@ -106,13 +113,13 @@ export default function LoginPage() {
           </form>
         </div>
 
-        <p className="text-center text-xs text-gray-500">
+        <p className="text-center text-xs text-muted-foreground">
           By signing in, you agree to our{' '}
-          <Link href="/terms" className="text-primary hover:underline">
+          <Link href={storeUrl('/terms')} className="text-primary hover:underline">
             Terms of Service
           </Link>{' '}
           and{' '}
-          <Link href="/privacy" className="text-primary hover:underline">
+          <Link href={storeUrl('/privacy')} className="text-primary hover:underline">
             Privacy Policy
           </Link>
         </p>

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
+import { useStoreUrl } from '@/contexts/StoreContext';
 import { Header, Footer } from '../../components';
 
 interface Category {
@@ -17,6 +18,7 @@ interface Category {
 export default function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const storeUrl = useStoreUrl();
 
   useEffect(() => {
     loadCategories();
@@ -61,7 +63,7 @@ export default function CategoriesPage() {
         {categories.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-gray-500 mb-4">No categories available yet.</p>
-            <Link href="/products" className="text-primary hover:underline">
+            <Link href={storeUrl('/products')} className="text-primary hover:underline">
               Browse all products
             </Link>
           </div>
@@ -70,10 +72,10 @@ export default function CategoriesPage() {
             {categories.map(category => (
               <Link
                 key={category.id}
-                href={`/products?category=${category.slug}`}
+                href={storeUrl(`/products?category=${category.slug}`)}
                 className="group bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow border"
               >
-                <div className="aspect-square bg-gradient-to-br from-orange-50 to-orange-100 relative">
+                <div className="aspect-square bg-gradient-to-br from-primary/5 to-primary/10 relative">
                   {category.image ? (
                     <img
                       src={category.image}

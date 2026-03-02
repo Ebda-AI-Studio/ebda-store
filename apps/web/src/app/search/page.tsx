@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api, type Category } from '@/lib/api';
 import { Header, Footer } from '../../components';
+import { useStoreUrl } from '../../contexts/StoreContext';
 import { trackSearch } from '../../components/MarketingPixels';
 
 interface Product {
@@ -51,6 +52,7 @@ function sortProducts(products: Product[], sortBy: SortValue): Product[] {
 
 function SearchContent() {
   const router = useRouter();
+  const storeUrl = useStoreUrl();
   const searchParams = useSearchParams();
 
   // Derive initial values from URL params for shareability
@@ -120,7 +122,7 @@ function SearchContent() {
     if (term) params.set('q', term);
     if (category) params.set('category', category);
     if (sort && sort !== 'newest') params.set('sort', sort);
-    router.push(`/search?${params.toString()}`);
+    router.push(storeUrl(`/search?${params.toString()}`));
   }
 
   function handleSearch(e: React.FormEvent) {
@@ -301,10 +303,10 @@ function SearchContent() {
               {products.map(product => (
                 <Link
                   key={product.id}
-                  href={`/products/${product.slug}`}
+                  href={storeUrl(`/products/${product.slug}`)}
                   className="group rounded-xl border border-border bg-card overflow-hidden hover:shadow-lg transition-shadow"
                 >
-                  <div className="aspect-square bg-gradient-to-br from-orange-50 to-orange-100 relative overflow-hidden">
+                  <div className="aspect-square bg-gradient-to-br from-primary/5 to-primary/10 relative overflow-hidden">
                     {product.images?.[0]?.url ? (
                       <img
                         src={product.images[0].url}
@@ -375,7 +377,7 @@ function SearchContent() {
                 Clear category filter
               </button>
             )}
-            <Link href="/products" className="text-primary hover:underline text-sm">
+            <Link href={storeUrl('/products')} className="text-primary hover:underline text-sm">
               Browse all products
             </Link>
           </div>

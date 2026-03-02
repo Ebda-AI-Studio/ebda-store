@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { Button, Badge, useToast } from '@force/ui';
 import { api, type Product } from '@/lib/api';
 import { useCart } from '../../../contexts/CartContext';
-import { useStore } from '../../../contexts/StoreContext';
+import { useStore, useStoreUrl } from '../../../contexts/StoreContext';
 import { Header, Footer } from '../../../components';
 import { trackViewContent, trackAddToCart } from '../../../components/MarketingPixels';
 import {
@@ -63,6 +63,7 @@ export default function ProductDetailPage() {
   const { success: toastSuccess } = useToast();
   const { addItem } = useCart();
   const { store } = useStore();
+  const storeUrl = useStoreUrl();
 
   useEffect(() => {
     if (!slug) return;
@@ -201,7 +202,7 @@ export default function ProductDetailPage() {
           <p className="mt-2 text-muted-foreground">
             The product you&apos;re looking for may have been removed or doesn&apos;t exist.
           </p>
-          <Link href="/products">
+          <Link href={storeUrl('/products')}>
             <Button className="mt-6">Browse Products</Button>
           </Link>
         </div>
@@ -225,11 +226,11 @@ export default function ProductDetailPage() {
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 flex-1">
         {/* Breadcrumb */}
         <nav className="mb-8 flex items-center gap-2 text-sm text-muted-foreground">
-          <Link href="/" className="hover:text-primary">
+          <Link href={storeUrl('/')} className="hover:text-primary">
             Home
           </Link>
           <span>/</span>
-          <Link href="/products" className="hover:text-primary flex items-center gap-1">
+          <Link href={storeUrl('/products')} className="hover:text-primary flex items-center gap-1">
             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
                 strokeLinecap="round"
@@ -284,7 +285,7 @@ export default function ProductDetailPage() {
                     className={`aspect-square overflow-hidden rounded-lg transition ${
                       selectedImage === index
                         ? 'ring-2 ring-primary'
-                        : 'hover:ring-2 hover:ring-gray-300'
+                        : 'hover:ring-2 hover:ring-border'
                     }`}
                   >
                     <img
@@ -459,7 +460,7 @@ export default function ProductDetailPage() {
               {relatedProducts.map(item => (
                 <Link
                   key={item.id}
-                  href={`/products/${item.slug}`}
+                  href={storeUrl(`/products/${item.slug}`)}
                   className="group rounded-xl border border-border bg-card p-4 shadow-sm transition hover:shadow-lg"
                 >
                   <div className="aspect-square overflow-hidden rounded-lg bg-gradient-to-br from-primary/5 to-primary/10">

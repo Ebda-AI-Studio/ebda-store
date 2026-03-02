@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { Button } from '@force/ui';
 import { api } from '@/lib/api';
+import { useStoreUrl } from '../../contexts/StoreContext';
 
 interface User {
   id: string;
@@ -45,13 +46,14 @@ const accountNav = [
 export default function AccountLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const storeUrl = useStoreUrl();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const checkAuth = useCallback(async () => {
     const token = localStorage.getItem('accessToken');
     if (!token) {
-      router.push('/auth/login');
+      router.push(storeUrl('/auth/login'));
       return;
     }
 
@@ -60,10 +62,10 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
       if (result.success && result.data) {
         setUser(result.data.user);
       } else {
-        router.push('/auth/login');
+        router.push(storeUrl('/auth/login'));
       }
     } catch {
-      router.push('/auth/login');
+      router.push(storeUrl('/auth/login'));
     } finally {
       setIsLoading(false);
     }
@@ -75,7 +77,7 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
 
   async function handleLogout() {
     await api.logout();
-    router.push('/');
+    router.push(storeUrl('/'));
   }
 
   if (isLoading) {
@@ -87,25 +89,25 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b bg-white">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <Link href="/" className="flex items-center gap-2">
+          <Link href={storeUrl('/')} className="flex items-center gap-2">
             <Image src="/logo.svg" alt="Force Store" width={32} height={24} />
             <span className="text-lg font-bold">
               <span className="text-primary">Force</span>
-              <span className="text-gray-700"> Store</span>
+              <span className="text-foreground"> Store</span>
             </span>
           </Link>
 
           <div className="flex items-center gap-4">
-            <Link href="/products">
+            <Link href={storeUrl('/products')}>
               <Button variant="ghost" size="sm">
                 Shop
               </Button>
             </Link>
-            <Link href="/cart">
+            <Link href={storeUrl('/cart')}>
               <Button variant="ghost" size="sm">
                 Cart
               </Button>
@@ -126,10 +128,10 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
                   {user?.lastName?.[0]}
                 </div>
                 <div>
-                  <p className="font-medium text-gray-900">
+                  <p className="font-medium text-foreground">
                     {user?.firstName} {user?.lastName}
                   </p>
-                  <p className="text-sm text-gray-500">{user?.email}</p>
+                  <p className="text-sm text-muted-foreground">{user?.email}</p>
                 </div>
               </div>
 
@@ -140,9 +142,11 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
                   return (
                     <Link
                       key={item.name}
-                      href={item.href}
+                      href={storeUrl(item.href)}
                       className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
-                        isActive ? 'bg-primary/10 text-primary' : 'text-gray-600 hover:bg-gray-100'
+                        isActive
+                          ? 'bg-primary/10 text-primary'
+                          : 'text-muted-foreground hover:bg-muted'
                       }`}
                     >
                       <svg

@@ -2,10 +2,11 @@
 
 import Link from 'next/link';
 import { Header, Footer } from '../../components';
-import { useStore } from '../../contexts/StoreContext';
+import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 
 export default function AboutPage() {
   const { store } = useStore();
+  const storeUrl = useStoreUrl();
 
   // Prefer a dedicated about/description field; fall back to a generic message
   const headingText = store.name || 'Our Store';
@@ -23,8 +24,8 @@ export default function AboutPage() {
           <div className="prose prose-lg max-w-none">
             <section className="mb-12">
               <h2 className="text-2xl font-semibold mb-4">Our Story</h2>
-              <p className="text-gray-600 mb-4">{descriptionText}</p>
-              <p className="text-gray-600">
+              <p className="text-muted-foreground mb-4">{descriptionText}</p>
+              <p className="text-muted-foreground">
                 Today, we continue to grow and evolve, always keeping our customers at the heart of
                 everything we do.
               </p>
@@ -32,7 +33,7 @@ export default function AboutPage() {
 
             <section className="mb-12">
               <h2 className="text-2xl font-semibold mb-4">Our Mission</h2>
-              <p className="text-gray-600">
+              <p className="text-muted-foreground">
                 We strive to deliver the best products at competitive prices while maintaining the
                 highest standards of customer service. Our team works tirelessly to ensure every
                 customer has a seamless shopping experience.
@@ -42,7 +43,7 @@ export default function AboutPage() {
             <section className="mb-12">
               <h2 className="text-2xl font-semibold mb-4">Why Choose Us?</h2>
               <div className="grid md:grid-cols-3 gap-6 mt-6">
-                <div className="bg-gray-50 p-6 rounded-lg">
+                <div className="bg-muted p-6 rounded-lg">
                   <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-4">
                     <svg
                       className="w-6 h-6 text-blue-600"
@@ -59,11 +60,11 @@ export default function AboutPage() {
                     </svg>
                   </div>
                   <h3 className="font-semibold mb-2">Quality Products</h3>
-                  <p className="text-gray-600 text-sm">
+                  <p className="text-muted-foreground text-sm">
                     We carefully curate our selection to ensure only the best products reach you.
                   </p>
                 </div>
-                <div className="bg-gray-50 p-6 rounded-lg">
+                <div className="bg-muted p-6 rounded-lg">
                   <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-4">
                     <svg
                       className="w-6 h-6 text-green-600"
@@ -80,11 +81,11 @@ export default function AboutPage() {
                     </svg>
                   </div>
                   <h3 className="font-semibold mb-2">Great Prices</h3>
-                  <p className="text-gray-600 text-sm">
+                  <p className="text-muted-foreground text-sm">
                     Competitive pricing without compromising on quality or service.
                   </p>
                 </div>
-                <div className="bg-gray-50 p-6 rounded-lg">
+                <div className="bg-muted p-6 rounded-lg">
                   <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mb-4">
                     <svg
                       className="w-6 h-6 text-purple-600"
@@ -101,7 +102,7 @@ export default function AboutPage() {
                     </svg>
                   </div>
                   <h3 className="font-semibold mb-2">24/7 Support</h3>
-                  <p className="text-gray-600 text-sm">
+                  <p className="text-muted-foreground text-sm">
                     Our customer support team is always here to help you.
                   </p>
                 </div>
@@ -112,7 +113,7 @@ export default function AboutPage() {
             {(store.email || store.phone || store.address) && (
               <section className="mb-12">
                 <h2 className="text-2xl font-semibold mb-4">Get In Touch</h2>
-                <ul className="space-y-2 text-gray-600">
+                <ul className="space-y-2 text-muted-foreground">
                   {store.email && (
                     <li>
                       <span className="font-medium">Email:</span>{' '}
@@ -140,9 +141,11 @@ export default function AboutPage() {
 
             <section className="mb-12">
               <h2 className="text-2xl font-semibold mb-4">Contact Us</h2>
-              <p className="text-gray-600 mb-4">Have questions? We&apos;d love to hear from you!</p>
+              <p className="text-muted-foreground mb-4">
+                Have questions? We&apos;d love to hear from you!
+              </p>
               <Link
-                href="/contact"
+                href={storeUrl('/contact')}
                 className="inline-flex items-center px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
               >
                 Get in Touch

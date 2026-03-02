@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
+import { useStoreUrl } from '../../contexts/StoreContext';
 
 interface Order {
   id: string;
@@ -13,6 +14,7 @@ interface Order {
 }
 
 export default function AccountDashboard() {
+  const storeUrl = useStoreUrl();
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -64,8 +66,8 @@ export default function AccountDashboard() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Account Dashboard</h1>
-        <p className="mt-1 text-gray-500">Manage your account and view your orders</p>
+        <h1 className="text-2xl font-bold text-foreground">Account Dashboard</h1>
+        <p className="mt-1 text-muted-foreground">Manage your account and view your orders</p>
       </div>
 
       {/* Error Display */}
@@ -116,8 +118,8 @@ export default function AccountDashboard() {
               </svg>
             </div>
             <div>
-              <p className="text-2xl font-bold text-gray-900">{recentOrders.length}</p>
-              <p className="text-sm text-gray-500">Total Orders</p>
+              <p className="text-2xl font-bold text-foreground">{recentOrders.length}</p>
+              <p className="text-sm text-muted-foreground">Total Orders</p>
             </div>
           </div>
         </div>
@@ -146,8 +148,8 @@ export default function AccountDashboard() {
               </svg>
             </div>
             <div>
-              <p className="text-2xl font-bold text-gray-900">0</p>
-              <p className="text-sm text-gray-500">Saved Addresses</p>
+              <p className="text-2xl font-bold text-foreground">0</p>
+              <p className="text-sm text-muted-foreground">Saved Addresses</p>
             </div>
           </div>
         </div>
@@ -170,8 +172,8 @@ export default function AccountDashboard() {
               </svg>
             </div>
             <div>
-              <p className="text-2xl font-bold text-gray-900">0</p>
-              <p className="text-sm text-gray-500">Wishlist Items</p>
+              <p className="text-2xl font-bold text-foreground">0</p>
+              <p className="text-sm text-muted-foreground">Wishlist Items</p>
             </div>
           </div>
         </div>
@@ -180,8 +182,8 @@ export default function AccountDashboard() {
       {/* Recent Orders */}
       <div className="rounded-xl border bg-white shadow-sm">
         <div className="flex items-center justify-between border-b p-4">
-          <h2 className="font-semibold text-gray-900">Recent Orders</h2>
-          <Link href="/account/orders" className="text-sm text-primary hover:underline">
+          <h2 className="font-semibold text-foreground">Recent Orders</h2>
+          <Link href={storeUrl('/account/orders')} className="text-sm text-primary hover:underline">
             View All
           </Link>
         </div>
@@ -195,16 +197,16 @@ export default function AccountDashboard() {
             {recentOrders.map(order => (
               <div key={order.id} className="flex items-center justify-between p-4">
                 <div>
-                  <p className="font-medium text-gray-900">#{order.orderNumber}</p>
-                  <p className="text-sm text-gray-500">{formatDate(order.createdAt)}</p>
+                  <p className="font-medium text-foreground">#{order.orderNumber}</p>
+                  <p className="text-sm text-muted-foreground">{formatDate(order.createdAt)}</p>
                 </div>
                 <div className="text-right">
                   <span
-                    className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${statusColors[order.status] || 'bg-gray-100 text-gray-800'}`}
+                    className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${statusColors[order.status] || 'bg-muted text-foreground'}`}
                   >
                     {order.status}
                   </span>
-                  <p className="mt-1 font-medium text-gray-900">{formatPrice(order.total)}</p>
+                  <p className="mt-1 font-medium text-foreground">{formatPrice(order.total)}</p>
                 </div>
               </div>
             ))}
@@ -212,7 +214,7 @@ export default function AccountDashboard() {
         ) : (
           <div className="p-8 text-center">
             <svg
-              className="mx-auto h-12 w-12 text-gray-400"
+              className="mx-auto h-12 w-12 text-muted-foreground/70"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -224,8 +226,11 @@ export default function AccountDashboard() {
                 d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
               />
             </svg>
-            <p className="mt-4 text-gray-500">No orders yet</p>
-            <Link href="/products" className="mt-2 inline-block text-primary hover:underline">
+            <p className="mt-4 text-muted-foreground">No orders yet</p>
+            <Link
+              href={storeUrl('/products')}
+              className="mt-2 inline-block text-primary hover:underline"
+            >
               Start shopping
             </Link>
           </div>
@@ -235,7 +240,7 @@ export default function AccountDashboard() {
       {/* Quick Actions */}
       <div className="grid gap-4 sm:grid-cols-2">
         <Link
-          href="/account/addresses"
+          href={storeUrl('/account/addresses')}
           className="flex items-center gap-4 rounded-xl border bg-white p-4 shadow-sm transition hover:border-primary hover:shadow-md"
         >
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100">
@@ -254,13 +259,13 @@ export default function AccountDashboard() {
             </svg>
           </div>
           <div>
-            <p className="font-medium text-gray-900">Add Address</p>
-            <p className="text-sm text-gray-500">Save a new delivery address</p>
+            <p className="font-medium text-foreground">Add Address</p>
+            <p className="text-sm text-muted-foreground">Save a new delivery address</p>
           </div>
         </Link>
 
         <Link
-          href="/account/settings"
+          href={storeUrl('/account/settings')}
           className="flex items-center gap-4 rounded-xl border bg-white p-4 shadow-sm transition hover:border-primary hover:shadow-md"
         >
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100">
@@ -285,8 +290,8 @@ export default function AccountDashboard() {
             </svg>
           </div>
           <div>
-            <p className="font-medium text-gray-900">Account Settings</p>
-            <p className="text-sm text-gray-500">Update your profile and password</p>
+            <p className="font-medium text-foreground">Account Settings</p>
+            <p className="text-sm text-muted-foreground">Update your profile and password</p>
           </div>
         </Link>
       </div>

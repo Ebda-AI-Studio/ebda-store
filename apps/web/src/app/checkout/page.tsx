@@ -5,7 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button, Input, Select } from '@force/ui';
-import { useStore } from '../../contexts/StoreContext';
+import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useCart } from '../../contexts/CartContext';
 import { api } from '../../lib/api';
 import { getPaymentIcon, DEFAULT_PAYMENT_PROVIDERS } from '../../components/PaymentIcons';
@@ -78,6 +78,7 @@ function formatPrice(fils: number) {
 export default function CheckoutPage() {
   const router = useRouter();
   const { store } = useStore();
+  const storeUrl = useStoreUrl();
   const { items: cartContextItems, total: cartContextTotal } = useCart();
   const [step, setStep] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -406,7 +407,7 @@ export default function CheckoutPage() {
         window.location.href = paymentData.data.paymentUrl;
       } else if (selectedProvider === 'cod') {
         // Cash on delivery - go straight to success
-        router.push(`/checkout/success?orderId=${order.id}`);
+        router.push(storeUrl(`/checkout/success?orderId=${order.id}`));
       } else {
         throw new Error(paymentData.error?.message || 'Failed to initiate payment');
       }
@@ -421,7 +422,7 @@ export default function CheckoutPage() {
 
   if (isLoading) {
     return (
-      <main className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <main className="min-h-screen bg-background flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </main>
     );
@@ -429,11 +430,11 @@ export default function CheckoutPage() {
 
   if (!cart || cart.items.length === 0) {
     return (
-      <main className="min-h-screen bg-gray-50">
+      <main className="min-h-screen bg-background">
         <div className="mx-auto max-w-7xl px-4 py-16 text-center">
-          <h1 className="text-2xl font-bold text-gray-900">Your cart is empty</h1>
-          <p className="mt-2 text-gray-600">Add some products before checking out.</p>
-          <Link href="/products">
+          <h1 className="text-2xl font-bold text-foreground">Your cart is empty</h1>
+          <p className="mt-2 text-muted-foreground">Add some products before checking out.</p>
+          <Link href={storeUrl('/products')}>
             <Button className="mt-6">Continue Shopping</Button>
           </Link>
         </div>
@@ -442,11 +443,11 @@ export default function CheckoutPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="min-h-screen bg-background">
       {/* Navigation */}
       <nav className="border-b bg-white">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <Link href="/" className="flex items-center gap-2">
+          <Link href={storeUrl('/')} className="flex items-center gap-2">
             {store?.logo ? (
               <Image
                 src={store.logo}
@@ -459,7 +460,7 @@ export default function CheckoutPage() {
               <span className="text-xl font-bold text-primary">{store?.name || 'Store'}</span>
             )}
           </Link>
-          <div className="flex items-center gap-2 text-sm text-gray-500">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
                 strokeLinecap="round"
@@ -479,25 +480,25 @@ export default function CheckoutPage() {
           <div className="flex items-center justify-center">
             <div className="flex items-center">
               <div
-                className={`flex h-8 w-8 items-center justify-center rounded-full ${step >= 1 ? 'bg-primary text-white' : 'bg-gray-200 text-gray-600'}`}
+                className={`flex h-8 w-8 items-center justify-center rounded-full ${step >= 1 ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'}`}
               >
                 1
               </div>
               <span
-                className={`ml-2 text-sm font-medium ${step >= 1 ? 'text-gray-900' : 'text-gray-500'}`}
+                className={`ml-2 text-sm font-medium ${step >= 1 ? 'text-foreground' : 'text-muted-foreground'}`}
               >
                 Shipping
               </span>
             </div>
-            <div className={`mx-4 h-0.5 w-16 ${step >= 2 ? 'bg-primary' : 'bg-gray-200'}`} />
+            <div className={`mx-4 h-0.5 w-16 ${step >= 2 ? 'bg-primary' : 'bg-muted'}`} />
             <div className="flex items-center">
               <div
-                className={`flex h-8 w-8 items-center justify-center rounded-full ${step >= 2 ? 'bg-primary text-white' : 'bg-gray-200 text-gray-600'}`}
+                className={`flex h-8 w-8 items-center justify-center rounded-full ${step >= 2 ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'}`}
               >
                 2
               </div>
               <span
-                className={`ml-2 text-sm font-medium ${step >= 2 ? 'text-gray-900' : 'text-gray-500'}`}
+                className={`ml-2 text-sm font-medium ${step >= 2 ? 'text-foreground' : 'text-muted-foreground'}`}
               >
                 Payment
               </span>
@@ -511,7 +512,7 @@ export default function CheckoutPage() {
             <form onSubmit={handleSubmit}>
               {step === 1 && (
                 <div className="rounded-xl border bg-white p-6 shadow-sm">
-                  <h2 className="text-lg font-semibold text-gray-900">Shipping Information</h2>
+                  <h2 className="text-lg font-semibold text-foreground">Shipping Information</h2>
 
                   <div className="mt-6 space-y-4">
                     <div data-error={!!formErrors.email}>
@@ -642,21 +643,21 @@ export default function CheckoutPage() {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-sm font-medium text-foreground mb-1">
                         Order Notes (optional)
                       </label>
                       <textarea
                         value={formData.notes}
                         onChange={e => updateField('notes', e.target.value)}
                         rows={3}
-                        className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
+                        className="w-full rounded-lg border border-border px-4 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
                         placeholder="Any special delivery instructions..."
                       />
                     </div>
                   </div>
 
                   <div className="mt-6 flex justify-between">
-                    <Link href="/cart" className="text-sm text-primary hover:underline">
+                    <Link href={storeUrl('/cart')} className="text-sm text-primary hover:underline">
                       &larr; Return to cart
                     </Link>
                     <Button type="submit">Continue to Payment</Button>
@@ -713,7 +714,7 @@ export default function CheckoutPage() {
                   {/* Shipping Summary */}
                   <div className="rounded-xl border bg-white p-6 shadow-sm">
                     <div className="flex items-center justify-between">
-                      <h3 className="font-medium text-gray-900">Shipping to</h3>
+                      <h3 className="font-medium text-foreground">Shipping to</h3>
                       <button
                         type="button"
                         onClick={() => setStep(1)}
@@ -722,7 +723,7 @@ export default function CheckoutPage() {
                         Edit
                       </button>
                     </div>
-                    <p className="mt-2 text-sm text-gray-600">
+                    <p className="mt-2 text-sm text-muted-foreground">
                       {formData.firstName} {formData.lastName}
                       <br />
                       {formData.address}
@@ -738,8 +739,8 @@ export default function CheckoutPage() {
 
                   {/* Payment Methods */}
                   <div className="rounded-xl border bg-white p-6 shadow-sm">
-                    <h2 className="text-lg font-semibold text-gray-900">Payment Method</h2>
-                    <p className="mt-1 text-sm text-gray-500">
+                    <h2 className="text-lg font-semibold text-foreground">Payment Method</h2>
+                    <p className="mt-1 text-sm text-muted-foreground">
                       Select your preferred payment method
                     </p>
 
@@ -763,7 +764,7 @@ export default function CheckoutPage() {
                             className={`flex items-center gap-4 rounded-lg border p-4 cursor-pointer transition ${
                               selectedProvider === provider.id
                                 ? 'border-primary bg-primary/5'
-                                : 'border-gray-200 hover:border-gray-300'
+                                : 'border-border hover:border-border/80'
                             }`}
                           >
                             <input
@@ -775,9 +776,11 @@ export default function CheckoutPage() {
                               className="h-4 w-4 text-primary focus:ring-primary"
                             />
                             <div className="flex-1">
-                              <span className="font-medium text-gray-900">{displayName}</span>
+                              <span className="font-medium text-foreground">{displayName}</span>
                               {displayDescription && (
-                                <p className="text-sm text-gray-500">{displayDescription}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {displayDescription}
+                                </p>
                               )}
                             </div>
                             {/* Render icon from logo URL or use default icon */}
@@ -829,12 +832,12 @@ export default function CheckoutPage() {
           {/* Order Summary */}
           <div className="mt-8 lg:col-span-5 lg:mt-0">
             <div className="sticky top-24 rounded-xl border bg-white p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-gray-900">Order Summary</h2>
+              <h2 className="text-lg font-semibold text-foreground">Order Summary</h2>
 
               <div className="mt-6 divide-y">
                 {cart.items.map(item => (
                   <div key={item.id} className="flex gap-4 py-4 first:pt-0">
-                    <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg bg-gray-100">
+                    <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg bg-muted">
                       {item.product.images?.[0] ? (
                         <Image
                           src={item.product.images[0].url}
@@ -845,7 +848,7 @@ export default function CheckoutPage() {
                       ) : (
                         <div className="flex h-full items-center justify-center">
                           <svg
-                            className="h-6 w-6 text-gray-400"
+                            className="h-6 w-6 text-muted-foreground/70"
                             fill="none"
                             viewBox="0 0 24 24"
                             stroke="currentColor"
@@ -859,13 +862,13 @@ export default function CheckoutPage() {
                           </svg>
                         </div>
                       )}
-                      <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-gray-500 text-xs text-white">
+                      <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-muted-foreground text-xs text-white">
                         {item.quantity}
                       </span>
                     </div>
                     <div className="flex flex-1 flex-col">
-                      <h3 className="text-sm font-medium text-gray-900">{item.product.name}</h3>
-                      <p className="mt-auto text-sm font-medium text-gray-600">
+                      <h3 className="text-sm font-medium text-foreground">{item.product.name}</h3>
+                      <p className="mt-auto text-sm font-medium text-muted-foreground">
                         {formatPrice(item.price * item.quantity)}
                       </p>
                     </div>
@@ -924,7 +927,7 @@ export default function CheckoutPage() {
               {/* Totals */}
               <div className="mt-6 space-y-3 border-t pt-6">
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Subtotal</span>
+                  <span className="text-muted-foreground">Subtotal</span>
                   <span className="font-medium">{formatPrice(subtotal)}</span>
                 </div>
                 {discount > 0 && (
@@ -934,13 +937,13 @@ export default function CheckoutPage() {
                   </div>
                 )}
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Shipping</span>
+                  <span className="text-muted-foreground">Shipping</span>
                   <span className={`font-medium ${freeShipping ? 'text-green-600' : ''}`}>
                     {freeShipping ? 'Free' : shipping > 0 ? formatPrice(shipping) : 'Select area'}
                   </span>
                 </div>
                 <div className="flex justify-between border-t pt-3">
-                  <span className="text-lg font-semibold text-gray-900">Total</span>
+                  <span className="text-lg font-semibold text-foreground">Total</span>
                   <span className="text-lg font-bold text-primary">{formatPrice(total)}</span>
                 </div>
               </div>

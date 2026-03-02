@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Button } from '@force/ui';
 import { Header, Footer } from '../../components';
-import { useStoreContact, useStore } from '../../contexts/StoreContext';
+import { useStoreContact, useStore, useStoreUrl } from '../../contexts/StoreContext';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
 
@@ -47,6 +47,7 @@ async function authFetch(url: string, options: RequestInit = {}) {
 }
 
 function ReturnRequestForm({ storeId }: { storeId: string }) {
+  const storeUrl = useStoreUrl();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoadingOrders, setIsLoadingOrders] = useState(false);
@@ -164,9 +165,9 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
   if (!isLoggedIn) {
     return (
       <section className="rounded-xl border bg-white p-6 shadow-sm">
-        <h2 className="text-xl font-semibold text-gray-900">Request a Return</h2>
-        <p className="mt-3 text-gray-600">
-          <Link href="/auth/login" className="font-medium text-primary hover:underline">
+        <h2 className="text-xl font-semibold text-foreground">Request a Return</h2>
+        <p className="mt-3 text-muted-foreground">
+          <Link href={storeUrl('/auth/login')} className="font-medium text-primary hover:underline">
             Log in
           </Link>{' '}
           to submit a return request for one of your orders.
@@ -188,17 +189,17 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
         </div>
-        <h2 className="mt-4 text-xl font-semibold text-gray-900">Return Request Submitted</h2>
-        <p className="mt-2 text-gray-600">{submitResult.text}</p>
+        <h2 className="mt-4 text-xl font-semibold text-foreground">Return Request Submitted</h2>
+        <p className="mt-2 text-muted-foreground">{submitResult.text}</p>
         {submitResult.returnNumber && (
-          <p className="mt-2 text-sm text-gray-500">
+          <p className="mt-2 text-sm text-muted-foreground">
             Return number:{' '}
-            <span className="font-mono font-semibold text-gray-800">
+            <span className="font-mono font-semibold text-foreground">
               #{submitResult.returnNumber}
             </span>
           </p>
         )}
-        <p className="mt-4 text-sm text-gray-500">
+        <p className="mt-4 text-sm text-muted-foreground">
           We will review your request and contact you shortly.
         </p>
         <button
@@ -213,8 +214,8 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
 
   return (
     <section className="rounded-xl border bg-white p-6 shadow-sm">
-      <h2 className="text-xl font-semibold text-gray-900">Request a Return</h2>
-      <p className="mt-1 text-sm text-gray-500">
+      <h2 className="text-xl font-semibold text-foreground">Request a Return</h2>
+      <p className="mt-1 text-sm text-muted-foreground">
         Fill out the form below to start a return for a delivered order.
       </p>
 
@@ -227,11 +228,11 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
       <form onSubmit={handleSubmit} className="mt-6 space-y-5">
         {/* Order selector */}
         <div>
-          <label htmlFor="return-order" className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="return-order" className="block text-sm font-medium text-foreground mb-1">
             Select Order <span className="text-red-500">*</span>
           </label>
           {isLoadingOrders ? (
-            <div className="flex items-center gap-2 text-sm text-gray-500">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
               Loading your orders...
             </div>
@@ -244,7 +245,7 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
                 setSelectedItemIds(new Set());
               }}
               required
-              className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary/50"
+              className="w-full rounded-lg border border-border px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
             >
               <option value="">-- Select an order --</option>
               {orders.map(order => (
@@ -258,7 +259,7 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
             </select>
           )}
           {!isLoadingOrders && orders.length === 0 && (
-            <p className="mt-1 text-sm text-gray-500">
+            <p className="mt-1 text-sm text-muted-foreground">
               No eligible orders found. Only delivered orders can be returned.
             </p>
           )}
@@ -267,25 +268,25 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
         {/* Item checkboxes */}
         {selectedOrder && selectedOrder.items.length > 0 && (
           <div>
-            <p className="block text-sm font-medium text-gray-700 mb-2">
+            <p className="block text-sm font-medium text-foreground mb-2">
               Select Items to Return <span className="text-red-500">*</span>
             </p>
             <div className="space-y-2">
               {selectedOrder.items.map(item => (
                 <label
                   key={item.id}
-                  className="flex items-center gap-3 rounded-lg border border-gray-200 px-4 py-3 cursor-pointer hover:bg-gray-50"
+                  className="flex items-center gap-3 rounded-lg border border-border px-4 py-3 cursor-pointer hover:bg-muted"
                 >
                   <input
                     type="checkbox"
                     checked={selectedItemIds.has(item.id)}
                     onChange={() => toggleItem(item.id)}
-                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
                   />
-                  <span className="flex-1 text-sm text-gray-800">
+                  <span className="flex-1 text-sm text-foreground">
                     {item.product?.name || `Item #${item.id.slice(0, 8)}`}
                   </span>
-                  <span className="text-sm text-gray-500">Qty: {item.quantity}</span>
+                  <span className="text-sm text-muted-foreground">Qty: {item.quantity}</span>
                 </label>
               ))}
             </div>
@@ -294,7 +295,7 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
 
         {/* Reason dropdown */}
         <div>
-          <label htmlFor="return-reason" className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="return-reason" className="block text-sm font-medium text-foreground mb-1">
             Reason for Return <span className="text-red-500">*</span>
           </label>
           <select
@@ -302,7 +303,7 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
             value={reason}
             onChange={e => setReason(e.target.value as ReturnReason)}
             required
-            className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary/50"
+            className="w-full rounded-lg border border-border px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
           >
             <option value="">-- Select a reason --</option>
             {RETURN_REASONS.map(r => (
@@ -315,7 +316,7 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
 
         {/* Notes textarea */}
         <div>
-          <label htmlFor="return-notes" className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="return-notes" className="block text-sm font-medium text-foreground mb-1">
             Additional Notes (optional)
           </label>
           <textarea
@@ -324,7 +325,7 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
             value={notes}
             onChange={e => setNotes(e.target.value)}
             placeholder="Describe the issue in more detail..."
-            className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
+            className="w-full rounded-lg border border-border px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
           />
         </div>
 
@@ -341,15 +342,16 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
 export default function ReturnsPage() {
   const { email } = useStoreContact();
   const { store } = useStore();
+  const storeUrl = useStoreUrl();
   const returnsEmail = email || 'our support team';
   return (
-    <main className="flex min-h-screen flex-col bg-gray-50">
+    <main className="flex min-h-screen flex-col bg-background">
       <Header />
 
       <div className="mx-auto w-full max-w-3xl flex-1 px-4 py-12 sm:px-6 lg:px-8">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900">Returns &amp; Refunds</h1>
-          <p className="mt-2 text-gray-500">Our hassle-free return policy</p>
+          <h1 className="text-3xl font-bold text-foreground">Returns &amp; Refunds</h1>
+          <p className="mt-2 text-muted-foreground">Our hassle-free return policy</p>
         </div>
 
         <div className="mt-12 space-y-8">
@@ -370,9 +372,9 @@ export default function ReturnsPage() {
                   />
                 </svg>
               </div>
-              <h2 className="text-xl font-semibold text-gray-900">30-Day Return Policy</h2>
+              <h2 className="text-xl font-semibold text-foreground">30-Day Return Policy</h2>
             </div>
-            <p className="mt-4 text-gray-600">
+            <p className="mt-4 text-muted-foreground">
               We want you to be completely satisfied with your purchase. If you&apos;re not happy
               with your order, you can return it within 30 days of delivery for a full refund or
               exchange.
@@ -380,8 +382,10 @@ export default function ReturnsPage() {
           </section>
 
           <section className="rounded-xl border bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-semibold text-gray-900">Return Eligibility</h2>
-            <p className="mt-2 text-gray-600">To be eligible for a return, items must be:</p>
+            <h2 className="text-xl font-semibold text-foreground">Return Eligibility</h2>
+            <p className="mt-2 text-muted-foreground">
+              To be eligible for a return, items must be:
+            </p>
             <ul className="mt-4 space-y-3">
               <li className="flex items-start gap-3">
                 <svg
@@ -397,7 +401,7 @@ export default function ReturnsPage() {
                     d="M5 13l4 4L19 7"
                   />
                 </svg>
-                <span className="text-gray-600">Unused and in original condition</span>
+                <span className="text-muted-foreground">Unused and in original condition</span>
               </li>
               <li className="flex items-start gap-3">
                 <svg
@@ -413,7 +417,9 @@ export default function ReturnsPage() {
                     d="M5 13l4 4L19 7"
                   />
                 </svg>
-                <span className="text-gray-600">In original packaging with all tags attached</span>
+                <span className="text-muted-foreground">
+                  In original packaging with all tags attached
+                </span>
               </li>
               <li className="flex items-start gap-3">
                 <svg
@@ -429,7 +435,7 @@ export default function ReturnsPage() {
                     d="M5 13l4 4L19 7"
                   />
                 </svg>
-                <span className="text-gray-600">
+                <span className="text-muted-foreground">
                   Accompanied by the original receipt or proof of purchase
                 </span>
               </li>
@@ -437,15 +443,15 @@ export default function ReturnsPage() {
           </section>
 
           <section className="rounded-xl border bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-semibold text-gray-900">How to Return an Item</h2>
+            <h2 className="text-xl font-semibold text-foreground">How to Return an Item</h2>
             <div className="mt-4 space-y-4">
               <div className="flex gap-4">
                 <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-white">
                   1
                 </div>
                 <div>
-                  <h3 className="font-medium text-gray-900">Contact Us</h3>
-                  <p className="text-sm text-gray-600">
+                  <h3 className="font-medium text-foreground">Contact Us</h3>
+                  <p className="text-sm text-muted-foreground">
                     Email us at {returnsEmail} with your order number and reason for return.
                   </p>
                 </div>
@@ -455,8 +461,8 @@ export default function ReturnsPage() {
                   2
                 </div>
                 <div>
-                  <h3 className="font-medium text-gray-900">Get Return Label</h3>
-                  <p className="text-sm text-gray-600">
+                  <h3 className="font-medium text-foreground">Get Return Label</h3>
+                  <p className="text-sm text-muted-foreground">
                     We&apos;ll send you a prepaid return shipping label via email.
                   </p>
                 </div>
@@ -466,8 +472,8 @@ export default function ReturnsPage() {
                   3
                 </div>
                 <div>
-                  <h3 className="font-medium text-gray-900">Ship the Item</h3>
-                  <p className="text-sm text-gray-600">
+                  <h3 className="font-medium text-foreground">Ship the Item</h3>
+                  <p className="text-sm text-muted-foreground">
                     Pack the item securely and drop it off at any authorized shipping location.
                   </p>
                 </div>
@@ -477,8 +483,8 @@ export default function ReturnsPage() {
                   4
                 </div>
                 <div>
-                  <h3 className="font-medium text-gray-900">Receive Refund</h3>
-                  <p className="text-sm text-gray-600">
+                  <h3 className="font-medium text-foreground">Receive Refund</h3>
+                  <p className="text-sm text-muted-foreground">
                     Once we receive and inspect the item, we&apos;ll process your refund within 5-7
                     business days.
                   </p>
@@ -488,8 +494,8 @@ export default function ReturnsPage() {
           </section>
 
           <section className="rounded-xl border bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-semibold text-gray-900">Refund Information</h2>
-            <ul className="mt-4 space-y-2 text-gray-600">
+            <h2 className="text-xl font-semibold text-foreground">Refund Information</h2>
+            <ul className="mt-4 space-y-2 text-muted-foreground">
               <li>Refunds will be credited to your original payment method</li>
               <li>Please allow 5-7 business days for the refund to appear</li>
               <li>Original shipping costs are non-refundable (unless the item was defective)</li>
@@ -502,9 +508,9 @@ export default function ReturnsPage() {
         </div>
 
         <div className="mt-8 text-center">
-          <p className="text-gray-500">
+          <p className="text-muted-foreground">
             Need help with a return?{' '}
-            <Link href="/contact" className="text-primary hover:underline">
+            <Link href={storeUrl('/contact')} className="text-primary hover:underline">
               Contact our support team
             </Link>
           </p>
