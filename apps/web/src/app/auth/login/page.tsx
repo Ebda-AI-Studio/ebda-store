@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Button, Input } from '@force/ui';
@@ -11,6 +11,7 @@ import { useStore } from '../../../contexts/StoreContext';
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { store } = useStore();
   const { syncCartToBackend } = useCart();
   const [isLoading, setIsLoading] = useState(false);
@@ -35,8 +36,9 @@ export default function LoginPage() {
       // Sync local cart to backend after login
       await syncCartToBackend();
 
-      // Redirect to home or account
-      router.push('/');
+      // Redirect to the original page or home
+      const redirectTo = searchParams.get('redirect') || '/';
+      router.push(redirectTo);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to login');
     } finally {

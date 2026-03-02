@@ -248,7 +248,7 @@ export default function ProductDetailPage() {
         <div className="grid gap-8 lg:grid-cols-2">
           {/* Images */}
           <div className="space-y-4">
-            <div className="aspect-square overflow-hidden rounded-2xl bg-gradient-to-br from-orange-50 to-orange-100">
+            <div className="aspect-square overflow-hidden rounded-2xl bg-gradient-to-br from-primary/5 to-primary/10">
               {images[selectedImage]?.url ? (
                 <img
                   src={images[selectedImage].url}
@@ -462,7 +462,7 @@ export default function ProductDetailPage() {
                   href={`/products/${item.slug}`}
                   className="group rounded-xl border border-border bg-card p-4 shadow-sm transition hover:shadow-lg"
                 >
-                  <div className="aspect-square overflow-hidden rounded-lg bg-gradient-to-br from-orange-50 to-orange-100">
+                  <div className="aspect-square overflow-hidden rounded-lg bg-gradient-to-br from-primary/5 to-primary/10">
                     {item.images?.[0]?.url ? (
                       <img
                         src={item.images[0].url}

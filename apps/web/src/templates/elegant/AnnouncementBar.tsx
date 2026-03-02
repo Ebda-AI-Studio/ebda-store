@@ -19,7 +19,7 @@ export default function ElegantAnnouncementBar({
 
   return (
     <div
-      className="bg-foreground text-background py-2.5 px-4 text-center"
+      className="bg-primary text-primary-foreground py-2.5 px-4 text-center"
       dir={isRtl ? 'rtl' : 'ltr'}
     >
       {link ? (

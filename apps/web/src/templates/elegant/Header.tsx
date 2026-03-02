@@ -86,9 +86,9 @@ export default function ElegantHeader({
           {/* Logo - Center */}
           <Link href={urlPrefix || '/'} className="flex-shrink-0">
             {displayLogo ? (
-              <img src={displayLogo} alt={displayName} className="h-14 max-h-14 w-auto" />
+              <img src={displayLogo} alt={displayName} className="h-20 max-h-20 w-auto" />
             ) : (
-              <span className="text-2xl font-light tracking-[0.2em]">{displayName}</span>
+              <span className="text-3xl font-light tracking-[0.2em]">{displayName}</span>
             )}
           </Link>
 

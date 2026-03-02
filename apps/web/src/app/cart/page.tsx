@@ -217,7 +217,7 @@ export default function CartPage() {
                     style={{ animationDelay: `${index * 100}ms` }}
                   >
                     {/* Product Image */}
-                    <div className="h-28 w-28 flex-shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-orange-50 to-orange-100 sm:h-32 sm:w-32">
+                    <div className="h-28 w-28 flex-shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-primary/5 to-primary/10 sm:h-32 sm:w-32">
                       <div className="flex h-full items-center justify-center">
                         <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
                           <svg

@@ -83,16 +83,6 @@ export default function CheckoutPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Auth guard: redirect to login if no token present
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('accessToken');
-      if (!token) {
-        router.push('/auth/login?redirect=/checkout');
-      }
-    }
-  }, [router]);
-
   // Fire InitiateCheckout pixel event once cart items are available
   useEffect(() => {
     if (cartContextItems.length > 0) {
@@ -432,7 +422,7 @@ export default function CheckoutPage() {
   if (isLoading) {
     return (
       <main className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </main>
     );
   }
@@ -466,7 +456,7 @@ export default function CheckoutPage() {
                 className="object-contain"
               />
             ) : (
-              <span className="text-xl font-bold text-orange-500">{store?.name || 'Store'}</span>
+              <span className="text-xl font-bold text-primary">{store?.name || 'Store'}</span>
             )}
           </Link>
           <div className="flex items-center gap-2 text-sm text-gray-500">
@@ -489,7 +479,7 @@ export default function CheckoutPage() {
           <div className="flex items-center justify-center">
             <div className="flex items-center">
               <div
-                className={`flex h-8 w-8 items-center justify-center rounded-full ${step >= 1 ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-600'}`}
+                className={`flex h-8 w-8 items-center justify-center rounded-full ${step >= 1 ? 'bg-primary text-white' : 'bg-gray-200 text-gray-600'}`}
               >
                 1
               </div>
@@ -499,10 +489,10 @@ export default function CheckoutPage() {
                 Shipping
               </span>
             </div>
-            <div className={`mx-4 h-0.5 w-16 ${step >= 2 ? 'bg-orange-500' : 'bg-gray-200'}`} />
+            <div className={`mx-4 h-0.5 w-16 ${step >= 2 ? 'bg-primary' : 'bg-gray-200'}`} />
             <div className="flex items-center">
               <div
-                className={`flex h-8 w-8 items-center justify-center rounded-full ${step >= 2 ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-600'}`}
+                className={`flex h-8 w-8 items-center justify-center rounded-full ${step >= 2 ? 'bg-primary text-white' : 'bg-gray-200 text-gray-600'}`}
               >
                 2
               </div>
@@ -659,14 +649,14 @@ export default function CheckoutPage() {
                         value={formData.notes}
                         onChange={e => updateField('notes', e.target.value)}
                         rows={3}
-                        className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
                         placeholder="Any special delivery instructions..."
                       />
                     </div>
                   </div>
 
                   <div className="mt-6 flex justify-between">
-                    <Link href="/cart" className="text-sm text-orange-500 hover:underline">
+                    <Link href="/cart" className="text-sm text-primary hover:underline">
                       &larr; Return to cart
                     </Link>
                     <Button type="submit">Continue to Payment</Button>
@@ -727,7 +717,7 @@ export default function CheckoutPage() {
                       <button
                         type="button"
                         onClick={() => setStep(1)}
-                        className="text-sm text-orange-500 hover:underline"
+                        className="text-sm text-primary hover:underline"
                       >
                         Edit
                       </button>
@@ -772,7 +762,7 @@ export default function CheckoutPage() {
                             key={provider.id}
                             className={`flex items-center gap-4 rounded-lg border p-4 cursor-pointer transition ${
                               selectedProvider === provider.id
-                                ? 'border-orange-500 bg-orange-50'
+                                ? 'border-primary bg-primary/5'
                                 : 'border-gray-200 hover:border-gray-300'
                             }`}
                           >
@@ -782,7 +772,7 @@ export default function CheckoutPage() {
                               value={provider.id}
                               checked={selectedProvider === provider.id}
                               onChange={e => setSelectedProvider(e.target.value)}
-                              className="h-4 w-4 text-orange-500 focus:ring-orange-500"
+                              className="h-4 w-4 text-primary focus:ring-primary"
                             />
                             <div className="flex-1">
                               <span className="font-medium text-gray-900">{displayName}</span>
@@ -814,7 +804,7 @@ export default function CheckoutPage() {
                     <button
                       type="button"
                       onClick={() => setStep(1)}
-                      className="text-sm text-orange-500 hover:underline"
+                      className="text-sm text-primary hover:underline"
                     >
                       &larr; Return to shipping
                     </button>
@@ -951,7 +941,7 @@ export default function CheckoutPage() {
                 </div>
                 <div className="flex justify-between border-t pt-3">
                   <span className="text-lg font-semibold text-gray-900">Total</span>
-                  <span className="text-lg font-bold text-orange-500">{formatPrice(total)}</span>
+                  <span className="text-lg font-bold text-primary">{formatPrice(total)}</span>
                 </div>
               </div>
             </div>

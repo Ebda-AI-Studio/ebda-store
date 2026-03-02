@@ -107,7 +107,6 @@ export default function ReviewSection({ storeId, productId }: Props) {
   const [averageRating, setAverageRating] = useState<number>(0);
   const [totalCount, setTotalCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
-  const [fetchError, setFetchError] = useState<string | null>(null);
 
   // Write-review form state
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -129,7 +128,6 @@ export default function ReviewSection({ storeId, productId }: Props) {
 
   const fetchReviews = useCallback(async () => {
     setIsLoading(true);
-    setFetchError(null);
     try {
       const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
       const headers: HeadersInit = { 'Content-Type': 'application/json' };
@@ -147,10 +145,12 @@ export default function ReviewSection({ storeId, productId }: Props) {
         setAverageRating(json.data.averageRating ?? 0);
         setTotalCount(json.data.totalCount ?? json.data.reviews?.length ?? 0);
       } else {
-        setFetchError(json.error?.message || 'Failed to load reviews');
+        setReviews([]);
+        setTotalCount(0);
       }
     } catch {
-      setFetchError('Unable to load reviews. Please check your connection.');
+      setReviews([]);
+      setTotalCount(0);
     } finally {
       setIsLoading(false);
     }
@@ -213,7 +213,7 @@ export default function ReviewSection({ storeId, productId }: Props) {
       <h2 className="text-2xl font-bold text-foreground">Customer Reviews</h2>
 
       {/* Average rating summary */}
-      {!isLoading && !fetchError && totalCount > 0 && (
+      {!isLoading && totalCount > 0 && (
         <div className="mt-4 flex items-center gap-4">
           <span className="text-5xl font-bold text-foreground">{averageRating.toFixed(1)}</span>
           <div>
@@ -232,15 +232,8 @@ export default function ReviewSection({ storeId, productId }: Props) {
         </div>
       )}
 
-      {/* Fetch error */}
-      {!isLoading && fetchError && (
-        <div className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
-          {fetchError}
-        </div>
-      )}
-
       {/* Reviews list */}
-      {!isLoading && !fetchError && reviews.length > 0 && (
+      {!isLoading && reviews.length > 0 && (
         <div className="mt-8 space-y-6">
           {reviews.map(review => (
             <div key={review.id} className="rounded-xl border border-border bg-card p-6 shadow-sm">
@@ -262,7 +255,7 @@ export default function ReviewSection({ storeId, productId }: Props) {
       )}
 
       {/* Empty state */}
-      {!isLoading && !fetchError && reviews.length === 0 && (
+      {!isLoading && reviews.length === 0 && (
         <p className="mt-6 text-muted-foreground">
           No reviews yet for this product. Be the first to share your thoughts!
         </p>
