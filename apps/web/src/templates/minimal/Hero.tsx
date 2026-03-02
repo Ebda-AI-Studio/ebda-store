@@ -41,7 +41,7 @@ export default function MinimalHero({
           </div>
 
           {/* Image - Full width, clean */}
-          <div className="aspect-[21/9] bg-muted overflow-hidden">
+          <div className="aspect-[21/9] bg-gradient-to-br from-primary/5 to-background overflow-hidden">
             {image ? (
               <img src={image} alt={displayTitle} className="w-full h-full object-cover" />
             ) : (

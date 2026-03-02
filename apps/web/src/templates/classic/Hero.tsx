@@ -87,7 +87,7 @@ export default function ClassicHero({
               {image ? (
                 <img src={image} alt={displayTitle} className="w-full h-full object-cover" />
               ) : (
-                <div className="w-full h-full bg-muted flex items-center justify-center">
+                <div className="w-full h-full bg-gradient-to-br from-primary/5 to-background flex items-center justify-center">
                   <div className="text-center p-8">
                     <div className="w-20 h-20 mx-auto mb-4 border border-border/50 flex items-center justify-center">
                       <svg

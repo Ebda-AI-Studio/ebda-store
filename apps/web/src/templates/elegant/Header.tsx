@@ -11,6 +11,7 @@ export default function ElegantHeader({
   cartItemCount = 0,
   isLoggedIn = false,
   onSearch,
+  urlPrefix = '',
 }: HeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -27,7 +28,7 @@ export default function ElegantHeader({
   const displayLogo = isRtl && branding.logoAr ? branding.logoAr : branding.logo;
 
   return (
-    <header className="bg-background border-b border-border/30">
+    <header className="bg-background border-b border-border/30 border-b-2 border-b-primary/20">
       <div className="container mx-auto px-4">
         {/* Top Bar */}
         <div className="hidden md:flex items-center justify-between py-2 text-xs border-b border-border/30">
@@ -38,13 +39,13 @@ export default function ElegantHeader({
           </div>
           <div className="flex items-center gap-6">
             <Link
-              href="/contact"
+              href={`${urlPrefix}/contact`}
               className="text-muted-foreground hover:text-primary transition-colors"
             >
               {isRtl ? 'تواصل معنا' : 'Contact'}
             </Link>
             <Link
-              href="/wishlist"
+              href={`${urlPrefix}/wishlist`}
               className="text-muted-foreground hover:text-primary transition-colors"
             >
               {isRtl ? 'المفضلة' : 'Wishlist'}
@@ -79,23 +80,13 @@ export default function ElegantHeader({
             </svg>
           </button>
 
-          {/* Desktop Navigation - Left */}
-          <nav className="hidden md:flex items-center gap-8 flex-1">
-            {navigation.slice(0, 3).map(item => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="text-xs tracking-[0.15em] uppercase text-muted-foreground hover:text-primary transition-colors"
-              >
-                {isRtl && item.labelAr ? item.labelAr : item.label}
-              </Link>
-            ))}
-          </nav>
+          {/* Desktop Navigation - Left (spacer for centering logo) */}
+          <div className="hidden md:flex flex-1" />
 
           {/* Logo - Center */}
-          <Link href="/" className="flex-shrink-0">
+          <Link href={urlPrefix || '/'} className="flex-shrink-0">
             {displayLogo ? (
-              <img src={displayLogo} alt={displayName} className="h-10 w-auto" />
+              <img src={displayLogo} alt={displayName} className="h-14 max-h-14 w-auto" />
             ) : (
               <span className="text-2xl font-light tracking-[0.2em]">{displayName}</span>
             )}
@@ -123,7 +114,7 @@ export default function ElegantHeader({
               </svg>
             </button>
             <Link
-              href={isLoggedIn ? '/account' : '/auth/login'}
+              href={isLoggedIn ? `${urlPrefix}/account` : `${urlPrefix}/auth/login`}
               className="hidden md:block text-muted-foreground hover:text-primary transition-colors"
               aria-label="Account"
             >
@@ -142,7 +133,7 @@ export default function ElegantHeader({
               </svg>
             </Link>
             <Link
-              href="/cart"
+              href={`${urlPrefix}/cart`}
               className="relative text-muted-foreground hover:text-primary transition-colors"
               aria-label="Cart"
             >
@@ -170,7 +161,7 @@ export default function ElegantHeader({
 
         {/* Desktop Navigation - Bottom */}
         <nav className="hidden md:flex items-center justify-center gap-8 pb-4 border-b border-border/30">
-          {navigation.slice(3).map(item => (
+          {navigation.map(item => (
             <Link
               key={item.href}
               href={item.href}

@@ -21,6 +21,7 @@ export default function ModernProductCard({
   onAddToCart,
   onAddToWishlist,
   quantityInCart = 0,
+  urlPrefix = '',
 }: ProductCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
@@ -42,7 +43,7 @@ export default function ModernProductCard({
 
   return (
     <Link
-      href={`/products/${product.slug}`}
+      href={`${urlPrefix}/products/${product.slug}`}
       className="group relative bg-background rounded-xl overflow-hidden border border-border hover:border-primary/30 hover:shadow-xl transition-all duration-300"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}

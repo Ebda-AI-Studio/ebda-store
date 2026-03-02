@@ -3,13 +3,17 @@
 import Link from 'next/link';
 import type { CategoryCardProps } from '../types';
 
-export default function MinimalCategoryCard({ category, isRtl = false }: CategoryCardProps) {
+export default function MinimalCategoryCard({
+  category,
+  isRtl = false,
+  urlPrefix = '',
+}: CategoryCardProps) {
   const displayName = isRtl && category.nameAr ? category.nameAr : category.name;
 
   return (
-    <Link href={`/products?category=${category.slug}`} className="group block">
+    <Link href={`${urlPrefix}/products?category=${category.slug}`} className="group block">
       {/* Image - Clean square */}
-      <div className="aspect-square bg-muted overflow-hidden mb-4">
+      <div className="aspect-square bg-gradient-to-br from-primary/10 to-primary/5 overflow-hidden mb-4">
         {category.image ? (
           <img
             src={category.image}
@@ -18,9 +22,11 @@ export default function MinimalCategoryCard({ category, isRtl = false }: Categor
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <span className="text-xs text-muted-foreground tracking-widest uppercase">
-              {isRtl ? 'صورة' : 'Image'}
-            </span>
+            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+              <span className="text-2xl font-light text-primary/60">
+                {displayName.charAt(0).toUpperCase()}
+              </span>
+            </div>
           </div>
         )}
       </div>

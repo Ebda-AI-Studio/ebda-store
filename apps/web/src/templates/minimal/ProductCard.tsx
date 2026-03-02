@@ -15,9 +15,10 @@ export default function MinimalProductCard({
   product,
   isRtl = false,
   currency = 'KWD',
+  urlPrefix = '',
 }: ProductCardProps) {
   return (
-    <Link href={`/products/${product.slug}`} className="group block">
+    <Link href={`${urlPrefix}/products/${product.slug}`} className="group block">
       {/* Image - Full bleed, no borders */}
       <div className="relative aspect-[3/4] overflow-hidden bg-muted/30 mb-6">
         {product.images?.[0]?.url ? (

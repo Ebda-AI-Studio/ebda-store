@@ -11,6 +11,7 @@ export default function ModernHeader({
   cartItemCount = 0,
   isLoggedIn = false,
   onSearch,
+  urlPrefix = '',
 }: HeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -31,9 +32,13 @@ export default function ModernHeader({
       <div className="container mx-auto px-4">
         <div className="flex h-16 items-center justify-between gap-4">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 shrink-0">
+          <Link href={urlPrefix || '/'} className="flex items-center gap-2 shrink-0">
             {displayLogo ? (
-              <img src={displayLogo} alt={displayName} className="h-8 w-auto object-contain" />
+              <img
+                src={displayLogo}
+                alt={displayName}
+                className="h-14 max-h-14 w-auto object-contain"
+              />
             ) : (
               <span className="text-xl font-bold text-primary">{displayName}</span>
             )}
@@ -72,7 +77,7 @@ export default function ModernHeader({
 
             {/* Account */}
             <Link
-              href={isLoggedIn ? '/account' : '/auth/login'}
+              href={isLoggedIn ? `${urlPrefix}/account` : `${urlPrefix}/auth/login`}
               className="p-2 rounded-full hover:bg-muted transition-colors"
               aria-label={isRtl ? 'الحساب' : 'Account'}
             >
@@ -88,7 +93,7 @@ export default function ModernHeader({
 
             {/* Cart */}
             <Link
-              href="/cart"
+              href={`${urlPrefix}/cart`}
               className="relative p-2 rounded-full hover:bg-muted transition-colors"
               aria-label={isRtl ? 'سلة التسوق' : 'Cart'}
             >

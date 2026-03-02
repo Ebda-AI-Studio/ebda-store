@@ -16,13 +16,14 @@ export default function ClassicProductCard({
   currency = 'KWD',
   quantityInCart = 0,
   onAddToCart,
+  urlPrefix = '',
 }: ProductCardProps) {
   const handleAddToCart = async (productId: string) => {
     await onAddToCart?.(productId);
   };
 
   return (
-    <Link href={`/products/${product.slug}`} className="group text-center">
+    <Link href={`${urlPrefix}/products/${product.slug}`} className="group text-center">
       {/* Image */}
       <div className="relative aspect-[3/4] overflow-hidden bg-muted mb-4">
         {product.images?.[0]?.url ? (

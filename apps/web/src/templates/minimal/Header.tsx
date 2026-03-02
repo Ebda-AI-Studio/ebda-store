@@ -11,6 +11,7 @@ export default function MinimalHeader({
   cartItemCount = 0,
   isLoggedIn = false,
   onSearch,
+  urlPrefix = '',
 }: HeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -31,9 +32,9 @@ export default function MinimalHeader({
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-20">
           {/* Logo */}
-          <Link href="/" className="flex-shrink-0">
+          <Link href={urlPrefix || '/'} className="flex-shrink-0">
             {displayLogo ? (
-              <img src={displayLogo} alt={displayName} className="h-6 w-auto" />
+              <img src={displayLogo} alt={displayName} className="h-14 max-h-14 w-auto" />
             ) : (
               <span className="text-sm tracking-[0.3em] uppercase font-light">{displayName}</span>
             )}
@@ -74,7 +75,7 @@ export default function MinimalHeader({
               </svg>
             </button>
             <Link
-              href={isLoggedIn ? '/account' : '/auth/login'}
+              href={isLoggedIn ? `${urlPrefix}/account` : `${urlPrefix}/auth/login`}
               className="hidden sm:block text-muted-foreground hover:text-foreground transition-colors"
               aria-label="Account"
             >
@@ -93,7 +94,7 @@ export default function MinimalHeader({
               </svg>
             </Link>
             <Link
-              href="/cart"
+              href={`${urlPrefix}/cart`}
               className="relative text-muted-foreground hover:text-foreground transition-colors"
               aria-label="Cart"
             >

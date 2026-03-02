@@ -89,6 +89,7 @@ export interface HeaderProps {
   cartItemCount?: number;
   isLoggedIn?: boolean;
   onSearch?: (query: string) => void;
+  urlPrefix?: string;
 }
 
 /**
@@ -100,6 +101,7 @@ export interface FooterProps {
   socials: StoreSocials;
   navigation?: NavItem[];
   isRtl?: boolean;
+  urlPrefix?: string;
 }
 
 /**
@@ -115,6 +117,7 @@ export interface HeroProps {
   ctaTextAr?: string;
   ctaLink?: string;
   isRtl?: boolean;
+  urlPrefix?: string;
 }
 
 /**
@@ -128,6 +131,7 @@ export interface ProductCardProps {
   quantityInCart?: number;
   onAddToCart?: (productId: string) => Promise<void> | void;
   onAddToWishlist?: (productId: string) => void;
+  urlPrefix?: string;
 }
 
 /**
@@ -147,6 +151,7 @@ export interface ProductGridProps {
   cartQuantities?: Record<string, number>;
   onAddToCart?: (productId: string) => Promise<void> | void;
   onAddToWishlist?: (productId: string) => void;
+  urlPrefix?: string;
 }
 
 /**
@@ -155,6 +160,7 @@ export interface ProductGridProps {
 export interface CategoryCardProps {
   category: TemplateCategory;
   isRtl?: boolean;
+  urlPrefix?: string;
 }
 
 /**
@@ -166,6 +172,7 @@ export interface CategoryGridProps {
   /** Section title */
   title?: string;
   titleAr?: string;
+  urlPrefix?: string;
 }
 
 /**

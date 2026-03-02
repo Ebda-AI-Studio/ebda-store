@@ -25,7 +25,7 @@ export default function ModernHero({
   const displayCta = isRtl && ctaTextAr ? ctaTextAr : ctaText || (isRtl ? 'تسوق الآن' : 'Shop Now');
 
   return (
-    <section className="relative overflow-hidden bg-gradient-to-br from-muted to-muted/50">
+    <section className="relative overflow-hidden bg-gradient-to-br from-primary/10 to-primary/5">
       <div className="container mx-auto px-4">
         <div className="grid lg:grid-cols-2 gap-8 items-center min-h-[500px] py-12 lg:py-20">
           {/* Content */}

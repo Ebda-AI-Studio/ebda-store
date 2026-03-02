@@ -18,6 +18,7 @@ export default function ElegantProductCard({
   quantityInCart = 0,
   onAddToCart,
   onAddToWishlist,
+  urlPrefix = '',
 }: ProductCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
@@ -37,7 +38,7 @@ export default function ElegantProductCard({
 
   return (
     <Link
-      href={`/products/${product.slug}`}
+      href={`${urlPrefix}/products/${product.slug}`}
       className="group block"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}

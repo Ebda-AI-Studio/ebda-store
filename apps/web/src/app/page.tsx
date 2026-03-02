@@ -63,6 +63,14 @@ export default function HomePage() {
 
   const isRtl = language === 'ar';
 
+  // Compute URL prefix for template components
+  const isPlatform =
+    typeof window !== 'undefined' &&
+    (window.location.hostname.includes('vercel.app') ||
+      window.location.hostname.includes('localhost') ||
+      window.location.hostname.includes('127.0.0.1'));
+  const urlPrefix = isPlatform && store.slug && store.id !== 'demo' ? `/${store.slug}` : '';
+
   useEffect(() => {
     async function fetchData() {
       try {
@@ -135,6 +143,7 @@ export default function HomePage() {
           cartItemCount={itemCount}
           isLoggedIn={false}
           onSearch={handleSearch}
+          urlPrefix={urlPrefix}
         />
 
         {store.announcementBar?.enabled && (
@@ -220,7 +229,7 @@ export default function HomePage() {
               <h2 className="text-3xl font-bold text-white lg:text-4xl">
                 {isRtl ? 'جاهز للتسوق؟' : 'Ready to Start Shopping?'}
               </h2>
-              <p className="mx-auto mt-4 max-w-xl text-lg text-orange-100">
+              <p className="mx-auto mt-4 max-w-xl text-lg text-primary-foreground/80">
                 {isRtl
                   ? 'انضم إلى آلاف العملاء الراضين واكتشف منتجاتنا المميزة'
                   : 'Join thousands of satisfied customers and discover our amazing products.'}
@@ -230,7 +239,7 @@ export default function HomePage() {
                   <Button
                     size="lg"
                     variant="secondary"
-                    className="bg-white text-primary hover:bg-orange-50 shadow-lg"
+                    className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 shadow-lg"
                   >
                     {isRtl ? 'تصفح المنتجات' : 'Browse Products'}
                   </Button>
@@ -246,6 +255,7 @@ export default function HomePage() {
           socials={store.socialLinks || {}}
           navigation={navigation}
           isRtl={isRtl}
+          urlPrefix={urlPrefix}
         />
       </main>
     );
@@ -259,14 +269,14 @@ export default function HomePage() {
       {/* Hero Section */}
       <section className="relative overflow-hidden hero-gradient hero-pattern">
         <div className="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-primary/5 blur-3xl" />
-        <div className="absolute -left-20 bottom-0 h-72 w-72 rounded-full bg-orange-500/5 blur-3xl" />
+        <div className="absolute -left-20 bottom-0 h-72 w-72 rounded-full bg-primary/5 blur-3xl" />
 
         <div className="relative mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
           <div className="grid gap-12 lg:grid-cols-2 lg:gap-8 items-center">
             <div className="text-center lg:text-left animate-slide-up">
               <h1 className="text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl lg:text-6xl">
                 <span className="block">Shop the Future</span>
-                <span className="mt-2 block bg-gradient-to-r from-primary via-orange-500 to-primary bg-clip-text text-transparent">
+                <span className="mt-2 block bg-gradient-to-r from-primary via-primary/70 to-primary bg-clip-text text-transparent">
                   of E-Commerce
                 </span>
               </h1>
@@ -291,7 +301,7 @@ export default function HomePage() {
             <div className="relative animate-slide-up" style={{ animationDelay: '0.2s' }}>
               <div className="relative mx-auto w-full max-w-lg">
                 <div className="relative z-10 rounded-3xl bg-white p-6 shadow-2xl">
-                  <div className="aspect-square overflow-hidden rounded-2xl bg-gradient-to-br from-orange-50 to-orange-100">
+                  <div className="aspect-square overflow-hidden rounded-2xl bg-gradient-to-br from-primary/5 to-primary/10">
                     <div className="flex h-full items-center justify-center">
                       <div className="text-center">
                         <div className="mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-full bg-primary/20">
@@ -397,7 +407,7 @@ export default function HomePage() {
                   href={storeUrl(`/products/${product.slug}`)}
                   className="group rounded-xl border bg-card shadow-sm transition hover:shadow-lg overflow-hidden"
                 >
-                  <div className="aspect-square overflow-hidden bg-gradient-to-br from-orange-50 to-orange-100">
+                  <div className="aspect-square overflow-hidden bg-gradient-to-br from-primary/5 to-primary/10">
                     {product.images?.[0]?.url ? (
                       <img
                         src={product.images[0].url}
@@ -458,7 +468,7 @@ export default function HomePage() {
         <div className="mx-auto max-w-7xl px-4 text-center sm:px-6 lg:px-8">
           <div className="mx-auto max-w-2xl">
             <h2 className="text-3xl font-bold text-white lg:text-4xl">Ready to Start Shopping?</h2>
-            <p className="mx-auto mt-4 max-w-xl text-lg text-orange-100">
+            <p className="mx-auto mt-4 max-w-xl text-lg text-primary-foreground/80">
               Join thousands of satisfied customers and discover our amazing products.
             </p>
             <div className="mt-8">
@@ -466,7 +476,7 @@ export default function HomePage() {
                 <Button
                   size="lg"
                   variant="secondary"
-                  className="bg-white text-primary hover:bg-orange-50 shadow-lg"
+                  className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 shadow-lg"
                 >
                   Browse Products
                 </Button>

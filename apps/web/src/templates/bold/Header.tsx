@@ -11,6 +11,7 @@ export default function BoldHeader({
   cartItemCount = 0,
   isLoggedIn = false,
   onSearch,
+  urlPrefix = '',
 }: HeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -31,9 +32,13 @@ export default function BoldHeader({
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-3">
+          <Link href={urlPrefix || '/'} className="flex items-center gap-3">
             {displayLogo ? (
-              <img src={displayLogo} alt={displayName} className="h-8 w-auto brightness-0 invert" />
+              <img
+                src={displayLogo}
+                alt={displayName}
+                className="h-14 max-h-14 w-auto brightness-0 invert"
+              />
             ) : (
               <span className="text-xl font-black tracking-tight">{displayName}</span>
             )}
@@ -69,7 +74,7 @@ export default function BoldHeader({
               </svg>
             </button>
             <Link
-              href={isLoggedIn ? '/account' : '/auth/login'}
+              href={isLoggedIn ? `${urlPrefix}/account` : `${urlPrefix}/auth/login`}
               className="hidden sm:flex p-2 rounded-full hover:bg-primary hover:text-primary-foreground transition-colors"
               aria-label="Account"
             >
@@ -83,7 +88,7 @@ export default function BoldHeader({
               </svg>
             </Link>
             <Link
-              href="/cart"
+              href={`${urlPrefix}/cart`}
               className="relative p-2 rounded-full bg-primary text-primary-foreground hover:bg-primary/80 transition-colors"
               aria-label="Cart"
             >

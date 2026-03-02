@@ -9,6 +9,7 @@ export default function ElegantFooter({
   socials,
   navigation = [],
   isRtl = false,
+  urlPrefix = '',
 }: FooterProps) {
   const displayName = isRtl && branding.nameAr ? branding.nameAr : branding.name;
   const displayLogo = isRtl && branding.logoAr ? branding.logoAr : branding.logo;
@@ -53,7 +54,7 @@ export default function ElegantFooter({
               />
               <button
                 type="submit"
-                className="px-8 py-4 bg-foreground text-background text-sm tracking-[0.2em] uppercase hover:bg-foreground/90 transition-colors"
+                className="px-8 py-4 bg-primary text-primary-foreground text-sm tracking-[0.2em] uppercase hover:bg-primary/90 transition-colors"
               >
                 {isRtl ? 'اشتراك' : 'Subscribe'}
               </button>
@@ -68,7 +69,11 @@ export default function ElegantFooter({
           {/* Brand */}
           <div className="col-span-2 md:col-span-1">
             {displayLogo ? (
-              <img src={displayLogo} alt={displayName} className="h-8 w-auto object-contain mb-6" />
+              <img
+                src={displayLogo}
+                alt={displayName}
+                className="h-10 max-h-10 w-auto object-contain mb-6"
+              />
             ) : (
               <h3 className="text-lg font-light tracking-wide text-foreground mb-6">
                 {displayName}
@@ -163,13 +168,19 @@ export default function ElegantFooter({
               {isRtl ? 'جميع الحقوق محفوظة.' : 'All rights reserved.'}
             </p>
             <div className="flex gap-6">
-              <Link href="/privacy" className="hover:text-foreground transition-colors">
+              <Link
+                href={`${urlPrefix}/privacy`}
+                className="hover:text-foreground transition-colors"
+              >
                 {isRtl ? 'الخصوصية' : 'Privacy'}
               </Link>
-              <Link href="/terms" className="hover:text-foreground transition-colors">
+              <Link href={`${urlPrefix}/terms`} className="hover:text-foreground transition-colors">
                 {isRtl ? 'الشروط' : 'Terms'}
               </Link>
-              <Link href="/shipping" className="hover:text-foreground transition-colors">
+              <Link
+                href={`${urlPrefix}/shipping`}
+                className="hover:text-foreground transition-colors"
+              >
                 {isRtl ? 'الشحن' : 'Shipping'}
               </Link>
             </div>

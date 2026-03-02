@@ -9,6 +9,7 @@ export default function ModernFooter({
   socials,
   navigation = [],
   isRtl = false,
+  urlPrefix = '',
 }: FooterProps) {
   const displayName = isRtl && branding.nameAr ? branding.nameAr : branding.name;
   const displayLogo = isRtl && branding.logoAr ? branding.logoAr : branding.logo;
@@ -65,7 +66,7 @@ export default function ModernFooter({
               <img
                 src={displayLogo}
                 alt={displayName}
-                className="h-10 w-auto object-contain mb-4 brightness-0 invert"
+                className="h-10 max-h-10 w-auto object-contain mb-4 brightness-0 invert"
               />
             ) : (
               <h3 className="text-xl font-bold mb-4">{displayName}</h3>
@@ -229,10 +230,10 @@ export default function ModernFooter({
               : `© ${new Date().getFullYear()} ${displayName}. All rights reserved.`}
           </p>
           <div className="flex items-center gap-4 text-background/50 text-sm">
-            <Link href="/privacy" className="hover:text-primary transition-colors">
+            <Link href={`${urlPrefix}/privacy`} className="hover:text-primary transition-colors">
               {isRtl ? 'سياسة الخصوصية' : 'Privacy Policy'}
             </Link>
-            <Link href="/terms" className="hover:text-primary transition-colors">
+            <Link href={`${urlPrefix}/terms`} className="hover:text-primary transition-colors">
               {isRtl ? 'الشروط والأحكام' : 'Terms & Conditions'}
             </Link>
           </div>

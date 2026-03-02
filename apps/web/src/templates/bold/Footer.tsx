@@ -9,6 +9,7 @@ export default function BoldFooter({
   socials,
   navigation = [],
   isRtl = false,
+  urlPrefix = '',
 }: FooterProps) {
   const displayName = isRtl && branding.nameAr ? branding.nameAr : branding.name;
   const displayLogo = isRtl && branding.logoAr ? branding.logoAr : branding.logo;
@@ -44,7 +45,7 @@ export default function BoldFooter({
               <img
                 src={displayLogo}
                 alt={displayName}
-                className="h-12 w-auto object-contain mb-6 brightness-0 invert"
+                className="h-10 max-h-10 w-auto object-contain mb-6 brightness-0 invert"
               />
             ) : (
               <h3 className="text-4xl font-black mb-6 tracking-tight">{displayName}</h3>
@@ -131,13 +132,13 @@ export default function BoldFooter({
           </p>
           <div className="flex gap-6">
             <Link
-              href="/privacy"
+              href={`${urlPrefix}/privacy`}
               className="text-background/50 hover:text-primary transition-colors font-medium"
             >
               {isRtl ? 'الخصوصية' : 'Privacy'}
             </Link>
             <Link
-              href="/terms"
+              href={`${urlPrefix}/terms`}
               className="text-background/50 hover:text-primary transition-colors font-medium"
             >
               {isRtl ? 'الشروط' : 'Terms'}

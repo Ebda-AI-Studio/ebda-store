@@ -9,6 +9,7 @@ export default function ClassicFooter({
   socials,
   navigation = [],
   isRtl = false,
+  urlPrefix = '',
 }: FooterProps) {
   const displayName = isRtl && branding.nameAr ? branding.nameAr : branding.name;
   const displayLogo = isRtl && branding.logoAr ? branding.logoAr : branding.logo;
@@ -54,7 +55,7 @@ export default function ClassicFooter({
               <img
                 src={displayLogo}
                 alt={displayName}
-                className="h-12 w-auto object-contain mx-auto"
+                className="h-10 max-h-10 w-auto object-contain mx-auto"
               />
             ) : (
               <h3 className="text-2xl font-serif font-normal text-foreground">{displayName}</h3>
@@ -156,11 +157,11 @@ export default function ClassicFooter({
               : `© ${new Date().getFullYear()} ${displayName}. All rights reserved.`}
           </p>
           <div className="flex justify-center gap-6 mt-4 text-xs text-muted-foreground">
-            <Link href="/privacy" className="hover:text-foreground transition-colors">
+            <Link href={`${urlPrefix}/privacy`} className="hover:text-foreground transition-colors">
               {isRtl ? 'سياسة الخصوصية' : 'Privacy Policy'}
             </Link>
             <span>·</span>
-            <Link href="/terms" className="hover:text-foreground transition-colors">
+            <Link href={`${urlPrefix}/terms`} className="hover:text-foreground transition-colors">
               {isRtl ? 'الشروط والأحكام' : 'Terms & Conditions'}
             </Link>
           </div>

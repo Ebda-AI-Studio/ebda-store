@@ -32,7 +32,7 @@ export default function ElegantHero({
         {image ? (
           <img src={image} alt={displayTitle} className="w-full h-full object-cover" />
         ) : (
-          <div className="w-full h-full bg-gradient-to-br from-muted via-muted/50 to-background" />
+          <div className="w-full h-full bg-gradient-to-br from-primary/10 via-secondary/5 to-background" />
         )}
         {/* Sophisticated overlay */}
         <div className="absolute inset-0 bg-gradient-to-r from-background via-background/80 to-transparent" />

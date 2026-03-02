@@ -11,6 +11,7 @@ export default function ClassicHeader({
   cartItemCount = 0,
   isLoggedIn = false,
   onSearch,
+  urlPrefix = '',
 }: HeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -34,10 +35,10 @@ export default function ClassicHeader({
             {isRtl ? 'جودة لا مثيل لها منذ التأسيس' : 'Unmatched Quality Since Establishment'}
           </span>
           <div className="flex items-center gap-6">
-            <Link href="/contact" className="hover:text-primary transition-colors">
+            <Link href={`${urlPrefix}/contact`} className="hover:text-primary transition-colors">
               {isRtl ? 'اتصل بنا' : 'Contact'}
             </Link>
-            <Link href="/about" className="hover:text-primary transition-colors">
+            <Link href={`${urlPrefix}/about`} className="hover:text-primary transition-colors">
               {isRtl ? 'من نحن' : 'About'}
             </Link>
           </div>
@@ -64,9 +65,12 @@ export default function ClassicHeader({
           </button>
 
           {/* Logo - Centered */}
-          <Link href="/" className="absolute left-1/2 -translate-x-1/2 md:static md:translate-x-0">
+          <Link
+            href={urlPrefix || '/'}
+            className="absolute left-1/2 -translate-x-1/2 md:static md:translate-x-0"
+          >
             {displayLogo ? (
-              <img src={displayLogo} alt={displayName} className="h-12 w-auto" />
+              <img src={displayLogo} alt={displayName} className="h-14 max-h-14 w-auto" />
             ) : (
               <span className="text-2xl font-serif font-bold tracking-wider">{displayName}</span>
             )}
@@ -88,7 +92,10 @@ export default function ClassicHeader({
                 />
               </svg>
             </button>
-            <Link href={isLoggedIn ? '/account' : '/auth/login'} aria-label="Account">
+            <Link
+              href={isLoggedIn ? `${urlPrefix}/account` : `${urlPrefix}/auth/login`}
+              aria-label="Account"
+            >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   strokeLinecap="round"
@@ -98,7 +105,7 @@ export default function ClassicHeader({
                 />
               </svg>
             </Link>
-            <Link href="/cart" className="relative" aria-label="Cart">
+            <Link href={`${urlPrefix}/cart`} className="relative" aria-label="Cart">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   strokeLinecap="round"

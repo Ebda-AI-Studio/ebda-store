@@ -9,6 +9,7 @@ export default function MinimalFooter({
   socials,
   navigation = [],
   isRtl = false,
+  urlPrefix = '',
 }: FooterProps) {
   const displayName = isRtl && branding.nameAr ? branding.nameAr : branding.name;
   const displayLogo = isRtl && branding.logoAr ? branding.logoAr : branding.logo;
@@ -33,7 +34,11 @@ export default function MinimalFooter({
           {/* Left - Logo/Name */}
           <div className="flex-shrink-0">
             {displayLogo ? (
-              <img src={displayLogo} alt={displayName} className="h-6 w-auto object-contain" />
+              <img
+                src={displayLogo}
+                alt={displayName}
+                className="h-10 max-h-10 w-auto object-contain"
+              />
             ) : (
               <span className="text-lg font-light tracking-wide text-foreground">
                 {displayName}
@@ -107,10 +112,10 @@ export default function MinimalFooter({
             © {new Date().getFullYear()} {displayName}
           </p>
           <div className="flex gap-6 text-xs text-muted-foreground">
-            <Link href="/privacy" className="hover:text-foreground transition-colors">
+            <Link href={`${urlPrefix}/privacy`} className="hover:text-foreground transition-colors">
               {isRtl ? 'الخصوصية' : 'Privacy'}
             </Link>
-            <Link href="/terms" className="hover:text-foreground transition-colors">
+            <Link href={`${urlPrefix}/terms`} className="hover:text-foreground transition-colors">
               {isRtl ? 'الشروط' : 'Terms'}
             </Link>
           </div>

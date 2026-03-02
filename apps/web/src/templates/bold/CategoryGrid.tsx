@@ -8,6 +8,7 @@ export default function BoldCategoryGrid({
   isRtl = false,
   title,
   titleAr,
+  urlPrefix = '',
 }: CategoryGridProps) {
   const displayTitle = isRtl && titleAr ? titleAr : title;
 
@@ -34,7 +35,7 @@ export default function BoldCategoryGrid({
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
           {categories.map((category, index) => (
             <div key={category.id} className={index % 2 === 1 ? 'lg:translate-y-8' : ''}>
-              <CategoryCard category={category} isRtl={isRtl} />
+              <CategoryCard category={category} isRtl={isRtl} urlPrefix={urlPrefix} />
             </div>
           ))}
         </div>

@@ -11,6 +11,7 @@ export default function BoldProductGrid({
   columns = 4,
   onAddToCart,
   cartQuantities = {},
+  urlPrefix = '',
 }: ProductGridProps) {
   const displayTitle = isRtl && titleAr ? titleAr : title;
 
@@ -49,6 +50,7 @@ export default function BoldProductGrid({
               isRtl={isRtl}
               onAddToCart={onAddToCart}
               quantityInCart={cartQuantities[product.id]}
+              urlPrefix={urlPrefix}
             />
           ))}
         </div>

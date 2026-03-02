@@ -8,6 +8,7 @@ export default function ClassicCategoryGrid({
   isRtl = false,
   title,
   titleAr,
+  urlPrefix = '',
 }: CategoryGridProps) {
   const displayTitle = isRtl && titleAr ? titleAr : title;
 
@@ -28,7 +29,12 @@ export default function ClassicCategoryGrid({
         {/* Grid - 4 columns on desktop for elegant spacing */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8 md:gap-12">
           {categories.map(category => (
-            <CategoryCard key={category.id} category={category} isRtl={isRtl} />
+            <CategoryCard
+              key={category.id}
+              category={category}
+              isRtl={isRtl}
+              urlPrefix={urlPrefix}
+            />
           ))}
         </div>
       </div>

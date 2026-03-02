@@ -20,6 +20,7 @@ export default function ModernProductGrid({
   cartQuantities = {},
   onAddToCart,
   onAddToWishlist,
+  urlPrefix = '',
 }: ProductGridProps) {
   const gridCols = {
     2: 'grid-cols-2',
@@ -75,6 +76,7 @@ export default function ModernProductGrid({
             quantityInCart={cartQuantities[product.id] ?? 0}
             onAddToCart={onAddToCart}
             onAddToWishlist={onAddToWishlist}
+            urlPrefix={urlPrefix}
           />
         </div>
       ))}

@@ -17,6 +17,7 @@ export default function BoldProductCard({
   currency = 'KWD',
   quantityInCart = 0,
   onAddToCart,
+  urlPrefix = '',
 }: ProductCardProps) {
   const [isHovered, setIsHovered] = useState(false);
 
@@ -30,7 +31,7 @@ export default function BoldProductCard({
 
   return (
     <Link
-      href={`/products/${product.slug}`}
+      href={`${urlPrefix}/products/${product.slug}`}
       className="group block relative overflow-hidden rounded-3xl bg-background border-4 border-border hover:border-primary transition-colors"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
