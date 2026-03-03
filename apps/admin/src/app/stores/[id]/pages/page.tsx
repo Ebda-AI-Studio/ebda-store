@@ -51,7 +51,7 @@ export default function StorePagesPage() {
   async function loadSettings() {
     try {
       const token = getAuthToken();
-      const res = await fetch(`${getApiUrl()}/stores/${storeId}`, {
+      const res = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const json = await res.json();
@@ -78,7 +78,7 @@ export default function StorePagesPage() {
     try {
       const token = getAuthToken();
       // First fetch current settings to merge
-      const getRes = await fetch(`${getApiUrl()}/stores/${storeId}`, {
+      const getRes = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const getJson = await getRes.json();
@@ -92,7 +92,7 @@ export default function StorePagesPage() {
         },
       };
 
-      const res = await fetch(`${getApiUrl()}/stores/${storeId}`, {
+      const res = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
