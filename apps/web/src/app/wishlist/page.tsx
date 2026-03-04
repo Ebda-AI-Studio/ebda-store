@@ -238,7 +238,7 @@ export default function WishlistPage() {
             <p className="text-muted-foreground mb-4">Start adding products you love!</p>
             <Link
               href={storeUrl('/products')}
-              className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              className="inline-flex items-center px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90"
             >
               Browse Products
             </Link>
@@ -248,7 +248,7 @@ export default function WishlistPage() {
             {items.map(item => (
               <div
                 key={item.id}
-                className="bg-white rounded-lg shadow-md p-4 flex items-center gap-4"
+                className="bg-card rounded-lg shadow-md p-4 flex items-center gap-4"
               >
                 <Link href={storeUrl(`/products/${item.product.slug}`)} className="flex-shrink-0">
                   <div className="w-24 h-24 bg-muted rounded-lg overflow-hidden">
@@ -280,7 +280,7 @@ export default function WishlistPage() {
 
                 <div className="flex-1 min-w-0">
                   <Link href={storeUrl(`/products/${item.product.slug}`)}>
-                    <h3 className="font-semibold text-foreground hover:text-blue-600 truncate">
+                    <h3 className="font-semibold text-foreground hover:text-primary truncate">
                       {item.product.name}
                     </h3>
                   </Link>
@@ -312,7 +312,7 @@ export default function WishlistPage() {
                   <button
                     onClick={() => addToCart(item.product.id)}
                     disabled={item.product.status !== 'active'}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Add to Cart
                   </button>

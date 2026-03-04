@@ -58,10 +58,10 @@ export function Footer() {
                 <img
                   src={store.logo}
                   alt={store.name}
-                  className="h-11 max-h-11 w-auto object-contain"
+                  className="h-14 max-h-14 w-auto object-contain"
                 />
               ) : (
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-lg font-bold text-primary-foreground">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-xl font-bold text-primary-foreground">
                   {store.name?.charAt(0) || 'S'}
                 </div>
               )}
@@ -186,7 +186,7 @@ export function Footer() {
                     }
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-muted-foreground shadow-sm transition-all hover:bg-primary hover:text-white hover:shadow-md hover:shadow-primary/25"
+                    className="flex h-10 w-10 items-center justify-center rounded-xl bg-card text-muted-foreground shadow-sm transition-all hover:bg-primary hover:text-white hover:shadow-md hover:shadow-primary/25"
                     aria-label={social.name}
                   >
                     <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
@@ -263,7 +263,7 @@ export function Footer() {
                 <input
                   type="email"
                   placeholder="Email"
-                  className="h-9 flex-1 rounded-lg border border-border bg-white px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  className="h-9 flex-1 rounded-lg border border-border bg-background px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                 />
                 <button
                   type="submit"
@@ -285,7 +285,7 @@ export function Footer() {
       </div>
 
       {/* Features Bar */}
-      <div className="border-t border-border/50 bg-white/50">
+      <div className="border-t border-border/50 bg-background/50">
         <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
             {[
@@ -347,7 +347,7 @@ export function Footer() {
                 {['KNET', 'Visa', 'Mastercard', 'Apple Pay'].map(method => (
                   <div
                     key={method}
-                    className="flex h-8 items-center rounded-md bg-white px-3 text-xs font-medium text-muted-foreground shadow-sm"
+                    className="flex h-8 items-center rounded-md bg-card px-3 text-xs font-medium text-muted-foreground shadow-sm"
                   >
                     {method}
                   </div>

@@ -445,7 +445,7 @@ export default function CheckoutPage() {
   return (
     <main className="min-h-screen bg-background">
       {/* Navigation */}
-      <nav className="border-b bg-white">
+      <nav className="border-b bg-background">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <Link href={storeUrl('/')} className="flex items-center gap-2">
             {store?.logo ? (
@@ -511,7 +511,7 @@ export default function CheckoutPage() {
           <div className="lg:col-span-7">
             <form onSubmit={handleSubmit}>
               {step === 1 && (
-                <div className="rounded-xl border bg-white p-6 shadow-sm">
+                <div className="rounded-xl border bg-card p-6 shadow-sm">
                   <h2 className="text-lg font-semibold text-foreground">Shipping Information</h2>
 
                   <div className="mt-6 space-y-4">
@@ -712,7 +712,7 @@ export default function CheckoutPage() {
                   )}
 
                   {/* Shipping Summary */}
-                  <div className="rounded-xl border bg-white p-6 shadow-sm">
+                  <div className="rounded-xl border bg-card p-6 shadow-sm">
                     <div className="flex items-center justify-between">
                       <h3 className="font-medium text-foreground">Shipping to</h3>
                       <button
@@ -738,7 +738,7 @@ export default function CheckoutPage() {
                   </div>
 
                   {/* Payment Methods */}
-                  <div className="rounded-xl border bg-white p-6 shadow-sm">
+                  <div className="rounded-xl border bg-card p-6 shadow-sm">
                     <h2 className="text-lg font-semibold text-foreground">Payment Method</h2>
                     <p className="mt-1 text-sm text-muted-foreground">
                       Select your preferred payment method
@@ -831,7 +831,7 @@ export default function CheckoutPage() {
 
           {/* Order Summary */}
           <div className="mt-8 lg:col-span-5 lg:mt-0">
-            <div className="sticky top-24 rounded-xl border bg-white p-6 shadow-sm">
+            <div className="sticky top-24 rounded-xl border bg-card p-6 shadow-sm">
               <h2 className="text-lg font-semibold text-foreground">Order Summary</h2>
 
               <div className="mt-6 divide-y">

@@ -44,9 +44,9 @@ export default function AboutPage() {
               <h2 className="text-2xl font-semibold mb-4">Why Choose Us?</h2>
               <div className="grid md:grid-cols-3 gap-6 mt-6">
                 <div className="bg-muted p-6 rounded-lg">
-                  <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                  <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
                     <svg
-                      className="w-6 h-6 text-blue-600"
+                      className="w-6 h-6 text-primary"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"

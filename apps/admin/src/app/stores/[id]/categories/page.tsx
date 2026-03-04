@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { ImageUpload } from '../../../../components/ImageUpload';
 import { getApiUrl } from '../../../../lib/api';
 
 interface Category {
@@ -13,6 +14,7 @@ interface Category {
   slug: string;
   description: string | null;
   descriptionAr: string | null;
+  image: string | null;
   isActive: boolean;
   sortOrder: number;
   _count?: { products: number };
@@ -26,6 +28,7 @@ const emptyForm = {
   slug: '',
   description: '',
   descriptionAr: '',
+  image: '',
 };
 
 function slugify(text: string) {
@@ -99,6 +102,7 @@ export default function StoreCategoriesPage() {
       slug: cat.slug,
       description: cat.description || '',
       descriptionAr: cat.descriptionAr || '',
+      image: cat.image || '',
     });
     setFormErrors({});
     setSaveMessage(null);
@@ -150,6 +154,7 @@ export default function StoreCategoriesPage() {
           slug: form.slug.trim(),
           description: form.description.trim() || undefined,
           descriptionAr: form.descriptionAr.trim() || undefined,
+          image: form.image || undefined,
         }),
       });
 
@@ -335,6 +340,17 @@ export default function StoreCategoriesPage() {
               </div>
             </div>
 
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Category Image</label>
+              <ImageUpload
+                value={form.image || undefined}
+                onUpload={url => setForm(prev => ({ ...prev, image: url }))}
+                onRemove={() => setForm(prev => ({ ...prev, image: '' }))}
+                folder="categories"
+                label="Upload Category Image"
+              />
+            </div>
+
             {saveMessage && (
               <p
                 className={`text-sm ${
@@ -426,14 +442,27 @@ export default function StoreCategoriesPage() {
                 {categories.map(cat => (
                   <tr key={cat.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4">
-                      <div>
-                        <p className="font-medium text-gray-900">{cat.name}</p>
-                        {cat.nameAr && <p className="text-sm text-gray-500">{cat.nameAr}</p>}
-                        {cat.description && (
-                          <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">
-                            {cat.description}
-                          </p>
+                      <div className="flex items-center gap-3">
+                        {cat.image ? (
+                          <img
+                            src={cat.image}
+                            alt={cat.name}
+                            className="h-10 w-10 rounded-lg object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary font-semibold">
+                            {cat.name.charAt(0)}
+                          </div>
                         )}
+                        <div>
+                          <p className="font-medium text-gray-900">{cat.name}</p>
+                          {cat.nameAr && <p className="text-sm text-gray-500">{cat.nameAr}</p>}
+                          {cat.description && (
+                            <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">
+                              {cat.description}
+                            </p>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td className="px-6 py-4">

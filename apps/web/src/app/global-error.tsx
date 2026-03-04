@@ -24,14 +24,20 @@ export default function GlobalError({
           <h2 style={{ fontSize: '1.5rem', fontWeight: 600, marginBottom: '0.5rem' }}>
             Something went wrong
           </h2>
-          <p style={{ color: '#6b7280', marginBottom: '2rem', maxWidth: '28rem' }}>
+          <p
+            style={{
+              color: 'hsl(var(--muted-foreground, 220 8.9% 46.1%))',
+              marginBottom: '2rem',
+              maxWidth: '28rem',
+            }}
+          >
             An unexpected error occurred. Please try again.
           </p>
           <button
             onClick={reset}
             style={{
-              backgroundColor: '#ff6e00',
-              color: '#fff',
+              backgroundColor: 'hsl(var(--primary, 24 100% 50%))',
+              color: 'hsl(var(--primary-foreground, 0 0% 100%))',
               border: 'none',
               borderRadius: '0.5rem',
               padding: '0.625rem 1.5rem',

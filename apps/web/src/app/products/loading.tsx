@@ -3,14 +3,14 @@ import { Header, Footer } from '../../components';
 
 export default function ProductsLoading() {
   return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="min-h-screen bg-background">
       <Header />
 
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {/* Header Skeleton */}
         <div className="mb-8">
-          <div className="h-9 w-48 animate-pulse rounded bg-gray-200" />
-          <div className="mt-2 h-5 w-72 animate-pulse rounded bg-gray-200" />
+          <div className="h-9 w-48 animate-pulse rounded bg-muted" />
+          <div className="mt-2 h-5 w-72 animate-pulse rounded bg-muted" />
         </div>
 
         {/* Filters Skeleton */}

@@ -401,7 +401,7 @@ export default function ProductsPage() {
 
                     {/* Wishlist Button */}
                     <button
-                      className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-muted-foreground opacity-0 shadow-md backdrop-blur-sm transition-all hover:bg-primary hover:text-white group-hover:opacity-100"
+                      className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-card/90 text-muted-foreground opacity-0 shadow-md backdrop-blur-sm transition-all hover:bg-primary hover:text-white group-hover:opacity-100"
                       onClick={e => {
                         e.preventDefault();
                       }}
@@ -430,7 +430,7 @@ export default function ProductsPage() {
                       className={`absolute left-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full shadow-md backdrop-blur-sm transition-all opacity-0 group-hover:opacity-100 ${
                         compareIds.has(product.id)
                           ? 'bg-primary text-white'
-                          : 'bg-white/90 text-muted-foreground hover:bg-primary hover:text-white'
+                          : 'bg-card/90 text-muted-foreground hover:bg-primary hover:text-white'
                       }`}
                       onClick={e => handleToggleCompare(product, e)}
                     >
@@ -451,7 +451,7 @@ export default function ProductsPage() {
                     </button>
 
                     {/* Image */}
-                    <div className="relative aspect-square overflow-hidden bg-gradient-to-br from-orange-50 to-orange-100">
+                    <div className="relative aspect-square overflow-hidden bg-gradient-to-br from-primary/5 to-primary/10">
                       {product.images?.[0]?.url ? (
                         <img
                           src={product.images[0].url}
@@ -540,7 +540,7 @@ export default function ProductsPage() {
                     className="flex gap-4 rounded-2xl border border-border bg-card p-4 transition-all hover:border-primary/30 hover:shadow-lg"
                   >
                     {/* Image */}
-                    <div className="relative h-32 w-32 flex-shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-orange-50 to-orange-100">
+                    <div className="relative h-32 w-32 flex-shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-primary/5 to-primary/10">
                       {product.compareAtPrice && product.compareAtPrice > product.price && (
                         <span className="absolute left-2 top-2 rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold uppercase text-white">
                           Sale

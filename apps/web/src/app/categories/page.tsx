@@ -45,7 +45,7 @@ export default function CategoriesPage() {
           <h1 className="text-3xl font-bold mb-8">Categories</h1>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {[...Array(8)].map((_, i) => (
-              <div key={i} className="bg-gray-100 animate-pulse rounded-lg h-48"></div>
+              <div key={i} className="bg-muted animate-pulse rounded-lg h-48"></div>
             ))}
           </div>
         </div>
@@ -62,7 +62,7 @@ export default function CategoriesPage() {
 
         {categories.length === 0 ? (
           <div className="text-center py-12">
-            <p className="text-gray-500 mb-4">No categories available yet.</p>
+            <p className="text-muted-foreground mb-4">No categories available yet.</p>
             <Link href={storeUrl('/products')} className="text-primary hover:underline">
               Browse all products
             </Link>
@@ -73,7 +73,7 @@ export default function CategoriesPage() {
               <Link
                 key={category.id}
                 href={storeUrl(`/products?category=${category.slug}`)}
-                className="group bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow border"
+                className="group bg-card rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow border"
               >
                 <div className="aspect-square bg-gradient-to-br from-primary/5 to-primary/10 relative">
                   {category.image ? (

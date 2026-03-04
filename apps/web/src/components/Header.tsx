@@ -44,7 +44,7 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
 
   return (
     <>
-      <nav className="sticky top-0 z-50 border-b border-border/50 bg-white/95 backdrop-blur-lg">
+      <nav className="sticky top-0 z-50 border-b border-border/50 bg-background/95 backdrop-blur-lg">
         {/* Top Bar - Optional Announcement */}
         <div className="hidden bg-primary text-center text-xs text-white sm:block">
           <div className="mx-auto max-w-7xl px-4 py-2">
@@ -83,21 +83,21 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
             </button>
 
             {/* Logo */}
-            <Link href={storeUrl('/')} className="flex items-center gap-2">
+            <Link href={storeUrl('/')} className="flex items-center gap-3">
               {store.logo ? (
                 <img
                   src={store.logo}
                   alt={store.name}
-                  className="h-10 max-h-10 w-auto object-contain"
+                  className="h-14 max-h-14 w-auto object-contain"
                 />
               ) : (
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-lg font-bold text-primary-foreground">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-xl font-bold text-primary-foreground">
                   {store.name?.charAt(0) || 'S'}
                 </div>
               )}
-              <span className="hidden text-xl font-bold tracking-tight text-foreground sm:block">
-                {store.name}
-              </span>
+            </Link>
+            <Link href={storeUrl('/')} className="hidden sm:block">
+              <span className="text-xl font-bold tracking-tight text-foreground">{store.name}</span>
             </Link>
 
             {/* Desktop Navigation */}
@@ -229,7 +229,7 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
 
       {/* Mobile Menu */}
       <div
-        className={`fixed inset-y-0 left-0 z-50 w-80 max-w-[85vw] transform bg-white shadow-2xl transition-transform duration-300 ease-out lg:hidden ${
+        className={`fixed inset-y-0 left-0 z-50 w-80 max-w-[85vw] transform bg-background shadow-2xl transition-transform duration-300 ease-out lg:hidden ${
           isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -393,7 +393,7 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
             className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm lg:hidden animate-fade-in"
             onClick={() => setIsSearchOpen(false)}
           />
-          <div className="fixed inset-x-0 top-0 z-50 bg-white p-4 shadow-lg lg:hidden animate-slide-down">
+          <div className="fixed inset-x-0 top-0 z-50 bg-background p-4 shadow-lg lg:hidden animate-slide-down">
             <div className="flex items-center gap-3">
               <form onSubmit={handleSearch} className="search-box flex-1">
                 <svg
