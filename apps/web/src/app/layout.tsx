@@ -8,7 +8,7 @@ import { AuthProvider } from '../contexts/AuthContext';
 import { getStore } from '../lib/store-resolver';
 import { MarketingPixelsProvider } from '../components/MarketingPixels';
 import { ServiceWorkerRegistration } from '../components/ServiceWorkerRegistration';
-import type { MarketingPixels } from '@force/shared';
+import { type MarketingPixels, themeToCssVars } from '@force/shared';
 import '../styles/globals.css';
 
 const plusJakarta = Plus_Jakarta_Sans({
@@ -70,8 +70,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // Fetch store data server-side
   const store = await getStore();
 
+  // Build inline theme styles so colors are correct on first paint (no flash of default orange)
+  const themeStyle = store.theme
+    ? Object.fromEntries(Object.entries(themeToCssVars(store.theme)).map(([k, v]) => [k, v]))
+    : undefined;
+
   return (
-    <html lang="en" dir="ltr" suppressHydrationWarning>
+    <html lang="en" dir="ltr" suppressHydrationWarning style={themeStyle}>
       <head>
         {store.favicon && <link rel="icon" href={store.favicon} />}
         <link rel="manifest" href="/manifest.webmanifest" />
