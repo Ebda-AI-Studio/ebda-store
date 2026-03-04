@@ -35,7 +35,7 @@ function slugify(text: string) {
   return text
     .toLowerCase()
     .replace(/\s+/g, '-')
-    .replace(/[^a-z0-9-]/g, '')
+    .replace(/[^a-z0-9\u0600-\u06FF-]/g, '')
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '');
 }
@@ -122,8 +122,8 @@ export default function StoreCategoriesPage() {
     if (!form.name.trim()) errors.name = 'Name is required';
     if (!form.slug.trim()) {
       errors.slug = 'Slug is required';
-    } else if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(form.slug)) {
-      errors.slug = 'Slug must be lowercase letters, numbers and hyphens only';
+    } else if (!/^[a-z0-9\u0600-\u06FF]+(?:-[a-z0-9\u0600-\u06FF]+)*$/.test(form.slug)) {
+      errors.slug = 'Slug must be lowercase letters, numbers, Arabic characters and hyphens only';
     }
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
