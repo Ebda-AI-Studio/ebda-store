@@ -70,14 +70,19 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // Fetch store data server-side
   const store = await getStore();
 
-  // Build inline theme styles so colors are correct on first paint (no flash of default orange)
-  const themeStyle = store.theme
-    ? Object.fromEntries(Object.entries(themeToCssVars(store.theme)).map(([k, v]) => [k, v]))
-    : undefined;
+  // Build a <style> tag that overrides the default orange theme in globals.css
+  // Inline styles on <html> don't beat `:root {}` in @layer base, so we inject a :root rule instead
+  const themeCssVars = store.theme ? themeToCssVars(store.theme) : null;
+  const themeStyleTag = themeCssVars
+    ? `:root { ${Object.entries(themeCssVars)
+        .map(([k, v]) => `${k}: ${v}`)
+        .join('; ')} }`
+    : '';
 
   return (
-    <html lang="en" dir="ltr" suppressHydrationWarning style={themeStyle}>
+    <html lang="en" dir="ltr" suppressHydrationWarning>
       <head>
+        {themeStyleTag && <style dangerouslySetInnerHTML={{ __html: themeStyleTag }} />}
         {store.favicon && <link rel="icon" href={store.favicon} />}
         <link rel="manifest" href="/manifest.webmanifest" />
       </head>
