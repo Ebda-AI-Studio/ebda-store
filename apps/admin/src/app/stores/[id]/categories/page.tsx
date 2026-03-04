@@ -62,7 +62,7 @@ export default function StoreCategoriesPage() {
     setError(null);
     try {
       const token = localStorage.getItem('authToken');
-      const res = await fetch(`${API_URL}/api/v1/stores/${storeId}/products/categories`, {
+      const res = await fetch(`${API_URL}/api/v1/stores/${storeId}/categories`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
@@ -135,8 +135,8 @@ export default function StoreCategoriesPage() {
       const token = localStorage.getItem('authToken');
       const isEditing = !!editingId;
       const url = isEditing
-        ? `${API_URL}/api/v1/stores/${storeId}/products/categories/${editingId}`
-        : `${API_URL}/api/v1/stores/${storeId}/products/categories`;
+        ? `${API_URL}/api/v1/stores/${storeId}/categories/${editingId}`
+        : `${API_URL}/api/v1/stores/${storeId}/categories`;
 
       const res = await fetch(url, {
         method: isEditing ? 'PUT' : 'POST',
@@ -183,7 +183,7 @@ export default function StoreCategoriesPage() {
     setDeletingId(catId);
     try {
       const token = localStorage.getItem('authToken');
-      const res = await fetch(`${API_URL}/api/v1/stores/${storeId}/products/categories/${catId}`, {
+      const res = await fetch(`${API_URL}/api/v1/stores/${storeId}/categories/${catId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       });
