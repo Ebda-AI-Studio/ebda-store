@@ -371,11 +371,18 @@ export class ProductService {
 
   static async getCategories(storeId: string) {
     const categories = await prisma.category.findMany({
-      where: { storeId },
+      where: { storeId, deletedAt: null, isActive: true },
       orderBy: { name: 'asc' },
       take: 100, // Guard against stores with unbounded category growth
+      include: {
+        _count: { select: { products: true } },
+      },
     });
-    return categories;
+    return categories.map(c => ({
+      ...c,
+      productCount: c._count.products,
+      _count: undefined,
+    }));
   }
 
   /**

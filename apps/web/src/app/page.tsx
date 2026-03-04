@@ -356,7 +356,14 @@ export default function HomePage() {
                   href={storeUrl(`/products?category=${category.slug}`)}
                   className="group relative overflow-hidden rounded-xl border bg-card shadow-sm transition hover:shadow-lg"
                 >
-                  <div className="relative h-48 bg-gradient-to-br from-primary/10 to-primary/5 p-6">
+                  <div className="relative h-48 bg-gradient-to-br from-primary/10 to-primary/5">
+                    {category.image && (
+                      <img
+                        src={category.image}
+                        alt={category.name}
+                        className="h-full w-full object-cover"
+                      />
+                    )}
                     <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-6">
                       <h3 className="text-lg font-bold text-white">{category.name}</h3>
                       {category.productCount !== undefined && (
