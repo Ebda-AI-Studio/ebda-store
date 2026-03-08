@@ -4,10 +4,12 @@ import { useState } from 'react';
 import { Button, Input, Textarea, useToast } from '@force/ui';
 import { Header, Footer } from '../../components';
 import { useStore } from '../../contexts/StoreContext';
+import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { api } from '@/lib/api';
 
 export default function ContactPage() {
   const { store } = useStore();
+  const { t } = useLanguage();
   const { success, error: showError } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
@@ -43,9 +45,12 @@ export default function ContactPage() {
 
       <div className="mx-auto w-full max-w-3xl flex-1 px-4 py-12 sm:px-6 lg:px-8">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-foreground">Contact Us</h1>
+          <h1 className="text-3xl font-bold text-foreground">{t('Contact Us', 'اتصل بنا')}</h1>
           <p className="mt-2 text-muted-foreground">
-            Have a question or need help? We&apos;re here for you.
+            {t(
+              "Have a question or need help? We're here for you.",
+              'هل لديك سؤال أو تحتاج مساعدة؟ نحن هنا من أجلك.'
+            )}
           </p>
         </div>
 
@@ -53,13 +58,13 @@ export default function ContactPage() {
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid gap-6 sm:grid-cols-2">
               <Input
-                label="Your Name"
+                label={t('Your Name', 'الاسم')}
                 value={formData.name}
                 onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
                 required
               />
               <Input
-                label="Email Address"
+                label={t('Email Address', 'البريد الإلكتروني')}
                 type="email"
                 value={formData.email}
                 onChange={e => setFormData(prev => ({ ...prev, email: e.target.value }))}
@@ -67,20 +72,20 @@ export default function ContactPage() {
               />
             </div>
             <Input
-              label="Subject"
+              label={t('Subject', 'الموضوع')}
               value={formData.subject}
               onChange={e => setFormData(prev => ({ ...prev, subject: e.target.value }))}
               required
             />
             <Textarea
-              label="Message"
+              label={t('Message', 'الرسالة')}
               rows={5}
               value={formData.message}
               onChange={e => setFormData(prev => ({ ...prev, message: e.target.value }))}
               required
             />
             <Button type="submit" className="w-full" isLoading={isSubmitting}>
-              Send Message
+              {t('Send Message', 'إرسال رسالة')}
             </Button>
           </form>
         </div>
@@ -102,8 +107,12 @@ export default function ContactPage() {
                 />
               </svg>
             </div>
-            <h3 className="mt-4 font-semibold text-foreground">Email</h3>
-            <p className="mt-1 text-sm text-muted-foreground">{store.email || 'Not available'}</p>
+            <h3 className="mt-4 font-semibold text-foreground">
+              {t('Email', translations['Email'])}
+            </h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {store.email || t('Not available', 'غير متوفر')}
+            </p>
           </div>
           <div className="text-center">
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
@@ -121,8 +130,12 @@ export default function ContactPage() {
                 />
               </svg>
             </div>
-            <h3 className="mt-4 font-semibold text-foreground">Phone</h3>
-            <p className="mt-1 text-sm text-muted-foreground">{store.phone || 'Not available'}</p>
+            <h3 className="mt-4 font-semibold text-foreground">
+              {t('Phone', translations['Phone'])}
+            </h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {store.phone || t('Not available', 'غير متوفر')}
+            </p>
           </div>
           <div className="text-center">
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
@@ -146,8 +159,10 @@ export default function ContactPage() {
                 />
               </svg>
             </div>
-            <h3 className="mt-4 font-semibold text-foreground">Location</h3>
-            <p className="mt-1 text-sm text-muted-foreground">{store.address || 'Not available'}</p>
+            <h3 className="mt-4 font-semibold text-foreground">{t('Location', 'الموقع')}</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {store.address || t('Not available', 'غير متوفر')}
+            </p>
           </div>
         </div>
       </div>

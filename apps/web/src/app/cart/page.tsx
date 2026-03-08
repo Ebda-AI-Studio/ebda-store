@@ -6,6 +6,7 @@ import { Button, useToast } from '@force/ui';
 import { Header, Footer } from '../../components';
 import { useCart } from '../../contexts/CartContext';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';
+import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { api } from '@/lib/api';
 
 function formatPrice(kwd: number) {
@@ -26,6 +27,7 @@ export default function CartPage() {
   } = useCart();
   const { store } = useStore();
   const storeUrl = useStoreUrl();
+  const { language, t } = useLanguage();
   const [promoCode, setPromoCode] = useState('');
   const [promoApplied, setPromoApplied] = useState(false);
   const [promoDiscount, setPromoDiscount] = useState(0);
@@ -138,18 +140,25 @@ export default function CartPage() {
         {/* Breadcrumb */}
         <nav className="mb-6 flex items-center gap-2 text-sm text-muted-foreground">
           <Link href={storeUrl('/')} className="transition-colors hover:text-primary">
-            Home
+            {t('Home', translations['Home'])}
           </Link>
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg
+            className={`h-4 w-4 ${language === 'ar' ? 'rotate-180' : ''}`}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
-          <span className="text-foreground">Shopping Cart</span>
+          <span className="text-foreground">{t('Shopping Cart', 'سلة التسوق')}</span>
         </nav>
 
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">Shopping Cart</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-foreground">
+          {t('Shopping Cart', 'سلة التسوق')}
+        </h1>
         {cartItems.length > 0 && (
           <p className="mt-2 text-muted-foreground">
-            {cartCount} item{cartCount !== 1 ? 's' : ''} in your cart
+            {cartCount} {t('items', 'منتجات')} {t('in your cart', 'في سلتك')}
           </p>
         )}
 
@@ -170,9 +179,11 @@ export default function CartPage() {
                 />
               </svg>
             </div>
-            <h2 className="text-2xl font-bold text-foreground">Your cart is empty</h2>
+            <h2 className="text-2xl font-bold text-foreground">
+              {t('Your cart is empty', 'سلة التسوق فارغة')}
+            </h2>
             <p className="mt-2 text-muted-foreground">
-              Looks like you haven&apos;t added any items yet.
+              {t("Looks like you haven't added any items yet.", 'يبدو أنك لم تضف أي منتجات بعد.')}
             </p>
             <Link href={storeUrl('/products')}>
               <Button className="mt-8 gap-2 rounded-xl shadow-lg shadow-primary/25" size="lg">
@@ -184,7 +195,7 @@ export default function CartPage() {
                     d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
                   />
                 </svg>
-                Start Shopping
+                {t('Start Shopping', 'ابدأ التسوق')}
               </Button>
             </Link>
 
@@ -202,7 +213,7 @@ export default function CartPage() {
                     d="M10 19l-7-7m0 0l7-7m-7 7h18"
                   />
                 </svg>
-                Browse all products
+                {t('Browse all products', 'تصفح جميع المنتجات')}
               </Link>
             </div>
           </div>
@@ -249,7 +260,7 @@ export default function CartPage() {
                           )}
                           <h3 className="mt-0.5 font-semibold text-foreground">{item.name}</h3>
                           <p className="mt-1 text-sm text-muted-foreground">
-                            {formatPrice(item.price / 1000)} each
+                            {formatPrice(item.price / 1000)} {t('each', 'للواحد')}
                           </p>
                         </div>
                         <button
@@ -343,7 +354,7 @@ export default function CartPage() {
                       d="M10 19l-7-7m0 0l7-7m-7 7h18"
                     />
                   </svg>
-                  Continue Shopping
+                  {t('Continue Shopping', 'متابعة التسوق')}
                 </Link>
               </div>
             </div>
@@ -353,17 +364,21 @@ export default function CartPage() {
               <div className="sticky top-24 space-y-6">
                 {/* Summary Card */}
                 <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-                  <h2 className="text-lg font-bold text-foreground">Order Summary</h2>
+                  <h2 className="text-lg font-bold text-foreground">
+                    {t('Order Summary', 'ملخص الطلب')}
+                  </h2>
 
                   {/* Promo Code */}
                   <div className="mt-6">
-                    <label className="text-sm font-medium text-foreground">Promo Code</label>
+                    <label className="text-sm font-medium text-foreground">
+                      {t('Promo Code', 'كود الخصم')}
+                    </label>
                     <div className="mt-2 flex gap-2">
                       <input
                         type="text"
                         value={promoCode}
                         onChange={e => setPromoCode(e.target.value)}
-                        placeholder="Enter code"
+                        placeholder={t('Enter code', 'أدخل الكود')}
                         disabled={promoApplied}
                         className="h-10 flex-1 rounded-lg border border-border bg-background px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
                       />
@@ -372,7 +387,11 @@ export default function CartPage() {
                         disabled={promoApplied || !promoCode || isValidating}
                         className="h-10 rounded-lg bg-muted px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        {promoApplied ? 'Applied' : isValidating ? 'Validating...' : 'Apply'}
+                        {promoApplied
+                          ? t('Applied', 'تم التطبيق')
+                          : isValidating
+                            ? t('Validating...', 'جاري التحقق...')
+                            : t('Apply', 'تطبيق')}
                       </button>
                     </div>
                     {promoApplied && (
@@ -398,13 +417,16 @@ export default function CartPage() {
                   {/* Price Breakdown */}
                   <div className="mt-6 space-y-3">
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Subtotal ({cartCount} items)</span>
+                      <span className="text-muted-foreground">
+                        {t('Subtotal', 'المجموع الفرعي')} ({cartCount} {t('items', 'منتجات')})
+                      </span>
                       <span className="font-medium text-foreground">{formatPrice(subtotal)}</span>
                     </div>
                     {promoApplied && (
                       <div className="flex justify-between text-sm">
                         <span className="text-emerald-600">
-                          Discount ({promoType === 'percentage' ? `${promoValue}%` : promoName})
+                          {t('Discount', 'الخصم')} (
+                          {promoType === 'percentage' ? `${promoValue}%` : promoName})
                         </span>
                         <span className="font-medium text-emerald-600">
                           -{formatPrice(discount)}
@@ -412,21 +434,24 @@ export default function CartPage() {
                       </div>
                     )}
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Shipping</span>
+                      <span className="text-muted-foreground">{t('Shipping', 'الشحن')}</span>
                       {shipping === 0 ? (
-                        <span className="font-medium text-emerald-600">Free</span>
+                        <span className="font-medium text-emerald-600">{t('Free', 'مجاني')}</span>
                       ) : (
                         <span className="font-medium text-foreground">{formatPrice(shipping)}</span>
                       )}
                     </div>
                     {shipping === 0 && (
                       <p className="text-xs text-muted-foreground">
-                        Free shipping on orders over {formatPrice(freeShippingThreshold / 1000)}
+                        {t('Free shipping on orders over', 'شحن مجاني للطلبات فوق')}{' '}
+                        {formatPrice(freeShippingThreshold / 1000)}
                       </p>
                     )}
                     <div className="border-t border-border pt-3">
                       <div className="flex justify-between">
-                        <span className="text-lg font-bold text-foreground">Total</span>
+                        <span className="text-lg font-bold text-foreground">
+                          {t('Total', 'الإجمالي')}
+                        </span>
                         <span className="text-xl font-bold text-primary">{formatPrice(total)}</span>
                       </div>
                     </div>
@@ -438,7 +463,7 @@ export default function CartPage() {
                       className="w-full gap-2 rounded-xl shadow-lg shadow-primary/25"
                       size="lg"
                     >
-                      Proceed to Checkout
+                      {t('Proceed to Checkout', 'المتابعة للدفع')}
                       <svg
                         className="h-5 w-5"
                         fill="none"
@@ -465,14 +490,14 @@ export default function CartPage() {
                         d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
                       />
                     </svg>
-                    Secure checkout with SSL encryption
+                    {t('Secure checkout with SSL encryption', 'دفع آمن بتشفير SSL')}
                   </div>
                 </div>
 
                 {/* Payment Methods */}
                 <div className="rounded-2xl border border-border bg-card p-4">
                   <p className="mb-3 text-center text-xs font-medium text-muted-foreground">
-                    We Accept
+                    {t('We Accept', 'نقبل الدفع عبر')}
                   </p>
                   <div className="flex items-center justify-center gap-3">
                     {['KNET', 'Visa', 'Mastercard', 'Apple Pay'].map(method => (
@@ -505,11 +530,13 @@ export default function CartPage() {
                       </svg>
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-foreground">Need Help?</p>
+                      <p className="text-sm font-medium text-foreground">
+                        {t('Need Help?', 'تحتاج مساعدة؟')}
+                      </p>
                       <p className="text-xs text-muted-foreground">
                         {store.phone
-                          ? `Contact us at ${store.phone}`
-                          : 'Visit our contact page for help'}
+                          ? `${t('Contact us at', 'تواصل معنا على')} ${store.phone}`
+                          : t('Visit our contact page for help', 'قم بزيارة صفحة التواصل للمساعدة')}
                       </p>
                     </div>
                   </div>

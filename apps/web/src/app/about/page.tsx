@@ -3,16 +3,21 @@
 import Link from 'next/link';
 import { Header, Footer } from '../../components';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';
+import { useLanguage, translations } from '../../contexts/LanguageContext';
 
 export default function AboutPage() {
   const { store } = useStore();
   const storeUrl = useStoreUrl();
+  const { t } = useLanguage();
 
   // Prefer a dedicated about/description field; fall back to a generic message
-  const headingText = store.name || 'Our Store';
+  const headingText = store.name || t('Our Store', 'متجرنا');
   const descriptionText =
     store.description ||
-    `Welcome to ${store.name || 'our store'}! We are passionate about providing high-quality products and exceptional customer service.`;
+    t(
+      `Welcome to ${store.name || 'our store'}! We are passionate about providing high-quality products and exceptional customer service.`,
+      `مرحباً بكم في ${store.name || 'متجرنا'}! نحن شغوفون بتقديم منتجات عالية الجودة وخدمة عملاء استثنائية.`
+    );
 
   return (
     <main className="flex min-h-screen flex-col bg-background">
@@ -23,25 +28,30 @@ export default function AboutPage() {
 
           <div className="prose prose-lg max-w-none">
             <section className="mb-12">
-              <h2 className="text-2xl font-semibold mb-4">Our Story</h2>
+              <h2 className="text-2xl font-semibold mb-4">{t('Our Story', 'قصتنا')}</h2>
               <p className="text-muted-foreground mb-4">{descriptionText}</p>
               <p className="text-muted-foreground">
-                Today, we continue to grow and evolve, always keeping our customers at the heart of
-                everything we do.
+                {t(
+                  'Today, we continue to grow and evolve, always keeping our customers at the heart of everything we do.',
+                  'اليوم، نواصل النمو والتطور، مع إبقاء عملائنا في صميم كل ما نقوم به.'
+                )}
               </p>
             </section>
 
             <section className="mb-12">
-              <h2 className="text-2xl font-semibold mb-4">Our Mission</h2>
+              <h2 className="text-2xl font-semibold mb-4">{t('Our Mission', 'مهمتنا')}</h2>
               <p className="text-muted-foreground">
-                We strive to deliver the best products at competitive prices while maintaining the
-                highest standards of customer service. Our team works tirelessly to ensure every
-                customer has a seamless shopping experience.
+                {t(
+                  'We strive to deliver the best products at competitive prices while maintaining the highest standards of customer service. Our team works tirelessly to ensure every customer has a seamless shopping experience.',
+                  'نسعى لتقديم أفضل المنتجات بأسعار تنافسية مع الحفاظ على أعلى معايير خدمة العملاء. يعمل فريقنا بلا كلل لضمان تجربة تسوق سلسة لكل عميل.'
+                )}
               </p>
             </section>
 
             <section className="mb-12">
-              <h2 className="text-2xl font-semibold mb-4">Why Choose Us?</h2>
+              <h2 className="text-2xl font-semibold mb-4">
+                {t('Why Choose Us?', 'لماذا تختارنا؟')}
+              </h2>
               <div className="grid md:grid-cols-3 gap-6 mt-6">
                 <div className="bg-muted p-6 rounded-lg">
                   <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
@@ -59,9 +69,14 @@ export default function AboutPage() {
                       />
                     </svg>
                   </div>
-                  <h3 className="font-semibold mb-2">Quality Products</h3>
+                  <h3 className="font-semibold mb-2">
+                    {t('Quality Products', 'منتجات عالية الجودة')}
+                  </h3>
                   <p className="text-muted-foreground text-sm">
-                    We carefully curate our selection to ensure only the best products reach you.
+                    {t(
+                      'We carefully curate our selection to ensure only the best products reach you.',
+                      'نختار منتجاتنا بعناية لضمان وصول الأفضل إليك.'
+                    )}
                   </p>
                 </div>
                 <div className="bg-muted p-6 rounded-lg">
@@ -80,9 +95,12 @@ export default function AboutPage() {
                       />
                     </svg>
                   </div>
-                  <h3 className="font-semibold mb-2">Great Prices</h3>
+                  <h3 className="font-semibold mb-2">{t('Great Prices', 'أسعار رائعة')}</h3>
                   <p className="text-muted-foreground text-sm">
-                    Competitive pricing without compromising on quality or service.
+                    {t(
+                      'Competitive pricing without compromising on quality or service.',
+                      'أسعار تنافسية دون المساومة على الجودة أو الخدمة.'
+                    )}
                   </p>
                 </div>
                 <div className="bg-muted p-6 rounded-lg">
@@ -101,9 +119,12 @@ export default function AboutPage() {
                       />
                     </svg>
                   </div>
-                  <h3 className="font-semibold mb-2">24/7 Support</h3>
+                  <h3 className="font-semibold mb-2">{t('24/7 Support', 'دعم على مدار الساعة')}</h3>
                   <p className="text-muted-foreground text-sm">
-                    Our customer support team is always here to help you.
+                    {t(
+                      'Our customer support team is always here to help you.',
+                      'فريق دعم العملاء لدينا موجود دائماً لمساعدتك.'
+                    )}
                   </p>
                 </div>
               </div>
@@ -112,11 +133,11 @@ export default function AboutPage() {
             {/* Show store contact details if available */}
             {(store.email || store.phone || store.address) && (
               <section className="mb-12">
-                <h2 className="text-2xl font-semibold mb-4">Get In Touch</h2>
+                <h2 className="text-2xl font-semibold mb-4">{t('Get In Touch', 'تواصل معنا')}</h2>
                 <ul className="space-y-2 text-muted-foreground">
                   {store.email && (
                     <li>
-                      <span className="font-medium">Email:</span>{' '}
+                      <span className="font-medium">{t('Email:', 'البريد الإلكتروني:')}</span>{' '}
                       <a href={`mailto:${store.email}`} className="text-primary hover:underline">
                         {store.email}
                       </a>
@@ -124,7 +145,7 @@ export default function AboutPage() {
                   )}
                   {store.phone && (
                     <li>
-                      <span className="font-medium">Phone:</span>{' '}
+                      <span className="font-medium">{t('Phone:', 'الهاتف:')}</span>{' '}
                       <a href={`tel:${store.phone}`} className="text-primary hover:underline">
                         {store.phone}
                       </a>
@@ -132,7 +153,8 @@ export default function AboutPage() {
                   )}
                   {store.address && (
                     <li>
-                      <span className="font-medium">Address:</span> {store.address}
+                      <span className="font-medium">{t('Address:', 'العنوان:')}</span>{' '}
+                      {store.address}
                     </li>
                   )}
                 </ul>
@@ -140,15 +162,20 @@ export default function AboutPage() {
             )}
 
             <section className="mb-12">
-              <h2 className="text-2xl font-semibold mb-4">Contact Us</h2>
+              <h2 className="text-2xl font-semibold mb-4">
+                {t('Contact Us', translations['Contact'])}
+              </h2>
               <p className="text-muted-foreground mb-4">
-                Have questions? We&apos;d love to hear from you!
+                {t(
+                  "Have questions? We'd love to hear from you!",
+                  'هل لديك أسئلة؟ يسعدنا سماعها منك!'
+                )}
               </p>
               <Link
                 href={storeUrl('/contact')}
                 className="inline-flex items-center px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
               >
-                Get in Touch
+                {t('Get in Touch', 'تواصل معنا')}
                 <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
                     strokeLinecap="round"

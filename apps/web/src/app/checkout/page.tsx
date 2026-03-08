@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { Button, Input, Select } from '@force/ui';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useCart } from '../../contexts/CartContext';
+import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { api } from '../../lib/api';
 import { getPaymentIcon, DEFAULT_PAYMENT_PROVIDERS } from '../../components/PaymentIcons';
 import { trackInitiateCheckout } from '../../components/MarketingPixels';
@@ -80,6 +81,7 @@ export default function CheckoutPage() {
   const { store } = useStore();
   const storeUrl = useStoreUrl();
   const { items: cartContextItems, total: cartContextTotal } = useCart();
+  const { language, t } = useLanguage();
   const [step, setStep] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -432,10 +434,16 @@ export default function CheckoutPage() {
     return (
       <main className="min-h-screen bg-background">
         <div className="mx-auto max-w-7xl px-4 py-16 text-center">
-          <h1 className="text-2xl font-bold text-foreground">Your cart is empty</h1>
-          <p className="mt-2 text-muted-foreground">Add some products before checking out.</p>
+          <h1 className="text-2xl font-bold text-foreground">
+            {t('Your cart is empty', translations['Your cart is empty'])}
+          </h1>
+          <p className="mt-2 text-muted-foreground">
+            {t('Add some products before checking out.', 'أضف بعض المنتجات قبل إتمام الدفع.')}
+          </p>
           <Link href={storeUrl('/products')}>
-            <Button className="mt-6">Continue Shopping</Button>
+            <Button className="mt-6">
+              {t('Continue Shopping', translations['Continue Shopping'])}
+            </Button>
           </Link>
         </div>
       </main>
@@ -469,7 +477,7 @@ export default function CheckoutPage() {
                 d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
               />
             </svg>
-            Secure Checkout
+            {t('Secure Checkout', 'دفع آمن')}
           </div>
         </div>
       </nav>
@@ -487,7 +495,7 @@ export default function CheckoutPage() {
               <span
                 className={`ml-2 text-sm font-medium ${step >= 1 ? 'text-foreground' : 'text-muted-foreground'}`}
               >
-                Shipping
+                {t('Shipping', translations['Shipping'])}
               </span>
             </div>
             <div className={`mx-4 h-0.5 w-16 ${step >= 2 ? 'bg-primary' : 'bg-muted'}`} />
@@ -500,7 +508,7 @@ export default function CheckoutPage() {
               <span
                 className={`ml-2 text-sm font-medium ${step >= 2 ? 'text-foreground' : 'text-muted-foreground'}`}
               >
-                Payment
+                {t('Payment', 'الدفع')}
               </span>
             </div>
           </div>
@@ -512,12 +520,14 @@ export default function CheckoutPage() {
             <form onSubmit={handleSubmit}>
               {step === 1 && (
                 <div className="rounded-xl border bg-card p-6 shadow-sm">
-                  <h2 className="text-lg font-semibold text-foreground">Shipping Information</h2>
+                  <h2 className="text-lg font-semibold text-foreground">
+                    {t('Shipping Information', 'معلومات الشحن')}
+                  </h2>
 
                   <div className="mt-6 space-y-4">
                     <div data-error={!!formErrors.email}>
                       <Input
-                        label="Email address"
+                        label={t('Email address', 'البريد الإلكتروني')}
                         type="email"
                         value={formData.email}
                         onChange={e => updateField('email', e.target.value)}
@@ -535,7 +545,7 @@ export default function CheckoutPage() {
                     <div className="grid grid-cols-2 gap-4">
                       <div data-error={!!formErrors.firstName}>
                         <Input
-                          label="First name"
+                          label={t('First name', 'الاسم الأول')}
                           value={formData.firstName}
                           onChange={e => updateField('firstName', e.target.value)}
                           className={
@@ -550,7 +560,7 @@ export default function CheckoutPage() {
                       </div>
                       <div data-error={!!formErrors.lastName}>
                         <Input
-                          label="Last name"
+                          label={t('Last name', 'اسم العائلة')}
                           value={formData.lastName}
                           onChange={e => updateField('lastName', e.target.value)}
                           className={
@@ -567,7 +577,7 @@ export default function CheckoutPage() {
 
                     <div data-error={!!formErrors.phone}>
                       <Input
-                        label="Phone"
+                        label={t('Phone', translations['Phone'])}
                         type="tel"
                         placeholder="+965 XXXX XXXX"
                         value={formData.phone}
@@ -585,12 +595,15 @@ export default function CheckoutPage() {
 
                     <div data-error={!!formErrors.area}>
                       <Select
-                        label="Delivery Area"
+                        label={t('Delivery Area', 'منطقة التوصيل')}
                         value={formData.area}
                         onChange={e => updateField('area', e.target.value)}
                         options={[
-                          { value: '', label: 'Select area...' },
-                          ...KUWAIT_AREAS.map(a => ({ value: a.en, label: `${a.en} / ${a.ar}` })),
+                          { value: '', label: t('Select area...', 'اختر المنطقة...') },
+                          ...KUWAIT_AREAS.map(a => ({
+                            value: a.en,
+                            label: language === 'ar' ? `${a.ar} / ${a.en}` : `${a.en} / ${a.ar}`,
+                          })),
                         ]}
                         className={
                           formErrors.area
@@ -605,7 +618,7 @@ export default function CheckoutPage() {
 
                     <div data-error={!!formErrors.address}>
                       <Input
-                        label="Block & Street"
+                        label={t('Block & Street', 'القطعة والشارع')}
                         value={formData.address}
                         onChange={e => updateField('address', e.target.value)}
                         className={
@@ -620,17 +633,17 @@ export default function CheckoutPage() {
                     </div>
 
                     <Input
-                      label="Building / House / Apartment"
+                      label={t('Building / House / Apartment', 'المبنى / المنزل / الشقة')}
                       value={formData.apartment}
                       onChange={e => updateField('apartment', e.target.value)}
                     />
 
                     <div data-error={!!formErrors.city}>
                       <Input
-                        label="City"
+                        label={t('City', 'المدينة')}
                         value={formData.city}
                         onChange={e => updateField('city', e.target.value)}
-                        placeholder="e.g., Kuwait City"
+                        placeholder={t('e.g., Kuwait City', 'مثال: مدينة الكويت')}
                         className={
                           formErrors.city
                             ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
@@ -644,23 +657,26 @@ export default function CheckoutPage() {
 
                     <div>
                       <label className="block text-sm font-medium text-foreground mb-1">
-                        Order Notes (optional)
+                        {t('Order Notes (optional)', 'ملاحظات الطلب (اختياري)')}
                       </label>
                       <textarea
                         value={formData.notes}
                         onChange={e => updateField('notes', e.target.value)}
                         rows={3}
                         className="w-full rounded-lg border border-border px-4 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
-                        placeholder="Any special delivery instructions..."
+                        placeholder={t(
+                          'Any special delivery instructions...',
+                          'أي تعليمات خاصة للتوصيل...'
+                        )}
                       />
                     </div>
                   </div>
 
                   <div className="mt-6 flex justify-between">
                     <Link href={storeUrl('/cart')} className="text-sm text-primary hover:underline">
-                      &larr; Return to cart
+                      {language === 'ar' ? 'العودة إلى السلة →' : '← Return to cart'}
                     </Link>
-                    <Button type="submit">Continue to Payment</Button>
+                    <Button type="submit">{t('Continue to Payment', 'المتابعة للدفع')}</Button>
                   </div>
                 </div>
               )}
@@ -685,7 +701,9 @@ export default function CheckoutPage() {
                           />
                         </svg>
                         <div className="flex-1">
-                          <h3 className="text-sm font-medium text-red-800">Checkout Error</h3>
+                          <h3 className="text-sm font-medium text-red-800">
+                            {t('Checkout Error', 'خطأ في الدفع')}
+                          </h3>
                           <p className="mt-1 text-sm text-red-700">{checkoutError}</p>
                         </div>
                         <button
@@ -714,13 +732,15 @@ export default function CheckoutPage() {
                   {/* Shipping Summary */}
                   <div className="rounded-xl border bg-card p-6 shadow-sm">
                     <div className="flex items-center justify-between">
-                      <h3 className="font-medium text-foreground">Shipping to</h3>
+                      <h3 className="font-medium text-foreground">
+                        {t('Shipping to', 'الشحن إلى')}
+                      </h3>
                       <button
                         type="button"
                         onClick={() => setStep(1)}
                         className="text-sm text-primary hover:underline"
                       >
-                        Edit
+                        {t('Edit', 'تعديل')}
                       </button>
                     </div>
                     <p className="mt-2 text-sm text-muted-foreground">
@@ -739,9 +759,11 @@ export default function CheckoutPage() {
 
                   {/* Payment Methods */}
                   <div className="rounded-xl border bg-card p-6 shadow-sm">
-                    <h2 className="text-lg font-semibold text-foreground">Payment Method</h2>
+                    <h2 className="text-lg font-semibold text-foreground">
+                      {t('Payment Method', translations['Payment Method'])}
+                    </h2>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Select your preferred payment method
+                      {t('Select your preferred payment method', 'اختر طريقة الدفع المفضلة')}
                     </p>
 
                     <div className="mt-6 space-y-3">
@@ -754,9 +776,17 @@ export default function CheckoutPage() {
                         const defaultInfo = DEFAULT_PAYMENT_PROVIDERS.find(
                           p => p.id === provider.id
                         );
-                        const displayName = provider.name || defaultInfo?.name || provider.id;
+                        const displayName =
+                          language === 'ar'
+                            ? provider.nameAr || provider.name || defaultInfo?.name || provider.id
+                            : provider.name || defaultInfo?.name || provider.id;
                         const displayDescription =
-                          provider.description || defaultInfo?.description || '';
+                          language === 'ar'
+                            ? provider.descriptionAr ||
+                              provider.description ||
+                              defaultInfo?.description ||
+                              ''
+                            : provider.description || defaultInfo?.description || '';
 
                         return (
                           <label
@@ -809,7 +839,7 @@ export default function CheckoutPage() {
                       onClick={() => setStep(1)}
                       className="text-sm text-primary hover:underline"
                     >
-                      &larr; Return to shipping
+                      {language === 'ar' ? 'العودة إلى الشحن →' : '← Return to shipping'}
                     </button>
                     <Button
                       type="submit"
@@ -818,10 +848,10 @@ export default function CheckoutPage() {
                       disabled={!selectedProvider}
                     >
                       {isProcessing
-                        ? 'Processing...'
+                        ? t('Processing...', 'جاري المعالجة...')
                         : selectedProvider === 'cod'
-                          ? 'Place Order'
-                          : `Pay ${formatPrice(total)}`}
+                          ? t('Place Order', translations['Place Order'])
+                          : `${t('Pay', 'ادفع')} ${formatPrice(total)}`}
                     </Button>
                   </div>
                 </div>
@@ -832,7 +862,9 @@ export default function CheckoutPage() {
           {/* Order Summary */}
           <div className="mt-8 lg:col-span-5 lg:mt-0">
             <div className="sticky top-24 rounded-xl border bg-card p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-foreground">Order Summary</h2>
+              <h2 className="text-lg font-semibold text-foreground">
+                {t('Order Summary', translations['Order Summary'])}
+              </h2>
 
               <div className="mt-6 divide-y">
                 {cart.items.map(item => (
@@ -886,10 +918,10 @@ export default function CheckoutPage() {
                       </span>
                       <span className="text-sm text-green-600 ml-2">
                         {appliedCoupon.type === 'percentage'
-                          ? `${appliedCoupon.value}% off`
+                          ? `${appliedCoupon.value}% ${t('off', 'خصم')}`
                           : appliedCoupon.type === 'free_shipping'
-                            ? 'Free shipping'
-                            : `${formatPrice(appliedCoupon.value)} off`}
+                            ? t('Free shipping', 'شحن مجاني')
+                            : `${formatPrice(appliedCoupon.value)} ${t('off', 'خصم')}`}
                       </span>
                     </div>
                     <button onClick={removeCoupon} className="text-green-600 hover:text-green-800">
@@ -911,13 +943,13 @@ export default function CheckoutPage() {
                 ) : (
                   <div className="flex gap-2">
                     <Input
-                      placeholder="Coupon code"
+                      placeholder={t('Coupon code', 'كود الخصم')}
                       value={couponCode}
                       onChange={e => setCouponCode(e.target.value.toUpperCase())}
                       className="flex-1"
                     />
                     <Button type="button" variant="outline" onClick={handleApplyCoupon}>
-                      Apply
+                      {t('Apply', translations['Apply'])}
                     </Button>
                   </div>
                 )}
@@ -927,23 +959,33 @@ export default function CheckoutPage() {
               {/* Totals */}
               <div className="mt-6 space-y-3 border-t pt-6">
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Subtotal</span>
+                  <span className="text-muted-foreground">
+                    {t('Subtotal', translations['Subtotal'])}
+                  </span>
                   <span className="font-medium">{formatPrice(subtotal)}</span>
                 </div>
                 {discount > 0 && (
                   <div className="flex justify-between text-sm">
-                    <span className="text-green-600">Discount</span>
+                    <span className="text-green-600">{t('Discount', 'الخصم')}</span>
                     <span className="font-medium text-green-600">-{formatPrice(discount)}</span>
                   </div>
                 )}
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Shipping</span>
+                  <span className="text-muted-foreground">
+                    {t('Shipping', translations['Shipping'])}
+                  </span>
                   <span className={`font-medium ${freeShipping ? 'text-green-600' : ''}`}>
-                    {freeShipping ? 'Free' : shipping > 0 ? formatPrice(shipping) : 'Select area'}
+                    {freeShipping
+                      ? t('Free', translations['Free'])
+                      : shipping > 0
+                        ? formatPrice(shipping)
+                        : t('Select area', 'اختر المنطقة')}
                   </span>
                 </div>
                 <div className="flex justify-between border-t pt-3">
-                  <span className="text-lg font-semibold text-foreground">Total</span>
+                  <span className="text-lg font-semibold text-foreground">
+                    {t('Total', translations['Total'])}
+                  </span>
                   <span className="text-lg font-bold text-primary">{formatPrice(total)}</span>
                 </div>
               </div>

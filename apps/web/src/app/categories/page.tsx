@@ -4,11 +4,13 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { useStoreUrl } from '@/contexts/StoreContext';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { Header, Footer } from '../../components';
 
 interface Category {
   id: string;
   name: string;
+  nameAr?: string;
   slug: string;
   description?: string;
   image?: string;
@@ -19,6 +21,7 @@ export default function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const storeUrl = useStoreUrl();
+  const { language, t } = useLanguage();
 
   useEffect(() => {
     loadCategories();
@@ -58,13 +61,15 @@ export default function CategoriesPage() {
     <main className="flex min-h-screen flex-col bg-background">
       <Header />
       <div className="container mx-auto px-4 py-8 flex-1">
-        <h1 className="text-3xl font-bold mb-8">Shop by Category</h1>
+        <h1 className="text-3xl font-bold mb-8">{t('Shop by Category', 'تسوق حسب الفئة')}</h1>
 
         {categories.length === 0 ? (
           <div className="text-center py-12">
-            <p className="text-muted-foreground mb-4">No categories available yet.</p>
+            <p className="text-muted-foreground mb-4">
+              {t('No categories available yet.', 'لا توجد فئات متاحة حالياً')}
+            </p>
             <Link href={storeUrl('/products')} className="text-primary hover:underline">
-              Browse all products
+              {t('Browse all products', 'تصفح جميع المنتجات')}
             </Link>
           </div>
         ) : (
@@ -102,7 +107,7 @@ export default function CategoriesPage() {
                 </div>
                 <div className="p-4">
                   <h3 className="font-semibold text-lg group-hover:text-primary transition-colors">
-                    {category.name}
+                    {language === 'ar' && category.nameAr ? category.nameAr : category.name}
                   </h3>
                   {category.description && (
                     <p className="text-muted-foreground text-sm mt-1 line-clamp-2">
@@ -111,7 +116,7 @@ export default function CategoriesPage() {
                   )}
                   {category.productCount !== undefined && (
                     <p className="text-muted-foreground/70 text-sm mt-2">
-                      {category.productCount} products
+                      {category.productCount} {t('products', 'منتج')}
                     </p>
                   )}
                 </div>

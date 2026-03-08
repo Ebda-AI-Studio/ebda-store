@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { Header, Footer } from '../../components';
 import { useStoreUrl } from '../../contexts/StoreContext';
+import { useLanguage, translations } from '../../contexts/LanguageContext';
 
 interface WishlistItem {
   id: string;
@@ -23,6 +24,7 @@ interface WishlistItem {
 export default function WishlistPage() {
   const router = useRouter();
   const storeUrl = useStoreUrl();
+  const { t } = useLanguage();
   const [items, setItems] = useState<WishlistItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -103,7 +105,7 @@ export default function WishlistPage() {
       <main className="flex min-h-screen flex-col bg-background">
         <Header />
         <div className="container mx-auto px-4 py-8 flex-1">
-          <h1 className="text-3xl font-bold mb-8">My Wishlist</h1>
+          <h1 className="text-3xl font-bold mb-8">{t('My Wishlist', 'قائمة المفضلة')}</h1>
           <div className="space-y-4">
             {[...Array(3)].map((_, i) => (
               <div key={i} className="bg-muted animate-pulse h-24 rounded-lg"></div>
@@ -120,7 +122,7 @@ export default function WishlistPage() {
       <main className="flex min-h-screen flex-col bg-background">
         <Header />
         <div className="container mx-auto px-4 py-8 flex-1">
-          <h1 className="text-3xl font-bold mb-8">My Wishlist</h1>
+          <h1 className="text-3xl font-bold mb-8">{t('My Wishlist', 'قائمة المفضلة')}</h1>
           <div className="text-center py-12 bg-muted rounded-xl">
             <svg
               className="w-16 h-16 text-muted-foreground mx-auto mb-4"
@@ -135,13 +137,17 @@ export default function WishlistPage() {
                 d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
               />
             </svg>
-            <h2 className="text-xl font-semibold mb-2">Sign in to view your wishlist</h2>
-            <p className="text-muted-foreground mb-4">Save your favorite items for later</p>
+            <h2 className="text-xl font-semibold mb-2">
+              {t('Sign in to view your wishlist', 'سجل دخولك لعرض قائمة المفضلة')}
+            </h2>
+            <p className="text-muted-foreground mb-4">
+              {t('Save your favorite items for later', 'احفظ منتجاتك المفضلة لوقت لاحق')}
+            </p>
             <Link
               href={storeUrl('/auth/login?redirect=/wishlist')}
               className="inline-flex items-center px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90"
             >
-              Sign In
+              {t('Sign In', translations['Sign In'])}
             </Link>
           </div>
         </div>
@@ -154,7 +160,7 @@ export default function WishlistPage() {
     <main className="flex min-h-screen flex-col bg-background">
       <Header />
       <div className="container mx-auto px-4 py-8 flex-1">
-        <h1 className="text-3xl font-bold mb-8">My Wishlist</h1>
+        <h1 className="text-3xl font-bold mb-8">{t('My Wishlist', 'قائمة المفضلة')}</h1>
 
         {/* Error Display */}
         {error && (
@@ -234,13 +240,17 @@ export default function WishlistPage() {
                 d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
               />
             </svg>
-            <h2 className="text-xl font-semibold mb-2">Your wishlist is empty</h2>
-            <p className="text-muted-foreground mb-4">Start adding products you love!</p>
+            <h2 className="text-xl font-semibold mb-2">
+              {t('Your wishlist is empty', 'قائمة المفضلة فارغة')}
+            </h2>
+            <p className="text-muted-foreground mb-4">
+              {t('Start adding products you love!', 'ابدأ بإضافة المنتجات التي تحبها!')}
+            </p>
             <Link
               href={storeUrl('/products')}
               className="inline-flex items-center px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90"
             >
-              Browse Products
+              {t('Browse Products', 'تصفح المنتجات')}
             </Link>
           </div>
         ) : (
@@ -304,7 +314,9 @@ export default function WishlistPage() {
                       )}
                   </div>
                   {item.product.status !== 'active' && (
-                    <span className="text-red-500 text-sm">Currently unavailable</span>
+                    <span className="text-red-500 text-sm">
+                      {t('Currently unavailable', 'غير متوفر حالياً')}
+                    </span>
                   )}
                 </div>
 
@@ -314,12 +326,12 @@ export default function WishlistPage() {
                     disabled={item.product.status !== 'active'}
                     className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Add to Cart
+                    {t('Add to Cart', translations['Add to Cart'])}
                   </button>
                   <button
                     onClick={() => removeFromWishlist(item.id)}
                     className="p-2 text-muted-foreground/70 hover:text-red-500"
-                    title="Remove from wishlist"
+                    title={t('Remove from wishlist', 'إزالة من المفضلة')}
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path

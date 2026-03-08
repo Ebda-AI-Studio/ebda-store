@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { api, type Category } from '@/lib/api';
 import { Header, Footer } from '../../components';
 import { useStoreUrl } from '../../contexts/StoreContext';
+import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { trackSearch } from '../../components/MarketingPixels';
 
 interface Product {
@@ -53,6 +54,7 @@ function sortProducts(products: Product[], sortBy: SortValue): Product[] {
 function SearchContent() {
   const router = useRouter();
   const storeUrl = useStoreUrl();
+  const { t } = useLanguage();
   const searchParams = useSearchParams();
 
   // Derive initial values from URL params for shareability
@@ -155,7 +157,7 @@ function SearchContent() {
     <main className="flex min-h-screen flex-col bg-background">
       <Header />
       <div className="container mx-auto px-4 py-8 flex-1">
-        <h1 className="text-3xl font-bold mb-6">Search Products</h1>
+        <h1 className="text-3xl font-bold mb-6">{t('Search Products', 'البحث عن المنتجات')}</h1>
 
         {/* Search form */}
         <form onSubmit={handleSearch} className="mb-6">
@@ -164,14 +166,14 @@ function SearchContent() {
               type="text"
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              placeholder="Search for products..."
+              placeholder={t('Search for products...', 'البحث عن المنتجات...')}
               className="flex-1 px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-background text-foreground"
             />
             <button
               type="submit"
               className="px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors font-medium"
             >
-              Search
+              {t('Search', translations['Search'])}
             </button>
           </div>
         </form>
@@ -186,7 +188,7 @@ function SearchContent() {
                   htmlFor="search-category"
                   className="text-sm font-medium text-muted-foreground whitespace-nowrap"
                 >
-                  Category:
+                  {t('Category:', 'الفئة:')}
                 </label>
                 <select
                   id="search-category"
@@ -194,7 +196,7 @@ function SearchContent() {
                   onChange={e => handleCategoryChange(e.target.value)}
                   className="h-9 rounded-lg border border-border bg-background px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                 >
-                  <option value="">All Categories</option>
+                  <option value="">{t('All Categories', 'كل الفئات')}</option>
                   {categories.map(cat => (
                     <option key={cat.id} value={cat.id}>
                       {cat.name}
@@ -210,7 +212,7 @@ function SearchContent() {
                 htmlFor="search-sort"
                 className="text-sm font-medium text-muted-foreground whitespace-nowrap"
               >
-                Sort by:
+                {t('Sort by:', 'ترتيب حسب:')}
               </label>
               <select
                 id="search-sort"
@@ -268,7 +270,7 @@ function SearchContent() {
                 onClick={() => performSearch(committedQuery, categoryFilter)}
                 className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
               >
-                Retry
+                {t('Retry', 'إعادة المحاولة')}
               </button>
             </div>
           </div>
@@ -287,12 +289,13 @@ function SearchContent() {
         {!isLoading && !error && products.length > 0 && (
           <>
             <p className="text-muted-foreground mb-6 text-sm">
-              {products.length} result{products.length !== 1 ? 's' : ''} for &quot;
+              {products.length} {t('result', 'نتيجة')}
+              {products.length !== 1 ? t('s', '') : ''} {t('for', 'لـ')} &quot;
               {displayQuery}&quot;
               {categoryFilter && (
                 <>
                   {' '}
-                  in{' '}
+                  {t('in', 'في')}{' '}
                   <span className="font-medium text-foreground">
                     {categories.find(c => c.id === categoryFilter)?.name ?? categoryFilter}
                   </span>
@@ -366,19 +369,20 @@ function SearchContent() {
         {!isLoading && !error && committedQuery && products.length === 0 && (
           <div className="text-center py-12">
             <p className="text-muted-foreground mb-3">
-              No products found for &quot;{committedQuery}&quot;
-              {categoryFilter ? ' in the selected category' : ''}
+              {t('No products found for', 'لم يتم العثور على منتجات لـ')} &quot;{committedQuery}
+              &quot;
+              {categoryFilter ? t(' in the selected category', ' في الفئة المحددة') : ''}
             </p>
             {categoryFilter && (
               <button
                 onClick={() => handleCategoryChange('')}
                 className="block mx-auto mb-3 text-sm text-primary hover:underline"
               >
-                Clear category filter
+                {t('Clear category filter', 'مسح فلتر الفئة')}
               </button>
             )}
             <Link href={storeUrl('/products')} className="text-primary hover:underline text-sm">
-              Browse all products
+              {t('Browse all products', 'تصفح كل المنتجات')}
             </Link>
           </div>
         )}
@@ -386,7 +390,9 @@ function SearchContent() {
         {/* Empty state when no query entered yet */}
         {!isLoading && !error && !committedQuery && (
           <div className="text-center py-12">
-            <p className="text-muted-foreground">Enter a search term to find products</p>
+            <p className="text-muted-foreground">
+              {t('Enter a search term to find products', 'أدخل كلمة بحث للعثور على المنتجات')}
+            </p>
           </div>
         )}
       </div>
@@ -402,7 +408,7 @@ export default function SearchPage() {
         <main className="flex min-h-screen flex-col bg-background">
           <Header />
           <div className="container mx-auto px-4 py-8 flex-1">
-            <h1 className="text-3xl font-bold mb-8">Search Products</h1>
+            <h1 className="text-3xl font-bold mb-8">Search</h1>
             <div className="animate-pulse bg-muted h-12 max-w-2xl rounded-lg" />
           </div>
           <Footer />

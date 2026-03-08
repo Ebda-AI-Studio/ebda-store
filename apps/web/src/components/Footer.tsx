@@ -2,10 +2,12 @@
 
 import Link from 'next/link';
 import { useStore, useStoreUrl } from '../contexts/StoreContext';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export function Footer() {
   const { store } = useStore();
   const storeUrl = useStoreUrl();
+  const { language, t } = useLanguage();
   const currentYear = new Date().getFullYear();
 
   const socialLinks = store.socialLinks as Record<string, string> | undefined;
@@ -18,11 +20,11 @@ export function Footer() {
     | undefined;
 
   const shopLinks = [
-    { name: 'All Products', href: storeUrl('/products') },
-    { name: 'Categories', href: storeUrl('/categories') },
-    { name: 'New Arrivals', href: storeUrl('/products?sort=newest') },
-    { name: 'Best Sellers', href: storeUrl('/products?sort=popular') },
-    { name: 'On Sale', href: storeUrl('/products?sale=true') },
+    { name: t('All Products', 'كل المنتجات'), href: storeUrl('/products') },
+    { name: t('Categories', 'الفئات'), href: storeUrl('/categories') },
+    { name: t('New Arrivals', 'وصل حديثاً'), href: storeUrl('/products?sort=newest') },
+    { name: t('Best Sellers', 'الأكثر مبيعاً'), href: storeUrl('/products?sort=popular') },
+    { name: t('On Sale', 'تخفيضات'), href: storeUrl('/products?sale=true') },
   ];
 
   const defaultSupportLinks = [
@@ -40,11 +42,17 @@ export function Footer() {
 
   const supportLinks = (footerConfig?.support ?? defaultSupportLinks)
     .filter(l => ('enabled' in l ? l.enabled : true))
-    .map(l => ({ name: l.name, href: storeUrl(l.href) }));
+    .map(l => {
+      const nameAr = 'nameAr' in l ? (l as { nameAr?: string }).nameAr : undefined;
+      return { name: (language === 'ar' && nameAr) || l.name, href: storeUrl(l.href) };
+    });
 
   const companyLinks = (footerConfig?.company ?? defaultCompanyLinks)
     .filter(l => ('enabled' in l ? l.enabled : true))
-    .map(l => ({ name: l.name, href: storeUrl(l.href) }));
+    .map(l => {
+      const nameAr = 'nameAr' in l ? (l as { nameAr?: string }).nameAr : undefined;
+      return { name: (language === 'ar' && nameAr) || l.name, href: storeUrl(l.href) };
+    });
 
   return (
     <footer className="bg-gradient-to-b from-muted/30 to-muted/80 border-t border-border/50">
@@ -199,7 +207,9 @@ export function Footer() {
 
           {/* Shop Links */}
           <div>
-            <h3 className="text-sm font-semibold uppercase tracking-wider text-foreground">Shop</h3>
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-foreground">
+              {t('Shop', 'تسوق')}
+            </h3>
             <ul className="mt-4 space-y-3">
               {shopLinks.map(link => (
                 <li key={link.name}>
@@ -217,7 +227,7 @@ export function Footer() {
           {/* Support Links */}
           <div>
             <h3 className="text-sm font-semibold uppercase tracking-wider text-foreground">
-              Support
+              {t('Support', 'الدعم')}
             </h3>
             <ul className="mt-4 space-y-3">
               {supportLinks.map(link => (
@@ -236,7 +246,7 @@ export function Footer() {
           {/* Company Links */}
           <div>
             <h3 className="text-sm font-semibold uppercase tracking-wider text-foreground">
-              Company
+              {t('Company', 'الشركة')}
             </h3>
             <ul className="mt-4 space-y-3">
               {companyLinks.map(link => (
@@ -254,15 +264,15 @@ export function Footer() {
             {/* Newsletter Mini */}
             <div className="mt-8">
               <h3 className="text-sm font-semibold uppercase tracking-wider text-foreground">
-                Newsletter
+                {t('Newsletter', 'النشرة البريدية')}
               </h3>
               <p className="mt-2 text-xs text-muted-foreground">
-                Get updates on new products and offers.
+                {t('Get updates on new products and offers.', 'احصل على آخر التحديثات والعروض')}
               </p>
               <form className="mt-3 flex gap-2">
                 <input
                   type="email"
-                  placeholder="Email"
+                  placeholder={t('Email', 'البريد الإلكتروني')}
                   className="h-9 flex-1 rounded-lg border border-border bg-background px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                 />
                 <button
@@ -291,23 +301,23 @@ export function Footer() {
             {[
               {
                 icon: 'M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4',
-                title: 'Free Delivery',
-                desc: 'Orders over 20 KWD',
+                title: t('Free Delivery', 'توصيل مجاني'),
+                desc: t('Orders over 20 KWD', 'للطلبات فوق 20 د.ك'),
               },
               {
                 icon: 'M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15',
-                title: 'Easy Returns',
-                desc: '14-day returns',
+                title: t('Easy Returns', 'إرجاع سهل'),
+                desc: t('14-day returns', 'إرجاع خلال 14 يوم'),
               },
               {
                 icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z',
-                title: 'Secure Payment',
-                desc: 'SSL encrypted',
+                title: t('Secure Payment', 'دفع آمن'),
+                desc: t('SSL encrypted', 'مشفر SSL'),
               },
               {
                 icon: 'M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z',
-                title: '24/7 Support',
-                desc: 'Always here to help',
+                title: t('24/7 Support', 'دعم 24/7'),
+                desc: t('Always here to help', 'دائماً هنا لمساعدتك'),
               },
             ].map(feature => (
               <div key={feature.title} className="flex items-center gap-3">
@@ -342,7 +352,9 @@ export function Footer() {
           <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
             {/* Payment Methods */}
             <div className="flex flex-wrap items-center justify-center gap-3">
-              <span className="text-xs text-muted-foreground">We accept:</span>
+              <span className="text-xs text-muted-foreground">
+                {t('We accept:', 'نقبل الدفع عبر:')}
+              </span>
               <div className="flex items-center gap-2">
                 {['KNET', 'Visa', 'Mastercard', 'Apple Pay'].map(method => (
                   <div
@@ -357,7 +369,7 @@ export function Footer() {
 
             {/* Copyright */}
             <p className="text-center text-xs text-muted-foreground">
-              &copy; {currentYear} {store.name}. All rights reserved.
+              &copy; {currentYear} {store.name}. {t('All rights reserved.', 'جميع الحقوق محفوظة.')}
             </p>
           </div>
         </div>

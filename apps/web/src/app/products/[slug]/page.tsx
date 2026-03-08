@@ -8,6 +8,7 @@ import { api, type Product } from '@/lib/api';
 import { useCart } from '../../../contexts/CartContext';
 import { useStore, useStoreUrl } from '../../../contexts/StoreContext';
 import { Header, Footer } from '../../../components';
+import { useLanguage, translations } from '../../../contexts/LanguageContext';
 import { trackViewContent, trackAddToCart } from '../../../components/MarketingPixels';
 import {
   VariantSelector,
@@ -64,6 +65,7 @@ export default function ProductDetailPage() {
   const { addItem } = useCart();
   const { store } = useStore();
   const storeUrl = useStoreUrl();
+  const { language, t } = useLanguage();
 
   useEffect(() => {
     if (!slug) return;
@@ -198,12 +200,17 @@ export default function ProductDetailPage() {
       <main className="min-h-screen bg-background flex flex-col">
         <Header />
         <div className="mx-auto max-w-7xl px-4 py-16 text-center flex-1">
-          <h1 className="text-2xl font-bold text-foreground">{error || 'Product not found'}</h1>
+          <h1 className="text-2xl font-bold text-foreground">
+            {error || t('Product not found', 'المنتج غير موجود')}
+          </h1>
           <p className="mt-2 text-muted-foreground">
-            The product you&apos;re looking for may have been removed or doesn&apos;t exist.
+            {t(
+              "The product you're looking for may have been removed or doesn't exist.",
+              'المنتج الذي تبحث عنه ربما تم إزالته أو غير موجود.'
+            )}
           </p>
           <Link href={storeUrl('/products')}>
-            <Button className="mt-6">Browse Products</Button>
+            <Button className="mt-6">{t('Browse Products', 'تصفح المنتجات')}</Button>
           </Link>
         </div>
         <Footer />
@@ -213,11 +220,17 @@ export default function ProductDetailPage() {
 
   const images = product.images || [];
   const cat0Raw = product.categories?.[0] as unknown as Record<string, unknown> | undefined;
-  const categoryName = cat0Raw
+  const categoryNameEn = cat0Raw
     ? cat0Raw.category
       ? (cat0Raw.category as { name: string }).name
       : (cat0Raw as unknown as { name: string }).name
     : undefined;
+  const categoryNameAr = cat0Raw
+    ? cat0Raw.category
+      ? (cat0Raw.category as { nameAr?: string }).nameAr
+      : (cat0Raw as unknown as { nameAr?: string }).nameAr
+    : undefined;
+  const categoryName = language === 'ar' && categoryNameAr ? categoryNameAr : categoryNameEn;
 
   return (
     <main className="min-h-screen bg-background flex flex-col">
@@ -227,11 +240,16 @@ export default function ProductDetailPage() {
         {/* Breadcrumb */}
         <nav className="mb-8 flex items-center gap-2 text-sm text-muted-foreground">
           <Link href={storeUrl('/')} className="hover:text-primary">
-            Home
+            {t('Home', translations['Home'])}
           </Link>
           <span>/</span>
           <Link href={storeUrl('/products')} className="hover:text-primary flex items-center gap-1">
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg
+              className={`h-3.5 w-3.5 ${language === 'ar' ? 'rotate-180' : ''}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -239,7 +257,7 @@ export default function ProductDetailPage() {
                 d="M15 19l-7-7 7-7"
               />
             </svg>
-            Products
+            {t('Products', translations['Products'])}
           </Link>
           <span>/</span>
           <span className="text-foreground">{product.name}</span>
@@ -362,7 +380,9 @@ export default function ProductDetailPage() {
                   : product.inventory;
                 return (
                   <div className="flex items-center gap-4">
-                    <span className="text-sm font-medium text-foreground">Quantity:</span>
+                    <span className="text-sm font-medium text-foreground">
+                      {t('Quantity', 'الكمية')}:
+                    </span>
                     <div className="flex items-center rounded-lg border border-border">
                       <button
                         onClick={() => setQuantity(Math.max(1, quantity - 1))}
@@ -380,7 +400,9 @@ export default function ProductDetailPage() {
                     </div>
                     {effectiveInventory !== undefined && effectiveInventory !== null && (
                       <span className="text-sm text-muted-foreground">
-                        {effectiveInventory > 0 ? `${effectiveInventory} in stock` : 'Out of stock'}
+                        {effectiveInventory > 0
+                          ? `${effectiveInventory} ${t('in stock', 'متوفر')}`
+                          : t('Out of Stock', 'غير متوفر')}
                       </span>
                     )}
                   </div>
@@ -406,10 +428,10 @@ export default function ProductDetailPage() {
                       disabled={outOfStock || variantRequired}
                     >
                       {outOfStock
-                        ? 'Out of Stock'
+                        ? t('Out of Stock', 'غير متوفر')
                         : variantRequired
-                          ? 'Select Options'
-                          : 'Add to Cart'}
+                          ? t('Select Options', 'اختر الخيارات')
+                          : t('Add to Cart', translations['Add to Cart'])}
                     </Button>
                   );
                 })()}
@@ -455,7 +477,9 @@ export default function ProductDetailPage() {
         {/* Related Products */}
         {relatedProducts.length > 0 && (
           <div className="mt-16">
-            <h2 className="text-2xl font-bold text-foreground">Related Products</h2>
+            <h2 className="text-2xl font-bold text-foreground">
+              {t('Related Products', 'منتجات ذات صلة')}
+            </h2>
             <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-3">
               {relatedProducts.map(item => (
                 <Link
