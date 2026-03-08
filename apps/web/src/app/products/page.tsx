@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { api, type Product, type Category, type PaginationMeta } from '@/lib/api';
 import { useCart } from '../../contexts/CartContext';
+import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { Header, Footer } from '../../components';
 import { toggleCompare } from '@/lib/compare';
 
@@ -52,6 +53,7 @@ export default function ProductsPage() {
   // Track which product ids are in the compare list so buttons re-render on change
   const [compareIds, setCompareIds] = useState<Set<string>>(new Set());
   const { addItem } = useCart();
+  const { language, t } = useLanguage();
 
   // Sync compare state from localStorage on mount (client-only)
   useEffect(() => {
@@ -175,20 +177,22 @@ export default function ProductsPage() {
         {/* Breadcrumb */}
         <nav className="mb-6 flex items-center gap-2 text-sm text-muted-foreground">
           <Link href="/" className="transition-colors hover:text-primary">
-            Home
+            {t('Home', translations['Home'])}
           </Link>
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
-          <span className="text-foreground">Products</span>
+          <span className="text-foreground">{t('Products', translations['Products'])}</span>
         </nav>
 
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-            All Products
+            {t('All Products', translations['All Products'])}
           </h1>
-          <p className="mt-2 text-muted-foreground">Browse our collection of premium products</p>
+          <p className="mt-2 text-muted-foreground">
+            {t('Browse our collection of premium products', 'تصفح مجموعتنا من المنتجات المميزة')}
+          </p>
         </div>
 
         <div className="flex flex-col gap-8 lg:flex-row">
@@ -197,7 +201,9 @@ export default function ProductsPage() {
             <div className="sticky top-24 space-y-6">
               {/* Search */}
               <form onSubmit={handleSearch}>
-                <label className="mb-2 block text-sm font-medium text-foreground">Search</label>
+                <label className="mb-2 block text-sm font-medium text-foreground">
+                  {t('Search', translations['Search'])}
+                </label>
                 <div className="search-box">
                   <svg
                     className="h-5 w-5 text-muted-foreground"
@@ -224,7 +230,9 @@ export default function ProductsPage() {
 
               {/* Categories */}
               <div>
-                <h3 className="mb-3 text-sm font-medium text-foreground">Categories</h3>
+                <h3 className="mb-3 text-sm font-medium text-foreground">
+                  {t('Categories', translations['Categories'])}
+                </h3>
                 <div className="space-y-2">
                   <button
                     onClick={() => setCategoryFilter('')}
@@ -234,7 +242,7 @@ export default function ProductsPage() {
                         : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground'
                     }`}
                   >
-                    <span>All</span>
+                    <span>{t('All', 'الكل')}</span>
                     {meta && (
                       <span
                         className={`rounded-full px-2 py-0.5 text-xs ${
@@ -245,28 +253,30 @@ export default function ProductsPage() {
                       </span>
                     )}
                   </button>
-                  {categories.map(cat => (
-                    <button
-                      key={cat.id}
-                      onClick={() => setCategoryFilter(cat.slug)}
-                      className={`flex w-full items-center justify-between rounded-xl px-4 py-2.5 text-sm transition-all ${
-                        categoryFilter === cat.slug
-                          ? 'bg-primary text-white shadow-md shadow-primary/25'
-                          : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground'
-                      }`}
-                    >
-                      <span>{cat.name}</span>
-                      {cat.productCount !== undefined && (
-                        <span
-                          className={`rounded-full px-2 py-0.5 text-xs ${
-                            categoryFilter === cat.slug ? 'bg-white/20' : 'bg-background'
-                          }`}
-                        >
-                          {cat.productCount}
-                        </span>
-                      )}
-                    </button>
-                  ))}
+                  {categories
+                    .filter(cat => cat.slug)
+                    .map(cat => (
+                      <button
+                        key={cat.id}
+                        onClick={() => setCategoryFilter(cat.slug)}
+                        className={`flex w-full items-center justify-between rounded-xl px-4 py-2.5 text-sm transition-all ${
+                          categoryFilter === cat.slug
+                            ? 'bg-primary text-white shadow-md shadow-primary/25'
+                            : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground'
+                        }`}
+                      >
+                        <span>{language === 'ar' && cat.nameAr ? cat.nameAr : cat.name}</span>
+                        {cat.productCount !== undefined && (
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-xs ${
+                              categoryFilter === cat.slug ? 'bg-white/20' : 'bg-background'
+                            }`}
+                          >
+                            {cat.productCount}
+                          </span>
+                        )}
+                      </button>
+                    ))}
                 </div>
               </div>
 
@@ -279,7 +289,7 @@ export default function ProductsPage() {
                 }}
                 className="w-full rounded-xl border border-border py-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted"
               >
-                Clear All Filters
+                {t('Clear All Filters', 'مسح جميع الفلاتر')}
               </button>
             </div>
           </aside>
@@ -497,7 +507,7 @@ export default function ProductsPage() {
                               d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
                             />
                           </svg>
-                          Add to Cart
+                          {t('Add to Cart', translations['Add to Cart'])}
                         </button>
                       </div>
                     </div>
@@ -644,7 +654,7 @@ export default function ProductsPage() {
                                 d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
                               />
                             </svg>
-                            Add to Cart
+                            {t('Add to Cart', translations['Add to Cart'])}
                           </button>
                         </div>
                       </div>
@@ -672,9 +682,14 @@ export default function ProductsPage() {
                     />
                   </svg>
                 </div>
-                <h3 className="text-lg font-semibold text-foreground">No products found</h3>
+                <h3 className="text-lg font-semibold text-foreground">
+                  {t('No products found', 'لم يتم العثور على منتجات')}
+                </h3>
                 <p className="mt-1 text-muted-foreground">
-                  Try adjusting your search or filter criteria
+                  {t(
+                    'Try adjusting your search or filter criteria',
+                    'حاول تعديل البحث أو معايير التصفية'
+                  )}
                 </p>
                 <button
                   onClick={() => {
@@ -683,7 +698,7 @@ export default function ProductsPage() {
                   }}
                   className="mt-4 rounded-xl bg-primary px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary/90"
                 >
-                  Clear Filters
+                  {t('Clear Filters', 'مسح الفلاتر')}
                 </button>
               </div>
             )}

@@ -144,8 +144,8 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
 
             {/* Right Actions */}
             <div className="flex items-center gap-2 sm:gap-3">
-              {/* Language Switcher - Desktop */}
-              <LanguageSwitcher variant="compact" className="hidden sm:flex" />
+              {/* Language Switcher */}
+              <LanguageSwitcher variant="compact" />
 
               {/* Search Button - Mobile */}
               <button
