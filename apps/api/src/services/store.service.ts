@@ -148,7 +148,10 @@ export class StoreService {
     let mergedSettings = data.settings;
     if (data.settings && typeof data.settings === 'object') {
       const existingSettings = (store.settings as Record<string, unknown>) || {};
-      mergedSettings = { ...existingSettings, ...(data.settings as Record<string, unknown>) };
+      mergedSettings = {
+        ...existingSettings,
+        ...(data.settings as Record<string, unknown>),
+      } as Prisma.InputJsonValue;
     }
 
     const updatedStore = await prisma.store.update({
