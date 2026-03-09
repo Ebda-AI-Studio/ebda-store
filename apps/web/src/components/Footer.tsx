@@ -14,18 +14,29 @@ export function Footer() {
   const storeSettings = store.settings as Record<string, unknown> | undefined;
   const footerConfig = storeSettings?.footerLinks as
     | {
+        shop?: { name: string; nameAr?: string; href: string; enabled: boolean }[];
         support?: { name: string; nameAr?: string; href: string; enabled: boolean }[];
         company?: { name: string; nameAr?: string; href: string; enabled: boolean }[];
+        newsletterEnabled?: boolean;
       }
     | undefined;
 
-  const shopLinks = [
-    { name: t('All Products', 'كل المنتجات'), href: storeUrl('/products') },
-    { name: t('Categories', 'الفئات'), href: storeUrl('/categories') },
-    { name: t('New Arrivals', 'وصل حديثاً'), href: storeUrl('/products?sort=newest') },
-    { name: t('Best Sellers', 'الأكثر مبيعاً'), href: storeUrl('/products?sort=popular') },
-    { name: t('On Sale', 'تخفيضات'), href: storeUrl('/products?sale=true') },
+  const defaultShopLinks = [
+    { name: 'All Products', nameAr: 'كل المنتجات', href: '/products' },
+    { name: 'Categories', nameAr: 'الفئات', href: '/categories' },
+    { name: 'New Arrivals', nameAr: 'وصل حديثاً', href: '/products?sort=newest' },
+    { name: 'Best Sellers', nameAr: 'الأكثر مبيعاً', href: '/products?sort=popular' },
+    { name: 'On Sale', nameAr: 'تخفيضات', href: '/products?sale=true' },
   ];
+
+  const shopLinks = (footerConfig?.shop ?? defaultShopLinks)
+    .filter(l => ('enabled' in l ? l.enabled : true))
+    .map(l => {
+      const nameAr = 'nameAr' in l ? (l as { nameAr?: string }).nameAr : undefined;
+      return { name: (language === 'ar' && nameAr) || l.name, href: storeUrl(l.href) };
+    });
+
+  const newsletterEnabled = footerConfig?.newsletterEnabled !== false;
 
   const defaultSupportLinks = [
     { name: 'Contact Us', href: '/contact' },
@@ -262,34 +273,36 @@ export function Footer() {
             </ul>
 
             {/* Newsletter Mini */}
-            <div className="mt-8">
-              <h3 className="text-sm font-semibold uppercase tracking-wider text-foreground">
-                {t('Newsletter', 'النشرة البريدية')}
-              </h3>
-              <p className="mt-2 text-xs text-muted-foreground">
-                {t('Get updates on new products and offers.', 'احصل على آخر التحديثات والعروض')}
-              </p>
-              <form className="mt-3 flex gap-2">
-                <input
-                  type="email"
-                  placeholder={t('Email', 'البريد الإلكتروني')}
-                  className="h-9 flex-1 rounded-lg border border-border bg-background px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                />
-                <button
-                  type="submit"
-                  className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-white transition-colors hover:bg-primary/90"
-                >
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M14 5l7 7m0 0l-7 7m7-7H3"
-                    />
-                  </svg>
-                </button>
-              </form>
-            </div>
+            {newsletterEnabled && (
+              <div className="mt-8">
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-foreground">
+                  {t('Newsletter', 'النشرة البريدية')}
+                </h3>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {t('Get updates on new products and offers.', 'احصل على آخر التحديثات والعروض')}
+                </p>
+                <form className="mt-3 flex gap-2">
+                  <input
+                    type="email"
+                    placeholder={t('Email', 'البريد الإلكتروني')}
+                    className="h-9 flex-1 rounded-lg border border-border bg-background px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                  <button
+                    type="submit"
+                    className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-white transition-colors hover:bg-primary/90"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M14 5l7 7m0 0l-7 7m7-7H3"
+                      />
+                    </svg>
+                  </button>
+                </form>
+              </div>
+            )}
           </div>
         </div>
       </div>

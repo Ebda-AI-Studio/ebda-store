@@ -16,11 +16,21 @@ interface FooterLink {
 
 interface StoreSettings {
   footerLinks?: {
+    shop?: FooterLink[];
     support: FooterLink[];
     company: FooterLink[];
+    newsletterEnabled?: boolean;
   };
   [key: string]: unknown;
 }
+
+const DEFAULT_SHOP_LINKS: FooterLink[] = [
+  { name: 'All Products', href: '/products', enabled: true },
+  { name: 'Categories', href: '/categories', enabled: true },
+  { name: 'New Arrivals', href: '/products?sort=newest', enabled: true },
+  { name: 'Best Sellers', href: '/products?sort=popular', enabled: true },
+  { name: 'On Sale', href: '/products?sale=true', enabled: true },
+];
 
 const DEFAULT_SUPPORT_LINKS: FooterLink[] = [
   { name: 'Contact Us', href: '/contact', enabled: true },
@@ -41,8 +51,10 @@ export default function StorePagesPage() {
   const { success, error: showError } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [shopLinks, setShopLinks] = useState<FooterLink[]>(DEFAULT_SHOP_LINKS);
   const [supportLinks, setSupportLinks] = useState<FooterLink[]>(DEFAULT_SUPPORT_LINKS);
   const [companyLinks, setCompanyLinks] = useState<FooterLink[]>(DEFAULT_COMPANY_LINKS);
+  const [newsletterEnabled, setNewsletterEnabled] = useState(true);
 
   useEffect(() => {
     loadSettings();
@@ -58,11 +70,17 @@ export default function StorePagesPage() {
       if (json.success && json.data?.store) {
         const settings = (json.data.store.settings || {}) as StoreSettings;
         if (settings.footerLinks) {
+          if (settings.footerLinks.shop?.length) {
+            setShopLinks(settings.footerLinks.shop);
+          }
           if (settings.footerLinks.support?.length) {
             setSupportLinks(settings.footerLinks.support);
           }
           if (settings.footerLinks.company?.length) {
             setCompanyLinks(settings.footerLinks.company);
+          }
+          if (typeof settings.footerLinks.newsletterEnabled === 'boolean') {
+            setNewsletterEnabled(settings.footerLinks.newsletterEnabled);
           }
         }
       }
@@ -87,8 +105,10 @@ export default function StorePagesPage() {
       const newSettings = {
         ...currentSettings,
         footerLinks: {
+          shop: shopLinks,
           support: supportLinks,
           company: companyLinks,
+          newsletterEnabled,
         },
       };
 
@@ -113,27 +133,36 @@ export default function StorePagesPage() {
     }
   }
 
+  function getSetter(section: 'shop' | 'support' | 'company') {
+    if (section === 'shop') return setShopLinks;
+    if (section === 'support') return setSupportLinks;
+    return setCompanyLinks;
+  }
+
   function updateLink(
-    section: 'support' | 'company',
+    section: 'shop' | 'support' | 'company',
     index: number,
     field: keyof FooterLink,
     value: string | boolean
   ) {
-    const setter = section === 'support' ? setSupportLinks : setCompanyLinks;
-    setter(prev => prev.map((link, i) => (i === index ? { ...link, [field]: value } : link)));
+    getSetter(section)(prev =>
+      prev.map((link, i) => (i === index ? { ...link, [field]: value } : link))
+    );
   }
 
-  function addLink(section: 'support' | 'company') {
-    const setter = section === 'support' ? setSupportLinks : setCompanyLinks;
-    setter(prev => [...prev, { name: '', href: '/', enabled: true }]);
+  function addLink(section: 'shop' | 'support' | 'company') {
+    getSetter(section)(prev => [...prev, { name: '', href: '/', enabled: true }]);
   }
 
-  function removeLink(section: 'support' | 'company', index: number) {
-    const setter = section === 'support' ? setSupportLinks : setCompanyLinks;
-    setter(prev => prev.filter((_, i) => i !== index));
+  function removeLink(section: 'shop' | 'support' | 'company', index: number) {
+    getSetter(section)(prev => prev.filter((_, i) => i !== index));
   }
 
-  function renderLinkEditor(title: string, section: 'support' | 'company', links: FooterLink[]) {
+  function renderLinkEditor(
+    title: string,
+    section: 'shop' | 'support' | 'company',
+    links: FooterLink[]
+  ) {
     return (
       <div className="rounded-xl border bg-white p-6 shadow-sm">
         <div className="flex items-center justify-between mb-4">
@@ -257,8 +286,30 @@ export default function StorePagesPage() {
           </p>
         </div>
 
+        {renderLinkEditor('Shop Links', 'shop', shopLinks)}
         {renderLinkEditor('Support Links', 'support', supportLinks)}
         {renderLinkEditor('Company Links', 'company', companyLinks)}
+
+        {/* Newsletter Toggle */}
+        <div className="rounded-xl border bg-white p-6 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Newsletter Section</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Show or hide the newsletter signup form in the footer.
+              </p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={newsletterEnabled}
+                onChange={e => setNewsletterEnabled(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary" />
+            </label>
+          </div>
+        </div>
       </div>
     </AdminLayout>
   );
