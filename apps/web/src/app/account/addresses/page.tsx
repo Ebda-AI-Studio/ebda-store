@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button, Input, useToast } from '@force/ui';
 import { api } from '@/lib/api';
 import { useAuth } from '../../../contexts/AuthContext';
+import { useLanguage } from '../../../contexts/LanguageContext';
 
 interface Address {
   id: string;
@@ -39,6 +40,7 @@ export default function AddressesPage() {
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { success, error: toastError } = useToast();
+  const { t } = useLanguage();
 
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -152,7 +154,9 @@ export default function AddressesPage() {
   if (isLoading || authLoading) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold text-gray-900">Saved Addresses</h1>
+        <h1 className="text-2xl font-bold text-gray-900">
+          {t('Saved Addresses', 'العناوين المحفوظة')}
+        </h1>
         <div className="flex justify-center py-12">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
         </div>
@@ -164,8 +168,12 @@ export default function AddressesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Saved Addresses</h1>
-          <p className="mt-1 text-gray-500">Manage your delivery addresses</p>
+          <h1 className="text-2xl font-bold text-gray-900">
+            {t('Saved Addresses', 'العناوين المحفوظة')}
+          </h1>
+          <p className="mt-1 text-gray-500">
+            {t('Manage your delivery addresses', 'إدارة عناوين التوصيل')}
+          </p>
         </div>
         {!isAdding && (
           <Button onClick={() => setIsAdding(true)}>
@@ -177,7 +185,7 @@ export default function AddressesPage() {
                 d="M12 4v16m8-8H4"
               />
             </svg>
-            Add Address
+            {t('Add Address', 'إضافة عنوان')}
           </Button>
         )}
       </div>
@@ -185,18 +193,20 @@ export default function AddressesPage() {
       {isAdding && (
         <div className="rounded-xl border bg-white p-6 shadow-sm">
           <h2 className="mb-4 text-lg font-semibold text-gray-900">
-            {editingId ? 'Edit Address' : 'Add New Address'}
+            {editingId
+              ? t('Edit Address', 'تعديل العنوان')
+              : t('Add New Address', 'إضافة عنوان جديد')}
           </h2>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <Input
-                label="First Name"
+                label={t('First Name', 'الاسم الأول')}
                 value={formData.firstName}
                 onChange={e => setFormData({ ...formData, firstName: e.target.value })}
                 required
               />
               <Input
-                label="Last Name"
+                label={t('Last Name', 'الاسم الأخير')}
                 value={formData.lastName}
                 onChange={e => setFormData({ ...formData, lastName: e.target.value })}
                 required
@@ -204,7 +214,7 @@ export default function AddressesPage() {
             </div>
 
             <Input
-              label="Phone Number"
+              label={t('Phone Number', 'رقم الهاتف')}
               type="tel"
               value={formData.phone}
               onChange={e => setFormData({ ...formData, phone: e.target.value })}
@@ -212,40 +222,42 @@ export default function AddressesPage() {
             />
 
             <Input
-              label="Street Address"
+              label={t('Street Address', 'عنوان الشارع')}
               value={formData.address1}
               onChange={e => setFormData({ ...formData, address1: e.target.value })}
               required
             />
 
             <Input
-              label="Apt / Suite / Building (optional)"
+              label={t('Apt / Suite / Building (optional)', 'شقة / جناح / مبنى (اختياري)')}
               value={formData.address2}
               onChange={e => setFormData({ ...formData, address2: e.target.value })}
             />
 
             <div className="grid gap-4 sm:grid-cols-3">
               <Input
-                label="City"
+                label={t('City', 'المدينة')}
                 value={formData.city}
                 onChange={e => setFormData({ ...formData, city: e.target.value })}
                 required
               />
               <Input
-                label="State / Area"
+                label={t('State / Area', 'المنطقة')}
                 value={formData.state}
                 onChange={e => setFormData({ ...formData, state: e.target.value })}
                 required
               />
               <Input
-                label="Postal Code"
+                label={t('Postal Code', 'الرمز البريدي')}
                 value={formData.postalCode}
                 onChange={e => setFormData({ ...formData, postalCode: e.target.value })}
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700">Country</label>
+              <label className="block text-sm font-medium text-gray-700">
+                {t('Country', 'الدولة')}
+              </label>
               <select
                 value={formData.country}
                 onChange={e => setFormData({ ...formData, country: e.target.value })}
@@ -267,15 +279,19 @@ export default function AddressesPage() {
                 onChange={e => setFormData({ ...formData, isDefault: e.target.checked })}
                 className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
               />
-              <span className="text-sm text-gray-700">Set as default address</span>
+              <span className="text-sm text-gray-700">
+                {t('Set as default address', 'تعيين كعنوان افتراضي')}
+              </span>
             </label>
 
             <div className="flex gap-2 pt-4">
               <Button type="submit" isLoading={isSaving}>
-                {editingId ? 'Update Address' : 'Save Address'}
+                {editingId
+                  ? t('Update Address', 'تحديث العنوان')
+                  : t('Save Address', 'حفظ العنوان')}
               </Button>
               <Button type="button" variant="outline" onClick={resetForm}>
-                Cancel
+                {t('Cancel', 'إلغاء')}
               </Button>
             </div>
           </form>
@@ -293,7 +309,7 @@ export default function AddressesPage() {
             >
               {address.isDefault && (
                 <span className="absolute right-4 top-4 rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
-                  Default
+                  {t('Default', 'الافتراضي')}
                 </span>
               )}
               <p className="font-medium text-gray-900">
@@ -312,21 +328,21 @@ export default function AddressesPage() {
                   onClick={() => startEdit(address)}
                   className="text-sm text-primary hover:underline"
                 >
-                  Edit
+                  {t('Edit', 'تعديل')}
                 </button>
                 {!address.isDefault && (
                   <button
                     onClick={() => handleSetDefault(address.id)}
                     className="text-sm text-primary hover:underline"
                   >
-                    Set as Default
+                    {t('Set as Default', 'تعيين كافتراضي')}
                   </button>
                 )}
                 <button
                   onClick={() => handleDelete(address.id)}
                   className="text-sm text-red-600 hover:underline"
                 >
-                  Delete
+                  {t('Delete', 'حذف')}
                 </button>
               </div>
             </div>
@@ -353,10 +369,14 @@ export default function AddressesPage() {
               d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
             />
           </svg>
-          <h3 className="mt-4 text-lg font-medium text-gray-900">No addresses saved</h3>
-          <p className="mt-2 text-gray-500">Add an address for faster checkout.</p>
+          <h3 className="mt-4 text-lg font-medium text-gray-900">
+            {t('No addresses saved', 'لا توجد عناوين محفوظة')}
+          </h3>
+          <p className="mt-2 text-gray-500">
+            {t('Add an address for faster checkout.', 'أضف عنواناً لإتمام الشراء بشكل أسرع.')}
+          </p>
           <Button onClick={() => setIsAdding(true)} className="mt-6">
-            Add Your First Address
+            {t('Add Your First Address', 'أضف عنوانك الأول')}
           </Button>
         </div>
       ) : null}

@@ -6,9 +6,11 @@ import Link from 'next/link';
 import { Button, Input } from '@force/ui';
 import { api } from '@/lib/api';
 import { useStoreUrl } from '../../../contexts/StoreContext';
+import { useLanguage } from '../../../contexts/LanguageContext';
 
 export default function ForgotPasswordPage() {
   const storeUrl = useStoreUrl();
+  const { t } = useLanguage();
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [email, setEmail] = useState('');
@@ -62,17 +64,26 @@ export default function ForgotPasswordPage() {
                 />
               </svg>
             </div>
-            <h2 className="mt-4 text-xl font-semibold text-foreground">Check your email</h2>
+            <h2 className="mt-4 text-xl font-semibold text-foreground">
+              {t('Check your email', 'تحقق من بريدك الإلكتروني')}
+            </h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              We&apos;ve sent a password reset link to <strong>{email}</strong>
+              {t(
+                "We've sent a password reset link to",
+                'لقد أرسلنا رابط إعادة تعيين كلمة المرور إلى'
+              )}{' '}
+              <strong>{email}</strong>
             </p>
             <p className="mt-4 text-xs text-muted-foreground">
-              Didn&apos;t receive the email? Check your spam folder or{' '}
+              {t(
+                "Didn't receive the email? Check your spam folder or",
+                'لم تستلم البريد؟ تحقق من مجلد الرسائل غير المرغوبة أو'
+              )}{' '}
               <button
                 onClick={() => setIsSubmitted(false)}
                 className="text-primary hover:underline"
               >
-                try again
+                {t('try again', 'حاول مرة أخرى')}
               </button>
             </p>
           </div>
@@ -81,7 +92,7 @@ export default function ForgotPasswordPage() {
             href={storeUrl('/auth/login')}
             className="inline-block text-sm text-primary hover:underline"
           >
-            &larr; Back to sign in
+            &larr; {t('Back to sign in', 'العودة لتسجيل الدخول')}
           </Link>
         </div>
       </main>
@@ -101,10 +112,13 @@ export default function ForgotPasswordPage() {
             </span>
           </Link>
           <h2 className="mt-6 text-3xl font-bold tracking-tight text-foreground">
-            Forgot password?
+            {t('Forgot password?', 'نسيت كلمة المرور؟')}
           </h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            No worries, we&apos;ll send you reset instructions.
+            {t(
+              "No worries, we'll send you reset instructions.",
+              'لا تقلق، سنرسل لك تعليمات إعادة التعيين.'
+            )}
           </p>
         </div>
 
@@ -116,7 +130,7 @@ export default function ForgotPasswordPage() {
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <Input
-              label="Email address"
+              label={t('Email address', 'البريد الإلكتروني')}
               type="email"
               autoComplete="email"
               value={email}
@@ -125,14 +139,14 @@ export default function ForgotPasswordPage() {
             />
 
             <Button type="submit" className="w-full" size="lg" isLoading={isLoading}>
-              Send reset link
+              {t('Send reset link', 'إرسال رابط إعادة التعيين')}
             </Button>
           </form>
         </div>
 
         <p className="text-center text-sm">
           <Link href={storeUrl('/auth/login')} className="text-primary hover:underline">
-            &larr; Back to sign in
+            &larr; {t('Back to sign in', 'العودة لتسجيل الدخول')}
           </Link>
         </p>
       </div>

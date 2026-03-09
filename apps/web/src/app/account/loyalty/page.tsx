@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useStore } from '../../../contexts/StoreContext';
+import { useLanguage } from '../../../contexts/LanguageContext';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
 
@@ -40,6 +41,7 @@ async function authFetch(url: string) {
 
 export default function LoyaltyPage() {
   const { store } = useStore();
+  const { t } = useLanguage();
   const storeId = store.id;
 
   const [loyaltyPoints, setLoyaltyPoints] = useState<LoyaltyPoints | null>(null);
@@ -158,9 +160,14 @@ export default function LoyaltyPage() {
               />
             </svg>
           </div>
-          <h2 className="mt-4 text-lg font-semibold text-gray-900">Loyalty Program Not Enabled</h2>
+          <h2 className="mt-4 text-lg font-semibold text-gray-900">
+            {t('Loyalty Program Not Enabled', 'برنامج الولاء غير مفعّل')}
+          </h2>
           <p className="mt-2 text-gray-500">
-            This store does not currently offer a loyalty rewards program.
+            {t(
+              'This store does not currently offer a loyalty rewards program.',
+              'هذا المتجر لا يقدم حالياً برنامج مكافآت ولاء.'
+            )}
           </p>
         </div>
       </div>
@@ -170,8 +177,10 @@ export default function LoyaltyPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Loyalty Program</h1>
-        <p className="mt-1 text-gray-500">Your points and rewards</p>
+        <h1 className="text-2xl font-bold text-gray-900">
+          {t('Loyalty Program', 'برنامج الولاء')}
+        </h1>
+        <p className="mt-1 text-gray-500">{t('Your points and rewards', 'نقاطك ومكافآتك')}</p>
       </div>
 
       {/* Points summary card */}
@@ -188,15 +197,19 @@ export default function LoyaltyPage() {
           <div className="bg-gradient-to-r from-primary/10 to-primary/5 p-6">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
-                <p className="text-sm font-medium text-gray-500">Current Balance</p>
+                <p className="text-sm font-medium text-gray-500">
+                  {t('Current Balance', 'الرصيد الحالي')}
+                </p>
                 <p className="mt-1 text-5xl font-bold text-primary">
                   {loyaltyPoints.points.toLocaleString()}
                 </p>
-                <p className="mt-1 text-sm text-gray-500">points</p>
+                <p className="mt-1 text-sm text-gray-500">{t('points', 'نقاط')}</p>
               </div>
               {loyaltyPoints.tier && (
                 <div className="text-right">
-                  <p className="text-sm text-gray-500 mb-1">Membership Tier</p>
+                  <p className="text-sm text-gray-500 mb-1">
+                    {t('Membership Tier', 'مستوى العضوية')}
+                  </p>
                   <span
                     className={`inline-block rounded-full px-4 py-1 text-sm font-semibold ${tierColor(loyaltyPoints.tier)}`}
                   >
@@ -212,8 +225,10 @@ export default function LoyaltyPage() {
       {/* Transaction history */}
       <div className="rounded-xl border bg-white shadow-sm">
         <div className="border-b p-4">
-          <h2 className="font-semibold text-gray-900">Points History</h2>
-          <p className="text-sm text-gray-500">Your recent loyalty activity</p>
+          <h2 className="font-semibold text-gray-900">{t('Points History', 'سجل النقاط')}</h2>
+          <p className="text-sm text-gray-500">
+            {t('Your recent loyalty activity', 'نشاط الولاء الأخير')}
+          </p>
         </div>
 
         {isLoadingHistory ? (
@@ -241,17 +256,23 @@ export default function LoyaltyPage() {
                 d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
               />
             </svg>
-            <p className="mt-3 text-gray-500">No transactions yet.</p>
+            <p className="mt-3 text-gray-500">
+              {t('No transactions yet.', 'لا توجد معاملات بعد.')}
+            </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-gray-50 text-left">
-                  <th className="px-6 py-3 font-medium text-gray-500">Date</th>
-                  <th className="px-6 py-3 font-medium text-gray-500">Type</th>
-                  <th className="px-6 py-3 font-medium text-gray-500">Description</th>
-                  <th className="px-6 py-3 text-right font-medium text-gray-500">Points</th>
+                  <th className="px-6 py-3 font-medium text-gray-500">{t('Date', 'التاريخ')}</th>
+                  <th className="px-6 py-3 font-medium text-gray-500">{t('Type', 'النوع')}</th>
+                  <th className="px-6 py-3 font-medium text-gray-500">
+                    {t('Description', 'الوصف')}
+                  </th>
+                  <th className="px-6 py-3 text-right font-medium text-gray-500">
+                    {t('Points', 'النقاط')}
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">

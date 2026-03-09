@@ -6,10 +6,12 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Button } from '@force/ui';
 import { useStoreUrl } from '../../../contexts/StoreContext';
+import { useLanguage } from '../../../contexts/LanguageContext';
 
 export default function CheckoutErrorPage() {
   const router = useRouter();
   const storeUrl = useStoreUrl();
+  const { t } = useLanguage();
   const [isRetrying, setIsRetrying] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
   const [paymentId, setPaymentId] = useState<string | null>(null);
@@ -64,11 +66,13 @@ export default function CheckoutErrorPage() {
           </div>
 
           <h1 className="mt-6 text-2xl font-bold text-foreground">
-            Payment could not be processed
+            {t('Payment could not be processed', 'تعذرت معالجة الدفع')}
           </h1>
           <p className="mt-2 text-muted-foreground">
-            Something went wrong during checkout. Please try again or contact support if the problem
-            persists.
+            {t(
+              'Something went wrong during checkout. Please try again or contact support if the problem persists.',
+              'حدث خطأ أثناء الدفع. يرجى المحاولة مرة أخرى أو التواصل مع الدعم إذا استمرت المشكلة.'
+            )}
           </p>
 
           <div className="mt-8 flex flex-col gap-3">
@@ -80,12 +84,12 @@ export default function CheckoutErrorPage() {
               onClick={handleRetryPayment}
               isLoading={isRetrying}
             >
-              Retry Payment
+              {t('Retry Payment', 'إعادة محاولة الدفع')}
             </Button>
 
             <Link href={storeUrl('/cart')}>
               <Button className="w-full" size="lg" variant="outline">
-                Return to Cart
+                {t('Return to Cart', 'العودة إلى السلة')}
               </Button>
             </Link>
           </div>

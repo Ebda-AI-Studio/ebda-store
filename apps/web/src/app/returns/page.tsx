@@ -5,15 +5,16 @@ import Link from 'next/link';
 import { Button } from '@force/ui';
 import { Header, Footer } from '../../components';
 import { useStoreContact, useStore, useStoreUrl } from '../../contexts/StoreContext';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
 
 const RETURN_REASONS = [
-  { value: 'defective', label: 'Item is defective or damaged' },
-  { value: 'wrong_item', label: 'Wrong item received' },
-  { value: 'not_as_described', label: 'Not as described' },
-  { value: 'changed_mind', label: 'Changed my mind' },
-  { value: 'other', label: 'Other' },
+  { value: 'defective', label: 'Item is defective or damaged', labelAr: 'المنتج معيب أو تالف' },
+  { value: 'wrong_item', label: 'Wrong item received', labelAr: 'تم استلام منتج خاطئ' },
+  { value: 'not_as_described', label: 'Not as described', labelAr: 'لا يطابق الوصف' },
+  { value: 'changed_mind', label: 'Changed my mind', labelAr: 'غيرت رأيي' },
+  { value: 'other', label: 'Other', labelAr: 'أخرى' },
 ] as const;
 
 type ReturnReason = (typeof RETURN_REASONS)[number]['value'];
@@ -48,6 +49,7 @@ async function authFetch(url: string, options: RequestInit = {}) {
 
 function ReturnRequestForm({ storeId }: { storeId: string }) {
   const storeUrl = useStoreUrl();
+  const { t } = useLanguage();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoadingOrders, setIsLoadingOrders] = useState(false);
@@ -107,15 +109,24 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
     setSubmitResult(null);
 
     if (!selectedOrderId) {
-      setSubmitResult({ type: 'error', text: 'Please select an order.' });
+      setSubmitResult({ type: 'error', text: t('Please select an order.', 'يرجى اختيار طلب.') });
       return;
     }
     if (selectedItemIds.size === 0) {
-      setSubmitResult({ type: 'error', text: 'Please select at least one item to return.' });
+      setSubmitResult({
+        type: 'error',
+        text: t(
+          'Please select at least one item to return.',
+          'يرجى اختيار عنصر واحد على الأقل للإرجاع.'
+        ),
+      });
       return;
     }
     if (!reason) {
-      setSubmitResult({ type: 'error', text: 'Please select a return reason.' });
+      setSubmitResult({
+        type: 'error',
+        text: t('Please select a return reason.', 'يرجى اختيار سبب الإرجاع.'),
+      });
       return;
     }
 
@@ -138,7 +149,10 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
           json.data?.return?.returnNumber ?? json.data?.returnNumber ?? json.returnNumber;
         setSubmitResult({
           type: 'success',
-          text: 'Your return request has been submitted successfully.',
+          text: t(
+            'Your return request has been submitted successfully.',
+            'تم تقديم طلب الإرجاع بنجاح.'
+          ),
           returnNumber,
         });
         // Reset form
@@ -149,13 +163,21 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
       } else {
         setSubmitResult({
           type: 'error',
-          text: json.error?.message || 'Failed to submit return request. Please try again.',
+          text:
+            json.error?.message ||
+            t(
+              'Failed to submit return request. Please try again.',
+              'فشل تقديم طلب الإرجاع. يرجى المحاولة مرة أخرى.'
+            ),
         });
       }
     } catch {
       setSubmitResult({
         type: 'error',
-        text: 'Failed to submit return request. Please check your connection.',
+        text: t(
+          'Failed to submit return request. Please check your connection.',
+          'فشل تقديم طلب الإرجاع. يرجى التحقق من اتصالك.'
+        ),
       });
     } finally {
       setIsSubmitting(false);
@@ -165,12 +187,14 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
   if (!isLoggedIn) {
     return (
       <section className="rounded-xl border bg-white p-6 shadow-sm">
-        <h2 className="text-xl font-semibold text-foreground">Request a Return</h2>
+        <h2 className="text-xl font-semibold text-foreground">
+          {t('Request a Return', 'طلب إرجاع')}
+        </h2>
         <p className="mt-3 text-muted-foreground">
           <Link href={storeUrl('/auth/login')} className="font-medium text-primary hover:underline">
-            Log in
+            {t('Log in', 'تسجيل الدخول')}
           </Link>{' '}
-          to submit a return request for one of your orders.
+          {t('to submit a return request for one of your orders.', 'لتقديم طلب إرجاع لأحد طلباتك.')}
         </p>
       </section>
     );
@@ -189,24 +213,29 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
         </div>
-        <h2 className="mt-4 text-xl font-semibold text-foreground">Return Request Submitted</h2>
+        <h2 className="mt-4 text-xl font-semibold text-foreground">
+          {t('Return Request Submitted', 'تم تقديم طلب الإرجاع')}
+        </h2>
         <p className="mt-2 text-muted-foreground">{submitResult.text}</p>
         {submitResult.returnNumber && (
           <p className="mt-2 text-sm text-muted-foreground">
-            Return number:{' '}
+            {t('Return number:', 'رقم الإرجاع:')}{' '}
             <span className="font-mono font-semibold text-foreground">
               #{submitResult.returnNumber}
             </span>
           </p>
         )}
         <p className="mt-4 text-sm text-muted-foreground">
-          We will review your request and contact you shortly.
+          {t(
+            'We will review your request and contact you shortly.',
+            'سنراجع طلبك ونتواصل معك قريباً.'
+          )}
         </p>
         <button
           onClick={() => setSubmitResult(null)}
           className="mt-6 text-sm font-medium text-primary hover:underline"
         >
-          Submit another return
+          {t('Submit another return', 'تقديم إرجاع آخر')}
         </button>
       </section>
     );
@@ -214,9 +243,14 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
 
   return (
     <section className="rounded-xl border bg-white p-6 shadow-sm">
-      <h2 className="text-xl font-semibold text-foreground">Request a Return</h2>
+      <h2 className="text-xl font-semibold text-foreground">
+        {t('Request a Return', 'طلب إرجاع')}
+      </h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        Fill out the form below to start a return for a delivered order.
+        {t(
+          'Fill out the form below to start a return for a delivered order.',
+          'املأ النموذج أدناه لبدء إرجاع طلب تم توصيله.'
+        )}
       </p>
 
       {submitResult?.type === 'error' && (
@@ -229,12 +263,12 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
         {/* Order selector */}
         <div>
           <label htmlFor="return-order" className="block text-sm font-medium text-foreground mb-1">
-            Select Order <span className="text-red-500">*</span>
+            {t('Select Order', 'اختر الطلب')} <span className="text-red-500">*</span>
           </label>
           {isLoadingOrders ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              Loading your orders...
+              {t('Loading your orders...', 'جاري تحميل طلباتك...')}
             </div>
           ) : (
             <select
@@ -247,7 +281,7 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
               required
               className="w-full rounded-lg border border-border px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
             >
-              <option value="">-- Select an order --</option>
+              <option value="">{t('-- Select an order --', '-- اختر طلباً --')}</option>
               {orders.map(order => (
                 <option key={order.id} value={order.id}>
                   #{order.orderNumber}{' '}
@@ -260,7 +294,10 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
           )}
           {!isLoadingOrders && orders.length === 0 && (
             <p className="mt-1 text-sm text-muted-foreground">
-              No eligible orders found. Only delivered orders can be returned.
+              {t(
+                'No eligible orders found. Only delivered orders can be returned.',
+                'لم يتم العثور على طلبات مؤهلة. يمكن إرجاع الطلبات المسلمة فقط.'
+              )}
             </p>
           )}
         </div>
@@ -269,7 +306,8 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
         {selectedOrder && selectedOrder.items.length > 0 && (
           <div>
             <p className="block text-sm font-medium text-foreground mb-2">
-              Select Items to Return <span className="text-red-500">*</span>
+              {t('Select Items to Return', 'اختر العناصر للإرجاع')}{' '}
+              <span className="text-red-500">*</span>
             </p>
             <div className="space-y-2">
               {selectedOrder.items.map(item => (
@@ -286,7 +324,9 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
                   <span className="flex-1 text-sm text-foreground">
                     {item.product?.name || `Item #${item.id.slice(0, 8)}`}
                   </span>
-                  <span className="text-sm text-muted-foreground">Qty: {item.quantity}</span>
+                  <span className="text-sm text-muted-foreground">
+                    {t('Qty', 'الكمية')}: {item.quantity}
+                  </span>
                 </label>
               ))}
             </div>
@@ -296,7 +336,7 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
         {/* Reason dropdown */}
         <div>
           <label htmlFor="return-reason" className="block text-sm font-medium text-foreground mb-1">
-            Reason for Return <span className="text-red-500">*</span>
+            {t('Reason for Return', 'سبب الإرجاع')} <span className="text-red-500">*</span>
           </label>
           <select
             id="return-reason"
@@ -305,10 +345,10 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
             required
             className="w-full rounded-lg border border-border px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
           >
-            <option value="">-- Select a reason --</option>
+            <option value="">{t('-- Select a reason --', '-- اختر سبباً --')}</option>
             {RETURN_REASONS.map(r => (
               <option key={r.value} value={r.value}>
-                {r.label}
+                {t(r.label, r.labelAr)}
               </option>
             ))}
           </select>
@@ -317,21 +357,24 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
         {/* Notes textarea */}
         <div>
           <label htmlFor="return-notes" className="block text-sm font-medium text-foreground mb-1">
-            Additional Notes (optional)
+            {t('Additional Notes (optional)', 'ملاحظات إضافية (اختياري)')}
           </label>
           <textarea
             id="return-notes"
             rows={4}
             value={notes}
             onChange={e => setNotes(e.target.value)}
-            placeholder="Describe the issue in more detail..."
+            placeholder={t(
+              'Describe the issue in more detail...',
+              'صف المشكلة بمزيد من التفصيل...'
+            )}
             className="w-full rounded-lg border border-border px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
           />
         </div>
 
         <div className="pt-2">
           <Button type="submit" isLoading={isSubmitting}>
-            Submit Return Request
+            {t('Submit Return Request', 'تقديم طلب الإرجاع')}
           </Button>
         </div>
       </form>
@@ -343,15 +386,20 @@ export default function ReturnsPage() {
   const { email } = useStoreContact();
   const { store } = useStore();
   const storeUrl = useStoreUrl();
-  const returnsEmail = email || 'our support team';
+  const { t } = useLanguage();
+  const returnsEmail = email || t('our support team', 'فريق الدعم');
   return (
     <main className="flex min-h-screen flex-col bg-background">
       <Header />
 
       <div className="mx-auto w-full max-w-3xl flex-1 px-4 py-12 sm:px-6 lg:px-8">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-foreground">Returns &amp; Refunds</h1>
-          <p className="mt-2 text-muted-foreground">Our hassle-free return policy</p>
+          <h1 className="text-3xl font-bold text-foreground">
+            {t('Returns & Refunds', 'المرتجعات والاستبدال')}
+          </h1>
+          <p className="mt-2 text-muted-foreground">
+            {t('Our hassle-free return policy', 'سياسة الإرجاع السهلة لدينا')}
+          </p>
         </div>
 
         <div className="mt-12 space-y-8">
@@ -372,19 +420,27 @@ export default function ReturnsPage() {
                   />
                 </svg>
               </div>
-              <h2 className="text-xl font-semibold text-foreground">30-Day Return Policy</h2>
+              <h2 className="text-xl font-semibold text-foreground">
+                {t('30-Day Return Policy', 'سياسة الإرجاع خلال 30 يوماً')}
+              </h2>
             </div>
             <p className="mt-4 text-muted-foreground">
-              We want you to be completely satisfied with your purchase. If you&apos;re not happy
-              with your order, you can return it within 30 days of delivery for a full refund or
-              exchange.
+              {t(
+                "We want you to be completely satisfied with your purchase. If you're not happy with your order, you can return it within 30 days of delivery for a full refund or exchange.",
+                'نريدك أن تكون راضياً تماماً عن مشترياتك. إذا لم تكن سعيداً بطلبك، يمكنك إرجاعه خلال 30 يوماً من التوصيل لاسترداد كامل المبلغ أو الاستبدال.'
+              )}
             </p>
           </section>
 
           <section className="rounded-xl border bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-semibold text-foreground">Return Eligibility</h2>
+            <h2 className="text-xl font-semibold text-foreground">
+              {t('Return Eligibility', 'أهلية الإرجاع')}
+            </h2>
             <p className="mt-2 text-muted-foreground">
-              To be eligible for a return, items must be:
+              {t(
+                'To be eligible for a return, items must be:',
+                'لتكون مؤهلاً للإرجاع، يجب أن تكون العناصر:'
+              )}
             </p>
             <ul className="mt-4 space-y-3">
               <li className="flex items-start gap-3">
@@ -401,24 +457,8 @@ export default function ReturnsPage() {
                     d="M5 13l4 4L19 7"
                   />
                 </svg>
-                <span className="text-muted-foreground">Unused and in original condition</span>
-              </li>
-              <li className="flex items-start gap-3">
-                <svg
-                  className="mt-0.5 h-5 w-5 flex-shrink-0 text-primary"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M5 13l4 4L19 7"
-                  />
-                </svg>
                 <span className="text-muted-foreground">
-                  In original packaging with all tags attached
+                  {t('Unused and in original condition', 'غير مستخدمة وبحالتها الأصلية')}
                 </span>
               </li>
               <li className="flex items-start gap-3">
@@ -436,23 +476,52 @@ export default function ReturnsPage() {
                   />
                 </svg>
                 <span className="text-muted-foreground">
-                  Accompanied by the original receipt or proof of purchase
+                  {t(
+                    'In original packaging with all tags attached',
+                    'في العبوة الأصلية مع جميع البطاقات'
+                  )}
+                </span>
+              </li>
+              <li className="flex items-start gap-3">
+                <svg
+                  className="mt-0.5 h-5 w-5 flex-shrink-0 text-primary"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+                <span className="text-muted-foreground">
+                  {t(
+                    'Accompanied by the original receipt or proof of purchase',
+                    'مرفقة بالإيصال الأصلي أو إثبات الشراء'
+                  )}
                 </span>
               </li>
             </ul>
           </section>
 
           <section className="rounded-xl border bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-semibold text-foreground">How to Return an Item</h2>
+            <h2 className="text-xl font-semibold text-foreground">
+              {t('How to Return an Item', 'كيفية إرجاع منتج')}
+            </h2>
             <div className="mt-4 space-y-4">
               <div className="flex gap-4">
                 <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-white">
                   1
                 </div>
                 <div>
-                  <h3 className="font-medium text-foreground">Contact Us</h3>
+                  <h3 className="font-medium text-foreground">{t('Contact Us', 'تواصل معنا')}</h3>
                   <p className="text-sm text-muted-foreground">
-                    Email us at {returnsEmail} with your order number and reason for return.
+                    {t(
+                      `Email us at ${returnsEmail} with your order number and reason for return.`,
+                      `راسلنا على ${returnsEmail} مع رقم طلبك وسبب الإرجاع.`
+                    )}
                   </p>
                 </div>
               </div>
@@ -461,9 +530,14 @@ export default function ReturnsPage() {
                   2
                 </div>
                 <div>
-                  <h3 className="font-medium text-foreground">Get Return Label</h3>
+                  <h3 className="font-medium text-foreground">
+                    {t('Get Return Label', 'الحصول على ملصق الإرجاع')}
+                  </h3>
                   <p className="text-sm text-muted-foreground">
-                    We&apos;ll send you a prepaid return shipping label via email.
+                    {t(
+                      "We'll send you a prepaid return shipping label via email.",
+                      'سنرسل لك ملصق شحن إرجاع مدفوع مسبقاً عبر البريد الإلكتروني.'
+                    )}
                   </p>
                 </div>
               </div>
@@ -472,9 +546,14 @@ export default function ReturnsPage() {
                   3
                 </div>
                 <div>
-                  <h3 className="font-medium text-foreground">Ship the Item</h3>
+                  <h3 className="font-medium text-foreground">
+                    {t('Ship the Item', 'شحن المنتج')}
+                  </h3>
                   <p className="text-sm text-muted-foreground">
-                    Pack the item securely and drop it off at any authorized shipping location.
+                    {t(
+                      'Pack the item securely and drop it off at any authorized shipping location.',
+                      'قم بتغليف المنتج بشكل آمن وتسليمه في أي موقع شحن معتمد.'
+                    )}
                   </p>
                 </div>
               </div>
@@ -483,10 +562,14 @@ export default function ReturnsPage() {
                   4
                 </div>
                 <div>
-                  <h3 className="font-medium text-foreground">Receive Refund</h3>
+                  <h3 className="font-medium text-foreground">
+                    {t('Receive Refund', 'استلام المبلغ المسترد')}
+                  </h3>
                   <p className="text-sm text-muted-foreground">
-                    Once we receive and inspect the item, we&apos;ll process your refund within 5-7
-                    business days.
+                    {t(
+                      "Once we receive and inspect the item, we'll process your refund within 5-7 business days.",
+                      'بمجرد استلام المنتج وفحصه، سنقوم بمعالجة استرداد المبلغ خلال 5-7 أيام عمل.'
+                    )}
                   </p>
                 </div>
               </div>
@@ -494,12 +577,34 @@ export default function ReturnsPage() {
           </section>
 
           <section className="rounded-xl border bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-semibold text-foreground">Refund Information</h2>
+            <h2 className="text-xl font-semibold text-foreground">
+              {t('Refund Information', 'معلومات الاسترداد')}
+            </h2>
             <ul className="mt-4 space-y-2 text-muted-foreground">
-              <li>Refunds will be credited to your original payment method</li>
-              <li>Please allow 5-7 business days for the refund to appear</li>
-              <li>Original shipping costs are non-refundable (unless the item was defective)</li>
-              <li>Sale items are final sale and cannot be returned</li>
+              <li>
+                {t(
+                  'Refunds will be credited to your original payment method',
+                  'سيتم إرجاع المبلغ إلى طريقة الدفع الأصلية'
+                )}
+              </li>
+              <li>
+                {t(
+                  'Please allow 5-7 business days for the refund to appear',
+                  'يرجى الانتظار 5-7 أيام عمل لظهور المبلغ المسترد'
+                )}
+              </li>
+              <li>
+                {t(
+                  'Original shipping costs are non-refundable (unless the item was defective)',
+                  'تكاليف الشحن الأصلية غير قابلة للاسترداد (ما لم يكن المنتج معيباً)'
+                )}
+              </li>
+              <li>
+                {t(
+                  'Sale items are final sale and cannot be returned',
+                  'العناصر المخفضة نهائية ولا يمكن إرجاعها'
+                )}
+              </li>
             </ul>
           </section>
 
@@ -509,9 +614,9 @@ export default function ReturnsPage() {
 
         <div className="mt-8 text-center">
           <p className="text-muted-foreground">
-            Need help with a return?{' '}
+            {t('Need help with a return?', 'هل تحتاج مساعدة في الإرجاع؟')}{' '}
             <Link href={storeUrl('/contact')} className="text-primary hover:underline">
-              Contact our support team
+              {t('Contact our support team', 'تواصل مع فريق الدعم')}
             </Link>
           </p>
         </div>

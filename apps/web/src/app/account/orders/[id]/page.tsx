@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { useStoreUrl } from '../../../../contexts/StoreContext';
+import { useLanguage } from '../../../../contexts/LanguageContext';
 
 interface OrderDetail {
   id: string;
@@ -81,6 +82,7 @@ interface OrderDetail {
 export default function OrderDetailPage() {
   const params = useParams();
   const storeUrl = useStoreUrl();
+  const { t } = useLanguage();
   const orderId = params.id as string;
 
   const [order, setOrder] = useState<OrderDetail | null>(null);
@@ -178,8 +180,12 @@ export default function OrderDetailPage() {
             </svg>
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Order Details</h1>
-            <p className="mt-1 text-muted-foreground">Loading order information...</p>
+            <h1 className="text-2xl font-bold text-foreground">
+              {t('Order Details', 'تفاصيل الطلب')}
+            </h1>
+            <p className="mt-1 text-muted-foreground">
+              {t('Loading order information...', 'جاري تحميل معلومات الطلب...')}
+            </p>
           </div>
         </div>
         <div className="flex justify-center py-12">
@@ -207,7 +213,9 @@ export default function OrderDetailPage() {
             </svg>
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Order Details</h1>
+            <h1 className="text-2xl font-bold text-foreground">
+              {t('Order Details', 'تفاصيل الطلب')}
+            </h1>
           </div>
         </div>
         <div className="rounded-lg border border-red-200 bg-red-50 p-4">
@@ -230,7 +238,7 @@ export default function OrderDetailPage() {
               onClick={() => fetchOrder()}
               className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
             >
-              Retry
+              {t('Retry', 'إعادة المحاولة')}
             </button>
           </div>
         </div>
@@ -264,9 +272,11 @@ export default function OrderDetailPage() {
             </svg>
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Order #{order.orderNumber}</h1>
+            <h1 className="text-2xl font-bold text-foreground">
+              {t('Order', 'طلب')} #{order.orderNumber}
+            </h1>
             <p className="mt-1 text-muted-foreground">
-              Placed on {formatDateTime(order.createdAt)}
+              {t('Placed on', 'تم الطلب في')} {formatDateTime(order.createdAt)}
             </p>
           </div>
         </div>
@@ -290,13 +300,13 @@ export default function OrderDetailPage() {
           <div className="flex flex-wrap gap-6 text-sm">
             {order.shippedAt && (
               <div>
-                <span className="text-muted-foreground">Shipped:</span>{' '}
+                <span className="text-muted-foreground">{t('Shipped', 'تم الشحن')}:</span>{' '}
                 <span className="font-medium text-foreground">{formatDate(order.shippedAt)}</span>
               </div>
             )}
             {order.deliveredAt && (
               <div>
-                <span className="text-muted-foreground">Delivered:</span>{' '}
+                <span className="text-muted-foreground">{t('Delivered', 'تم التوصيل')}:</span>{' '}
                 <span className="font-medium text-foreground">{formatDate(order.deliveredAt)}</span>
               </div>
             )}
@@ -307,7 +317,9 @@ export default function OrderDetailPage() {
       {/* Order Items */}
       <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
         <div className="border-b bg-muted px-4 py-3">
-          <h2 className="font-semibold text-foreground">Order Items ({order.items.length})</h2>
+          <h2 className="font-semibold text-foreground">
+            {t('Order Items', 'المنتجات')} ({order.items.length})
+          </h2>
         </div>
 
         {/* Desktop table */}
@@ -315,10 +327,10 @@ export default function OrderDetailPage() {
           <table className="w-full">
             <thead>
               <tr className="border-b text-left text-sm text-muted-foreground">
-                <th className="px-4 py-3 font-medium">Product</th>
-                <th className="px-4 py-3 font-medium text-center">Qty</th>
-                <th className="px-4 py-3 font-medium text-right">Price</th>
-                <th className="px-4 py-3 font-medium text-right">Total</th>
+                <th className="px-4 py-3 font-medium">{t('Product', 'المنتج')}</th>
+                <th className="px-4 py-3 font-medium text-center">{t('Qty', 'الكمية')}</th>
+                <th className="px-4 py-3 font-medium text-right">{t('Price', 'السعر')}</th>
+                <th className="px-4 py-3 font-medium text-right">{t('Total', 'الإجمالي')}</th>
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -414,39 +426,41 @@ export default function OrderDetailPage() {
         {/* Order Summary */}
         <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
           <div className="border-b bg-muted px-4 py-3">
-            <h2 className="font-semibold text-foreground">Order Summary</h2>
+            <h2 className="font-semibold text-foreground">{t('Order Summary', 'ملخص الطلب')}</h2>
           </div>
           <div className="p-4 space-y-3">
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Subtotal</span>
+              <span className="text-muted-foreground">{t('Subtotal', 'المجموع الفرعي')}</span>
               <span className="text-foreground">{formatPrice(order.subtotal)}</span>
             </div>
             {order.tax > 0 && (
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Tax</span>
+                <span className="text-muted-foreground">{t('Tax', 'الضريبة')}</span>
                 <span className="text-foreground">{formatPrice(order.tax)}</span>
               </div>
             )}
             {order.shipping > 0 && (
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Shipping</span>
+                <span className="text-muted-foreground">{t('Shipping', 'الشحن')}</span>
                 <span className="text-foreground">{formatPrice(order.shipping)}</span>
               </div>
             )}
             {order.discount > 0 && (
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Discount</span>
+                <span className="text-muted-foreground">{t('Discount', 'الخصم')}</span>
                 <span className="text-green-600">-{formatPrice(order.discount)}</span>
               </div>
             )}
             {order.couponCode && order.couponDiscount > 0 && (
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Coupon ({order.couponCode})</span>
+                <span className="text-muted-foreground">
+                  {t('Coupon', 'كوبون')} ({order.couponCode})
+                </span>
                 <span className="text-green-600">-{formatPrice(order.couponDiscount)}</span>
               </div>
             )}
             <div className="border-t pt-3 flex justify-between">
-              <span className="font-semibold text-foreground">Total</span>
+              <span className="font-semibold text-foreground">{t('Total', 'الإجمالي')}</span>
               <span className="font-semibold text-foreground">{formatPrice(order.total)}</span>
             </div>
           </div>
@@ -455,7 +469,9 @@ export default function OrderDetailPage() {
         {/* Shipping Address */}
         <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
           <div className="border-b bg-muted px-4 py-3">
-            <h2 className="font-semibold text-foreground">Shipping Address</h2>
+            <h2 className="font-semibold text-foreground">
+              {t('Shipping Address', 'عنوان الشحن')}
+            </h2>
           </div>
           <div className="p-4 text-sm text-foreground space-y-1">
             {(shippingAddr.firstName || shippingAddr.lastName) && (
@@ -475,7 +491,9 @@ export default function OrderDetailPage() {
             )}
             {shippingAddr.country && <p>{shippingAddr.country}</p>}
             {shippingAddr.phone && (
-              <p className="pt-2 text-muted-foreground">Phone: {shippingAddr.phone}</p>
+              <p className="pt-2 text-muted-foreground">
+                {t('Phone', 'الهاتف')}: {shippingAddr.phone}
+              </p>
             )}
           </div>
         </div>
@@ -485,7 +503,9 @@ export default function OrderDetailPage() {
       {order.payments && order.payments.length > 0 && (
         <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
           <div className="border-b bg-muted px-4 py-3">
-            <h2 className="font-semibold text-foreground">Payment Information</h2>
+            <h2 className="font-semibold text-foreground">
+              {t('Payment Information', 'معلومات الدفع')}
+            </h2>
           </div>
           <div className="p-4">
             <div className="space-y-4">
@@ -518,19 +538,19 @@ export default function OrderDetailPage() {
                     </div>
                     {payment.transactionId && (
                       <p className="text-muted-foreground">
-                        Transaction ID:{' '}
+                        {t('Transaction ID', 'رقم المعاملة')}:{' '}
                         <span className="font-mono text-foreground">{payment.transactionId}</span>
                       </p>
                     )}
                     {payment.invoiceId && (
                       <p className="text-muted-foreground">
-                        Invoice ID:{' '}
+                        {t('Invoice ID', 'رقم الفاتورة')}:{' '}
                         <span className="font-mono text-foreground">{payment.invoiceId}</span>
                       </p>
                     )}
                     {payment.paidAt && (
                       <p className="text-muted-foreground">
-                        Paid on {formatDateTime(payment.paidAt)}
+                        {t('Paid on', 'تم الدفع في')} {formatDateTime(payment.paidAt)}
                       </p>
                     )}
                   </div>
@@ -546,13 +566,13 @@ export default function OrderDetailPage() {
       {(order.notes || order.customerNotes) && (
         <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
           <div className="border-b bg-muted px-4 py-3">
-            <h2 className="font-semibold text-foreground">Notes</h2>
+            <h2 className="font-semibold text-foreground">{t('Notes', 'ملاحظات')}</h2>
           </div>
           <div className="p-4 text-sm text-foreground space-y-3">
             {order.customerNotes && (
               <div>
                 <p className="text-xs font-medium text-muted-foreground uppercase mb-1">
-                  Your Notes
+                  {t('Your Notes', 'ملاحظاتك')}
                 </p>
                 <p>{order.customerNotes}</p>
               </div>
@@ -560,7 +580,7 @@ export default function OrderDetailPage() {
             {order.notes && (
               <div>
                 <p className="text-xs font-medium text-muted-foreground uppercase mb-1">
-                  Store Notes
+                  {t('Store Notes', 'ملاحظات المتجر')}
                 </p>
                 <p>{order.notes}</p>
               </div>
@@ -575,7 +595,7 @@ export default function OrderDetailPage() {
           href={storeUrl('/account/orders')}
           className="rounded-lg border bg-white px-4 py-2 text-sm font-medium text-foreground hover:bg-muted transition-colors"
         >
-          Back to Orders
+          {t('Back to Orders', 'العودة للطلبات')}
         </Link>
 
         {/* Track Order button — enabled only when shipped/delivered AND tracking number exists */}
@@ -618,12 +638,12 @@ export default function OrderDetailPage() {
                     d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"
                   />
                 </svg>
-                Track Order
+                {t('Track Order', 'تتبع الطلب')}
               </button>
               {/* Tooltip for disabled state */}
               {!canTrack && (
                 <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-800 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100 hidden sm:block">
-                  Available when shipped
+                  {t('Available when shipped', 'متاح عند الشحن')}
                 </span>
               )}
             </div>
@@ -645,7 +665,7 @@ export default function OrderDetailPage() {
                 d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
               />
             </svg>
-            Download Invoice
+            {t('Download Invoice', 'تحميل الفاتورة')}
           </a>
         )}
       </div>
@@ -665,7 +685,7 @@ export default function OrderDetailPage() {
           <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
             <div className="flex items-start justify-between mb-4">
               <h2 id="tracking-modal-title" className="text-lg font-semibold text-foreground">
-                Tracking Information
+                {t('Tracking Information', 'معلومات التتبع')}
               </h2>
               <button
                 onClick={() => setShowTrackingModal(false)}
@@ -684,8 +704,10 @@ export default function OrderDetailPage() {
             </div>
 
             <p className="text-sm text-muted-foreground mb-4">
-              Use the tracking number below on your carrier&apos;s website to check your shipment
-              status.
+              {t(
+                "Use the tracking number below on your carrier's website to check your shipment status.",
+                'استخدم رقم التتبع أدناه على موقع شركة الشحن للتحقق من حالة شحنتك.'
+              )}
             </p>
 
             <div className="rounded-lg border border-border bg-muted p-3 flex items-center justify-between gap-3">
@@ -712,7 +734,7 @@ export default function OrderDetailPage() {
               onClick={() => setShowTrackingModal(false)}
               className="mt-4 w-full rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
             >
-              Close
+              {t('Close', 'إغلاق')}
             </button>
           </div>
         </div>

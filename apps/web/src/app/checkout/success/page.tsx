@@ -9,6 +9,7 @@ import { api, type Order } from '@/lib/api';
 import { useStore, useStoreUrl } from '../../../contexts/StoreContext';
 import { useCart } from '../../../contexts/CartContext';
 import { trackPurchase } from '../../../components/MarketingPixels';
+import { useLanguage } from '../../../contexts/LanguageContext';
 
 function formatPrice(fils: number) {
   return `${(fils / 1000).toFixed(3)} KWD`;
@@ -20,6 +21,7 @@ function SuccessContent() {
   const { store } = useStore();
   const storeUrl = useStoreUrl();
   const { clearCart } = useCart();
+  const { t } = useLanguage();
 
   const [order, setOrder] = useState<Order | null>(null);
   const [, setIsLoading] = useState(true);
@@ -104,25 +106,30 @@ function SuccessContent() {
             </svg>
           </div>
 
-          <h1 className="mt-6 text-3xl font-bold text-foreground">Thank you for your order!</h1>
+          <h1 className="mt-6 text-3xl font-bold text-foreground">
+            {t('Thank you for your order!', 'شكراً لطلبك!')}
+          </h1>
           <p className="mt-2 text-lg text-muted-foreground">
-            Your order has been confirmed and will be shipped soon.
+            {t(
+              'Your order has been confirmed and will be shipped soon.',
+              'تم تأكيد طلبك وسيتم شحنه قريباً.'
+            )}
           </p>
 
           <div className="mt-8 rounded-xl border bg-white p-6 shadow-sm text-left">
             <div className="flex items-center justify-between border-b pb-4">
               <div>
-                <p className="text-sm text-muted-foreground">Order number</p>
+                <p className="text-sm text-muted-foreground">{t('Order number', 'رقم الطلب')}</p>
                 <p className="text-lg font-semibold text-foreground">
                   {order
                     ? `#${order.orderNumber}`
                     : orderId
                       ? `#${orderId.slice(0, 8)}...`
-                      : 'Processing'}
+                      : t('Processing', 'جاري المعالجة')}
                 </p>
               </div>
               <div className="text-right">
-                <p className="text-sm text-muted-foreground">Date</p>
+                <p className="text-sm text-muted-foreground">{t('Date', 'التاريخ')}</p>
                 <p className="text-foreground">
                   {order?.createdAt
                     ? new Date(order.createdAt).toLocaleDateString()
@@ -140,7 +147,9 @@ function SuccessContent() {
                       <p className="font-medium text-foreground">
                         {item.product?.name || 'Product'}
                       </p>
-                      <p className="text-sm text-muted-foreground">Qty: {item.quantity}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {t('Qty', 'الكمية')}: {item.quantity}
+                      </p>
                     </div>
                     <p className="font-medium text-foreground">
                       {formatPrice(item.price * item.quantity)}
@@ -148,7 +157,7 @@ function SuccessContent() {
                   </div>
                 ))}
                 <div className="flex items-center justify-between pt-3">
-                  <p className="font-semibold text-foreground">Total</p>
+                  <p className="font-semibold text-foreground">{t('Total', 'المجموع')}</p>
                   <p className="font-bold text-primary">{formatPrice(order.total)}</p>
                 </div>
               </div>
@@ -157,14 +166,16 @@ function SuccessContent() {
             {!order?.items && (
               <div className="py-4">
                 <p className="text-sm text-muted-foreground">
-                  We&apos;ll send you a confirmation email with your order details and tracking
-                  information once your order ships.
+                  {t(
+                    "We'll send you a confirmation email with your order details and tracking information once your order ships.",
+                    'سنرسل لك بريداً إلكترونياً للتأكيد يتضمن تفاصيل طلبك ومعلومات التتبع بمجرد شحن طلبك.'
+                  )}
                 </p>
               </div>
             )}
 
             <div className="border-t pt-4">
-              <h3 className="font-medium text-foreground">What&apos;s next?</h3>
+              <h3 className="font-medium text-foreground">{t("What's next?", 'ما التالي؟')}</h3>
               <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
                 <li className="flex items-center gap-2">
                   <svg
@@ -180,7 +191,7 @@ function SuccessContent() {
                       d="M5 13l4 4L19 7"
                     />
                   </svg>
-                  Order confirmation email sent
+                  {t('Order confirmation email sent', 'تم إرسال بريد تأكيد الطلب')}
                 </li>
                 <li className="flex items-center gap-2">
                   <svg
@@ -196,7 +207,7 @@ function SuccessContent() {
                       d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
                     />
                   </svg>
-                  Processing your order
+                  {t('Processing your order', 'جاري معالجة طلبك')}
                 </li>
                 <li className="flex items-center gap-2">
                   <svg
@@ -212,7 +223,10 @@ function SuccessContent() {
                       d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"
                     />
                   </svg>
-                  Order shipped (tracking sent via email)
+                  {t(
+                    'Order shipped (tracking sent via email)',
+                    'تم شحن الطلب (تم إرسال التتبع عبر البريد)'
+                  )}
                 </li>
                 <li className="flex items-center gap-2">
                   <svg
@@ -228,7 +242,7 @@ function SuccessContent() {
                       d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
                     />
                   </svg>
-                  Delivered to your doorstep
+                  {t('Delivered to your doorstep', 'تم التوصيل إلى باب منزلك')}
                 </li>
               </ul>
             </div>
@@ -236,19 +250,19 @@ function SuccessContent() {
 
           <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:justify-center">
             <Link href={storeUrl('/products')}>
-              <Button size="lg">Continue Shopping</Button>
+              <Button size="lg">{t('Continue Shopping', 'متابعة التسوق')}</Button>
             </Link>
             <Link href={storeUrl('/account/orders')}>
               <Button size="lg" variant="outline">
-                View Order Status
+                {t('View Order Status', 'عرض حالة الطلب')}
               </Button>
             </Link>
           </div>
 
           <p className="mt-8 text-sm text-muted-foreground">
-            Questions about your order?{' '}
+            {t('Questions about your order?', 'هل لديك أسئلة حول طلبك؟')}{' '}
             <Link href={storeUrl('/contact')} className="text-primary hover:underline">
-              Contact Support
+              {t('Contact Support', 'تواصل مع الدعم')}
             </Link>
           </p>
         </div>

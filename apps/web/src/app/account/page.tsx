@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { useStoreUrl } from '../../contexts/StoreContext';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 interface Order {
   id: string;
@@ -15,6 +16,7 @@ interface Order {
 
 export default function AccountDashboard() {
   const storeUrl = useStoreUrl();
+  const { t } = useLanguage();
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -66,8 +68,12 @@ export default function AccountDashboard() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Account Dashboard</h1>
-        <p className="mt-1 text-muted-foreground">Manage your account and view your orders</p>
+        <h1 className="text-2xl font-bold text-foreground">
+          {t('Account Dashboard', 'لوحة التحكم')}
+        </h1>
+        <p className="mt-1 text-muted-foreground">
+          {t('Manage your account and view your orders', 'إدارة حسابك وعرض طلباتك')}
+        </p>
       </div>
 
       {/* Error Display */}
@@ -92,7 +98,7 @@ export default function AccountDashboard() {
               onClick={() => fetchOrders()}
               className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
             >
-              Retry
+              {t('Retry', 'إعادة المحاولة')}
             </button>
           </div>
         </div>
@@ -119,7 +125,7 @@ export default function AccountDashboard() {
             </div>
             <div>
               <p className="text-2xl font-bold text-foreground">{recentOrders.length}</p>
-              <p className="text-sm text-muted-foreground">Total Orders</p>
+              <p className="text-sm text-muted-foreground">{t('Total Orders', 'إجمالي الطلبات')}</p>
             </div>
           </div>
         </div>
@@ -149,7 +155,9 @@ export default function AccountDashboard() {
             </div>
             <div>
               <p className="text-2xl font-bold text-foreground">0</p>
-              <p className="text-sm text-muted-foreground">Saved Addresses</p>
+              <p className="text-sm text-muted-foreground">
+                {t('Saved Addresses', 'العناوين المحفوظة')}
+              </p>
             </div>
           </div>
         </div>
@@ -173,7 +181,9 @@ export default function AccountDashboard() {
             </div>
             <div>
               <p className="text-2xl font-bold text-foreground">0</p>
-              <p className="text-sm text-muted-foreground">Wishlist Items</p>
+              <p className="text-sm text-muted-foreground">
+                {t('Wishlist Items', 'قائمة الأمنيات')}
+              </p>
             </div>
           </div>
         </div>
@@ -182,9 +192,9 @@ export default function AccountDashboard() {
       {/* Recent Orders */}
       <div className="rounded-xl border bg-white shadow-sm">
         <div className="flex items-center justify-between border-b p-4">
-          <h2 className="font-semibold text-foreground">Recent Orders</h2>
+          <h2 className="font-semibold text-foreground">{t('Recent Orders', 'الطلبات الأخيرة')}</h2>
           <Link href={storeUrl('/account/orders')} className="text-sm text-primary hover:underline">
-            View All
+            {t('View All', 'عرض الكل')}
           </Link>
         </div>
 
@@ -226,12 +236,12 @@ export default function AccountDashboard() {
                 d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
               />
             </svg>
-            <p className="mt-4 text-muted-foreground">No orders yet</p>
+            <p className="mt-4 text-muted-foreground">{t('No orders yet', 'لا توجد طلبات بعد')}</p>
             <Link
               href={storeUrl('/products')}
               className="mt-2 inline-block text-primary hover:underline"
             >
-              Start shopping
+              {t('Start shopping', 'ابدأ التسوق')}
             </Link>
           </div>
         )}
@@ -259,8 +269,10 @@ export default function AccountDashboard() {
             </svg>
           </div>
           <div>
-            <p className="font-medium text-foreground">Add Address</p>
-            <p className="text-sm text-muted-foreground">Save a new delivery address</p>
+            <p className="font-medium text-foreground">{t('Add Address', 'إضافة عنوان')}</p>
+            <p className="text-sm text-muted-foreground">
+              {t('Save a new delivery address', 'حفظ عنوان توصيل جديد')}
+            </p>
           </div>
         </Link>
 
@@ -290,8 +302,10 @@ export default function AccountDashboard() {
             </svg>
           </div>
           <div>
-            <p className="font-medium text-foreground">Account Settings</p>
-            <p className="text-sm text-muted-foreground">Update your profile and password</p>
+            <p className="font-medium text-foreground">{t('Account Settings', 'إعدادات الحساب')}</p>
+            <p className="text-sm text-muted-foreground">
+              {t('Update your profile and password', 'تحديث ملفك الشخصي وكلمة المرور')}
+            </p>
           </div>
         </Link>
       </div>

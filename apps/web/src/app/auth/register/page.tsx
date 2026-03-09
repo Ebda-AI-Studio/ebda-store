@@ -7,11 +7,13 @@ import Link from 'next/link';
 import { Button, Input } from '@force/ui';
 import { api } from '@/lib/api';
 import { useStore, useStoreUrl } from '../../../contexts/StoreContext';
+import { useLanguage } from '../../../contexts/LanguageContext';
 
 export default function RegisterPage() {
   const router = useRouter();
   const { store } = useStore();
   const storeUrl = useStoreUrl();
+  const { t } = useLanguage();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [formData, setFormData] = useState({
@@ -82,15 +84,15 @@ export default function RegisterPage() {
             <span className="text-2xl font-bold text-foreground">{store.name}</span>
           </Link>
           <h2 className="mt-6 text-3xl font-bold tracking-tight text-foreground">
-            Create your account
+            {t('Create your account', 'إنشاء حسابك')}
           </h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Already have an account?{' '}
+            {t('Already have an account?', 'لديك حساب بالفعل؟')}{' '}
             <Link
               href={storeUrl('/auth/login')}
               className="font-medium text-primary hover:underline"
             >
-              Sign in
+              {t('Sign in', 'تسجيل الدخول')}
             </Link>
           </p>
         </div>
@@ -104,14 +106,14 @@ export default function RegisterPage() {
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="grid grid-cols-2 gap-4">
               <Input
-                label="First name"
+                label={t('First name', 'الاسم الأول')}
                 autoComplete="given-name"
                 value={formData.firstName}
                 onChange={e => setFormData({ ...formData, firstName: e.target.value })}
                 required
               />
               <Input
-                label="Last name"
+                label={t('Last name', 'اسم العائلة')}
                 autoComplete="family-name"
                 value={formData.lastName}
                 onChange={e => setFormData({ ...formData, lastName: e.target.value })}
@@ -120,7 +122,7 @@ export default function RegisterPage() {
             </div>
 
             <Input
-              label="Email address"
+              label={t('Email address', 'البريد الإلكتروني')}
               type="email"
               autoComplete="email"
               value={formData.email}
@@ -129,7 +131,7 @@ export default function RegisterPage() {
             />
 
             <Input
-              label="Password"
+              label={t('Password', 'كلمة المرور')}
               type="password"
               autoComplete="new-password"
               value={formData.password}
@@ -138,7 +140,7 @@ export default function RegisterPage() {
             />
 
             <Input
-              label="Confirm password"
+              label={t('Confirm password', 'تأكيد كلمة المرور')}
               type="password"
               autoComplete="new-password"
               value={formData.confirmPassword}
@@ -154,19 +156,19 @@ export default function RegisterPage() {
                 required
               />
               <label htmlFor="terms" className="text-sm text-muted-foreground">
-                I agree to the{' '}
+                {t('I agree to the', 'أوافق على')}{' '}
                 <Link href={storeUrl('/terms')} className="text-primary hover:underline">
-                  Terms of Service
+                  {t('Terms of Service', 'الشروط والأحكام')}
                 </Link>{' '}
-                and{' '}
+                {t('and', 'و')}{' '}
                 <Link href={storeUrl('/privacy')} className="text-primary hover:underline">
-                  Privacy Policy
+                  {t('Privacy Policy', 'سياسة الخصوصية')}
                 </Link>
               </label>
             </div>
 
             <Button type="submit" className="w-full" size="lg" isLoading={isLoading}>
-              Create account
+              {t('Create account', 'إنشاء حساب')}
             </Button>
           </form>
         </div>

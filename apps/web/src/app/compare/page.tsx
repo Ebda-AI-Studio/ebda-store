@@ -6,6 +6,7 @@ import { useToast } from '@force/ui';
 import { Header, Footer } from '../../components';
 import { useCart } from '../../contexts/CartContext';
 import { useStoreUrl } from '../../contexts/StoreContext';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 interface CompareProduct {
   id: string;
@@ -38,6 +39,7 @@ export default function ComparePage() {
   const { addItem } = useCart();
   const storeUrl = useStoreUrl();
   const { success: toastSuccess } = useToast();
+  const { t } = useLanguage();
 
   function handleAddToCart(product: CompareProduct) {
     addItem({
@@ -47,7 +49,10 @@ export default function ComparePage() {
       slug: product.slug,
       image: product.images?.[0],
     });
-    toastSuccess('Added to cart!', `${product.name} added to your cart`);
+    toastSuccess(
+      t('Added to cart!', 'تمت الإضافة إلى السلة!'),
+      `${product.name} ${t('added to your cart', 'تمت إضافته إلى سلتك')}`
+    );
   }
 
   function removeProduct(productId: string) {
@@ -66,7 +71,7 @@ export default function ComparePage() {
       <main className="flex min-h-screen flex-col bg-background">
         <Header />
         <div className="container mx-auto px-4 py-8 flex-1">
-          <h1 className="text-3xl font-bold mb-8">Compare Products</h1>
+          <h1 className="text-3xl font-bold mb-8">{t('Compare Products', 'مقارنة المنتجات')}</h1>
           <div className="animate-pulse bg-muted h-96 rounded-lg"></div>
         </div>
         <Footer />
@@ -79,7 +84,7 @@ export default function ComparePage() {
       <main className="flex min-h-screen flex-col bg-background">
         <Header />
         <div className="container mx-auto px-4 py-8 flex-1">
-          <h1 className="text-3xl font-bold mb-8">Compare Products</h1>
+          <h1 className="text-3xl font-bold mb-8">{t('Compare Products', 'مقارنة المنتجات')}</h1>
           <div className="text-center py-12 bg-muted rounded-lg">
             <svg
               className="w-16 h-16 text-muted-foreground/70 mx-auto mb-4"
@@ -94,13 +99,17 @@ export default function ComparePage() {
                 d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
               />
             </svg>
-            <h2 className="text-xl font-semibold mb-2">No products to compare</h2>
-            <p className="text-muted-foreground mb-4">Add products to compare their features</p>
+            <h2 className="text-xl font-semibold mb-2">
+              {t('No products to compare', 'لا توجد منتجات للمقارنة')}
+            </h2>
+            <p className="text-muted-foreground mb-4">
+              {t('Add products to compare their features', 'أضف منتجات لمقارنة ميزاتها')}
+            </p>
             <Link
               href={storeUrl('/products')}
               className="inline-flex items-center px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90"
             >
-              Browse Products
+              {t('Browse Products', 'تصفح المنتجات')}
             </Link>
           </div>
         </div>
@@ -122,9 +131,9 @@ export default function ComparePage() {
       <Header />
       <div className="container mx-auto px-4 py-8 flex-1">
         <div className="flex items-center justify-between mb-8">
-          <h1 className="text-3xl font-bold">Compare Products</h1>
+          <h1 className="text-3xl font-bold">{t('Compare Products', 'مقارنة المنتجات')}</h1>
           <button onClick={clearAll} className="text-red-600 hover:text-red-700 text-sm">
-            Clear All
+            {t('Clear All', 'مسح الكل')}
           </button>
         </div>
 
@@ -132,7 +141,7 @@ export default function ComparePage() {
           <table className="w-full min-w-[600px]">
             <thead>
               <tr>
-                <th className="text-left p-4 bg-muted w-1/4">Product</th>
+                <th className="text-left p-4 bg-muted w-1/4">{t('Product', 'المنتج')}</th>
                 {products.map(product => (
                   <th key={product.id} className="p-4 bg-muted">
                     <div className="relative">
@@ -191,7 +200,7 @@ export default function ComparePage() {
             </thead>
             <tbody>
               <tr className="border-t">
-                <td className="p-4 font-medium text-muted-foreground">Price</td>
+                <td className="p-4 font-medium text-muted-foreground">{t('Price', 'السعر')}</td>
                 {products.map(product => (
                   <td key={product.id} className="p-4 text-center">
                     <span className="font-bold text-lg">
@@ -206,7 +215,9 @@ export default function ComparePage() {
                 ))}
               </tr>
               <tr className="border-t">
-                <td className="p-4 font-medium text-muted-foreground">Description</td>
+                <td className="p-4 font-medium text-muted-foreground">
+                  {t('Description', 'الوصف')}
+                </td>
                 {products.map(product => (
                   <td key={product.id} className="p-4 text-center text-sm text-muted-foreground">
                     {product.description ? (
@@ -237,7 +248,7 @@ export default function ComparePage() {
                       onClick={() => handleAddToCart(product)}
                       className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                     >
-                      Add to Cart
+                      {t('Add to Cart', 'أضف إلى السلة')}
                     </button>
                   </td>
                 ))}

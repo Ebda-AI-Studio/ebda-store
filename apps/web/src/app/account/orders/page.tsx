@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { useStoreUrl } from '../../../contexts/StoreContext';
+import { useLanguage } from '../../../contexts/LanguageContext';
 
 interface Order {
   id: string;
@@ -25,6 +26,7 @@ interface Order {
 
 export default function OrdersPage() {
   const storeUrl = useStoreUrl();
+  const { t } = useLanguage();
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -74,12 +76,24 @@ export default function OrdersPage() {
     cancelled: 'bg-red-100 text-red-800',
   };
 
+  const statusLabels: Record<string, [string, string]> = {
+    pending: ['Pending', 'قيد الانتظار'],
+    processing: ['Processing', 'قيد المعالجة'],
+    shipped: ['Shipped', 'تم الشحن'],
+    delivered: ['Delivered', 'تم التوصيل'],
+    cancelled: ['Cancelled', 'ملغي'],
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Order History</h1>
-          <p className="mt-1 text-muted-foreground">View and track your orders</p>
+          <h1 className="text-2xl font-bold text-foreground">
+            {t('Order History', 'سجل الطلبات')}
+          </h1>
+          <p className="mt-1 text-muted-foreground">
+            {t('View and track your orders', 'عرض وتتبع طلباتك')}
+          </p>
         </div>
         <div className="flex justify-center py-12">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
@@ -91,8 +105,10 @@ export default function OrdersPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Order History</h1>
-        <p className="mt-1 text-muted-foreground">View and track your orders</p>
+        <h1 className="text-2xl font-bold text-foreground">{t('Order History', 'سجل الطلبات')}</h1>
+        <p className="mt-1 text-muted-foreground">
+          {t('View and track your orders', 'عرض وتتبع طلباتك')}
+        </p>
       </div>
 
       {/* Error Display */}
@@ -117,7 +133,7 @@ export default function OrdersPage() {
               onClick={() => fetchOrders()}
               className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
             >
-              Retry
+              {t('Retry', 'إعادة المحاولة')}
             </button>
           </div>
         </div>
@@ -130,22 +146,26 @@ export default function OrdersPage() {
               <div className="flex flex-wrap items-center justify-between gap-4 border-b bg-muted p-4">
                 <div className="flex flex-wrap items-center gap-4">
                   <div>
-                    <p className="text-sm text-muted-foreground">Order Number</p>
+                    <p className="text-sm text-muted-foreground">
+                      {t('Order Number', 'رقم الطلب')}
+                    </p>
                     <p className="font-medium text-foreground">#{order.orderNumber}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Date</p>
+                    <p className="text-sm text-muted-foreground">{t('Date', 'التاريخ')}</p>
                     <p className="font-medium text-foreground">{formatDate(order.createdAt)}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Total</p>
+                    <p className="text-sm text-muted-foreground">{t('Total', 'الإجمالي')}</p>
                     <p className="font-medium text-foreground">{formatPrice(order.total)}</p>
                   </div>
                 </div>
                 <span
                   className={`inline-flex rounded-full px-3 py-1 text-sm font-medium ${statusColors[order.status] || 'bg-muted text-foreground'}`}
                 >
-                  {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                  {statusLabels[order.status]
+                    ? t(statusLabels[order.status][0], statusLabels[order.status][1])
+                    : order.status.charAt(0).toUpperCase() + order.status.slice(1)}
                 </span>
               </div>
 
@@ -183,14 +203,18 @@ export default function OrdersPage() {
                           <p className="font-medium text-foreground">
                             {item.product?.name || 'Product'}
                           </p>
-                          <p className="text-sm text-muted-foreground">Qty: {item.quantity}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {t('Qty', 'الكمية')}: {item.quantity}
+                          </p>
                         </div>
                         <p className="font-medium text-foreground">{formatPrice(item.price)}</p>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground">No items in this order</p>
+                  <p className="text-sm text-muted-foreground">
+                    {t('No items in this order', 'لا توجد منتجات في هذا الطلب')}
+                  </p>
                 )}
               </div>
 
@@ -201,14 +225,14 @@ export default function OrdersPage() {
                     title="Tracking info not available yet"
                     disabled
                   >
-                    Track Order
+                    {t('Track Order', 'تتبع الطلب')}
                   </button>
                 ) : null}
                 <Link
                   href={storeUrl(`/account/orders/${order.id}`)}
                   className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90"
                 >
-                  View Details
+                  {t('View Details', 'عرض التفاصيل')}
                 </Link>
               </div>
             </div>
@@ -229,15 +253,17 @@ export default function OrdersPage() {
               d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
             />
           </svg>
-          <h3 className="mt-4 text-lg font-medium text-foreground">No orders yet</h3>
+          <h3 className="mt-4 text-lg font-medium text-foreground">
+            {t('No orders yet', 'لا توجد طلبات بعد')}
+          </h3>
           <p className="mt-2 text-muted-foreground">
-            When you place orders, they will appear here.
+            {t('When you place orders, they will appear here.', 'عندما تقوم بطلبات، ستظهر هنا.')}
           </p>
           <Link
             href={storeUrl('/products')}
             className="mt-6 inline-flex items-center rounded-lg bg-primary px-6 py-3 font-medium text-white hover:bg-primary/90"
           >
-            Start Shopping
+            {t('Start Shopping', 'ابدأ التسوق')}
           </Link>
         </div>
       ) : null}

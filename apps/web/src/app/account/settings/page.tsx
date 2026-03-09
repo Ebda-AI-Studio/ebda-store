@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, Input } from '@force/ui';
 import { api } from '@/lib/api';
+import { useLanguage } from '../../../contexts/LanguageContext';
 
 interface User {
   id: string;
@@ -15,6 +16,7 @@ interface User {
 
 export default function SettingsPage() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -197,8 +199,12 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Account Settings</h1>
-        <p className="mt-1 text-gray-500">Manage your profile and security</p>
+        <h1 className="text-2xl font-bold text-gray-900">
+          {t('Account Settings', 'إعدادات الحساب')}
+        </h1>
+        <p className="mt-1 text-gray-500">
+          {t('Manage your profile and security', 'إدارة ملفك الشخصي والأمان')}
+        </p>
       </div>
 
       {message && (
@@ -214,19 +220,23 @@ export default function SettingsPage() {
       {/* Profile Settings */}
       <div className="rounded-xl border bg-white shadow-sm">
         <div className="border-b p-4">
-          <h2 className="font-semibold text-gray-900">Profile Information</h2>
-          <p className="text-sm text-gray-500">Update your personal details</p>
+          <h2 className="font-semibold text-gray-900">
+            {t('Profile Information', 'المعلومات الشخصية')}
+          </h2>
+          <p className="text-sm text-gray-500">
+            {t('Update your personal details', 'تحديث بياناتك الشخصية')}
+          </p>
         </div>
         <form onSubmit={handleProfileSubmit} className="p-6 space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <Input
-              label="First Name"
+              label={t('First Name', 'الاسم الأول')}
               value={profileData.firstName}
               onChange={e => setProfileData({ ...profileData, firstName: e.target.value })}
               required
             />
             <Input
-              label="Last Name"
+              label={t('Last Name', 'الاسم الأخير')}
               value={profileData.lastName}
               onChange={e => setProfileData({ ...profileData, lastName: e.target.value })}
               required
@@ -234,7 +244,7 @@ export default function SettingsPage() {
           </div>
 
           <Input
-            label="Email Address"
+            label={t('Email Address', 'البريد الإلكتروني')}
             type="email"
             value={profileData.email}
             onChange={e => setProfileData({ ...profileData, email: e.target.value })}
@@ -242,7 +252,7 @@ export default function SettingsPage() {
           />
 
           <Input
-            label="Phone Number"
+            label={t('Phone Number', 'رقم الهاتف')}
             type="tel"
             value={profileData.phone}
             onChange={e => setProfileData({ ...profileData, phone: e.target.value })}
@@ -250,7 +260,7 @@ export default function SettingsPage() {
 
           <div className="pt-4">
             <Button type="submit" isLoading={isSaving}>
-              Save Changes
+              {t('Save Changes', 'حفظ التغييرات')}
             </Button>
           </div>
         </form>
@@ -259,12 +269,19 @@ export default function SettingsPage() {
       {/* Password Settings */}
       <div className="rounded-xl border bg-white shadow-sm">
         <div className="border-b p-4">
-          <h2 className="font-semibold text-gray-900">Change Password</h2>
-          <p className="text-sm text-gray-500">Update your password to keep your account secure</p>
+          <h2 className="font-semibold text-gray-900">
+            {t('Change Password', 'تغيير كلمة المرور')}
+          </h2>
+          <p className="text-sm text-gray-500">
+            {t(
+              'Update your password to keep your account secure',
+              'حدّث كلمة المرور للحفاظ على أمان حسابك'
+            )}
+          </p>
         </div>
         <form onSubmit={handlePasswordSubmit} className="p-6 space-y-4">
           <Input
-            label="Current Password"
+            label={t('Current Password', 'كلمة المرور الحالية')}
             type="password"
             value={passwordData.currentPassword}
             onChange={e => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
@@ -272,7 +289,7 @@ export default function SettingsPage() {
           />
 
           <Input
-            label="New Password"
+            label={t('New Password', 'كلمة المرور الجديدة')}
             type="password"
             value={passwordData.newPassword}
             onChange={e => setPasswordData({ ...passwordData, newPassword: e.target.value })}
@@ -280,7 +297,7 @@ export default function SettingsPage() {
           />
 
           <Input
-            label="Confirm New Password"
+            label={t('Confirm New Password', 'تأكيد كلمة المرور الجديدة')}
             type="password"
             value={passwordData.confirmPassword}
             onChange={e => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
@@ -289,7 +306,7 @@ export default function SettingsPage() {
 
           <div className="pt-4">
             <Button type="submit" isLoading={isSaving}>
-              Update Password
+              {t('Update Password', 'تحديث كلمة المرور')}
             </Button>
           </div>
         </form>
@@ -298,19 +315,24 @@ export default function SettingsPage() {
       {/* Danger Zone */}
       <div className="rounded-xl border border-red-200 bg-white shadow-sm">
         <div className="border-b border-red-200 bg-red-50 p-4">
-          <h2 className="font-semibold text-red-800">Danger Zone</h2>
-          <p className="text-sm text-red-600">Irreversible actions</p>
+          <h2 className="font-semibold text-red-800">{t('Danger Zone', 'منطقة الخطر')}</h2>
+          <p className="text-sm text-red-600">
+            {t('Irreversible actions', 'إجراءات لا يمكن التراجع عنها')}
+          </p>
         </div>
         <div className="p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-medium text-gray-900">Delete Account</p>
+              <p className="font-medium text-gray-900">{t('Delete Account', 'حذف الحساب')}</p>
               <p className="text-sm text-gray-500">
-                Permanently delete your account and all associated data
+                {t(
+                  'Permanently delete your account and all associated data',
+                  'حذف حسابك نهائياً وجميع البيانات المرتبطة به'
+                )}
               </p>
             </div>
             <Button variant="destructive" onClick={handleDeleteAccount} isLoading={isDeleting}>
-              Delete Account
+              {t('Delete Account', 'حذف الحساب')}
             </Button>
           </div>
         </div>

@@ -7,12 +7,14 @@ import Link from 'next/link';
 import { Button, Input } from '@force/ui';
 import { api } from '@/lib/api';
 import { useStore, useStoreUrl } from '../../../contexts/StoreContext';
+import { useLanguage } from '../../../contexts/LanguageContext';
 
 function ResetPasswordForm() {
   const searchParams = useSearchParams();
   const token = searchParams?.get('token') || '';
   const { store } = useStore();
   const storeUrl = useStoreUrl();
+  const { t } = useLanguage();
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -73,9 +75,11 @@ function ResetPasswordForm() {
             <span className="text-2xl font-bold text-foreground">{store.name}</span>
           </Link>
           <h2 className="mt-6 text-3xl font-bold tracking-tight text-foreground">
-            Reset your password
+            {t('Reset your password', 'إعادة تعيين كلمة المرور')}
           </h2>
-          <p className="mt-2 text-sm text-muted-foreground">Enter your new password below.</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {t('Enter your new password below.', 'أدخل كلمة المرور الجديدة أدناه.')}
+          </p>
         </div>
 
         {/* Form */}
@@ -97,15 +101,20 @@ function ResetPasswordForm() {
                   />
                 </svg>
               </div>
-              <h3 className="text-lg font-semibold text-foreground">Password reset successfully</h3>
+              <h3 className="text-lg font-semibold text-foreground">
+                {t('Password reset successfully', 'تم إعادة تعيين كلمة المرور بنجاح')}
+              </h3>
               <p className="text-sm text-muted-foreground">
-                Your password has been updated. You can now sign in with your new password.
+                {t(
+                  'Your password has been updated. You can now sign in with your new password.',
+                  'تم تحديث كلمة المرور. يمكنك الآن تسجيل الدخول بكلمة المرور الجديدة.'
+                )}
               </p>
               <Link
                 href={storeUrl('/auth/login')}
                 className="mt-4 inline-block font-medium text-primary hover:underline"
               >
-                Back to sign in
+                {t('Back to sign in', 'العودة لتسجيل الدخول')}
               </Link>
             </div>
           ) : (
@@ -116,13 +125,16 @@ function ResetPasswordForm() {
 
               {!token && (
                 <div className="mb-4 rounded-lg bg-yellow-50 p-3 text-sm text-yellow-700">
-                  No reset token found. Please use the link from your password reset email.
+                  {t(
+                    'No reset token found. Please use the link from your password reset email.',
+                    'لم يتم العثور على رمز إعادة التعيين. يرجى استخدام الرابط من بريد إعادة تعيين كلمة المرور.'
+                  )}
                 </div>
               )}
 
               <form onSubmit={handleSubmit} className="space-y-6">
                 <Input
-                  label="New Password"
+                  label={t('New Password', 'كلمة المرور الجديدة')}
                   type="password"
                   autoComplete="new-password"
                   value={formData.newPassword}
@@ -132,7 +144,7 @@ function ResetPasswordForm() {
                 />
 
                 <Input
-                  label="Confirm New Password"
+                  label={t('Confirm New Password', 'تأكيد كلمة المرور الجديدة')}
                   type="password"
                   autoComplete="new-password"
                   value={formData.confirmPassword}
@@ -148,7 +160,7 @@ function ResetPasswordForm() {
                   isLoading={isLoading}
                   disabled={!token}
                 >
-                  Reset Password
+                  {t('Reset Password', 'إعادة تعيين كلمة المرور')}
                 </Button>
               </form>
 
@@ -157,7 +169,7 @@ function ResetPasswordForm() {
                   href={storeUrl('/auth/login')}
                   className="text-sm text-primary hover:underline"
                 >
-                  Back to sign in
+                  {t('Back to sign in', 'العودة لتسجيل الدخول')}
                 </Link>
               </div>
             </>
@@ -165,9 +177,9 @@ function ResetPasswordForm() {
         </div>
 
         <p className="text-center text-xs text-muted-foreground">
-          Need a new reset link?{' '}
+          {t('Need a new reset link?', 'تحتاج رابط إعادة تعيين جديد؟')}{' '}
           <Link href={storeUrl('/auth/forgot-password')} className="text-primary hover:underline">
-            Request password reset
+            {t('Request password reset', 'طلب إعادة تعيين كلمة المرور')}
           </Link>
         </p>
       </div>

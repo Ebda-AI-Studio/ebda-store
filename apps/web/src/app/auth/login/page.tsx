@@ -8,6 +8,7 @@ import { Button, Input } from '@force/ui';
 import { api } from '@/lib/api';
 import { useCart } from '../../../contexts/CartContext';
 import { useStore, useStoreUrl } from '../../../contexts/StoreContext';
+import { useLanguage } from '../../../contexts/LanguageContext';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -15,6 +16,7 @@ export default function LoginPage() {
   const { store } = useStore();
   const storeUrl = useStoreUrl();
   const { syncCartToBackend } = useCart();
+  const { t } = useLanguage();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [formData, setFormData] = useState({
@@ -60,14 +62,16 @@ export default function LoginPage() {
             )}
             <span className="text-2xl font-bold text-foreground">{store.name}</span>
           </Link>
-          <h2 className="mt-6 text-3xl font-bold tracking-tight text-foreground">Welcome back</h2>
+          <h2 className="mt-6 text-3xl font-bold tracking-tight text-foreground">
+            {t('Welcome back', 'مرحباً بعودتك')}
+          </h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Don&apos;t have an account?{' '}
+            {t("Don't have an account?", 'ليس لديك حساب؟')}{' '}
             <Link
               href={storeUrl('/auth/register')}
               className="font-medium text-primary hover:underline"
             >
-              Sign up
+              {t('Sign up', 'إنشاء حساب')}
             </Link>
           </p>
         </div>
@@ -80,7 +84,7 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <Input
-              label="Email address"
+              label={t('Email address', 'البريد الإلكتروني')}
               type="email"
               autoComplete="email"
               value={formData.email}
@@ -90,7 +94,7 @@ export default function LoginPage() {
 
             <div>
               <Input
-                label="Password"
+                label={t('Password', 'كلمة المرور')}
                 type="password"
                 autoComplete="current-password"
                 value={formData.password}
@@ -102,25 +106,25 @@ export default function LoginPage() {
                   href={storeUrl('/auth/forgot-password')}
                   className="text-sm text-primary hover:underline"
                 >
-                  Forgot password?
+                  {t('Forgot password?', 'نسيت كلمة المرور؟')}
                 </Link>
               </div>
             </div>
 
             <Button type="submit" className="w-full" size="lg" isLoading={isLoading}>
-              Sign in
+              {t('Sign in', 'تسجيل الدخول')}
             </Button>
           </form>
         </div>
 
         <p className="text-center text-xs text-muted-foreground">
-          By signing in, you agree to our{' '}
+          {t('By signing in, you agree to our', 'بتسجيل الدخول، أنت توافق على')}{' '}
           <Link href={storeUrl('/terms')} className="text-primary hover:underline">
-            Terms of Service
+            {t('Terms of Service', 'الشروط والأحكام')}
           </Link>{' '}
-          and{' '}
+          {t('and', 'و')}{' '}
           <Link href={storeUrl('/privacy')} className="text-primary hover:underline">
-            Privacy Policy
+            {t('Privacy Policy', 'سياسة الخصوصية')}
           </Link>
         </p>
       </div>

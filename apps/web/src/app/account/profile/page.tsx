@@ -5,10 +5,12 @@ import { useRouter } from 'next/navigation';
 import { Button, Input, useToast } from '@force/ui';
 import { api } from '@/lib/api';
 import { useAuth } from '../../../contexts/AuthContext';
+import { useLanguage } from '../../../contexts/LanguageContext';
 
 export default function ProfilePage() {
   const router = useRouter();
   const { user, isAuthenticated, isLoading: authLoading, refreshUser } = useAuth();
+  const { t } = useLanguage();
   const { success, error: toastError } = useToast();
 
   const [isLoading, setIsLoading] = useState(true);
@@ -107,7 +109,7 @@ export default function ProfilePage() {
   if (isLoading || authLoading) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold text-gray-900">My Profile</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{t('My Profile', 'ملفي الشخصي')}</h1>
         <div className="flex justify-center py-12">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
         </div>
@@ -118,25 +120,29 @@ export default function ProfilePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">My Profile</h1>
-        <p className="mt-1 text-gray-500">Manage your personal information</p>
+        <h1 className="text-2xl font-bold text-gray-900">{t('My Profile', 'ملفي الشخصي')}</h1>
+        <p className="mt-1 text-gray-500">
+          {t('Manage your personal information', 'إدارة معلوماتك الشخصية')}
+        </p>
       </div>
 
       <div className="max-w-2xl space-y-6">
         {/* Personal Information */}
         <div className="rounded-xl border bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900 mb-6">Personal Information</h2>
+          <h2 className="text-lg font-semibold text-gray-900 mb-6">
+            {t('Personal Information', 'المعلومات الشخصية')}
+          </h2>
 
           <form onSubmit={handleSaveProfile} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <Input
-                label="First Name"
+                label={t('First Name', 'الاسم الأول')}
                 value={profile.firstName}
                 onChange={e => setProfile({ ...profile, firstName: e.target.value })}
                 required
               />
               <Input
-                label="Last Name"
+                label={t('Last Name', 'الاسم الأخير')}
                 value={profile.lastName}
                 onChange={e => setProfile({ ...profile, lastName: e.target.value })}
                 required
@@ -144,7 +150,7 @@ export default function ProfilePage() {
             </div>
 
             <Input
-              label="Email"
+              label={t('Email', 'البريد الإلكتروني')}
               type="email"
               value={profile.email}
               disabled
@@ -152,7 +158,7 @@ export default function ProfilePage() {
             />
 
             <Input
-              label="Phone"
+              label={t('Phone', 'الهاتف')}
               type="tel"
               value={profile.phone}
               onChange={e => setProfile({ ...profile, phone: e.target.value })}
@@ -160,14 +166,16 @@ export default function ProfilePage() {
             />
 
             <Button type="submit" isLoading={isSaving}>
-              Save Changes
+              {t('Save Changes', 'حفظ التغييرات')}
             </Button>
           </form>
         </div>
 
         {/* Change Password */}
         <div className="rounded-xl border bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900 mb-6">Change Password</h2>
+          <h2 className="text-lg font-semibold text-gray-900 mb-6">
+            {t('Change Password', 'تغيير كلمة المرور')}
+          </h2>
 
           {passwordError && (
             <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">
@@ -177,21 +185,21 @@ export default function ProfilePage() {
 
           <form onSubmit={handleChangePassword} className="space-y-4">
             <Input
-              label="Current Password"
+              label={t('Current Password', 'كلمة المرور الحالية')}
               type="password"
               value={passwords.currentPassword}
               onChange={e => setPasswords({ ...passwords, currentPassword: e.target.value })}
               required
             />
             <Input
-              label="New Password"
+              label={t('New Password', 'كلمة المرور الجديدة')}
               type="password"
               value={passwords.newPassword}
               onChange={e => setPasswords({ ...passwords, newPassword: e.target.value })}
               required
             />
             <Input
-              label="Confirm New Password"
+              label={t('Confirm New Password', 'تأكيد كلمة المرور الجديدة')}
               type="password"
               value={passwords.confirmPassword}
               onChange={e => setPasswords({ ...passwords, confirmPassword: e.target.value })}
@@ -199,7 +207,7 @@ export default function ProfilePage() {
             />
 
             <Button type="submit" variant="outline" isLoading={isChangingPassword}>
-              Update Password
+              {t('Update Password', 'تحديث كلمة المرور')}
             </Button>
           </form>
         </div>
