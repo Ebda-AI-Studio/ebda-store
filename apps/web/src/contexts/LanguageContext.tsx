@@ -15,17 +15,24 @@ interface LanguageContextType {
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
 // Get initial language from localStorage (client-side only)
-function getInitialLanguage(): Language {
-  if (typeof window === 'undefined') return 'en';
+function getInitialLanguage(storeDefault?: Language): Language {
+  if (typeof window === 'undefined') return storeDefault || 'en';
   const savedLang = localStorage.getItem('force-language') as Language;
   if (savedLang && ['en', 'ar'].includes(savedLang)) {
     return savedLang;
   }
-  return 'en';
+  return storeDefault || 'en';
 }
 
-export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [language, setLanguageState] = useState<Language>(getInitialLanguage);
+interface LanguageProviderProps {
+  children: ReactNode;
+  defaultLanguage?: Language;
+}
+
+export function LanguageProvider({ children, defaultLanguage }: LanguageProviderProps) {
+  const [language, setLanguageState] = useState<Language>(() =>
+    getInitialLanguage(defaultLanguage)
+  );
   const direction: Direction = language === 'ar' ? 'rtl' : 'ltr';
 
   // Use useLayoutEffect to avoid flash - sync document attributes

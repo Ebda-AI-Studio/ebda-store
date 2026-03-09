@@ -91,7 +91,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       >
         <StoreProvider initialStore={store}>
           <AuthProvider>
-            <LanguageProvider>
+            <LanguageProvider
+              defaultLanguage={
+                (store.settings as Record<string, unknown>)?.defaultLanguage as
+                  | 'en'
+                  | 'ar'
+                  | undefined
+              }
+            >
               <CartProvider>
                 <ToastProvider>{children}</ToastProvider>
               </CartProvider>

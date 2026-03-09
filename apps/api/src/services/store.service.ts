@@ -144,13 +144,20 @@ export class StoreService {
       }
     }
 
+    // Merge settings instead of replacing entirely
+    let mergedSettings = data.settings;
+    if (data.settings && typeof data.settings === 'object') {
+      const existingSettings = (store.settings as Record<string, unknown>) || {};
+      mergedSettings = { ...existingSettings, ...(data.settings as Record<string, unknown>) };
+    }
+
     const updatedStore = await prisma.store.update({
       where: { id: storeId },
       data: {
         name: data.name,
         slug: data.slug,
         domain: data.domain,
-        settings: data.settings,
+        settings: mergedSettings,
       },
       include: {
         owner: {
