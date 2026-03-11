@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import type { HeaderProps } from '../types';
 
 export default function MinimalHeader({
@@ -34,7 +35,13 @@ export default function MinimalHeader({
           {/* Logo */}
           <Link href={urlPrefix || '/'} className="flex-shrink-0">
             {displayLogo ? (
-              <img src={displayLogo} alt={displayName} className="h-14 max-h-14 w-auto" />
+              <Image
+                src={displayLogo}
+                alt={displayName}
+                width={120}
+                height={56}
+                className="h-14 max-h-14 w-auto"
+              />
             ) : (
               <span className="text-sm tracking-[0.3em] uppercase font-light">{displayName}</span>
             )}

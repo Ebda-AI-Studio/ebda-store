@@ -15,14 +15,32 @@ declare module 'express-serve-static-core' {
   }
 }
 
-export function authenticate(req: Request, _res: Response, next: NextFunction): void {
+/**
+ * Extract token from Authorization header or HTTP-only cookie.
+ * The header takes precedence; the cookie is a fallback for
+ * browser-based requests that rely on cookie-based auth.
+ */
+function extractToken(req: Request): string | undefined {
   const authHeader = req.headers.authorization;
-
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    throw new AppError(401, 'UNAUTHORIZED', 'Authentication required');
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return authHeader.split(' ')[1];
   }
 
-  const token = authHeader.split(' ')[1];
+  // Fallback: check HTTP-only cookie set by login/register routes
+  const cookieToken = req.cookies?.token as string | undefined;
+  if (cookieToken) {
+    return cookieToken;
+  }
+
+  return undefined;
+}
+
+export function authenticate(req: Request, _res: Response, next: NextFunction): void {
+  const token = extractToken(req);
+
+  if (!token) {
+    throw new AppError(401, 'UNAUTHORIZED', 'Authentication required');
+  }
 
   try {
     const payload = jwt.verify(token, config.jwtSecret, {
@@ -41,15 +59,13 @@ export function authenticate(req: Request, _res: Response, next: NextFunction): 
  * Optional authentication - sets req.user if valid token provided, but doesn't require it
  */
 export function optionalAuthenticate(req: Request, _res: Response, next: NextFunction): void {
-  const authHeader = req.headers.authorization;
+  const token = extractToken(req);
 
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  if (!token) {
     // No token provided, continue without user
     next();
     return;
   }
-
-  const token = authHeader.split(' ')[1];
 
   try {
     const payload = jwt.verify(token, config.jwtSecret, {

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Button, Badge } from '@force/ui';
 import { AdminLayout } from '../components/AdminLayout';
 import { formatPrice, formatDate, formatNumber } from '../lib/format';
-import { getApiUrl } from '../lib/api';
+import { apiGet } from '../lib/api';
 import { useStore } from '../contexts/StoreContext';
 
 interface PlatformStats {
@@ -34,8 +34,6 @@ interface RecentOrder {
   store: { name: string };
 }
 
-const API_URL = getApiUrl();
-
 export default function DashboardPage() {
   const { selectedStoreId, stores: globalStores } = useStore();
   const storeName =
@@ -49,18 +47,18 @@ export default function DashboardPage() {
     async function fetchData() {
       try {
         setIsLoading(true);
-        const token = localStorage.getItem('authToken');
         const params = new URLSearchParams();
         if (selectedStoreId !== 'all') params.append('storeId', selectedStoreId);
         const qs = params.toString() ? `?${params}` : '';
-        const response = await fetch(`${API_URL}/api/v1/admin/dashboard${qs}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setStats(data.data.stats);
-          setRecentStores(data.data.recentStores || []);
-          setRecentOrders(data.data.recentOrders || []);
+        const { data } = await apiGet<{
+          stats: PlatformStats;
+          recentStores: RecentStore[];
+          recentOrders: RecentOrder[];
+        }>(`/api/v1/admin/dashboard${qs}`);
+        if (data) {
+          setStats(data.stats);
+          setRecentStores(data.recentStores || []);
+          setRecentOrders(data.recentOrders || []);
         }
       } catch (error) {
         console.error('Failed to fetch dashboard data:', error);

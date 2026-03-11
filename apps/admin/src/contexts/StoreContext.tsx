@@ -22,7 +22,7 @@ const StoreContext = createContext<StoreContextType | null>(null);
 const STORAGE_KEY = 'selectedStoreId';
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
-  const { token } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [stores, setStores] = useState<Store[]>([]);
   const [selectedStoreId, setSelectedStoreIdState] = useState<string>('all');
   const [isLoading, setIsLoading] = useState(true);
@@ -37,12 +37,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!token) return;
+    if (!isAuthenticated) return;
 
     async function fetchStores() {
       try {
         const response = await fetch(`${getApiUrl()}/api/v1/admin/stores`, {
-          headers: { Authorization: `Bearer ${token}` },
+          credentials: 'include',
         });
         if (response.ok) {
           const data = await response.json();
@@ -74,7 +74,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }
 
     fetchStores();
-  }, [token]);
+  }, [isAuthenticated]);
 
   const selectedStore = stores.find(s => s.id === selectedStoreId);
 

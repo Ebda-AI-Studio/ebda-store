@@ -30,9 +30,10 @@ export interface User {
   email: string;
   firstName: string;
   lastName: string;
+  phone?: string;
   role: UserRole;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Date | string;
+  updatedAt?: Date | string;
 }
 
 export type UserRole = 'customer' | 'store_admin' | 'super_admin';
@@ -42,15 +43,34 @@ export interface Store {
   id: string;
   name: string;
   slug: string;
-  domain?: string;
-  ownerId: string;
+  domain?: string | null;
+  logo?: string;
+  ownerId?: string;
   status: StoreStatus;
-  settings: StoreSettings;
-  createdAt: Date;
-  updatedAt: Date;
+  plan?: StorePlan;
+  settings?: StoreSettings | Record<string, unknown>;
+  owner?: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+  };
+  _count?: {
+    products: number;
+    orders: number;
+    customers?: number;
+  };
+  stats?: {
+    revenue: number;
+    ordersThisMonth: number;
+  };
+  createdAt: Date | string;
+  updatedAt?: Date | string;
 }
 
 export type StoreStatus = 'active' | 'inactive' | 'suspended';
+
+export type StorePlan = 'free' | 'starter' | 'professional' | 'enterprise';
 
 export interface StoreSettings {
   currency: string;
@@ -59,44 +79,108 @@ export interface StoreSettings {
   theme: string;
 }
 
-// Product Types
-export interface Product {
+// Category Types
+export interface Category {
   id: string;
-  storeId: string;
   name: string;
+  nameAr?: string | null;
   slug: string;
-  description: string;
+  description?: string | null;
+  descriptionAr?: string | null;
+  image?: string | null;
+  isActive?: boolean;
+  sortOrder?: number;
+  productCount?: number;
+  _count?: { products: number };
+}
+
+// Product Types
+export interface ProductImage {
+  id: string;
+  url: string;
+  alt?: string;
+  position: number;
+}
+
+export interface ProductCategory {
+  id?: string;
+  categoryId?: string;
+  category: {
+    id: string;
+    name: string;
+    nameAr?: string;
+    slug?: string;
+  };
+}
+
+export interface ProductTag {
+  tagId?: string;
+  tag: {
+    id: string;
+    name: string;
+  };
+}
+
+export interface ProductVariant {
+  id: string;
+  name?: string;
+  sku?: string;
   price: number;
   compareAtPrice?: number;
-  sku?: string;
+  inventory?: number;
+  options: Record<string, string>;
+}
+
+export interface ProductOption {
+  id: string;
+  name: string;
+  values: string[];
+}
+
+export interface Product {
+  id: string;
+  storeId?: string;
+  name: string;
+  nameAr?: string;
+  slug: string;
+  description?: string;
+  descriptionAr?: string;
+  price: number;
+  compareAtPrice?: number;
+  costPrice?: number;
+  sku?: string | null;
+  barcode?: string;
   inventory: number;
+  lowStockThreshold?: number;
+  trackInventory?: boolean;
   status: ProductStatus;
+  isFeatured?: boolean;
+  isNew?: boolean;
+  hasVariants?: boolean;
+  weight?: number;
   images: ProductImage[];
-  categories: string[];
-  tags: string[];
-  createdAt: Date;
-  updatedAt: Date;
+  categories?: ProductCategory[] | string[];
+  tags?: ProductTag[] | string[];
+  variants?: ProductVariant[];
+  options?: ProductOption[];
+  store?: { id: string; name: string; slug: string };
+  createdAt: Date | string;
+  updatedAt?: Date | string;
 }
 
 export type ProductStatus = 'draft' | 'active' | 'archived';
 
-export interface ProductImage {
-  id: string;
-  url: string;
-  alt: string;
-  position: number;
-}
-
 // Cart Types
 export interface Cart {
   id: string;
-  storeId: string;
+  storeId?: string;
   customerId?: string;
-  sessionId: string;
+  sessionId?: string;
   items: CartItem[];
   subtotal: number;
-  createdAt: Date;
-  updatedAt: Date;
+  total?: number;
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
 }
 
 export interface CartItem {
@@ -104,25 +188,37 @@ export interface CartItem {
   productId: string;
   quantity: number;
   price: number;
+  product?: Product;
 }
 
 // Order Types
+export interface OrderCustomer {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+}
+
 export interface Order {
   id: string;
-  storeId: string;
-  customerId: string;
-  orderNumber: string;
+  storeId?: string;
+  customerId?: string;
+  orderNumber?: string;
   status: OrderStatus;
-  items: OrderItem[];
-  subtotal: number;
-  tax: number;
-  shipping: number;
+  paymentStatus?: string;
+  items?: OrderItem[];
+  customer?: OrderCustomer;
+  subtotal?: number;
+  tax?: number;
+  shipping?: number;
   total: number;
-  shippingAddress: Address;
-  billingAddress: Address;
-  paymentMethod: string;
-  createdAt: Date;
-  updatedAt: Date;
+  shippingAddress?: Address | Record<string, string>;
+  billingAddress?: Address | Record<string, string>;
+  paymentMethod?: string;
+  trackingNumber?: string;
+  trackingUrl?: string;
+  createdAt: Date | string;
+  updatedAt?: Date | string;
 }
 
 export type OrderStatus =
@@ -137,9 +233,10 @@ export type OrderStatus =
 export interface OrderItem {
   id: string;
   productId: string;
-  productName: string;
+  productName?: string;
   quantity: number;
   price: number;
+  product?: Product;
 }
 
 export interface Address {

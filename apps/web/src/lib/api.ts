@@ -1,3 +1,27 @@
+/**
+ * Storefront (Web) App API Client
+ *
+ * Pattern: Class-based ApiClient instance that manages session IDs
+ * and store context headers automatically.
+ *
+ * Base URL includes the /api/v1 prefix and comes from NEXT_PUBLIC_API_URL.
+ * Auth is handled via HTTP-only cookies (set by the API on login).
+ * All requests use credentials: 'include' to send cookies automatically.
+ * A persistent session ID (X-Session-ID) is generated per browser for
+ * anonymous cart tracking. An optional X-Store-ID header supports
+ * multi-store routing.
+ *
+ * Usage:
+ *   import { api } from '@/lib/api';
+ *   const result = await api.getProducts({ page: '1', limit: '12' });
+ *   const result = await api.post<MyType>('/custom-endpoint', body);
+ *
+ * Note: The admin app uses a different pattern -- functional helpers
+ * (apiGet, apiPost, etc.) exported from apps/admin/src/lib/api.ts.
+ * The two patterns are intentionally kept separate because the storefront
+ * authenticates via 'accessToken' with session/store headers, while the
+ * admin app uses a simpler 'authToken' approach.
+ */
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
 
 // Common types
@@ -8,6 +32,32 @@ interface User {
   lastName: string;
   phone?: string;
   role: string;
+}
+
+interface ProductVariant {
+  id: string;
+  name?: string;
+  sku?: string;
+  price: number;
+  compareAtPrice?: number;
+  inventory?: number;
+  options: Record<string, string>;
+}
+
+interface ProductOption {
+  id: string;
+  name: string;
+  values: string[];
+}
+
+interface ProductCategory {
+  id: string;
+  category: {
+    id: string;
+    name: string;
+    nameAr?: string;
+    slug: string;
+  };
 }
 
 interface Product {
@@ -21,7 +71,10 @@ interface Product {
   inventory?: number;
   status: string;
   images: Array<{ id: string; url: string; alt?: string }>;
-  categories?: Array<{ id: string; name: string; slug: string }>;
+  categories?: ProductCategory[];
+  variants?: ProductVariant[];
+  options?: ProductOption[];
+  createdAt?: string;
 }
 
 interface Category {
@@ -123,25 +176,10 @@ interface CreateOrderData {
 
 class ApiClient {
   private baseUrl: string;
-  private accessToken: string | null = null;
   private storeId: string | null = null;
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl;
-    if (typeof window !== 'undefined') {
-      this.accessToken = localStorage.getItem('accessToken');
-    }
-  }
-
-  setToken(token: string | null) {
-    this.accessToken = token;
-    if (typeof window !== 'undefined') {
-      if (token) {
-        localStorage.setItem('accessToken', token);
-      } else {
-        localStorage.removeItem('accessToken');
-      }
-    }
   }
 
   setStoreId(storeId: string | null) {
@@ -152,7 +190,9 @@ class ApiClient {
     if (typeof window === 'undefined') return 'server';
     let sessionId = localStorage.getItem('sessionId');
     if (!sessionId) {
-      sessionId = `sess_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const array = new Uint8Array(16);
+      crypto.getRandomValues(array);
+      sessionId = `sess_${Array.from(array, b => b.toString(16).padStart(2, '0')).join('')}`;
       localStorage.setItem('sessionId', sessionId);
     }
     return sessionId;
@@ -165,9 +205,6 @@ class ApiClient {
       ...options.headers,
     };
 
-    if (this.accessToken) {
-      (headers as Record<string, string>)['Authorization'] = `Bearer ${this.accessToken}`;
-    }
     if (this.storeId) {
       (headers as Record<string, string>)['X-Store-ID'] = this.storeId;
     }
@@ -175,10 +212,22 @@ class ApiClient {
     try {
       const response = await fetch(`${this.baseUrl}${endpoint}`, {
         ...options,
+        credentials: 'include',
         headers,
       });
 
-      const data = await response.json();
+      let data: ApiResponse<T>;
+      try {
+        data = await response.json();
+      } catch (e) {
+        if (e instanceof SyntaxError) {
+          return {
+            success: false,
+            error: { code: 'INVALID_RESPONSE', message: 'Server returned an invalid response' },
+          };
+        }
+        throw e;
+      }
 
       if (!response.ok) {
         return {
@@ -211,7 +260,8 @@ class ApiClient {
     );
 
     if (result.success && result.data) {
-      this.setToken(result.data.accessToken);
+      // The access token is set as an HTTP-only cookie by the API response.
+      // Only store the refresh token in localStorage.
       if (typeof window !== 'undefined') {
         localStorage.setItem('refreshToken', result.data.refreshToken);
       }
@@ -227,7 +277,6 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify({ refreshToken }),
     });
-    this.setToken(null);
     if (typeof window !== 'undefined') {
       localStorage.removeItem('refreshToken');
     }
@@ -383,4 +432,18 @@ class ApiClient {
 }
 
 export const api = new ApiClient(API_URL);
-export type { ApiResponse, User, Product, Category, Cart, CartItem, Order, Store, PaginationMeta };
+export { API_URL };
+export type {
+  ApiResponse,
+  User,
+  Product,
+  ProductVariant,
+  ProductOption,
+  ProductCategory,
+  Category,
+  Cart,
+  CartItem,
+  Order,
+  Store,
+  PaginationMeta,
+};

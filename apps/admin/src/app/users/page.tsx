@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Button, Badge } from '@force/ui';
 import { AdminLayout } from '../../components/AdminLayout';
 import { ErrorState } from '../../components/ErrorState';
-import { getApiUrl } from '../../lib/api';
+import { apiGet } from '../../lib/api';
 
 interface User {
   id: string;
@@ -63,7 +63,6 @@ export default function UsersPage() {
   const fetchUsers = useCallback(async () => {
     try {
       setError(null);
-      const token = localStorage.getItem('authToken');
       const params = new URLSearchParams({
         page: pagination.page.toString(),
         limit: pagination.limit.toString(),
@@ -71,16 +70,15 @@ export default function UsersPage() {
       if (roleFilter !== 'all') params.append('role', roleFilter);
       if (search) params.append('search', search);
 
-      const response = await fetch(`${getApiUrl()}/api/v1/admin/users?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setUsers(data.data.users || []);
-        setPagination(prev => ({ ...prev, ...data.data.pagination }));
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        setError(errorData.error?.message || 'Failed to fetch users');
+      const { data, error: apiError } = await apiGet<{
+        users: User[];
+        pagination: Pagination;
+      }>(`/api/v1/admin/users?${params}`);
+      if (data) {
+        setUsers(data.users || []);
+        setPagination(prev => ({ ...prev, ...data.pagination }));
+      } else if (apiError) {
+        setError(apiError.message || 'Failed to fetch users');
       }
     } catch (error) {
       console.error('Failed to fetch users:', error);
@@ -163,29 +161,29 @@ export default function UsersPage() {
 
       {/* Users Table */}
       {!error && (
-        <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
+        <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
           <table className="w-full">
-            <thead className="bg-gray-50 border-b">
+            <thead className="bg-muted border-b">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   User
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Role
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Status
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Stores
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Joined
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Last Login
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
@@ -225,7 +223,7 @@ export default function UsersPage() {
                 ))
               ) : users.length > 0 ? (
                 users.map(user => (
-                  <tr key={user.id} className="hover:bg-gray-50">
+                  <tr key={user.id} className="hover:bg-muted">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
@@ -235,10 +233,10 @@ export default function UsersPage() {
                           </span>
                         </div>
                         <div>
-                          <p className="font-medium text-gray-900">
+                          <p className="font-medium text-foreground">
                             {user.firstName} {user.lastName}
                           </p>
-                          <p className="text-sm text-gray-500">{user.email}</p>
+                          <p className="text-sm text-muted-foreground">{user.email}</p>
                         </div>
                       </div>
                     </td>
@@ -248,7 +246,7 @@ export default function UsersPage() {
                     <td className="px-6 py-4">
                       <Badge variant={statusColors[user.status]}>{user.status}</Badge>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-500">
+                    <td className="px-6 py-4 text-sm text-muted-foreground">
                       {user.stores && user.stores.length > 0 ? (
                         <div className="flex flex-wrap gap-1">
                           {user.stores.slice(0, 2).map(store => (
@@ -268,10 +266,10 @@ export default function UsersPage() {
                         <span className="text-gray-400">-</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-500">
+                    <td className="px-6 py-4 text-sm text-muted-foreground">
                       {formatDate(user.createdAt)}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-500">
+                    <td className="px-6 py-4 text-sm text-muted-foreground">
                       {formatDate(user.lastLoginAt)}
                     </td>
                     <td className="px-6 py-4 text-right">
@@ -300,7 +298,7 @@ export default function UsersPage() {
                           d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
                         />
                       </svg>
-                      <p className="mt-4 text-gray-500">No users found</p>
+                      <p className="mt-4 text-muted-foreground">No users found</p>
                     </div>
                   </td>
                 </tr>
@@ -311,7 +309,7 @@ export default function UsersPage() {
           {/* Pagination */}
           {pagination.totalPages > 1 && (
             <div className="flex items-center justify-between border-t px-6 py-3">
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-muted-foreground">
                 Showing {(pagination.page - 1) * pagination.limit + 1} to{' '}
                 {Math.min(pagination.page * pagination.limit, pagination.total)} of{' '}
                 {pagination.total} users

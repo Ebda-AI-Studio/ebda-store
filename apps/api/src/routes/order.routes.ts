@@ -5,6 +5,7 @@ import { OrderService } from '../services/order.service';
 import { InvoiceService } from '../services/invoice.service';
 import { requirePermission, requireRole } from '../middleware/rbac';
 import { auditLog, writeLimiter } from '../middleware/security';
+import { getAuthUser } from '../utils/store-helpers';
 
 const router = Router({ mergeParams: true });
 
@@ -108,7 +109,7 @@ router.post('/', authenticate, async (req: Request, res: Response, next: NextFun
     const sessionId = getSessionId(req);
     const data = createOrderSchema.parse(req.body);
 
-    const order = await OrderService.create(storeId, req.user!.userId, sessionId, data);
+    const order = await OrderService.create(storeId, getAuthUser(req).userId, sessionId, data);
 
     res.status(201).json({
       success: true,
@@ -136,7 +137,7 @@ router.put(
       // Audit log
       await auditLog({
         action: 'order.status.updated',
-        userId: req.user!.userId,
+        userId: getAuthUser(req).userId,
         resourceType: 'order',
         resourceId: id,
         details: { previousStatus: previousOrder.status, newStatus: status },
@@ -179,11 +180,15 @@ router.get('/my/list', authenticate, async (req: Request, res: Response, next: N
   try {
     const { storeId } = req.params;
 
-    const orders = await OrderService.getCustomerOrders(storeId, req.user!.userId);
+    const { page, limit } = req.query;
+    const result = await OrderService.getCustomerOrders(storeId, getAuthUser(req).userId, {
+      page: page ? parseInt(page as string) : undefined,
+      limit: limit ? parseInt(limit as string) : undefined,
+    });
 
     res.json({
       success: true,
-      data: { orders },
+      data: result,
     });
   } catch (error) {
     next(error);

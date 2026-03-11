@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { AdminLayout } from '../../../../components/AdminLayout';
-import { getApiUrl } from '../../../../lib/api';
+import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '../../../../lib/api';
 
 interface Coupon {
   id: string;
@@ -23,8 +23,6 @@ interface Coupon {
   expiresAt?: string;
   createdAt: string;
 }
-
-const API_URL = getApiUrl();
 
 export default function CouponsPage() {
   const params = useParams();
@@ -61,35 +59,24 @@ export default function CouponsPage() {
   }, [storeId]);
 
   async function fetchStoreName() {
-    try {
-      const token = localStorage.getItem('authToken');
-      const response = await fetch(`${API_URL}/api/v1/stores/${storeId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await response.json();
-      if (data.success) {
-        setStoreName(data.data.store.name);
-      }
-    } catch (error) {
-      console.error('Failed to fetch store:', error);
+    const { data } = await apiGet<{ store: { name: string } }>(`/api/v1/stores/${storeId}`);
+    if (data) {
+      setStoreName(data.store.name);
     }
   }
 
   async function fetchCoupons() {
     try {
-      const token = localStorage.getItem('authToken');
       const params = new URLSearchParams();
       if (searchTerm) params.append('search', searchTerm);
       if (filterActive !== 'all')
         params.append('isActive', filterActive === 'active' ? 'true' : 'false');
 
-      const response = await fetch(`${API_URL}/api/v1/stores/${storeId}/coupons?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await response.json();
-
-      if (data.success) {
-        setCoupons(data.data.coupons);
+      const { data } = await apiGet<{ coupons: Coupon[] }>(
+        `/api/v1/stores/${storeId}/coupons?${params}`
+      );
+      if (data) {
+        setCoupons(data.coupons);
       }
     } catch (error) {
       console.error('Failed to fetch coupons:', error);
@@ -102,10 +89,9 @@ export default function CouponsPage() {
     e.preventDefault();
 
     try {
-      const token = localStorage.getItem('authToken');
-      const url = editingCoupon
-        ? `${API_URL}/api/v1/stores/${storeId}/coupons/${editingCoupon.id}`
-        : `${API_URL}/api/v1/stores/${storeId}/coupons`;
+      const endpoint = editingCoupon
+        ? `/api/v1/stores/${storeId}/coupons/${editingCoupon.id}`
+        : `/api/v1/stores/${storeId}/coupons`;
 
       const body = {
         code: formData.code,
@@ -127,22 +113,16 @@ export default function CouponsPage() {
         expiresAt: formData.expiresAt ? new Date(formData.expiresAt).toISOString() : undefined,
       };
 
-      const response = await fetch(url, {
-        method: editingCoupon ? 'PUT' : 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(body),
-      });
+      const { error } = editingCoupon
+        ? await apiPut(endpoint, body)
+        : await apiPost(endpoint, body);
 
-      if (response.ok) {
+      if (!error) {
         setShowModal(false);
         resetForm();
         fetchCoupons();
       } else {
-        const data = await response.json();
-        console.error('Failed to save coupon:', data.error?.message);
+        console.error('Failed to save coupon:', error.message);
       }
     } catch (error) {
       console.error('Failed to save coupon:', error);
@@ -151,13 +131,8 @@ export default function CouponsPage() {
 
   async function handleDelete(couponId: string) {
     try {
-      const token = localStorage.getItem('authToken');
-      const response = await fetch(`${API_URL}/api/v1/stores/${storeId}/coupons/${couponId}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (response.ok) {
+      const { error } = await apiDelete(`/api/v1/stores/${storeId}/coupons/${couponId}`);
+      if (!error) {
         fetchCoupons();
       }
     } catch (error) {
@@ -167,16 +142,8 @@ export default function CouponsPage() {
 
   async function handleToggleActive(couponId: string) {
     try {
-      const token = localStorage.getItem('authToken');
-      const response = await fetch(
-        `${API_URL}/api/v1/stores/${storeId}/coupons/${couponId}/toggle`,
-        {
-          method: 'PATCH',
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-
-      if (response.ok) {
+      const { error } = await apiPatch(`/api/v1/stores/${storeId}/coupons/${couponId}/toggle`);
+      if (!error) {
         fetchCoupons();
       }
     } catch (error) {
@@ -282,7 +249,7 @@ export default function CouponsPage() {
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && fetchCoupons()}
-              className="w-full max-w-md px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              className="w-full max-w-md px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
             />
           </div>
           <select
@@ -291,7 +258,7 @@ export default function CouponsPage() {
               setFilterActive(e.target.value as typeof filterActive);
               setTimeout(fetchCoupons, 0);
             }}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            className="px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
           >
             <option value="all">All Status</option>
             <option value="active">Active</option>
@@ -300,7 +267,7 @@ export default function CouponsPage() {
         </div>
 
         {/* Coupons Table */}
-        <div className="bg-white rounded-xl border overflow-hidden">
+        <div className="bg-card rounded-xl border overflow-hidden">
           {coupons.length === 0 ? (
             <div className="text-center py-12">
               <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
@@ -331,27 +298,27 @@ export default function CouponsPage() {
             </div>
           ) : (
             <table className="w-full">
-              <thead className="bg-gray-50 border-b">
+              <thead className="bg-muted border-b">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Code
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Name
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Type
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Value
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Usage
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Status
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
@@ -360,7 +327,7 @@ export default function CouponsPage() {
                 {coupons.map(coupon => {
                   const status = getCouponStatus(coupon);
                   return (
-                    <tr key={coupon.id} className="hover:bg-gray-50">
+                    <tr key={coupon.id} className="hover:bg-muted">
                       <td className="px-6 py-4">
                         <span className="font-mono text-sm bg-gray-100 px-2 py-1 rounded">
                           {coupon.code}
@@ -368,16 +335,16 @@ export default function CouponsPage() {
                       </td>
                       <td className="px-6 py-4">
                         <div>
-                          <p className="font-medium text-gray-900">{coupon.name}</p>
+                          <p className="font-medium text-foreground">{coupon.name}</p>
                           {coupon.nameAr && (
-                            <p className="text-sm text-gray-500" dir="rtl">
+                            <p className="text-sm text-muted-foreground" dir="rtl">
                               {coupon.nameAr}
                             </p>
                           )}
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <span className="capitalize text-sm text-gray-600">
+                        <span className="capitalize text-sm text-muted-foreground">
                           {coupon.type.replace('_', ' ')}
                         </span>
                       </td>
@@ -385,7 +352,7 @@ export default function CouponsPage() {
                         <span className="font-medium text-primary">{formatValue(coupon)}</span>
                       </td>
                       <td className="px-6 py-4">
-                        <span className="text-sm text-gray-600">
+                        <span className="text-sm text-muted-foreground">
                           {coupon.usageCount}
                           {coupon.usageLimit && ` / ${coupon.usageLimit}`}
                         </span>
@@ -489,8 +456,8 @@ export default function CouponsPage() {
         {/* Modal */}
         {showModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-              <div className="p-6 border-b sticky top-0 bg-white">
+            <div className="bg-card rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+              <div className="p-6 border-b sticky top-0 bg-card">
                 <h2 className="text-xl font-bold">
                   {editingCoupon ? 'Edit Coupon' : 'Create Coupon'}
                 </h2>
@@ -511,7 +478,7 @@ export default function CouponsPage() {
                         setFormData({ ...formData, code: e.target.value.toUpperCase() })
                       }
                       placeholder="SUMMER20"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary font-mono uppercase"
+                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary font-mono uppercase"
                     />
                   </div>
                   <div>
@@ -522,7 +489,7 @@ export default function CouponsPage() {
                       value={formData.name}
                       onChange={e => setFormData({ ...formData, name: e.target.value })}
                       placeholder="Summer Sale 20% Off"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
                     />
                   </div>
                 </div>
@@ -538,7 +505,7 @@ export default function CouponsPage() {
                       value={formData.nameAr}
                       onChange={e => setFormData({ ...formData, nameAr: e.target.value })}
                       placeholder="خصم الصيف ٢٠٪"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
                     />
                   </div>
                   <div>
@@ -550,7 +517,7 @@ export default function CouponsPage() {
                       value={formData.description}
                       onChange={e => setFormData({ ...formData, description: e.target.value })}
                       placeholder="Get 20% off on all summer items"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
                     />
                   </div>
                 </div>
@@ -566,7 +533,7 @@ export default function CouponsPage() {
                       onChange={e =>
                         setFormData({ ...formData, type: e.target.value as typeof formData.type })
                       }
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
                     >
                       <option value="percentage">Percentage Off</option>
                       <option value="fixed">Fixed Amount</option>
@@ -587,7 +554,7 @@ export default function CouponsPage() {
                         setFormData({ ...formData, value: parseFloat(e.target.value) || 0 })
                       }
                       disabled={formData.type === 'free_shipping'}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:bg-gray-100"
+                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:bg-gray-100"
                     />
                   </div>
                 </div>
@@ -605,7 +572,7 @@ export default function CouponsPage() {
                       value={formData.minOrderAmount}
                       onChange={e => setFormData({ ...formData, minOrderAmount: e.target.value })}
                       placeholder="10.000"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
                     />
                   </div>
                   {formData.type === 'percentage' && (
@@ -620,7 +587,7 @@ export default function CouponsPage() {
                         value={formData.maxDiscount}
                         onChange={e => setFormData({ ...formData, maxDiscount: e.target.value })}
                         placeholder="50.000"
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                        className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
                       />
                     </div>
                   )}
@@ -637,7 +604,7 @@ export default function CouponsPage() {
                       value={formData.usageLimit}
                       onChange={e => setFormData({ ...formData, usageLimit: e.target.value })}
                       placeholder="100"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
                     />
                   </div>
                   <div>
@@ -652,7 +619,7 @@ export default function CouponsPage() {
                         setFormData({ ...formData, usageLimitPerUser: e.target.value })
                       }
                       placeholder="1"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
                     />
                   </div>
                 </div>
@@ -667,7 +634,7 @@ export default function CouponsPage() {
                       type="datetime-local"
                       value={formData.startsAt}
                       onChange={e => setFormData({ ...formData, startsAt: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
                     />
                   </div>
                   <div>
@@ -678,7 +645,7 @@ export default function CouponsPage() {
                       type="datetime-local"
                       value={formData.expiresAt}
                       onChange={e => setFormData({ ...formData, expiresAt: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
                     />
                   </div>
                 </div>
@@ -690,7 +657,7 @@ export default function CouponsPage() {
                     id="isActive"
                     checked={formData.isActive}
                     onChange={e => setFormData({ ...formData, isActive: e.target.checked })}
-                    className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
+                    className="w-4 h-4 text-primary border-border rounded focus:ring-primary"
                   />
                   <label htmlFor="isActive" className="text-sm font-medium text-gray-700">
                     Coupon is active
@@ -705,7 +672,7 @@ export default function CouponsPage() {
                       setShowModal(false);
                       resetForm();
                     }}
-                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-muted"
                   >
                     Cancel
                   </button>

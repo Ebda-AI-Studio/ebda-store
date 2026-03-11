@@ -14,6 +14,8 @@ import {
   writeLimiter,
 } from '../middleware/security';
 import { getStoreIdFromRequest } from '../utils/store-helpers';
+import { redis } from '../services/redis.service';
+import logger from '../lib/logger';
 
 const router = Router();
 
@@ -306,12 +308,16 @@ router.post(
 // GET /orders - Get user's orders (requires auth)
 router.get('/orders', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const { page, limit } = req.query;
     const storeId = await getStoreIdFromRequest(req);
-    const orders = await OrderService.getCustomerOrders(storeId, req.user!.userId);
+    const result = await OrderService.getCustomerOrders(storeId, req.user!.userId, {
+      page: page ? parseInt(page as string) : undefined,
+      limit: limit ? parseInt(limit as string) : undefined,
+    });
 
     res.json({
       success: true,
-      data: { orders },
+      data: result,
     });
   } catch (error) {
     next(error);
@@ -375,8 +381,8 @@ router.get(
 router.get('/stores', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { page = '1', limit = '10' } = req.query;
-    const pageNum = parseInt(page as string);
-    const limitNum = parseInt(limit as string);
+    const pageNum = Math.max(1, parseInt(page as string) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit as string) || 10));
     const skip = (pageNum - 1) * limitNum;
 
     const [stores, total] = await Promise.all([
@@ -484,6 +490,25 @@ router.get('/stores/:slugOrId', async (req: Request, res: Response, next: NextFu
 // GET /store - Get default store info
 router.get('/store', async (_req: Request, res: Response, next: NextFunction) => {
   try {
+    // Try Redis cache first (best-effort)
+    const cacheKey = 'store:default';
+    try {
+      const cached = await redis.get<string>(cacheKey);
+      if (cached) {
+        const parsed = typeof cached === 'string' ? JSON.parse(cached) : cached;
+        res.json({
+          success: true,
+          data: { store: parsed },
+        });
+        return;
+      }
+    } catch (err) {
+      logger.warn(
+        { err: err instanceof Error ? err.message : 'unknown' },
+        '[PUBLIC] Redis cache read failed for default store'
+      );
+    }
+
     const store = await prisma.store.findFirst({
       orderBy: { createdAt: 'asc' },
       select: {
@@ -501,6 +526,16 @@ router.get('/store', async (_req: Request, res: Response, next: NextFunction) =>
         error: { code: 'NOT_FOUND', message: 'Store not found' },
       });
       return;
+    }
+
+    // Write to cache (best-effort, 60s TTL)
+    try {
+      await redis.set(cacheKey, JSON.stringify(store), 60);
+    } catch (err) {
+      logger.warn(
+        { err: err instanceof Error ? err.message : 'unknown' },
+        '[PUBLIC] Redis cache write failed for default store'
+      );
     }
 
     res.json({

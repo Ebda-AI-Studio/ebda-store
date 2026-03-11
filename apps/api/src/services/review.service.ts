@@ -363,6 +363,7 @@ export class ReviewService {
   static async getCustomerReviews(storeId: string, customerId: string) {
     return prisma.review.findMany({
       where: { storeId, customerId },
+      take: 100,
       include: {
         product: {
           select: { id: true, name: true, slug: true },

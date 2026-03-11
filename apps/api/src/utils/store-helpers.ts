@@ -1,6 +1,7 @@
 import { Request } from 'express';
 import { prisma } from '@force/database';
 import { AppError } from '../middleware/error-handler';
+import { AuthPayload } from '../middleware/auth';
 
 /**
  * Returns the ID of the first store ordered by creation date.
@@ -12,6 +13,18 @@ export async function getDefaultStoreId(): Promise<string> {
     throw new AppError(404, 'NO_STORE', 'No store configured');
   }
   return store.id;
+}
+
+/**
+ * Extracts the authenticated user from the request.
+ * Use in routes that run after the `authenticate` middleware —
+ * this replaces the `req.user!` non-null assertion with a proper runtime check.
+ */
+export function getAuthUser(req: Request): AuthPayload {
+  if (!req.user) {
+    throw new AppError(401, 'UNAUTHORIZED', 'Not authenticated');
+  }
+  return req.user;
 }
 
 /**

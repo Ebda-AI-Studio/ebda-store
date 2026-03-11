@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useStore, useStoreUrl } from '../contexts/StoreContext';
 import { useLanguage } from '../contexts/LanguageContext';
 
@@ -66,7 +67,10 @@ export function Footer() {
     });
 
   return (
-    <footer className="bg-gradient-to-b from-muted/30 to-muted/80 border-t border-border/50">
+    <footer
+      className="bg-gradient-to-b from-muted/30 to-muted/80 border-t border-border/50"
+      aria-label={t('Site footer', 'تذييل الموقع')}
+    >
       {/* Main Footer */}
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-5">
@@ -74,9 +78,11 @@ export function Footer() {
           <div className="lg:col-span-2">
             <Link href={storeUrl('/')} className="inline-flex items-center gap-3">
               {store.logo ? (
-                <img
+                <Image
                   src={store.logo}
                   alt={store.name}
+                  width={120}
+                  height={56}
                   className="h-14 max-h-14 w-auto object-contain"
                 />
               ) : (
@@ -208,9 +214,15 @@ export function Footer() {
                     className="flex h-10 w-10 items-center justify-center rounded-xl bg-card text-muted-foreground shadow-sm transition-all hover:bg-primary hover:text-white hover:shadow-md hover:shadow-primary/25"
                     aria-label={social.name}
                   >
-                    <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+                    <svg
+                      className="h-5 w-5"
+                      fill="currentColor"
+                      viewBox="0 0 24 24"
+                      aria-hidden="true"
+                    >
                       <path d={social.icon} />
                     </svg>
+                    <span className="sr-only">{social.name}</span>
                   </a>
                 ))}
             </div>
@@ -291,7 +303,13 @@ export function Footer() {
                     type="submit"
                     className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-white transition-colors hover:bg-primary/90"
                   >
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg
+                      className="h-4 w-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      aria-hidden="true"
+                    >
                       <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -299,6 +317,7 @@ export function Footer() {
                         d="M14 5l7 7m0 0l-7 7m7-7H3"
                       />
                     </svg>
+                    <span className="sr-only">{t('Subscribe', 'اشتراك')}</span>
                   </button>
                 </form>
               </div>

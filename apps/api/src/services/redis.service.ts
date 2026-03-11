@@ -66,23 +66,34 @@ class RedisService {
     return this.client;
   }
 
+  /**
+   * Returns the connected Redis client or throws if not connected.
+   * Replaces non-null assertions (`this.getConnectedClient()`) with a proper runtime check.
+   */
+  private getConnectedClient(): Redis {
+    if (!this.client) {
+      throw new Error('Redis client is not connected');
+    }
+    return this.client;
+  }
+
   // ==========================================
   // CSRF Token Management
   // ==========================================
 
   async setCsrfToken(sessionId: string, token: string, ttlSeconds = 3600): Promise<void> {
     if (!this.isAvailable()) return;
-    await this.client!.setex(`csrf:${sessionId}`, ttlSeconds, token);
+    await this.getConnectedClient().setex(`csrf:${sessionId}`, ttlSeconds, token);
   }
 
   async getCsrfToken(sessionId: string): Promise<string | null> {
     if (!this.isAvailable()) return null;
-    return this.client!.get(`csrf:${sessionId}`);
+    return this.getConnectedClient().get(`csrf:${sessionId}`);
   }
 
   async deleteCsrfToken(sessionId: string): Promise<void> {
     if (!this.isAvailable()) return;
-    await this.client!.del(`csrf:${sessionId}`);
+    await this.getConnectedClient().del(`csrf:${sessionId}`);
   }
 
   // ==========================================
@@ -95,12 +106,12 @@ class RedisService {
     ttlSeconds = 86400
   ): Promise<void> {
     if (!this.isAvailable()) return;
-    await this.client!.setex(`session:${sessionId}`, ttlSeconds, JSON.stringify(data));
+    await this.getConnectedClient().setex(`session:${sessionId}`, ttlSeconds, JSON.stringify(data));
   }
 
   async getSession(sessionId: string): Promise<Record<string, unknown> | null> {
     if (!this.isAvailable()) return null;
-    const data = await this.client!.get(`session:${sessionId}`);
+    const data = await this.getConnectedClient().get(`session:${sessionId}`);
     if (!data) return null;
     try {
       return JSON.parse(data);
@@ -111,12 +122,12 @@ class RedisService {
 
   async deleteSession(sessionId: string): Promise<void> {
     if (!this.isAvailable()) return;
-    await this.client!.del(`session:${sessionId}`);
+    await this.getConnectedClient().del(`session:${sessionId}`);
   }
 
   async extendSession(sessionId: string, ttlSeconds = 86400): Promise<void> {
     if (!this.isAvailable()) return;
-    await this.client!.expire(`session:${sessionId}`, ttlSeconds);
+    await this.getConnectedClient().expire(`session:${sessionId}`, ttlSeconds);
   }
 
   // ==========================================
@@ -127,15 +138,15 @@ class RedisService {
     if (!this.isAvailable()) return;
     const stringValue = typeof value === 'object' ? JSON.stringify(value) : value;
     if (ttlSeconds) {
-      await this.client!.setex(`cache:${key}`, ttlSeconds, stringValue);
+      await this.getConnectedClient().setex(`cache:${key}`, ttlSeconds, stringValue);
     } else {
-      await this.client!.set(`cache:${key}`, stringValue);
+      await this.getConnectedClient().set(`cache:${key}`, stringValue);
     }
   }
 
   async get<T = string>(key: string, parseJson = false): Promise<T | null> {
     if (!this.isAvailable()) return null;
-    const data = await this.client!.get(`cache:${key}`);
+    const data = await this.getConnectedClient().get(`cache:${key}`);
     if (!data) return null;
     if (parseJson) {
       try {
@@ -149,12 +160,12 @@ class RedisService {
 
   async delete(key: string): Promise<void> {
     if (!this.isAvailable()) return;
-    await this.client!.del(`cache:${key}`);
+    await this.getConnectedClient().del(`cache:${key}`);
   }
 
   async exists(key: string): Promise<boolean> {
     if (!this.isAvailable()) return false;
-    return (await this.client!.exists(`cache:${key}`)) === 1;
+    return (await this.getConnectedClient().exists(`cache:${key}`)) === 1;
   }
 
   // ==========================================
@@ -165,7 +176,7 @@ class RedisService {
     if (!this.isAvailable()) return 0;
 
     const redisKey = `ratelimit:${key}`;
-    const multi = this.client!.multi();
+    const multi = this.getConnectedClient().multi();
     multi.incr(redisKey);
     multi.expire(redisKey, windowSeconds);
     const results = await multi.exec();
@@ -175,7 +186,7 @@ class RedisService {
 
   async getRateLimitCount(key: string): Promise<number> {
     if (!this.isAvailable()) return 0;
-    const count = await this.client!.get(`ratelimit:${key}`);
+    const count = await this.getConnectedClient().get(`ratelimit:${key}`);
     return count ? parseInt(count, 10) : 0;
   }
 
@@ -187,13 +198,13 @@ class RedisService {
     if (!this.isAvailable()) return true; // Allow operation if Redis unavailable
 
     const lockKey = `lock:${lockName}`;
-    const result = await this.client!.set(lockKey, '1', 'EX', ttlSeconds, 'NX');
+    const result = await this.getConnectedClient().set(lockKey, '1', 'EX', ttlSeconds, 'NX');
     return result === 'OK';
   }
 
   async releaseLock(lockName: string): Promise<void> {
     if (!this.isAvailable()) return;
-    await this.client!.del(`lock:${lockName}`);
+    await this.getConnectedClient().del(`lock:${lockName}`);
   }
 
   // ==========================================
@@ -203,7 +214,7 @@ class RedisService {
   async publish(channel: string, message: string | object): Promise<void> {
     if (!this.isAvailable()) return;
     const msg = typeof message === 'object' ? JSON.stringify(message) : message;
-    await this.client!.publish(channel, msg);
+    await this.getConnectedClient().publish(channel, msg);
   }
 
   // ==========================================
@@ -213,7 +224,7 @@ class RedisService {
   async ping(): Promise<boolean> {
     if (!this.isAvailable()) return false;
     try {
-      const result = await this.client!.ping();
+      const result = await this.getConnectedClient().ping();
       return result === 'PONG';
     } catch {
       return false;

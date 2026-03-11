@@ -235,9 +235,12 @@ export class OrderService {
         },
       });
 
-      // Decrement inventory (rows already locked above)
+      // Decrement inventory and record history (rows already locked above)
       for (const item of cart.items) {
         if (item.product.trackInventory) {
+          // The locked row gives us the accurate pre-decrement stock
+          const previousStock = item.product.inventory;
+
           await tx.product.update({
             where: { id: item.productId },
             data: { inventory: { decrement: item.quantity } },
@@ -249,6 +252,22 @@ export class OrderService {
               data: { inventory: { decrement: item.quantity } },
             });
           }
+
+          // DB-010: Record inventory history inside the transaction so the
+          // previousStock value is accurate (from the locked row) and the
+          // history record is atomic with the inventory decrement.
+          await tx.inventoryHistory.create({
+            data: {
+              productId: item.productId,
+              storeId,
+              type: 'sale',
+              quantity: -item.quantity,
+              previousStock,
+              newStock: Math.max(0, previousStock - item.quantity),
+              reason: 'Sold via order',
+              reference: newOrder.id,
+            },
+          });
         }
       }
 
@@ -257,32 +276,6 @@ export class OrderService {
 
       return newOrder;
     });
-
-    // Record inventory history (non-blocking — stock already decremented in transaction)
-    for (const item of cart.items) {
-      if (item.product.trackInventory) {
-        try {
-          const prevStock = item.product.inventory;
-          await prisma.inventoryHistory.create({
-            data: {
-              productId: item.productId,
-              storeId,
-              type: 'sale',
-              quantity: -item.quantity,
-              previousStock: prevStock,
-              newStock: Math.max(0, prevStock - item.quantity),
-              reason: 'Sold via order',
-              reference: order.id,
-            },
-          });
-        } catch (err) {
-          logger.error(
-            { err, productId: item.productId, orderId: order.id },
-            'Failed to record inventory history'
-          );
-        }
-      }
-    }
 
     // Send order confirmation email
     try {
@@ -486,19 +479,44 @@ export class OrderService {
     return updatedOrder;
   }
 
-  static async getCustomerOrders(storeId: string, customerId: string) {
-    return prisma.order.findMany({
-      where: { storeId, customerId },
-      include: {
-        items: {
-          include: {
-            product: {
-              include: { images: { take: 1, orderBy: { position: 'asc' } } },
+  static async getCustomerOrders(
+    storeId: string,
+    customerId: string,
+    options: { page?: number; limit?: number } = {}
+  ) {
+    const page = Math.max(1, options.page || 1);
+    const limit = Math.min(50, Math.max(1, options.limit || 20));
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.OrderWhereInput = { storeId, customerId };
+
+    const [orders, total] = await Promise.all([
+      prisma.order.findMany({
+        where,
+        skip,
+        take: limit,
+        include: {
+          items: {
+            include: {
+              product: {
+                include: { images: { take: 1, orderBy: { position: 'asc' } } },
+              },
             },
           },
         },
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.order.count({ where }),
+    ]);
+
+    return {
+      orders,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
       },
-      orderBy: { createdAt: 'desc' },
-    });
+    };
   }
 }

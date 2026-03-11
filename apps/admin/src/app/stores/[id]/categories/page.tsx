@@ -3,26 +3,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { useToast } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
-import { ImageUpload } from '../../../../components/ImageUpload';
-import { getApiUrl } from '../../../../lib/api';
+import { apiGet, apiPost, apiPut, apiDelete } from '../../../../lib/api';
+import { CategoryForm, type CategoryFormData } from './CategoryForm';
+import { CategoryTable, type Category } from './CategoryTable';
 
-interface Category {
-  id: string;
-  name: string;
-  nameAr: string | null;
-  slug: string;
-  description: string | null;
-  descriptionAr: string | null;
-  image: string | null;
-  isActive: boolean;
-  sortOrder: number;
-  _count?: { products: number };
-}
-
-const API_URL = getApiUrl();
-
-const emptyForm = {
+const emptyForm: CategoryFormData = {
   name: '',
   nameAr: '',
   slug: '',
@@ -51,29 +38,28 @@ export default function StoreCategoriesPage() {
   // Form state for add/edit
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState<CategoryFormData>(emptyForm);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
   // Delete state
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const { success: toastSuccess, error: showError } = useToast();
 
   const fetchCategories = useCallback(async () => {
     if (!storeId) return;
     setIsLoading(true);
     setError(null);
     try {
-      const token = localStorage.getItem('authToken');
-      const res = await fetch(`${API_URL}/api/v1/stores/${storeId}/categories`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setCategories(data.data?.categories || data.data || []);
+      const { data, error: apiError } = await apiGet<{ categories: Category[] }>(
+        `/api/v1/stores/${storeId}/categories`
+      );
+      if (apiError) {
+        setError(apiError.message || 'Failed to fetch categories');
       } else {
-        const errData = await res.json().catch(() => ({}));
-        setError(errData.error?.message || 'Failed to fetch categories');
+        setCategories(data?.categories || []);
       }
     } catch {
       setError('Unable to connect to the server. Please check your connection and try again.');
@@ -136,38 +122,33 @@ export default function StoreCategoriesPage() {
     setIsSaving(true);
     setSaveMessage(null);
     try {
-      const token = localStorage.getItem('authToken');
       const isEditing = !!editingId;
-      const url = isEditing
-        ? `${API_URL}/api/v1/stores/${storeId}/categories/${editingId}`
-        : `${API_URL}/api/v1/stores/${storeId}/categories`;
+      const endpoint = isEditing
+        ? `/api/v1/stores/${storeId}/categories/${editingId}`
+        : `/api/v1/stores/${storeId}/categories`;
 
-      const res = await fetch(url, {
-        method: isEditing ? 'PUT' : 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          name: form.name.trim(),
-          nameAr: form.nameAr.trim() || undefined,
-          slug: form.slug.trim(),
-          description: form.description.trim() || undefined,
-          descriptionAr: form.descriptionAr.trim() || undefined,
-          image: form.image || undefined,
-        }),
-      });
+      const body = {
+        name: form.name.trim(),
+        nameAr: form.nameAr.trim() || undefined,
+        slug: form.slug.trim(),
+        description: form.description.trim() || undefined,
+        descriptionAr: form.descriptionAr.trim() || undefined,
+        image: form.image || undefined,
+      };
 
-      if (res.ok) {
+      const { error: apiError } = isEditing
+        ? await apiPut<{ category: Category }>(endpoint, body)
+        : await apiPost<{ category: Category }>(endpoint, body);
+
+      if (!apiError) {
         setSaveMessage(
           isEditing ? 'Category updated successfully' : 'Category created successfully'
         );
         await fetchCategories();
         setTimeout(closeForm, 800);
       } else {
-        const errData = await res.json().catch(() => ({}));
         const msg =
-          errData.error?.message ||
+          apiError.message ||
           (isEditing ? 'Failed to update category' : 'Failed to create category');
         if (msg.toLowerCase().includes('slug')) {
           setFormErrors(prev => ({ ...prev, slug: 'This slug is already in use' }));
@@ -182,26 +163,25 @@ export default function StoreCategoriesPage() {
     }
   }
 
-  async function handleDelete(catId: string, catName: string) {
-    if (!window.confirm(`Delete category "${catName}"? This cannot be undone.`)) return;
+  async function confirmDelete() {
+    if (!deleteTarget) return;
 
-    setDeletingId(catId);
+    setDeletingId(deleteTarget.id);
     try {
-      const token = localStorage.getItem('authToken');
-      const res = await fetch(`${API_URL}/api/v1/stores/${storeId}/categories/${catId}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
+      const { error: deleteError } = await apiDelete(
+        `/api/v1/stores/${storeId}/categories/${deleteTarget.id}`
+      );
+      if (!deleteError) {
+        toastSuccess('Category Deleted', `"${deleteTarget.name}" has been removed.`);
         await fetchCategories();
       } else {
-        const errData = await res.json().catch(() => ({}));
-        alert(errData.error?.message || 'Failed to delete category');
+        showError('Error', deleteError.message || 'Failed to delete category');
       }
     } catch {
-      alert('Unable to connect to the server');
+      showError('Error', 'Unable to connect to the server');
     } finally {
       setDeletingId(null);
+      setDeleteTarget(null);
     }
   }
 
@@ -237,282 +217,58 @@ export default function StoreCategoriesPage() {
 
       {/* Add/Edit Form */}
       {showForm && (
-        <div className="mb-6 rounded-xl border bg-white shadow-sm">
-          <div className="flex items-center justify-between border-b p-4">
-            <h2 className="font-semibold text-gray-900">
-              {editingId ? 'Edit Category' : 'Add Category'}
-            </h2>
-            <button
-              onClick={closeForm}
-              className="p-1 text-gray-400 hover:text-gray-600"
-              aria-label="Close"
-            >
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
-          </div>
-          <form onSubmit={handleSubmit} className="p-6 space-y-4">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Name (English) <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={form.name}
-                  onChange={e => {
-                    const val = e.target.value;
-                    setForm(prev => ({
-                      ...prev,
-                      name: val,
-                      // Auto-generate slug only when adding, not editing
-                      slug: !editingId ? slugify(val) : prev.slug,
-                    }));
-                    if (formErrors.name) setFormErrors(prev => ({ ...prev, name: '' }));
-                  }}
-                  placeholder="Electronics"
-                  className={`w-full rounded-lg border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary ${formErrors.name ? 'border-red-500' : 'border-gray-300'}`}
-                />
-                {formErrors.name && <p className="mt-1 text-xs text-red-500">{formErrors.name}</p>}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Name (Arabic)
-                </label>
-                <input
-                  type="text"
-                  dir="rtl"
-                  value={form.nameAr}
-                  onChange={e => setForm(prev => ({ ...prev, nameAr: e.target.value }))}
-                  placeholder="إلكترونيات"
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                />
-              </div>
-            </div>
+        <CategoryForm
+          editingId={editingId}
+          form={form}
+          formErrors={formErrors}
+          isSaving={isSaving}
+          saveMessage={saveMessage}
+          onFormChange={setForm}
+          onFormErrorChange={setFormErrors}
+          onSubmit={handleSubmit}
+          onClose={closeForm}
+          slugify={slugify}
+        />
+      )}
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                URL Slug <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={form.slug}
-                onChange={e => {
-                  setForm(prev => ({ ...prev, slug: slugify(e.target.value) }));
-                  if (formErrors.slug) setFormErrors(prev => ({ ...prev, slug: '' }));
-                }}
-                placeholder="electronics"
-                className={`w-full rounded-lg border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary ${formErrors.slug ? 'border-red-500' : 'border-gray-300'}`}
-              />
-              {formErrors.slug && <p className="mt-1 text-xs text-red-500">{formErrors.slug}</p>}
-              <p className="mt-1 text-xs text-gray-500">Used in URLs: lowercase, hyphens only</p>
-            </div>
+      {/* Categories List */}
+      <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
+        <CategoryTable
+          categories={categories}
+          isLoading={isLoading}
+          deletingId={deletingId}
+          onEdit={openEditForm}
+          onDelete={setDeleteTarget}
+          onAddFirst={openAddForm}
+        />
+      </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                <textarea
-                  value={form.description}
-                  onChange={e => setForm(prev => ({ ...prev, description: e.target.value }))}
-                  placeholder="Category description..."
-                  rows={3}
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Description (Arabic)
-                </label>
-                <textarea
-                  dir="rtl"
-                  value={form.descriptionAr}
-                  onChange={e => setForm(prev => ({ ...prev, descriptionAr: e.target.value }))}
-                  placeholder="وصف التصنيف..."
-                  rows={3}
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Category Image</label>
-              <ImageUpload
-                value={form.image || undefined}
-                onUpload={url => setForm(prev => ({ ...prev, image: url }))}
-                onRemove={() => setForm(prev => ({ ...prev, image: '' }))}
-                folder="categories"
-                label="Upload Category Image"
-              />
-            </div>
-
-            {saveMessage && (
-              <p
-                className={`text-sm ${
-                  saveMessage.includes('success') ? 'text-emerald-600' : 'text-red-600'
-                }`}
-              >
-                {saveMessage}
-              </p>
-            )}
-
-            <div className="flex items-center justify-end gap-3 border-t border-gray-100 pt-4">
+      {/* Delete Confirmation Dialog */}
+      {deleteTarget && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">Delete Category</h2>
+            <p className="text-sm text-gray-600 mb-6">
+              Delete category &quot;{deleteTarget.name}&quot;? This cannot be undone.
+            </p>
+            <div className="flex items-center justify-end gap-3">
               <button
-                type="button"
-                onClick={closeForm}
+                onClick={() => setDeleteTarget(null)}
                 className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
               >
                 Cancel
               </button>
               <button
-                type="submit"
-                disabled={isSaving}
-                className="px-6 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 font-medium"
+                onClick={confirmDelete}
+                disabled={deletingId === deleteTarget.id}
+                className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
               >
-                {isSaving ? 'Saving...' : editingId ? 'Update Category' : 'Create Category'}
+                {deletingId === deleteTarget.id ? 'Deleting...' : 'Delete'}
               </button>
             </div>
-          </form>
+          </div>
         </div>
       )}
-
-      {/* Categories List */}
-      <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
-        {isLoading ? (
-          <div className="space-y-4 p-6">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-4 animate-pulse">
-                <div className="h-10 w-10 rounded-xl bg-gray-200" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 w-32 rounded bg-gray-200" />
-                  <div className="h-3 w-20 rounded bg-gray-200" />
-                </div>
-                <div className="h-8 w-20 rounded bg-gray-200" />
-              </div>
-            ))}
-          </div>
-        ) : categories.length === 0 ? (
-          <div className="py-16 text-center">
-            <svg
-              className="mx-auto h-12 w-12 text-gray-300"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1}
-                d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
-              />
-            </svg>
-            <p className="mt-4 text-gray-500">No categories yet</p>
-            <button onClick={openAddForm} className="mt-4 text-sm text-primary hover:underline">
-              Add your first category
-            </button>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Category
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Slug
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Products
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {categories.map(cat => (
-                  <tr key={cat.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        {cat.image ? (
-                          <img
-                            src={cat.image}
-                            alt={cat.name}
-                            className="h-10 w-10 rounded-lg object-cover"
-                          />
-                        ) : (
-                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary font-semibold">
-                            {cat.name.charAt(0)}
-                          </div>
-                        )}
-                        <div>
-                          <p className="font-medium text-gray-900">{cat.name}</p>
-                          {cat.nameAr && <p className="text-sm text-gray-500">{cat.nameAr}</p>}
-                          {cat.description && (
-                            <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">
-                              {cat.description}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="font-mono text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded">
-                        {cat.slug}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm font-medium text-gray-900">
-                        {cat._count?.products ?? 0}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 hidden md:table-cell">
-                      <span
-                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${
-                          cat.isActive
-                            ? 'bg-emerald-50 text-emerald-700'
-                            : 'bg-gray-100 text-gray-600'
-                        }`}
-                      >
-                        <span
-                          className={`h-1.5 w-1.5 rounded-full ${cat.isActive ? 'bg-emerald-500' : 'bg-gray-400'}`}
-                        />
-                        {cat.isActive ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => openEditForm(cat)}
-                          className="px-3 py-1.5 text-xs font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDelete(cat.id, cat.name)}
-                          disabled={deletingId === cat.id}
-                          className="px-3 py-1.5 text-xs font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
-                        >
-                          {deletingId === cat.id ? 'Deleting...' : 'Delete'}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
     </AdminLayout>
   );
 }

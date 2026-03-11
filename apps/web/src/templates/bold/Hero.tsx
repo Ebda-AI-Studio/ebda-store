@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import type { HeroProps } from '../types';
 
 export default function BoldHero({
@@ -110,7 +111,7 @@ export default function BoldHero({
               {/* Image container */}
               <div className="relative aspect-square rounded-3xl overflow-hidden shadow-2xl">
                 {image ? (
-                  <img src={image} alt={displayTitle} className="w-full h-full object-cover" />
+                  <Image src={image} alt={displayTitle} fill className="object-cover" />
                 ) : (
                   <div className="w-full h-full bg-white/10 flex items-center justify-center">
                     <div className="text-center p-8">

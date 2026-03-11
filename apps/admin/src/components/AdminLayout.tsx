@@ -125,10 +125,8 @@ export function AdminLayout({
   const [storeInfo, setStoreInfo] = useState<{ domain?: string; slug?: string } | null>(null);
   useEffect(() => {
     if (!currentStoreId || storeDomain || storeSlug) return;
-    const token = localStorage.getItem('authToken');
-    if (!token) return;
     fetch(`${getApiUrl()}/api/v1/stores/${currentStoreId}`, {
-      headers: { Authorization: `Bearer ${token}` },
+      credentials: 'include',
     })
       .then(r => (r.ok ? r.json() : null))
       .then(data => {
@@ -315,7 +313,7 @@ export function AdminLayout({
             <button
               onClick={logout}
               className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-              title="Logout"
+              aria-label="Log out"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
@@ -433,20 +431,6 @@ export function AdminLayout({
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {/* Search Button */}
-            <button className="hidden h-10 items-center gap-2 rounded-xl border border-border/50 bg-muted/50 px-4 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:flex">
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-              </svg>
-              <span>Search...</span>
-              <kbd className="ml-2 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium">⌘K</kbd>
-            </button>
-
             {/* Notifications */}
             <NotificationBell />
 

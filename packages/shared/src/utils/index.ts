@@ -5,13 +5,17 @@ export * from './image';
 export * from './csv';
 
 /**
- * Format price with currency
+ * Format a price stored in fils (1 KWD = 1000 fils) as a localised currency string.
+ *
+ * @param fils  - The price in the smallest currency unit (fils for KWD).
+ * @param currency - ISO 4217 currency code. Defaults to `'KWD'`.
  */
-export function formatPrice(amount: number, currency = 'USD', locale = 'en-US'): string {
-  return new Intl.NumberFormat(locale, {
+export function formatPrice(fils: number, currency = 'KWD'): string {
+  return new Intl.NumberFormat('en-KW', {
     style: 'currency',
     currency,
-  }).format(amount / 100);
+    minimumFractionDigits: 3,
+  }).format(fils / 1000);
 }
 
 /**
@@ -87,6 +91,18 @@ export function isEmpty(value: unknown): boolean {
   if (Array.isArray(value)) return value.length === 0;
   if (typeof value === 'object') return Object.keys(value).length === 0;
   return false;
+}
+
+/**
+ * Validate an email address.
+ *
+ * Uses a simple, widely-accepted pattern: no whitespace, exactly one `@`,
+ * and at least one `.` in the domain part.
+ */
+export const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export function isValidEmail(email: string): boolean {
+  return EMAIL_REGEX.test(email);
 }
 
 /**

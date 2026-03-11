@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { AdminLayout } from '../../../../components/AdminLayout';
-import { getApiUrl } from '../../../../lib/api';
+import { apiGet, apiPut } from '../../../../lib/api';
 
 type TemplateId = 'modern' | 'classic' | 'minimal' | 'bold' | 'elegant';
 
@@ -94,18 +94,15 @@ export default function StoreTemplatePage() {
 
   async function fetchStore() {
     try {
-      const token = localStorage.getItem('authToken');
-      const response = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await response.json();
-
-      if (data.success && data.data?.store) {
+      const { data } = await apiGet<{ store: { name: string; template?: TemplateId } }>(
+        `/api/v1/stores/${storeId}`
+      );
+      if (data?.store) {
         setStore({
-          name: data.data.store.name,
-          template: data.data.store.template || 'modern',
+          name: data.store.name,
+          template: data.store.template || 'modern',
         });
-        setSelectedTemplate(data.data.store.template || 'modern');
+        setSelectedTemplate(data.store.template || 'modern');
       }
     } catch (error) {
       console.error('Failed to fetch store:', error);
@@ -117,17 +114,11 @@ export default function StoreTemplatePage() {
   async function handleSave() {
     setIsSaving(true);
     try {
-      const token = localStorage.getItem('authToken');
-      const response = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/template`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ template: selectedTemplate }),
+      const { error } = await apiPut(`/api/v1/stores/${storeId}/template`, {
+        template: selectedTemplate,
       });
 
-      if (response.ok) {
+      if (!error) {
         router.push(`/stores/${storeId}`);
       }
     } catch (error) {

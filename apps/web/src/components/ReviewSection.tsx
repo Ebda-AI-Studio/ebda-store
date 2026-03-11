@@ -4,8 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Button } from '@force/ui';
 import { useStore } from '../contexts/StoreContext';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
+import { API_URL } from '../lib/api';
 
 interface Review {
   id: string;
@@ -119,24 +118,21 @@ export default function ReviewSection({ storeId, productId }: Props) {
     text: string;
   } | null>(null);
 
-  // Check auth token on mount (client-only)
+  // Check auth by attempting to fetch profile (cookie-based auth)
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      setIsLoggedIn(!!localStorage.getItem('accessToken'));
+      fetch(`${API_URL}/auth/me`, { credentials: 'include' })
+        .then(res => setIsLoggedIn(res.ok))
+        .catch(() => setIsLoggedIn(false));
     }
   }, []);
 
   const fetchReviews = useCallback(async () => {
     setIsLoading(true);
     try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-      const headers: HeadersInit = { 'Content-Type': 'application/json' };
-      if (token) {
-        (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
-      }
-
       const res = await fetch(`${API_URL}/stores/${storeId}/reviews?productId=${productId}`, {
-        headers,
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
       });
       const json: ReviewsResponse = await res.json();
 
@@ -171,13 +167,10 @@ export default function ReviewSection({ storeId, productId }: Props) {
     setSubmitMessage(null);
 
     try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
       const res = await fetch(`${API_URL}/stores/${storeId}/reviews`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ productId, rating, comment }),
       });
 

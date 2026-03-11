@@ -6,7 +6,7 @@ import { Button, Input, Textarea, Select } from '@force/ui';
 import { AdminLayout } from '../../../../../components/AdminLayout';
 import { MultiImageUpload } from '../../../../../components/ImageUpload';
 import { useAuth } from '../../../../../lib/auth';
-import { apiPost, getApiUrl } from '../../../../../lib/api';
+import { apiGet, apiPost } from '../../../../../lib/api';
 
 interface Category {
   id: string;
@@ -23,7 +23,7 @@ export default function NewProductPage() {
   const router = useRouter();
   const params = useParams();
   const storeId = params?.id as string;
-  const { token } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -44,16 +44,15 @@ export default function NewProductPage() {
 
   // Fetch categories for this store
   useEffect(() => {
-    if (!storeId || !token) return;
+    if (!storeId || !isAuthenticated) return;
 
     async function fetchCategories() {
       try {
-        const response = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/categories`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const result = await response.json();
-        if (result.success && result.data?.categories) {
-          setCategories(result.data.categories);
+        const { data } = await apiGet<{ categories: Category[] }>(
+          `/api/v1/stores/${storeId}/categories`
+        );
+        if (data?.categories) {
+          setCategories(data.categories);
         }
       } catch {
         setCategories([]);
@@ -61,7 +60,7 @@ export default function NewProductPage() {
     }
 
     fetchCategories();
-  }, [storeId, token]);
+  }, [storeId, isAuthenticated]);
 
   const updateField = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -125,8 +124,8 @@ export default function NewProductPage() {
         <div className="grid gap-6 lg:grid-cols-3">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
-            <div className="rounded-xl border bg-white p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Basic Information</h2>
+            <div className="rounded-xl border bg-card p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-foreground mb-4">Basic Information</h2>
               <div className="space-y-4">
                 <Input
                   label="Product Name"
@@ -160,8 +159,8 @@ export default function NewProductPage() {
               </div>
             </div>
 
-            <div className="rounded-xl border bg-white p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Media</h2>
+            <div className="rounded-xl border bg-card p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-foreground mb-4">Media</h2>
               <MultiImageUpload
                 values={images}
                 onChange={setImages}
@@ -171,8 +170,8 @@ export default function NewProductPage() {
               />
             </div>
 
-            <div className="rounded-xl border bg-white p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Pricing</h2>
+            <div className="rounded-xl border bg-card p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-foreground mb-4">Pricing</h2>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Input
                   label="Price (KWD)"
@@ -192,13 +191,13 @@ export default function NewProductPage() {
                   placeholder="0.000"
                 />
               </div>
-              <p className="mt-2 text-xs text-gray-500">
+              <p className="mt-2 text-xs text-muted-foreground">
                 Enter prices in KWD. Compare at price is used to show a crossed-out price.
               </p>
             </div>
 
-            <div className="rounded-xl border bg-white p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Inventory</h2>
+            <div className="rounded-xl border bg-card p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-foreground mb-4">Inventory</h2>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Input
                   label="SKU"
@@ -219,8 +218,8 @@ export default function NewProductPage() {
 
           {/* Sidebar */}
           <div className="space-y-6">
-            <div className="rounded-xl border bg-white p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Status</h2>
+            <div className="rounded-xl border bg-card p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-foreground mb-4">Status</h2>
               <Select
                 label="Product Status"
                 value={formData.status}
@@ -229,8 +228,8 @@ export default function NewProductPage() {
               />
             </div>
 
-            <div className="rounded-xl border bg-white p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Organization</h2>
+            <div className="rounded-xl border bg-card p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-foreground mb-4">Organization</h2>
               <Select
                 label="Category"
                 value={formData.category}
@@ -239,7 +238,7 @@ export default function NewProductPage() {
               />
             </div>
 
-            <div className="rounded-xl border bg-white p-6 shadow-sm">
+            <div className="rounded-xl border bg-card p-6 shadow-sm">
               <div className="space-y-3">
                 <Button type="submit" className="w-full" isLoading={isLoading}>
                   Create Product

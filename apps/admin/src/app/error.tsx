@@ -37,7 +37,9 @@ export default function Error({
           </p>
         )}
         <p className="mb-6 rounded-lg bg-muted px-3 py-2 text-left font-mono text-xs text-muted-foreground break-all">
-          {error.message || 'Unknown error'}
+          {process.env.NODE_ENV === 'development'
+            ? error.message || 'Unknown error'
+            : 'An unexpected error occurred.'}
         </p>
         <div className="flex justify-center gap-3">
           <button

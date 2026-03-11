@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AdminLayout } from '../../../../components/AdminLayout';
-import { getApiUrl } from '../../../../lib/api';
+import { apiGet, apiPut } from '../../../../lib/api';
 
 // Marketing pixel platform configuration
 const PLATFORMS = [
@@ -170,15 +170,10 @@ export default function MarketingPixelsPage() {
 
   async function fetchStore() {
     try {
-      const token = localStorage.getItem('authToken');
-      const response = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await response.json();
-
-      if (data.success && data.data?.store) {
-        setStore(data.data.store);
-        setPixels(data.data.store.marketingPixels || {});
+      const { data } = await apiGet<{ store: StoreData }>(`/api/v1/stores/${storeId}`);
+      if (data?.store) {
+        setStore(data.store);
+        setPixels(data.store.marketingPixels || {});
       }
     } catch (error) {
       console.error('Failed to fetch store:', error);
@@ -191,17 +186,11 @@ export default function MarketingPixelsPage() {
     setIsSaving(true);
     setSaveMessage(null);
     try {
-      const token = localStorage.getItem('authToken');
-      const response = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/marketing-pixels`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ marketingPixels: pixels }),
+      const { error } = await apiPut(`/api/v1/stores/${storeId}/marketing-pixels`, {
+        marketingPixels: pixels,
       });
 
-      if (!response.ok) {
+      if (error) {
         throw new Error('Failed to save');
       }
       setSaveMessage('Marketing pixels saved successfully.');
@@ -245,7 +234,7 @@ export default function MarketingPixelsPage() {
   if (!store) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-500">Store not found</p>
+        <p className="text-muted-foreground">Store not found</p>
         <Link href="/stores" className="text-primary hover:underline mt-2 inline-block">
           Back to stores
         </Link>
@@ -346,7 +335,7 @@ export default function MarketingPixelsPage() {
             return (
               <div
                 key={platform.id}
-                className={`bg-white rounded-xl border transition-all ${
+                className={`bg-card rounded-xl border transition-all ${
                   isEnabled ? 'border-primary/30 shadow-sm' : 'border-gray-200'
                 }`}
               >
@@ -361,14 +350,16 @@ export default function MarketingPixelsPage() {
                     </div>
                     <div>
                       <h3 className="font-medium">{platform.name}</h3>
-                      <p className="text-sm text-gray-500">{platform.description}</p>
+                      <p className="text-sm text-muted-foreground">{platform.description}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
                     {/* Status Badge */}
                     <span
                       className={`px-2 py-1 text-xs font-medium rounded-full ${
-                        isEnabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+                        isEnabled
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-gray-100 text-muted-foreground'
                       }`}
                     >
                       {isEnabled ? 'Active' : 'Inactive'}
@@ -384,7 +375,7 @@ export default function MarketingPixelsPage() {
                       }`}
                     >
                       <span
-                        className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                        className={`absolute top-0.5 w-5 h-5 bg-card rounded-full shadow transition-transform ${
                           isEnabled ? 'left-5' : 'left-0.5'
                         }`}
                       />
@@ -408,7 +399,7 @@ export default function MarketingPixelsPage() {
 
                 {/* Platform Config (Expanded) */}
                 {isExpanded && (
-                  <div className="border-t border-gray-100 p-4 space-y-4 bg-gray-50/50">
+                  <div className="border-t border-gray-100 p-4 space-y-4 bg-muted/50">
                     {/* Main ID Field */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -420,7 +411,7 @@ export default function MarketingPixelsPage() {
                         onChange={e => updatePixel(platform.id, getIdField(), e.target.value)}
                         placeholder={platform.idPlaceholder}
                         disabled={!isEnabled}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:bg-gray-100 disabled:cursor-not-allowed"
                       />
                     </div>
 
@@ -436,9 +427,9 @@ export default function MarketingPixelsPage() {
                           onChange={e => updatePixel(platform.id, 'accessToken', e.target.value)}
                           placeholder="Enter access token for server-side tracking"
                           disabled={!isEnabled}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:bg-gray-100 disabled:cursor-not-allowed"
+                          className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:bg-gray-100 disabled:cursor-not-allowed"
                         />
-                        <p className="text-xs text-gray-500 mt-1">
+                        <p className="text-xs text-muted-foreground mt-1">
                           Access tokens enable server-side event tracking for better accuracy
                         </p>
                       </div>
@@ -458,7 +449,7 @@ export default function MarketingPixelsPage() {
                           }
                           placeholder="e.g., AbC123def456"
                           disabled={!isEnabled}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:bg-gray-100 disabled:cursor-not-allowed"
+                          className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:bg-gray-100 disabled:cursor-not-allowed"
                         />
                       </div>
                     )}
@@ -495,9 +486,9 @@ export default function MarketingPixelsPage() {
         </div>
 
         {/* Events Info */}
-        <div className="bg-white rounded-xl border p-6">
+        <div className="bg-card rounded-xl border p-6">
           <h2 className="font-semibold text-lg mb-4">Tracked Events</h2>
-          <p className="text-gray-600 mb-4">
+          <p className="text-muted-foreground mb-4">
             When pixels are enabled, the following e-commerce events are automatically tracked:
           </p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -511,9 +502,9 @@ export default function MarketingPixelsPage() {
               { name: 'Add to Wishlist', description: 'Wishlist additions' },
               { name: 'Lead', description: 'Contact form submissions' },
             ].map(event => (
-              <div key={event.name} className="p-3 bg-gray-50 rounded-lg">
+              <div key={event.name} className="p-3 bg-muted rounded-lg">
                 <div className="font-medium text-sm">{event.name}</div>
-                <div className="text-xs text-gray-500">{event.description}</div>
+                <div className="text-xs text-muted-foreground">{event.description}</div>
               </div>
             ))}
           </div>

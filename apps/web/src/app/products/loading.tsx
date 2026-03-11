@@ -17,10 +17,10 @@ export default function ProductsLoading() {
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex gap-2">
             {[1, 2, 3, 4].map(i => (
-              <div key={i} className="h-10 w-24 animate-pulse rounded-full bg-gray-200" />
+              <div key={i} className="h-10 w-24 animate-pulse rounded-full bg-muted" />
             ))}
           </div>
-          <div className="h-10 w-full animate-pulse rounded-md bg-gray-200 sm:w-64" />
+          <div className="h-10 w-full animate-pulse rounded-md bg-muted sm:w-64" />
         </div>
 
         {/* Products Grid Skeleton */}

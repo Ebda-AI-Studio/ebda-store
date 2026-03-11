@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { AdminLayout } from '../../../../components/AdminLayout';
-import { getApiUrl } from '../../../../lib/api';
+import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '../../../../lib/api';
 
 interface TaxSettings {
   taxEnabled: boolean;
@@ -73,66 +73,46 @@ export default function TaxSettingsPage() {
   const [filter, setFilter] = useState<'all' | 'active' | 'inactive'>('all');
 
   const fetchStoreName = useCallback(async () => {
-    try {
-      const token = localStorage.getItem('authToken');
-      const res = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setStoreName(data.data?.store?.name || '');
-      }
-    } catch (err) {
-      console.error('Failed to fetch store name:', err);
+    const { data } = await apiGet<{ store: { name: string } }>(`/api/v1/stores/${storeId}`);
+    if (data) {
+      setStoreName(data.store?.name || '');
     }
   }, [storeId]);
 
   const fetchSettings = useCallback(async () => {
-    try {
-      const token = localStorage.getItem('authToken');
-      const res = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/tax/settings`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setSettings(
-          data.data?.settings || {
-            taxEnabled: false,
-            taxIncludedInPrice: false,
-            defaultTaxRate: null,
-          }
-        );
-      }
-    } catch (err) {
-      console.error('Failed to fetch tax settings:', err);
+    const { data } = await apiGet<{ settings: TaxSettings }>(
+      `/api/v1/stores/${storeId}/tax/settings`
+    );
+    if (data) {
+      setSettings(
+        data.settings || {
+          taxEnabled: false,
+          taxIncludedInPrice: false,
+          defaultTaxRate: null,
+        }
+      );
     }
   }, [storeId]);
 
   const fetchRates = useCallback(async () => {
-    try {
-      const token = localStorage.getItem('authToken');
-      const params = new URLSearchParams();
-      if (filter !== 'all') {
-        params.set('includeInactive', 'true');
+    const params = new URLSearchParams();
+    if (filter !== 'all') {
+      params.set('includeInactive', 'true');
+    }
+
+    const { data } = await apiGet<{ rates: TaxRate[] }>(
+      `/api/v1/stores/${storeId}/tax/rates?${params}`
+    );
+    if (data) {
+      let allRates = data.rates || [];
+
+      if (filter === 'active') {
+        allRates = allRates.filter((r: TaxRate) => r.isActive);
+      } else if (filter === 'inactive') {
+        allRates = allRates.filter((r: TaxRate) => !r.isActive);
       }
 
-      const res = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/tax/rates?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        let allRates = data.data?.rates || [];
-
-        if (filter === 'active') {
-          allRates = allRates.filter((r: TaxRate) => r.isActive);
-        } else if (filter === 'inactive') {
-          allRates = allRates.filter((r: TaxRate) => !r.isActive);
-        }
-
-        setRates(allRates);
-      }
-    } catch (err) {
-      console.error('Failed to fetch tax rates:', err);
+      setRates(allRates);
     }
   }, [storeId, filter]);
 
@@ -149,18 +129,12 @@ export default function TaxSettingsPage() {
   const handleSaveSettings = async (newSettings: Partial<TaxSettings>) => {
     setSavingSettings(true);
     try {
-      const token = localStorage.getItem('authToken');
-      const res = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/tax/settings`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(newSettings),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setSettings(data.data?.settings);
+      const { data } = await apiPut<{ settings: TaxSettings }>(
+        `/api/v1/stores/${storeId}/tax/settings`,
+        newSettings
+      );
+      if (data) {
+        setSettings(data.settings);
       }
     } catch (err) {
       console.error('Failed to save tax settings:', err);
@@ -200,7 +174,6 @@ export default function TaxSettingsPage() {
     setSaving(true);
 
     try {
-      const token = localStorage.getItem('authToken');
       const body = {
         name: formData.name,
         nameAr: formData.nameAr || undefined,
@@ -212,20 +185,13 @@ export default function TaxSettingsPage() {
         isActive: formData.isActive,
       };
 
-      const url = editingRate
-        ? `${getApiUrl()}/api/v1/stores/${storeId}/tax/rates/${editingRate.id}`
-        : `${getApiUrl()}/api/v1/stores/${storeId}/tax/rates`;
+      const endpoint = editingRate
+        ? `/api/v1/stores/${storeId}/tax/rates/${editingRate.id}`
+        : `/api/v1/stores/${storeId}/tax/rates`;
 
-      const res = await fetch(url, {
-        method: editingRate ? 'PUT' : 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(body),
-      });
+      const { error } = editingRate ? await apiPut(endpoint, body) : await apiPost(endpoint, body);
 
-      if (res.ok) {
+      if (!error) {
         handleCloseModal();
         fetchRates();
       }
@@ -238,11 +204,7 @@ export default function TaxSettingsPage() {
 
   const handleToggle = async (rate: TaxRate) => {
     try {
-      const token = localStorage.getItem('authToken');
-      await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/tax/rates/${rate.id}/toggle`, {
-        method: 'PATCH',
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await apiPatch(`/api/v1/stores/${storeId}/tax/rates/${rate.id}/toggle`);
       fetchRates();
     } catch (err) {
       console.error('Failed to toggle tax rate:', err);
@@ -251,11 +213,7 @@ export default function TaxSettingsPage() {
 
   const handleDelete = async (rate: TaxRate) => {
     try {
-      const token = localStorage.getItem('authToken');
-      await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/tax/rates/${rate.id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await apiDelete(`/api/v1/stores/${storeId}/tax/rates/${rate.id}`);
       fetchRates();
     } catch (err) {
       console.error('Failed to delete tax rate:', err);
@@ -284,14 +242,14 @@ export default function TaxSettingsPage() {
         ) : (
           <>
             {/* Tax Settings Card */}
-            <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">General Settings</h2>
+            <div className="bg-card rounded-xl border border-border p-6 mb-6">
+              <h2 className="text-lg font-semibold text-foreground mb-4">General Settings</h2>
               <div className="space-y-6">
                 {/* Enable Tax */}
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-sm font-medium text-gray-900">Enable Tax Collection</h3>
-                    <p className="text-sm text-gray-500">
+                    <h3 className="text-sm font-medium text-foreground">Enable Tax Collection</h3>
+                    <p className="text-sm text-muted-foreground">
                       When enabled, taxes will be calculated and added to orders
                     </p>
                   </div>
@@ -314,8 +272,8 @@ export default function TaxSettingsPage() {
                 {/* Tax Included in Price */}
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-sm font-medium text-gray-900">Prices Include Tax</h3>
-                    <p className="text-sm text-gray-500">
+                    <h3 className="text-sm font-medium text-foreground">Prices Include Tax</h3>
+                    <p className="text-sm text-muted-foreground">
                       Product prices already include tax (tax will be calculated backwards)
                     </p>
                   </div>
@@ -339,10 +297,10 @@ export default function TaxSettingsPage() {
 
                 {/* Default Tax Rate */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     Default Tax Rate (%)
                   </label>
-                  <p className="text-sm text-gray-500 mb-2">
+                  <p className="text-sm text-muted-foreground mb-2">
                     Used when no specific tax rate rules apply
                   </p>
                   <div className="flex items-center gap-3">
@@ -358,7 +316,7 @@ export default function TaxSettingsPage() {
                       }}
                       onBlur={() => handleSaveSettings({ defaultTaxRate: settings.defaultTaxRate })}
                       placeholder="e.g., 5.00"
-                      className="w-32 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      className="w-32 px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                       disabled={!settings.taxEnabled}
                     />
                     <span className="text-gray-500">%</span>
@@ -368,11 +326,11 @@ export default function TaxSettingsPage() {
             </div>
 
             {/* Tax Rates Section */}
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-              <div className="flex items-center justify-between p-6 border-b border-gray-200">
+            <div className="bg-card rounded-xl border border-border overflow-hidden">
+              <div className="flex items-center justify-between p-6 border-b border-border">
                 <div>
-                  <h2 className="text-lg font-semibold text-gray-900">Tax Rates</h2>
-                  <p className="text-sm text-gray-500">
+                  <h2 className="text-lg font-semibold text-foreground">Tax Rates</h2>
+                  <p className="text-sm text-muted-foreground">
                     Create specific tax rates for different regions or categories
                   </p>
                 </div>
@@ -394,7 +352,7 @@ export default function TaxSettingsPage() {
               </div>
 
               {/* Filters */}
-              <div className="flex gap-2 p-4 bg-gray-50 border-b border-gray-200">
+              <div className="flex gap-2 p-4 bg-muted border-b border-border">
                 {(['all', 'active', 'inactive'] as const).map(f => (
                   <button
                     key={f}
@@ -402,7 +360,7 @@ export default function TaxSettingsPage() {
                     className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                       filter === f
                         ? 'bg-orange-500 text-white'
-                        : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                        : 'bg-card text-gray-700 hover:bg-gray-100 border border-border'
                     }`}
                   >
                     {f.charAt(0).toUpperCase() + f.slice(1)}
@@ -428,7 +386,7 @@ export default function TaxSettingsPage() {
                       />
                     </svg>
                   </div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No Tax Rates</h3>
+                  <h3 className="text-lg font-semibold text-foreground mb-2">No Tax Rates</h3>
                   <p className="text-gray-600 mb-6">
                     {settings.taxEnabled
                       ? 'Create tax rates for specific regions or product categories'
@@ -446,57 +404,59 @@ export default function TaxSettingsPage() {
               ) : (
                 <table className="w-full">
                   <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <tr className="bg-muted border-b border-border">
+                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Name
                       </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Rate
                       </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Region
                       </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Priority
                       </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Type
                       </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Status
                       </th>
-                      <th className="text-right px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="text-right px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Actions
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200">
+                  <tbody className="divide-y divide-border">
                     {rates.map(rate => (
-                      <tr key={rate.id} className="hover:bg-gray-50">
+                      <tr key={rate.id} className="hover:bg-muted">
                         <td className="px-6 py-4">
                           <div>
-                            <div className="font-medium text-gray-900">{rate.name}</div>
+                            <div className="font-medium text-foreground">{rate.name}</div>
                             {rate.nameAr && (
-                              <div className="text-sm text-gray-500 font-arabic">{rate.nameAr}</div>
+                              <div className="text-sm text-muted-foreground font-arabic">
+                                {rate.nameAr}
+                              </div>
                             )}
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <span className="font-medium text-gray-900">{rate.rate}%</span>
+                          <span className="font-medium text-foreground">{rate.rate}%</span>
                         </td>
                         <td className="px-6 py-4">
                           {rate.country || rate.state ? (
-                            <div className="text-sm text-gray-600">
+                            <div className="text-sm text-muted-foreground">
                               {rate.country && <span className="uppercase">{rate.country}</span>}
                               {rate.country && rate.state && <span> / </span>}
                               {rate.state && <span>{rate.state}</span>}
                             </div>
                           ) : (
-                            <span className="text-sm text-gray-400">All regions</span>
+                            <span className="text-sm text-muted-foreground">All regions</span>
                           )}
                         </td>
                         <td className="px-6 py-4">
-                          <span className="text-sm text-gray-600">{rate.priority}</span>
+                          <span className="text-sm text-muted-foreground">{rate.priority}</span>
                         </td>
                         <td className="px-6 py-4">
                           <span
@@ -603,9 +563,9 @@ export default function TaxSettingsPage() {
         {/* Modal */}
         {showModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-              <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                <h2 className="text-xl font-semibold text-gray-900">
+            <div className="bg-card rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between p-6 border-b border-border">
+                <h2 className="text-xl font-semibold text-foreground">
                   {editingRate ? 'Edit Tax Rate' : 'New Tax Rate'}
                 </h2>
                 <button
@@ -627,7 +587,7 @@ export default function TaxSettingsPage() {
                 {/* Quick Templates */}
                 {!editingRate && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-muted-foreground mb-2">
                       Quick Templates
                     </label>
                     <div className="flex flex-wrap gap-2">
@@ -648,7 +608,7 @@ export default function TaxSettingsPage() {
                 {/* Rate Name */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-muted-foreground mb-2">
                       Tax Name <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -656,12 +616,12 @@ export default function TaxSettingsPage() {
                       value={formData.name}
                       onChange={e => setFormData({ ...formData, name: e.target.value })}
                       placeholder="e.g., VAT"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                       required
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-muted-foreground mb-2">
                       Tax Name (Arabic)
                     </label>
                     <input
@@ -669,7 +629,7 @@ export default function TaxSettingsPage() {
                       value={formData.nameAr}
                       onChange={e => setFormData({ ...formData, nameAr: e.target.value })}
                       placeholder="e.g., ضريبة القيمة المضافة"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                       dir="rtl"
                     />
                   </div>
@@ -677,7 +637,7 @@ export default function TaxSettingsPage() {
 
                 {/* Rate */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-muted-foreground mb-2">
                     Tax Rate (%) <span className="text-red-500">*</span>
                   </label>
                   <div className="flex items-center gap-3">
@@ -689,7 +649,7 @@ export default function TaxSettingsPage() {
                       value={formData.rate}
                       onChange={e => setFormData({ ...formData, rate: e.target.value })}
                       placeholder="5.00"
-                      className="w-32 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      className="w-32 px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                       required
                     />
                     <span className="text-gray-500">%</span>
@@ -699,7 +659,7 @@ export default function TaxSettingsPage() {
                 {/* Region */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-muted-foreground mb-2">
                       Country Code
                     </label>
                     <input
@@ -710,12 +670,14 @@ export default function TaxSettingsPage() {
                       }
                       placeholder="e.g., KW"
                       maxLength={2}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 uppercase"
+                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 uppercase"
                     />
-                    <p className="text-xs text-gray-500 mt-1">Leave empty for all countries</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Leave empty for all countries
+                    </p>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-muted-foreground mb-2">
                       State/Region
                     </label>
                     <input
@@ -723,24 +685,26 @@ export default function TaxSettingsPage() {
                       value={formData.state}
                       onChange={e => setFormData({ ...formData, state: e.target.value })}
                       placeholder="e.g., Capital"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                     />
-                    <p className="text-xs text-gray-500 mt-1">Leave empty for all states</p>
+                    <p className="text-xs text-muted-foreground mt-1">Leave empty for all states</p>
                   </div>
                 </div>
 
                 {/* Priority */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
+                  <label className="block text-sm font-medium text-muted-foreground mb-2">
+                    Priority
+                  </label>
                   <input
                     type="number"
                     min="0"
                     value={formData.priority}
                     onChange={e => setFormData({ ...formData, priority: e.target.value })}
                     placeholder="0"
-                    className="w-24 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                    className="w-24 px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   />
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     Higher priority rates are applied first
                   </p>
                 </div>
@@ -759,7 +723,7 @@ export default function TaxSettingsPage() {
                     </label>
                     <div>
                       <span className="text-sm text-gray-900 font-medium">Compound Tax</span>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-muted-foreground">
                         Calculate on subtotal + previous taxes
                       </p>
                     </div>
@@ -780,11 +744,11 @@ export default function TaxSettingsPage() {
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
+                <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
                   <button
                     type="button"
                     onClick={handleCloseModal}
-                    className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    className="px-4 py-2 text-gray-700 border border-border rounded-lg hover:bg-muted transition-colors"
                   >
                     Cancel
                   </button>

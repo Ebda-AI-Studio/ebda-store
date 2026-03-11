@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AdminLayout } from '../../../../components/AdminLayout';
-import { getApiUrl } from '../../../../lib/api';
+import { apiGet } from '../../../../lib/api';
 
 interface OrderCustomer {
   id: string;
@@ -32,8 +32,6 @@ interface CustomerRow {
   lastOrderId: string;
   lastOrderNumber?: string;
 }
-
-const API_URL = getApiUrl();
 
 function formatDate(dateString: string) {
   return new Date(dateString).toLocaleDateString('en-US', {
@@ -65,38 +63,33 @@ export default function StoreCustomersPage() {
     setError(null);
 
     try {
-      const token = localStorage.getItem('authToken');
-      const headers = { Authorization: `Bearer ${token}` };
       const limit = 100;
 
       // Fetch first page to learn total
-      const firstRes = await fetch(
-        `${API_URL}/api/v1/stores/${storeId}/orders?page=1&limit=${limit}`,
-        { headers }
-      );
+      const { data: firstData, error: firstError } = await apiGet<{
+        orders: Order[];
+        pagination: { totalPages: number };
+      }>(`/api/v1/stores/${storeId}/orders?page=1&limit=${limit}`);
 
-      if (!firstRes.ok) {
-        const errData = await firstRes.json().catch(() => ({}));
-        setError(errData.error?.message || 'Failed to fetch customers');
+      if (firstError || !firstData) {
+        setError(firstError?.message || 'Failed to fetch customers');
         return;
       }
 
-      const firstData = await firstRes.json();
-      const allOrders: Order[] = firstData.data?.orders ?? [];
-      const totalPages: number = firstData.data?.pagination?.totalPages ?? 1;
+      const allOrders: Order[] = firstData.orders ?? [];
+      const totalPages: number = firstData.pagination?.totalPages ?? 1;
 
       // Fetch remaining pages in parallel if there are more
       if (totalPages > 1) {
         setIsFetchingAll(true);
         const pageNumbers = Array.from({ length: totalPages - 1 }, (_, i) => i + 2);
         const remainingResults = await Promise.all(
-          pageNumbers.map(page =>
-            fetch(`${API_URL}/api/v1/stores/${storeId}/orders?page=${page}&limit=${limit}`, {
-              headers,
-            })
-              .then(r => (r.ok ? r.json() : Promise.resolve({ data: { orders: [] } })))
-              .then((d: { data: { orders: Order[] } }) => d.data?.orders ?? [])
-          )
+          pageNumbers.map(async pageNum => {
+            const { data } = await apiGet<{ orders: Order[] }>(
+              `/api/v1/stores/${storeId}/orders?page=${pageNum}&limit=${limit}`
+            );
+            return data?.orders ?? [];
+          })
         );
         for (const pageOrders of remainingResults) {
           allOrders.push(...pageOrders);
@@ -165,7 +158,7 @@ export default function StoreCustomersPage() {
       subtitle="Customers who have placed orders in this store"
       actions={
         <Link href={`/stores/${storeId}`}>
-          <button className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 font-medium">
+          <button className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted font-medium">
             Back to Store
           </button>
         </Link>
@@ -174,7 +167,7 @@ export default function StoreCustomersPage() {
       {/* Search bar */}
       <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-500">
+          <span className="text-sm text-muted-foreground">
             {isLoading || isFetchingAll
               ? 'Loading customers...'
               : `${filteredCustomers.length} customer${filteredCustomers.length !== 1 ? 's' : ''}`}
@@ -219,7 +212,7 @@ export default function StoreCustomersPage() {
       )}
 
       {/* Customers table */}
-      <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
+      <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
         {isLoading ? (
           <div className="space-y-4 p-6">
             {Array.from({ length: 5 }).map((_, i) => (
@@ -249,38 +242,38 @@ export default function StoreCustomersPage() {
                 d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
               />
             </svg>
-            <p className="mt-4 text-gray-500">
+            <p className="mt-4 text-muted-foreground">
               {search ? 'No customers match your search' : 'No customers yet for this store'}
             </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50 border-b">
+              <thead className="bg-muted border-b">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Customer
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Email
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Total Orders
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Total Spent
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider hidden md:table-cell">
                     Last Order
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {filteredCustomers.map(customer => (
-                  <tr key={customer.id} className="hover:bg-gray-50 transition-colors">
+                  <tr key={customer.id} className="hover:bg-muted transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         {/* Avatar with initials */}
@@ -288,30 +281,30 @@ export default function StoreCustomersPage() {
                           {customer.firstName?.[0]}
                           {customer.lastName?.[0]}
                         </div>
-                        <p className="font-medium text-gray-900">
+                        <p className="font-medium text-foreground">
                           {customer.firstName} {customer.lastName}
                         </p>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-500">{customer.email}</td>
+                    <td className="px-6 py-4 text-sm text-muted-foreground">{customer.email}</td>
                     <td className="px-6 py-4">
                       <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">
                         {customer.totalOrders} order{customer.totalOrders !== 1 ? 's' : ''}
                       </span>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="font-bold text-gray-900">
+                      <span className="font-bold text-foreground">
                         {(customer.totalSpent / 1000).toFixed(3)} KWD
                       </span>
                     </td>
-                    <td className="px-6 py-4 hidden md:table-cell text-sm text-gray-500">
+                    <td className="px-6 py-4 hidden md:table-cell text-sm text-muted-foreground">
                       {formatDate(customer.lastOrderDate)}
                     </td>
                     <td className="px-6 py-4 text-right">
                       {/* Link to store orders filtered by this customer's name/email */}
                       <Link
                         href={`/stores/${storeId}/orders`}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-muted transition-colors"
                         title="View orders for this customer"
                       >
                         <svg

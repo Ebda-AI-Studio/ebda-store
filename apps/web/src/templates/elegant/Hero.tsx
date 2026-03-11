@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import type { HeroProps } from '../types';
 
 export default function ElegantHero({
@@ -28,7 +29,7 @@ export default function ElegantHero({
         /* With image: full-bleed hero */
         <div className="relative min-h-[70vh]">
           <div className="absolute inset-0">
-            <img src={image} alt={displayTitle} className="w-full h-full object-cover" />
+            <Image src={image} alt={displayTitle} fill className="object-cover" />
             <div className="absolute inset-0 bg-gradient-to-r from-background via-background/80 to-transparent" />
             <div className="absolute inset-0 bg-gradient-to-t from-background/50 to-transparent" />
           </div>

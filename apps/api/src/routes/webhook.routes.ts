@@ -47,7 +47,7 @@ function verifyWebhookSignature(req: Request, res: Response, next: NextFunction)
   }
 
   // Store signature for later use
-  (req as any).webhookSignature = signature;
+  req.webhookSignature = signature;
   next();
 }
 
@@ -129,7 +129,7 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const provider = req.params.provider as PaymentProvider;
-      const signature = (req as any).webhookSignature || '';
+      const signature = req.webhookSignature || '';
 
       // req.body is a raw Buffer (from express.raw). Parse it here so handlers
       // can access properties while the raw Buffer is preserved for signature
@@ -265,6 +265,38 @@ router.post('/payment', async (req: Request, res: Response, next: NextFunction) 
       return;
     }
 
+    // Idempotency check - same pattern as provider-specific handler
+    const idempotencyKey = generateIdempotencyKey(provider, payload);
+    const { alreadyProcessed, order } = await checkIdempotency(idempotencyKey);
+
+    if (alreadyProcessed) {
+      logger.info({ idempotencyKey }, '[WEBHOOK] Duplicate auto-detected webhook detected');
+
+      await auditLog({
+        action: 'WEBHOOK_DUPLICATE',
+        resourceType: 'payment',
+        resourceId: order?.id,
+        details: {
+          provider,
+          idempotencyKey,
+          orderNumber: order?.orderNumber ?? null,
+          previousStatus: order?.paymentStatus ?? null,
+        },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+
+      res.json({
+        success: true,
+        data: {
+          message: 'Webhook already processed',
+          orderId: order?.id,
+          orderNumber: order?.orderNumber,
+        },
+      });
+      return;
+    }
+
     // Pass the parsed payload for business logic and the raw body string for
     // HMAC signature verification so providers compute the correct digest.
     const result = await PaymentService.handleWebhook(
@@ -275,7 +307,25 @@ router.post('/payment', async (req: Request, res: Response, next: NextFunction) 
       rawBody.toString()
     );
 
+    // Mark as processed if we have an order
+    if (result.orderId) {
+      await markWebhookProcessed(result.orderId, idempotencyKey);
+    }
+
     logger.info({ provider, result }, '[WEBHOOK] Auto-detected provider processed');
+
+    await auditLog({
+      action: 'WEBHOOK_PROCESSED',
+      resourceType: 'payment',
+      resourceId: result.orderId,
+      details: {
+        provider,
+        idempotencyKey,
+        status: result.status || 'unknown',
+      },
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
 
     res.json({
       success: true,

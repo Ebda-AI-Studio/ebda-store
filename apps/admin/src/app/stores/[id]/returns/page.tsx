@@ -2,9 +2,9 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
-import { Button, Badge } from '@force/ui';
+import { Button, Badge, useToast } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
-import { getApiUrl } from '../../../../lib/api';
+import { apiGet, apiPost } from '../../../../lib/api';
 
 interface ReturnItem {
   id: string;
@@ -97,23 +97,19 @@ export default function ReturnsPage() {
   const [meta, setMeta] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
   const [selectedReturn, setSelectedReturn] = useState<Return | null>(null);
   const [showDetails, setShowDetails] = useState(false);
+  const { success: toastSuccess, error: showError } = useToast();
 
   const fetchReturns = useCallback(async () => {
     if (!storeId) return;
     setIsLoading(true);
     try {
-      const token = localStorage.getItem('authToken');
       const statusFilter = filter === 'all' ? '' : `&status=${filter}`;
-      const response = await fetch(
-        `${getApiUrl()}/api/v1/stores/${storeId}/returns/admin/list?page=${meta.page}&limit=${meta.limit}${statusFilter}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+      const { data } = await apiGet<{ returns: Return[]; meta: typeof meta }>(
+        `/api/v1/stores/${storeId}/returns/admin/list?page=${meta.page}&limit=${meta.limit}${statusFilter}`
       );
-      if (response.ok) {
-        const data = await response.json();
-        setReturns(data.data.returns);
-        setMeta(data.data.meta);
+      if (data) {
+        setReturns(data.returns);
+        setMeta(data.meta);
       }
     } catch (error) {
       console.error('Failed to fetch returns:', error);
@@ -125,13 +121,11 @@ export default function ReturnsPage() {
   const fetchStats = useCallback(async () => {
     if (!storeId) return;
     try {
-      const token = localStorage.getItem('authToken');
-      const response = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/returns/admin/stats`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setStats(data.data.stats);
+      const { data } = await apiGet<{ stats: Stats }>(
+        `/api/v1/stores/${storeId}/returns/admin/stats`
+      );
+      if (data) {
+        setStats(data.stats);
       }
     } catch (error) {
       console.error('Failed to fetch stats:', error);
@@ -145,24 +139,20 @@ export default function ReturnsPage() {
 
   async function handleApprove(returnId: string) {
     try {
-      const token = localStorage.getItem('authToken');
-      const res = await fetch(
-        `${getApiUrl()}/api/v1/stores/${storeId}/returns/admin/${returnId}/approve`,
-        {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
-        }
+      const { error } = await apiPost(
+        `/api/v1/stores/${storeId}/returns/admin/${returnId}/approve`
       );
-      if (!res.ok) {
-        alert('Failed to approve return. Please try again.');
+      if (error) {
+        showError('Error', 'Failed to approve return. Please try again.');
         return;
       }
+      toastSuccess('Return Approved', 'The return has been approved.');
       fetchReturns();
       fetchStats();
       setShowDetails(false);
     } catch (error) {
       console.error('Failed to approve return:', error);
-      alert('Failed to approve return. Please try again.');
+      showError('Error', 'Failed to approve return. Please try again.');
     }
   }
 
@@ -170,51 +160,40 @@ export default function ReturnsPage() {
     const reason = prompt('Enter rejection reason:');
     if (!reason) return;
     try {
-      const token = localStorage.getItem('authToken');
-      const res = await fetch(
-        `${getApiUrl()}/api/v1/stores/${storeId}/returns/admin/${returnId}/reject`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ reason }),
-        }
+      const { error } = await apiPost(
+        `/api/v1/stores/${storeId}/returns/admin/${returnId}/reject`,
+        { reason }
       );
-      if (!res.ok) {
-        alert('Failed to reject return. Please try again.');
+      if (error) {
+        showError('Error', 'Failed to reject return. Please try again.');
         return;
       }
+      toastSuccess('Return Rejected', 'The return has been rejected.');
       fetchReturns();
       fetchStats();
       setShowDetails(false);
     } catch (error) {
       console.error('Failed to reject return:', error);
-      alert('Failed to reject return. Please try again.');
+      showError('Error', 'Failed to reject return. Please try again.');
     }
   }
 
   async function handleReceived(returnId: string) {
     try {
-      const token = localStorage.getItem('authToken');
-      const res = await fetch(
-        `${getApiUrl()}/api/v1/stores/${storeId}/returns/admin/${returnId}/received`,
-        {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
-        }
+      const { error } = await apiPost(
+        `/api/v1/stores/${storeId}/returns/admin/${returnId}/received`
       );
-      if (!res.ok) {
-        alert('Failed to mark return as received. Please try again.');
+      if (error) {
+        showError('Error', 'Failed to mark return as received. Please try again.');
         return;
       }
+      toastSuccess('Return Received', 'The return has been marked as received.');
       fetchReturns();
       fetchStats();
       setShowDetails(false);
     } catch (error) {
       console.error('Failed to mark as received:', error);
-      alert('Failed to mark return as received. Please try again.');
+      showError('Error', 'Failed to mark return as received. Please try again.');
     }
   }
 
@@ -222,28 +201,21 @@ export default function ReturnsPage() {
     const refundMethod = prompt('Enter refund method (original, store_credit, bank_transfer):');
     if (!refundMethod) return;
     try {
-      const token = localStorage.getItem('authToken');
-      const res = await fetch(
-        `${getApiUrl()}/api/v1/stores/${storeId}/returns/admin/${returnId}/complete`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ refundMethod }),
-        }
+      const { error } = await apiPost(
+        `/api/v1/stores/${storeId}/returns/admin/${returnId}/complete`,
+        { refundMethod }
       );
-      if (!res.ok) {
-        alert('Failed to complete return. Please try again.');
+      if (error) {
+        showError('Error', 'Failed to complete return. Please try again.');
         return;
       }
+      toastSuccess('Return Completed', 'The return has been completed and refund processed.');
       fetchReturns();
       fetchStats();
       setShowDetails(false);
     } catch (error) {
       console.error('Failed to complete return:', error);
-      alert('Failed to complete return. Please try again.');
+      showError('Error', 'Failed to complete return. Please try again.');
     }
   }
 
@@ -252,20 +224,20 @@ export default function ReturnsPage() {
       {/* Stats */}
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-xl border p-4 shadow-sm">
-            <p className="text-sm text-gray-500">Total Returns</p>
-            <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
+          <div className="bg-card rounded-xl border p-4 shadow-sm">
+            <p className="text-sm text-muted-foreground">Total Returns</p>
+            <p className="text-2xl font-bold text-foreground">{stats.total}</p>
           </div>
-          <div className="bg-white rounded-xl border p-4 shadow-sm">
-            <p className="text-sm text-gray-500">Pending</p>
+          <div className="bg-card rounded-xl border p-4 shadow-sm">
+            <p className="text-sm text-muted-foreground">Pending</p>
             <p className="text-2xl font-bold text-yellow-600">{stats.pending}</p>
           </div>
-          <div className="bg-white rounded-xl border p-4 shadow-sm">
-            <p className="text-sm text-gray-500">Approved</p>
+          <div className="bg-card rounded-xl border p-4 shadow-sm">
+            <p className="text-sm text-muted-foreground">Approved</p>
             <p className="text-2xl font-bold text-blue-600">{stats.approved}</p>
           </div>
-          <div className="bg-white rounded-xl border p-4 shadow-sm">
-            <p className="text-sm text-gray-500">Completed</p>
+          <div className="bg-card rounded-xl border p-4 shadow-sm">
+            <p className="text-sm text-muted-foreground">Completed</p>
             <p className="text-2xl font-bold text-green-600">{stats.completed}</p>
           </div>
         </div>
@@ -286,17 +258,17 @@ export default function ReturnsPage() {
       </div>
 
       {/* Returns List */}
-      <div className="rounded-xl border bg-white shadow-sm">
+      <div className="rounded-xl border bg-card shadow-sm">
         {isLoading ? (
-          <div className="p-8 text-center text-gray-500">Loading returns...</div>
+          <div className="p-8 text-center text-muted-foreground">Loading returns...</div>
         ) : returns.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">No returns found</div>
+          <div className="p-8 text-center text-muted-foreground">No returns found</div>
         ) : (
           <div className="divide-y">
             {returns.map(ret => (
               <div
                 key={ret.id}
-                className="p-6 hover:bg-gray-50 cursor-pointer"
+                className="p-6 hover:bg-muted cursor-pointer"
                 onClick={() => {
                   setSelectedReturn(ret);
                   setShowDetails(true);
@@ -305,21 +277,21 @@ export default function ReturnsPage() {
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
-                      <span className="font-semibold text-gray-900">#{ret.returnNumber}</span>
+                      <span className="font-semibold text-foreground">#{ret.returnNumber}</span>
                       <Badge className={statusColors[ret.status] || 'bg-gray-100 text-gray-800'}>
                         {ret.status}
                       </Badge>
                       <Badge variant="outline">{typeLabels[ret.type] || ret.type}</Badge>
                     </div>
-                    <p className="text-sm text-gray-600 mb-2">
+                    <p className="text-sm text-muted-foreground mb-2">
                       <span className="font-medium">Order:</span> #{ret.order.orderNumber} |
                       <span className="font-medium ml-2">Customer:</span> {ret.customer.firstName}{' '}
                       {ret.customer.lastName}
                     </p>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-muted-foreground">
                       <span className="font-medium">Reason:</span> {ret.reason}
                     </p>
-                    <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                    <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
                       <span>{formatDate(ret.createdAt)}</span>
                       <span>{ret.items.length} item(s)</span>
                       <span className="font-medium text-gray-700">
@@ -383,7 +355,7 @@ export default function ReturnsPage() {
         {/* Pagination */}
         {meta.totalPages > 1 && (
           <div className="flex items-center justify-between border-t px-6 py-3">
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-muted-foreground">
               Showing {(meta.page - 1) * meta.limit + 1} to{' '}
               {Math.min(meta.page * meta.limit, meta.total)} of {meta.total} returns
             </p>
@@ -416,19 +388,21 @@ export default function ReturnsPage() {
           onClick={() => setShowDetails(false)}
         >
           <div
-            className="bg-white rounded-xl shadow-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto"
+            className="bg-card rounded-xl shadow-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto"
             onClick={e => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b p-4">
               <div>
-                <h2 className="font-semibold text-gray-900">
+                <h2 className="font-semibold text-foreground">
                   Return #{selectedReturn.returnNumber}
                 </h2>
-                <p className="text-sm text-gray-500">Order #{selectedReturn.order.orderNumber}</p>
+                <p className="text-sm text-muted-foreground">
+                  Order #{selectedReturn.order.orderNumber}
+                </p>
               </div>
               <button
                 onClick={() => setShowDetails(false)}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-400 hover:text-muted-foreground"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path
@@ -455,31 +429,30 @@ export default function ReturnsPage() {
 
               {/* Customer Info */}
               <div>
-                <h3 className="font-medium text-gray-900 mb-2">Customer</h3>
-                <p className="text-sm text-gray-600">
+                <h3 className="font-medium text-foreground mb-2">Customer</h3>
+                <p className="text-sm text-muted-foreground">
                   {selectedReturn.customer.firstName} {selectedReturn.customer.lastName}
                 </p>
-                <p className="text-sm text-gray-500">{selectedReturn.customer.email}</p>
+                <p className="text-sm text-muted-foreground">{selectedReturn.customer.email}</p>
               </div>
 
               {/* Reason */}
               <div>
-                <h3 className="font-medium text-gray-900 mb-2">Reason</h3>
-                <p className="text-sm text-gray-600">{selectedReturn.reason}</p>
+                <h3 className="font-medium text-foreground mb-2">Reason</h3>
+                <p className="text-sm text-muted-foreground">{selectedReturn.reason}</p>
                 {selectedReturn.reasonDetail && (
-                  <p className="text-sm text-gray-500 mt-1">{selectedReturn.reasonDetail}</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {selectedReturn.reasonDetail}
+                  </p>
                 )}
               </div>
 
               {/* Items */}
               <div>
-                <h3 className="font-medium text-gray-900 mb-2">Items</h3>
+                <h3 className="font-medium text-foreground mb-2">Items</h3>
                 <div className="space-y-2">
                   {selectedReturn.items.map(item => (
-                    <div
-                      key={item.id}
-                      className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg"
-                    >
+                    <div key={item.id} className="flex items-center gap-3 p-3 bg-muted rounded-lg">
                       {item.product?.images?.[0]?.url ? (
                         <img
                           src={item.product.images[0].url}
@@ -504,8 +477,8 @@ export default function ReturnsPage() {
                         </div>
                       )}
                       <div className="flex-1">
-                        <p className="font-medium text-gray-900">{item.productName}</p>
-                        <p className="text-sm text-gray-500">
+                        <p className="font-medium text-foreground">{item.productName}</p>
+                        <p className="text-sm text-muted-foreground">
                           Qty: {item.quantity} | Condition: {item.condition || 'N/A'}
                         </p>
                       </div>
@@ -515,8 +488,8 @@ export default function ReturnsPage() {
               </div>
 
               {/* Refund Info */}
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                <span className="font-medium text-gray-900">Refund Amount</span>
+              <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
+                <span className="font-medium text-foreground">Refund Amount</span>
                 <span className="text-lg font-bold text-orange-600">
                   {formatCurrency(selectedReturn.refundAmount)}
                 </span>

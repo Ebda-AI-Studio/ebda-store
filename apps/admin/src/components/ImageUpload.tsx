@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useRef, useCallback } from 'react';
-import { getApiUrl, getAuthToken } from '../lib/api';
+import Image from 'next/image';
+import { getApiUrl } from '../lib/api';
 
 interface ImageUploadProps {
   value?: string;
@@ -47,7 +48,6 @@ export function ImageUpload({
       formData.append('file', file);
 
       try {
-        const token = getAuthToken();
         const xhr = new XMLHttpRequest();
 
         const url = await new Promise<string>((resolve, reject) => {
@@ -59,11 +59,15 @@ export function ImageUpload({
 
           xhr.addEventListener('load', () => {
             if (xhr.status >= 200 && xhr.status < 300) {
-              const data = JSON.parse(xhr.responseText);
-              if (data.success && data.data?.url) {
-                resolve(data.data.url);
-              } else {
-                reject(new Error(data.error?.message || 'Upload failed'));
+              try {
+                const data = JSON.parse(xhr.responseText);
+                if (data.success && data.data?.url) {
+                  resolve(data.data.url);
+                } else {
+                  reject(new Error(data.error?.message || 'Upload failed'));
+                }
+              } catch {
+                reject(new Error('Invalid server response'));
               }
             } else {
               try {
@@ -82,7 +86,7 @@ export function ImageUpload({
             'POST',
             `${getApiUrl()}/api/v1/uploads/image?folder=${encodeURIComponent(folder)}`
           );
-          if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+          xhr.withCredentials = true;
           xhr.send(formData);
         });
 
@@ -140,7 +144,13 @@ export function ImageUpload({
     return (
       <div className={`relative group ${className}`}>
         <div className="rounded-lg border bg-gray-50 p-3">
-          <img src={value} alt={label} className="h-24 w-auto object-contain mx-auto" />
+          <Image
+            src={value}
+            alt={label}
+            width={200}
+            height={96}
+            className="h-24 w-auto object-contain mx-auto"
+          />
         </div>
         {onRemove && (
           <button
@@ -252,7 +262,6 @@ export function MultiImageUpload({
       toUpload.forEach(f => formData.append('files', f));
 
       try {
-        const token = getAuthToken();
         const newUrls = await new Promise<string[]>((resolve, reject) => {
           const xhr = new XMLHttpRequest();
 
@@ -264,11 +273,15 @@ export function MultiImageUpload({
 
           xhr.addEventListener('load', () => {
             if (xhr.status >= 200 && xhr.status < 300) {
-              const data = JSON.parse(xhr.responseText);
-              if (data.success && data.data?.files) {
-                resolve(data.data.files.map((f: { url: string }) => f.url));
-              } else {
-                reject(new Error(data.error?.message || 'Upload failed'));
+              try {
+                const data = JSON.parse(xhr.responseText);
+                if (data.success && data.data?.files) {
+                  resolve(data.data.files.map((f: { url: string }) => f.url));
+                } else {
+                  reject(new Error(data.error?.message || 'Upload failed'));
+                }
+              } catch {
+                reject(new Error('Invalid server response'));
               }
             } else {
               try {
@@ -286,7 +299,7 @@ export function MultiImageUpload({
             'POST',
             `${getApiUrl()}/api/v1/uploads/images?folder=${encodeURIComponent(folder)}`
           );
-          if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+          xhr.withCredentials = true;
           xhr.send(formData);
         });
 
@@ -362,7 +375,7 @@ export function MultiImageUpload({
               key={url}
               className="relative group aspect-square rounded-lg border bg-gray-50 overflow-hidden"
             >
-              <img src={url} alt={`Image ${i + 1}`} className="w-full h-full object-cover" />
+              <Image src={url} alt={`Image ${i + 1}`} fill className="object-cover" />
               {i === 0 && (
                 <span className="absolute top-1 left-1 bg-primary text-white text-[10px] font-medium px-1.5 py-0.5 rounded">
                   Main

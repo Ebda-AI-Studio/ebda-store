@@ -135,7 +135,7 @@ export function StoreProvider({ children, initialStore }: StoreProviderProps) {
   // Set store ID on API client so all requests include it
   useEffect(() => {
     if (store.id && store.id !== 'demo') {
-      import('../lib/api').then(({ api }) => api.setStoreId(store.id));
+      import('../lib/api').then(({ api }) => api.setStoreId(store.id)).catch(() => {});
     }
   }, [store.id]);
 

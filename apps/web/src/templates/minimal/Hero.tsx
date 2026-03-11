@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import type { HeroProps } from '../types';
 
 export default function MinimalHero({
@@ -41,9 +42,9 @@ export default function MinimalHero({
           </div>
 
           {/* Image - Full width, clean */}
-          <div className="aspect-[21/9] bg-gradient-to-br from-primary/5 to-background overflow-hidden">
+          <div className="relative aspect-[21/9] bg-gradient-to-br from-primary/5 to-background overflow-hidden">
             {image ? (
-              <img src={image} alt={displayTitle} className="w-full h-full object-cover" />
+              <Image src={image} alt={displayTitle} fill className="object-cover" />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
                 <span className="text-sm text-muted-foreground tracking-widest uppercase">

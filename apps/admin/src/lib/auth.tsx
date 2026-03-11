@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import { getApiUrl } from './api';
 
 interface User {
   id: string;
@@ -13,21 +14,19 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
-  token: string | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   refreshToken: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const API_URL = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1`;
+const API_URL = `${getApiUrl()}/api/v1`;
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
@@ -39,14 +38,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const response = await fetch(`${API_URL}/auth/refresh`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refreshToken: refreshTokenValue }),
       });
 
       if (response.ok) {
         const data = await response.json();
-        localStorage.setItem('authToken', data.data.accessToken);
-        setToken(data.data.accessToken);
+        // The new access token is set as an HTTP-only cookie by the API.
+        // Store the new refresh token in localStorage (not sensitive the
+        // same way since it can only be used once and is paired with the
+        // server-side record).
         if (data.data.refreshToken) {
           localStorage.setItem('refreshToken', data.data.refreshToken);
         }
@@ -61,29 +63,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const checkAuth = useCallback(async () => {
-    const storedToken = localStorage.getItem('authToken');
-
-    if (!storedToken) {
-      setIsLoading(false);
-      return;
-    }
-
     try {
+      // The HTTP-only cookie is sent automatically with credentials: 'include'.
+      // No need to check localStorage for a token first.
       const response = await fetch(`${API_URL}/auth/me`, {
-        headers: { Authorization: `Bearer ${storedToken}` },
+        credentials: 'include',
       });
 
       if (response.ok) {
         const data = await response.json();
         setUser(data.data.user);
-        setToken(storedToken);
       } else if (response.status === 401) {
         // Try to refresh token
         const refreshed = await refreshToken();
         if (!refreshed) {
-          localStorage.removeItem('authToken');
           localStorage.removeItem('refreshToken');
-          setToken(null);
         }
       }
     } catch (error) {
@@ -108,11 +102,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function login(email: string, password: string) {
     const response = await fetch(`${API_URL}/auth/login`, {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
     });
 
-    const data = await response.json();
+    let data;
+    try {
+      data = await response.json();
+    } catch {
+      throw new Error('Server returned an invalid response. Please try again.');
+    }
 
     if (!response.ok) {
       throw new Error(data.error?.message || 'Login failed');
@@ -123,28 +123,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error('Access denied. Admin privileges required.');
     }
 
-    localStorage.setItem('authToken', data.data.accessToken);
+    // The access token is set as an HTTP-only cookie by the API response.
+    // Only store the refresh token in localStorage.
     localStorage.setItem('refreshToken', data.data.refreshToken);
-    setToken(data.data.accessToken);
     setUser(data.data.user);
     router.push('/');
   }
 
-  function logout() {
+  async function logout() {
     const refreshTokenValue = localStorage.getItem('refreshToken');
 
-    // Call logout endpoint
-    if (refreshTokenValue) {
-      fetch(`${API_URL}/auth/logout`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken: refreshTokenValue }),
-      }).catch(console.error);
-    }
+    // Invalidate the refresh token server-side before clearing local state.
+    // The API also clears the HTTP-only auth cookie in its response.
+    // Awaiting ensures the token is revoked before we redirect, preventing
+    // a window where a stolen token could still be used to obtain new access.
+    await fetch(`${API_URL}/auth/logout`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken: refreshTokenValue }),
+    }).catch(() => {
+      // Best-effort: if the server is unreachable we still clear local state
+    });
 
-    localStorage.removeItem('authToken');
     localStorage.removeItem('refreshToken');
-    setToken(null);
     setUser(null);
     router.push('/login');
   }
@@ -153,7 +155,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
-        token,
         isLoading,
         isAuthenticated: !!user,
         login,

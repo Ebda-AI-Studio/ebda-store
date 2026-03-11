@@ -75,15 +75,39 @@ jobs:
       name: staging
       url: https://staging.forcemedia.com
     steps:
-      - name: Deploy notification
-        run: echo "Deploying to staging environment..."
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      # TODO: Configure deployment commands for your staging infrastructure
-      # Examples: kubectl apply, docker compose pull && up, ssh deploy, etc.
-      - name: Deploy to staging server
-        run: |
-          echo "Deploying to staging environment"
-          echo "Images pushed to registry - configure deployment commands for your infrastructure"
+      # API deploys to Railway via Dockerfile.api
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy API to Railway (staging)
+        run: railway up --service api --environment staging
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+      # Admin and Web deploy to Vercel
+      - name: Install Vercel CLI
+        run: npm install -g vercel
+
+      - name: Deploy Admin to Vercel (staging)
+        run: vercel --token "$VERCEL_TOKEN" --scope "$VERCEL_TEAM_ID" --yes
+        working-directory: apps/admin
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_TEAM_ID: ${{ secrets.VERCEL_TEAM_ID }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_TEAM_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_ADMIN_PROJECT_ID }}
+
+      - name: Deploy Web to Vercel (staging)
+        run: vercel --token "$VERCEL_TOKEN" --scope "$VERCEL_TEAM_ID" --yes
+        working-directory: apps/web
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_TEAM_ID: ${{ secrets.VERCEL_TEAM_ID }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_TEAM_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_WEB_PROJECT_ID }}
 
   # Deploy to production
   deploy-production:
@@ -95,15 +119,39 @@ jobs:
       name: production
       url: https://forcemedia.com
     steps:
-      - name: Deploy notification
-        run: echo "Deploying to production environment..."
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      # TODO: Configure deployment commands for your production infrastructure
-      # Examples: kubectl apply, docker compose pull && up, ssh deploy, etc.
-      - name: Deploy to production server
-        run: |
-          echo "Deploying to production environment"
-          echo "Images pushed to registry - configure deployment commands for your infrastructure"
+      # API deploys to Railway via Dockerfile.api
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy API to Railway (production)
+        run: railway up --service api --environment production
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+      # Admin and Web deploy to Vercel with --prod flag
+      - name: Install Vercel CLI
+        run: npm install -g vercel
+
+      - name: Deploy Admin to Vercel (production)
+        run: vercel --token "$VERCEL_TOKEN" --scope "$VERCEL_TEAM_ID" --prod --yes
+        working-directory: apps/admin
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_TEAM_ID: ${{ secrets.VERCEL_TEAM_ID }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_TEAM_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_ADMIN_PROJECT_ID }}
+
+      - name: Deploy Web to Vercel (production)
+        run: vercel --token "$VERCEL_TOKEN" --scope "$VERCEL_TEAM_ID" --prod --yes
+        working-directory: apps/web
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_TEAM_ID: ${{ secrets.VERCEL_TEAM_ID }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_TEAM_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_WEB_PROJECT_ID }}
 
   # Run database migrations
   migrate:

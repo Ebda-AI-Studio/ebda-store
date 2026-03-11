@@ -196,36 +196,38 @@ export class AnalyticsService {
 
     const endDate = dateRange?.endDate || now;
 
-    const orders = await prisma.order.findMany({
-      where: {
-        storeId,
-        createdAt: { gte: startDate, lte: endDate },
-        status: { notIn: ['cancelled', 'refunded'] },
-      },
-      select: {
-        total: true,
-        createdAt: true,
-      },
-      orderBy: { createdAt: 'asc' },
-    });
+    // Aggregate revenue and order count per period at the database level
+    // instead of fetching all individual order rows into JS memory.
+    const truncUnit = groupBy === 'day' ? 'day' : 'month';
+    const aggregated = await prisma.$queryRaw<
+      Array<{ period: Date; revenue: number; orders: bigint }>
+    >`
+      SELECT
+        date_trunc(${truncUnit}, "created_at") AS period,
+        COALESCE(SUM(total), 0) AS revenue,
+        COUNT(*)::bigint AS orders
+      FROM orders
+      WHERE store_id = ${storeId}
+        AND created_at >= ${startDate}
+        AND created_at <= ${endDate}
+        AND status NOT IN ('cancelled', 'refunded')
+      GROUP BY period
+      ORDER BY period ASC
+    `;
 
-    // Group by period
     const salesMap = new Map<string, { revenue: number; orders: number }>();
 
-    orders.forEach(order => {
+    aggregated.forEach(row => {
+      const date = new Date(row.period);
       let key: string;
-      const date = new Date(order.createdAt);
-
       if (groupBy === 'day') {
         key = date.toISOString().split('T')[0];
       } else {
         key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
       }
-
-      const existing = salesMap.get(key) || { revenue: 0, orders: 0 };
       salesMap.set(key, {
-        revenue: existing.revenue + order.total,
-        orders: existing.orders + 1,
+        revenue: Number(row.revenue),
+        orders: Number(row.orders),
       });
     });
 

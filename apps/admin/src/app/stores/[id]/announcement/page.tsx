@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AdminLayout } from '../../../../components/AdminLayout';
-import { getApiUrl } from '../../../../lib/api';
+import { apiGet, apiPut } from '../../../../lib/api';
 
 interface AnnouncementSettings {
   enabled: boolean;
@@ -16,8 +16,6 @@ interface AnnouncementSettings {
   linkText: string;
   linkTextAr: string;
 }
-
-const API_URL = getApiUrl();
 
 const DEFAULT_SETTINGS: AnnouncementSettings = {
   enabled: false,
@@ -43,16 +41,12 @@ export default function AnnouncementPage() {
     if (!storeId) return;
     setIsLoading(true);
     try {
-      const token = localStorage.getItem('authToken');
-      const res = await fetch(`${API_URL}/api/v1/stores/${storeId}/announcement`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const announcement = data.data?.announcement || data.data;
-        if (announcement) {
-          setSettings({ ...DEFAULT_SETTINGS, ...announcement });
-        }
+      const { data } = await apiGet<{ announcement?: AnnouncementSettings } | AnnouncementSettings>(
+        `/api/v1/stores/${storeId}/announcement`
+      );
+      const announcement = (data && 'announcement' in data ? data.announcement : data) || null;
+      if (announcement) {
+        setSettings({ ...DEFAULT_SETTINGS, ...announcement });
       }
       // If 404 or no data, keep defaults
     } catch (err) {
@@ -70,23 +64,14 @@ export default function AnnouncementPage() {
     setIsSaving(true);
     setMessage(null);
     try {
-      const token = localStorage.getItem('authToken');
-      const res = await fetch(`${API_URL}/api/v1/stores/${storeId}/announcement`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(settings),
-      });
+      const { error } = await apiPut(`/api/v1/stores/${storeId}/announcement`, settings);
 
-      if (res.ok) {
+      if (!error) {
         setMessage({ type: 'success', text: 'Announcement settings saved successfully' });
       } else {
-        const errData = await res.json().catch(() => ({}));
         setMessage({
           type: 'error',
-          text: errData.error?.message || 'Failed to save announcement settings',
+          text: error.message || 'Failed to save announcement settings',
         });
       }
     } catch {
@@ -114,7 +99,7 @@ export default function AnnouncementPage() {
       actions={
         <div className="flex gap-2">
           <Link href={`/stores/${storeId}/settings`}>
-            <button className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 font-medium">
+            <button className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-gray-50 font-medium">
               Back to Settings
             </button>
           </Link>
@@ -131,7 +116,9 @@ export default function AnnouncementPage() {
       {/* Live Preview */}
       {settings.text && (
         <div className="mb-6">
-          <p className="mb-2 text-xs font-medium uppercase tracking-wider text-gray-500">Preview</p>
+          <p className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Preview
+          </p>
           <div
             className="flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg"
             style={{
@@ -149,11 +136,11 @@ export default function AnnouncementPage() {
 
       <div className="space-y-6">
         {/* Enable/Disable */}
-        <div className="rounded-xl border bg-white p-6 shadow-sm">
+        <div className="rounded-xl border bg-card p-6 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="font-semibold text-gray-900">Announcement Bar</h2>
-              <p className="mt-1 text-sm text-gray-500">
+              <h2 className="font-semibold text-foreground">Announcement Bar</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
                 Show a banner at the top of your store for promotions, announcements or news
               </p>
             </div>
@@ -164,14 +151,14 @@ export default function AnnouncementPage() {
                 onChange={e => setSettings(prev => ({ ...prev, enabled: e.target.checked }))}
                 className="sr-only peer"
               />
-              <div className="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/20" />
+              <div className="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-border after:bg-card after:transition-all after:content-[''] peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/20" />
             </label>
           </div>
         </div>
 
         {/* Content */}
-        <div className="rounded-xl border bg-white p-6 shadow-sm space-y-4">
-          <h2 className="font-semibold text-gray-900">Content</h2>
+        <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
+          <h2 className="font-semibold text-foreground">Content</h2>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
@@ -183,7 +170,7 @@ export default function AnnouncementPage() {
                 value={settings.text}
                 onChange={e => setSettings(prev => ({ ...prev, text: e.target.value }))}
                 placeholder="Free shipping on orders over 10 KWD!"
-                className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               />
             </div>
             <div>
@@ -196,7 +183,7 @@ export default function AnnouncementPage() {
                 value={settings.textAr}
                 onChange={e => setSettings(prev => ({ ...prev, textAr: e.target.value }))}
                 placeholder="شحن مجاني للطلبات فوق ١٠ د.ك!"
-                className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               />
             </div>
           </div>
@@ -210,9 +197,9 @@ export default function AnnouncementPage() {
               value={settings.linkUrl}
               onChange={e => setSettings(prev => ({ ...prev, linkUrl: e.target.value }))}
               placeholder="https://example.com/sale"
-              className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             />
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-xs text-muted-foreground">
               The entire bar will link to this URL when clicked
             </p>
           </div>
@@ -227,7 +214,7 @@ export default function AnnouncementPage() {
                 value={settings.linkText}
                 onChange={e => setSettings(prev => ({ ...prev, linkText: e.target.value }))}
                 placeholder="Shop Now"
-                className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               />
             </div>
             <div>
@@ -240,15 +227,15 @@ export default function AnnouncementPage() {
                 value={settings.linkTextAr}
                 onChange={e => setSettings(prev => ({ ...prev, linkTextAr: e.target.value }))}
                 placeholder="تسوق الآن"
-                className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               />
             </div>
           </div>
         </div>
 
         {/* Colors */}
-        <div className="rounded-xl border bg-white p-6 shadow-sm space-y-4">
-          <h2 className="font-semibold text-gray-900">Colors</h2>
+        <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
+          <h2 className="font-semibold text-foreground">Colors</h2>
 
           <div className="grid gap-6 sm:grid-cols-2">
             <div>
@@ -262,7 +249,7 @@ export default function AnnouncementPage() {
                   onChange={e =>
                     setSettings(prev => ({ ...prev, backgroundColor: e.target.value }))
                   }
-                  className="h-10 w-14 cursor-pointer rounded-lg border border-gray-300 p-1"
+                  className="h-10 w-14 cursor-pointer rounded-lg border border-border p-1"
                 />
                 <input
                   type="text"
@@ -271,7 +258,7 @@ export default function AnnouncementPage() {
                     setSettings(prev => ({ ...prev, backgroundColor: e.target.value }))
                   }
                   placeholder="#000000"
-                  className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm font-mono focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  className="flex-1 rounded-lg border border-border px-4 py-2 text-sm font-mono focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 />
               </div>
               {/* Quick presets */}
@@ -299,14 +286,14 @@ export default function AnnouncementPage() {
                   type="color"
                   value={settings.textColor}
                   onChange={e => setSettings(prev => ({ ...prev, textColor: e.target.value }))}
-                  className="h-10 w-14 cursor-pointer rounded-lg border border-gray-300 p-1"
+                  className="h-10 w-14 cursor-pointer rounded-lg border border-border p-1"
                 />
                 <input
                   type="text"
                   value={settings.textColor}
                   onChange={e => setSettings(prev => ({ ...prev, textColor: e.target.value }))}
                   placeholder="#ffffff"
-                  className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm font-mono focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  className="flex-1 rounded-lg border border-border px-4 py-2 text-sm font-mono focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 />
               </div>
               {/* Quick presets */}
@@ -316,7 +303,7 @@ export default function AnnouncementPage() {
                     key={color}
                     onClick={() => setSettings(prev => ({ ...prev, textColor: color }))}
                     className={`h-6 w-6 rounded-full border-2 transition-transform hover:scale-110 ${
-                      settings.textColor === color ? 'border-gray-900 scale-110' : 'border-gray-300'
+                      settings.textColor === color ? 'border-gray-900 scale-110' : 'border-border'
                     }`}
                     style={{ backgroundColor: color }}
                     title={color}

@@ -7,7 +7,7 @@ import { requirePermission } from '../middleware/rbac';
 import { prisma } from '@force/database';
 import { paymentLimiter, auditLog } from '../middleware/security';
 import { config } from '../config';
-import { getStoreIdFromRequest } from '../utils/store-helpers';
+import { getAuthUser, getStoreIdFromRequest } from '../utils/store-helpers';
 
 const router = Router();
 
@@ -61,12 +61,7 @@ const refundSchema = z.object({
 // Helper Functions
 // ==========================================
 
-function getUserFromRequest(req: Request): { userId: string; email: string; role: string } {
-  if (!req.user) {
-    throw new Error('User not authenticated');
-  }
-  return req.user;
-}
+// getUserFromRequest replaced by shared getAuthUser from ../utils/store-helpers
 
 // ==========================================
 // Routes
@@ -124,7 +119,7 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const data = createPaymentSchema.parse(req.body);
-      const user = getUserFromRequest(req);
+      const user = getAuthUser(req);
 
       // Verify the order belongs to the user
       const storeId = await getStoreIdFromRequest(req);
@@ -209,7 +204,35 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { transactionId } = req.params;
+      const user = getAuthUser(req);
       const provider = req.query.provider as PaymentProvider | undefined;
+
+      // Verify the user owns the associated order (or is admin)
+      if (user.role !== 'store_admin' && user.role !== 'super_admin') {
+        const storeId = await getStoreIdFromRequest(req);
+        const order = await prisma.order.findFirst({
+          where: {
+            storeId,
+            payments: { some: { transactionId } },
+          },
+        });
+
+        if (!order) {
+          res.status(404).json({
+            success: false,
+            error: { code: 'NOT_FOUND', message: 'Payment not found' },
+          });
+          return;
+        }
+
+        if (order.customerId !== user.userId) {
+          res.status(403).json({
+            success: false,
+            error: { code: 'FORBIDDEN', message: 'Not authorized' },
+          });
+          return;
+        }
+      }
 
       const status = await PaymentService.getPaymentStatus(transactionId, provider);
 
@@ -234,7 +257,7 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const data = refundSchema.parse(req.body);
-      const user = getUserFromRequest(req);
+      const user = getAuthUser(req);
 
       const refund = await PaymentService.refund({
         transactionId: data.transactionId,
@@ -278,7 +301,7 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { paymentId } = req.params;
-      const user = getUserFromRequest(req);
+      const user = getAuthUser(req);
       const provider = req.body.provider as PaymentProvider | undefined;
 
       // Verify the payment belongs to user's order
@@ -317,7 +340,7 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { orderId } = req.params;
-      const user = getUserFromRequest(req);
+      const user = getAuthUser(req);
 
       // Verify the order belongs to the user (or user is admin)
       const storeId = await getStoreIdFromRequest(req);

@@ -9,42 +9,15 @@ export default function GlobalError({
 }) {
   return (
     <html lang="en">
-      <body style={{ margin: 0, fontFamily: 'system-ui, sans-serif' }}>
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            minHeight: '100vh',
-            padding: '1rem',
-            textAlign: 'center',
-          }}
-        >
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 600, marginBottom: '0.5rem' }}>
-            Something went wrong
-          </h2>
-          <p
-            style={{
-              color: 'hsl(var(--muted-foreground, 220 8.9% 46.1%))',
-              marginBottom: '2rem',
-              maxWidth: '28rem',
-            }}
-          >
+      <body className="m-0 font-sans">
+        <div className="flex min-h-screen flex-col items-center justify-center p-4 text-center">
+          <h2 className="mb-2 text-2xl font-semibold">Something went wrong</h2>
+          <p className="mb-8 max-w-md text-gray-500">
             An unexpected error occurred. Please try again.
           </p>
           <button
             onClick={reset}
-            style={{
-              backgroundColor: 'hsl(var(--primary, 24 100% 50%))',
-              color: 'hsl(var(--primary-foreground, 0 0% 100%))',
-              border: 'none',
-              borderRadius: '0.5rem',
-              padding: '0.625rem 1.5rem',
-              fontSize: '0.875rem',
-              fontWeight: 500,
-              cursor: 'pointer',
-            }}
+            className="cursor-pointer rounded-lg border-none bg-orange-500 px-6 py-2.5 text-sm font-medium text-white hover:bg-orange-600"
           >
             Try Again
           </button>

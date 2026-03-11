@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import type { HeaderProps } from '../types';
 
 export default function ClassicHeader({
@@ -70,7 +71,13 @@ export default function ClassicHeader({
             className="absolute left-1/2 -translate-x-1/2 md:static md:translate-x-0"
           >
             {displayLogo ? (
-              <img src={displayLogo} alt={displayName} className="h-14 max-h-14 w-auto" />
+              <Image
+                src={displayLogo}
+                alt={displayName}
+                width={120}
+                height={56}
+                className="h-14 max-h-14 w-auto"
+              />
             ) : (
               <span className="text-2xl font-serif font-bold tracking-wider">{displayName}</span>
             )}

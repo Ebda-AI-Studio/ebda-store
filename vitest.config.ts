@@ -31,11 +31,7 @@ export default defineConfig({
     hookTimeout: 30000,
     // Run integration tests sequentially to avoid port conflicts
     pool: 'forks',
-    poolOptions: {
-      forks: {
-        singleFork: true,
-      },
-    },
+    maxWorkers: 1,
     // Retry failing tests once (useful for flaky network tests)
     retry: 1,
   },

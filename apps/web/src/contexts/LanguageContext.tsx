@@ -1,6 +1,8 @@
 'use client';
 
-import { createContext, useContext, useState, useLayoutEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useLayoutEffect, ReactNode } from 'react';
+
+const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
 type Language = 'en' | 'ar';
 type Direction = 'ltr' | 'rtl';
@@ -35,8 +37,8 @@ export function LanguageProvider({ children, defaultLanguage }: LanguageProvider
   );
   const direction: Direction = language === 'ar' ? 'rtl' : 'ltr';
 
-  // Use useLayoutEffect to avoid flash - sync document attributes
-  useLayoutEffect(() => {
+  // Use useLayoutEffect to avoid flash - sync document attributes (falls back to useEffect on server)
+  useIsomorphicLayoutEffect(() => {
     document.documentElement.dir = direction;
     document.documentElement.lang = language;
     document.body.style.fontFamily =

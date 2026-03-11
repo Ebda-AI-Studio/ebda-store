@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AdminLayout } from '../../../components/AdminLayout';
-import { getApiUrl } from '../../../lib/api';
+import { apiGet, apiPut } from '../../../lib/api';
 
 interface UserDetail {
   id: string;
@@ -19,8 +19,6 @@ interface UserDetail {
   stores?: { id: string; name: string; slug: string }[];
 }
 
-const API_URL = getApiUrl();
-
 const ROLE_LABELS: Record<string, string> = {
   super_admin: 'Super Admin',
   store_admin: 'Store Admin',
@@ -29,7 +27,7 @@ const ROLE_LABELS: Record<string, string> = {
 
 const STATUS_STYLES: Record<string, { bg: string; text: string; dot: string }> = {
   active: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
-  inactive: { bg: 'bg-gray-100', text: 'text-gray-600', dot: 'bg-gray-400' },
+  inactive: { bg: 'bg-gray-100', text: 'text-muted-foreground', dot: 'bg-gray-400' },
   suspended: { bg: 'bg-red-50', text: 'text-red-700', dot: 'bg-red-500' },
 };
 
@@ -66,19 +64,16 @@ export default function UserDetailPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const token = localStorage.getItem('authToken');
-      const res = await fetch(`${API_URL}/api/v1/admin/users/${userId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const u = data.data?.user || data.data;
+      const { data, error: apiError } = await apiGet<{ user?: UserDetail } & UserDetail>(
+        `/api/v1/admin/users/${userId}`
+      );
+      if (data) {
+        const u = (data.user || data) as UserDetail;
         setUser(u);
         setEditRole(u.role);
         setEditStatus(u.status || (u.isActive ? 'active' : 'inactive'));
-      } else {
-        const errData = await res.json().catch(() => ({}));
-        setError(errData.error?.message || 'Failed to fetch user');
+      } else if (apiError) {
+        setError(apiError.message || 'Failed to fetch user');
       }
     } catch {
       setError('Unable to connect to the server. Please check your connection and try again.');
@@ -96,31 +91,24 @@ export default function UserDetailPage() {
     setIsSaving(true);
     setSaveMessage(null);
     try {
-      const token = localStorage.getItem('authToken');
-      const res = await fetch(`${API_URL}/api/v1/admin/users/${userId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
+      const { data, error: apiError } = await apiPut<{ user?: UserDetail } & UserDetail>(
+        `/api/v1/admin/users/${userId}`,
+        {
           role: editRole,
           status: editStatus,
           isActive: editStatus === 'active',
-        }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const u = data.data?.user || data.data;
+        }
+      );
+      if (data) {
+        const u = (data.user || data) as UserDetail;
         setUser(u);
         setEditRole(u.role);
         setEditStatus(u.status || (u.isActive ? 'active' : 'inactive'));
         setSaveMessage({ type: 'success', text: 'User updated successfully' });
-      } else {
-        const errData = await res.json().catch(() => ({}));
+      } else if (apiError) {
         setSaveMessage({
           type: 'error',
-          text: errData.error?.message || 'Failed to update user',
+          text: apiError.message || 'Failed to update user',
         });
       }
     } catch {
@@ -166,7 +154,7 @@ export default function UserDetailPage() {
       subtitle={user.email}
       actions={
         <Link href="/users">
-          <button className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 font-medium">
+          <button className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-muted font-medium">
             Back to Users
           </button>
         </Link>
@@ -175,9 +163,9 @@ export default function UserDetailPage() {
       <div className="grid gap-6 lg:grid-cols-3">
         {/* User Profile Card */}
         <div className="lg:col-span-1">
-          <div className="rounded-xl border bg-white shadow-sm">
+          <div className="rounded-xl border bg-card shadow-sm">
             <div className="border-b p-4">
-              <h2 className="font-semibold text-gray-900">Profile</h2>
+              <h2 className="font-semibold text-foreground">Profile</h2>
             </div>
             <div className="p-6 text-center">
               <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 text-primary">
@@ -186,10 +174,10 @@ export default function UserDetailPage() {
                   {user.lastName[0]}
                 </span>
               </div>
-              <h3 className="mt-4 text-lg font-semibold text-gray-900">
+              <h3 className="mt-4 text-lg font-semibold text-foreground">
                 {user.firstName} {user.lastName}
               </h3>
-              <p className="text-sm text-gray-500">{user.email}</p>
+              <p className="text-sm text-muted-foreground">{user.email}</p>
 
               <div className="mt-4 flex justify-center">
                 <span
@@ -203,7 +191,7 @@ export default function UserDetailPage() {
               <div className="mt-6 space-y-3 text-left">
                 <div>
                   <p className="text-xs font-medium uppercase tracking-wider text-gray-400">Role</p>
-                  <p className="mt-1 font-medium text-gray-900">
+                  <p className="mt-1 font-medium text-foreground">
                     {ROLE_LABELS[user.role] || user.role}
                   </p>
                 </div>
@@ -225,16 +213,16 @@ export default function UserDetailPage() {
 
           {/* Stores */}
           {user.stores && user.stores.length > 0 && (
-            <div className="mt-6 rounded-xl border bg-white shadow-sm">
+            <div className="mt-6 rounded-xl border bg-card shadow-sm">
               <div className="border-b p-4">
-                <h2 className="font-semibold text-gray-900">Stores ({user.stores.length})</h2>
+                <h2 className="font-semibold text-foreground">Stores ({user.stores.length})</h2>
               </div>
               <div className="divide-y">
                 {user.stores.map(store => (
                   <div key={store.id} className="flex items-center justify-between p-4">
                     <div>
-                      <p className="font-medium text-gray-900">{store.name}</p>
-                      <p className="text-xs text-gray-500">{store.slug}</p>
+                      <p className="font-medium text-foreground">{store.name}</p>
+                      <p className="text-xs text-muted-foreground">{store.slug}</p>
                     </div>
                     <Link
                       href={`/stores/${store.id}`}
@@ -251,9 +239,9 @@ export default function UserDetailPage() {
 
         {/* Edit Form */}
         <div className="lg:col-span-2">
-          <div className="rounded-xl border bg-white shadow-sm">
+          <div className="rounded-xl border bg-card shadow-sm">
             <div className="border-b p-4">
-              <h2 className="font-semibold text-gray-900">Edit User</h2>
+              <h2 className="font-semibold text-foreground">Edit User</h2>
             </div>
             <div className="p-6 space-y-6">
               {/* Read-only info */}
@@ -264,7 +252,7 @@ export default function UserDetailPage() {
                     type="text"
                     value={user.firstName}
                     disabled
-                    className="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-500 cursor-not-allowed"
+                    className="w-full rounded-lg border border-gray-200 bg-muted px-4 py-2 text-sm text-muted-foreground cursor-not-allowed"
                   />
                 </div>
                 <div>
@@ -273,7 +261,7 @@ export default function UserDetailPage() {
                     type="text"
                     value={user.lastName}
                     disabled
-                    className="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-500 cursor-not-allowed"
+                    className="w-full rounded-lg border border-gray-200 bg-muted px-4 py-2 text-sm text-muted-foreground cursor-not-allowed"
                   />
                 </div>
               </div>
@@ -286,7 +274,7 @@ export default function UserDetailPage() {
                   type="email"
                   value={user.email}
                   disabled
-                  className="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-500 cursor-not-allowed"
+                  className="w-full rounded-lg border border-gray-200 bg-muted px-4 py-2 text-sm text-muted-foreground cursor-not-allowed"
                 />
                 <p className="mt-1 text-xs text-gray-400">
                   Email cannot be changed from admin panel
@@ -305,7 +293,7 @@ export default function UserDetailPage() {
                   <option value="store_admin">Store Admin</option>
                   <option value="super_admin">Super Admin</option>
                 </select>
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-muted-foreground">
                   Changing to super_admin grants full platform access.
                 </p>
               </div>
@@ -328,11 +316,11 @@ export default function UserDetailPage() {
               </div>
 
               {/* Status toggle as toggle switch for quick active/inactive */}
-              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+              <div className="rounded-xl border border-gray-200 bg-muted p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-medium text-gray-900">Active Status</p>
-                    <p className="text-sm text-gray-500">
+                    <p className="font-medium text-foreground">Active Status</p>
+                    <p className="text-sm text-muted-foreground">
                       Toggle to quickly enable or disable this account
                     </p>
                   </div>
@@ -343,7 +331,7 @@ export default function UserDetailPage() {
                       onChange={e => setEditStatus(e.target.checked ? 'active' : 'inactive')}
                       className="sr-only peer"
                     />
-                    <div className="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/20" />
+                    <div className="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-card after:transition-all after:content-[''] peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/20" />
                   </label>
                 </div>
               </div>

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import type { CategoryCardProps } from '../types';
+import { ArrowIcon } from '../shared/icons';
 
 export default function ModernCategoryCard({
   category,
@@ -50,19 +51,7 @@ export default function ModernCategoryCard({
         <div
           className={`absolute ${isRtl ? 'left-4' : 'right-4'} bottom-4 w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center group-hover:bg-primary transition-colors`}
         >
-          <svg
-            className={`w-5 h-5 text-white ${isRtl ? 'rotate-180' : ''}`}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M17 8l4 4m0 0l-4 4m4-4H3"
-            />
-          </svg>
+          <ArrowIcon className="w-5 h-5 text-white" isRtl={isRtl} />
         </div>
       </div>
     </Link>

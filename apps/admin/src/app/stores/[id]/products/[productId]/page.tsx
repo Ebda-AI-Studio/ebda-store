@@ -3,10 +3,11 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Button, Badge, Modal } from '@force/ui';
+import { Button, Badge, Modal, useToast } from '@force/ui';
 import { AdminLayout } from '../../../../../components/AdminLayout';
 import { useAuth } from '../../../../../lib/auth';
-import { getApiUrl } from '../../../../../lib/api';
+import { apiGet, apiDelete } from '../../../../../lib/api';
+import { formatPrice } from '../../../../../lib/format';
 
 interface Product {
   id: string;
@@ -36,18 +37,10 @@ interface Product {
   updatedAt: string;
 }
 
-function formatPrice(fils: number) {
-  return new Intl.NumberFormat('en-KW', {
-    style: 'currency',
-    currency: 'KWD',
-    minimumFractionDigits: 3,
-  }).format(fils / 1000);
-}
-
 export default function ProductDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { token } = useAuth();
+  const { isAuthenticated } = useAuth();
   const storeId = params?.id as string;
   const productId = params?.productId as string;
   const [product, setProduct] = useState<Product | null>(null);
@@ -55,25 +48,24 @@ export default function ProductDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const { success: toastSuccess, error: toastError } = useToast();
 
   useEffect(() => {
     async function fetchProduct() {
-      if (!token || !storeId || !productId) return;
+      if (!isAuthenticated || !storeId || !productId) return;
 
       try {
         setLoading(true);
-        const response = await fetch(
-          `${getApiUrl()}/api/v1/stores/${storeId}/products/${productId}`,
-          { headers: { Authorization: `Bearer ${token}` } }
+        const { data, error: apiError } = await apiGet<{ product: Product }>(
+          `/api/v1/stores/${storeId}/products/${productId}`
         );
 
-        if (!response.ok) {
-          setError(response.status === 404 ? 'Product not found' : 'Failed to load product');
+        if (apiError) {
+          setError(apiError.status === 404 ? 'Product not found' : 'Failed to load product');
           return;
         }
 
-        const data = await response.json();
-        setProduct(data.data?.product || data.data);
+        setProduct(data?.product || null);
       } catch {
         setError('Failed to load product');
       } finally {
@@ -82,27 +74,26 @@ export default function ProductDetailPage() {
     }
 
     fetchProduct();
-  }, [productId, storeId, token]);
+  }, [productId, storeId, isAuthenticated]);
 
   const handleDelete = async () => {
-    if (!product || !token) return;
+    if (!product || !isAuthenticated) return;
 
     try {
       setDeleting(true);
-      const response = await fetch(
-        `${getApiUrl()}/api/v1/stores/${storeId}/products/${product.id}`,
-        {
-          method: 'DELETE',
-          headers: { Authorization: `Bearer ${token}` },
-        }
+      const { error: deleteError } = await apiDelete(
+        `/api/v1/stores/${storeId}/products/${product.id}`
       );
 
-      if (response.ok) {
+      if (!deleteError) {
+        toastSuccess('Product deleted', `${product.name} has been deleted.`);
         router.push(`/stores/${storeId}/products`);
       } else {
+        toastError('Delete failed', 'Failed to delete the product. Please try again.');
         setError('Failed to delete product');
       }
     } catch {
+      toastError('Delete failed', 'Failed to delete the product. Please try again.');
       setError('Failed to delete product');
     } finally {
       setDeleting(false);
@@ -140,9 +131,11 @@ export default function ProductDetailPage() {
   if (error || !product) {
     return (
       <AdminLayout title="Product Not Found" subtitle="">
-        <div className="rounded-xl border bg-white p-8 text-center">
-          <h3 className="mt-4 text-lg font-medium text-gray-900">{error || 'Product not found'}</h3>
-          <p className="mt-2 text-sm text-gray-500">
+        <div className="rounded-xl border bg-card p-8 text-center">
+          <h3 className="mt-4 text-lg font-medium text-foreground">
+            {error || 'Product not found'}
+          </h3>
+          <p className="mt-2 text-sm text-muted-foreground">
             The product you&apos;re looking for doesn&apos;t exist or has been removed.
           </p>
           <Button className="mt-6" onClick={() => router.push(`/stores/${storeId}/products`)}>
@@ -178,39 +171,41 @@ export default function ProductDetailPage() {
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
           {/* Basic Details */}
-          <div className="rounded-xl border bg-white p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Product Details</h2>
+          <div className="rounded-xl border bg-card p-6">
+            <h2 className="text-lg font-semibold text-foreground mb-4">Product Details</h2>
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <label className="text-sm font-medium text-gray-500">Name</label>
-                <p className="mt-1 text-gray-900">{product.name}</p>
+                <label className="text-sm font-medium text-muted-foreground">Name</label>
+                <p className="mt-1 text-foreground">{product.name}</p>
               </div>
               {product.nameAr && (
                 <div>
-                  <label className="text-sm font-medium text-gray-500">Name (Arabic)</label>
-                  <p className="mt-1 text-gray-900" dir="rtl">
+                  <label className="text-sm font-medium text-muted-foreground">Name (Arabic)</label>
+                  <p className="mt-1 text-foreground" dir="rtl">
                     {product.nameAr}
                   </p>
                 </div>
               )}
               <div>
-                <label className="text-sm font-medium text-gray-500">Slug</label>
-                <p className="mt-1 text-gray-900 font-mono text-sm">{product.slug}</p>
+                <label className="text-sm font-medium text-muted-foreground">Slug</label>
+                <p className="mt-1 text-foreground font-mono text-sm">{product.slug}</p>
               </div>
               <div>
-                <label className="text-sm font-medium text-gray-500">Status</label>
+                <label className="text-sm font-medium text-muted-foreground">Status</label>
                 <div className="mt-1">{getStatusBadge(product.status)}</div>
               </div>
             </div>
             {product.description && (
               <div className="mt-4">
-                <label className="text-sm font-medium text-gray-500">Description</label>
+                <label className="text-sm font-medium text-muted-foreground">Description</label>
                 <p className="mt-1 text-gray-700">{product.description}</p>
               </div>
             )}
             {product.descriptionAr && (
               <div className="mt-4">
-                <label className="text-sm font-medium text-gray-500">Description (Arabic)</label>
+                <label className="text-sm font-medium text-muted-foreground">
+                  Description (Arabic)
+                </label>
                 <p className="mt-1 text-gray-700" dir="rtl">
                   {product.descriptionAr}
                 </p>
@@ -219,26 +214,28 @@ export default function ProductDetailPage() {
           </div>
 
           {/* Pricing */}
-          <div className="rounded-xl border bg-white p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Pricing</h2>
+          <div className="rounded-xl border bg-card p-6">
+            <h2 className="text-lg font-semibold text-foreground mb-4">Pricing</h2>
             <div className="grid gap-4 sm:grid-cols-3">
               <div>
-                <label className="text-sm font-medium text-gray-500">Price</label>
-                <p className="mt-1 text-2xl font-bold text-gray-900">
+                <label className="text-sm font-medium text-muted-foreground">Price</label>
+                <p className="mt-1 text-2xl font-bold text-foreground">
                   {formatPrice(product.price)}
                 </p>
               </div>
               {product.compareAtPrice && (
                 <div>
-                  <label className="text-sm font-medium text-gray-500">Compare at Price</label>
-                  <p className="mt-1 text-lg text-gray-500 line-through">
+                  <label className="text-sm font-medium text-muted-foreground">
+                    Compare at Price
+                  </label>
+                  <p className="mt-1 text-lg text-muted-foreground line-through">
                     {formatPrice(product.compareAtPrice)}
                   </p>
                 </div>
               )}
               {product.costPrice && (
                 <div>
-                  <label className="text-sm font-medium text-gray-500">Cost Price</label>
+                  <label className="text-sm font-medium text-muted-foreground">Cost Price</label>
                   <p className="mt-1 text-lg text-gray-700">{formatPrice(product.costPrice)}</p>
                 </div>
               )}
@@ -246,19 +243,19 @@ export default function ProductDetailPage() {
           </div>
 
           {/* Inventory */}
-          <div className="rounded-xl border bg-white p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Inventory</h2>
+          <div className="rounded-xl border bg-card p-6">
+            <h2 className="text-lg font-semibold text-foreground mb-4">Inventory</h2>
             <div className="grid gap-4 sm:grid-cols-3">
               <div>
-                <label className="text-sm font-medium text-gray-500">SKU</label>
-                <p className="mt-1 text-gray-900 font-mono">{product.sku || 'N/A'}</p>
+                <label className="text-sm font-medium text-muted-foreground">SKU</label>
+                <p className="mt-1 text-foreground font-mono">{product.sku || 'N/A'}</p>
               </div>
               <div>
-                <label className="text-sm font-medium text-gray-500">Barcode</label>
-                <p className="mt-1 text-gray-900 font-mono">{product.barcode || 'N/A'}</p>
+                <label className="text-sm font-medium text-muted-foreground">Barcode</label>
+                <p className="mt-1 text-foreground font-mono">{product.barcode || 'N/A'}</p>
               </div>
               <div>
-                <label className="text-sm font-medium text-gray-500">Stock</label>
+                <label className="text-sm font-medium text-muted-foreground">Stock</label>
                 <p
                   className={`mt-1 text-lg font-semibold ${
                     product.inventory === 0
@@ -276,13 +273,13 @@ export default function ProductDetailPage() {
 
           {/* Images */}
           {product.images && product.images.length > 0 && (
-            <div className="rounded-xl border bg-white p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Images</h2>
+            <div className="rounded-xl border bg-card p-6">
+              <h2 className="text-lg font-semibold text-foreground mb-4">Images</h2>
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
                 {product.images.map(image => (
                   <div
                     key={image.id}
-                    className="aspect-square rounded-lg overflow-hidden border bg-gray-50"
+                    className="aspect-square rounded-lg overflow-hidden border bg-muted"
                   >
                     <img
                       src={image.url}
@@ -299,8 +296,8 @@ export default function ProductDetailPage() {
         {/* Sidebar */}
         <div className="space-y-6">
           {product.categories && product.categories.length > 0 && (
-            <div className="rounded-xl border bg-white p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Categories</h2>
+            <div className="rounded-xl border bg-card p-6">
+              <h2 className="text-lg font-semibold text-foreground mb-4">Categories</h2>
               <div className="flex flex-wrap gap-2">
                 {product.categories.map(c => (
                   <Badge key={c.categoryId || c.category?.id} variant="secondary">
@@ -312,8 +309,8 @@ export default function ProductDetailPage() {
           )}
 
           {product.tags && product.tags.length > 0 && (
-            <div className="rounded-xl border bg-white p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Tags</h2>
+            <div className="rounded-xl border bg-card p-6">
+              <h2 className="text-lg font-semibold text-foreground mb-4">Tags</h2>
               <div className="flex flex-wrap gap-2">
                 {product.tags.map(t => (
                   <Badge key={t.tagId || t.tag?.id} variant="outline">
@@ -324,23 +321,23 @@ export default function ProductDetailPage() {
             </div>
           )}
 
-          <div className="rounded-xl border bg-white p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Product Flags</h2>
+          <div className="rounded-xl border bg-card p-6">
+            <h2 className="text-lg font-semibold text-foreground mb-4">Product Flags</h2>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-gray-600">Featured</span>
+                <span className="text-muted-foreground">Featured</span>
                 <Badge variant={product.isFeatured ? 'default' : 'secondary'}>
                   {product.isFeatured ? 'Yes' : 'No'}
                 </Badge>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-gray-600">New Arrival</span>
+                <span className="text-muted-foreground">New Arrival</span>
                 <Badge variant={product.isNew ? 'default' : 'secondary'}>
                   {product.isNew ? 'Yes' : 'No'}
                 </Badge>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-gray-600">Track Inventory</span>
+                <span className="text-muted-foreground">Track Inventory</span>
                 <Badge variant={product.trackInventory ? 'default' : 'secondary'}>
                   {product.trackInventory ? 'Yes' : 'No'}
                 </Badge>
@@ -348,12 +345,12 @@ export default function ProductDetailPage() {
             </div>
           </div>
 
-          <div className="rounded-xl border bg-white p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Timestamps</h2>
+          <div className="rounded-xl border bg-card p-6">
+            <h2 className="text-lg font-semibold text-foreground mb-4">Timestamps</h2>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
-                <span className="text-gray-500">Created</span>
-                <span className="text-gray-900">
+                <span className="text-muted-foreground">Created</span>
+                <span className="text-foreground">
                   {new Date(product.createdAt).toLocaleDateString('en-US', {
                     year: 'numeric',
                     month: 'short',
@@ -362,8 +359,8 @@ export default function ProductDetailPage() {
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500">Updated</span>
-                <span className="text-gray-900">
+                <span className="text-muted-foreground">Updated</span>
+                <span className="text-foreground">
                   {new Date(product.updatedAt).toLocaleDateString('en-US', {
                     year: 'numeric',
                     month: 'short',
@@ -381,7 +378,7 @@ export default function ProductDetailPage() {
         onClose={() => setIsDeleteModalOpen(false)}
         title="Delete Product"
       >
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-muted-foreground">
           Are you sure you want to delete <strong>{product.name}</strong>? This action cannot be
           undone.
         </p>

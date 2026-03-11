@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from '@/lib/auth';
+import { getApiUrl } from '@/lib/api';
 
 interface Notification {
   id: string;
@@ -28,7 +29,7 @@ interface NotificationContextType {
 const NotificationContext = createContext<NotificationContextType | null>(null);
 
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
-  const { user, token } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const socketRef = useRef<Socket | null>(null);
@@ -36,14 +37,14 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
   // Connect to WebSocket when user is authenticated
   useEffect(() => {
-    if (!token || !user) {
+    if (!isAuthenticated || !user) {
       return;
     }
 
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+    const apiUrl = getApiUrl();
 
     socketRef.current = io(apiUrl, {
-      auth: { token },
+      withCredentials: true,
       reconnection: true,
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
@@ -51,7 +52,6 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
     socketRef.current.on('connect', () => {
       setIsConnected(true);
-      console.log('Connected to notification server');
 
       // Resubscribe to stores on reconnect
       subscribedStoresRef.current.forEach(storeId => {
@@ -61,7 +61,6 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
     socketRef.current.on('disconnect', () => {
       setIsConnected(false);
-      console.log('Disconnected from notification server');
     });
 
     socketRef.current.on('notification', (notification: Omit<Notification, 'id' | 'read'>) => {
@@ -83,7 +82,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       socketRef.current?.disconnect();
       socketRef.current = null;
     };
-  }, [token, user]);
+  }, [isAuthenticated, user]);
 
   const subscribeToStore = useCallback((storeId: string) => {
     if (socketRef.current?.connected) {

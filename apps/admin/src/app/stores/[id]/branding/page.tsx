@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { ImageUpload } from '../../../../components/ImageUpload';
 import { useToast } from '@force/ui';
-import { getApiUrl } from '../../../../lib/api';
+import { apiGet, apiPut } from '../../../../lib/api';
 
 interface StoreTheme {
   primaryColor: string;
@@ -166,22 +166,39 @@ export default function StoreBrandingPage() {
 
   async function fetchBranding() {
     try {
-      const token = localStorage.getItem('authToken');
-      const response = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await response.json();
+      interface StoreResponse {
+        id: string;
+        name: string;
+        nameAr?: string;
+        logo?: string;
+        logoAr?: string;
+        favicon?: string;
+        description?: string;
+        descriptionAr?: string;
+        theme?: Partial<StoreTheme>;
+        email?: string;
+        phone?: string;
+        phoneAr?: string;
+        whatsapp?: string;
+        address?: string;
+        addressAr?: string;
+        socialLinks?: StoreBranding['socialLinks'];
+      }
 
-      if (!response.ok) {
+      const { data, error: apiError } = await apiGet<{ store: StoreResponse }>(
+        `/api/v1/stores/${storeId}`
+      );
+
+      if (apiError) {
         toast.error(
           'Failed to load branding',
-          data.error?.message || `Server error: ${response.status}`
+          apiError.message || `Server error: ${apiError.status}`
         );
         return;
       }
 
-      if (data.success && data.data?.store) {
-        const store = data.data.store;
+      if (data?.store) {
+        const store = data.store;
         setBranding({
           id: store.id,
           name: store.name,
@@ -214,71 +231,47 @@ export default function StoreBrandingPage() {
 
     setIsSaving(true);
     try {
-      const token = localStorage.getItem('authToken');
-      const baseUrl = `${getApiUrl()}/api/v1/stores/${storeId}`;
-      const headers = {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      };
+      const basePath = `/api/v1/stores/${storeId}`;
 
-      const [brandingRes, themeRes, contactRes, socialRes] = await Promise.all([
-        fetch(`${baseUrl}/branding`, {
-          method: 'PUT',
-          headers,
-          body: JSON.stringify({
-            name: branding.name,
-            nameAr: branding.nameAr,
-            logo: branding.logo,
-            logoAr: branding.logoAr,
-            favicon: branding.favicon,
-            description: branding.description,
-            descriptionAr: branding.descriptionAr,
-          }),
+      const [brandingResult, themeResult, contactResult, socialResult] = await Promise.all([
+        apiPut(`${basePath}/branding`, {
+          name: branding.name,
+          nameAr: branding.nameAr,
+          logo: branding.logo,
+          logoAr: branding.logoAr,
+          favicon: branding.favicon,
+          description: branding.description,
+          descriptionAr: branding.descriptionAr,
         }),
-        fetch(`${baseUrl}/theme`, {
-          method: 'PUT',
-          headers,
-          body: JSON.stringify(branding.theme),
+        apiPut(`${basePath}/theme`, branding.theme),
+        apiPut(`${basePath}/contact`, {
+          email: branding.email,
+          phone: branding.phone,
+          phoneAr: branding.phoneAr,
+          whatsapp: branding.whatsapp,
+          address: branding.address,
+          addressAr: branding.addressAr,
         }),
-        fetch(`${baseUrl}/contact`, {
-          method: 'PUT',
-          headers,
-          body: JSON.stringify({
-            email: branding.email,
-            phone: branding.phone,
-            phoneAr: branding.phoneAr,
-            whatsapp: branding.whatsapp,
-            address: branding.address,
-            addressAr: branding.addressAr,
-          }),
-        }),
-        fetch(`${baseUrl}/social`, {
-          method: 'PUT',
-          headers,
-          body: JSON.stringify(branding.socialLinks),
-        }),
+        apiPut(`${basePath}/social`, branding.socialLinks),
       ]);
 
       // Check for failures
       const failed = [
-        { name: 'Branding', res: brandingRes },
-        { name: 'Theme', res: themeRes },
-        { name: 'Contact', res: contactRes },
-        { name: 'Social', res: socialRes },
-      ].filter(r => !r.res.ok);
+        { name: 'Branding', result: brandingResult },
+        { name: 'Theme', result: themeResult },
+        { name: 'Contact', result: contactResult },
+        { name: 'Social', result: socialResult },
+      ].filter(r => r.result.error !== null);
 
       if (failed.length > 0) {
         const first = failed[0];
-        if (first.res.status === 403) {
+        const err = first.result.error;
+        if (err?.status === 403) {
           toast.error('Access denied', 'You do not have permission to update this store');
-        } else if (first.res.status === 401) {
+        } else if (err?.status === 401) {
           toast.error('Session expired', 'Please log in again');
         } else {
-          const data = await first.res.json().catch(() => ({}));
-          toast.error(
-            `Failed to save ${first.name.toLowerCase()}`,
-            data.error?.message || `Server error: ${first.res.status}`
-          );
+          toast.error(`Failed to save ${first.name.toLowerCase()}`, err?.message || 'Server error');
         }
         return;
       }
@@ -327,7 +320,7 @@ export default function StoreBrandingPage() {
     >
       <div className="space-y-6">
         {/* Tabs */}
-        <div className="flex gap-2 border-b border-gray-200">
+        <div className="flex gap-2 border-b border-border">
           {[
             { id: 'branding', label: 'Branding' },
             { id: 'theme', label: 'Theme & Colors' },
@@ -350,7 +343,7 @@ export default function StoreBrandingPage() {
 
         {/* Branding Tab */}
         {activeTab === 'branding' && (
-          <div className="bg-white rounded-xl border p-6 space-y-6">
+          <div className="bg-card rounded-xl border p-6 space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Store Name</label>
@@ -358,7 +351,7 @@ export default function StoreBrandingPage() {
                   type="text"
                   value={branding.name}
                   onChange={e => setBranding({ ...branding, name: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 />
               </div>
               <div>
@@ -370,7 +363,7 @@ export default function StoreBrandingPage() {
                   dir="rtl"
                   value={branding.nameAr || ''}
                   onChange={e => setBranding({ ...branding, nameAr: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 />
               </div>
             </div>
@@ -420,7 +413,7 @@ export default function StoreBrandingPage() {
                   value={branding.description || ''}
                   onChange={e => setBranding({ ...branding, description: e.target.value })}
                   rows={3}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
                 />
               </div>
               <div>
@@ -432,7 +425,7 @@ export default function StoreBrandingPage() {
                   value={branding.descriptionAr || ''}
                   onChange={e => setBranding({ ...branding, descriptionAr: e.target.value })}
                   rows={3}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
                 />
               </div>
             </div>
@@ -441,7 +434,7 @@ export default function StoreBrandingPage() {
 
         {/* Theme Tab */}
         {activeTab === 'theme' && (
-          <div className="bg-white rounded-xl border p-6 space-y-6">
+          <div className="bg-card rounded-xl border p-6 space-y-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-3">Primary Color</label>
               <div className="flex flex-wrap gap-3">
@@ -478,7 +471,7 @@ export default function StoreBrandingPage() {
                       theme: { ...branding.theme, primaryColor: hexToHsl(e.target.value) },
                     })
                   }
-                  className="w-10 h-10 rounded-lg border border-gray-300 cursor-pointer p-0.5"
+                  className="w-10 h-10 rounded-lg border border-border cursor-pointer p-0.5"
                 />
                 <div>
                   <label className="block text-[10px] text-gray-400 mb-0.5">HEX</label>
@@ -496,7 +489,7 @@ export default function StoreBrandingPage() {
                     }}
                     placeholder="#FF6600"
                     maxLength={7}
-                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary font-mono text-sm"
+                    className="w-24 px-3 py-1.5 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary font-mono text-sm"
                   />
                 </div>
                 {(['r', 'g', 'b'] as const).map(channel => {
@@ -520,7 +513,7 @@ export default function StoreBrandingPage() {
                             theme: { ...branding.theme, primaryColor: hexToHsl(hex) },
                           });
                         }}
-                        className="w-16 px-2 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm text-center"
+                        className="w-16 px-2 py-1.5 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm text-center"
                       />
                     </div>
                   );
@@ -542,7 +535,7 @@ export default function StoreBrandingPage() {
                       theme: { ...branding.theme, secondaryColor: hexToHsl(e.target.value) },
                     })
                   }
-                  className="w-10 h-10 rounded-lg border border-gray-300 cursor-pointer p-0.5"
+                  className="w-10 h-10 rounded-lg border border-border cursor-pointer p-0.5"
                 />
                 <div>
                   <label className="block text-[10px] text-gray-400 mb-0.5">HEX</label>
@@ -560,7 +553,7 @@ export default function StoreBrandingPage() {
                     }}
                     placeholder="#F3F4F6"
                     maxLength={7}
-                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary font-mono text-sm"
+                    className="w-24 px-3 py-1.5 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary font-mono text-sm"
                   />
                 </div>
                 {(['r', 'g', 'b'] as const).map(channel => {
@@ -584,7 +577,7 @@ export default function StoreBrandingPage() {
                             theme: { ...branding.theme, secondaryColor: hexToHsl(hex) },
                           });
                         }}
-                        className="w-16 px-2 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm text-center"
+                        className="w-16 px-2 py-1.5 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm text-center"
                       />
                     </div>
                   );
@@ -603,7 +596,7 @@ export default function StoreBrandingPage() {
                       theme: { ...branding.theme, fontFamily: e.target.value },
                     })
                   }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 >
                   {fontOptions.map(opt => (
                     <option key={opt.value} value={opt.value}>
@@ -624,7 +617,7 @@ export default function StoreBrandingPage() {
                       theme: { ...branding.theme, borderRadius: e.target.value },
                     })
                   }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 >
                   {borderRadiusOptions.map(opt => (
                     <option key={opt.value} value={opt.value}>
@@ -639,7 +632,7 @@ export default function StoreBrandingPage() {
             <div className="mt-8 pt-6 border-t">
               <h3 className="text-sm font-medium text-gray-700 mb-4">Preview</h3>
               <div
-                className="p-6 bg-gray-50 rounded-xl"
+                className="p-6 bg-muted rounded-xl"
                 style={{ '--primary': branding.theme.primaryColor } as React.CSSProperties}
               >
                 <div className="flex items-center gap-4 mb-4">
@@ -649,7 +642,7 @@ export default function StoreBrandingPage() {
                   >
                     Primary Button
                   </button>
-                  <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100">
+                  <button className="px-4 py-2 border border-border rounded-lg hover:bg-gray-100">
                     Secondary Button
                   </button>
                 </div>
@@ -663,7 +656,7 @@ export default function StoreBrandingPage() {
 
         {/* Contact Tab */}
         {activeTab === 'contact' && (
-          <div className="bg-white rounded-xl border p-6 space-y-6">
+          <div className="bg-card rounded-xl border p-6 space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
@@ -672,7 +665,7 @@ export default function StoreBrandingPage() {
                   value={branding.email || ''}
                   onChange={e => setBranding({ ...branding, email: e.target.value })}
                   placeholder="store@example.com"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 />
               </div>
               <div>
@@ -684,7 +677,7 @@ export default function StoreBrandingPage() {
                   value={branding.whatsapp || ''}
                   onChange={e => setBranding({ ...branding, whatsapp: e.target.value })}
                   placeholder="+965 XXXX XXXX"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 />
               </div>
             </div>
@@ -697,7 +690,7 @@ export default function StoreBrandingPage() {
                   value={branding.phone || ''}
                   onChange={e => setBranding({ ...branding, phone: e.target.value })}
                   placeholder="+965 XXXX XXXX"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 />
               </div>
               <div>
@@ -710,7 +703,7 @@ export default function StoreBrandingPage() {
                   value={branding.phoneAr || ''}
                   onChange={e => setBranding({ ...branding, phoneAr: e.target.value })}
                   placeholder="٩٦٥ XXXX XXXX+"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 />
               </div>
             </div>
@@ -723,7 +716,7 @@ export default function StoreBrandingPage() {
                   onChange={e => setBranding({ ...branding, address: e.target.value })}
                   rows={3}
                   placeholder="123 Street, City, Kuwait"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
                 />
               </div>
               <div>
@@ -736,7 +729,7 @@ export default function StoreBrandingPage() {
                   onChange={e => setBranding({ ...branding, addressAr: e.target.value })}
                   rows={3}
                   placeholder="١٢٣ شارع، المدينة، الكويت"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
                 />
               </div>
             </div>
@@ -745,7 +738,7 @@ export default function StoreBrandingPage() {
 
         {/* Social Tab */}
         {activeTab === 'social' && (
-          <div className="bg-white rounded-xl border p-6 space-y-6">
+          <div className="bg-card rounded-xl border p-6 space-y-6">
             {[
               {
                 key: 'instagram',
@@ -780,7 +773,7 @@ export default function StoreBrandingPage() {
                     })
                   }
                   placeholder={social.placeholder}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 />
               </div>
             ))}

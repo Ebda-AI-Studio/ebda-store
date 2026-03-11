@@ -1,8 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import Image from 'next/image';
+import { useRouter, usePathname } from 'next/navigation';
 import { Button } from '@force/ui';
 import { useLanguage, translations } from '../contexts/LanguageContext';
 import { useCart } from '../contexts/CartContext';
@@ -15,6 +22,7 @@ interface HeaderProps {
 
 export function Header({ cartCount: cartCountProp }: HeaderProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const { store } = useStore();
   const { itemCount } = useCart();
   const cartCount = cartCountProp ?? itemCount;
@@ -23,6 +31,52 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const { t } = useLanguage();
   const storeUrl = useStoreUrl();
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
+
+  // UX-007: Close mobile menu on route change
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [pathname]);
+
+  // A11Y-001/A11Y-002: Escape key closes mobile menu and auto-focus close button
+  const handleMobileMenuEscape = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      setIsMobileMenuOpen(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isMobileMenuOpen) return;
+    document.addEventListener('keydown', handleMobileMenuEscape);
+    closeButtonRef.current?.focus();
+    return () => document.removeEventListener('keydown', handleMobileMenuEscape);
+  }, [isMobileMenuOpen, handleMobileMenuEscape]);
+
+  // A11Y-002: Focus trap within mobile menu
+  const handleMobileMenuKeyDown = useCallback((e: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Escape') {
+      setIsMobileMenuOpen(false);
+      return;
+    }
+    if (e.key !== 'Tab' || !mobileMenuRef.current) return;
+
+    const focusableElements = mobileMenuRef.current.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    );
+    if (focusableElements.length === 0) return;
+
+    const first = focusableElements[0];
+    const last = focusableElements[focusableElements.length - 1];
+
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }, []);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,7 +98,10 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
 
   return (
     <>
-      <nav className="sticky top-0 z-50 border-b border-border/50 bg-background/95 backdrop-blur-lg">
+      <nav
+        className="sticky top-0 z-50 border-b border-border/50 bg-background/95 backdrop-blur-lg"
+        aria-label="Main navigation"
+      >
         {/* Top Bar - Optional Announcement */}
         <div className="hidden bg-primary text-center text-xs text-white sm:block">
           <div className="mx-auto max-w-7xl px-4 py-2">
@@ -72,7 +129,13 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
               className="flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:hidden"
               aria-label="Open menu"
             >
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg
+                className="h-6 w-6"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                aria-hidden="true"
+              >
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -80,14 +143,17 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
                   d="M4 6h16M4 12h16M4 18h16"
                 />
               </svg>
+              <span className="sr-only">Open menu</span>
             </button>
 
             {/* Logo */}
             <Link href={storeUrl('/')} className="flex items-center gap-3">
               {store.logo ? (
-                <img
+                <Image
                   src={store.logo}
                   alt={store.name}
+                  width={120}
+                  height={56}
                   className="h-14 max-h-14 w-auto object-contain"
                 />
               ) : (
@@ -115,7 +181,7 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
 
             {/* Search Bar - Desktop */}
             <div className="hidden flex-1 max-w-md lg:block">
-              <form onSubmit={handleSearch} className="search-box">
+              <form onSubmit={handleSearch} role="search" className="search-box">
                 <svg
                   className="h-5 w-5 text-muted-foreground"
                   fill="none"
@@ -133,6 +199,7 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
                   type="text"
                   placeholder="Search products..."
                   className="search-input"
+                  aria-label="Search products"
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                 />
@@ -153,7 +220,13 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
                 className="flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:hidden"
                 aria-label={t('Search', translations['Search'])}
               >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg
+                  className="h-5 w-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  aria-hidden="true"
+                >
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -161,6 +234,7 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
                     d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                   />
                 </svg>
+                <span className="sr-only">{t('Search', translations['Search'])}</span>
               </button>
 
               {/* Wishlist */}
@@ -169,7 +243,13 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
                 className="hidden h-10 w-10 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:flex"
                 aria-label={t('Wishlist', translations['Wishlist'])}
               >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg
+                  className="h-5 w-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  aria-hidden="true"
+                >
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -177,6 +257,7 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
                     d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
                   />
                 </svg>
+                <span className="sr-only">{t('Wishlist', translations['Wishlist'])}</span>
               </Link>
 
               {/* Cart */}
@@ -185,7 +266,13 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
                 className="relative flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 aria-label={`${t('Cart', translations['Cart'])} ${cartCount}`}
               >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg
+                  className="h-5 w-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  aria-hidden="true"
+                >
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -193,6 +280,7 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
                     d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
                   />
                 </svg>
+                <span className="sr-only">{`${t('Cart', translations['Cart'])} ${cartCount}`}</span>
                 {cartCount > 0 && (
                   <span className="absolute -end-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white shadow-lg shadow-primary/25">
                     {cartCount > 99 ? '99+' : cartCount}
@@ -223,15 +311,21 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
       {isMobileMenuOpen && (
         <div
           className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm lg:hidden animate-fade-in"
+          role="presentation"
           onClick={() => setIsMobileMenuOpen(false)}
+          onKeyDown={e => {
+            if (e.key === 'Escape') setIsMobileMenuOpen(false);
+          }}
         />
       )}
 
       {/* Mobile Menu */}
       <div
+        ref={mobileMenuRef}
         className={`fixed inset-y-0 left-0 z-50 w-80 max-w-[85vw] transform bg-background shadow-2xl transition-transform duration-300 ease-out lg:hidden ${
           isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
+        onKeyDown={handleMobileMenuKeyDown}
       >
         <div className="flex h-full flex-col">
           {/* Menu Header */}
@@ -242,9 +336,11 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
               onClick={() => setIsMobileMenuOpen(false)}
             >
               {store.logo ? (
-                <img
+                <Image
                   src={store.logo}
                   alt={store.name}
+                  width={80}
+                  height={36}
                   className="h-9 max-h-9 w-auto object-contain"
                 />
               ) : (
@@ -255,11 +351,18 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
               <span className="text-lg font-bold text-foreground">{store.name}</span>
             </Link>
             <button
+              ref={closeButtonRef}
               onClick={() => setIsMobileMenuOpen(false)}
               className="flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground"
               aria-label="Close menu"
             >
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg
+                className="h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                aria-hidden="true"
+              >
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -267,12 +370,13 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
                   d="M6 18L18 6M6 6l12 12"
                 />
               </svg>
+              <span className="sr-only">Close menu</span>
             </button>
           </div>
 
           {/* Search */}
           <div className="border-b px-4 py-4">
-            <form onSubmit={handleSearch} className="search-box">
+            <form onSubmit={handleSearch} role="search" className="search-box">
               <svg
                 className="h-5 w-5 text-muted-foreground"
                 fill="none"
@@ -290,6 +394,7 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
                 type="text"
                 placeholder="Search products..."
                 className="search-input"
+                aria-label="Search products"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
               />
@@ -297,7 +402,7 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 overflow-y-auto px-4 py-4">
+          <nav className="flex-1 overflow-y-auto px-4 py-4" aria-label="Mobile navigation">
             <ul className="space-y-1">
               {navigation.map(item => (
                 <li key={item.name}>
@@ -395,7 +500,7 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
           />
           <div className="fixed inset-x-0 top-0 z-50 bg-background p-4 shadow-lg lg:hidden animate-slide-down">
             <div className="flex items-center gap-3">
-              <form onSubmit={handleSearch} className="search-box flex-1">
+              <form onSubmit={handleSearch} role="search" className="search-box flex-1">
                 <svg
                   className="h-5 w-5 text-muted-foreground"
                   fill="none"
@@ -413,6 +518,7 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
                   type="text"
                   placeholder="Search products..."
                   className="search-input"
+                  aria-label="Search products"
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                   autoFocus
@@ -423,7 +529,13 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
                 className="flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground"
                 aria-label="Close search"
               >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg
+                  className="h-5 w-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  aria-hidden="true"
+                >
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -431,6 +543,7 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
                     d="M6 18L18 6M6 6l12 12"
                   />
                 </svg>
+                <span className="sr-only">Close search</span>
               </button>
             </div>
           </div>

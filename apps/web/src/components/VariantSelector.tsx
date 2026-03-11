@@ -1,32 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-
-export interface ProductVariant {
-  id: string;
-  price: number;
-  compareAtPrice?: number;
-  inventory?: number;
-  sku?: string;
-  options: Record<string, string>; // e.g. { Size: 'M', Color: 'Red' }
-}
-
-export interface ProductOption {
-  name: string; // e.g. "Size"
-  values: string[]; // e.g. ["S", "M", "L"]
-}
+import { formatPrice } from '@/lib/format';
+import type { ProductVariant, ProductOption } from '@/lib/api';
 
 interface VariantSelectorProps {
   variants: ProductVariant[];
   options: ProductOption[];
   onVariantSelect: (variant: ProductVariant | null) => void;
-}
-
-function formatPrice(fils: number) {
-  return new Intl.NumberFormat('en-KW', {
-    style: 'currency',
-    currency: 'KWD',
-  }).format(fils / 1000);
 }
 
 export function VariantSelector({ variants, options, onVariantSelect }: VariantSelectorProps) {

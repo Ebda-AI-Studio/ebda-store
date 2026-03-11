@@ -69,48 +69,60 @@ export class CartService {
     quantity: number = 1,
     customerId?: string
   ) {
-    // Verify product exists and is active
-    const product = await prisma.product.findFirst({
-      where: { id: productId, storeId, status: 'active' },
-    });
-
-    if (!product) {
-      throw new AppError(404, 'NOT_FOUND', 'Product not found or unavailable');
-    }
-
-    // Check inventory
-    if (product.trackInventory && product.inventory < quantity) {
-      throw new AppError(400, 'INSUFFICIENT_INVENTORY', 'Not enough inventory');
-    }
-
-    // Get or create cart
+    // Get or create cart first (outside transaction since getOrCreate has its own retry logic)
     const cart = await this.getOrCreate(storeId, sessionId, customerId);
 
-    // Check if item already exists
-    const existingItem = await prisma.cartItem.findFirst({
-      where: { cartId: cart.id, productId },
-    });
+    // Wrap the inventory check + cart item creation in a serializable transaction
+    // to prevent a TOCTOU race where two concurrent addItem calls both pass the
+    // inventory check before either has written. Note: the definitive inventory
+    // lock happens at order creation time (SELECT ... FOR UPDATE in order.service),
+    // but this transaction reduces the window for overselling at cart level.
+    await prisma.$transaction(
+      async tx => {
+        // Verify product exists and is active
+        const product = await tx.product.findFirst({
+          where: { id: productId, storeId, status: 'active' },
+        });
 
-    if (existingItem) {
-      const newQuantity = existingItem.quantity + quantity;
+        if (!product) {
+          throw new AppError(404, 'NOT_FOUND', 'Product not found or unavailable');
+        }
 
-      if (product.trackInventory && product.inventory < newQuantity) {
-        throw new AppError(400, 'INSUFFICIENT_INVENTORY', 'Not enough inventory');
+        // Check if item already exists
+        const existingItem = await tx.cartItem.findFirst({
+          where: { cartId: cart.id, productId },
+        });
+
+        if (existingItem) {
+          const newQuantity = existingItem.quantity + quantity;
+
+          if (product.trackInventory && product.inventory < newQuantity) {
+            throw new AppError(400, 'INSUFFICIENT_INVENTORY', 'Not enough inventory');
+          }
+
+          await tx.cartItem.update({
+            where: { id: existingItem.id },
+            data: { quantity: newQuantity },
+          });
+        } else {
+          // Check inventory for new item
+          if (product.trackInventory && product.inventory < quantity) {
+            throw new AppError(400, 'INSUFFICIENT_INVENTORY', 'Not enough inventory');
+          }
+
+          await tx.cartItem.create({
+            data: {
+              cartId: cart.id,
+              productId,
+              quantity,
+            },
+          });
+        }
+      },
+      {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
       }
-
-      await prisma.cartItem.update({
-        where: { id: existingItem.id },
-        data: { quantity: newQuantity },
-      });
-    } else {
-      await prisma.cartItem.create({
-        data: {
-          cartId: cart.id,
-          productId,
-          quantity,
-        },
-      });
-    }
+    );
 
     return this.getOrCreate(storeId, sessionId, customerId);
   }

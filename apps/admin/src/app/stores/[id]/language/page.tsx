@@ -4,11 +4,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AdminLayout } from '../../../../components/AdminLayout';
-import { getApiUrl } from '../../../../lib/api';
+import { apiGet, apiPut } from '../../../../lib/api';
 
 type Language = 'en' | 'ar';
-
-const API_URL = getApiUrl();
 
 export default function LanguagePage() {
   const params = useParams();
@@ -23,16 +21,13 @@ export default function LanguagePage() {
     if (!storeId) return;
     setIsLoading(true);
     try {
-      const token = localStorage.getItem('authToken');
-      const res = await fetch(`${API_URL}/api/v1/stores/${storeId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const settings = data.data?.settings || data.data?.store?.settings;
-        if (settings?.defaultLanguage) {
-          setDefaultLanguage(settings.defaultLanguage);
-        }
+      const { data } = await apiGet<{
+        settings?: { defaultLanguage?: Language };
+        store?: { settings?: { defaultLanguage?: Language } };
+      }>(`/api/v1/stores/${storeId}`);
+      const storeSettings = data?.settings || data?.store?.settings;
+      if (storeSettings?.defaultLanguage) {
+        setDefaultLanguage(storeSettings.defaultLanguage);
       }
     } catch (err) {
       console.error('Failed to fetch store settings:', err);
@@ -49,23 +44,16 @@ export default function LanguagePage() {
     setIsSaving(true);
     setMessage(null);
     try {
-      const token = localStorage.getItem('authToken');
-      const res = await fetch(`${API_URL}/api/v1/stores/${storeId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ settings: { defaultLanguage } }),
+      const { error } = await apiPut(`/api/v1/stores/${storeId}`, {
+        settings: { defaultLanguage },
       });
 
-      if (res.ok) {
+      if (!error) {
         setMessage({ type: 'success', text: 'Language settings saved successfully' });
       } else {
-        const errData = await res.json().catch(() => ({}));
         setMessage({
           type: 'error',
-          text: errData.error?.message || 'Failed to save language settings',
+          text: error.message || 'Failed to save language settings',
         });
       }
     } catch {

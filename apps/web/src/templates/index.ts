@@ -67,7 +67,6 @@ export async function getTemplateComponents(templateId: TemplateId): Promise<Tem
   const loader = templates[templateId];
   if (!loader) {
     // Fallback to modern if template not found
-    console.warn(`Template '${templateId}' not found, falling back to 'modern'`);
     return templates.modern();
   }
   return loader();

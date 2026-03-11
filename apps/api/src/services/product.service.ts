@@ -1,6 +1,8 @@
 import { prisma, Prisma, ProductStatus } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import { slugify } from '@force/shared';
+import { redis } from './redis.service';
+import logger from '../lib/logger';
 
 interface CreateProductData {
   name: string;
@@ -109,7 +111,7 @@ export class ProductService {
 
   static async getById(storeId: string, productId: string) {
     const product = await prisma.product.findFirst({
-      where: { id: productId, storeId },
+      where: { id: productId, storeId, deletedAt: null },
       include: {
         images: { orderBy: { position: 'asc' } },
         categories: { include: { category: true } },
@@ -142,6 +144,23 @@ export class ProductService {
     return product;
   }
 
+  /**
+   * Invalidate Redis caches related to a store's products and categories.
+   * Best-effort: failures are logged but do not throw.
+   */
+  private static async invalidateStoreProductCache(storeId: string): Promise<void> {
+    try {
+      // Invalidate the categories cache (product counts may have changed)
+      await redis.delete(`categories:store:${storeId}`);
+      // Product list caches expire after 30s so we don't attempt pattern-based deletion
+    } catch (err) {
+      logger.warn(
+        { err: err instanceof Error ? err.message : 'unknown', storeId },
+        '[PRODUCT] Redis cache invalidation failed'
+      );
+    }
+  }
+
   static async create(storeId: string, data: CreateProductData) {
     const baseSlug = data.slug || slugify(data.name);
 
@@ -150,6 +169,7 @@ export class ProductService {
     let suffix = 0;
     while (await prisma.product.findFirst({ where: { storeId, slug } })) {
       suffix++;
+      if (suffix > 100) throw new AppError(409, 'SLUG_COLLISION', 'Too many slug collisions');
       slug = `${baseSlug}-${suffix}`;
     }
 
@@ -189,6 +209,7 @@ export class ProductService {
       },
     });
 
+    await this.invalidateStoreProductCache(storeId);
     return product;
   }
 
@@ -206,58 +227,64 @@ export class ProductService {
         })
       ) {
         suffix++;
+        if (suffix > 100) throw new AppError(409, 'SLUG_COLLISION', 'Too many slug collisions');
         finalSlug = `${baseSlug}-${suffix}`;
       }
     }
 
-    // If images are provided, replace all existing images
-    if (data.images !== undefined) {
-      await prisma.productImage.deleteMany({ where: { productId } });
-      if (data.images.length > 0) {
-        await prisma.productImage.createMany({
-          data: data.images.map((img, index) => ({
-            productId,
-            url: img.url,
-            alt: img.alt || data.name || product.name,
-            position: index,
-          })),
-        });
+    // Wrap image/category replacement and product update in a transaction
+    // so that a failure mid-way does not leave orphaned or missing relations.
+    const updatedProduct = await prisma.$transaction(async tx => {
+      // If images are provided, replace all existing images
+      if (data.images !== undefined) {
+        await tx.productImage.deleteMany({ where: { productId } });
+        if (data.images.length > 0) {
+          await tx.productImage.createMany({
+            data: data.images.map((img, index) => ({
+              productId,
+              url: img.url,
+              alt: img.alt || data.name || product.name,
+              position: index,
+            })),
+          });
+        }
       }
-    }
 
-    // If categories are provided, replace all existing categories
-    if (data.categories !== undefined) {
-      await prisma.productCategory.deleteMany({ where: { productId } });
-      if (data.categories.length > 0) {
-        await prisma.productCategory.createMany({
-          data: data.categories.map(categoryId => ({
-            productId,
-            categoryId,
-          })),
-        });
+      // If categories are provided, replace all existing categories
+      if (data.categories !== undefined) {
+        await tx.productCategory.deleteMany({ where: { productId } });
+        if (data.categories.length > 0) {
+          await tx.productCategory.createMany({
+            data: data.categories.map(categoryId => ({
+              productId,
+              categoryId,
+            })),
+          });
+        }
       }
-    }
 
-    const updatedProduct = await prisma.product.update({
-      where: { id: productId, storeId },
-      data: {
-        name: data.name,
-        nameAr: data.nameAr,
-        slug: finalSlug,
-        description: data.description,
-        descriptionAr: data.descriptionAr,
-        price: data.price,
-        compareAtPrice: data.compareAtPrice,
-        sku: data.sku,
-        inventory: data.inventory,
-        status: data.status,
-      },
-      include: {
-        images: { orderBy: { position: 'asc' } },
-        categories: { include: { category: true } },
-      },
+      return tx.product.update({
+        where: { id: productId, storeId },
+        data: {
+          name: data.name,
+          nameAr: data.nameAr,
+          slug: finalSlug,
+          description: data.description,
+          descriptionAr: data.descriptionAr,
+          price: data.price,
+          compareAtPrice: data.compareAtPrice,
+          sku: data.sku,
+          inventory: data.inventory,
+          status: data.status,
+        },
+        include: {
+          images: { orderBy: { position: 'asc' } },
+          categories: { include: { category: true } },
+        },
+      });
     });
 
+    await this.invalidateStoreProductCache(storeId);
     return updatedProduct;
   }
 
@@ -268,6 +295,8 @@ export class ProductService {
       where: { id: productId, storeId },
       data: { deletedAt: new Date() },
     });
+
+    await this.invalidateStoreProductCache(storeId);
   }
 
   static async updateInventory(storeId: string, productId: string, quantity: number) {
@@ -285,6 +314,21 @@ export class ProductService {
     const page = Math.max(1, options.page || 1);
     const limit = Math.min(100, Math.max(1, options.limit || 20));
     const skip = (page - 1) * limit;
+
+    // Build a stable cache key from params (best-effort cache, 30s TTL)
+    const cacheParams = JSON.stringify({ status, category, search, featured, page, limit });
+    const cacheKey = `products:store:${storeId}:${cacheParams}`;
+    try {
+      const cached = await redis.get<string>(cacheKey);
+      if (cached) {
+        return typeof cached === 'string' ? JSON.parse(cached) : cached;
+      }
+    } catch (err) {
+      logger.warn(
+        { err: err instanceof Error ? err.message : 'unknown' },
+        '[PRODUCT] Redis cache read failed for listPublic'
+      );
+    }
 
     const where: Prisma.ProductWhereInput = {
       storeId,
@@ -324,7 +368,7 @@ export class ProductService {
       prisma.product.count({ where }),
     ]);
 
-    return {
+    const result = {
       products,
       meta: {
         page,
@@ -333,6 +377,18 @@ export class ProductService {
         totalPages: Math.ceil(total / limit),
       },
     };
+
+    // Write to cache (best-effort, 30s TTL)
+    try {
+      await redis.set(cacheKey, JSON.stringify(result), 30);
+    } catch (err) {
+      logger.warn(
+        { err: err instanceof Error ? err.message : 'unknown' },
+        '[PRODUCT] Redis cache write failed for listPublic'
+      );
+    }
+
+    return result;
   }
 
   static async getPublicBySlug(storeId: string, slug: string) {
@@ -370,6 +426,20 @@ export class ProductService {
   }
 
   static async getCategories(storeId: string) {
+    // Try Redis cache first (best-effort)
+    const cacheKey = `categories:store:${storeId}`;
+    try {
+      const cached = await redis.get<string>(cacheKey);
+      if (cached) {
+        return typeof cached === 'string' ? JSON.parse(cached) : cached;
+      }
+    } catch (err) {
+      logger.warn(
+        { err: err instanceof Error ? err.message : 'unknown' },
+        '[PRODUCT] Redis cache read failed for getCategories'
+      );
+    }
+
     const categories = await prisma.category.findMany({
       where: { storeId, deletedAt: null, isActive: true },
       orderBy: { name: 'asc' },
@@ -378,11 +448,23 @@ export class ProductService {
         _count: { select: { products: true } },
       },
     });
-    return categories.map(c => ({
+    const result = categories.map(c => ({
       ...c,
       productCount: c._count.products,
       _count: undefined,
     }));
+
+    // Write to cache (best-effort, 60s TTL)
+    try {
+      await redis.set(cacheKey, JSON.stringify(result), 60);
+    } catch (err) {
+      logger.warn(
+        { err: err instanceof Error ? err.message : 'unknown' },
+        '[PRODUCT] Redis cache write failed for getCategories'
+      );
+    }
+
+    return result;
   }
 
   /**

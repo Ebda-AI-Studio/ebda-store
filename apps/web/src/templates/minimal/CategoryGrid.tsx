@@ -1,6 +1,7 @@
 'use client';
 
 import type { CategoryGridProps } from '../types';
+import { getDisplayTitle } from '../shared';
 import CategoryCard from './CategoryCard';
 
 export default function MinimalCategoryGrid({
@@ -10,7 +11,7 @@ export default function MinimalCategoryGrid({
   titleAr,
   urlPrefix = '',
 }: CategoryGridProps) {
-  const displayTitle = isRtl && titleAr ? titleAr : title;
+  const displayTitle = getDisplayTitle(isRtl, title, titleAr);
 
   return (
     <section className="py-24 md:py-32 bg-background" dir={isRtl ? 'rtl' : 'ltr'}>

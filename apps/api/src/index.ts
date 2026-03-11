@@ -1,5 +1,6 @@
 import express, { Request, Response } from 'express';
 import { createServer } from 'http';
+import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
@@ -91,8 +92,12 @@ const CORS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (mobile apps, curl, Postman, etc.)
-      if (!origin) return callback(null, true);
+      // Requests without an Origin header are rejected by CORS.
+      // Same-origin requests, server-to-server calls, mobile apps, and dev
+      // tools (curl, Postman) are unaffected because CORS is only enforced by
+      // browsers.  Returning false means no Access-Control-Allow-Origin header
+      // is set, which does not block non-browser clients.
+      if (!origin) return callback(null, false);
 
       // Always allow platform URLs
       const platformOrigins = [config.webUrl, config.adminUrl].filter(Boolean);
@@ -166,6 +171,9 @@ app.use('/api/v1/webhooks', express.raw({ type: 'application/json' }), webhookRo
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// Cookie parsing (for HTTP-only auth cookie support)
+app.use(cookieParser());
 
 // Input sanitization
 app.use(sanitizeInput);

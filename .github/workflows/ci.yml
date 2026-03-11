@@ -55,6 +55,12 @@ jobs:
       - name: Type check API
         run: npx tsc --noEmit -p apps/api/tsconfig.json
 
+      - name: Type check Admin
+        run: npx tsc --noEmit -p apps/admin/tsconfig.json
+
+      - name: Type check Web
+        run: npx tsc --noEmit -p apps/web/tsconfig.json
+
       - name: Type check shared packages
         run: npx tsc --noEmit -p packages/shared/tsconfig.json
 

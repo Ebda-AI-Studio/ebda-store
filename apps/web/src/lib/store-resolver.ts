@@ -7,8 +7,7 @@ import {
   DEFAULT_THEME,
   getTemplateTheme,
 } from '@force/shared';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
+import { API_URL } from './api';
 
 /**
  * Resolved store configuration
@@ -291,7 +290,6 @@ export async function getStore(): Promise<ResolvedStore> {
   if (domain) {
     const store = await resolveStoreByDomain(domain);
     if (store) return store;
-    console.warn(`Store not found for domain: ${domain}`);
     return DEFAULT_STORE;
   }
 
@@ -300,7 +298,6 @@ export async function getStore(): Promise<ResolvedStore> {
   if (slug) {
     const store = await resolveStoreBySlug(slug);
     if (store) return store;
-    console.warn(`Store not found for slug: ${slug}`);
     return DEFAULT_STORE;
   }
 

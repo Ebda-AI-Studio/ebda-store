@@ -4,7 +4,8 @@ import { useState, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import { Button, Input, Badge } from '@force/ui';
 import { AdminLayout } from '../../../components/AdminLayout';
-import { getApiUrl } from '../../../lib/api';
+import { apiGet, apiPost } from '../../../lib/api';
+import { isValidEmail } from '@force/shared';
 
 interface CreatedStore {
   id: string;
@@ -75,7 +76,7 @@ export default function CreateStorePage() {
 
     if (step === 'owner') {
       if (!formData.ownerEmail.trim()) errors.ownerEmail = 'Email is required';
-      if (formData.ownerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.ownerEmail)) {
+      if (formData.ownerEmail && !isValidEmail(formData.ownerEmail)) {
         errors.ownerEmail = 'Please enter a valid email address';
       }
       if (!formData.ownerName.trim()) errors.ownerName = 'Owner name is required';
@@ -115,7 +116,6 @@ export default function CreateStorePage() {
     setError(null);
 
     try {
-      const token = localStorage.getItem('authToken');
       const payload = {
         storeName: formData.storeName,
         storeSlug: formData.storeSlug,
@@ -124,25 +124,21 @@ export default function CreateStorePage() {
         ownerPassword: formData.ownerPassword,
         domain: formData.customDomain || undefined,
       };
-      const response = await fetch(`${getApiUrl()}/api/v1/admin/stores`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
+      const { data, error: apiError } = await apiPost<{
+        store: CreatedStore;
+        owner: CreatedOwner;
+      }>('/api/v1/admin/stores', payload);
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error?.message || data.message || 'Failed to create store');
+      if (apiError) {
+        throw new Error(apiError.message || 'Failed to create store');
       }
 
-      setSuccess({
-        store: data.data.store,
-        owner: data.data.owner,
-      });
+      if (data) {
+        setSuccess({
+          store: data.store,
+          owner: data.owner,
+        });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
     } finally {
@@ -162,13 +158,12 @@ export default function CreateStorePage() {
   const checkDomainStatus = useCallback(async (storeId: string) => {
     setIsCheckingDns(true);
     try {
-      const token = localStorage.getItem('authToken');
-      const response = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/domain`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setDomainStatus(data.data);
+      const { data } = await apiGet<{
+        verified: boolean;
+        dnsRecords: Array<{ type: string; name: string; value: string }>;
+      }>(`/api/v1/stores/${storeId}/domain`);
+      if (data) {
+        setDomainStatus(data);
       }
     } catch {
       // Silently fail — DNS check is non-critical
@@ -189,7 +184,7 @@ export default function CreateStorePage() {
     return (
       <AdminLayout title="Store Created!" subtitle="Your new store is ready">
         <div className="mx-auto max-w-2xl">
-          <div className="rounded-xl border bg-white p-8 shadow-sm text-center">
+          <div className="rounded-xl border bg-card p-8 shadow-sm text-center">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
               <svg
                 className="h-8 w-8 text-green-600"
@@ -205,35 +200,35 @@ export default function CreateStorePage() {
                 />
               </svg>
             </div>
-            <h2 className="mt-4 text-2xl font-bold text-gray-900">Store Created Successfully!</h2>
-            <p className="mt-2 text-gray-500">
+            <h2 className="mt-4 text-2xl font-bold text-foreground">Store Created Successfully!</h2>
+            <p className="mt-2 text-muted-foreground">
               {success.store.name} is now live and ready for products.
             </p>
 
-            <div className="mt-6 rounded-lg bg-gray-50 p-4 text-left">
-              <h3 className="font-semibold text-gray-900">Store Details</h3>
+            <div className="mt-6 rounded-lg bg-muted p-4 text-left">
+              <h3 className="font-semibold text-foreground">Store Details</h3>
               <dl className="mt-2 space-y-1 text-sm">
                 <div className="flex justify-between">
-                  <dt className="text-gray-500">Store URL:</dt>
+                  <dt className="text-muted-foreground">Store URL:</dt>
                   <dd className="font-medium">
                     {success.store.domain || `${success.store.slug}.forcemediakw.com`}
                   </dd>
                 </div>
                 {success.store.domain && (
                   <div className="flex justify-between">
-                    <dt className="text-gray-500">Default URL:</dt>
+                    <dt className="text-muted-foreground">Default URL:</dt>
                     <dd className="font-medium text-gray-400">
                       {success.store.slug}.forcemediakw.com
                     </dd>
                   </div>
                 )}
                 <div className="flex justify-between">
-                  <dt className="text-gray-500">Owner Email:</dt>
+                  <dt className="text-muted-foreground">Owner Email:</dt>
                   <dd className="font-medium">{success.owner.email}</dd>
                 </div>
                 {success.owner.temporaryPassword && (
                   <div className="flex justify-between">
-                    <dt className="text-gray-500">Temporary Password:</dt>
+                    <dt className="text-muted-foreground">Temporary Password:</dt>
                     <dd className="font-mono font-medium text-primary">
                       {success.owner.temporaryPassword}
                     </dd>
@@ -254,7 +249,7 @@ export default function CreateStorePage() {
                 <p className="mt-2 text-sm text-amber-800">
                   Add the following DNS record to your domain provider to complete setup:
                 </p>
-                <div className="mt-3 overflow-hidden rounded-md border border-amber-200 bg-white">
+                <div className="mt-3 overflow-hidden rounded-md border border-amber-200 bg-card">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b bg-amber-50">
@@ -342,7 +337,7 @@ export default function CreateStorePage() {
                         ? 'border-primary bg-primary text-white'
                         : index === currentStepIndex
                           ? 'border-primary text-primary'
-                          : 'border-gray-300 text-gray-500'
+                          : 'border-border text-muted-foreground'
                     }`}
                   >
                     {index < currentStepIndex ? (
@@ -359,7 +354,7 @@ export default function CreateStorePage() {
                   </span>
                   <span
                     className={`ml-3 text-sm font-medium hidden sm:block ${
-                      index <= currentStepIndex ? 'text-gray-900' : 'text-gray-500'
+                      index <= currentStepIndex ? 'text-foreground' : 'text-muted-foreground'
                     }`}
                   >
                     {step.name}
@@ -368,7 +363,7 @@ export default function CreateStorePage() {
                 {index < steps.length - 1 && (
                   <div
                     className={`ml-4 flex-1 border-t-2 ${
-                      index < currentStepIndex ? 'border-primary' : 'border-gray-200'
+                      index < currentStepIndex ? 'border-primary' : 'border-border'
                     }`}
                   />
                 )}
@@ -378,12 +373,12 @@ export default function CreateStorePage() {
         </nav>
 
         {/* Step Content */}
-        <div className="rounded-xl border bg-white shadow-sm">
+        <div className="rounded-xl border bg-card shadow-sm">
           {/* Step 1: Store Details */}
           {currentStep === 'store' && (
             <div className="p-6">
-              <h2 className="text-lg font-semibold text-gray-900">Store Details</h2>
-              <p className="mt-1 text-sm text-gray-500">
+              <h2 className="text-lg font-semibold text-foreground">Store Details</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
                 Enter the basic information for the new store
               </p>
 
@@ -411,7 +406,7 @@ export default function CreateStorePage() {
                   <div
                     className={`mt-1 flex rounded-lg border overflow-hidden ${validationErrors.storeSlug ? 'border-red-500' : ''}`}
                   >
-                    <span className="flex items-center bg-gray-50 px-3 text-sm text-gray-500 border-r">
+                    <span className="flex items-center bg-muted px-3 text-sm text-muted-foreground border-r">
                       https://
                     </span>
                     <input
@@ -425,7 +420,7 @@ export default function CreateStorePage() {
                       placeholder="my-awesome-store"
                       className="flex-1 px-3 py-2 text-sm focus:outline-none"
                     />
-                    <span className="flex items-center bg-gray-50 px-3 text-sm text-gray-500 border-l">
+                    <span className="flex items-center bg-muted px-3 text-sm text-muted-foreground border-l">
                       .forcemediakw.com
                     </span>
                   </div>
@@ -447,7 +442,7 @@ export default function CreateStorePage() {
                     placeholder="store.example.com"
                     className="mt-1"
                   />
-                  <p className="mt-1 text-xs text-gray-500">
+                  <p className="mt-1 text-xs text-muted-foreground">
                     Leave empty to use the default subdomain. Custom domains require DNS
                     configuration.
                   </p>
@@ -459,8 +454,10 @@ export default function CreateStorePage() {
           {/* Step 2: Owner Details */}
           {currentStep === 'owner' && (
             <div className="p-6">
-              <h2 className="text-lg font-semibold text-gray-900">Store Owner</h2>
-              <p className="mt-1 text-sm text-gray-500">Set up the owner account for this store</p>
+              <h2 className="text-lg font-semibold text-foreground">Store Owner</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Set up the owner account for this store
+              </p>
 
               <div className="mt-6 space-y-4">
                 <div>
@@ -523,7 +520,7 @@ export default function CreateStorePage() {
                   {validationErrors.ownerPassword && (
                     <p className="mt-1 text-sm text-red-500">{validationErrors.ownerPassword}</p>
                   )}
-                  <p className="mt-1 text-xs text-gray-500">
+                  <p className="mt-1 text-xs text-muted-foreground">
                     The owner will be prompted to change this on first login
                   </p>
                 </div>
@@ -534,14 +531,14 @@ export default function CreateStorePage() {
           {/* Step 3: Review */}
           {currentStep === 'review' && (
             <div className="p-6">
-              <h2 className="text-lg font-semibold text-gray-900">Review & Create</h2>
-              <p className="mt-1 text-sm text-gray-500">
+              <h2 className="text-lg font-semibold text-foreground">Review & Create</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
                 Please review the details before creating the store
               </p>
 
               <div className="mt-6 space-y-6">
-                <div className="rounded-lg bg-gray-50 p-4">
-                  <h3 className="flex items-center justify-between font-medium text-gray-900">
+                <div className="rounded-lg bg-muted p-4">
+                  <h3 className="flex items-center justify-between font-medium text-foreground">
                     Store Details
                     <button
                       onClick={() => setCurrentStep('store')}
@@ -552,24 +549,24 @@ export default function CreateStorePage() {
                   </h3>
                   <dl className="mt-2 space-y-1 text-sm">
                     <div className="flex justify-between">
-                      <dt className="text-gray-500">Name:</dt>
+                      <dt className="text-muted-foreground">Name:</dt>
                       <dd className="font-medium">{formData.storeName}</dd>
                     </div>
                     <div className="flex justify-between">
-                      <dt className="text-gray-500">Default URL:</dt>
+                      <dt className="text-muted-foreground">Default URL:</dt>
                       <dd className="font-medium">{formData.storeSlug}.forcemediakw.com</dd>
                     </div>
                     {formData.customDomain && (
                       <div className="flex justify-between">
-                        <dt className="text-gray-500">Custom Domain:</dt>
+                        <dt className="text-muted-foreground">Custom Domain:</dt>
                         <dd className="font-medium">{formData.customDomain}</dd>
                       </div>
                     )}
                   </dl>
                 </div>
 
-                <div className="rounded-lg bg-gray-50 p-4">
-                  <h3 className="flex items-center justify-between font-medium text-gray-900">
+                <div className="rounded-lg bg-muted p-4">
+                  <h3 className="flex items-center justify-between font-medium text-foreground">
                     Store Owner
                     <button
                       onClick={() => setCurrentStep('owner')}
@@ -580,11 +577,11 @@ export default function CreateStorePage() {
                   </h3>
                   <dl className="mt-2 space-y-1 text-sm">
                     <div className="flex justify-between">
-                      <dt className="text-gray-500">Name:</dt>
+                      <dt className="text-muted-foreground">Name:</dt>
                       <dd className="font-medium">{formData.ownerName}</dd>
                     </div>
                     <div className="flex justify-between">
-                      <dt className="text-gray-500">Email:</dt>
+                      <dt className="text-muted-foreground">Email:</dt>
                       <dd className="font-medium">{formData.ownerEmail}</dd>
                     </div>
                   </dl>
@@ -598,7 +595,7 @@ export default function CreateStorePage() {
           )}
 
           {/* Navigation Buttons */}
-          <div className="flex justify-between border-t bg-gray-50 px-6 py-4">
+          <div className="flex justify-between border-t bg-muted px-6 py-4">
             <Button
               type="button"
               variant="outline"

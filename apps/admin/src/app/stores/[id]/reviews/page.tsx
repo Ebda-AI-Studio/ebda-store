@@ -2,9 +2,9 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
-import { Button, Badge } from '@force/ui';
+import { Button, Badge, useToast } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
-import { getApiUrl } from '../../../../lib/api';
+import { apiGet, apiPost, apiDelete } from '../../../../lib/api';
 
 interface Review {
   id: string;
@@ -60,22 +60,19 @@ export default function ReviewsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved'>('all');
   const [meta, setMeta] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const { success: toastSuccess, error: showError } = useToast();
 
   const fetchReviews = useCallback(async () => {
     if (!storeId) return;
     setIsLoading(true);
     try {
-      const token = localStorage.getItem('authToken');
-      const response = await fetch(
-        `${getApiUrl()}/api/v1/stores/${storeId}/reviews/admin?status=${filter}&page=${meta.page}&limit=${meta.limit}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+      const { data } = await apiGet<{ reviews: Review[]; meta: typeof meta }>(
+        `/api/v1/stores/${storeId}/reviews/admin?status=${filter}&page=${meta.page}&limit=${meta.limit}`
       );
-      if (response.ok) {
-        const data = await response.json();
-        setReviews(data.data.reviews);
-        setMeta(data.data.meta);
+      if (data) {
+        setReviews(data.reviews);
+        setMeta(data.meta);
       }
     } catch (error) {
       console.error('Failed to fetch reviews:', error);
@@ -90,62 +87,51 @@ export default function ReviewsPage() {
 
   async function handleApprove(reviewId: string) {
     try {
-      const token = localStorage.getItem('authToken');
-      const res = await fetch(
-        `${getApiUrl()}/api/v1/stores/${storeId}/reviews/admin/${reviewId}/approve`,
-        {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
-        }
+      const { error } = await apiPost(
+        `/api/v1/stores/${storeId}/reviews/admin/${reviewId}/approve`
       );
-      if (!res.ok) {
-        alert('Failed to approve review. Please try again.');
+      if (error) {
+        showError('Error', 'Failed to approve review. Please try again.');
         return;
       }
+      toastSuccess('Review Approved', 'The review is now visible to customers.');
       fetchReviews();
-    } catch (error) {
-      console.error('Failed to approve review:', error);
-      alert('Failed to approve review. Please try again.');
+    } catch (err) {
+      console.error('Failed to approve review:', err);
+      showError('Error', 'Failed to approve review. Please try again.');
     }
   }
 
   async function handleReject(reviewId: string) {
     try {
-      const token = localStorage.getItem('authToken');
-      const res = await fetch(
-        `${getApiUrl()}/api/v1/stores/${storeId}/reviews/admin/${reviewId}/reject`,
-        {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      if (!res.ok) {
-        alert('Failed to unapprove review. Please try again.');
+      const { error } = await apiPost(`/api/v1/stores/${storeId}/reviews/admin/${reviewId}/reject`);
+      if (error) {
+        showError('Error', 'Failed to unapprove review. Please try again.');
         return;
       }
+      toastSuccess('Review Unapproved', 'The review has been unapproved.');
       fetchReviews();
-    } catch (error) {
-      console.error('Failed to reject review:', error);
-      alert('Failed to unapprove review. Please try again.');
+    } catch (err) {
+      console.error('Failed to reject review:', err);
+      showError('Error', 'Failed to unapprove review. Please try again.');
     }
   }
 
-  async function handleDelete(reviewId: string) {
-    if (!window.confirm('Delete this review? This action cannot be undone.')) return;
+  async function confirmDelete() {
+    if (!deleteTarget) return;
     try {
-      const token = localStorage.getItem('authToken');
-      const res = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/reviews/admin/${reviewId}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) {
-        alert('Failed to delete review. Please try again.');
+      const { error } = await apiDelete(`/api/v1/stores/${storeId}/reviews/admin/${deleteTarget}`);
+      if (error) {
+        showError('Error', 'Failed to delete review. Please try again.');
         return;
       }
+      toastSuccess('Review Deleted', 'The review has been permanently removed.');
       fetchReviews();
-    } catch (error) {
-      console.error('Failed to delete review:', error);
-      alert('Failed to delete review. Please try again.');
+    } catch (err) {
+      console.error('Failed to delete review:', err);
+      showError('Error', 'Failed to delete review. Please try again.');
+    } finally {
+      setDeleteTarget(null);
     }
   }
 
@@ -241,7 +227,7 @@ export default function ReviewsPage() {
                       variant="outline"
                       size="sm"
                       className="text-red-600 hover:bg-red-50"
-                      onClick={() => handleDelete(review.id)}
+                      onClick={() => setDeleteTarget(review.id)}
                     >
                       Delete
                     </Button>
@@ -280,6 +266,30 @@ export default function ReviewsPage() {
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      {deleteTarget && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">Delete Review</h2>
+            <p className="text-sm text-gray-600 mb-6">
+              Are you sure you want to delete this review? This action cannot be undone.
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <Button variant="outline" size="sm" onClick={() => setDeleteTarget(null)}>
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                className="bg-red-600 hover:bg-red-700 text-white"
+                onClick={confirmDelete}
+              >
+                Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </AdminLayout>
   );
 }

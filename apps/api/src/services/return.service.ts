@@ -346,14 +346,24 @@ export class ReturnService {
       },
     });
 
-    // If refund type, update inventory
+    // If refund type, restore inventory atomically with row locking
+    // so that concurrent operations cannot read stale inventory counts.
     if (returnRequest.type === 'return' || returnRequest.type === 'refund') {
-      for (const item of returnRequest.items) {
-        await prisma.product.update({
-          where: { id: item.productId },
-          data: { inventory: { increment: item.quantity } },
-        });
-      }
+      await prisma.$transaction(async tx => {
+        for (const item of returnRequest.items) {
+          // Lock the product row to prevent concurrent inventory changes
+          await tx.$queryRaw`
+            SELECT id FROM "products"
+            WHERE id = ${item.productId}
+            FOR UPDATE
+          `;
+
+          await tx.product.update({
+            where: { id: item.productId },
+            data: { inventory: { increment: item.quantity } },
+          });
+        }
+      });
     }
 
     return updatedReturn;

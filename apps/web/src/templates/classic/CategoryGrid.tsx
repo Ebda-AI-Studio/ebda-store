@@ -1,6 +1,7 @@
 'use client';
 
 import type { CategoryGridProps } from '../types';
+import { getDisplayTitle } from '../shared';
 import CategoryCard from './CategoryCard';
 
 export default function ClassicCategoryGrid({
@@ -10,7 +11,7 @@ export default function ClassicCategoryGrid({
   titleAr,
   urlPrefix = '',
 }: CategoryGridProps) {
-  const displayTitle = isRtl && titleAr ? titleAr : title;
+  const displayTitle = getDisplayTitle(isRtl, title, titleAr);
 
   return (
     <section className="py-16 md:py-24 bg-background" dir={isRtl ? 'rtl' : 'ltr'}>

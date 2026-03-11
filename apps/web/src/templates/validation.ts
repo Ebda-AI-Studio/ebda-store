@@ -437,26 +437,6 @@ export function isTemplateRegistered(templateId: string): templateId is Template
 /**
  * Log template validation results
  */
-export function logValidationResult(templateId: TemplateId, result: ValidationResult): void {
-  if (process.env.NODE_ENV !== 'development') return;
-
-  console.group(`Template Validation: ${templateId}`);
-
-  if (result.isValid) {
-    console.log('✅ Template is valid');
-  } else {
-    console.error('❌ Template has errors:');
-    result.errors.forEach(error => {
-      console.error(`  [${error.slot}] ${error.code}: ${error.message}`);
-    });
-  }
-
-  if (result.warnings.length > 0) {
-    console.warn('⚠️ Warnings:');
-    result.warnings.forEach(warning => {
-      console.warn(`  [${warning.slot}] ${warning.code}: ${warning.message}`);
-    });
-  }
-
-  console.groupEnd();
+export function logValidationResult(_templateId: TemplateId, _result: ValidationResult): void {
+  // No-op: validation results are available in the returned object
 }

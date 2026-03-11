@@ -8,6 +8,7 @@ import { StoreService } from '../services/store.service';
 import { VercelDomainService } from '../services/vercel-domain.service';
 import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
+import { getAuthUser } from '../utils/store-helpers';
 
 const router = Router();
 
@@ -211,20 +212,26 @@ router.get(
 );
 
 // GET /stores/:id/stats - Get store stats
-router.get('/:id/stats', authenticate, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { id } = req.params;
+router.get(
+  '/:id/stats',
+  authenticate,
+  requireRole(['store_admin', 'super_admin']),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
 
-    const stats = await StoreService.getStoreStats(id);
+      const stats = await StoreService.getStoreStats(id);
 
-    res.json({
-      success: true,
-      data: stats,
-    });
-  } catch (error) {
-    next(error);
+      res.json({
+        success: true,
+        data: stats,
+      });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 /**
  * @swagger
@@ -283,7 +290,7 @@ router.post(
     try {
       const data = createStoreSchema.parse(req.body);
 
-      const store = await StoreService.create(req.user!.userId, data);
+      const store = await StoreService.create(getAuthUser(req).userId, data);
 
       res.status(201).json({
         success: true,

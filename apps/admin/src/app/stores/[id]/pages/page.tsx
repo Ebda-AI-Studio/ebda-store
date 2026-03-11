@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { useToast } from '@force/ui';
-import { getApiUrl, getAuthToken } from '../../../../lib/api';
+import { apiGet, apiPut } from '../../../../lib/api';
 
 interface FooterLink {
   name: string;
@@ -62,13 +62,11 @@ export default function StorePagesPage() {
 
   async function loadSettings() {
     try {
-      const token = getAuthToken();
-      const res = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const json = await res.json();
-      if (json.success && json.data?.store) {
-        const settings = (json.data.store.settings || {}) as StoreSettings;
+      const { data } = await apiGet<{ store: { settings: StoreSettings } }>(
+        `/api/v1/stores/${storeId}`
+      );
+      if (data?.store) {
+        const settings = (data.store.settings || {}) as StoreSettings;
         if (settings.footerLinks) {
           if (settings.footerLinks.shop?.length) {
             setShopLinks(settings.footerLinks.shop);
@@ -94,13 +92,11 @@ export default function StorePagesPage() {
   async function handleSave() {
     setIsSaving(true);
     try {
-      const token = getAuthToken();
       // First fetch current settings to merge
-      const getRes = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const getJson = await getRes.json();
-      const currentSettings = (getJson.data?.store?.settings || {}) as StoreSettings;
+      const { data: getData } = await apiGet<{ store: { settings: StoreSettings } }>(
+        `/api/v1/stores/${storeId}`
+      );
+      const currentSettings = (getData?.store?.settings || {}) as StoreSettings;
 
       const newSettings = {
         ...currentSettings,
@@ -112,19 +108,13 @@ export default function StorePagesPage() {
         },
       };
 
-      const res = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ settings: newSettings }),
+      const { error: saveError } = await apiPut(`/api/v1/stores/${storeId}`, {
+        settings: newSettings,
       });
-      const json = await res.json();
-      if (json.success) {
+      if (!saveError) {
         success('Saved', 'Footer links updated successfully.');
       } else {
-        showError('Error', json.error?.message || 'Failed to save.');
+        showError('Error', saveError.message || 'Failed to save.');
       }
     } catch {
       showError('Error', 'Failed to save footer links.');

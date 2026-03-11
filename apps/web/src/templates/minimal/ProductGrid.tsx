@@ -1,6 +1,7 @@
 'use client';
 
 import type { ProductGridProps } from '../types';
+import { getGridColsClass, getDisplayTitle } from '../shared';
 import ProductCard from './ProductCard';
 
 export default function MinimalProductGrid({
@@ -13,14 +14,8 @@ export default function MinimalProductGrid({
   cartQuantities = {},
   urlPrefix = '',
 }: ProductGridProps) {
-  const displayTitle = isRtl && titleAr ? titleAr : title;
-
-  const gridCols =
-    {
-      2: 'grid-cols-1 sm:grid-cols-2',
-      3: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
-      4: 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4',
-    }[columns] || 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4';
+  const displayTitle = getDisplayTitle(isRtl, title, titleAr);
+  const gridCols = getGridColsClass(columns);
 
   return (
     <section className="py-24 md:py-32 bg-background" dir={isRtl ? 'rtl' : 'ltr'}>

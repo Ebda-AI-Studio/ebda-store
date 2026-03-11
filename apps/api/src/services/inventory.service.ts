@@ -36,33 +36,50 @@ export class InventoryService {
    * Get inventory statistics for a store
    */
   static async getStats(storeId: string): Promise<InventoryStats> {
-    const products = await prisma.product.findMany({
-      where: {
-        storeId,
-        deletedAt: null,
-        trackInventory: true,
-      },
-      select: {
-        inventory: true,
-        lowStockThreshold: true,
-        costPrice: true,
-      },
-    });
+    const baseWhere: Prisma.ProductWhereInput = {
+      storeId,
+      deletedAt: null,
+      trackInventory: true,
+    };
 
-    const totalProducts = products.length;
-    const totalStock = products.reduce((sum, p) => sum + p.inventory, 0);
-    const lowStockCount = products.filter(
-      p => p.inventory > 0 && p.inventory <= p.lowStockThreshold
-    ).length;
-    const outOfStockCount = products.filter(p => p.inventory <= 0).length;
-    const totalValue = products.reduce((sum, p) => sum + p.inventory * (p.costPrice || 0), 0);
+    const [aggregate, totalProducts, outOfStockCount, totalValue] = await Promise.all([
+      prisma.product.aggregate({
+        where: baseWhere,
+        _sum: { inventory: true },
+      }),
+      prisma.product.count({ where: baseWhere }),
+      prisma.product.count({
+        where: { ...baseWhere, inventory: { lte: 0 } },
+      }),
+      // totalValue requires per-row computation (inventory * costPrice) which
+      // Prisma aggregate cannot express; use raw SQL for accuracy.
+      prisma.$queryRaw<[{ total_value: bigint | null }]>`
+        SELECT COALESCE(SUM(inventory * COALESCE(cost_price, 0)), 0) AS total_value
+        FROM products
+        WHERE store_id = ${storeId}
+          AND deleted_at IS NULL
+          AND track_inventory = true
+      `,
+    ]);
+
+    // Low stock requires a column-to-column comparison (inventory <= lowStockThreshold)
+    // which Prisma does not support; use raw SQL.
+    const [{ low_stock_count }] = await prisma.$queryRaw<[{ low_stock_count: bigint }]>`
+      SELECT COUNT(*)::bigint AS low_stock_count
+      FROM products
+      WHERE store_id = ${storeId}
+        AND deleted_at IS NULL
+        AND track_inventory = true
+        AND inventory > 0
+        AND inventory <= low_stock_threshold
+    `;
 
     return {
       totalProducts,
-      totalStock,
-      lowStockCount,
+      totalStock: aggregate._sum.inventory ?? 0,
+      lowStockCount: Number(low_stock_count),
       outOfStockCount,
-      totalValue,
+      totalValue: Number(totalValue[0].total_value ?? 0),
     };
   }
 
@@ -198,43 +215,77 @@ export class InventoryService {
 
   /**
    * Get low stock alerts
+   * Uses raw SQL to compare inventory against the per-row low_stock_threshold
+   * column, which Prisma's where clause cannot express.
    */
   static async getLowStockAlerts(storeId: string): Promise<ProductInventory[]> {
-    const products = await prisma.product.findMany({
-      where: {
-        storeId,
-        deletedAt: null,
-        trackInventory: true,
-      },
-      select: {
-        id: true,
-        name: true,
-        nameAr: true,
-        sku: true,
-        inventory: true,
-        lowStockThreshold: true,
-        trackInventory: true,
-        costPrice: true,
-        status: true,
-      },
-      orderBy: { inventory: 'asc' },
-    });
+    // Products that are low on stock (0 < inventory <= low_stock_threshold)
+    const lowStockProducts = await prisma.$queryRaw<
+      Array<{
+        id: string;
+        name: string;
+        name_ar: string | null;
+        sku: string | null;
+        inventory: number;
+        low_stock_threshold: number;
+        track_inventory: boolean;
+        cost_price: number | null;
+        status: string;
+      }>
+    >`
+      SELECT id, name, name_ar, sku, inventory, low_stock_threshold,
+             track_inventory, cost_price, status
+      FROM products
+      WHERE store_id = ${storeId}
+        AND deleted_at IS NULL
+        AND track_inventory = true
+        AND inventory <= low_stock_threshold
+        AND inventory > 0
+      ORDER BY inventory ASC
+      LIMIT 100
+    `;
 
-    return products
-      .filter(p => p.inventory <= p.lowStockThreshold)
-      .map(p => ({
-        id: p.id,
-        name: p.name,
-        nameAr: p.nameAr,
-        sku: p.sku,
-        inventory: p.inventory,
-        lowStockThreshold: p.lowStockThreshold,
-        trackInventory: p.trackInventory,
-        costPrice: p.costPrice,
-        status: p.status,
-        stockStatus: this.getStockStatus(p.inventory, p.lowStockThreshold),
-        stockValue: p.inventory * (p.costPrice || 0),
-      }));
+    // Products that are completely out of stock (inventory <= 0)
+    const outOfStockProducts = await prisma.$queryRaw<
+      Array<{
+        id: string;
+        name: string;
+        name_ar: string | null;
+        sku: string | null;
+        inventory: number;
+        low_stock_threshold: number;
+        track_inventory: boolean;
+        cost_price: number | null;
+        status: string;
+      }>
+    >`
+      SELECT id, name, name_ar, sku, inventory, low_stock_threshold,
+             track_inventory, cost_price, status
+      FROM products
+      WHERE store_id = ${storeId}
+        AND deleted_at IS NULL
+        AND track_inventory = true
+        AND inventory <= 0
+      ORDER BY inventory ASC
+      LIMIT 100
+    `;
+
+    // Combine: out-of-stock first (more urgent), then low stock
+    const allProducts = [...outOfStockProducts, ...lowStockProducts];
+
+    return allProducts.map(p => ({
+      id: p.id,
+      name: p.name,
+      nameAr: p.name_ar,
+      sku: p.sku,
+      inventory: p.inventory,
+      lowStockThreshold: p.low_stock_threshold,
+      trackInventory: p.track_inventory,
+      costPrice: p.cost_price,
+      status: p.status,
+      stockStatus: this.getStockStatus(p.inventory, p.low_stock_threshold),
+      stockValue: p.inventory * (p.cost_price || 0),
+    }));
   }
 
   /**

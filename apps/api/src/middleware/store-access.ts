@@ -56,7 +56,7 @@ export async function requireStoreAccess(
       });
 
       // Attach store to request for downstream use
-      (req as any).store = store;
+      req.store = store;
       return next();
     }
 
@@ -80,7 +80,7 @@ export async function requireStoreAccess(
       }
 
       // Attach store to request for downstream use
-      (req as any).store = store;
+      req.store = store;
       return next();
     }
 
@@ -121,7 +121,7 @@ export async function requireActiveStore(
   next: NextFunction
 ): Promise<void> {
   try {
-    const store = (req as any).store;
+    const store = req.store;
 
     if (!store) {
       // If store not attached, fetch it

@@ -1,533 +1,137 @@
-'use client';
+import type { Metadata } from 'next';
+import { getStore } from '../../../lib/store-resolver';
+import { API_URL } from '../../../lib/api';
+import ProductDetailClient from './ProductDetailClient';
 
-import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
-import Link from 'next/link';
-import { Button, Badge, useToast } from '@force/ui';
-import { api, type Product } from '@/lib/api';
-import { useCart } from '../../../contexts/CartContext';
-import { useStore, useStoreUrl } from '../../../contexts/StoreContext';
-import { Header, Footer } from '../../../components';
-import { useLanguage, translations } from '../../../contexts/LanguageContext';
-import { trackViewContent, trackAddToCart } from '../../../components/MarketingPixels';
-import {
-  VariantSelector,
-  type ProductVariant,
-  type ProductOption,
-} from '../../../components/VariantSelector';
-import ReviewSection from '../../../components/ReviewSection';
+/**
+ * Server-side metadata for product pages.
+ * Fetches product data to populate title, description, and og:image
+ * so that search engines and social previews get the correct content
+ * without waiting for client-side hydration.
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const store = await getStore();
 
-function formatPrice(fils: number) {
-  return new Intl.NumberFormat('en-KW', {
-    style: 'currency',
-    currency: 'KWD',
-  }).format(fils / 1000);
+  // Fetch product data server-side for meta tags
+  try {
+    const storeId = store.id !== 'demo' ? store.id : null;
+    if (!storeId) {
+      return { title: 'Product' };
+    }
+
+    const response = await fetch(
+      `${API_URL}/stores/${storeId}/products/${encodeURIComponent(slug)}`,
+      { next: { revalidate: 60 } }
+    );
+
+    if (!response.ok) {
+      // Fall back to public endpoint
+      const publicResponse = await fetch(`${API_URL}/public/products/${encodeURIComponent(slug)}`, {
+        next: { revalidate: 60 },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(store.domain ? { 'x-store-domain': store.domain } : {}),
+        },
+      });
+
+      if (!publicResponse.ok) {
+        return { title: 'Product Not Found' };
+      }
+
+      const publicData = await publicResponse.json();
+      const product = publicData?.data?.product;
+      if (!product) {
+        return { title: 'Product Not Found' };
+      }
+
+      return buildProductMetadata(product, store.name);
+    }
+
+    const data = await response.json();
+    const product = data?.data?.product;
+    if (!product) {
+      return { title: 'Product Not Found' };
+    }
+
+    return buildProductMetadata(product, store.name);
+  } catch {
+    // On any fetch error, return minimal metadata
+    return { title: 'Product' };
+  }
 }
 
-function ProductSkeleton() {
-  return (
-    <div className="grid gap-8 lg:grid-cols-2 animate-pulse">
-      <div className="space-y-4">
-        <div className="aspect-square rounded-2xl bg-muted" />
-        <div className="grid grid-cols-3 gap-4">
-          {[0, 1, 2].map(i => (
-            <div key={i} className="aspect-square rounded-lg bg-muted" />
-          ))}
-        </div>
-      </div>
-      <div className="space-y-4">
-        <div className="h-6 w-24 rounded bg-muted" />
-        <div className="h-8 w-3/4 rounded bg-muted" />
-        <div className="h-10 w-40 rounded bg-muted" />
-        <div className="h-20 w-full rounded bg-muted" />
-        <div className="h-12 w-full rounded bg-muted" />
-      </div>
-    </div>
-  );
+interface ProductData {
+  name: string;
+  description?: string;
+  price: number;
+  images?: Array<{ url: string; alt?: string }>;
+  categories?: Array<{ category?: { name?: string } }>;
 }
 
-export default function ProductDetailPage() {
-  const params = useParams();
-  const slug = params?.slug as string;
+function buildProductMetadata(product: ProductData, storeName: string): Metadata {
+  const title = product.name;
+  const description =
+    product.description?.slice(0, 160) ||
+    `Buy ${product.name} at ${storeName}. Fast delivery in Kuwait.`;
+  const ogImage = product.images?.[0]?.url;
+  const category = product.categories?.[0]?.category?.name;
 
-  const [product, setProduct] = useState<Product | null>(null);
-  const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [quantity, setQuantity] = useState(1);
-  const [selectedImage, setSelectedImage] = useState(0);
-  const [isAdding, setIsAdding] = useState(false);
-  const [isWishlisted, setIsWishlisted] = useState(false);
-  const [isTogglingWishlist, setIsTogglingWishlist] = useState(false);
-  // Selected variant from VariantSelector (null = no variant chosen or invalid combo)
-  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
-  const { success: toastSuccess } = useToast();
-  const { addItem } = useCart();
-  const { store } = useStore();
-  const storeUrl = useStoreUrl();
-  const { language, t } = useLanguage();
-
-  useEffect(() => {
-    if (!slug) return;
-
-    async function fetchProduct() {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const response = await api.getProduct(slug);
-        if (response.success && response.data) {
-          const loadedProduct = response.data.product;
-          setProduct(loadedProduct);
-
-          // Fire ViewContent pixel event when product data is ready
-          trackViewContent({
-            contentId: loadedProduct.id,
-            contentName: loadedProduct.name,
-            contentCategory: loadedProduct.categories?.[0]?.name,
-            value: loadedProduct.price / 1000,
-            currency: 'KWD',
-          });
-
-          // Fetch related products from the same category
-          const categories = response.data.product.categories;
-          if (categories && categories.length > 0) {
-            const cat0 = categories[0] as unknown as Record<string, unknown>;
-            const catId = cat0.category
-              ? (cat0.category as { id: string }).id
-              : (cat0 as { id: string }).id;
-            if (catId) {
-              const relResponse = await api.getProducts({ category: catId, limit: '3' });
-              if (relResponse.success && relResponse.data) {
-                setRelatedProducts(
-                  relResponse.data.products
-                    .filter((p: Product) => p.id !== response.data!.product.id)
-                    .slice(0, 3)
-                );
-              }
-            }
-          }
-        } else {
-          setError(response.error?.message || 'Product not found');
-        }
-      } catch {
-        setError('Unable to load product. Please check your connection.');
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    fetchProduct();
-  }, [slug]);
-
-  const handleToggleWishlist = async () => {
-    if (!product) return;
-    const token = localStorage.getItem('accessToken');
-    if (!token) {
-      toastSuccess('Sign in required', 'Please sign in to add items to your wishlist');
-      return;
-    }
-    setIsTogglingWishlist(true);
-    try {
-      if (isWishlisted) {
-        await api.delete(`/wishlist/${product.id}`);
-        setIsWishlisted(false);
-        toastSuccess('Removed from wishlist', `${product.name} removed from your wishlist`);
-      } else {
-        await api.post('/wishlist', { productId: product.id });
-        setIsWishlisted(true);
-        toastSuccess('Added to wishlist', `${product.name} added to your wishlist`);
-      }
-    } catch {
-      toastSuccess('Error', 'Failed to update wishlist. Please try again.');
-    } finally {
-      setIsTogglingWishlist(false);
-    }
+  return {
+    title,
+    description,
+    openGraph: {
+      title: `${title} | ${storeName}`,
+      description,
+      type: 'website',
+      ...(ogImage ? { images: [{ url: ogImage, alt: product.name }] } : {}),
+    },
+    other: {
+      ...(category ? { 'product:category': category } : {}),
+      'product:price:amount': String(product.price / 1000),
+      'product:price:currency': 'KWD',
+    },
   };
+}
 
-  const handleAddToCart = async () => {
-    if (!product) return;
+async function fetchInitialProduct(slug: string, store: { id: string; domain?: string }) {
+  try {
+    const storeId = store.id !== 'demo' ? store.id : null;
+    if (!storeId) return null;
 
-    // If this product has variants and no variant is selected yet, prompt the user
-    const productVariants = (product as unknown as { variants?: ProductVariant[] }).variants ?? [];
-    if (productVariants.length > 0 && !selectedVariant) {
-      toastSuccess('Select options', 'Please select all options before adding to cart');
-      return;
+    const response = await fetch(
+      `${API_URL}/stores/${storeId}/products/${encodeURIComponent(slug)}`,
+      { next: { revalidate: 60 } }
+    );
+
+    if (!response.ok) {
+      const publicResponse = await fetch(`${API_URL}/public/products/${encodeURIComponent(slug)}`, {
+        next: { revalidate: 60 },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(store.domain ? { 'x-store-domain': store.domain } : {}),
+        },
+      });
+      if (!publicResponse.ok) return null;
+      const publicData = await publicResponse.json();
+      return publicData?.data?.product ?? null;
     }
 
-    setIsAdding(true);
-    await new Promise(resolve => setTimeout(resolve, 300));
-    addItem(
-      {
-        id: product.id,
-        name: product.name,
-        // Use variant price when a variant is selected
-        price: selectedVariant ? selectedVariant.price : product.price,
-        slug: product.slug,
-        image: product.images?.[0]?.url,
-        category: product.categories?.[0]?.name,
-        // Pass the variantId so the backend can track the correct SKU
-        variantId: selectedVariant?.id,
-      },
-      quantity
-    );
-    // Fire AddToCart pixel event
-    trackAddToCart({
-      contentId: product.id,
-      contentName: product.name,
-      quantity,
-      value: (selectedVariant ? selectedVariant.price : product.price) / 1000,
-      currency: 'KWD',
-    });
-
-    setIsAdding(false);
-    toastSuccess('Added to cart!', `${quantity}x ${product.name} added to your cart`);
-  };
-
-  if (isLoading) {
-    return (
-      <main className="min-h-screen bg-background flex flex-col">
-        <Header />
-        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 flex-1">
-          <ProductSkeleton />
-        </div>
-        <Footer />
-      </main>
-    );
+    const data = await response.json();
+    return data?.data?.product ?? null;
+  } catch {
+    return null;
   }
+}
 
-  if (error || !product) {
-    return (
-      <main className="min-h-screen bg-background flex flex-col">
-        <Header />
-        <div className="mx-auto max-w-7xl px-4 py-16 text-center flex-1">
-          <h1 className="text-2xl font-bold text-foreground">
-            {error || t('Product not found', 'المنتج غير موجود')}
-          </h1>
-          <p className="mt-2 text-muted-foreground">
-            {t(
-              "The product you're looking for may have been removed or doesn't exist.",
-              'المنتج الذي تبحث عنه ربما تم إزالته أو غير موجود.'
-            )}
-          </p>
-          <Link href={storeUrl('/products')}>
-            <Button className="mt-6">{t('Browse Products', 'تصفح المنتجات')}</Button>
-          </Link>
-        </div>
-        <Footer />
-      </main>
-    );
-  }
+export default async function ProductDetailPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const store = await getStore();
+  const initialProduct = await fetchInitialProduct(slug, store);
 
-  const images = product.images || [];
-  const cat0Raw = product.categories?.[0] as unknown as Record<string, unknown> | undefined;
-  const categoryNameEn = cat0Raw
-    ? cat0Raw.category
-      ? (cat0Raw.category as { name: string }).name
-      : (cat0Raw as unknown as { name: string }).name
-    : undefined;
-  const categoryNameAr = cat0Raw
-    ? cat0Raw.category
-      ? (cat0Raw.category as { nameAr?: string }).nameAr
-      : (cat0Raw as unknown as { nameAr?: string }).nameAr
-    : undefined;
-  const categoryName = language === 'ar' && categoryNameAr ? categoryNameAr : categoryNameEn;
-
-  return (
-    <main className="min-h-screen bg-background flex flex-col">
-      <Header />
-
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 flex-1">
-        {/* Breadcrumb */}
-        <nav className="mb-8 flex items-center gap-2 text-sm text-muted-foreground">
-          <Link href={storeUrl('/')} className="hover:text-primary">
-            {t('Home', translations['Home'])}
-          </Link>
-          <span>/</span>
-          <Link href={storeUrl('/products')} className="hover:text-primary flex items-center gap-1">
-            <svg
-              className={`h-3.5 w-3.5 ${language === 'ar' ? 'rotate-180' : ''}`}
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 19l-7-7 7-7"
-              />
-            </svg>
-            {t('Products', translations['Products'])}
-          </Link>
-          <span>/</span>
-          <span className="text-foreground">{product.name}</span>
-        </nav>
-
-        {/* Product Details */}
-        <div className="grid gap-8 lg:grid-cols-2">
-          {/* Images */}
-          <div className="space-y-4">
-            <div className="aspect-square overflow-hidden rounded-2xl bg-gradient-to-br from-primary/5 to-primary/10">
-              {images[selectedImage]?.url ? (
-                <img
-                  src={images[selectedImage].url}
-                  alt={images[selectedImage].alt || product.name}
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <div className="flex h-full items-center justify-center">
-                  <div className="mx-auto flex h-40 w-40 items-center justify-center rounded-full bg-primary/20">
-                    <svg
-                      className="h-20 w-20 text-primary"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={1.5}
-                        d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                      />
-                    </svg>
-                  </div>
-                </div>
-              )}
-            </div>
-            {images.length > 1 && (
-              <div className="grid grid-cols-4 gap-4">
-                {images.map((img, index) => (
-                  <button
-                    key={img.id || index}
-                    onClick={() => setSelectedImage(index)}
-                    className={`aspect-square overflow-hidden rounded-lg transition ${
-                      selectedImage === index
-                        ? 'ring-2 ring-primary'
-                        : 'hover:ring-2 hover:ring-border'
-                    }`}
-                  >
-                    <img
-                      src={img.url}
-                      alt={img.alt || `${product.name} ${index + 1}`}
-                      className="h-full w-full object-cover"
-                    />
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Product Info */}
-          <div>
-            <div className="mb-4 flex items-center gap-2">
-              {categoryName && <Badge variant="secondary">{categoryName}</Badge>}
-              {product.compareAtPrice && product.compareAtPrice > product.price && (
-                <Badge variant="destructive">
-                  {Math.round((1 - product.price / product.compareAtPrice) * 100)}% OFF
-                </Badge>
-              )}
-              {product.status === 'draft' && <Badge variant="outline">Draft</Badge>}
-            </div>
-
-            <h1 className="text-3xl font-bold text-foreground">{product.name}</h1>
-
-            {/* Price — shows variant price when a variant is selected */}
-            {(() => {
-              const displayPrice = selectedVariant ? selectedVariant.price : product.price;
-              const displayCompare = selectedVariant
-                ? selectedVariant.compareAtPrice
-                : product.compareAtPrice;
-              return (
-                <div className="mt-4 flex items-baseline gap-3">
-                  <span className="text-3xl font-bold text-primary">
-                    {formatPrice(displayPrice)}
-                  </span>
-                  {displayCompare && displayCompare > displayPrice && (
-                    <span className="text-xl text-muted-foreground line-through">
-                      {formatPrice(displayCompare)}
-                    </span>
-                  )}
-                </div>
-              );
-            })()}
-
-            {product.description && (
-              <p className="mt-6 text-muted-foreground leading-relaxed">{product.description}</p>
-            )}
-
-            {/* Variant Selector — rendered when the API returns variants and options */}
-            {(() => {
-              const productVariants =
-                (product as unknown as { variants?: ProductVariant[] }).variants ?? [];
-              const productOptions =
-                (product as unknown as { options?: ProductOption[] }).options ?? [];
-              if (productVariants.length === 0 || productOptions.length === 0) return null;
-              return (
-                <VariantSelector
-                  variants={productVariants}
-                  options={productOptions}
-                  onVariantSelect={setSelectedVariant}
-                />
-              );
-            })()}
-
-            {/* Quantity & Add to Cart */}
-            <div className="mt-8 space-y-4">
-              {(() => {
-                // Use variant inventory when a variant is selected; fall back to product-level
-                const effectiveInventory = selectedVariant
-                  ? selectedVariant.inventory
-                  : product.inventory;
-                return (
-                  <div className="flex items-center gap-4">
-                    <span className="text-sm font-medium text-foreground">
-                      {t('Quantity', 'الكمية')}:
-                    </span>
-                    <div className="flex items-center rounded-lg border border-border">
-                      <button
-                        onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                        className="px-4 py-2 text-muted-foreground hover:bg-muted"
-                      >
-                        -
-                      </button>
-                      <span className="w-12 text-center font-medium">{quantity}</span>
-                      <button
-                        onClick={() => setQuantity(quantity + 1)}
-                        className="px-4 py-2 text-muted-foreground hover:bg-muted"
-                      >
-                        +
-                      </button>
-                    </div>
-                    {effectiveInventory !== undefined && effectiveInventory !== null && (
-                      <span className="text-sm text-muted-foreground">
-                        {effectiveInventory > 0
-                          ? `${effectiveInventory} ${t('in stock', 'متوفر')}`
-                          : t('Out of Stock', 'غير متوفر')}
-                      </span>
-                    )}
-                  </div>
-                );
-              })()}
-
-              <div className="flex gap-4">
-                {(() => {
-                  const productVariants =
-                    (product as unknown as { variants?: ProductVariant[] }).variants ?? [];
-                  const effectiveInventory = selectedVariant
-                    ? selectedVariant.inventory
-                    : product.inventory;
-                  // Disable "Add to Cart" if the product requires a variant but none is selected
-                  const variantRequired = productVariants.length > 0 && !selectedVariant;
-                  const outOfStock = effectiveInventory === 0;
-                  return (
-                    <Button
-                      size="lg"
-                      className="flex-1"
-                      onClick={handleAddToCart}
-                      isLoading={isAdding}
-                      disabled={outOfStock || variantRequired}
-                    >
-                      {outOfStock
-                        ? t('Out of Stock', 'غير متوفر')
-                        : variantRequired
-                          ? t('Select Options', 'اختر الخيارات')
-                          : t('Add to Cart', translations['Add to Cart'])}
-                    </Button>
-                  );
-                })()}
-
-                <Button
-                  size="lg"
-                  variant="outline"
-                  onClick={handleToggleWishlist}
-                  disabled={isTogglingWishlist}
-                  aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
-                >
-                  <svg
-                    className="h-5 w-5"
-                    fill={isWishlisted ? 'currentColor' : 'none'}
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-                    />
-                  </svg>
-                </Button>
-              </div>
-            </div>
-
-            {/* SKU */}
-            {product.sku && (
-              <div className="mt-6 border-t border-border pt-6">
-                <p className="text-sm text-muted-foreground">SKU: {product.sku}</p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Product Reviews */}
-        {product && store.id && store.id !== 'demo' && (
-          <ReviewSection storeId={store.id} productId={product.id} />
-        )}
-
-        {/* Related Products */}
-        {relatedProducts.length > 0 && (
-          <div className="mt-16">
-            <h2 className="text-2xl font-bold text-foreground">
-              {t('Related Products', 'منتجات ذات صلة')}
-            </h2>
-            <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-3">
-              {relatedProducts.map(item => (
-                <Link
-                  key={item.id}
-                  href={storeUrl(`/products/${item.slug}`)}
-                  className="group rounded-xl border border-border bg-card p-4 shadow-sm transition hover:shadow-lg"
-                >
-                  <div className="aspect-square overflow-hidden rounded-lg bg-gradient-to-br from-primary/5 to-primary/10">
-                    {item.images?.[0]?.url ? (
-                      <img
-                        src={item.images[0].url}
-                        alt={item.name}
-                        className="h-full w-full object-cover group-hover:scale-105 transition-transform"
-                      />
-                    ) : (
-                      <div className="flex h-full items-center justify-center">
-                        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/20">
-                          <svg
-                            className="h-8 w-8 text-primary"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={1.5}
-                              d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                            />
-                          </svg>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  <div className="mt-4">
-                    <h3 className="mt-1 font-medium text-foreground group-hover:text-primary">
-                      {item.name}
-                    </h3>
-                    <p className="mt-2 font-bold text-primary">{formatPrice(item.price)}</p>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
-      <Footer />
-    </main>
-  );
+  return <ProductDetailClient initialProduct={initialProduct} />;
 }

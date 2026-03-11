@@ -4,7 +4,7 @@ import { useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button, Input, Label } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
-import { getApiUrl } from '../../../../lib/api';
+import { apiPost, getApiUrl } from '../../../../lib/api';
 
 interface ImportResult {
   total: number;
@@ -35,9 +35,8 @@ export default function BulkOperationsPage() {
 
   async function handleDownloadTemplate() {
     try {
-      const token = localStorage.getItem('authToken');
       const response = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/bulk/template`, {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
       });
 
       if (response.ok) {
@@ -75,30 +74,20 @@ export default function BulkOperationsPage() {
     setImportResult(null);
 
     try {
-      const token = localStorage.getItem('authToken');
-      const response = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/bulk/import`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          csvData: csvContent,
-          options: { updateExisting },
-        }),
-      });
+      const { data, error } = await apiPost<{ result: ImportResult }>(
+        `/api/v1/stores/${storeId}/bulk/import`,
+        { csvData: csvContent, options: { updateExisting } }
+      );
 
-      if (response.ok) {
-        const data = await response.json();
-        setImportResult(data.data.result);
+      if (data) {
+        setImportResult(data.result);
       } else {
-        const error = await response.json();
         setImportResult({
           total: 0,
           created: 0,
           updated: 0,
           failed: 1,
-          errors: [{ row: 0, error: error.error?.message || 'Import failed' }],
+          errors: [{ row: 0, error: error?.message || 'Import failed' }],
         });
       }
     } catch (error) {
@@ -118,7 +107,6 @@ export default function BulkOperationsPage() {
     setIsExporting(true);
 
     try {
-      const token = localStorage.getItem('authToken');
       const queryParams = new URLSearchParams();
       if (exportFilters.status) queryParams.append('status', exportFilters.status);
       if (exportFilters.search) queryParams.append('search', exportFilters.search);
@@ -126,7 +114,7 @@ export default function BulkOperationsPage() {
 
       const response = await fetch(
         `${getApiUrl()}/api/v1/stores/${storeId}/bulk/export?${queryParams}`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { credentials: 'include' }
       );
 
       if (response.ok) {
@@ -181,7 +169,7 @@ export default function BulkOperationsPage() {
             className={`pb-3 text-sm font-medium transition ${
               activeTab === 'import'
                 ? 'border-b-2 border-primary text-primary'
-                : 'text-gray-500 hover:text-gray-700'
+                : 'text-muted-foreground hover:text-gray-700'
             }`}
           >
             <svg
@@ -204,7 +192,7 @@ export default function BulkOperationsPage() {
             className={`pb-3 text-sm font-medium transition ${
               activeTab === 'export'
                 ? 'border-b-2 border-primary text-primary'
-                : 'text-gray-500 hover:text-gray-700'
+                : 'text-muted-foreground hover:text-gray-700'
             }`}
           >
             <svg
@@ -254,8 +242,8 @@ export default function BulkOperationsPage() {
           </div>
 
           {/* File Upload */}
-          <div className="rounded-xl border bg-white p-6 shadow-sm">
-            <h3 className="font-semibold text-gray-900 mb-4">Upload CSV File</h3>
+          <div className="rounded-xl border bg-card p-6 shadow-sm">
+            <h3 className="font-semibold text-foreground mb-4">Upload CSV File</h3>
 
             <div className="space-y-4">
               <div
@@ -282,7 +270,7 @@ export default function BulkOperationsPage() {
                     d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
                   />
                 </svg>
-                <p className="mt-2 text-sm text-gray-600">
+                <p className="mt-2 text-sm text-muted-foreground">
                   {csvContent ? 'File loaded. Click to change.' : 'Click to upload CSV file'}
                 </p>
                 {csvContent && (
@@ -300,7 +288,7 @@ export default function BulkOperationsPage() {
                   id="updateExisting"
                   checked={updateExisting}
                   onChange={e => setUpdateExisting(e.target.checked)}
-                  className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                  className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
                 />
                 <Label htmlFor="updateExisting" className="text-sm font-normal">
                   Update existing products (match by SKU or slug)
@@ -363,25 +351,25 @@ export default function BulkOperationsPage() {
 
           {/* Import Results */}
           {importResult && (
-            <div className="rounded-xl border bg-white p-6 shadow-sm">
-              <h3 className="font-semibold text-gray-900 mb-4">Import Results</h3>
+            <div className="rounded-xl border bg-card p-6 shadow-sm">
+              <h3 className="font-semibold text-foreground mb-4">Import Results</h3>
 
               <div className="grid gap-4 sm:grid-cols-4 mb-4">
-                <div className="text-center p-4 bg-gray-50 rounded-lg">
-                  <p className="text-2xl font-bold text-gray-900">{importResult.total}</p>
-                  <p className="text-xs text-gray-500">Total Rows</p>
+                <div className="text-center p-4 bg-muted rounded-lg">
+                  <p className="text-2xl font-bold text-foreground">{importResult.total}</p>
+                  <p className="text-xs text-muted-foreground">Total Rows</p>
                 </div>
                 <div className="text-center p-4 bg-green-50 rounded-lg">
                   <p className="text-2xl font-bold text-green-600">{importResult.created}</p>
-                  <p className="text-xs text-gray-500">Created</p>
+                  <p className="text-xs text-muted-foreground">Created</p>
                 </div>
                 <div className="text-center p-4 bg-blue-50 rounded-lg">
                   <p className="text-2xl font-bold text-blue-600">{importResult.updated}</p>
-                  <p className="text-xs text-gray-500">Updated</p>
+                  <p className="text-xs text-muted-foreground">Updated</p>
                 </div>
                 <div className="text-center p-4 bg-red-50 rounded-lg">
                   <p className="text-2xl font-bold text-red-600">{importResult.failed}</p>
-                  <p className="text-xs text-gray-500">Failed</p>
+                  <p className="text-xs text-muted-foreground">Failed</p>
                 </div>
               </div>
 
@@ -424,8 +412,8 @@ export default function BulkOperationsPage() {
       {activeTab === 'export' && (
         <div className="space-y-6">
           {/* Export Options */}
-          <div className="rounded-xl border bg-white p-6 shadow-sm">
-            <h3 className="font-semibold text-gray-900 mb-4">Export Options</h3>
+          <div className="rounded-xl border bg-card p-6 shadow-sm">
+            <h3 className="font-semibold text-foreground mb-4">Export Options</h3>
 
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <div>
@@ -463,7 +451,7 @@ export default function BulkOperationsPage() {
                     onChange={e =>
                       setExportFilters(prev => ({ ...prev, includeDeleted: e.target.checked }))
                     }
-                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
                   />
                   <Label htmlFor="includeDeleted" className="text-sm font-normal">
                     Include deleted products
@@ -516,9 +504,9 @@ export default function BulkOperationsPage() {
           </div>
 
           {/* Export Info */}
-          <div className="rounded-xl border bg-gray-50 p-6">
-            <h3 className="font-semibold text-gray-900">Export Information</h3>
-            <ul className="mt-3 space-y-2 text-sm text-gray-600">
+          <div className="rounded-xl border bg-muted p-6">
+            <h3 className="font-semibold text-foreground">Export Information</h3>
+            <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
               <li className="flex items-start gap-2">
                 <svg
                   className="h-5 w-5 text-green-500 flex-shrink-0"

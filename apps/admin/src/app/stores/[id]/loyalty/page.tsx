@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
+import { useToast } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
-import { getApiUrl } from '../../../../lib/api';
+import { apiGet, apiPut, apiPost } from '../../../../lib/api';
 
 interface LoyaltySettings {
   pointsPerDinar: number;
@@ -89,68 +90,42 @@ export default function LoyaltySettingsPage() {
   const [selectedMember, setSelectedMember] = useState<LoyaltyMember | null>(null);
   const [awardPoints, setAwardPoints] = useState('');
   const [awardReason, setAwardReason] = useState('');
+  const [showDisableConfirm, setShowDisableConfirm] = useState(false);
+  const { success: toastSuccess, error: showError } = useToast();
 
   const fetchStoreName = useCallback(async () => {
-    try {
-      const token = localStorage.getItem('authToken');
-      const res = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setStoreName(data.data?.store?.name || '');
-      }
-    } catch (err) {
-      console.error('Failed to fetch store name:', err);
+    const { data } = await apiGet<{ store: { name: string } }>(`/api/v1/stores/${storeId}`);
+    if (data) {
+      setStoreName(data.store?.name || '');
     }
   }, [storeId]);
 
   const fetchSettings = useCallback(async () => {
-    try {
-      const token = localStorage.getItem('authToken');
-      const res = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/loyalty/settings`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setLoyaltyEnabled(data.data?.loyaltyEnabled || false);
-        setSettings({ ...DEFAULT_SETTINGS, ...(data.data?.settings || {}) });
-      }
-    } catch (err) {
-      console.error('Failed to fetch loyalty settings:', err);
+    const { data } = await apiGet<{ loyaltyEnabled: boolean; settings: LoyaltySettings }>(
+      `/api/v1/stores/${storeId}/loyalty/settings`
+    );
+    if (data) {
+      setLoyaltyEnabled(data.loyaltyEnabled || false);
+      setSettings({ ...DEFAULT_SETTINGS, ...(data.settings || {}) });
     }
   }, [storeId]);
 
   const fetchStats = useCallback(async () => {
-    try {
-      const token = localStorage.getItem('authToken');
-      const res = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/loyalty/stats`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setStats(data.data?.stats || null);
-      }
-    } catch (err) {
-      console.error('Failed to fetch loyalty stats:', err);
+    const { data } = await apiGet<{ stats: Stats }>(`/api/v1/stores/${storeId}/loyalty/stats`);
+    if (data) {
+      setStats(data.stats || null);
     }
   }, [storeId]);
 
   const fetchMembers = useCallback(async () => {
-    try {
-      const token = localStorage.getItem('authToken');
-      const params = new URLSearchParams();
-      if (tierFilter !== 'all') params.set('tier', tierFilter);
+    const params = new URLSearchParams();
+    if (tierFilter !== 'all') params.set('tier', tierFilter);
 
-      const res = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/loyalty/members?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setMembers(data.data?.members || []);
-      }
-    } catch (err) {
-      console.error('Failed to fetch members:', err);
+    const { data } = await apiGet<{ members: LoyaltyMember[] }>(
+      `/api/v1/stores/${storeId}/loyalty/members?${params}`
+    );
+    if (data) {
+      setMembers(data.members || []);
     }
   }, [storeId, tierFilter]);
 
@@ -173,30 +148,28 @@ export default function LoyaltySettingsPage() {
   const handleToggleEnabled = async () => {
     // Confirm before disabling to prevent accidental deactivation
     if (loyaltyEnabled) {
-      const confirmed = window.confirm(
-        'Disable the loyalty program? Customers will no longer earn or redeem points until you re-enable it.'
-      );
-      if (!confirmed) return;
+      setShowDisableConfirm(true);
+      return;
     }
+    await performToggle();
+  };
+
+  const performToggle = async () => {
+    setShowDisableConfirm(false);
     setSaving(true);
     try {
-      const token = localStorage.getItem('authToken');
-      const res = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/loyalty/settings`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ loyaltyEnabled: !loyaltyEnabled }),
+      const { error } = await apiPut(`/api/v1/stores/${storeId}/loyalty/settings`, {
+        loyaltyEnabled: !loyaltyEnabled,
       });
-      if (res.ok) {
+      if (!error) {
         setLoyaltyEnabled(!loyaltyEnabled);
+        toastSuccess('Updated', `Loyalty program ${loyaltyEnabled ? 'disabled' : 'enabled'}.`);
       } else {
-        alert('Failed to update loyalty program status. Please try again.');
+        showError('Error', 'Failed to update loyalty program status. Please try again.');
       }
     } catch (err) {
       console.error('Failed to toggle loyalty:', err);
-      alert('Failed to update loyalty program status. Please try again.');
+      showError('Error', 'Failed to update loyalty program status. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -205,21 +178,15 @@ export default function LoyaltySettingsPage() {
   const handleSaveSettings = async () => {
     setSaving(true);
     try {
-      const token = localStorage.getItem('authToken');
-      const res = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/loyalty/settings`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ settings }),
-      });
-      if (!res.ok) {
-        alert('Failed to save loyalty settings. Please try again.');
+      const { error } = await apiPut(`/api/v1/stores/${storeId}/loyalty/settings`, { settings });
+      if (!error) {
+        toastSuccess('Settings Saved', 'Loyalty settings have been updated.');
+      } else {
+        showError('Error', 'Failed to save loyalty settings. Please try again.');
       }
     } catch (err) {
       console.error('Failed to save settings:', err);
-      alert('Failed to save loyalty settings. Please try again.');
+      showError('Error', 'Failed to save loyalty settings. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -231,23 +198,19 @@ export default function LoyaltySettingsPage() {
 
     setSaving(true);
     try {
-      const token = localStorage.getItem('authToken');
-      const res = await fetch(
-        `${getApiUrl()}/api/v1/stores/${storeId}/loyalty/members/${selectedMember.customerId}/award`,
+      const { error } = await apiPost(
+        `/api/v1/stores/${storeId}/loyalty/members/${selectedMember.customerId}/award`,
         {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            points: parseInt(awardPoints),
-            type: 'earn_manual',
-            description: awardReason || 'Manual points adjustment',
-          }),
+          points: parseInt(awardPoints),
+          type: 'earn_manual',
+          description: awardReason || 'Manual points adjustment',
         }
       );
-      if (res.ok) {
+      if (!error) {
+        toastSuccess(
+          'Points Awarded',
+          `Points have been awarded to ${selectedMember.customer.firstName}.`
+        );
         setShowAwardModal(false);
         setSelectedMember(null);
         setAwardPoints('');
@@ -255,11 +218,11 @@ export default function LoyaltySettingsPage() {
         fetchMembers();
         fetchStats();
       } else {
-        alert('Failed to award points. Please try again.');
+        showError('Error', 'Failed to award points. Please try again.');
       }
     } catch (err) {
       console.error('Failed to award points:', err);
-      alert('Failed to award points. Please try again.');
+      showError('Error', 'Failed to award points. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -271,7 +234,7 @@ export default function LoyaltySettingsPage() {
       subtitle="Reward your customers with points and exclusive benefits"
       actions={
         <div className="flex items-center gap-3">
-          <span className="text-sm text-gray-600">Program Status:</span>
+          <span className="text-sm text-muted-foreground">Program Status:</span>
           <button
             onClick={handleToggleEnabled}
             disabled={saving}
@@ -295,30 +258,30 @@ export default function LoyaltySettingsPage() {
           {/* Stats Cards */}
           {loyaltyEnabled && stats && (
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-              <div className="bg-white rounded-xl border border-gray-200 p-4">
-                <p className="text-sm text-gray-500">Total Members</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.totalMembers}</p>
+              <div className="bg-card rounded-xl border border-border p-4">
+                <p className="text-sm text-muted-foreground">Total Members</p>
+                <p className="text-2xl font-bold text-foreground">{stats.totalMembers}</p>
               </div>
-              <div className="bg-white rounded-xl border border-gray-200 p-4">
-                <p className="text-sm text-gray-500">Points Issued</p>
+              <div className="bg-card rounded-xl border border-border p-4">
+                <p className="text-sm text-muted-foreground">Points Issued</p>
                 <p className="text-2xl font-bold text-green-600">
                   {stats.totalPointsIssued.toLocaleString()}
                 </p>
               </div>
-              <div className="bg-white rounded-xl border border-gray-200 p-4">
-                <p className="text-sm text-gray-500">Points Redeemed</p>
+              <div className="bg-card rounded-xl border border-border p-4">
+                <p className="text-sm text-muted-foreground">Points Redeemed</p>
                 <p className="text-2xl font-bold text-orange-600">
                   {stats.totalPointsRedeemed.toLocaleString()}
                 </p>
               </div>
-              <div className="bg-white rounded-xl border border-gray-200 p-4">
-                <p className="text-sm text-gray-500">Outstanding</p>
+              <div className="bg-card rounded-xl border border-border p-4">
+                <p className="text-sm text-muted-foreground">Outstanding</p>
                 <p className="text-2xl font-bold text-blue-600">
                   {stats.outstandingPoints.toLocaleString()}
                 </p>
               </div>
-              <div className="bg-white rounded-xl border border-gray-200 p-4">
-                <p className="text-sm text-gray-500 mb-2">Tier Breakdown</p>
+              <div className="bg-card rounded-xl border border-border p-4">
+                <p className="text-sm text-muted-foreground mb-2">Tier Breakdown</p>
                 <div className="flex gap-1">
                   {Object.entries(stats.tierBreakdown).map(([tier, count]) => (
                     <div
@@ -362,11 +325,11 @@ export default function LoyaltySettingsPage() {
           {activeTab === 'settings' && (
             <div className="space-y-6">
               {/* Earning Settings */}
-              <div className="bg-white rounded-xl border border-gray-200 p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Point Earning</h2>
+              <div className="bg-card rounded-xl border border-border p-6">
+                <h2 className="text-lg font-semibold text-foreground mb-4">Point Earning</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-muted-foreground mb-2">
                       Points per 1 KWD Spent
                     </label>
                     <input
@@ -376,12 +339,12 @@ export default function LoyaltySettingsPage() {
                       onChange={e =>
                         setSettings({ ...settings, pointsPerDinar: parseInt(e.target.value) || 1 })
                       }
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                       disabled={!loyaltyEnabled}
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-muted-foreground mb-2">
                       Signup Bonus
                     </label>
                     <input
@@ -391,12 +354,12 @@ export default function LoyaltySettingsPage() {
                       onChange={e =>
                         setSettings({ ...settings, signupBonus: parseInt(e.target.value) || 0 })
                       }
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                       disabled={!loyaltyEnabled}
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-muted-foreground mb-2">
                       Referral Bonus
                     </label>
                     <input
@@ -406,12 +369,12 @@ export default function LoyaltySettingsPage() {
                       onChange={e =>
                         setSettings({ ...settings, referralBonus: parseInt(e.target.value) || 0 })
                       }
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                       disabled={!loyaltyEnabled}
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-muted-foreground mb-2">
                       Review Bonus
                     </label>
                     <input
@@ -421,12 +384,12 @@ export default function LoyaltySettingsPage() {
                       onChange={e =>
                         setSettings({ ...settings, reviewBonus: parseInt(e.target.value) || 0 })
                       }
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                       disabled={!loyaltyEnabled}
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-muted-foreground mb-2">
                       Birthday Bonus
                     </label>
                     <input
@@ -436,7 +399,7 @@ export default function LoyaltySettingsPage() {
                       onChange={e =>
                         setSettings({ ...settings, birthdayBonus: parseInt(e.target.value) || 0 })
                       }
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                       disabled={!loyaltyEnabled}
                     />
                   </div>
@@ -444,8 +407,8 @@ export default function LoyaltySettingsPage() {
               </div>
 
               {/* Tier Settings */}
-              <div className="bg-white rounded-xl border border-gray-200 p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Membership Tiers</h2>
+              <div className="bg-card rounded-xl border border-border p-6">
+                <h2 className="text-lg font-semibold text-foreground mb-4">Membership Tiers</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   {(['bronze', 'silver', 'gold', 'platinum'] as const).map(tier => (
                     <div key={tier} className={`p-4 rounded-lg ${TIER_COLORS[tier].bg}`}>
@@ -457,7 +420,9 @@ export default function LoyaltySettingsPage() {
                       </div>
                       <div className="space-y-3">
                         <div>
-                          <label className="block text-xs text-gray-600 mb-1">Min Points</label>
+                          <label className="block text-xs text-muted-foreground mb-1">
+                            Min Points
+                          </label>
                           <input
                             type="number"
                             min="0"
@@ -474,12 +439,14 @@ export default function LoyaltySettingsPage() {
                                 },
                               })
                             }
-                            className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                            className="w-full px-3 py-1.5 border border-border rounded text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                             disabled={!loyaltyEnabled || tier === 'bronze'}
                           />
                         </div>
                         <div>
-                          <label className="block text-xs text-gray-600 mb-1">Multiplier</label>
+                          <label className="block text-xs text-muted-foreground mb-1">
+                            Multiplier
+                          </label>
                           <input
                             type="number"
                             step="0.05"
@@ -497,7 +464,7 @@ export default function LoyaltySettingsPage() {
                                 },
                               })
                             }
-                            className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                            className="w-full px-3 py-1.5 border border-border rounded text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                             disabled={!loyaltyEnabled}
                           />
                         </div>
@@ -508,11 +475,11 @@ export default function LoyaltySettingsPage() {
               </div>
 
               {/* Redemption Settings */}
-              <div className="bg-white rounded-xl border border-gray-200 p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Redemption</h2>
+              <div className="bg-card rounded-xl border border-border p-6">
+                <h2 className="text-lg font-semibold text-foreground mb-4">Redemption</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-muted-foreground mb-2">
                       Point Value (fils)
                     </label>
                     <input
@@ -522,15 +489,15 @@ export default function LoyaltySettingsPage() {
                       onChange={e =>
                         setSettings({ ...settings, pointsValue: parseInt(e.target.value) || 1 })
                       }
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                       disabled={!loyaltyEnabled}
                     />
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-muted-foreground mt-1">
                       1 point = {settings.pointsValue} fils
                     </p>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-muted-foreground mb-2">
                       Min Points to Redeem
                     </label>
                     <input
@@ -540,12 +507,12 @@ export default function LoyaltySettingsPage() {
                       onChange={e =>
                         setSettings({ ...settings, minRedeemPoints: parseInt(e.target.value) || 0 })
                       }
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                       disabled={!loyaltyEnabled}
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-muted-foreground mb-2">
                       Max % of Order
                     </label>
                     <input
@@ -559,12 +526,12 @@ export default function LoyaltySettingsPage() {
                           maxRedeemPercentage: parseInt(e.target.value) || 0,
                         })
                       }
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                       disabled={!loyaltyEnabled}
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-muted-foreground mb-2">
                       Expiration (months)
                     </label>
                     <input
@@ -577,10 +544,10 @@ export default function LoyaltySettingsPage() {
                           expirationMonths: parseInt(e.target.value) || 0,
                         })
                       }
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                       disabled={!loyaltyEnabled}
                     />
-                    <p className="text-xs text-gray-500 mt-1">0 = never expires</p>
+                    <p className="text-xs text-muted-foreground mt-1">0 = never expires</p>
                   </div>
                 </div>
               </div>
@@ -605,9 +572,9 @@ export default function LoyaltySettingsPage() {
 
           {/* Members Tab */}
           {activeTab === 'members' && loyaltyEnabled && (
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="bg-card rounded-xl border border-border overflow-hidden">
               {/* Tier Filter */}
-              <div className="flex gap-2 p-4 bg-gray-50 border-b border-gray-200">
+              <div className="flex gap-2 p-4 bg-muted border-b border-border">
                 {['all', 'bronze', 'silver', 'gold', 'platinum'].map(t => (
                   <button
                     key={t}
@@ -615,7 +582,7 @@ export default function LoyaltySettingsPage() {
                     className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors capitalize ${
                       tierFilter === t
                         ? 'bg-orange-500 text-white'
-                        : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                        : 'bg-card text-gray-700 hover:bg-gray-100 border border-border'
                     }`}
                   >
                     {t}
@@ -641,7 +608,7 @@ export default function LoyaltySettingsPage() {
                       />
                     </svg>
                   </div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No Members Yet</h3>
+                  <h3 className="text-lg font-semibold text-foreground mb-2">No Members Yet</h3>
                   <p className="text-gray-600">
                     Customers will appear here when they join your loyalty program
                   </p>
@@ -649,36 +616,38 @@ export default function LoyaltySettingsPage() {
               ) : (
                 <table className="w-full">
                   <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <tr className="bg-muted border-b border-border">
+                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Member
                       </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Tier
                       </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Points Balance
                       </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Total Earned
                       </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Total Redeemed
                       </th>
-                      <th className="text-right px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="text-right px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Actions
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200">
+                  <tbody className="divide-y divide-border">
                     {members.map(member => (
-                      <tr key={member.id} className="hover:bg-gray-50">
+                      <tr key={member.id} className="hover:bg-muted">
                         <td className="px-6 py-4">
                           <div>
-                            <div className="font-medium text-gray-900">
+                            <div className="font-medium text-foreground">
                               {member.customer.firstName} {member.customer.lastName}
                             </div>
-                            <div className="text-sm text-gray-500">{member.customer.email}</div>
+                            <div className="text-sm text-muted-foreground">
+                              {member.customer.email}
+                            </div>
                           </div>
                         </td>
                         <td className="px-6 py-4">
@@ -689,7 +658,7 @@ export default function LoyaltySettingsPage() {
                           </span>
                         </td>
                         <td className="px-6 py-4">
-                          <span className="font-medium text-gray-900">
+                          <span className="font-medium text-foreground">
                             {member.points.toLocaleString()}
                           </span>
                         </td>
@@ -720,12 +689,40 @@ export default function LoyaltySettingsPage() {
         </>
       )}
 
+      {/* Disable Confirmation Dialog */}
+      {showDisableConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-card rounded-xl shadow-xl w-full max-w-sm p-6">
+            <h2 className="text-lg font-semibold text-foreground mb-2">Disable Loyalty Program</h2>
+            <p className="text-sm text-muted-foreground mb-6">
+              Disable the loyalty program? Customers will no longer earn or redeem points until you
+              re-enable it.
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                onClick={() => setShowDisableConfirm(false)}
+                className="px-4 py-2 text-gray-700 border border-border rounded-lg hover:bg-muted"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={performToggle}
+                disabled={saving}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+              >
+                Disable
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Award Modal */}
       {showAwardModal && selectedMember && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-900">Award Points</h2>
+          <div className="bg-card rounded-xl shadow-xl w-full max-w-md">
+            <div className="flex items-center justify-between p-6 border-b border-border">
+              <h2 className="text-xl font-semibold text-foreground">Award Points</h2>
               <button
                 onClick={() => {
                   setShowAwardModal(false);
@@ -746,7 +743,7 @@ export default function LoyaltySettingsPage() {
 
             <form onSubmit={handleAwardPoints} className="p-6 space-y-4">
               <div>
-                <p className="text-sm text-gray-600 mb-4">
+                <p className="text-sm text-muted-foreground mb-4">
                   Award points to{' '}
                   <strong>
                     {selectedMember.customer.firstName} {selectedMember.customer.lastName}
@@ -755,7 +752,7 @@ export default function LoyaltySettingsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-muted-foreground mb-2">
                   Points <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -763,19 +760,21 @@ export default function LoyaltySettingsPage() {
                   value={awardPoints}
                   onChange={e => setAwardPoints(e.target.value)}
                   placeholder="Enter points (negative to deduct)"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Reason</label>
+                <label className="block text-sm font-medium text-muted-foreground mb-2">
+                  Reason
+                </label>
                 <input
                   type="text"
                   value={awardReason}
                   onChange={e => setAwardReason(e.target.value)}
                   placeholder="Optional reason for adjustment"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                 />
               </div>
 
@@ -786,7 +785,7 @@ export default function LoyaltySettingsPage() {
                     setShowAwardModal(false);
                     setSelectedMember(null);
                   }}
-                  className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  className="px-4 py-2 text-gray-700 border border-border rounded-lg hover:bg-muted"
                 >
                   Cancel
                 </button>

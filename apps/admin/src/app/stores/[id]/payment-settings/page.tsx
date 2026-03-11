@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AdminLayout } from '../../../../components/AdminLayout';
-import { getApiUrl } from '../../../../lib/api';
+import { apiGet, apiPost, apiPut } from '../../../../lib/api';
 
 interface StorePaymentConfig {
   id?: string;
@@ -16,8 +16,6 @@ interface StorePaymentConfig {
   merchantId: string | null;
   testMode: boolean;
 }
-
-const API_URL = getApiUrl();
 
 const PROVIDERS = [
   { id: 'tap', name: 'Tap Payments', nameAr: 'تاب للمدفوعات', color: '#00D4AA' },
@@ -59,29 +57,32 @@ export default function StorePaymentSettingsPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const token = localStorage.getItem('authToken');
-      const res = await fetch(`${API_URL}/api/v1/payment-settings/store/${storeId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const loaded: StorePaymentConfig[] =
-          data.data?.storeConfigs ||
-          data.data?.configs ||
-          (Array.isArray(data.data) ? data.data : []);
-        setConfigs(loaded);
+      const { data, error: apiError } = await apiGet<
+        | { storeConfigs?: StorePaymentConfig[]; configs?: StorePaymentConfig[] }
+        | StorePaymentConfig[]
+      >(`/api/v1/payment-settings/store/${storeId}`);
 
-        // Initialize form state from loaded configs
-        const initialForms: Record<string, StorePaymentConfig> = {};
-        PROVIDERS.forEach(p => {
-          const existing = loaded.find(c => c.provider === p.id);
-          initialForms[p.id] = existing ? { ...existing } : emptyConfig(p.id);
-        });
-        setForms(initialForms);
-      } else {
-        const errData = await res.json().catch(() => ({}));
-        setError(errData.error?.message || 'Failed to load payment settings');
+      if (apiError) {
+        setError(apiError.message || 'Failed to load payment settings');
+        return;
       }
+
+      const loaded: StorePaymentConfig[] = Array.isArray(data)
+        ? data
+        : (data as { storeConfigs?: StorePaymentConfig[]; configs?: StorePaymentConfig[] })
+            ?.storeConfigs ||
+          (data as { storeConfigs?: StorePaymentConfig[]; configs?: StorePaymentConfig[] })
+            ?.configs ||
+          [];
+      setConfigs(loaded);
+
+      // Initialize form state from loaded configs
+      const initialForms: Record<string, StorePaymentConfig> = {};
+      PROVIDERS.forEach(p => {
+        const existing = loaded.find(c => c.provider === p.id);
+        initialForms[p.id] = existing ? { ...existing } : emptyConfig(p.id);
+      });
+      setForms(initialForms);
     } catch {
       setError('Unable to connect to the server. Please check your connection and try again.');
     } finally {
@@ -130,34 +131,28 @@ export default function StorePaymentSettingsPage() {
     const isNew = !existingConfig?.id;
 
     try {
-      const token = localStorage.getItem('authToken');
-      const res = await fetch(`${API_URL}/api/v1/payment-settings/store/${storeId}`, {
-        method: isNew ? 'POST' : 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          ...formData,
-          // Omit empty strings — treat as null
-          apiKey: formData.apiKey || null,
-          secretKey: formData.secretKey || null,
-          webhookSecret: formData.webhookSecret || null,
-          merchantId: formData.merchantId || null,
-        }),
-      });
+      const body = {
+        ...formData,
+        // Omit empty strings — treat as null
+        apiKey: formData.apiKey || null,
+        secretKey: formData.secretKey || null,
+        webhookSecret: formData.webhookSecret || null,
+        merchantId: formData.merchantId || null,
+      };
 
-      if (res.ok) {
+      const apiCall = isNew ? apiPost : apiPut;
+      const { error: saveError } = await apiCall(`/api/v1/payment-settings/store/${storeId}`, body);
+
+      if (!saveError) {
         setSaveMessages(prev => ({
           ...prev,
           [provider]: { type: 'success', text: 'Saved successfully' },
         }));
         await fetchConfigs();
       } else {
-        const errData = await res.json().catch(() => ({}));
         setSaveMessages(prev => ({
           ...prev,
-          [provider]: { type: 'error', text: errData.error?.message || 'Failed to save' },
+          [provider]: { type: 'error', text: saveError.message || 'Failed to save' },
         }));
         // Revert optimistic toggle
         if (overrides?.isEnabled !== undefined) {

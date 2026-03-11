@@ -125,9 +125,12 @@ class EmailQueueService {
           '[EMAIL QUEUE] Email failed, retrying'
         );
 
-        setTimeout(async () => {
+        setTimeout(() => {
           if (redis.isAvailable()) {
-            await redis.getClient()?.lpush(QUEUE_KEY, JSON.stringify(email));
+            redis
+              .getClient()
+              ?.lpush(QUEUE_KEY, JSON.stringify(email))
+              .catch(() => {});
           }
         }, RETRY_DELAY_MS * email.attempts);
       } else {
@@ -177,7 +180,14 @@ class EmailQueueService {
     const client = redis.getClient();
     const emails = await client?.lrange(FAILED_KEY, 0, limit - 1);
 
-    return (emails || []).map((e: string) => JSON.parse(e));
+    return (emails || []).reduce<QueuedEmail[]>((acc, e) => {
+      try {
+        acc.push(JSON.parse(e));
+      } catch {
+        // Skip corrupted entries
+      }
+      return acc;
+    }, []);
   }
 
   /**

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import type { HeroProps } from '../types';
 
 export default function ClassicHero({
@@ -85,7 +86,7 @@ export default function ClassicHero({
           <div className={`relative ${isRtl ? 'lg:order-1' : 'lg:order-2'} hidden lg:block`}>
             <div className="absolute inset-0 m-8">
               {image ? (
-                <img src={image} alt={displayTitle} className="w-full h-full object-cover" />
+                <Image src={image} alt={displayTitle} fill className="object-cover" />
               ) : (
                 <div className="w-full h-full bg-gradient-to-br from-primary/5 to-background flex items-center justify-center">
                   <div className="text-center p-8">

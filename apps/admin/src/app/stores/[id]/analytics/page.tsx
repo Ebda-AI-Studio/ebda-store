@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { AdminLayout } from '../../../../components/AdminLayout';
-import { getApiUrl } from '../../../../lib/api';
+import { apiGet } from '../../../../lib/api';
 
 interface DashboardStats {
   totalRevenue: number;
@@ -95,7 +95,7 @@ function SimpleBarChart({
 
   return (
     <div className="space-y-2">
-      <div className="flex justify-between text-xs text-gray-500 mb-4">
+      <div className="flex justify-between text-xs text-muted-foreground mb-4">
         <span>{label}</span>
         <span>Max: {dataKey === 'revenue' ? formatCurrency(maxValue) : maxValue}</span>
       </div>
@@ -144,13 +144,13 @@ function StatCard({
         : formatNumber(value);
 
   return (
-    <div className="bg-white rounded-xl border p-6 shadow-sm">
+    <div className="bg-card rounded-xl border p-6 shadow-sm">
       <div className="flex items-center justify-between mb-4">
-        <span className="text-gray-500 text-sm font-medium">{title}</span>
+        <span className="text-muted-foreground text-sm font-medium">{title}</span>
         <div className="p-2 bg-orange-50 rounded-lg text-orange-600">{icon}</div>
       </div>
       <div className="flex items-end gap-2">
-        <span className="text-2xl font-bold text-gray-900">{displayValue}</span>
+        <span className="text-2xl font-bold text-foreground">{displayValue}</span>
         {change !== undefined && (
           <span
             className={`text-sm font-medium ${change >= 0 ? 'text-green-600' : 'text-red-600'}`}
@@ -180,41 +180,35 @@ export default function AnalyticsPage() {
     setIsLoading(true);
 
     try {
-      const token = localStorage.getItem('authToken');
-      const headers = { Authorization: `Bearer ${token}` };
-      const baseUrl = `${getApiUrl()}/api/v1/stores/${storeId}/analytics`;
+      const basePath = `/api/v1/stores/${storeId}/analytics`;
 
-      const [dashboardRes, salesRes, productsRes, ordersRes, stockRes] = await Promise.all([
-        fetch(`${baseUrl}/dashboard`, { headers }),
-        fetch(`${baseUrl}/sales?period=${period}`, { headers }),
-        fetch(`${baseUrl}/top-products?limit=5`, { headers }),
-        fetch(`${baseUrl}/recent-orders?limit=5`, { headers }),
-        fetch(`${baseUrl}/low-stock?threshold=10`, { headers }),
-      ]);
+      const [dashboardResult, salesResult, productsResult, ordersResult, stockResult] =
+        await Promise.all([
+          apiGet<{ stats: DashboardStats }>(`${basePath}/dashboard`),
+          apiGet<{ sales: SalesData[] }>(`${basePath}/sales?period=${period}`),
+          apiGet<{ products: TopProduct[] }>(`${basePath}/top-products?limit=5`),
+          apiGet<{ orders: RecentOrder[] }>(`${basePath}/recent-orders?limit=5`),
+          apiGet<{ products: LowStockProduct[] }>(`${basePath}/low-stock?threshold=10`),
+        ]);
 
-      if (dashboardRes.ok) {
-        const data = await dashboardRes.json();
-        setStats(data.data.stats);
+      if (dashboardResult.data) {
+        setStats(dashboardResult.data.stats);
       }
 
-      if (salesRes.ok) {
-        const data = await salesRes.json();
-        setSalesData(data.data.sales);
+      if (salesResult.data) {
+        setSalesData(salesResult.data.sales);
       }
 
-      if (productsRes.ok) {
-        const data = await productsRes.json();
-        setTopProducts(data.data.products);
+      if (productsResult.data) {
+        setTopProducts(productsResult.data.products);
       }
 
-      if (ordersRes.ok) {
-        const data = await ordersRes.json();
-        setRecentOrders(data.data.orders);
+      if (ordersResult.data) {
+        setRecentOrders(ordersResult.data.orders);
       }
 
-      if (stockRes.ok) {
-        const data = await stockRes.json();
-        setLowStockProducts(data.data.products);
+      if (stockResult.data) {
+        setLowStockProducts(stockResult.data.products);
       }
     } catch (error) {
       console.error('Failed to fetch analytics:', error);
@@ -248,7 +242,7 @@ export default function AnalyticsPage() {
             className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
               period === p
                 ? 'bg-orange-500 text-white'
-                : 'bg-white text-gray-600 border hover:bg-gray-50'
+                : 'bg-card text-muted-foreground border hover:bg-muted'
             }`}
           >
             {p === 'week' ? 'Last 7 Days' : p === 'month' ? 'This Month' : 'This Year'}
@@ -328,14 +322,16 @@ export default function AnalyticsPage() {
           </div>
 
           {/* Sales Chart */}
-          <div className="bg-white rounded-xl border p-6 shadow-sm mb-8">
+          <div className="bg-card rounded-xl border p-6 shadow-sm mb-8">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-semibold text-gray-900">Sales Overview</h2>
+              <h2 className="text-lg font-semibold text-foreground">Sales Overview</h2>
               <div className="flex gap-2">
                 <button
                   onClick={() => setChartType('revenue')}
                   className={`px-3 py-1 text-sm rounded ${
-                    chartType === 'revenue' ? 'bg-orange-100 text-orange-600' : 'text-gray-500'
+                    chartType === 'revenue'
+                      ? 'bg-orange-100 text-orange-600'
+                      : 'text-muted-foreground'
                   }`}
                 >
                   Revenue
@@ -343,7 +339,9 @@ export default function AnalyticsPage() {
                 <button
                   onClick={() => setChartType('orders')}
                   className={`px-3 py-1 text-sm rounded ${
-                    chartType === 'orders' ? 'bg-orange-100 text-orange-600' : 'text-gray-500'
+                    chartType === 'orders'
+                      ? 'bg-orange-100 text-orange-600'
+                      : 'text-muted-foreground'
                   }`}
                 >
                   Orders
@@ -360,10 +358,10 @@ export default function AnalyticsPage() {
           {/* Three Column Layout */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Top Products */}
-            <div className="bg-white rounded-xl border p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Top Products</h2>
+            <div className="bg-card rounded-xl border p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-foreground mb-4">Top Products</h2>
               {topProducts.length === 0 ? (
-                <p className="text-gray-500 text-sm">No sales data yet</p>
+                <p className="text-muted-foreground text-sm">No sales data yet</p>
               ) : (
                 <div className="space-y-4">
                   {topProducts.map((product, i) => (
@@ -393,10 +391,12 @@ export default function AnalyticsPage() {
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">{product.name}</p>
-                        <p className="text-xs text-gray-500">{product.quantity} sold</p>
+                        <p className="text-sm font-medium text-foreground truncate">
+                          {product.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">{product.quantity} sold</p>
                       </div>
-                      <span className="text-sm font-semibold text-gray-900">
+                      <span className="text-sm font-semibold text-foreground">
                         {formatCurrency(product.revenue)}
                       </span>
                     </div>
@@ -406,24 +406,24 @@ export default function AnalyticsPage() {
             </div>
 
             {/* Recent Orders */}
-            <div className="bg-white rounded-xl border p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Recent Orders</h2>
+            <div className="bg-card rounded-xl border p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-foreground mb-4">Recent Orders</h2>
               {recentOrders.length === 0 ? (
-                <p className="text-gray-500 text-sm">No orders yet</p>
+                <p className="text-muted-foreground text-sm">No orders yet</p>
               ) : (
                 <div className="space-y-4">
                   {recentOrders.map(order => (
                     <div key={order.id} className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium text-gray-900">
+                        <p className="text-sm font-medium text-foreground">
                           {order.customer
                             ? `${order.customer.firstName} ${order.customer.lastName}`
                             : 'Guest'}
                         </p>
-                        <p className="text-xs text-gray-500">#{order.orderNumber}</p>
+                        <p className="text-xs text-muted-foreground">#{order.orderNumber}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm font-semibold text-gray-900">
+                        <p className="text-sm font-semibold text-foreground">
                           {formatCurrency(order.total)}
                         </p>
                         <span
@@ -441,8 +441,8 @@ export default function AnalyticsPage() {
             </div>
 
             {/* Low Stock Alerts */}
-            <div className="bg-white rounded-xl border p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Low Stock Alerts</h2>
+            <div className="bg-card rounded-xl border p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-foreground mb-4">Low Stock Alerts</h2>
               {lowStockProducts.length === 0 ? (
                 <div className="text-center py-4">
                   <svg
@@ -458,7 +458,7 @@ export default function AnalyticsPage() {
                       d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
                     />
                   </svg>
-                  <p className="text-gray-500 text-sm">All products are well stocked</p>
+                  <p className="text-muted-foreground text-sm">All products are well stocked</p>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -488,8 +488,10 @@ export default function AnalyticsPage() {
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">{product.name}</p>
-                        <p className="text-xs text-gray-500">{product.sku}</p>
+                        <p className="text-sm font-medium text-foreground truncate">
+                          {product.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">{product.sku}</p>
                       </div>
                       <span
                         className={`px-2 py-1 text-xs font-semibold rounded ${

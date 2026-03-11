@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { AdminLayout } from '../../../../components/AdminLayout';
-import { getApiUrl } from '../../../../lib/api';
+import { apiGet, apiPost } from '../../../../lib/api';
 
 interface InventoryStats {
   totalProducts: number;
@@ -77,85 +77,51 @@ export default function InventoryPage() {
   const [saving, setSaving] = useState(false);
 
   const fetchStoreName = useCallback(async () => {
-    try {
-      const token = localStorage.getItem('authToken');
-      const res = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setStoreName(data.data?.store?.name || '');
-      }
-    } catch (err) {
-      console.error('Failed to fetch store name:', err);
+    const { data } = await apiGet<{ store: { name: string } }>(`/api/v1/stores/${storeId}`);
+    if (data) {
+      setStoreName(data.store?.name || '');
     }
   }, [storeId]);
 
   const fetchStats = useCallback(async () => {
-    try {
-      const token = localStorage.getItem('authToken');
-      const res = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/inventory/stats`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setStats(data.data?.stats || null);
-      }
-    } catch (err) {
-      console.error('Failed to fetch stats:', err);
+    const { data } = await apiGet<{ stats: InventoryStats }>(
+      `/api/v1/stores/${storeId}/inventory/stats`
+    );
+    if (data) {
+      setStats(data.stats || null);
     }
   }, [storeId]);
 
   const fetchProducts = useCallback(async () => {
-    try {
-      const token = localStorage.getItem('authToken');
-      const params = new URLSearchParams();
-      if (stockFilter !== 'all') params.set('stockFilter', stockFilter);
-      if (search) params.set('search', search);
-      params.set('sortBy', 'inventory');
-      params.set('sortOrder', 'asc');
+    const params = new URLSearchParams();
+    if (stockFilter !== 'all') params.set('stockFilter', stockFilter);
+    if (search) params.set('search', search);
+    params.set('sortBy', 'inventory');
+    params.set('sortOrder', 'asc');
 
-      const res = await fetch(
-        `${getApiUrl()}/api/v1/stores/${storeId}/inventory/products?${params}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      if (res.ok) {
-        const data = await res.json();
-        setProducts(data.data?.products || []);
-      }
-    } catch (err) {
-      console.error('Failed to fetch products:', err);
+    const { data } = await apiGet<{ products: ProductInventory[] }>(
+      `/api/v1/stores/${storeId}/inventory/products?${params}`
+    );
+    if (data) {
+      setProducts(data.products || []);
     }
   }, [storeId, stockFilter, search]);
 
   const fetchHistory = useCallback(async () => {
-    try {
-      const token = localStorage.getItem('authToken');
-      const res = await fetch(
-        `${getApiUrl()}/api/v1/stores/${storeId}/inventory/history?limit=50`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      if (res.ok) {
-        const data = await res.json();
-        setHistory(data.data?.history || []);
-      }
-    } catch (err) {
-      console.error('Failed to fetch history:', err);
+    const { data } = await apiGet<{ history: HistoryItem[] }>(
+      `/api/v1/stores/${storeId}/inventory/history?limit=50`
+    );
+    if (data) {
+      setHistory(data.history || []);
     }
   }, [storeId]);
 
   const fetchAlerts = useCallback(async () => {
-    try {
-      const token = localStorage.getItem('authToken');
-      const res = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/inventory/alerts`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setAlerts(data.data?.alerts || []);
-      }
-    } catch (err) {
-      console.error('Failed to fetch alerts:', err);
+    const { data } = await apiGet<{ alerts: ProductInventory[] }>(
+      `/api/v1/stores/${storeId}/inventory/alerts`
+    );
+    if (data) {
+      setAlerts(data.alerts || []);
     }
   }, [storeId]);
 
@@ -187,7 +153,6 @@ export default function InventoryPage() {
 
     setSaving(true);
     try {
-      const token = localStorage.getItem('authToken');
       let quantity = parseInt(adjustQuantity);
 
       // Make negative for remove types
@@ -195,21 +160,14 @@ export default function InventoryPage() {
         quantity = -Math.abs(quantity);
       }
 
-      const res = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/inventory/adjust`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          productId: selectedProduct.id,
-          quantity,
-          type: adjustType,
-          reason: adjustReason || undefined,
-        }),
+      const { error } = await apiPost(`/api/v1/stores/${storeId}/inventory/adjust`, {
+        productId: selectedProduct.id,
+        quantity,
+        type: adjustType,
+        reason: adjustReason || undefined,
       });
 
-      if (res.ok) {
+      if (!error) {
         setShowAdjustModal(false);
         setSelectedProduct(null);
         setAdjustQuantity('');
@@ -253,26 +211,26 @@ export default function InventoryPage() {
           {/* Stats Cards */}
           {stats && (
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-              <div className="bg-white rounded-xl border border-gray-200 p-4">
-                <p className="text-sm text-gray-500">Total Products</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.totalProducts}</p>
+              <div className="bg-card rounded-xl border border-border p-4">
+                <p className="text-sm text-muted-foreground">Total Products</p>
+                <p className="text-2xl font-bold text-foreground">{stats.totalProducts}</p>
               </div>
-              <div className="bg-white rounded-xl border border-gray-200 p-4">
-                <p className="text-sm text-gray-500">Total Stock</p>
+              <div className="bg-card rounded-xl border border-border p-4">
+                <p className="text-sm text-muted-foreground">Total Stock</p>
                 <p className="text-2xl font-bold text-blue-600">
                   {stats.totalStock.toLocaleString()}
                 </p>
               </div>
-              <div className="bg-white rounded-xl border border-gray-200 p-4">
-                <p className="text-sm text-gray-500">Low Stock</p>
+              <div className="bg-card rounded-xl border border-border p-4">
+                <p className="text-sm text-muted-foreground">Low Stock</p>
                 <p className="text-2xl font-bold text-yellow-600">{stats.lowStockCount}</p>
               </div>
-              <div className="bg-white rounded-xl border border-gray-200 p-4">
-                <p className="text-sm text-gray-500">Out of Stock</p>
+              <div className="bg-card rounded-xl border border-border p-4">
+                <p className="text-sm text-muted-foreground">Out of Stock</p>
                 <p className="text-2xl font-bold text-red-600">{stats.outOfStockCount}</p>
               </div>
-              <div className="bg-white rounded-xl border border-gray-200 p-4">
-                <p className="text-sm text-gray-500">Stock Value</p>
+              <div className="bg-card rounded-xl border border-border p-4">
+                <p className="text-sm text-muted-foreground">Stock Value</p>
                 <p className="text-2xl font-bold text-green-600">
                   {(stats.totalValue / 1000).toFixed(3)} KWD
                 </p>
@@ -359,16 +317,16 @@ export default function InventoryPage() {
 
           {/* Products Tab */}
           {activeTab === 'products' && (
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="bg-card rounded-xl border border-border overflow-hidden">
               {/* Filters */}
-              <div className="flex flex-wrap gap-4 p-4 bg-gray-50 border-b border-gray-200">
+              <div className="flex flex-wrap gap-4 p-4 bg-muted border-b border-border">
                 <div className="flex-1 min-w-[200px]">
                   <input
                     type="text"
                     placeholder="Search products..."
                     value={search}
                     onChange={e => setSearch(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                    className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   />
                 </div>
                 <div className="flex gap-2">
@@ -379,7 +337,7 @@ export default function InventoryPage() {
                       className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                         stockFilter === filter
                           ? 'bg-orange-500 text-white'
-                          : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                          : 'bg-card text-gray-700 hover:bg-gray-100 border border-border'
                       }`}
                     >
                       {filter === 'all' ? 'All' : STOCK_STATUS_STYLES[filter].label}
@@ -391,53 +349,55 @@ export default function InventoryPage() {
               {/* Products Table */}
               {products.length === 0 ? (
                 <div className="p-12 text-center">
-                  <p className="text-gray-500">No products found</p>
+                  <p className="text-muted-foreground">No products found</p>
                 </div>
               ) : (
                 <table className="w-full">
                   <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <tr className="bg-muted border-b border-border">
+                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Product
                       </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         SKU
                       </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Stock
                       </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Threshold
                       </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Status
                       </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Value
                       </th>
-                      <th className="text-right px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="text-right px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Actions
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200">
+                  <tbody className="divide-y divide-border">
                     {products.map(product => (
-                      <tr key={product.id} className="hover:bg-gray-50">
+                      <tr key={product.id} className="hover:bg-muted">
                         <td className="px-6 py-4">
                           <div>
-                            <div className="font-medium text-gray-900">{product.name}</div>
+                            <div className="font-medium text-foreground">{product.name}</div>
                             {product.nameAr && (
-                              <div className="text-sm text-gray-500 font-arabic">
+                              <div className="text-sm text-muted-foreground font-arabic">
                                 {product.nameAr}
                               </div>
                             )}
                           </div>
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{product.sku || '-'}</td>
-                        <td className="px-6 py-4">
-                          <span className="font-semibold text-gray-900">{product.inventory}</span>
+                        <td className="px-6 py-4 text-sm text-muted-foreground">
+                          {product.sku || '-'}
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-600">
+                        <td className="px-6 py-4">
+                          <span className="font-semibold text-foreground">{product.inventory}</span>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-muted-foreground">
                           {product.lowStockThreshold}
                         </td>
                         <td className="px-6 py-4">
@@ -447,7 +407,7 @@ export default function InventoryPage() {
                             {STOCK_STATUS_STYLES[product.stockStatus].label}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-600">
+                        <td className="px-6 py-4 text-sm text-muted-foreground">
                           {product.costPrice
                             ? `${(product.stockValue / 1000).toFixed(3)} KWD`
                             : '-'}
@@ -473,39 +433,39 @@ export default function InventoryPage() {
 
           {/* History Tab */}
           {activeTab === 'history' && (
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="bg-card rounded-xl border border-border overflow-hidden">
               {history.length === 0 ? (
                 <div className="p-12 text-center">
-                  <p className="text-gray-500">No inventory history yet</p>
+                  <p className="text-muted-foreground">No inventory history yet</p>
                 </div>
               ) : (
                 <table className="w-full">
                   <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <tr className="bg-muted border-b border-border">
+                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Date
                       </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Product
                       </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Type
                       </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Change
                       </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Stock
                       </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Reason
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200">
+                  <tbody className="divide-y divide-border">
                     {history.map(item => (
-                      <tr key={item.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 text-sm text-gray-600">
+                      <tr key={item.id} className="hover:bg-muted">
+                        <td className="px-6 py-4 text-sm text-muted-foreground">
                           {new Date(item.createdAt).toLocaleDateString('en-US', {
                             month: 'short',
                             day: 'numeric',
@@ -514,14 +474,14 @@ export default function InventoryPage() {
                           })}
                         </td>
                         <td className="px-6 py-4">
-                          <div className="font-medium text-gray-900">
+                          <div className="font-medium text-foreground">
                             {item.product?.name || '-'}
                           </div>
                           {item.product?.sku && (
-                            <div className="text-xs text-gray-500">{item.product.sku}</div>
+                            <div className="text-xs text-muted-foreground">{item.product.sku}</div>
                           )}
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-600">
+                        <td className="px-6 py-4 text-sm text-muted-foreground">
                           {formatChangeType(item.type)}
                         </td>
                         <td className="px-6 py-4">
@@ -532,10 +492,12 @@ export default function InventoryPage() {
                             {item.quantity}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-600">
+                        <td className="px-6 py-4 text-sm text-muted-foreground">
                           {item.previousStock} → {item.newStock}
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-500">{item.reason || '-'}</td>
+                        <td className="px-6 py-4 text-sm text-muted-foreground">
+                          {item.reason || '-'}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -546,7 +508,7 @@ export default function InventoryPage() {
 
           {/* Alerts Tab */}
           {activeTab === 'alerts' && (
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="bg-card rounded-xl border border-border overflow-hidden">
               {alerts.length === 0 ? (
                 <div className="p-12 text-center">
                   <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -564,45 +526,47 @@ export default function InventoryPage() {
                       />
                     </svg>
                   </div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">All Good!</h3>
-                  <p className="text-gray-500">No low stock or out of stock products</p>
+                  <h3 className="text-lg font-semibold text-foreground mb-2">All Good!</h3>
+                  <p className="text-muted-foreground">No low stock or out of stock products</p>
                 </div>
               ) : (
                 <table className="w-full">
                   <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <tr className="bg-muted border-b border-border">
+                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Product
                       </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         SKU
                       </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Current Stock
                       </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Threshold
                       </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Status
                       </th>
-                      <th className="text-right px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="text-right px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Actions
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200">
+                  <tbody className="divide-y divide-border">
                     {alerts.map(product => (
-                      <tr key={product.id} className="hover:bg-gray-50">
+                      <tr key={product.id} className="hover:bg-muted">
                         <td className="px-6 py-4">
-                          <div className="font-medium text-gray-900">{product.name}</div>
+                          <div className="font-medium text-foreground">{product.name}</div>
                           {product.nameAr && (
-                            <div className="text-sm text-gray-500 font-arabic">
+                            <div className="text-sm text-muted-foreground font-arabic">
                               {product.nameAr}
                             </div>
                           )}
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{product.sku || '-'}</td>
+                        <td className="px-6 py-4 text-sm text-muted-foreground">
+                          {product.sku || '-'}
+                        </td>
                         <td className="px-6 py-4">
                           <span
                             className={`font-semibold ${product.inventory <= 0 ? 'text-red-600' : 'text-yellow-600'}`}
@@ -610,7 +574,7 @@ export default function InventoryPage() {
                             {product.inventory}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-600">
+                        <td className="px-6 py-4 text-sm text-muted-foreground">
                           {product.lowStockThreshold}
                         </td>
                         <td className="px-6 py-4">
@@ -644,9 +608,9 @@ export default function InventoryPage() {
       {/* Adjust Modal */}
       {showAdjustModal && selectedProduct && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-900">Adjust Inventory</h2>
+          <div className="bg-card rounded-xl shadow-xl w-full max-w-md">
+            <div className="flex items-center justify-between p-6 border-b border-border">
+              <h2 className="text-xl font-semibold text-foreground">Adjust Inventory</h2>
               <button
                 onClick={() => {
                   setShowAdjustModal(false);
@@ -666,9 +630,11 @@ export default function InventoryPage() {
             </div>
 
             <form onSubmit={handleAdjust} className="p-6 space-y-4">
-              <div className="bg-gray-50 rounded-lg p-4">
-                <p className="font-medium text-gray-900">{selectedProduct.name}</p>
-                <p className="text-sm text-gray-500">Current stock: {selectedProduct.inventory}</p>
+              <div className="bg-muted rounded-lg p-4">
+                <p className="font-medium text-foreground">{selectedProduct.name}</p>
+                <p className="text-sm text-muted-foreground">
+                  Current stock: {selectedProduct.inventory}
+                </p>
               </div>
 
               <div>
@@ -678,7 +644,7 @@ export default function InventoryPage() {
                 <select
                   value={adjustType}
                   onChange={e => setAdjustType(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                 >
                   {ADJUSTMENT_TYPES.map(type => (
                     <option key={type.value} value={type.value}>
@@ -698,11 +664,11 @@ export default function InventoryPage() {
                   value={adjustQuantity}
                   onChange={e => setAdjustQuantity(e.target.value)}
                   placeholder="Enter quantity"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   required
                 />
                 {adjustQuantity && (
-                  <p className="text-sm text-gray-500 mt-1">
+                  <p className="text-sm text-muted-foreground mt-1">
                     New stock will be:{' '}
                     <span className="font-medium">
                       {['manual_remove', 'damage'].includes(adjustType)
@@ -720,7 +686,7 @@ export default function InventoryPage() {
                   value={adjustReason}
                   onChange={e => setAdjustReason(e.target.value)}
                   placeholder="Optional reason for adjustment"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                 />
               </div>
 
@@ -731,7 +697,7 @@ export default function InventoryPage() {
                     setShowAdjustModal(false);
                     setSelectedProduct(null);
                   }}
-                  className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  className="px-4 py-2 text-gray-700 border border-border rounded-lg hover:bg-muted"
                 >
                   Cancel
                 </button>

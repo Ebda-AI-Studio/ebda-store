@@ -51,13 +51,8 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
   const [isLoading, setIsLoading] = useState(true);
 
   const checkAuth = useCallback(async () => {
-    const token = localStorage.getItem('accessToken');
-    if (!token) {
-      router.push(storeUrl('/auth/login'));
-      return;
-    }
-
     try {
+      // Auth is via HTTP-only cookies — just call getProfile directly.
       const result = await api.getProfile();
       if (result.success && result.data) {
         setUser(result.data.user);
@@ -91,7 +86,7 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b bg-white">
+      <header className="border-b bg-card">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <Link href={storeUrl('/')} className="flex items-center gap-2">
             <Image src="/logo.svg" alt="Force Store" width={32} height={24} />
@@ -120,7 +115,7 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
         <div className="lg:grid lg:grid-cols-12 lg:gap-8">
           {/* Sidebar */}
           <aside className="lg:col-span-3">
-            <div className="rounded-xl border bg-white p-6 shadow-sm">
+            <div className="rounded-xl border bg-card p-6 shadow-sm">
               {/* User Info */}
               <div className="flex items-center gap-4 border-b pb-6">
                 <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary font-bold">
@@ -172,6 +167,7 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
                 <button
                   onClick={handleLogout}
                   className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 transition"
+                  aria-label="Log out"
                 >
                   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path

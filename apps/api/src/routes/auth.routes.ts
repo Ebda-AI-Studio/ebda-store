@@ -1,11 +1,31 @@
-import { Router, Request, Response, NextFunction } from 'express';
+import { Router, Request, Response, NextFunction, CookieOptions } from 'express';
 import { z } from 'zod';
 import { prisma } from '@force/database';
+import { config } from '../config';
 import { authenticate } from '../middleware/auth';
 import { AuthService } from '../services/auth.service';
 import { authLimiter, auditLog, generateCsrfToken } from '../middleware/security';
 
 const router = Router();
+
+/** Shared cookie options for the HTTP-only auth token cookie */
+const AUTH_COOKIE_OPTIONS: CookieOptions = {
+  httpOnly: true,
+  secure: config.nodeEnv === 'production',
+  sameSite: 'strict',
+  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  path: '/',
+};
+
+/** Set the access token as an HTTP-only cookie on the response */
+function setTokenCookie(res: Response, accessToken: string): void {
+  res.cookie('token', accessToken, AUTH_COOKIE_OPTIONS);
+}
+
+/** Clear the auth token cookie on the response */
+function clearTokenCookie(res: Response): void {
+  res.clearCookie('token', { path: '/' });
+}
 
 // Validation schemas
 const registerSchema = z
@@ -102,6 +122,9 @@ router.post('/register', authLimiter, async (req: Request, res: Response, next: 
       userAgent: req.headers['user-agent'],
     });
 
+    // Set access token as HTTP-only cookie for cookie-based auth
+    setTokenCookie(res, result.accessToken);
+
     res.status(201).json({
       success: true,
       data: result,
@@ -177,6 +200,9 @@ router.post('/login', authLimiter, async (req: Request, res: Response, next: Nex
       userAgent: req.headers['user-agent'],
     });
 
+    // Set access token as HTTP-only cookie for cookie-based auth
+    setTokenCookie(res, result.accessToken);
+
     res.json({
       success: true,
       data: {
@@ -212,6 +238,9 @@ router.post('/refresh', authLimiter, async (req: Request, res: Response, next: N
 
     const tokens = await AuthService.refreshTokens(refreshToken);
 
+    // Update the HTTP-only cookie with the new access token
+    setTokenCookie(res, tokens.accessToken);
+
     res.json({
       success: true,
       data: tokens,
@@ -229,6 +258,9 @@ router.post('/logout', async (req: Request, res: Response, next: NextFunction) =
     if (refreshToken) {
       await AuthService.logout(refreshToken);
     }
+
+    // Clear the HTTP-only auth cookie
+    clearTokenCookie(res);
 
     res.json({
       success: true,

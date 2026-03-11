@@ -1,5 +1,11 @@
 // Force Website Builder - Database Schema
 // Prisma ORM
+//
+// NOTE: Prisma Migrate does not generate down (rollback) migrations by default.
+// For critical schema changes (e.g. dropping columns, renaming tables, changing
+// types), write a manual SQL down-migration in the corresponding migration
+// directory (e.g. prisma/migrations/<name>/down.sql) so the change can be
+// safely reverted in production if needed.
 
 generator client {
   provider = "prisma-client-js"

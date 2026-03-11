@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Button } from '@force/ui';
 import { api, type Product, type Category } from '@/lib/api';
@@ -11,13 +12,7 @@ import { useCart } from '../contexts/CartContext';
 import { useTemplateComponents } from '../hooks/useTemplateComponents';
 import { Header, Footer } from '../components';
 import type { TemplateProduct, TemplateCategory, NavItem } from '../templates/types';
-
-function formatPrice(fils: number) {
-  return new Intl.NumberFormat('en-KW', {
-    style: 'currency',
-    currency: 'KWD',
-  }).format(fils / 1000);
-}
+import { formatPrice } from '@/lib/format';
 
 function toTemplateProduct(p: Product): TemplateProduct {
   return {
@@ -300,7 +295,7 @@ export default function HomePage() {
 
             <div className="relative animate-slide-up" style={{ animationDelay: '0.2s' }}>
               <div className="relative mx-auto w-full max-w-lg">
-                <div className="relative z-10 rounded-3xl bg-white p-6 shadow-2xl">
+                <div className="relative z-10 rounded-3xl bg-card p-6 shadow-2xl">
                   <div className="aspect-square overflow-hidden rounded-2xl bg-gradient-to-br from-primary/5 to-primary/10">
                     <div className="flex h-full items-center justify-center">
                       <div className="text-center">
@@ -358,10 +353,13 @@ export default function HomePage() {
                 >
                   <div className="relative h-48 bg-gradient-to-br from-primary/10 to-primary/5">
                     {category.image && (
-                      <img
+                      <Image
                         src={category.image}
                         alt={category.name}
+                        width={500}
+                        height={192}
                         className="h-full w-full object-cover"
+                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
                       />
                     )}
                     <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-6">
@@ -412,14 +410,17 @@ export default function HomePage() {
                 <Link
                   key={product.id}
                   href={storeUrl(`/products/${product.slug}`)}
-                  className="group rounded-xl border bg-card shadow-sm transition hover:shadow-lg overflow-hidden"
+                  className="group rounded-2xl border bg-card shadow-sm transition hover:shadow-lg overflow-hidden"
                 >
                   <div className="aspect-square overflow-hidden bg-gradient-to-br from-primary/5 to-primary/10">
                     {product.images?.[0]?.url ? (
-                      <img
+                      <Image
                         src={product.images[0].url}
                         alt={product.name}
+                        width={500}
+                        height={500}
                         className="h-full w-full object-cover group-hover:scale-105 transition-transform"
+                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
                       />
                     ) : (
                       <div className="flex h-full items-center justify-center">

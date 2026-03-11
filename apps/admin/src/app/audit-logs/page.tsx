@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { Button, Badge } from '@force/ui';
 import { AdminLayout } from '../../components/AdminLayout';
-import { getApiUrl } from '../../lib/api';
+import { apiGet } from '../../lib/api';
 import { useStore } from '../../contexts/StoreContext';
 
 interface AuditLog {
@@ -83,7 +83,6 @@ export default function AuditLogsPage() {
 
   const fetchLogs = useCallback(async () => {
     try {
-      const token = localStorage.getItem('authToken');
       const params = new URLSearchParams({
         page: pagination.page.toString(),
         limit: pagination.limit.toString(),
@@ -92,13 +91,13 @@ export default function AuditLogsPage() {
       if (actionFilter !== 'all') params.append('action', actionFilter);
       if (selectedStoreId !== 'all') params.append('storeId', selectedStoreId);
 
-      const response = await fetch(`${getApiUrl()}/api/v1/admin/audit-logs?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setLogs(data.data.logs || []);
-        setPagination(prev => ({ ...prev, ...data.data.meta }));
+      const { data } = await apiGet<{
+        logs: AuditLog[];
+        meta: Pagination;
+      }>(`/api/v1/admin/audit-logs?${params}`);
+      if (data) {
+        setLogs(data.logs || []);
+        setPagination(prev => ({ ...prev, ...data.meta }));
       }
     } catch (error) {
       console.error('Failed to fetch audit logs:', error);

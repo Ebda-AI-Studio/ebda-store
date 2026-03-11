@@ -1,6 +1,23 @@
 /**
- * API Helper Utilities
- * Standardized fetch wrapper with proper error handling
+ * Admin App API Helper Utilities
+ *
+ * Pattern: Functional helpers (apiGet, apiPost, apiPut, apiPatch, apiDelete)
+ * that wrap the base `apiRequest` function with standardized error handling.
+ *
+ * Base URL comes from `getApiUrl()` which reads NEXT_PUBLIC_API_URL.
+ * Authentication is handled via HTTP-only cookies set by the API on
+ * login/register. All requests include `credentials: 'include'` so the
+ * browser automatically sends the cookie -- no manual token management.
+ *
+ * Usage:
+ *   import { apiGet, apiPost } from '@/lib/api';
+ *   const { data, error } = await apiGet<MyType>('/api/v1/stores');
+ *   const { data, error } = await apiPost<MyType>('/api/v1/stores', body);
+ *
+ * Note: The web (storefront) app uses a different pattern -- a class-based
+ * ApiClient instance exported from apps/web/src/lib/api.ts. The two patterns
+ * are intentionally kept separate because the storefront includes additional
+ * session IDs and store IDs in headers.
  */
 
 export interface ApiResponse<T = unknown> {
@@ -26,29 +43,22 @@ export function getApiUrl(): string {
 }
 
 /**
- * Get the authentication token from localStorage
- */
-export function getAuthToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem('authToken');
-}
-
-/**
- * Make an API request with proper error handling
+ * Make an API request with proper error handling.
+ * Authentication is handled automatically via the HTTP-only cookie sent
+ * by the browser when `credentials: 'include'` is set.
  */
 export async function apiRequest<T = unknown>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<{ data: T | null; error: ApiError | null }> {
-  const token = getAuthToken();
   const url = endpoint.startsWith('http') ? endpoint : `${getApiUrl()}${endpoint}`;
 
   try {
     const response = await fetch(url, {
       ...options,
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
-        ...(token && { Authorization: `Bearer ${token}` }),
         ...options.headers,
       },
     });
@@ -84,7 +94,6 @@ export async function apiRequest<T = unknown>(
 
     return { data: data.data as T, error: null };
   } catch (error) {
-    console.error('API request failed:', error);
     return {
       data: null,
       error: {

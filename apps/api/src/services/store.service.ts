@@ -1,6 +1,8 @@
 import { prisma, Prisma } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import { slugify } from '@force/shared';
+import { redis } from './redis.service';
+import logger from '../lib/logger';
 
 interface CreateStoreData {
   name: string;
@@ -12,6 +14,26 @@ interface CreateStoreData {
 type UpdateStoreData = Partial<CreateStoreData>;
 
 export class StoreService {
+  /**
+   * Invalidate all Redis cache keys for a store.
+   * Requires the store record so we know which slug/domain keys to delete.
+   * Best-effort: failures are logged but never thrown.
+   */
+  private static async invalidateCache(store: {
+    slug: string;
+    domain?: string | null;
+  }): Promise<void> {
+    try {
+      await redis.delete(`store:slug:${store.slug}`);
+      if (store.domain) await redis.delete(`store:domain:${store.domain}`);
+    } catch (err) {
+      logger.warn(
+        { err: err instanceof Error ? err.message : 'unknown' },
+        '[STORE] Redis cache invalidation failed'
+      );
+    }
+  }
+
   static async list(options: { page?: number; limit?: number } = {}) {
     const page = Math.max(1, options.page || 1);
     const limit = Math.min(100, Math.max(1, options.limit || 20));
@@ -62,6 +84,20 @@ export class StoreService {
   }
 
   static async getBySlug(slug: string) {
+    // Try Redis cache first (best-effort)
+    try {
+      const cached = await redis.get<string>(`store:slug:${slug}`);
+      if (cached) {
+        const parsed = typeof cached === 'string' ? JSON.parse(cached) : cached;
+        return parsed;
+      }
+    } catch (err) {
+      logger.warn(
+        { err: err instanceof Error ? err.message : 'unknown' },
+        '[STORE] Redis cache read failed for getBySlug'
+      );
+    }
+
     const store = await prisma.store.findUnique({
       where: { slug },
       include: {
@@ -71,6 +107,16 @@ export class StoreService {
 
     if (!store) {
       throw new AppError(404, 'NOT_FOUND', 'Store not found');
+    }
+
+    // Write to cache (best-effort, 60s TTL)
+    try {
+      await redis.set(`store:slug:${slug}`, JSON.stringify(store), 60);
+    } catch (err) {
+      logger.warn(
+        { err: err instanceof Error ? err.message : 'unknown' },
+        '[STORE] Redis cache write failed for getBySlug'
+      );
     }
 
     return store;
@@ -84,6 +130,7 @@ export class StoreService {
     let suffix = 0;
     while (await prisma.store.findUnique({ where: { slug } })) {
       suffix++;
+      if (suffix > 100) throw new AppError(409, 'SLUG_COLLISION', 'Too many slug collisions');
       slug = `${baseSlug}-${suffix}`;
     }
 
@@ -129,6 +176,7 @@ export class StoreService {
       let suffix = 0;
       while (await prisma.store.findUnique({ where: { slug: data.slug } })) {
         suffix++;
+        if (suffix > 100) throw new AppError(409, 'SLUG_COLLISION', 'Too many slug collisions');
         data.slug = `${baseSlug}-${suffix}`;
       }
     }
@@ -169,16 +217,42 @@ export class StoreService {
       },
     });
 
+    // Invalidate store cache (best-effort)
+    try {
+      await redis.delete(`store:slug:${store.slug}`);
+      if (store.domain) await redis.delete(`store:domain:${store.domain}`);
+      // Also invalidate updated keys if slug/domain changed
+      if (data.slug && data.slug !== store.slug) await redis.delete(`store:slug:${data.slug}`);
+      if (data.domain && data.domain !== store.domain)
+        await redis.delete(`store:domain:${data.domain}`);
+    } catch (err) {
+      logger.warn(
+        { err: err instanceof Error ? err.message : 'unknown' },
+        '[STORE] Redis cache invalidation failed'
+      );
+    }
+
     return updatedStore;
   }
 
   static async delete(storeId: string) {
-    await this.getById(storeId);
+    const store = await this.getById(storeId);
 
     await prisma.store.update({
       where: { id: storeId },
       data: { deletedAt: new Date() },
     });
+
+    // Invalidate store cache (best-effort)
+    try {
+      await redis.delete(`store:slug:${store.slug}`);
+      if (store.domain) await redis.delete(`store:domain:${store.domain}`);
+    } catch (err) {
+      logger.warn(
+        { err: err instanceof Error ? err.message : 'unknown' },
+        '[STORE] Redis cache invalidation failed on delete'
+      );
+    }
   }
 
   static async getStoreStats(storeId: string) {
@@ -208,6 +282,20 @@ export class StoreService {
   }
 
   static async getByDomain(domain: string) {
+    // Try Redis cache first (best-effort)
+    try {
+      const cached = await redis.get<string>(`store:domain:${domain}`);
+      if (cached) {
+        const parsed = typeof cached === 'string' ? JSON.parse(cached) : cached;
+        return parsed;
+      }
+    } catch (err) {
+      logger.warn(
+        { err: err instanceof Error ? err.message : 'unknown' },
+        '[STORE] Redis cache read failed for getByDomain'
+      );
+    }
+
     const store = await prisma.store.findUnique({
       where: { domain },
       include: {
@@ -219,11 +307,21 @@ export class StoreService {
       throw new AppError(404, 'NOT_FOUND', 'Store not found');
     }
 
+    // Write to cache (best-effort, 60s TTL)
+    try {
+      await redis.set(`store:domain:${domain}`, JSON.stringify(store), 60);
+    } catch (err) {
+      logger.warn(
+        { err: err instanceof Error ? err.message : 'unknown' },
+        '[STORE] Redis cache write failed for getByDomain'
+      );
+    }
+
     return store;
   }
 
   static async updateTemplate(storeId: string, template: string) {
-    await this.getById(storeId);
+    const store = await this.getById(storeId);
 
     const validTemplates = ['modern', 'classic', 'minimal', 'bold', 'elegant'];
     if (!validTemplates.includes(template)) {
@@ -239,17 +337,19 @@ export class StoreService {
       data: { template: template as 'modern' | 'classic' | 'minimal' | 'bold' | 'elegant' },
     });
 
+    await StoreService.invalidateCache(store);
     return updatedStore;
   }
 
   static async updateTheme(storeId: string, theme: Prisma.InputJsonValue) {
-    await this.getById(storeId);
+    const store = await this.getById(storeId);
 
     const updatedStore = await prisma.store.update({
       where: { id: storeId },
       data: { theme },
     });
 
+    await StoreService.invalidateCache(store);
     return updatedStore;
   }
 
@@ -265,7 +365,7 @@ export class StoreService {
       descriptionAr?: string;
     }
   ) {
-    await this.getById(storeId);
+    const store = await this.getById(storeId);
 
     const updatedStore = await prisma.store.update({
       where: { id: storeId },
@@ -280,17 +380,19 @@ export class StoreService {
       },
     });
 
+    await StoreService.invalidateCache(store);
     return updatedStore;
   }
 
   static async updateSocialLinks(storeId: string, socialLinks: Prisma.InputJsonValue) {
-    await this.getById(storeId);
+    const store = await this.getById(storeId);
 
     const updatedStore = await prisma.store.update({
       where: { id: storeId },
       data: { socialLinks },
     });
 
+    await StoreService.invalidateCache(store);
     return updatedStore;
   }
 
@@ -305,7 +407,7 @@ export class StoreService {
       addressAr?: string;
     }
   ) {
-    await this.getById(storeId);
+    const store = await this.getById(storeId);
 
     const updatedStore = await prisma.store.update({
       where: { id: storeId },
@@ -319,17 +421,19 @@ export class StoreService {
       },
     });
 
+    await StoreService.invalidateCache(store);
     return updatedStore;
   }
 
   static async updateAnnouncementBar(storeId: string, announcementBar: Prisma.InputJsonValue) {
-    await this.getById(storeId);
+    const store = await this.getById(storeId);
 
     const updatedStore = await prisma.store.update({
       where: { id: storeId },
       data: { announcementBar },
     });
 
+    await StoreService.invalidateCache(store);
     return updatedStore;
   }
 
@@ -342,7 +446,7 @@ export class StoreService {
       metaDescriptionAr?: string;
     }
   ) {
-    await this.getById(storeId);
+    const store = await this.getById(storeId);
 
     const updatedStore = await prisma.store.update({
       where: { id: storeId },
@@ -354,11 +458,12 @@ export class StoreService {
       },
     });
 
+    await StoreService.invalidateCache(store);
     return updatedStore;
   }
 
   static async updateMarketingPixels(storeId: string, marketingPixels: Prisma.InputJsonValue) {
-    await this.getById(storeId);
+    const store = await this.getById(storeId);
 
     // Extract individual pixel IDs from the marketingPixels object for quick access
     const pixels = marketingPixels as Record<
@@ -392,6 +497,7 @@ export class StoreService {
       },
     });
 
+    await StoreService.invalidateCache(store);
     return updatedStore;
   }
 }

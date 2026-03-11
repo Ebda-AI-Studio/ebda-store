@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { AdminLayout } from '../../../../components/AdminLayout';
-import { getApiUrl } from '../../../../lib/api';
+import { apiGet, apiPut } from '../../../../lib/api';
 
 interface PWASettings {
   appName: string;
@@ -124,48 +124,34 @@ export default function PWASettingsPage() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const fetchStoreInfo = useCallback(async () => {
-    try {
-      const token = localStorage.getItem('authToken');
-      const res = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}`, {
-        headers: { Authorization: `Bearer ${token}` },
+    const { data } = await apiGet<{ store: StoreInfo & { [key: string]: unknown } }>(
+      `/api/v1/stores/${storeId}`
+    );
+    const store = data?.store;
+    if (store) {
+      setStoreInfo({
+        name: store.name || '',
+        nameAr: store.nameAr || undefined,
+        logo: store.logo || undefined,
+        logoAr: store.logoAr || undefined,
+        favicon: store.favicon || undefined,
+        description: store.description || undefined,
+        descriptionAr: store.descriptionAr || undefined,
+        theme: store.theme || undefined,
       });
-      if (res.ok) {
-        const data = await res.json();
-        const store = data.data?.store || data.data;
-        if (store) {
-          setStoreInfo({
-            name: store.name || '',
-            nameAr: store.nameAr || undefined,
-            logo: store.logo || undefined,
-            logoAr: store.logoAr || undefined,
-            favicon: store.favicon || undefined,
-            description: store.description || undefined,
-            descriptionAr: store.descriptionAr || undefined,
-            theme: store.theme || undefined,
-          });
-        }
-      }
-    } catch (err) {
-      console.error('Failed to fetch store info:', err);
     }
   }, [storeId]);
 
   const fetchSettings = useCallback(async () => {
-    try {
-      const token = localStorage.getItem('authToken');
-      const res = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/pwa/settings`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setPwaEnabled(data.data?.pwaEnabled || false);
-        if (data.data?.settings && Object.keys(data.data.settings).length > 0) {
-          setHasExistingSettings(true);
-          setSettings({ ...DEFAULT_SETTINGS, ...(data.data.settings || {}) });
-        }
+    const { data } = await apiGet<{ pwaEnabled: boolean; settings: PWASettings }>(
+      `/api/v1/stores/${storeId}/pwa/settings`
+    );
+    if (data) {
+      setPwaEnabled(data.pwaEnabled || false);
+      if (data.settings && Object.keys(data.settings).length > 0) {
+        setHasExistingSettings(true);
+        setSettings({ ...DEFAULT_SETTINGS, ...(data.settings || {}) });
       }
-    } catch (err) {
-      console.error('Failed to fetch PWA settings:', err);
     }
   }, [storeId]);
 
@@ -228,16 +214,10 @@ export default function PWASettingsPage() {
     setSaving(true);
     setMessage(null);
     try {
-      const token = localStorage.getItem('authToken');
-      const res = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/pwa/settings`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ pwaEnabled: !pwaEnabled }),
+      const { error } = await apiPut(`/api/v1/stores/${storeId}/pwa/settings`, {
+        pwaEnabled: !pwaEnabled,
       });
-      if (res.ok) {
+      if (!error) {
         setPwaEnabled(!pwaEnabled);
       } else {
         setMessage({ type: 'error', text: 'Failed to update PWA status' });
@@ -253,16 +233,8 @@ export default function PWASettingsPage() {
     setSaving(true);
     setMessage(null);
     try {
-      const token = localStorage.getItem('authToken');
-      const res = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/pwa/settings`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ settings }),
-      });
-      if (res.ok) {
+      const { error } = await apiPut(`/api/v1/stores/${storeId}/pwa/settings`, { settings });
+      if (!error) {
         setMessage({ type: 'success', text: 'PWA settings saved successfully' });
         setHasExistingSettings(true);
       } else {
@@ -281,7 +253,7 @@ export default function PWASettingsPage() {
       subtitle="Enable app-like experience for your customers"
       actions={
         <div className="flex items-center gap-3">
-          <span className="text-sm text-gray-600">PWA Status:</span>
+          <span className="text-sm text-muted-foreground">PWA Status:</span>
           <button
             onClick={handleToggleEnabled}
             disabled={saving}
@@ -314,12 +286,14 @@ export default function PWASettingsPage() {
                   />
                 )}
                 <div>
-                  <p className="font-medium text-gray-900">
+                  <p className="font-medium text-foreground">
                     {storeInfo.name}
                     {storeInfo.nameAr && <span className="text-gray-500 mx-2">|</span>}
                     {storeInfo.nameAr && <span dir="rtl">{storeInfo.nameAr}</span>}
                   </p>
-                  <p className="text-sm text-gray-600">Use store branding to fill PWA settings</p>
+                  <p className="text-sm text-muted-foreground">
+                    Use store branding to fill PWA settings
+                  </p>
                 </div>
               </div>
               <button
@@ -333,7 +307,7 @@ export default function PWASettingsPage() {
 
           {/* PWA Benefits Info */}
           <div className="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-6">
-            <h3 className="font-semibold text-gray-900 mb-3">Why Enable PWA?</h3>
+            <h3 className="font-semibold text-foreground mb-3">Why Enable PWA?</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="flex items-start gap-3">
                 <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -352,8 +326,8 @@ export default function PWASettingsPage() {
                   </svg>
                 </div>
                 <div>
-                  <p className="font-medium text-gray-900">Install on Device</p>
-                  <p className="text-sm text-gray-600">Customers can add to home screen</p>
+                  <p className="font-medium text-foreground">Install on Device</p>
+                  <p className="text-sm text-muted-foreground">Customers can add to home screen</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
@@ -373,8 +347,8 @@ export default function PWASettingsPage() {
                   </svg>
                 </div>
                 <div>
-                  <p className="font-medium text-gray-900">Offline Support</p>
-                  <p className="text-sm text-gray-600">Works even without internet</p>
+                  <p className="font-medium text-foreground">Offline Support</p>
+                  <p className="text-sm text-muted-foreground">Works even without internet</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
@@ -394,30 +368,32 @@ export default function PWASettingsPage() {
                   </svg>
                 </div>
                 <div>
-                  <p className="font-medium text-gray-900">Fast Performance</p>
-                  <p className="text-sm text-gray-600">Cached assets load instantly</p>
+                  <p className="font-medium text-foreground">Fast Performance</p>
+                  <p className="text-sm text-muted-foreground">Cached assets load instantly</p>
                 </div>
               </div>
             </div>
           </div>
 
           {/* App Identity */}
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">App Identity</h2>
+          <div className="bg-card rounded-xl border border-border p-6">
+            <h2 className="text-lg font-semibold text-foreground mb-4">App Identity</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">App Name</label>
+                <label className="block text-sm font-medium text-muted-foreground mb-2">
+                  App Name
+                </label>
                 <input
                   type="text"
                   value={settings.appName}
                   onChange={e => setSettings({ ...settings, appName: e.target.value })}
                   placeholder="My Store"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   disabled={!pwaEnabled}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-muted-foreground mb-2">
                   App Name (Arabic)
                 </label>
                 <input
@@ -425,13 +401,13 @@ export default function PWASettingsPage() {
                   value={settings.appNameAr || ''}
                   onChange={e => setSettings({ ...settings, appNameAr: e.target.value })}
                   placeholder="متجري"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   dir="rtl"
                   disabled={!pwaEnabled}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-muted-foreground mb-2">
                   Short Name (max 12 chars)
                 </label>
                 <input
@@ -440,13 +416,13 @@ export default function PWASettingsPage() {
                   value={settings.shortName}
                   onChange={e => setSettings({ ...settings, shortName: e.target.value })}
                   placeholder="Store"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   disabled={!pwaEnabled}
                 />
-                <p className="text-xs text-gray-500 mt-1">Shown under home screen icon</p>
+                <p className="text-xs text-muted-foreground mt-1">Shown under home screen icon</p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-muted-foreground mb-2">
                   Short Name (Arabic)
                 </label>
                 <input
@@ -455,31 +431,33 @@ export default function PWASettingsPage() {
                   value={settings.shortNameAr || ''}
                   onChange={e => setSettings({ ...settings, shortNameAr: e.target.value })}
                   placeholder="المتجر"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   dir="rtl"
                   disabled={!pwaEnabled}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                <label className="block text-sm font-medium text-muted-foreground mb-2">
+                  Description
+                </label>
                 <textarea
                   value={settings.description}
                   onChange={e => setSettings({ ...settings, description: e.target.value })}
                   placeholder="Shop the latest products at amazing prices"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   rows={2}
                   disabled={!pwaEnabled}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-muted-foreground mb-2">
                   Description (Arabic)
                 </label>
                 <textarea
                   value={settings.descriptionAr || ''}
                   onChange={e => setSettings({ ...settings, descriptionAr: e.target.value })}
                   placeholder="تسوق أحدث المنتجات بأسعار مميزة"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   rows={2}
                   dir="rtl"
                   disabled={!pwaEnabled}
@@ -489,31 +467,33 @@ export default function PWASettingsPage() {
           </div>
 
           {/* Theme & Appearance */}
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Theme & Appearance</h2>
+          <div className="bg-card rounded-xl border border-border p-6">
+            <h2 className="text-lg font-semibold text-foreground mb-4">Theme & Appearance</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Theme Color</label>
+                <label className="block text-sm font-medium text-muted-foreground mb-2">
+                  Theme Color
+                </label>
                 <div className="flex items-center gap-2">
                   <input
                     type="color"
                     value={settings.themeColor}
                     onChange={e => setSettings({ ...settings, themeColor: e.target.value })}
-                    className="w-10 h-10 rounded border border-gray-300 cursor-pointer"
+                    className="w-10 h-10 rounded border border-border cursor-pointer"
                     disabled={!pwaEnabled}
                   />
                   <input
                     type="text"
                     value={settings.themeColor}
                     onChange={e => setSettings({ ...settings, themeColor: e.target.value })}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm uppercase"
+                    className="flex-1 px-3 py-2 border border-border rounded-lg text-sm uppercase"
                     disabled={!pwaEnabled}
                   />
                 </div>
-                <p className="text-xs text-gray-500 mt-1">Browser address bar color</p>
+                <p className="text-xs text-muted-foreground mt-1">Browser address bar color</p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-muted-foreground mb-2">
                   Background Color
                 </label>
                 <div className="flex items-center gap-2">
@@ -521,27 +501,29 @@ export default function PWASettingsPage() {
                     type="color"
                     value={settings.backgroundColor}
                     onChange={e => setSettings({ ...settings, backgroundColor: e.target.value })}
-                    className="w-10 h-10 rounded border border-gray-300 cursor-pointer"
+                    className="w-10 h-10 rounded border border-border cursor-pointer"
                     disabled={!pwaEnabled}
                   />
                   <input
                     type="text"
                     value={settings.backgroundColor}
                     onChange={e => setSettings({ ...settings, backgroundColor: e.target.value })}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm uppercase"
+                    className="flex-1 px-3 py-2 border border-border rounded-lg text-sm uppercase"
                     disabled={!pwaEnabled}
                   />
                 </div>
-                <p className="text-xs text-gray-500 mt-1">Splash screen background</p>
+                <p className="text-xs text-muted-foreground mt-1">Splash screen background</p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Display Mode</label>
+                <label className="block text-sm font-medium text-muted-foreground mb-2">
+                  Display Mode
+                </label>
                 <select
                   value={settings.display}
                   onChange={e =>
                     setSettings({ ...settings, display: e.target.value as PWASettings['display'] })
                   }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   disabled={!pwaEnabled}
                 >
                   {DISPLAY_OPTIONS.map(opt => (
@@ -552,7 +534,9 @@ export default function PWASettingsPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Orientation</label>
+                <label className="block text-sm font-medium text-muted-foreground mb-2">
+                  Orientation
+                </label>
                 <select
                   value={settings.orientation}
                   onChange={e =>
@@ -561,7 +545,7 @@ export default function PWASettingsPage() {
                       orientation: e.target.value as PWASettings['orientation'],
                     })
                   }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   disabled={!pwaEnabled}
                 >
                   {ORIENTATION_OPTIONS.map(opt => (
@@ -575,17 +559,19 @@ export default function PWASettingsPage() {
           </div>
 
           {/* Icons */}
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">App Icons</h2>
+          <div className="bg-card rounded-xl border border-border p-6">
+            <h2 className="text-lg font-semibold text-foreground mb-4">App Icons</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Icon 192x192</label>
+                <label className="block text-sm font-medium text-muted-foreground mb-2">
+                  Icon 192x192
+                </label>
                 <input
                   type="text"
                   value={settings.icon192 || ''}
                   onChange={e => setSettings({ ...settings, icon192: e.target.value })}
                   placeholder="https://..."
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   disabled={!pwaEnabled}
                 />
                 {settings.icon192 && (
@@ -595,16 +581,18 @@ export default function PWASettingsPage() {
                     className="mt-2 w-12 h-12 rounded-lg object-contain bg-gray-50 border"
                   />
                 )}
-                <p className="text-xs text-gray-500 mt-1">Standard icon for app</p>
+                <p className="text-xs text-muted-foreground mt-1">Standard icon for app</p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Icon 512x512</label>
+                <label className="block text-sm font-medium text-muted-foreground mb-2">
+                  Icon 512x512
+                </label>
                 <input
                   type="text"
                   value={settings.icon512 || ''}
                   onChange={e => setSettings({ ...settings, icon512: e.target.value })}
                   placeholder="https://..."
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   disabled={!pwaEnabled}
                 />
                 {settings.icon512 && (
@@ -614,10 +602,12 @@ export default function PWASettingsPage() {
                     className="mt-2 w-12 h-12 rounded-lg object-contain bg-gray-50 border"
                   />
                 )}
-                <p className="text-xs text-gray-500 mt-1">High-res icon for splash screen</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  High-res icon for splash screen
+                </p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-muted-foreground mb-2">
                   Maskable Icon
                 </label>
                 <input
@@ -625,7 +615,7 @@ export default function PWASettingsPage() {
                   value={settings.maskableIcon || ''}
                   onChange={e => setSettings({ ...settings, maskableIcon: e.target.value })}
                   placeholder="https://..."
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   disabled={!pwaEnabled}
                 />
                 {settings.maskableIcon && (
@@ -635,19 +625,21 @@ export default function PWASettingsPage() {
                     className="mt-2 w-12 h-12 rounded-lg object-contain bg-gray-50 border"
                   />
                 )}
-                <p className="text-xs text-gray-500 mt-1">Adaptive icon with safe zone</p>
+                <p className="text-xs text-muted-foreground mt-1">Adaptive icon with safe zone</p>
               </div>
             </div>
           </div>
 
           {/* Features */}
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Features</h2>
+          <div className="bg-card rounded-xl border border-border p-6">
+            <h2 className="text-lg font-semibold text-foreground mb-4">Features</h2>
             <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
                 <div>
-                  <h3 className="font-medium text-gray-900">Install Prompt</h3>
-                  <p className="text-sm text-gray-500">Show prompt to add app to home screen</p>
+                  <h3 className="font-medium text-foreground">Install Prompt</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Show prompt to add app to home screen
+                  </p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
@@ -665,10 +657,10 @@ export default function PWASettingsPage() {
                 </label>
               </div>
 
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
                 <div>
-                  <h3 className="font-medium text-gray-900">Offline Support</h3>
-                  <p className="text-sm text-gray-500">Cache pages for offline access</p>
+                  <h3 className="font-medium text-foreground">Offline Support</h3>
+                  <p className="text-sm text-muted-foreground">Cache pages for offline access</p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
@@ -684,10 +676,10 @@ export default function PWASettingsPage() {
                 </label>
               </div>
 
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
                 <div>
-                  <h3 className="font-medium text-gray-900">Push Notifications</h3>
-                  <p className="text-sm text-gray-500">
+                  <h3 className="font-medium text-foreground">Push Notifications</h3>
+                  <p className="text-sm text-muted-foreground">
                     Send notifications to customers (requires setup)
                   </p>
                 </div>
@@ -710,11 +702,11 @@ export default function PWASettingsPage() {
           </div>
 
           {/* iOS Specific */}
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">iOS Settings</h2>
+          <div className="bg-card rounded-xl border border-border p-6">
+            <h2 className="text-lg font-semibold text-foreground mb-4">iOS Settings</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-muted-foreground mb-2">
                   Status Bar Style
                 </label>
                 <select
@@ -725,7 +717,7 @@ export default function PWASettingsPage() {
                       iosStatusBarStyle: e.target.value as PWASettings['iosStatusBarStyle'],
                     })
                   }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   disabled={!pwaEnabled}
                 >
                   {IOS_STATUS_OPTIONS.map(opt => (
@@ -736,7 +728,7 @@ export default function PWASettingsPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-muted-foreground mb-2">
                   Splash Screen Color
                 </label>
                 <div className="flex items-center gap-2">
@@ -744,14 +736,14 @@ export default function PWASettingsPage() {
                     type="color"
                     value={settings.splashScreenColor}
                     onChange={e => setSettings({ ...settings, splashScreenColor: e.target.value })}
-                    className="w-10 h-10 rounded border border-gray-300 cursor-pointer"
+                    className="w-10 h-10 rounded border border-border cursor-pointer"
                     disabled={!pwaEnabled}
                   />
                   <input
                     type="text"
                     value={settings.splashScreenColor}
                     onChange={e => setSettings({ ...settings, splashScreenColor: e.target.value })}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm uppercase"
+                    className="flex-1 px-3 py-2 border border-border rounded-lg text-sm uppercase"
                     disabled={!pwaEnabled}
                   />
                 </div>

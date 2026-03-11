@@ -9,18 +9,23 @@ const nextConfig = {
 
   images: {
     remotePatterns: [
-      {
-        protocol: 'http',
-        hostname: 'localhost',
-        port: '',
-        pathname: '/**',
-      },
-      {
-        protocol: 'http',
-        hostname: 'localhost',
-        port: '9000',
-        pathname: '/**',
-      },
+      // Only allow localhost image sources in non-production environments
+      ...(process.env.NODE_ENV !== 'production'
+        ? [
+            {
+              protocol: 'http',
+              hostname: 'localhost',
+              port: '',
+              pathname: '/**',
+            },
+            {
+              protocol: 'http',
+              hostname: 'localhost',
+              port: '9000',
+              pathname: '/**',
+            },
+          ]
+        : []),
       {
         protocol: 'https',
         hostname: 'cdn.forcemedia.com',
@@ -62,6 +67,11 @@ const nextConfig = {
             value: 'max-age=31536000; includeSubDomains; preload',
           },
           { key: 'X-XSS-Protection', value: '1; mode=block' },
+          {
+            key: 'Content-Security-Policy',
+            value:
+              "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: https: blob:; connect-src 'self' https://backend.forcemediakw.com https://*.supabase.co; frame-ancestors 'none'",
+          },
         ],
       },
     ];

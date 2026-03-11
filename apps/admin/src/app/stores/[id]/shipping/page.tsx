@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { AdminLayout } from '../../../../components/AdminLayout';
-import { getApiUrl } from '../../../../lib/api';
+import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '../../../../lib/api';
 
 interface ShippingZone {
   id: string;
@@ -68,34 +68,24 @@ export default function ShippingSettingsPage() {
   const [filter, setFilter] = useState<'all' | 'active' | 'inactive'>('all');
 
   const fetchStoreName = useCallback(async () => {
-    try {
-      const token = localStorage.getItem('authToken');
-      const res = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setStoreName(data.data?.store?.name || '');
-      }
-    } catch (err) {
-      console.error('Failed to fetch store name:', err);
+    const { data } = await apiGet<{ store: { name: string } }>(`/api/v1/stores/${storeId}`);
+    if (data) {
+      setStoreName(data.store?.name || '');
     }
   }, [storeId]);
 
   const fetchZones = useCallback(async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('authToken');
       const params = new URLSearchParams();
       if (filter === 'active') params.set('isActive', 'true');
       if (filter === 'inactive') params.set('isActive', 'false');
 
-      const res = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/shipping?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setZones(data.data?.zones || []);
+      const { data } = await apiGet<{ zones: ShippingZone[] }>(
+        `/api/v1/stores/${storeId}/shipping?${params}`
+      );
+      if (data) {
+        setZones(data.zones || []);
       }
     } catch (err) {
       console.error('Failed to fetch shipping zones:', err);
@@ -143,7 +133,6 @@ export default function ShippingSettingsPage() {
     setSaving(true);
 
     try {
-      const token = localStorage.getItem('authToken');
       const areas = formData.areas
         .split(',')
         .map(a => a.trim())
@@ -171,20 +160,13 @@ export default function ShippingSettingsPage() {
         isActive: formData.isActive,
       };
 
-      const url = editingZone
-        ? `${getApiUrl()}/api/v1/stores/${storeId}/shipping/${editingZone.id}`
-        : `${getApiUrl()}/api/v1/stores/${storeId}/shipping`;
+      const endpoint = editingZone
+        ? `/api/v1/stores/${storeId}/shipping/${editingZone.id}`
+        : `/api/v1/stores/${storeId}/shipping`;
 
-      const res = await fetch(url, {
-        method: editingZone ? 'PUT' : 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(body),
-      });
+      const { error } = editingZone ? await apiPut(endpoint, body) : await apiPost(endpoint, body);
 
-      if (res.ok) {
+      if (!error) {
         handleCloseModal();
         fetchZones();
       }
@@ -197,11 +179,7 @@ export default function ShippingSettingsPage() {
 
   const handleToggle = async (zone: ShippingZone) => {
     try {
-      const token = localStorage.getItem('authToken');
-      await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/shipping/${zone.id}/toggle`, {
-        method: 'PATCH',
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await apiPatch(`/api/v1/stores/${storeId}/shipping/${zone.id}/toggle`);
       fetchZones();
     } catch (err) {
       console.error('Failed to toggle shipping zone:', err);
@@ -210,11 +188,7 @@ export default function ShippingSettingsPage() {
 
   const handleDelete = async (zone: ShippingZone) => {
     try {
-      const token = localStorage.getItem('authToken');
-      await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/shipping/${zone.id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await apiDelete(`/api/v1/stores/${storeId}/shipping/${zone.id}`);
       fetchZones();
     } catch (err) {
       console.error('Failed to delete shipping zone:', err);
@@ -281,7 +255,7 @@ export default function ShippingSettingsPage() {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
           </div>
         ) : zones.length === 0 ? (
-          <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+          <div className="bg-card rounded-xl border border-border p-12 text-center">
             <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <svg
                 className="w-8 h-8 text-gray-400"
@@ -297,8 +271,8 @@ export default function ShippingSettingsPage() {
                 />
               </svg>
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">No Shipping Zones</h3>
-            <p className="text-gray-600 mb-6">
+            <h3 className="text-lg font-semibold text-foreground mb-2">No Shipping Zones</h3>
+            <p className="text-muted-foreground mb-6">
               Create shipping zones to configure delivery rates for different areas
             </p>
             <button
@@ -309,41 +283,43 @@ export default function ShippingSettingsPage() {
             </button>
           </div>
         ) : (
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="bg-card rounded-xl border border-border overflow-hidden">
             <table className="w-full">
               <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <tr className="bg-muted border-b border-border">
+                  <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Zone
                   </th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Areas
                   </th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Delivery Fee
                   </th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Free Shipping
                   </th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Est. Delivery
                   </th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Status
                   </th>
-                  <th className="text-right px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="text-right px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="divide-y divide-border">
                 {zones.map(zone => (
-                  <tr key={zone.id} className="hover:bg-gray-50">
+                  <tr key={zone.id} className="hover:bg-muted">
                     <td className="px-6 py-4">
                       <div>
-                        <div className="font-medium text-gray-900">{zone.name}</div>
+                        <div className="font-medium text-foreground">{zone.name}</div>
                         {zone.nameAr && (
-                          <div className="text-sm text-gray-500 font-arabic">{zone.nameAr}</div>
+                          <div className="text-sm text-muted-foreground font-arabic">
+                            {zone.nameAr}
+                          </div>
                         )}
                       </div>
                     </td>
@@ -365,7 +341,7 @@ export default function ShippingSettingsPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="font-medium text-gray-900">
+                      <span className="font-medium text-foreground">
                         {(zone.deliveryFee / 1000).toFixed(3)} KWD
                       </span>
                     </td>
@@ -378,7 +354,9 @@ export default function ShippingSettingsPage() {
                         <span className="text-gray-400">-</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{formatDeliveryTime(zone)}</td>
+                    <td className="px-6 py-4 text-sm text-muted-foreground">
+                      {formatDeliveryTime(zone)}
+                    </td>
                     <td className="px-6 py-4">
                       <button
                         onClick={() => handleToggle(zone)}
@@ -443,9 +421,9 @@ export default function ShippingSettingsPage() {
         {/* Modal */}
         {showModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-              <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                <h2 className="text-xl font-semibold text-gray-900">
+            <div className="bg-card rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between p-6 border-b border-border">
+                <h2 className="text-xl font-semibold text-foreground">
                   {editingZone ? 'Edit Shipping Zone' : 'New Shipping Zone'}
                 </h2>
                 <button
@@ -467,7 +445,7 @@ export default function ShippingSettingsPage() {
                 {/* Zone Name */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-muted-foreground mb-2">
                       Zone Name <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -475,12 +453,12 @@ export default function ShippingSettingsPage() {
                       value={formData.name}
                       onChange={e => setFormData({ ...formData, name: e.target.value })}
                       placeholder="e.g., Capital Area"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                       required
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-muted-foreground mb-2">
                       Zone Name (Arabic)
                     </label>
                     <input
@@ -488,7 +466,7 @@ export default function ShippingSettingsPage() {
                       value={formData.nameAr}
                       onChange={e => setFormData({ ...formData, nameAr: e.target.value })}
                       placeholder="e.g., منطقة العاصمة"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                       dir="rtl"
                     />
                   </div>
@@ -497,7 +475,7 @@ export default function ShippingSettingsPage() {
                 {/* Areas */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <label className="block text-sm font-medium text-gray-700">
+                    <label className="block text-sm font-medium text-muted-foreground">
                       Areas <span className="text-red-500">*</span>
                     </label>
                     <button
@@ -512,21 +490,21 @@ export default function ShippingSettingsPage() {
                     value={formData.areas}
                     onChange={e => setFormData({ ...formData, areas: e.target.value })}
                     placeholder="Separate areas with commas: Capital, Hawalli, Farwaniya"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                    className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                     rows={2}
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-muted-foreground mb-2">
                     Areas (Arabic)
                   </label>
                   <textarea
                     value={formData.areasAr}
                     onChange={e => setFormData({ ...formData, areasAr: e.target.value })}
                     placeholder="العاصمة، حولي، الفروانية"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                    className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                     rows={2}
                     dir="rtl"
                   />
@@ -535,7 +513,7 @@ export default function ShippingSettingsPage() {
                 {/* Delivery Fee */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-muted-foreground mb-2">
                       Delivery Fee (KWD) <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -545,12 +523,12 @@ export default function ShippingSettingsPage() {
                       value={formData.deliveryFee}
                       onChange={e => setFormData({ ...formData, deliveryFee: e.target.value })}
                       placeholder="1.000"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                       required
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-muted-foreground mb-2">
                       Free Shipping Over (KWD)
                     </label>
                     <input
@@ -562,14 +540,14 @@ export default function ShippingSettingsPage() {
                         setFormData({ ...formData, freeShippingThreshold: e.target.value })
                       }
                       placeholder="25.000"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                     />
                   </div>
                 </div>
 
                 {/* Delivery Time */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-muted-foreground mb-2">
                     Estimated Delivery Time (Days)
                   </label>
                   <div className="grid grid-cols-2 gap-4">
@@ -579,7 +557,7 @@ export default function ShippingSettingsPage() {
                       value={formData.estimatedDaysMin}
                       onChange={e => setFormData({ ...formData, estimatedDaysMin: e.target.value })}
                       placeholder="Min days"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                     />
                     <input
                       type="number"
@@ -587,7 +565,7 @@ export default function ShippingSettingsPage() {
                       value={formData.estimatedDaysMax}
                       onChange={e => setFormData({ ...formData, estimatedDaysMax: e.target.value })}
                       placeholder="Max days"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                     />
                   </div>
                 </div>
@@ -607,11 +585,11 @@ export default function ShippingSettingsPage() {
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
+                <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
                   <button
                     type="button"
                     onClick={handleCloseModal}
-                    className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    className="px-4 py-2 text-gray-700 border border-border rounded-lg hover:bg-muted transition-colors"
                   >
                     Cancel
                   </button>

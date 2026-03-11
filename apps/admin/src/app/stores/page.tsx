@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Button } from '@force/ui';
 import { AdminLayout } from '../../components/AdminLayout';
 import { ErrorState } from '../../components/ErrorState';
-import { getApiUrl } from '../../lib/api';
+import { apiGet } from '../../lib/api';
 
 interface Store {
   id: string;
@@ -87,7 +87,6 @@ export default function StoresPage() {
   const fetchStores = useCallback(async () => {
     try {
       setError(null);
-      const token = localStorage.getItem('authToken');
       const params = new URLSearchParams({
         page: pagination.page.toString(),
         limit: pagination.limit.toString(),
@@ -95,16 +94,16 @@ export default function StoresPage() {
       if (statusFilter !== 'all') params.append('status', statusFilter);
       if (search) params.append('search', search);
 
-      const response = await fetch(`${getApiUrl()}/api/v1/admin/stores?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setStores(data.data.stores || []);
-        setPagination(prev => ({ ...prev, ...data.data.pagination }));
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        setError(errorData.error?.message || 'Failed to fetch stores');
+      const { data, error: apiError } = await apiGet<{
+        stores: Store[];
+        pagination: Pagination;
+      }>(`/api/v1/admin/stores?${params}`);
+
+      if (apiError) {
+        setError(apiError.message || 'Failed to fetch stores');
+      } else if (data) {
+        setStores(data.stores || []);
+        setPagination(prev => ({ ...prev, ...data.pagination }));
       }
     } catch (error) {
       console.error('Failed to fetch stores:', error);

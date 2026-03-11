@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { Button, Badge, Input, Label } from '@force/ui';
 import { AdminLayout } from '../../../components/AdminLayout';
 import { formatPrice, formatDate } from '../../../lib/format';
-import { getApiUrl } from '../../../lib/api';
+import { apiGet, apiPut, apiPatch } from '../../../lib/api';
 
 interface Store {
   id: string;
@@ -61,26 +61,25 @@ function DomainSection({
   } | null>(null);
   const [domainError, setDomainError] = useState('');
 
-  const apiUrl = getApiUrl();
-
   const checkDns = useCallback(async () => {
     if (!domain) return;
     setIsChecking(true);
     try {
-      const token = localStorage.getItem('authToken');
-      const res = await fetch(`${apiUrl}/api/v1/stores/${storeId}/domain`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setDomainStatus(data.data);
+      const { data } = await apiGet<{
+        domain: string;
+        verified: boolean;
+        misconfigured: boolean;
+        dnsRecords: Array<{ type: string; name: string; value: string }>;
+      }>(`/api/v1/stores/${storeId}/domain`);
+      if (data) {
+        setDomainStatus(data);
       }
     } catch {
       // non-critical
     } finally {
       setIsChecking(false);
     }
-  }, [domain, storeId, apiUrl]);
+  }, [domain, storeId]);
 
   useEffect(() => {
     checkDns();
@@ -99,17 +98,11 @@ function DomainSection({
     setIsSaving(true);
     setDomainError('');
     try {
-      const token = localStorage.getItem('authToken');
-      const res = await fetch(`${apiUrl}/api/v1/stores/${storeId}/domain`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ domain: trimmed || null }),
+      const { error: apiError } = await apiPut(`/api/v1/stores/${storeId}/domain`, {
+        domain: trimmed || null,
       });
 
-      if (res.ok) {
+      if (!apiError) {
         setIsEditing(false);
         onDomainChange();
         if (trimmed) {
@@ -119,8 +112,7 @@ function DomainSection({
           setDomainStatus(null);
         }
       } else {
-        const errorData = await res.json().catch(() => ({}));
-        setDomainError(errorData.error?.message || 'Failed to update domain');
+        setDomainError(apiError.message || 'Failed to update domain');
       }
     } catch {
       setDomainError('Failed to update domain');
@@ -133,16 +125,10 @@ function DomainSection({
     setNewDomain('');
     setIsSaving(true);
     try {
-      const token = localStorage.getItem('authToken');
-      const res = await fetch(`${apiUrl}/api/v1/stores/${storeId}/domain`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ domain: null }),
+      const { error: apiError } = await apiPut(`/api/v1/stores/${storeId}/domain`, {
+        domain: null,
       });
-      if (res.ok) {
+      if (!apiError) {
         setDomainStatus(null);
         setIsEditing(false);
         onDomainChange();
@@ -156,9 +142,9 @@ function DomainSection({
 
   return (
     <div className="mt-8">
-      <div className="rounded-xl border bg-white shadow-sm">
+      <div className="rounded-xl border bg-card shadow-sm">
         <div className="flex items-center justify-between border-b p-4">
-          <h2 className="font-semibold text-gray-900">Custom Domain</h2>
+          <h2 className="font-semibold text-foreground">Custom Domain</h2>
           <div className="flex gap-2">
             {!isEditing && (
               <Button
@@ -196,7 +182,7 @@ function DomainSection({
                   className={`mt-1 ${domainError ? 'border-red-500' : ''}`}
                 />
                 {domainError && <p className="mt-1 text-sm text-red-500">{domainError}</p>}
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-muted-foreground">
                   Leave empty and save to remove the custom domain.
                 </p>
               </div>
@@ -219,7 +205,7 @@ function DomainSection({
           ) : domain ? (
             <div className="space-y-4">
               <div className="flex items-center gap-3">
-                <p className="font-medium text-gray-900">{domain}</p>
+                <p className="font-medium text-foreground">{domain}</p>
                 <Badge variant={domainStatus?.verified ? 'default' : 'secondary'}>
                   {domainStatus?.verified ? 'Verified' : 'Pending Verification'}
                 </Badge>
@@ -276,7 +262,7 @@ function DomainSection({
               )}
             </div>
           ) : (
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-muted-foreground">
               No custom domain configured. This store is accessible via its default subdomain.
             </p>
           )}
@@ -299,18 +285,14 @@ export default function StoreDetailPage() {
   const fetchStore = useCallback(async () => {
     if (!storeId) return;
     try {
-      const token = localStorage.getItem('authToken');
-      const response = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setStore(data.data.store);
+      const { data } = await apiGet<{ store: Store }>(`/api/v1/stores/${storeId}`);
+      if (data?.store) {
+        setStore(data.store);
         setEditForm({
-          name: data.data.store.name,
-          slug: data.data.store.slug,
-          plan: data.data.store.plan,
-          status: data.data.store.status,
+          name: data.store.name,
+          slug: data.store.slug,
+          plan: data.store.plan,
+          status: data.store.status,
         });
       }
     } catch (error) {
@@ -358,28 +340,21 @@ export default function StoreDetailPage() {
 
     setIsSaving(true);
     try {
-      const token = localStorage.getItem('authToken');
-      const response = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
+      const { data, error: apiError } = await apiPut<{ store: Store }>(
+        `/api/v1/stores/${storeId}`,
+        {
           name: editForm.name.trim(),
           slug: editForm.slug.trim().toLowerCase(),
           plan: editForm.plan,
           status: editForm.status,
-        }),
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setStore(data.data.store);
+        }
+      );
+      if (data?.store) {
+        setStore(data.store);
         setIsEditing(false);
         setFormErrors({});
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        if (errorData.error?.message?.toLowerCase().includes('slug')) {
+      } else if (apiError) {
+        if (apiError.message?.toLowerCase().includes('slug')) {
           setFormErrors({ slug: 'This slug is already in use' });
         }
       }
@@ -391,15 +366,7 @@ export default function StoreDetailPage() {
   }
 
   async function handleStatusChange(newStatus: string) {
-    const token = localStorage.getItem('authToken');
-    await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/status`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ status: newStatus }),
-    });
+    await apiPatch(`/api/v1/stores/${storeId}/status`, { status: newStatus });
     fetchStore();
   }
 
@@ -407,10 +374,10 @@ export default function StoreDetailPage() {
     return (
       <AdminLayout title="Loading..." subtitle="Please wait">
         <div className="animate-pulse space-y-6">
-          <div className="h-32 bg-gray-200 rounded-xl" />
+          <div className="h-32 bg-muted rounded-xl" />
           <div className="grid gap-6 sm:grid-cols-4">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="h-24 bg-gray-200 rounded-xl" />
+              <div key={i} className="h-24 bg-muted rounded-xl" />
             ))}
           </div>
         </div>
@@ -469,15 +436,15 @@ export default function StoreDetailPage() {
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-xl border bg-white p-6 shadow-sm">
           <p className="text-sm font-medium text-gray-500">Products</p>
-          <p className="mt-1 text-2xl font-bold text-gray-900">{store._count?.products || 0}</p>
+          <p className="mt-1 text-2xl font-bold text-foreground">{store._count?.products || 0}</p>
         </div>
         <div className="rounded-xl border bg-white p-6 shadow-sm">
           <p className="text-sm font-medium text-gray-500">Orders</p>
-          <p className="mt-1 text-2xl font-bold text-gray-900">{store._count?.orders || 0}</p>
+          <p className="mt-1 text-2xl font-bold text-foreground">{store._count?.orders || 0}</p>
         </div>
         <div className="rounded-xl border bg-white p-6 shadow-sm">
           <p className="text-sm font-medium text-gray-500">Customers</p>
-          <p className="mt-1 text-2xl font-bold text-gray-900">{store._count?.customers || 0}</p>
+          <p className="mt-1 text-2xl font-bold text-foreground">{store._count?.customers || 0}</p>
         </div>
         <div className="rounded-xl border bg-white p-6 shadow-sm">
           <p className="text-sm font-medium text-gray-500">Revenue</p>
@@ -489,9 +456,9 @@ export default function StoreDetailPage() {
 
       <div className="mt-8 grid gap-6 lg:grid-cols-3">
         {/* Store Details */}
-        <div className="lg:col-span-2 rounded-xl border bg-white shadow-sm">
+        <div className="lg:col-span-2 rounded-xl border bg-card shadow-sm">
           <div className="flex items-center justify-between border-b p-4">
-            <h2 className="font-semibold text-gray-900">Store Details</h2>
+            <h2 className="font-semibold text-foreground">Store Details</h2>
             {isEditing && (
               <div className="flex gap-2">
                 <Button
@@ -552,7 +519,7 @@ export default function StoreDetailPage() {
                   {formErrors.slug && (
                     <p className="mt-1 text-sm text-red-500">{formErrors.slug}</p>
                   )}
-                  <p className="mt-1 text-xs text-gray-500">
+                  <p className="mt-1 text-xs text-muted-foreground">
                     Your store will be at: {editForm.slug || 'your-slug'}.forcemediakw.com
                   </p>
                 </div>
@@ -587,32 +554,32 @@ export default function StoreDetailPage() {
             ) : (
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <p className="text-sm text-gray-500">Store Name</p>
-                  <p className="font-medium text-gray-900">{store.name}</p>
+                  <p className="text-sm text-muted-foreground">Store Name</p>
+                  <p className="font-medium text-foreground">{store.name}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">URL</p>
-                  <p className="font-medium text-gray-900">
+                  <p className="text-sm text-muted-foreground">URL</p>
+                  <p className="font-medium text-foreground">
                     {store.domain || `${store.slug}.forcemediakw.com`}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">Status</p>
+                  <p className="text-sm text-muted-foreground">Status</p>
                   <Badge variant={statusColors[store.status]} className="mt-1">
                     {store.status}
                   </Badge>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">Plan</p>
-                  <p className="font-medium text-gray-900 capitalize">{store.plan}</p>
+                  <p className="text-sm text-muted-foreground">Plan</p>
+                  <p className="font-medium text-foreground capitalize">{store.plan}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">Created</p>
-                  <p className="font-medium text-gray-900">{formatDate(store.createdAt)}</p>
+                  <p className="text-sm text-muted-foreground">Created</p>
+                  <p className="font-medium text-foreground">{formatDate(store.createdAt)}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">Last Updated</p>
-                  <p className="font-medium text-gray-900">{formatDate(store.updatedAt)}</p>
+                  <p className="text-sm text-muted-foreground">Last Updated</p>
+                  <p className="font-medium text-foreground">{formatDate(store.updatedAt)}</p>
                 </div>
               </div>
             )}
@@ -620,9 +587,9 @@ export default function StoreDetailPage() {
         </div>
 
         {/* Owner Info */}
-        <div className="rounded-xl border bg-white shadow-sm">
+        <div className="rounded-xl border bg-card shadow-sm">
           <div className="border-b p-4">
-            <h2 className="font-semibold text-gray-900">Store Owner</h2>
+            <h2 className="font-semibold text-foreground">Store Owner</h2>
           </div>
           <div className="p-6">
             <div className="flex items-center gap-4">
@@ -633,10 +600,10 @@ export default function StoreDetailPage() {
                 </span>
               </div>
               <div>
-                <p className="font-medium text-gray-900">
+                <p className="font-medium text-foreground">
                   {store.owner.firstName} {store.owner.lastName}
                 </p>
-                <p className="text-sm text-gray-500">{store.owner.email}</p>
+                <p className="text-sm text-muted-foreground">{store.owner.email}</p>
               </div>
             </div>
             <div className="mt-6 space-y-2">
@@ -655,12 +622,12 @@ export default function StoreDetailPage() {
 
       {/* Quick Actions */}
       <div className="mt-8">
-        <h2 className="mb-4 font-semibold text-gray-900">Quick Actions</h2>
+        <h2 className="mb-4 font-semibold text-foreground">Quick Actions</h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {store.status === 'active' ? (
             <button
               onClick={() => handleStatusChange('suspended')}
-              className="flex items-center gap-3 rounded-xl border bg-white p-4 shadow-sm transition hover:border-red-300 hover:shadow-md text-left"
+              className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm transition hover:border-red-300 hover:shadow-md text-left"
             >
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-100">
                 <svg
@@ -678,14 +645,14 @@ export default function StoreDetailPage() {
                 </svg>
               </div>
               <div>
-                <p className="font-medium text-gray-900">Suspend Store</p>
-                <p className="text-xs text-gray-500">Temporarily disable access</p>
+                <p className="font-medium text-foreground">Suspend Store</p>
+                <p className="text-xs text-muted-foreground">Temporarily disable access</p>
               </div>
             </button>
           ) : (
             <button
               onClick={() => handleStatusChange('active')}
-              className="flex items-center gap-3 rounded-xl border bg-white p-4 shadow-sm transition hover:border-green-300 hover:shadow-md text-left"
+              className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm transition hover:border-green-300 hover:shadow-md text-left"
             >
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100">
                 <svg
@@ -703,15 +670,15 @@ export default function StoreDetailPage() {
                 </svg>
               </div>
               <div>
-                <p className="font-medium text-gray-900">Activate Store</p>
-                <p className="text-xs text-gray-500">Enable store access</p>
+                <p className="font-medium text-foreground">Activate Store</p>
+                <p className="text-xs text-muted-foreground">Enable store access</p>
               </div>
             </button>
           )}
 
           <Link
             href={`/stores/${store.id}/products`}
-            className="flex items-center gap-3 rounded-xl border bg-white p-4 shadow-sm transition hover:border-primary hover:shadow-md"
+            className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm transition hover:border-primary hover:shadow-md"
           >
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100">
               <svg
@@ -729,14 +696,16 @@ export default function StoreDetailPage() {
               </svg>
             </div>
             <div>
-              <p className="font-medium text-gray-900">View Products</p>
-              <p className="text-xs text-gray-500">{store._count?.products || 0} products</p>
+              <p className="font-medium text-foreground">View Products</p>
+              <p className="text-xs text-muted-foreground">
+                {store._count?.products || 0} products
+              </p>
             </div>
           </Link>
 
           <Link
             href={`/stores/${store.id}/orders`}
-            className="flex items-center gap-3 rounded-xl border bg-white p-4 shadow-sm transition hover:border-primary hover:shadow-md"
+            className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm transition hover:border-primary hover:shadow-md"
           >
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-100">
               <svg
@@ -754,14 +723,14 @@ export default function StoreDetailPage() {
               </svg>
             </div>
             <div>
-              <p className="font-medium text-gray-900">View Orders</p>
-              <p className="text-xs text-gray-500">{store._count?.orders || 0} orders</p>
+              <p className="font-medium text-foreground">View Orders</p>
+              <p className="text-xs text-muted-foreground">{store._count?.orders || 0} orders</p>
             </div>
           </Link>
 
           <Link
             href={`/stores/${store.id}/analytics`}
-            className="flex items-center gap-3 rounded-xl border bg-white p-4 shadow-sm transition hover:border-primary hover:shadow-md"
+            className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm transition hover:border-primary hover:shadow-md"
           >
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100">
               <svg
@@ -779,8 +748,8 @@ export default function StoreDetailPage() {
               </svg>
             </div>
             <div>
-              <p className="font-medium text-gray-900">Analytics</p>
-              <p className="text-xs text-gray-500">View store metrics</p>
+              <p className="font-medium text-foreground">Analytics</p>
+              <p className="text-xs text-muted-foreground">View store metrics</p>
             </div>
           </Link>
         </div>
@@ -790,7 +759,7 @@ export default function StoreDetailPage() {
       <div className="mt-8">
         <Link
           href={`/stores/${store.id}/settings`}
-          className="flex items-center justify-between rounded-xl border bg-white p-5 shadow-sm transition hover:border-primary hover:shadow-md group"
+          className="flex items-center justify-between rounded-xl border bg-card p-5 shadow-sm transition hover:border-primary hover:shadow-md group"
         >
           <div className="flex items-center gap-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gray-100 transition-transform group-hover:scale-110">
@@ -815,10 +784,10 @@ export default function StoreDetailPage() {
               </svg>
             </div>
             <div>
-              <p className="font-semibold text-gray-900 group-hover:text-primary transition-colors">
+              <p className="font-semibold text-foreground group-hover:text-primary transition-colors">
                 Settings & Configuration
               </p>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-muted-foreground">
                 Branding, SEO, shipping, tax, payments, PWA, and more
               </p>
             </div>

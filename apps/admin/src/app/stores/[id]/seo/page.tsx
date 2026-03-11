@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AdminLayout } from '../../../../components/AdminLayout';
-import { getApiUrl } from '../../../../lib/api';
+import { apiGet, apiPut } from '../../../../lib/api';
 
 interface SeoSettings {
   metaTitle: string;
@@ -15,8 +15,6 @@ interface SeoSettings {
   twitterHandle: string;
   googleSiteVerification: string;
 }
-
-const API_URL = getApiUrl();
 
 const DEFAULT_SETTINGS: SeoSettings = {
   metaTitle: '',
@@ -60,24 +58,21 @@ export default function StoreSeoPage() {
     if (!storeId) return;
     setIsLoading(true);
     try {
-      const token = localStorage.getItem('authToken');
-      const res = await fetch(`${API_URL}/api/v1/stores/${storeId}/seo`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const seo = data.data?.seo || data.data;
-        if (seo) {
-          setSettings({
-            metaTitle: seo.metaTitle || '',
-            metaTitleAr: seo.metaTitleAr || '',
-            metaDescription: seo.metaDescription || '',
-            metaDescriptionAr: seo.metaDescriptionAr || '',
-            ogImage: seo.ogImage || '',
-            twitterHandle: seo.twitterHandle || '',
-            googleSiteVerification: seo.googleSiteVerification || '',
-          });
-        }
+      const { data } = await apiGet<{ seo?: Partial<SeoSettings> }>(
+        `/api/v1/stores/${storeId}/seo`
+      );
+      const seo: Partial<SeoSettings> | null =
+        (data?.seo ?? (data as unknown as Partial<SeoSettings>)) || null;
+      if (seo) {
+        setSettings({
+          metaTitle: seo.metaTitle || '',
+          metaTitleAr: seo.metaTitleAr || '',
+          metaDescription: seo.metaDescription || '',
+          metaDescriptionAr: seo.metaDescriptionAr || '',
+          ogImage: seo.ogImage || '',
+          twitterHandle: seo.twitterHandle || '',
+          googleSiteVerification: seo.googleSiteVerification || '',
+        });
       }
       // If 404 or no data, keep defaults
     } catch (err) {
@@ -95,23 +90,14 @@ export default function StoreSeoPage() {
     setIsSaving(true);
     setMessage(null);
     try {
-      const token = localStorage.getItem('authToken');
-      const res = await fetch(`${API_URL}/api/v1/stores/${storeId}/seo`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(settings),
-      });
+      const { error } = await apiPut(`/api/v1/stores/${storeId}/seo`, settings);
 
-      if (res.ok) {
+      if (!error) {
         setMessage({ type: 'success', text: 'SEO settings saved successfully' });
       } else {
-        const errData = await res.json().catch(() => ({}));
         setMessage({
           type: 'error',
-          text: errData.error?.message || 'Failed to save SEO settings',
+          text: error.message || 'Failed to save SEO settings',
         });
       }
     } catch {
@@ -139,7 +125,7 @@ export default function StoreSeoPage() {
       actions={
         <div className="flex gap-2">
           <Link href={`/stores/${storeId}/settings`}>
-            <button className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 font-medium">
+            <button className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-gray-50 font-medium">
               Back to Settings
             </button>
           </Link>
@@ -155,15 +141,17 @@ export default function StoreSeoPage() {
     >
       {/* SERP Preview */}
       {settings.metaTitle && (
-        <div className="mb-6 rounded-xl border bg-white p-6 shadow-sm">
+        <div className="mb-6 rounded-xl border bg-card p-6 shadow-sm">
           <h2 className="mb-4 text-sm font-medium text-gray-700">Search Result Preview</h2>
           <div className="rounded-lg border border-gray-200 p-4 max-w-xl">
-            <p className="text-xs text-gray-500 mb-1">example.com</p>
+            <p className="text-xs text-muted-foreground mb-1">example.com</p>
             <p className="text-lg font-medium text-blue-700 leading-tight line-clamp-1">
               {settings.metaTitle}
             </p>
             {settings.metaDescription && (
-              <p className="mt-1 text-sm text-gray-600 line-clamp-2">{settings.metaDescription}</p>
+              <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
+                {settings.metaDescription}
+              </p>
             )}
           </div>
         </div>
@@ -171,12 +159,12 @@ export default function StoreSeoPage() {
 
       <div className="space-y-6">
         {/* English SEO */}
-        <div className="rounded-xl border bg-white p-6 shadow-sm space-y-4">
+        <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
           <div className="flex items-center gap-2">
             <div className="flex h-6 w-6 items-center justify-center rounded bg-blue-100">
               <span className="text-xs font-bold text-blue-600">EN</span>
             </div>
-            <h2 className="font-semibold text-gray-900">English SEO</h2>
+            <h2 className="font-semibold text-foreground">English SEO</h2>
           </div>
 
           <div>
@@ -191,7 +179,7 @@ export default function StoreSeoPage() {
               placeholder="My Store — Best Products in Kuwait"
               maxLength={TITLE_MAX + 20}
               className={`w-full rounded-lg border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary ${
-                settings.metaTitle.length > TITLE_MAX ? 'border-red-300' : 'border-gray-300'
+                settings.metaTitle.length > TITLE_MAX ? 'border-red-300' : 'border-border'
               }`}
             />
             <p className="mt-1 text-xs text-gray-400">
@@ -212,7 +200,7 @@ export default function StoreSeoPage() {
               rows={3}
               maxLength={DESC_MAX + 50}
               className={`w-full rounded-lg border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none ${
-                settings.metaDescription.length > DESC_MAX ? 'border-red-300' : 'border-gray-300'
+                settings.metaDescription.length > DESC_MAX ? 'border-red-300' : 'border-border'
               }`}
             />
             <p className="mt-1 text-xs text-gray-400">
@@ -222,12 +210,12 @@ export default function StoreSeoPage() {
         </div>
 
         {/* Arabic SEO */}
-        <div className="rounded-xl border bg-white p-6 shadow-sm space-y-4">
+        <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
           <div className="flex items-center gap-2">
             <div className="flex h-6 w-6 items-center justify-center rounded bg-green-100">
               <span className="text-xs font-bold text-green-600">AR</span>
             </div>
-            <h2 className="font-semibold text-gray-900">Arabic SEO</h2>
+            <h2 className="font-semibold text-foreground">Arabic SEO</h2>
           </div>
 
           <div>
@@ -243,7 +231,7 @@ export default function StoreSeoPage() {
               placeholder="متجري — أفضل المنتجات في الكويت"
               maxLength={TITLE_MAX + 20}
               className={`w-full rounded-lg border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary ${
-                settings.metaTitleAr.length > TITLE_MAX ? 'border-red-300' : 'border-gray-300'
+                settings.metaTitleAr.length > TITLE_MAX ? 'border-red-300' : 'border-border'
               }`}
             />
           </div>
@@ -261,15 +249,15 @@ export default function StoreSeoPage() {
               rows={3}
               maxLength={DESC_MAX + 50}
               className={`w-full rounded-lg border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none ${
-                settings.metaDescriptionAr.length > DESC_MAX ? 'border-red-300' : 'border-gray-300'
+                settings.metaDescriptionAr.length > DESC_MAX ? 'border-red-300' : 'border-border'
               }`}
             />
           </div>
         </div>
 
         {/* Advanced */}
-        <div className="rounded-xl border bg-white p-6 shadow-sm space-y-4">
-          <h2 className="font-semibold text-gray-900">Advanced</h2>
+        <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
+          <h2 className="font-semibold text-foreground">Advanced</h2>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">OG Image URL</label>
@@ -278,7 +266,7 @@ export default function StoreSeoPage() {
               value={settings.ogImage}
               onChange={e => setSettings(prev => ({ ...prev, ogImage: e.target.value }))}
               placeholder="https://example.com/og-image.jpg"
-              className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             />
             <p className="mt-1 text-xs text-gray-400">
               Image shown when your store is shared on social media. Recommended: 1200×630px.
@@ -291,7 +279,7 @@ export default function StoreSeoPage() {
                 Twitter / X Handle
               </label>
               <div className="flex">
-                <span className="inline-flex items-center rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 px-3 text-sm text-gray-500">
+                <span className="inline-flex items-center rounded-l-lg border border-r-0 border-border bg-gray-50 px-3 text-sm text-muted-foreground">
                   @
                 </span>
                 <input
@@ -304,7 +292,7 @@ export default function StoreSeoPage() {
                     }))
                   }
                   placeholder="yourstorehandle"
-                  className="flex-1 rounded-r-lg border border-gray-300 px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  className="flex-1 rounded-r-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 />
               </div>
             </div>
@@ -320,7 +308,7 @@ export default function StoreSeoPage() {
                   setSettings(prev => ({ ...prev, googleSiteVerification: e.target.value }))
                 }
                 placeholder="Verification meta tag content"
-                className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               />
               <p className="mt-1 text-xs text-gray-400">From Google Search Console verification</p>
             </div>

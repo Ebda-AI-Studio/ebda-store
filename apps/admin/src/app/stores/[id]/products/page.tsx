@@ -3,10 +3,11 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { Button, Input, Badge, Modal } from '@force/ui';
+import { Button, Input, Badge, Modal, useToast } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { useAuth } from '../../../../lib/auth';
-import { getApiUrl } from '../../../../lib/api';
+import { apiGet, apiDelete } from '../../../../lib/api';
+import { formatPrice } from '../../../../lib/format';
 
 interface Product {
   id: string;
@@ -33,17 +34,9 @@ interface Pagination {
   totalPages: number;
 }
 
-function formatPrice(fils: number) {
-  return new Intl.NumberFormat('en-KW', {
-    style: 'currency',
-    currency: 'KWD',
-    minimumFractionDigits: 3,
-  }).format(fils / 1000);
-}
-
 export default function StoreProductsPage() {
   const params = useParams();
-  const { token } = useAuth();
+  const { isAuthenticated } = useAuth();
   const storeId = params.id as string;
 
   const [store, setStore] = useState<Store | null>(null);
@@ -56,26 +49,24 @@ export default function StoreProductsPage() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const { success: toastSuccess, error: toastError } = useToast();
 
   useEffect(() => {
     fetchStore();
-  }, [storeId, token]);
+  }, [storeId, isAuthenticated]);
 
   useEffect(() => {
     if (store) {
       fetchProducts();
     }
-  }, [store, token, page, statusFilter]);
+  }, [store, isAuthenticated, page, statusFilter, search]);
 
   async function fetchStore() {
-    if (!token) return;
+    if (!isAuthenticated) return;
     try {
-      const response = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setStore(data.data.store);
+      const { data } = await apiGet<{ store: Store }>(`/api/v1/stores/${storeId}`);
+      if (data) {
+        setStore(data.store);
       }
     } catch (error) {
       console.error('Error fetching store:', error);
@@ -83,7 +74,7 @@ export default function StoreProductsPage() {
   }
 
   async function fetchProducts() {
-    if (!token) return;
+    if (!isAuthenticated) return;
 
     try {
       setLoading(true);
@@ -94,17 +85,13 @@ export default function StoreProductsPage() {
       if (statusFilter !== 'all') queryParams.append('status', statusFilter);
       if (search) queryParams.append('search', search);
 
-      const response = await fetch(
-        `${getApiUrl()}/api/v1/stores/${storeId}/products?${queryParams}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+      const { data } = await apiGet<{ products: Product[]; pagination: Pagination }>(
+        `/api/v1/stores/${storeId}/products?${queryParams}`
       );
 
-      if (response.ok) {
-        const data = await response.json();
-        setProducts(data.data.products || []);
-        setPagination(data.data.pagination);
+      if (data) {
+        setProducts(data.products || []);
+        setPagination(data.pagination);
       }
     } catch (error) {
       console.error('Error fetching products:', error);
@@ -120,23 +107,23 @@ export default function StoreProductsPage() {
   };
 
   const handleDelete = async () => {
-    if (!productToDelete || !token) return;
+    if (!productToDelete || !isAuthenticated) return;
 
     try {
       setDeleting(true);
-      const response = await fetch(
-        `${getApiUrl()}/api/v1/stores/${storeId}/products/${productToDelete.id}`,
-        {
-          method: 'DELETE',
-          headers: { Authorization: `Bearer ${token}` },
-        }
+      const { error: deleteError } = await apiDelete(
+        `/api/v1/stores/${storeId}/products/${productToDelete.id}`
       );
 
-      if (response.ok) {
+      if (!deleteError) {
+        toastSuccess('Product deleted', `${productToDelete.name} has been deleted.`);
         fetchProducts();
+      } else {
+        toastError('Delete failed', 'Failed to delete the product. Please try again.');
       }
     } catch (error) {
       console.error('Error deleting product:', error);
+      toastError('Delete failed', 'Failed to delete the product. Please try again.');
     } finally {
       setDeleting(false);
       setIsDeleteModalOpen(false);
@@ -239,22 +226,32 @@ export default function StoreProductsPage() {
       </div>
 
       {/* Products Table */}
-      <div className="rounded-xl border bg-white overflow-hidden">
+      <div className="rounded-xl border bg-card overflow-hidden">
         <table className="w-full">
-          <thead className="bg-gray-50 border-b">
+          <thead className="bg-muted border-b">
             <tr>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Product</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">SKU</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Price</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Inventory</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Status</th>
-              <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">Actions</th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
+                Product
+              </th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">SKU</th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
+                Price
+              </th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
+                Inventory
+              </th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
+                Status
+              </th>
+              <th className="px-4 py-3 text-right text-sm font-medium text-muted-foreground">
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y">
             {loading ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
                   <div className="flex items-center justify-center">
                     <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent mr-2"></div>
                     Loading products...
@@ -263,13 +260,33 @@ export default function StoreProductsPage() {
               </tr>
             ) : products.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
-                  No products found
+                <td colSpan={6} className="px-4 py-12 text-center">
+                  <div className="flex flex-col items-center">
+                    <svg
+                      className="h-12 w-12 text-gray-300 mb-3"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1}
+                        d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                      />
+                    </svg>
+                    <p className="text-muted-foreground font-medium">No products found</p>
+                    <p className="text-sm text-gray-400 mt-1">
+                      {search || statusFilter !== 'all'
+                        ? 'Try adjusting your search or filters.'
+                        : 'Add your first product to get started.'}
+                    </p>
+                  </div>
                 </td>
               </tr>
             ) : (
               products.map(product => (
-                <tr key={product.id} className="hover:bg-gray-50">
+                <tr key={product.id} className="hover:bg-muted">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <div className="h-10 w-10 rounded-lg bg-gray-100 overflow-hidden">
@@ -298,14 +315,14 @@ export default function StoreProductsPage() {
                         )}
                       </div>
                       <div>
-                        <p className="font-medium text-gray-900">{product.name}</p>
+                        <p className="font-medium text-foreground">{product.name}</p>
                         {product.hasVariants && (
                           <span className="text-xs text-blue-600">Has variants</span>
                         )}
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-500 font-mono">
+                  <td className="px-4 py-3 text-sm text-muted-foreground font-mono">
                     {product.sku || '-'}
                   </td>
                   <td className="px-4 py-3 text-sm font-medium">{formatPrice(product.price)}</td>
@@ -364,7 +381,7 @@ export default function StoreProductsPage() {
       {/* Pagination */}
       {pagination && pagination.totalPages > 1 && (
         <div className="mt-4 flex items-center justify-between">
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-muted-foreground">
             Showing {(page - 1) * pagination.limit + 1} to{' '}
             {Math.min(page * pagination.limit, pagination.total)} of {pagination.total} products
           </p>
@@ -395,7 +412,7 @@ export default function StoreProductsPage() {
         onClose={() => setIsDeleteModalOpen(false)}
         title="Delete Product"
       >
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-muted-foreground">
           Are you sure you want to delete <strong>{productToDelete?.name}</strong>? This action
           cannot be undone.
         </p>

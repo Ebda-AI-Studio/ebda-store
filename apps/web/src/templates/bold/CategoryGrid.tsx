@@ -1,6 +1,7 @@
 'use client';
 
 import type { CategoryGridProps } from '../types';
+import { getDisplayTitle } from '../shared';
 import CategoryCard from './CategoryCard';
 
 export default function BoldCategoryGrid({
@@ -10,7 +11,7 @@ export default function BoldCategoryGrid({
   titleAr,
   urlPrefix = '',
 }: CategoryGridProps) {
-  const displayTitle = isRtl && titleAr ? titleAr : title;
+  const displayTitle = getDisplayTitle(isRtl, title, titleAr);
 
   return (
     <section

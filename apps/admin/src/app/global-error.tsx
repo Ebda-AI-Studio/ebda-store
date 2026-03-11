@@ -9,84 +9,31 @@ export default function GlobalError({
 }) {
   return (
     <html lang="en">
-      <body style={{ margin: 0, fontFamily: 'system-ui, sans-serif' }}>
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            minHeight: '100vh',
-            padding: '1rem',
-            textAlign: 'center',
-          }}
-        >
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 600, marginBottom: '0.5rem' }}>
-            Admin Error
-          </h2>
-          <p style={{ color: '#6b7280', marginBottom: '1rem', maxWidth: '28rem' }}>
+      <body className="m-0 font-sans">
+        <div className="flex min-h-screen flex-col items-center justify-center p-4 text-center">
+          <h2 className="mb-2 text-2xl font-semibold">Admin Error</h2>
+          <p className="mb-4 max-w-md text-gray-500">
             A critical error occurred in the admin application.
           </p>
           {error.digest && (
-            <p
-              style={{
-                fontFamily: 'monospace',
-                fontSize: '0.75rem',
-                color: '#6b7280',
-                background: '#f3f4f6',
-                padding: '0.5rem 0.75rem',
-                borderRadius: '0.5rem',
-                marginBottom: '1rem',
-              }}
-            >
+            <p className="mb-4 rounded-lg bg-gray-100 px-3 py-2 font-mono text-xs text-gray-500">
               Error ID: {error.digest}
             </p>
           )}
-          <p
-            style={{
-              fontFamily: 'monospace',
-              fontSize: '0.75rem',
-              color: '#6b7280',
-              background: '#f3f4f6',
-              padding: '0.5rem 0.75rem',
-              borderRadius: '0.5rem',
-              marginBottom: '2rem',
-              maxWidth: '28rem',
-              wordBreak: 'break-all',
-            }}
-          >
+          <p className="mb-8 max-w-md break-all rounded-lg bg-gray-100 px-3 py-2 font-mono text-xs text-gray-500">
             {error.message || 'Unknown error'}
           </p>
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <div className="flex gap-3">
             <button
               onClick={reset}
-              style={{
-                backgroundColor: '#ff6e00',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '0.5rem',
-                padding: '0.625rem 1.5rem',
-                fontSize: '0.875rem',
-                fontWeight: 500,
-                cursor: 'pointer',
-              }}
+              className="cursor-pointer rounded-lg border-none bg-orange-500 px-6 py-2.5 text-sm font-medium text-white hover:bg-orange-600"
             >
               Try Again
             </button>
             {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- global-error has no Next.js context */}
             <a
               href="/"
-              style={{
-                display: 'inline-block',
-                border: '1px solid #e5e7eb',
-                borderRadius: '0.5rem',
-                padding: '0.625rem 1.5rem',
-                fontSize: '0.875rem',
-                fontWeight: 500,
-                color: '#1f2937',
-                textDecoration: 'none',
-                cursor: 'pointer',
-              }}
+              className="inline-block rounded-lg border border-gray-200 px-6 py-2.5 text-sm font-medium text-gray-800 no-underline hover:bg-gray-50"
             >
               Go to Dashboard
             </a>

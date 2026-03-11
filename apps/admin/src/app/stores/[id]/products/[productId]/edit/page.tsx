@@ -6,7 +6,7 @@ import { Button, Input, Textarea, Select } from '@force/ui';
 import { AdminLayout } from '../../../../../../components/AdminLayout';
 import { MultiImageUpload } from '../../../../../../components/ImageUpload';
 import { useAuth } from '../../../../../../lib/auth';
-import { apiPut, getApiUrl } from '../../../../../../lib/api';
+import { apiGet, apiPut } from '../../../../../../lib/api';
 
 interface Product {
   id: string;
@@ -42,7 +42,7 @@ const statuses = [
 export default function EditProductPage() {
   const params = useParams();
   const router = useRouter();
-  const { token } = useAuth();
+  const { isAuthenticated } = useAuth();
   const storeId = params?.id as string;
   const productId = params?.productId as string;
 
@@ -70,22 +70,24 @@ export default function EditProductPage() {
 
   useEffect(() => {
     async function fetchProduct() {
-      if (!token || !storeId || !productId) return;
+      if (!isAuthenticated || !storeId || !productId) return;
 
       try {
         setLoading(true);
-        const response = await fetch(
-          `${getApiUrl()}/api/v1/stores/${storeId}/products/${productId}`,
-          { headers: { Authorization: `Bearer ${token}` } }
+        const { data, error: apiError } = await apiGet<{ product?: Product } & Product>(
+          `/api/v1/stores/${storeId}/products/${productId}`
         );
 
-        if (!response.ok) {
-          setError(response.status === 404 ? 'Product not found' : 'Failed to load product');
+        if (apiError) {
+          setError(apiError.status === 404 ? 'Product not found' : 'Failed to load product');
           return;
         }
 
-        const data = await response.json();
-        const p = data.data?.product || data.data;
+        const p = data?.product || data;
+        if (!p) {
+          setError('Failed to load product');
+          return;
+        }
         setProduct(p);
 
         if (p.images?.length) {
@@ -118,19 +120,18 @@ export default function EditProductPage() {
     }
 
     fetchProduct();
-  }, [productId, storeId, token]);
+  }, [productId, storeId, isAuthenticated]);
 
   useEffect(() => {
-    if (!storeId || !token) return;
+    if (!storeId || !isAuthenticated) return;
 
     async function fetchCategories() {
       try {
-        const response = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/categories`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const result = await response.json();
-        if (result.success && result.data?.categories) {
-          setCategories(result.data.categories);
+        const { data } = await apiGet<{ categories: Category[] }>(
+          `/api/v1/stores/${storeId}/categories`
+        );
+        if (data?.categories) {
+          setCategories(data.categories);
         }
       } catch {
         setCategories([]);
@@ -138,7 +139,7 @@ export default function EditProductPage() {
     }
 
     fetchCategories();
-  }, [storeId, token]);
+  }, [storeId, isAuthenticated]);
 
   const updateField = (field: string, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -214,8 +215,8 @@ export default function EditProductPage() {
   if (error && !product) {
     return (
       <AdminLayout title="Product Not Found" subtitle="">
-        <div className="rounded-xl border bg-white p-8 text-center">
-          <h3 className="mt-4 text-lg font-medium text-gray-900">{error}</h3>
+        <div className="rounded-xl border bg-card p-8 text-center">
+          <h3 className="mt-4 text-lg font-medium text-foreground">{error}</h3>
           <Button className="mt-6" onClick={() => router.push(`/stores/${storeId}/products`)}>
             Back to Products
           </Button>
@@ -234,8 +235,8 @@ export default function EditProductPage() {
 
         <div className="grid gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2 space-y-6">
-            <div className="rounded-xl border bg-white p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Basic Information</h2>
+            <div className="rounded-xl border bg-card p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-foreground mb-4">Basic Information</h2>
               <div className="space-y-4">
                 <Input
                   label="Product Name"
@@ -269,8 +270,8 @@ export default function EditProductPage() {
               </div>
             </div>
 
-            <div className="rounded-xl border bg-white p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Media</h2>
+            <div className="rounded-xl border bg-card p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-foreground mb-4">Media</h2>
               <MultiImageUpload
                 values={images}
                 onChange={setImages}
@@ -280,8 +281,8 @@ export default function EditProductPage() {
               />
             </div>
 
-            <div className="rounded-xl border bg-white p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Pricing</h2>
+            <div className="rounded-xl border bg-card p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-foreground mb-4">Pricing</h2>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Input
                   label="Price (KWD)"
@@ -303,8 +304,8 @@ export default function EditProductPage() {
               </div>
             </div>
 
-            <div className="rounded-xl border bg-white p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Inventory</h2>
+            <div className="rounded-xl border bg-card p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-foreground mb-4">Inventory</h2>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Input
                   label="SKU"
@@ -324,8 +325,8 @@ export default function EditProductPage() {
           </div>
 
           <div className="space-y-6">
-            <div className="rounded-xl border bg-white p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Status</h2>
+            <div className="rounded-xl border bg-card p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-foreground mb-4">Status</h2>
               <Select
                 label="Product Status"
                 value={formData.status}
@@ -334,8 +335,8 @@ export default function EditProductPage() {
               />
             </div>
 
-            <div className="rounded-xl border bg-white p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Organization</h2>
+            <div className="rounded-xl border bg-card p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-foreground mb-4">Organization</h2>
               <Select
                 label="Category"
                 value={formData.category}
@@ -344,8 +345,8 @@ export default function EditProductPage() {
               />
             </div>
 
-            <div className="rounded-xl border bg-white p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Product Flags</h2>
+            <div className="rounded-xl border bg-card p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-foreground mb-4">Product Flags</h2>
               <div className="space-y-3">
                 <label className="flex items-center gap-3 cursor-pointer">
                   <input
@@ -368,7 +369,7 @@ export default function EditProductPage() {
               </div>
             </div>
 
-            <div className="rounded-xl border bg-white p-6 shadow-sm">
+            <div className="rounded-xl border bg-card p-6 shadow-sm">
               <div className="space-y-3">
                 <Button type="submit" className="w-full" isLoading={saving}>
                   Save Changes

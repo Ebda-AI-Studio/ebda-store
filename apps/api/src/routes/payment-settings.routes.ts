@@ -6,6 +6,7 @@ import { requirePermission } from '../middleware/rbac';
 import { encryption } from '../services/encryption.service';
 import { auditLog } from '../middleware/security';
 import { PaymentService } from '../services/payment.service';
+import { getAuthUser } from '../utils/store-helpers';
 
 const router = Router();
 
@@ -152,7 +153,7 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const data = paymentConfigSchema.parse(req.body);
-      const userId = req.user!.userId;
+      const userId = getAuthUser(req).userId;
 
       // Check if provider already exists
       const existing = await prisma.paymentConfig.findFirst({
@@ -242,7 +243,7 @@ router.put(
     try {
       const { provider } = req.params;
       const data = updateConfigSchema.parse(req.body);
-      const userId = req.user!.userId;
+      const userId = getAuthUser(req).userId;
 
       const existing = await prisma.paymentConfig.findFirst({
         where: {
@@ -342,7 +343,7 @@ router.delete(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { provider } = req.params;
-      const userId = req.user!.userId;
+      const userId = getAuthUser(req).userId;
 
       const existing = await prisma.paymentConfig.findFirst({
         where: {
@@ -398,7 +399,7 @@ router.post(
     try {
       const { provider } = req.params;
       const { enabled } = req.body;
-      const userId = req.user!.userId;
+      const userId = getAuthUser(req).userId;
 
       const existing = await prisma.paymentConfig.findFirst({
         where: {
@@ -462,7 +463,7 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { provider } = req.params;
-      const userId = req.user!.userId;
+      const userId = getAuthUser(req).userId;
 
       const existing = await prisma.paymentConfig.findFirst({
         where: {
@@ -533,7 +534,7 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { provider } = req.params;
-      const userId = req.user!.userId;
+      const userId = getAuthUser(req).userId;
 
       const config = await prisma.paymentConfig.findFirst({
         where: {
@@ -712,7 +713,8 @@ router.get(
       }
 
       // Check if user owns the store or is super_admin
-      if (req.user!.role !== 'super_admin' && store.ownerId !== req.user!.userId) {
+      const user = getAuthUser(req);
+      if (user.role !== 'super_admin' && store.ownerId !== user.userId) {
         res.status(403).json({
           success: false,
           error: { code: 'FORBIDDEN', message: 'Access denied' },
@@ -768,7 +770,8 @@ router.post(
     try {
       const { storeId } = req.params;
       const data = paymentConfigSchema.parse(req.body);
-      const userId = req.user!.userId;
+      const user = getAuthUser(req);
+      const userId = user.userId;
 
       // Verify user has access to this store
       const store = await prisma.store.findUnique({
@@ -783,7 +786,7 @@ router.post(
         return;
       }
 
-      if (req.user!.role !== 'super_admin' && store.ownerId !== req.user!.userId) {
+      if (user.role !== 'super_admin' && store.ownerId !== user.userId) {
         res.status(403).json({
           success: false,
           error: { code: 'FORBIDDEN', message: 'Access denied' },
@@ -880,7 +883,8 @@ router.put(
     try {
       const { storeId, provider } = req.params;
       const data = updateConfigSchema.parse(req.body);
-      const userId = req.user!.userId;
+      const user = getAuthUser(req);
+      const userId = user.userId;
 
       // Verify user has access to this store
       const store = await prisma.store.findUnique({
@@ -895,7 +899,7 @@ router.put(
         return;
       }
 
-      if (req.user!.role !== 'super_admin' && store.ownerId !== req.user!.userId) {
+      if (user.role !== 'super_admin' && store.ownerId !== user.userId) {
         res.status(403).json({
           success: false,
           error: { code: 'FORBIDDEN', message: 'Access denied' },
@@ -1000,7 +1004,8 @@ router.delete(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, provider } = req.params;
-      const userId = req.user!.userId;
+      const user = getAuthUser(req);
+      const userId = user.userId;
 
       // Verify user has access to this store
       const store = await prisma.store.findUnique({
@@ -1015,7 +1020,7 @@ router.delete(
         return;
       }
 
-      if (req.user!.role !== 'super_admin' && store.ownerId !== req.user!.userId) {
+      if (user.role !== 'super_admin' && store.ownerId !== user.userId) {
         res.status(403).json({
           success: false,
           error: { code: 'FORBIDDEN', message: 'Access denied' },
@@ -1077,7 +1082,8 @@ router.post(
     try {
       const { storeId, provider } = req.params;
       const { enabled } = req.body;
-      const userId = req.user!.userId;
+      const user = getAuthUser(req);
+      const userId = user.userId;
 
       // Verify user has access to this store
       const store = await prisma.store.findUnique({
@@ -1092,7 +1098,7 @@ router.post(
         return;
       }
 
-      if (req.user!.role !== 'super_admin' && store.ownerId !== req.user!.userId) {
+      if (user.role !== 'super_admin' && store.ownerId !== user.userId) {
         res.status(403).json({
           success: false,
           error: { code: 'FORBIDDEN', message: 'Access denied' },

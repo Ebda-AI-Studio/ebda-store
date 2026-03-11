@@ -95,14 +95,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   // Sync local cart items to the backend (call after login)
   const syncCartToBackend = useCallback(async () => {
     if (items.length === 0) return;
-    try {
-      for (const item of items) {
-        await api.addToCart(item.id, item.quantity);
-      }
-    } catch {
-      // Non-critical — local cart still works as fallback
-      console.error('Failed to sync cart to backend');
-    }
+    // Use Promise.allSettled so all items attempt to sync independently
+    await Promise.allSettled(items.map(item => api.addToCart(item.id, item.quantity)));
   }, [items]);
 
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);

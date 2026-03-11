@@ -25,20 +25,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   const refreshUser = useCallback(async () => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-    if (!token) {
-      setUser(null);
-      setIsLoading(false);
-      return;
-    }
-
+    // Auth is handled via HTTP-only cookies sent automatically with
+    // credentials: 'include'. No need to check localStorage for tokens.
     try {
       const result = await api.getProfile();
       if (result.success && result.data) {
         setUser(result.data.user);
       } else {
         setUser(null);
-        api.setToken(null);
       }
     } catch {
       setUser(null);
@@ -64,7 +58,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (data: { email: string; password: string; firstName: string; lastName: string }) => {
       const result = await api.register(data);
       if (result.success && result.data) {
-        api.setToken(result.data.accessToken);
+        // Access token is set as HTTP-only cookie by the API.
+        // Only store the refresh token in localStorage.
         if (typeof window !== 'undefined') {
           localStorage.setItem('refreshToken', result.data.refreshToken);
         }

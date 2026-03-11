@@ -4,7 +4,8 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button, Badge, Input, Label } from '@force/ui';
 import { AdminLayout } from '../../../../../../components/AdminLayout';
-import { getApiUrl } from '../../../../../../lib/api';
+import { apiGet, apiPost, apiPut, apiDelete } from '../../../../../../lib/api';
+import { formatPrice } from '../../../../../../lib/format';
 
 interface OptionValue {
   id: string;
@@ -53,10 +54,6 @@ interface ProductInfo {
   inventory: number;
 }
 
-function formatPrice(fils: number) {
-  return `${(fils / 1000).toFixed(3)} KWD`;
-}
-
 export default function ProductVariantsPage() {
   const params = useParams();
   const router = useRouter();
@@ -92,17 +89,16 @@ export default function ProductVariantsPage() {
 
   const fetchVariants = useCallback(async () => {
     try {
-      const token = localStorage.getItem('authToken');
-      const response = await fetch(
-        `${getApiUrl()}/api/v1/stores/${storeId}/products/${productId}/variants`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const { data } = await apiGet<{
+        product: ProductInfo;
+        options: Option[];
+        variants: Variant[];
+      }>(`/api/v1/stores/${storeId}/products/${productId}/variants`);
 
-      if (response.ok) {
-        const data = await response.json();
-        setProduct(data.data.product);
-        setOptions(data.data.options);
-        setVariants(data.data.variants);
+      if (data) {
+        setProduct(data.product);
+        setOptions(data.options);
+        setVariants(data.variants);
       }
     } catch (error) {
       console.error('Failed to fetch variants:', error);
@@ -126,24 +122,16 @@ export default function ProductVariantsPage() {
       .filter(v => v.value);
 
     try {
-      const token = localStorage.getItem('authToken');
-      const response = await fetch(
-        `${getApiUrl()}/api/v1/stores/${storeId}/products/${productId}/options`,
+      const { error: apiError } = await apiPost(
+        `/api/v1/stores/${storeId}/products/${productId}/options`,
         {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            name: newOptionName,
-            nameAr: newOptionNameAr || undefined,
-            values,
-          }),
+          name: newOptionName,
+          nameAr: newOptionNameAr || undefined,
+          values,
         }
       );
 
-      if (response.ok) {
+      if (!apiError) {
         setShowAddOption(false);
         setNewOptionName('');
         setNewOptionNameAr('');
@@ -157,14 +145,7 @@ export default function ProductVariantsPage() {
 
   async function handleDeleteOption(optionId: string) {
     try {
-      const token = localStorage.getItem('authToken');
-      await fetch(
-        `${getApiUrl()}/api/v1/stores/${storeId}/products/${productId}/options/${optionId}`,
-        {
-          method: 'DELETE',
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      await apiDelete(`/api/v1/stores/${storeId}/products/${productId}/options/${optionId}`);
       fetchVariants();
     } catch (error) {
       console.error('Failed to delete option:', error);
@@ -175,23 +156,15 @@ export default function ProductVariantsPage() {
     if (!newValue.trim()) return;
 
     try {
-      const token = localStorage.getItem('authToken');
-      const response = await fetch(
-        `${getApiUrl()}/api/v1/stores/${storeId}/products/${productId}/options/${optionId}/values`,
+      const { error: apiError } = await apiPost(
+        `/api/v1/stores/${storeId}/products/${productId}/options/${optionId}/values`,
         {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            value: newValue,
-            valueAr: newValueAr || undefined,
-          }),
+          value: newValue,
+          valueAr: newValueAr || undefined,
         }
       );
 
-      if (response.ok) {
+      if (!apiError) {
         setShowAddValue(null);
         setNewValue('');
         setNewValueAr('');
@@ -204,14 +177,7 @@ export default function ProductVariantsPage() {
 
   async function handleDeleteValue(valueId: string) {
     try {
-      const token = localStorage.getItem('authToken');
-      await fetch(
-        `${getApiUrl()}/api/v1/stores/${storeId}/products/${productId}/option-values/${valueId}`,
-        {
-          method: 'DELETE',
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      await apiDelete(`/api/v1/stores/${storeId}/products/${productId}/option-values/${valueId}`);
       fetchVariants();
     } catch (error) {
       console.error('Failed to delete value:', error);
@@ -220,16 +186,11 @@ export default function ProductVariantsPage() {
 
   async function handleGenerateVariants() {
     try {
-      const token = localStorage.getItem('authToken');
-      const response = await fetch(
-        `${getApiUrl()}/api/v1/stores/${storeId}/products/${productId}/variants/generate`,
-        {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
-        }
+      const { error: apiError } = await apiPost(
+        `/api/v1/stores/${storeId}/products/${productId}/variants/generate`
       );
 
-      if (response.ok) {
+      if (!apiError) {
         fetchVariants();
       }
     } catch (error) {
@@ -241,30 +202,20 @@ export default function ProductVariantsPage() {
     if (!editingVariant) return;
 
     try {
-      const token = localStorage.getItem('authToken');
-      const response = await fetch(
-        `${getApiUrl()}/api/v1/stores/${storeId}/products/${productId}/variants/${editingVariant.id}`,
+      const { error: apiError } = await apiPut(
+        `/api/v1/stores/${storeId}/products/${productId}/variants/${editingVariant.id}`,
         {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            sku: variantForm.sku || null,
-            barcode: variantForm.barcode || null,
-            price: variantForm.price ? parseInt(variantForm.price) : null,
-            compareAtPrice: variantForm.compareAtPrice
-              ? parseInt(variantForm.compareAtPrice)
-              : null,
-            costPrice: variantForm.costPrice ? parseInt(variantForm.costPrice) : null,
-            inventory: parseInt(variantForm.inventory) || 0,
-            weight: variantForm.weight ? parseFloat(variantForm.weight) : null,
-          }),
+          sku: variantForm.sku || null,
+          barcode: variantForm.barcode || null,
+          price: variantForm.price ? parseInt(variantForm.price) : null,
+          compareAtPrice: variantForm.compareAtPrice ? parseInt(variantForm.compareAtPrice) : null,
+          costPrice: variantForm.costPrice ? parseInt(variantForm.costPrice) : null,
+          inventory: parseInt(variantForm.inventory) || 0,
+          weight: variantForm.weight ? parseFloat(variantForm.weight) : null,
         }
       );
 
-      if (response.ok) {
+      if (!apiError) {
         setEditingVariant(null);
         fetchVariants();
       }
@@ -275,14 +226,7 @@ export default function ProductVariantsPage() {
 
   async function handleDeleteVariant(variantId: string) {
     try {
-      const token = localStorage.getItem('authToken');
-      await fetch(
-        `${getApiUrl()}/api/v1/stores/${storeId}/products/${productId}/variants/${variantId}`,
-        {
-          method: 'DELETE',
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      await apiDelete(`/api/v1/stores/${storeId}/products/${productId}/variants/${variantId}`);
       fetchVariants();
     } catch (error) {
       console.error('Failed to delete variant:', error);
@@ -349,20 +293,22 @@ export default function ProductVariantsPage() {
       }
     >
       {/* Product Summary */}
-      <div className="rounded-xl border bg-white p-6 shadow-sm mb-6">
+      <div className="rounded-xl border bg-card p-6 shadow-sm mb-6">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="font-semibold text-gray-900">{product.name}</h2>
+            <h2 className="font-semibold text-foreground">{product.name}</h2>
             {product.nameAr && (
-              <p className="text-sm text-gray-500" dir="rtl">
+              <p className="text-sm text-muted-foreground" dir="rtl">
                 {product.nameAr}
               </p>
             )}
-            <p className="text-sm text-gray-500 mt-1">Base Price: {formatPrice(product.price)}</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Base Price: {formatPrice(product.price)}
+            </p>
           </div>
           <div className="text-right">
-            <p className="text-sm text-gray-500">Total Variant Stock</p>
-            <p className="text-2xl font-bold text-gray-900">{totalVariantInventory}</p>
+            <p className="text-sm text-muted-foreground">Total Variant Stock</p>
+            <p className="text-2xl font-bold text-foreground">{totalVariantInventory}</p>
           </div>
         </div>
       </div>
@@ -370,9 +316,9 @@ export default function ProductVariantsPage() {
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Options Panel */}
         <div className="lg:col-span-1 space-y-4">
-          <div className="rounded-xl border bg-white shadow-sm">
+          <div className="rounded-xl border bg-card shadow-sm">
             <div className="flex items-center justify-between border-b p-4">
-              <h3 className="font-semibold text-gray-900">Options</h3>
+              <h3 className="font-semibold text-foreground">Options</h3>
               {options.length < 3 && (
                 <Button size="sm" onClick={() => setShowAddOption(true)}>
                   Add Option
@@ -381,7 +327,7 @@ export default function ProductVariantsPage() {
             </div>
 
             {options.length === 0 ? (
-              <div className="p-6 text-center text-gray-500">
+              <div className="p-6 text-center text-muted-foreground">
                 <p className="text-sm">No options defined yet.</p>
                 <p className="text-xs mt-1">
                   Add options like &quot;Size&quot; or &quot;Color&quot;
@@ -393,9 +339,9 @@ export default function ProductVariantsPage() {
                   <div key={option.id} className="p-4">
                     <div className="flex items-center justify-between mb-2">
                       <div>
-                        <p className="font-medium text-gray-900">{option.name}</p>
+                        <p className="font-medium text-foreground">{option.name}</p>
                         {option.nameAr && (
-                          <p className="text-xs text-gray-500" dir="rtl">
+                          <p className="text-xs text-muted-foreground" dir="rtl">
                             {option.nameAr}
                           </p>
                         )}
@@ -476,13 +422,13 @@ export default function ProductVariantsPage() {
         </div>
 
         {/* Variants Table */}
-        <div className="lg:col-span-2 rounded-xl border bg-white shadow-sm">
+        <div className="lg:col-span-2 rounded-xl border bg-card shadow-sm">
           <div className="border-b p-4">
-            <h3 className="font-semibold text-gray-900">Variants ({variants.length})</h3>
+            <h3 className="font-semibold text-foreground">Variants ({variants.length})</h3>
           </div>
 
           {variants.length === 0 ? (
-            <div className="p-6 text-center text-gray-500">
+            <div className="p-6 text-center text-muted-foreground">
               <svg
                 className="mx-auto h-12 w-12 text-gray-400"
                 fill="none"
@@ -502,7 +448,7 @@ export default function ProductVariantsPage() {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
+                <thead className="bg-muted text-left text-xs uppercase text-muted-foreground">
                   <tr>
                     <th className="px-4 py-3">Variant</th>
                     <th className="px-4 py-3">SKU</th>
@@ -514,16 +460,16 @@ export default function ProductVariantsPage() {
                 </thead>
                 <tbody className="divide-y">
                   {variants.map(variant => (
-                    <tr key={variant.id} className="hover:bg-gray-50">
+                    <tr key={variant.id} className="hover:bg-muted">
                       <td className="px-4 py-3">
-                        <p className="font-medium text-gray-900">{variant.title}</p>
+                        <p className="font-medium text-foreground">{variant.title}</p>
                         {variant.titleAr && (
-                          <p className="text-xs text-gray-500" dir="rtl">
+                          <p className="text-xs text-muted-foreground" dir="rtl">
                             {variant.titleAr}
                           </p>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-gray-600">{variant.sku || '-'}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{variant.sku || '-'}</td>
                       <td className="px-4 py-3 text-right">
                         {variant.price ? (
                           formatPrice(variant.price)
@@ -593,8 +539,8 @@ export default function ProductVariantsPage() {
       {/* Add Option Modal */}
       {showAddOption && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Add Option</h3>
+          <div className="w-full max-w-md rounded-xl bg-card p-6 shadow-xl">
+            <h3 className="text-lg font-semibold text-foreground mb-4">Add Option</h3>
 
             <div className="space-y-4">
               <div>
@@ -645,8 +591,8 @@ export default function ProductVariantsPage() {
       {/* Add Value Modal */}
       {showAddValue && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Add Value</h3>
+          <div className="w-full max-w-md rounded-xl bg-card p-6 shadow-xl">
+            <h3 className="text-lg font-semibold text-foreground mb-4">Add Value</h3>
 
             <div className="space-y-4">
               <div>
@@ -685,8 +631,8 @@ export default function ProductVariantsPage() {
       {/* Edit Variant Modal */}
       {editingVariant && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+          <div className="w-full max-w-lg rounded-xl bg-card p-6 shadow-xl max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold text-foreground mb-4">
               Edit Variant: {editingVariant.title}
             </h3>
 
