@@ -35,8 +35,8 @@ const getRequiredSecret = (envVar: string, name: string): string => {
 export const config = {
   // Server
   nodeEnv: process.env.NODE_ENV || 'development',
-  port: parseInt(process.env.API_PORT || '4000', 10),
-  host: process.env.API_HOST || 'localhost',
+  port: parseInt(process.env.PORT || process.env.API_PORT || '4000', 10),
+  host: process.env.API_HOST || '0.0.0.0',
   appVersion: process.env.APP_VERSION || '1.0.0',
 
   // URLs
