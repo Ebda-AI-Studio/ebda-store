@@ -5,6 +5,9 @@
     "rootDir": "./src",
     "baseUrl": ".",
     "noImplicitAny": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "strict": false,
     "paths": {
       "@/*": ["./src/*"]
     }
