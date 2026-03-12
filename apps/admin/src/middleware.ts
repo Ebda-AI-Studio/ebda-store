@@ -27,11 +27,11 @@ export function middleware(request: NextRequest) {
   }
 
   // Auth pages that should be accessible without a token
-  const isAuthPage = pathname.startsWith('/auth/');
+  const isAuthPage = pathname === '/login';
 
   // No token on a protected route -- redirect to login
   if (!token && !isAuthPage) {
-    const loginUrl = new URL('/auth/login', request.url);
+    const loginUrl = new URL('/login', request.url);
     return NextResponse.redirect(loginUrl);
   }
 
