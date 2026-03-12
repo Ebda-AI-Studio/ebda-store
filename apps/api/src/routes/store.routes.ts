@@ -712,7 +712,7 @@ router.put(
           });
 
       // Get verification status
-      let domainStatus = null;
+      let domainStatus: import('../services/vercel-domain.service').DomainStatus | null = null;
       if (domain) {
         domainStatus = await VercelDomainService.getDomain(domain);
       }

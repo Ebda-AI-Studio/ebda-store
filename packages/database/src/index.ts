@@ -49,6 +49,29 @@ if (process.env.NODE_ENV !== 'production') {
   globalForPrisma.prisma = prisma;
 }
 
-// Export Prisma types for use in other packages
+// Re-export everything from Prisma client (types, enums, Prisma namespace)
 export * from '@prisma/client';
+export { Prisma } from '@prisma/client';
+
+// Explicit enum re-exports for environments where barrel re-exports may not resolve
+export {
+  UserRole,
+  UserStatus,
+  StoreStatus,
+  StorePlan,
+  StoreTemplate,
+  ProductStatus,
+  InventoryChangeType,
+  PaymentStatus,
+  OrderStatus,
+  OrderPaymentStatus,
+  ReturnType,
+  ReturnStatus,
+  PaymentProvider,
+  ProviderHealthStatus,
+  CouponType,
+  VerificationTokenType,
+  LoyaltyTransactionType,
+} from '@prisma/client';
+
 export { prisma as db };
