@@ -194,6 +194,7 @@ export function AdminLayout({
                   width={20}
                   height={15}
                   className="brightness-0 invert"
+                  unoptimized
                 />
               </div>
               <div>

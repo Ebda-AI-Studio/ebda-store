@@ -41,7 +41,7 @@ export default function LoginPage() {
         <div className="mx-auto w-full max-w-sm lg:w-96">
           <div className="text-center">
             <div className="flex justify-center">
-              <Image src="/logo.svg" alt="Force Media" width={48} height={36} />
+              <Image src="/logo.svg" alt="Force Media" width={48} height={36} unoptimized />
             </div>
             <h2 className="mt-6 text-3xl font-bold text-gray-900">Admin Login</h2>
             <p className="mt-2 text-sm text-gray-600">Sign in to access the Force Platform</p>
