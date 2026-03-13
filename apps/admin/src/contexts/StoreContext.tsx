@@ -90,10 +90,15 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+const defaultStoreContext: StoreContextType = {
+  stores: [],
+  selectedStoreId: 'all',
+  setSelectedStoreId: () => {},
+  selectedStore: undefined,
+  isLoading: true,
+};
+
 export function useStore() {
   const context = useContext(StoreContext);
-  if (!context) {
-    throw new Error('useStore must be used within a StoreProvider');
-  }
-  return context;
+  return context ?? defaultStoreContext;
 }
