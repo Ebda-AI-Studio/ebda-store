@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/lib/auth';
-import { getApiUrl } from '@/lib/api';
+import { apiGet } from '@/lib/api';
 
 interface Store {
   id: string;
@@ -41,12 +41,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
     async function fetchStores() {
       try {
-        const response = await fetch(`${getApiUrl()}/api/v1/admin/stores`, {
-          credentials: 'include',
-        });
-        if (response.ok) {
-          const data = await response.json();
-          const raw = data.data?.stores || data.data;
+        const { data } = await apiGet<{ stores?: Store[] } | Store[]>('/api/v1/admin/stores');
+        if (data) {
+          const raw = (data as { stores?: Store[] }).stores || data;
           const storeList: Store[] = Array.isArray(raw) ? raw : [];
           setStores(storeList);
 

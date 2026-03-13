@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import {
   type StoreTheme,
   type StoreSocialLinks,
@@ -82,7 +82,6 @@ interface StoreContextValue {
   store: StoreData;
   isLoading: boolean;
   error: Error | null;
-  refreshStore: () => Promise<void>;
 }
 
 const StoreContext = createContext<StoreContextValue | null>(null);
@@ -128,9 +127,9 @@ export function StoreProvider({ children, initialStore }: StoreProviderProps) {
     ? { ...DEFAULT_STORE, ...initialStore, theme: initialStore.theme || DEFAULT_THEME }
     : DEFAULT_STORE;
 
-  const [store, setStore] = useState<StoreData>(mergedInitialStore);
-  const [isLoading, setIsLoading] = useState(!initialStore);
-  const [error, setError] = useState<Error | null>(null);
+  const [store] = useState<StoreData>(mergedInitialStore);
+  const [isLoading] = useState(!initialStore);
+  const [error] = useState<Error | null>(null);
 
   // Set store ID on API client so all requests include it
   useEffect(() => {
@@ -157,30 +156,8 @@ export function StoreProvider({ children, initialStore }: StoreProviderProps) {
     }
   }, [store.favicon]);
 
-  const refreshStore = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch('/api/store');
-      if (!response.ok) {
-        throw new Error('Failed to fetch store');
-      }
-      const data = await response.json();
-      if (data.store) {
-        setStore(data.store);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error('Unknown error'));
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
   return (
-    <StoreContext.Provider value={{ store, isLoading, error, refreshStore }}>
-      {children}
-    </StoreContext.Provider>
+    <StoreContext.Provider value={{ store, isLoading, error }}>{children}</StoreContext.Provider>
   );
 }
 
@@ -242,14 +219,6 @@ export function useStoreContact() {
     addressAr: store.addressAr,
     socialLinks: store.socialLinks,
   };
-}
-
-/**
- * Hook to get announcement bar configuration
- */
-export function useAnnouncementBar(): AnnouncementBar | undefined {
-  const { store } = useStore();
-  return store.announcementBar;
 }
 
 /**

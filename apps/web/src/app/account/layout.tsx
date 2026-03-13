@@ -1,19 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { Button } from '@force/ui';
-import { api } from '@/lib/api';
+import { useAuth } from '../../contexts/AuthContext';
 import { useStoreUrl } from '../../contexts/StoreContext';
-
-interface User {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-}
 
 const accountNav = [
   {
@@ -47,31 +40,17 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
   const pathname = usePathname();
   const router = useRouter();
   const storeUrl = useStoreUrl();
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const { user, isLoading, isAuthenticated, logout } = useAuth();
 
-  const checkAuth = useCallback(async () => {
-    try {
-      // Auth is via HTTP-only cookies — just call getProfile directly.
-      const result = await api.getProfile();
-      if (result.success && result.data) {
-        setUser(result.data.user);
-      } else {
-        router.push(storeUrl('/auth/login'));
-      }
-    } catch {
-      router.push(storeUrl('/auth/login'));
-    } finally {
-      setIsLoading(false);
-    }
-  }, [router]);
-
+  // Redirect to login if not authenticated once loading completes
   useEffect(() => {
-    checkAuth();
-  }, [checkAuth]);
+    if (!isLoading && !isAuthenticated) {
+      router.push(storeUrl('/auth/login'));
+    }
+  }, [isLoading, isAuthenticated, router, storeUrl]);
 
   async function handleLogout() {
-    await api.logout();
+    await logout();
     router.push(storeUrl('/'));
   }
 

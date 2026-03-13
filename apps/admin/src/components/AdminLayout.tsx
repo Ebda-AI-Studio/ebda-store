@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Button } from '@force/ui';
 import { useAuth } from '../lib/auth';
-import { getApiUrl } from '../lib/api';
+import { apiGet } from '../lib/api';
 import { NotificationBell } from './NotificationBell';
 import { useStore } from '../contexts/StoreContext';
 
@@ -125,15 +125,12 @@ export function AdminLayout({
   const [storeInfo, setStoreInfo] = useState<{ domain?: string; slug?: string } | null>(null);
   useEffect(() => {
     if (!currentStoreId || storeDomain || storeSlug) return;
-    fetch(`${getApiUrl()}/api/v1/stores/${currentStoreId}`, {
-      credentials: 'include',
-    })
-      .then(r => (r.ok ? r.json() : null))
-      .then(data => {
-        const s = data?.data?.store || data?.data;
-        if (s) setStoreInfo({ domain: s.domain || undefined, slug: s.slug });
-      })
-      .catch(() => {});
+    apiGet<{ store?: { domain?: string; slug?: string }; domain?: string; slug?: string }>(
+      `/api/v1/stores/${currentStoreId}`
+    ).then(({ data }) => {
+      const s = (data as { store?: { domain?: string; slug?: string } })?.store || data;
+      if (s) setStoreInfo({ domain: s.domain || undefined, slug: s.slug });
+    });
   }, [currentStoreId, storeDomain, storeSlug]);
 
   const viewStoreUrl = useMemo(() => {
