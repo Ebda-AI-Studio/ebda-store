@@ -87,10 +87,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [refreshToken]);
 
-  // Check auth on mount
+  // Check auth on mount (skip on login page — no session to check)
   useEffect(() => {
+    if (pathname === '/login') {
+      setIsLoading(false);
+      return;
+    }
     checkAuth();
-  }, [checkAuth]);
+  }, [checkAuth, pathname]);
 
   // Redirect if not authenticated
   useEffect(() => {
