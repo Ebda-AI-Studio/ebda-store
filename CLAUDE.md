@@ -92,17 +92,12 @@ Railway uses Railpack despite `railway.json` saying Dockerfile. Key implications
 
 ### Admin App
 
-- `withAuth` HOC in `lib/auth.tsx` is exported but never used — remove or use consistently
 - Some pages redundantly check `isAuthenticated` in useEffect — unnecessary since AuthProvider handles redirects
-- `StoreContext` and `AdminLayout` use raw `fetch()` instead of `apiGet` utility
 - `NotificationContext` sets up WebSocket but no pages call `subscribeToStore()` — notifications are wired but inactive
 
 ### Web App
 
-- `refreshStore` in `StoreContext` calls `/api/store` which doesn't exist — dead code
-- `useAnnouncementBar()` hook exported but never imported anywhere — dead code
 - `isPlatform` detection logic duplicated in `page.tsx` and `StoreContext.tsx` — extract to shared util
-- `account/layout.tsx` duplicates auth check that `AuthContext` already performs
 - Cart sync after login calls `addToCart()` per item — should use bulk sync or `getCart()`
 - Profile fetched independently in `SettingsClient` instead of using `useAuth().user`
 
