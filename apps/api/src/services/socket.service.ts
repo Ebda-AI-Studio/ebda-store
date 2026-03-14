@@ -62,8 +62,15 @@ class SocketService {
     // Authentication middleware
     this.io.use(async (socket, next) => {
       try {
-        const token =
+        // Check auth token, authorization header, or HTTP-only cookie
+        let token =
           socket.handshake.auth.token || socket.handshake.headers.authorization?.split(' ')[1];
+
+        // Fall back to cookie (sent via withCredentials: true)
+        if (!token && socket.handshake.headers.cookie) {
+          const match = socket.handshake.headers.cookie.match(/(?:^|;\s*)token=([^;]*)/);
+          if (match) token = match[1];
+        }
 
         if (!token) {
           return next(new Error('Authentication required'));
