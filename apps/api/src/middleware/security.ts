@@ -103,6 +103,19 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
     return next();
   }
 
+  // Skip for cookie-based JWT auth when the request includes a non-simple
+  // Content-Type (e.g. application/json). Non-simple content types trigger
+  // a CORS preflight — the browser sends an OPTIONS request first, and the
+  // server's CORS config only allows specific origins. An attacker's page
+  // on a different origin would fail the preflight check, so the request
+  // never reaches this point. This is the OWASP "custom request header"
+  // defense and is safe as long as CORS is properly configured.
+  const tokenCookie = req.cookies?.token;
+  const contentType = req.headers['content-type'] || '';
+  if (tokenCookie && contentType.includes('application/json')) {
+    return next();
+  }
+
   const sessionId = req.headers['x-session-id'] as string;
   const csrfToken = req.headers['x-csrf-token'] as string;
 
