@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
+import { requireStoreAccess } from '../middleware/store-access';
 import { ShippingService } from '../services/shipping.service';
 
 const router = Router();
@@ -31,6 +32,7 @@ router.get(
   '/:storeId/shipping',
   authenticate,
   authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -57,6 +59,7 @@ router.get(
   '/:storeId/shipping/:id',
   authenticate,
   authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, id } = req.params;
@@ -78,6 +81,7 @@ router.post(
   '/:storeId/shipping',
   authenticate,
   authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -100,6 +104,7 @@ router.put(
   '/:storeId/shipping/:id',
   authenticate,
   authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, id } = req.params;
@@ -122,6 +127,7 @@ router.delete(
   '/:storeId/shipping/:id',
   authenticate,
   authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, id } = req.params;
@@ -143,6 +149,7 @@ router.patch(
   '/:storeId/shipping/:id/toggle',
   authenticate,
   authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, id } = req.params;
@@ -164,6 +171,7 @@ router.put(
   '/:storeId/shipping/reorder',
   authenticate,
   authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;

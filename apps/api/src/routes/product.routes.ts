@@ -4,6 +4,7 @@ import { authenticate } from '../middleware/auth';
 import { ProductService } from '../services/product.service';
 import { requirePermission } from '../middleware/rbac';
 import { auditLog, writeLimiter } from '../middleware/security';
+import { requireStoreAccess } from '../middleware/store-access';
 
 const router = Router({ mergeParams: true });
 
@@ -230,6 +231,7 @@ router.post(
   '/',
   authenticate,
   requirePermission('products:write'),
+  requireStoreAccess,
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -264,6 +266,7 @@ router.put(
   '/:id',
   authenticate,
   requirePermission('products:write'),
+  requireStoreAccess,
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -298,6 +301,7 @@ router.delete(
   '/:id',
   authenticate,
   requirePermission('products:delete'),
+  requireStoreAccess,
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {

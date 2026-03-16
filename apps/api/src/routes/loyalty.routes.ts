@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
+import { requireStoreAccess } from '../middleware/store-access';
 import { LoyaltyService } from '../services/loyalty.service';
 import { LoyaltyTransactionType } from '@force/database';
 
@@ -52,6 +53,7 @@ router.get(
   '/:storeId/loyalty/settings',
   authenticate,
   authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -72,6 +74,7 @@ router.put(
   '/:storeId/loyalty/settings',
   authenticate,
   authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -94,6 +97,7 @@ router.get(
   '/:storeId/loyalty/stats',
   authenticate,
   authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -114,6 +118,7 @@ router.get(
   '/:storeId/loyalty/members',
   authenticate,
   authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -141,6 +146,7 @@ router.get(
   '/:storeId/loyalty/members/:customerId',
   authenticate,
   authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, customerId } = req.params;
@@ -169,6 +175,7 @@ router.get(
   '/:storeId/loyalty/members/:customerId/transactions',
   authenticate,
   authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, customerId } = req.params;
@@ -194,6 +201,7 @@ router.post(
   '/:storeId/loyalty/members/:customerId/award',
   authenticate,
   authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, customerId } = req.params;

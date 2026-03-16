@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
+import { requireStoreAccess } from '../middleware/store-access';
 import { InventoryService } from '../services/inventory.service';
 import { InventoryChangeType } from '@force/database';
 
@@ -40,6 +41,7 @@ router.get(
   '/:storeId/inventory/stats',
   authenticate,
   authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -60,6 +62,7 @@ router.get(
   '/:storeId/inventory/products',
   authenticate,
   authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -89,6 +92,7 @@ router.get(
   '/:storeId/inventory/alerts',
   authenticate,
   authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -109,6 +113,7 @@ router.post(
   '/:storeId/inventory/adjust',
   authenticate,
   authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -142,6 +147,7 @@ router.post(
   '/:storeId/inventory/bulk-adjust',
   authenticate,
   authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -175,6 +181,7 @@ router.put(
   '/:storeId/inventory/products/:productId/set',
   authenticate,
   authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, productId } = req.params;
@@ -204,6 +211,7 @@ router.put(
   '/:storeId/inventory/products/:productId/threshold',
   authenticate,
   authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, productId } = req.params;
@@ -226,6 +234,7 @@ router.get(
   '/:storeId/inventory/products/:productId/history',
   authenticate,
   authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, productId } = req.params;
@@ -251,6 +260,7 @@ router.get(
   '/:storeId/inventory/history',
   authenticate,
   authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;

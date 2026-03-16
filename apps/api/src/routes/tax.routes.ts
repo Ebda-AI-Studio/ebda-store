@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
+import { requireStoreAccess } from '../middleware/store-access';
 import { TaxService } from '../services/tax.service';
 
 const router = Router();
@@ -30,6 +31,7 @@ router.get(
   '/:storeId/tax/settings',
   authenticate,
   authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -51,6 +53,7 @@ router.put(
   '/:storeId/tax/settings',
   authenticate,
   authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -73,6 +76,7 @@ router.get(
   '/:storeId/tax/rates',
   authenticate,
   authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -95,6 +99,7 @@ router.get(
   '/:storeId/tax/rates/:id',
   authenticate,
   authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, id } = req.params;
@@ -116,6 +121,7 @@ router.post(
   '/:storeId/tax/rates',
   authenticate,
   authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -138,6 +144,7 @@ router.put(
   '/:storeId/tax/rates/:id',
   authenticate,
   authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, id } = req.params;
@@ -160,6 +167,7 @@ router.delete(
   '/:storeId/tax/rates/:id',
   authenticate,
   authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, id } = req.params;
@@ -181,6 +189,7 @@ router.patch(
   '/:storeId/tax/rates/:id/toggle',
   authenticate,
   authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, id } = req.params;

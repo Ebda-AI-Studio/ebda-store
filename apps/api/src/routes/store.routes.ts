@@ -2,7 +2,6 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
-import { requireRole } from '../middleware/rbac';
 import { Prisma, prisma, StoreStatus } from '@force/database';
 import { StoreService } from '../services/store.service';
 import { VercelDomainService } from '../services/vercel-domain.service';
@@ -194,7 +193,8 @@ router.get(
 router.get(
   '/:id',
   authenticate,
-  requireRole(['store_admin', 'super_admin']),
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
@@ -215,7 +215,7 @@ router.get(
 router.get(
   '/:id/stats',
   authenticate,
-  requireRole(['store_admin', 'super_admin']),
+  authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -350,7 +350,7 @@ router.delete(
 router.patch(
   '/:id/status',
   authenticate,
-  requireRole(['super_admin']),
+  authorize('super_admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { status } = req.body as { status: StoreStatus };
@@ -498,7 +498,8 @@ router.put(
 router.get(
   '/:id/announcement',
   authenticate,
-  requireRole(['store_admin', 'super_admin']),
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const store = await prisma.store.findFirst({
@@ -542,7 +543,8 @@ router.put(
 router.get(
   '/:id/seo',
   authenticate,
-  requireRole(['store_admin', 'super_admin']),
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const store = await prisma.store.findFirst({

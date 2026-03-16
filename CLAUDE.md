@@ -1,5 +1,19 @@
 # Force Website Builder - Project Guidelines
 
+## Tech Stack
+
+- **API**: Express.js + TypeScript (apps/api)
+- **Admin Dashboard**: Next.js + App Router (apps/admin)
+- **Storefront**: Next.js + App Router (apps/web)
+- **ORM**: Prisma (packages/database)
+- **Database**: Neon PostgreSQL (serverless)
+- **Storage**: Cloudflare R2 (S3-compatible, public bucket via `*.r2.dev`)
+- **Cache**: Redis
+- **UI Components**: Shared package (@force/ui) with Tailwind CSS
+- **Validation**: Zod (shared schemas in @force/shared)
+- **Auth**: Custom JWT (HTTP-only cookies, cross-origin with SameSite=None)
+- **Real-time**: Socket.io (WebSocket notifications)
+
 ## Architecture
 
 ### Monorepo Structure (npm workspaces)
@@ -21,9 +35,9 @@ packages/
 - **API**: Railway (Railpack build, NOT Dockerfile) at `api-production-c058.up.railway.app`
 - **Admin**: Vercel at `force-admin-seven.vercel.app`
 - **Web**: Vercel at `force-web-sigma.vercel.app`
-- **Database**: Neon PostgreSQL (serverless)
+- **Database**: Neon PostgreSQL (serverless) — local .env has stale Supabase URL, production uses Neon
 - **Redis**: Railway internal (`redis.railway.internal:6379`)
-- **Storage**: Cloudflare R2
+- **Storage**: Cloudflare R2 (public bucket `*.r2.dev`, NOT `*.r2.cloudflarestorage.com`)
 
 ### Domain Boundaries
 
@@ -58,6 +72,25 @@ Railway uses Railpack despite `railway.json` saying Dockerfile. Key implications
 - Root `railway.json` must have `startCommand` pointing to `node apps/api/dist/index.js`
 - The API reads `PORT` env var (set by Railway), falling back to `API_PORT` then `4000`
 - Build runs `npm run build` across ALL workspaces
+
+## Route Authorization Pattern
+
+Every admin route MUST use this middleware chain:
+
+```
+authenticate → authorize('store_admin', 'super_admin') → requireStoreAccess → handler
+```
+
+- **`authenticate`**: Verifies JWT token, sets `req.user`
+- **`authorize(...roles)`**: Checks `req.user.role` against allowed roles (use this, NOT `requireRole`)
+- **`requireStoreAccess`**: Verifies user owns the store (or is super_admin). Reads `req.params.id` or `req.params.storeId`
+
+**Rules:**
+
+- Use `authorize()` for role checks, NOT `requireRole()` — standardized across all routes
+- Every endpoint with a storeId param MUST have `requireStoreAccess` (prevents cross-store access)
+- Public endpoints (no auth) should NOT have `requireStoreAccess`
+- JWT access tokens last 7 days — stale role requires re-login
 
 ## Code Standards
 

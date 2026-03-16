@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/rbac';
 import { AnalyticsService } from '../services/analytics.service';
+import { requireStoreAccess } from '../middleware/store-access';
 
 const router = Router({ mergeParams: true });
 
@@ -22,6 +23,7 @@ router.get(
   '/dashboard',
   authenticate,
   requirePermission('analytics:read'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -44,6 +46,7 @@ router.get(
   '/sales',
   authenticate,
   requirePermission('analytics:read'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -71,6 +74,7 @@ router.get(
   '/top-products',
   authenticate,
   requirePermission('analytics:read'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -98,6 +102,7 @@ router.get(
   '/top-categories',
   authenticate,
   requirePermission('analytics:read'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -125,6 +130,7 @@ router.get(
   '/orders-by-status',
   authenticate,
   requirePermission('analytics:read'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -147,6 +153,7 @@ router.get(
   '/customers',
   authenticate,
   requirePermission('analytics:read'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -169,6 +176,7 @@ router.get(
   '/recent-orders',
   authenticate,
   requirePermission('analytics:read'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -194,6 +202,7 @@ router.get(
   '/low-stock',
   authenticate,
   requirePermission('analytics:read'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -219,6 +228,7 @@ router.get(
   '/payment-status',
   authenticate,
   requirePermission('analytics:read'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -241,6 +251,7 @@ router.get(
   '/performance',
   authenticate,
   requirePermission('analytics:read'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;

@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
+import { requireStoreAccess } from '../middleware/store-access';
 import { BulkService } from '../services/bulk.service';
 import { ProductStatus } from '@force/database';
 import { auditLog, writeLimiter } from '../middleware/security';
@@ -27,6 +28,7 @@ router.get(
   '/:storeId/bulk/export',
   authenticate,
   authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -67,6 +69,7 @@ router.get(
   '/:storeId/bulk/template',
   authenticate,
   authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
   async (_req: Request, res: Response) => {
     const template = BulkService.getImportTemplate();
 
@@ -81,6 +84,7 @@ router.post(
   '/:storeId/bulk/import',
   authenticate,
   authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -131,6 +135,7 @@ router.post(
   '/:storeId/bulk/delete',
   authenticate,
   authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -171,6 +176,7 @@ router.post(
   '/:storeId/bulk/status',
   authenticate,
   authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {

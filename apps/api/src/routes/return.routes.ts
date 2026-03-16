@@ -4,6 +4,7 @@ import { authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/rbac';
 import { ReturnService } from '../services/return.service';
 import { auditLog, writeLimiter } from '../middleware/security';
+import { requireStoreAccess } from '../middleware/store-access';
 
 const router = Router({ mergeParams: true });
 
@@ -119,6 +120,7 @@ router.get(
   '/admin/list',
   authenticate,
   requirePermission('returns:read'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -146,6 +148,7 @@ router.get(
   '/admin/stats',
   authenticate,
   requirePermission('returns:read'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -166,6 +169,7 @@ router.post(
   '/admin/:id/approve',
   authenticate,
   requirePermission('returns:write'),
+  requireStoreAccess,
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -200,6 +204,7 @@ router.post(
   '/admin/:id/reject',
   authenticate,
   requirePermission('returns:write'),
+  requireStoreAccess,
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -242,6 +247,7 @@ router.post(
   '/admin/:id/received',
   authenticate,
   requirePermission('returns:write'),
+  requireStoreAccess,
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -275,6 +281,7 @@ router.post(
   '/admin/:id/complete',
   authenticate,
   requirePermission('returns:write'),
+  requireStoreAccess,
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -322,6 +329,7 @@ router.put(
   '/admin/:id/tracking',
   authenticate,
   requirePermission('returns:write'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, id } = req.params;

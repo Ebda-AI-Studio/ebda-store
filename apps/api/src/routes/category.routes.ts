@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/rbac';
 import { auditLog, writeLimiter } from '../middleware/security';
+import { requireStoreAccess } from '../middleware/store-access';
 import { prisma } from '@force/database';
 
 const router = Router({ mergeParams: true });
@@ -62,6 +63,7 @@ router.post(
   '/',
   authenticate,
   requirePermission('products:write'),
+  requireStoreAccess,
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -132,6 +134,7 @@ router.put(
   '/:categoryId',
   authenticate,
   requirePermission('products:write'),
+  requireStoreAccess,
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -205,6 +208,7 @@ router.delete(
   '/:categoryId',
   authenticate,
   requirePermission('products:write'),
+  requireStoreAccess,
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
