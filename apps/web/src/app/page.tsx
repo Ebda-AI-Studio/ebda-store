@@ -58,13 +58,18 @@ export default function HomePage() {
 
   const isRtl = language === 'ar';
 
-  // Compute URL prefix for template components
-  const isPlatform =
-    typeof window !== 'undefined' &&
-    (window.location.hostname.includes('vercel.app') ||
+  // Compute URL prefix for template components — must use state to avoid
+  // hydration mismatch (window is undefined on the server).
+  const [urlPrefix, setUrlPrefix] = useState('');
+  useEffect(() => {
+    const isPlatform =
+      window.location.hostname.includes('vercel.app') ||
       window.location.hostname.includes('localhost') ||
-      window.location.hostname.includes('127.0.0.1'));
-  const urlPrefix = isPlatform && store.slug && store.id !== 'demo' ? `/${store.slug}` : '';
+      window.location.hostname.includes('127.0.0.1');
+    if (isPlatform && store.slug && store.id !== 'demo') {
+      setUrlPrefix(`/${store.slug}`);
+    }
+  }, [store.slug, store.id]);
 
   useEffect(() => {
     async function fetchData() {

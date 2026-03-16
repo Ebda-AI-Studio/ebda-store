@@ -229,11 +229,15 @@ export function useStoreContact() {
 export function useStoreUrl() {
   const { store } = useStore();
 
-  const isPlatform =
-    typeof window !== 'undefined' &&
-    (window.location.hostname.includes('vercel.app') ||
-      window.location.hostname.includes('localhost') ||
-      window.location.hostname.includes('127.0.0.1'));
+  // Compute platform check in state to avoid hydration mismatch
+  const [isPlatform, setIsPlatform] = useState(false);
+  useEffect(() => {
+    setIsPlatform(
+      window.location.hostname.includes('vercel.app') ||
+        window.location.hostname.includes('localhost') ||
+        window.location.hostname.includes('127.0.0.1')
+    );
+  }, []);
 
   const prefix = isPlatform && store.slug && store.id !== 'demo' ? `/${store.slug}` : '';
 
