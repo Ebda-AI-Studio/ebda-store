@@ -87,6 +87,7 @@ export function ImageUpload({
             `${getApiUrl()}/api/v1/uploads/image?folder=${encodeURIComponent(folder)}`
           );
           xhr.withCredentials = true;
+          xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
           xhr.send(formData);
         });
 
@@ -300,6 +301,7 @@ export function MultiImageUpload({
             `${getApiUrl()}/api/v1/uploads/images?folder=${encodeURIComponent(folder)}`
           );
           xhr.withCredentials = true;
+          xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
           xhr.send(formData);
         });
 
