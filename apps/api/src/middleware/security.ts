@@ -434,20 +434,13 @@ export function securityHeaders(_req: Request, res: Response, next: NextFunction
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=(), payment=()');
 
-  // Content Security Policy
+  // Content Security Policy — API serves JSON, not HTML, so this is a
+  // defense-in-depth measure in case an error page or redirect is rendered.
   res.setHeader(
     'Content-Security-Policy',
-    [
-      "default-src 'self'",
-      "script-src 'self' 'strict-dynamic' https://www.googletagmanager.com https://connect.facebook.net",
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-      "font-src 'self' https://fonts.gstatic.com",
-      "img-src 'self' data: https: blob:",
-      "connect-src 'self' https://api.anthropic.com https://*.supabase.co wss://*.supabase.co",
-      "frame-ancestors 'none'",
-      "base-uri 'self'",
-      "form-action 'self'",
-    ].join('; ')
+    ["default-src 'none'", "frame-ancestors 'none'", "base-uri 'self'", "form-action 'self'"].join(
+      '; '
+    )
   );
 
   // Remove server identification
