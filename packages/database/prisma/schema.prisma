@@ -52,6 +52,7 @@ model User {
   loyaltyPoints       LoyaltyPoints[]
   loyaltyTransactions LoyaltyTransaction[]
   featureToggles      StoreFeature[]       @relation("FeatureToggledBy")
+  pushSubscriptions   PushSubscription[]   @relation("UserPushSubscriptions")
 
   @@index([role])
   @@index([status])
@@ -202,6 +203,10 @@ model Store {
   tags           Tag[]
   auditLogs      AuditLog[]
   features       StoreFeature[]
+  notificationConfigs      NotificationConfig[]
+  notificationEventConfigs NotificationEventConfig[]
+  pushSubscriptions        PushSubscription[]
+  notificationLogs         NotificationLog[]
 
   @@index([ownerId])
   @@index([status])
@@ -875,6 +880,85 @@ model StoreFeature {
   @@unique([storeId, featureKey])
   @@index([storeId])
   @@map("store_features")
+}
+
+// ==========================================
+// Communication Hub
+// ==========================================
+
+model NotificationConfig {
+  id          String   @id @default(uuid())
+  storeId     String   @map("store_id")
+  channel     String   // 'whatsapp' | 'sms' | 'push'
+  provider    String   // 'meta' | 'unifonic' | 'firebase'
+  credentials String   @default("") // Encrypted JSON string
+  enabled     Boolean  @default(false)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, channel])
+  @@index([storeId])
+  @@map("notification_configs")
+}
+
+model NotificationEventConfig {
+  id       String  @id @default(uuid())
+  storeId  String  @map("store_id")
+  event    String  // 'order_confirmed' | 'payment_success' | etc.
+  whatsapp Boolean @default(true)
+  sms      Boolean @default(true)
+  push     Boolean @default(true)
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, event])
+  @@index([storeId])
+  @@map("notification_event_configs")
+}
+
+model PushSubscription {
+  id         String   @id @default(uuid())
+  storeId    String   @map("store_id")
+  customerId String?  @map("customer_id")
+  endpoint   String
+  p256dh     String
+  auth       String
+  deviceInfo String?  @map("device_info")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  store    Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  customer User? @relation("UserPushSubscriptions", fields: [customerId], references: [id], onDelete: SetNull)
+
+  @@unique([storeId, endpoint])
+  @@index([storeId])
+  @@index([customerId])
+  @@map("push_subscriptions")
+}
+
+model NotificationLog {
+  id                 String   @id @default(uuid())
+  storeId            String   @map("store_id")
+  channel            String
+  event              String
+  recipientPhoneHash String?  @map("recipient_phone_hash")
+  recipientEmailHash String?  @map("recipient_email_hash")
+  status             String   @default("queued")
+  providerMessageId  String?  @map("provider_message_id")
+  idempotencyKey     String?  @unique @map("idempotency_key")
+  error              String?
+  metadata           Json     @default("{}")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId])
+  @@index([storeId, channel])
+  @@index([storeId, event])
+  @@index([status])
+  @@map("notification_logs")
 }
 
 // ==========================================
