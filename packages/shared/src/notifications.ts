@@ -15,6 +15,9 @@ export const NOTIFICATION_EVENTS = [
   'order_delivered',
   'order_cancelled',
   'refund_processed',
+  'cart_abandoned_step1',
+  'cart_abandoned_step2',
+  'cart_abandoned_step3',
 ] as const;
 export type NotificationEvent = (typeof NOTIFICATION_EVENTS)[number];
 
@@ -30,6 +33,10 @@ export interface NotificationData {
   amount?: number;
   storeId: string;
   storeName: string;
+  cartUrl?: string;
+  cartTotal?: string;
+  cartItemCount?: number;
+  couponCode?: string;
 }
 
 // ─── WhatsApp Templates ───────────────────────────────────────────────────────
@@ -76,6 +83,26 @@ export const WHATSAPP_TEMPLATES: Record<NotificationEvent, WhatsAppTemplate> = {
       data.amount !== undefined ? data.amount.toFixed(2) : '0.00',
     ],
   },
+  cart_abandoned_step1: {
+    name: 'cart_reminder_1',
+    variables: data => [
+      data.customerName,
+      data.cartItemCount !== undefined ? String(data.cartItemCount) : '0',
+      data.cartTotal ?? '0.00',
+    ],
+  },
+  cart_abandoned_step2: {
+    name: 'cart_reminder_2',
+    variables: data => [
+      data.customerName,
+      data.cartItemCount !== undefined ? String(data.cartItemCount) : '0',
+      data.cartUrl ?? '',
+    ],
+  },
+  cart_abandoned_step3: {
+    name: 'cart_reminder_3',
+    variables: data => [data.customerName, data.couponCode ?? 'Complete your order'],
+  },
 };
 
 // ─── SMS Templates ────────────────────────────────────────────────────────────
@@ -110,6 +137,18 @@ export const SMS_TEMPLATES: Record<NotificationEvent, SmsTemplate> = {
     en: 'Hi {name}, a refund of {amount} for order #{number} has been processed. It may take 3-5 business days.',
     ar: 'مرحباً {name}، تمت معالجة استرداد {amount} للطلب رقم #{number}. قد يستغرق 3-5 أيام عمل.',
   },
+  cart_abandoned_step1: {
+    en: 'Hi {name}, you left {cartItemCount} items ({cartTotal} KWD) in your cart at {storeName}. Complete your order: {cartUrl}',
+    ar: 'مرحباً {name}، تركت {cartItemCount} عناصر ({cartTotal} د.ك) في سلتك في {storeName}. أكمل طلبك: {cartUrl}',
+  },
+  cart_abandoned_step2: {
+    en: 'Hi {name}, your items are still waiting! Complete your order now: {cartUrl}',
+    ar: 'مرحباً {name}، عناصرك لا تزال بانتظارك! أكمل طلبك الآن: {cartUrl}',
+  },
+  cart_abandoned_step3: {
+    en: '{name}, last chance! {couponCode} Complete your order: {cartUrl}',
+    ar: '{name}، فرصتك الأخيرة! {couponCode} أكمل طلبك: {cartUrl}',
+  },
 };
 
 export function renderSmsTemplate(template: string, data: NotificationData): string {
@@ -119,7 +158,12 @@ export function renderSmsTemplate(template: string, data: NotificationData): str
     .replace('{total}', data.total !== undefined ? data.total.toFixed(2) : '')
     .replace('{tracking}', data.trackingNumber ?? '')
     .replace('{reason}', data.reason ?? '')
-    .replace('{amount}', data.amount !== undefined ? data.amount.toFixed(2) : '');
+    .replace('{amount}', data.amount !== undefined ? data.amount.toFixed(2) : '')
+    .replace('{cartUrl}', data.cartUrl ?? '')
+    .replace('{cartTotal}', data.cartTotal ?? '')
+    .replace('{cartItemCount}', data.cartItemCount !== undefined ? String(data.cartItemCount) : '')
+    .replace('{couponCode}', data.couponCode ? `${data.couponCode}` : '')
+    .replace('{storeName}', data.storeName);
 }
 
 // ─── Push Templates ───────────────────────────────────────────────────────────
@@ -188,6 +232,36 @@ export const PUSH_TEMPLATES: Record<NotificationEvent, PushTemplate> = {
     body: {
       en: 'A refund of {amount} for order #{number} has been processed.',
       ar: 'تمت معالجة استرداد {amount} للطلب رقم #{number}.',
+    },
+  },
+  cart_abandoned_step1: {
+    title: {
+      en: 'You left something behind!',
+      ar: 'تركت شيئاً خلفك!',
+    },
+    body: {
+      en: 'Hi {name}, you have {cartItemCount} items worth {cartTotal} KWD waiting in your cart.',
+      ar: 'مرحباً {name}، لديك {cartItemCount} عناصر بقيمة {cartTotal} د.ك بانتظارك في سلتك.',
+    },
+  },
+  cart_abandoned_step2: {
+    title: {
+      en: 'Your cart is waiting for you',
+      ar: 'سلتك بانتظارك',
+    },
+    body: {
+      en: 'Hi {name}, your items are still in your cart. Complete your order before they sell out!',
+      ar: 'مرحباً {name}، عناصرك لا تزال في سلتك. أكمل طلبك قبل نفاد الكمية!',
+    },
+  },
+  cart_abandoned_step3: {
+    title: {
+      en: 'Last chance — complete your order!',
+      ar: 'فرصتك الأخيرة — أكمل طلبك!',
+    },
+    body: {
+      en: '{name}, your cart is about to expire. Use {couponCode} to save on your order.',
+      ar: '{name}، سلتك على وشك الانتهاء. استخدم {couponCode} لتوفير على طلبك.',
     },
   },
 };
