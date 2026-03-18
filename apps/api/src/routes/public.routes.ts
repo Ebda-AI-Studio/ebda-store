@@ -378,6 +378,72 @@ router.get(
   }
 );
 
+// GET /public/:storeId/wishlist/:userId - Get a user's public wishlist (no auth required)
+router.get(
+  '/:storeId/wishlist/:userId',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, userId } = req.params;
+
+      const wishlist = await prisma.wishlist.findFirst({
+        where: { userId, storeId },
+        include: {
+          items: {
+            include: {
+              product: {
+                include: {
+                  images: {
+                    orderBy: { position: 'asc' },
+                    take: 1,
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!wishlist) {
+        res.status(404).json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'Wishlist not found' },
+        });
+        return;
+      }
+
+      if (!wishlist.isPublic) {
+        res.status(403).json({
+          success: false,
+          error: { code: 'PRIVATE_WISHLIST', message: 'This wishlist is private' },
+        });
+        return;
+      }
+
+      const items = wishlist.items.map(item => ({
+        id: item.id,
+        product: {
+          id: item.product.id,
+          name: item.product.name,
+          slug: item.product.slug,
+          price: item.product.price / 1000,
+          compareAtPrice: item.product.compareAtPrice
+            ? item.product.compareAtPrice / 1000
+            : undefined,
+          images: item.product.images.map(img => img.url),
+          status: item.product.status,
+        },
+      }));
+
+      res.json({
+        success: true,
+        data: { items, isPublic: wishlist.isPublic },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // GET /stores - List all public stores
 router.get('/stores', async (req: Request, res: Response, next: NextFunction) => {
   try {

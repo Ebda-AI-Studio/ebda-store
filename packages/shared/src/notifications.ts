@@ -18,6 +18,7 @@ export const NOTIFICATION_EVENTS = [
   'cart_abandoned_step1',
   'cart_abandoned_step2',
   'cart_abandoned_step3',
+  'back_in_stock',
 ] as const;
 export type NotificationEvent = (typeof NOTIFICATION_EVENTS)[number];
 
@@ -37,6 +38,8 @@ export interface NotificationData {
   cartTotal?: string;
   cartItemCount?: number;
   couponCode?: string;
+  productName?: string;
+  productUrl?: string;
 }
 
 // ─── WhatsApp Templates ───────────────────────────────────────────────────────
@@ -103,6 +106,10 @@ export const WHATSAPP_TEMPLATES: Record<NotificationEvent, WhatsAppTemplate> = {
     name: 'cart_reminder_3',
     variables: data => [data.customerName, data.couponCode ?? 'Complete your order'],
   },
+  back_in_stock: {
+    name: 'back_in_stock',
+    variables: data => [data.customerName, data.productName ?? '', data.productUrl ?? ''],
+  },
 };
 
 // ─── SMS Templates ────────────────────────────────────────────────────────────
@@ -149,6 +156,10 @@ export const SMS_TEMPLATES: Record<NotificationEvent, SmsTemplate> = {
     en: '{name}, last chance! {couponCode} Complete your order: {cartUrl}',
     ar: '{name}، فرصتك الأخيرة! {couponCode} أكمل طلبك: {cartUrl}',
   },
+  back_in_stock: {
+    en: 'Hi {name}, great news! "{productName}" is back in stock at {storeName}. Shop now: {productUrl}',
+    ar: 'مرحباً {name}، خبر رائع! "{productName}" عاد للمخزن في {storeName}. تسوق الآن: {productUrl}',
+  },
 };
 
 export function renderSmsTemplate(template: string, data: NotificationData): string {
@@ -163,7 +174,9 @@ export function renderSmsTemplate(template: string, data: NotificationData): str
     .replace('{cartTotal}', data.cartTotal ?? '')
     .replace('{cartItemCount}', data.cartItemCount !== undefined ? String(data.cartItemCount) : '')
     .replace('{couponCode}', data.couponCode ? `${data.couponCode}` : '')
-    .replace('{storeName}', data.storeName);
+    .replace('{storeName}', data.storeName)
+    .replace('{productName}', data.productName ?? '')
+    .replace('{productUrl}', data.productUrl ?? '');
 }
 
 // ─── Push Templates ───────────────────────────────────────────────────────────
@@ -262,6 +275,16 @@ export const PUSH_TEMPLATES: Record<NotificationEvent, PushTemplate> = {
     body: {
       en: '{name}, your cart is about to expire. Use {couponCode} to save on your order.',
       ar: '{name}، سلتك على وشك الانتهاء. استخدم {couponCode} لتوفير على طلبك.',
+    },
+  },
+  back_in_stock: {
+    title: {
+      en: 'Back in Stock!',
+      ar: 'عاد للمخزن!',
+    },
+    body: {
+      en: 'Hi {name}, "{productName}" is now available again at {storeName}.',
+      ar: 'مرحباً {name}، "{productName}" متوفر مجدداً في {storeName}.',
     },
   },
 };

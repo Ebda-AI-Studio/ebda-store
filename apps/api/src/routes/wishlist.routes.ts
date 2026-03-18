@@ -86,7 +86,7 @@ router.get('/', authenticate, async (req: Request, res: Response, next: NextFunc
 
     res.json({
       success: true,
-      data: { items },
+      data: { items, isPublic: wishlist.isPublic },
     });
   } catch (error) {
     next(error);
@@ -251,6 +251,61 @@ router.delete('/:itemId', authenticate, async (req: Request, res: Response, next
     res.json({
       success: true,
       message: 'Item removed from wishlist',
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Toggle wishlist visibility (public/private)
+router.put('/visibility', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        error: { code: 'UNAUTHORIZED', message: 'Authentication required' },
+      });
+      return;
+    }
+
+    const storeId = getStoreIdFromHeader(req);
+    if (!storeId) {
+      res.status(400).json({
+        success: false,
+        error: { code: 'MISSING_STORE', message: 'Store ID is required' },
+      });
+      return;
+    }
+
+    const { isPublic } = req.body;
+    if (typeof isPublic !== 'boolean') {
+      res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'isPublic must be a boolean' },
+      });
+      return;
+    }
+
+    // Find or create the wishlist and update visibility
+    let wishlist = await prisma.wishlist.findFirst({
+      where: { userId, storeId },
+    });
+
+    if (!wishlist) {
+      wishlist = await prisma.wishlist.create({
+        data: { userId, storeId, isPublic },
+      });
+    } else {
+      wishlist = await prisma.wishlist.update({
+        where: { id: wishlist.id },
+        data: { isPublic },
+      });
+    }
+
+    res.json({
+      success: true,
+      data: { isPublic: wishlist.isPublic },
     });
   } catch (error) {
     next(error);

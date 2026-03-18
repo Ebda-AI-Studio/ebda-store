@@ -1,5 +1,7 @@
 import { prisma, Prisma, InventoryChangeType } from '@force/database';
 import { AppError } from '../middleware/error-handler';
+import { notificationDispatcher } from './notification-dispatcher.service';
+import logger from '../lib/logger';
 
 interface InventoryAdjustment {
   productId: string;
@@ -343,7 +345,7 @@ export class InventoryService {
       }),
     ]);
 
-    return {
+    const result = {
       product: {
         id: updatedProduct.id,
         name: updatedProduct.name,
@@ -362,6 +364,19 @@ export class InventoryService {
       },
       history,
     };
+
+    // Fire back-in-stock notifications if stock went from 0 to >0
+    if (previousStock <= 0 && newStock > 0) {
+      this.fireBackInStockNotifications(storeId, adjustment.productId, updatedProduct.name).catch(
+        err =>
+          logger.error(
+            { err, storeId, productId: adjustment.productId },
+            '[InventoryService] Back-in-stock notification failed'
+          )
+      );
+    }
+
+    return result;
   }
 
   /**
@@ -443,7 +458,7 @@ export class InventoryService {
       }),
     ]);
 
-    return {
+    const result = {
       product: {
         id: updatedProduct.id,
         name: updatedProduct.name,
@@ -462,6 +477,18 @@ export class InventoryService {
       },
       history,
     };
+
+    // Fire back-in-stock notifications if stock went from 0 to >0
+    if (previousStock <= 0 && newQuantity > 0) {
+      this.fireBackInStockNotifications(storeId, productId, updatedProduct.name).catch(err =>
+        logger.error(
+          { err, storeId, productId },
+          '[InventoryService] Back-in-stock notification failed'
+        )
+      );
+    }
+
+    return result;
   }
 
   /**
@@ -698,5 +725,85 @@ export class InventoryService {
     if (inventory <= 0) return 'out_of_stock';
     if (inventory <= threshold) return 'low_stock';
     return 'in_stock';
+  }
+
+  /**
+   * Fire back-in-stock notifications to all users who have this product
+   * in a public or private wishlist for this store.
+   * Fire-and-forget — never throws.
+   */
+  private static async fireBackInStockNotifications(
+    storeId: string,
+    productId: string,
+    productName: string
+  ): Promise<void> {
+    try {
+      // Find the store for name and slug
+      const store = await prisma.store.findUnique({
+        where: { id: storeId },
+        select: { name: true, slug: true, domain: true },
+      });
+
+      if (!store) return;
+
+      // Find all wishlists in this store that contain this product
+      const wishlistItems = await prisma.wishlistItem.findMany({
+        where: {
+          productId,
+          wishlist: { storeId },
+        },
+        include: {
+          wishlist: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  phone: true,
+                },
+              },
+            },
+          },
+          product: {
+            select: { slug: true },
+          },
+        },
+      });
+
+      if (wishlistItems.length === 0) return;
+
+      logger.info(
+        { storeId, productId, userCount: wishlistItems.length },
+        '[InventoryService] Firing back-in-stock notifications'
+      );
+
+      const storeBase = store.domain
+        ? `https://${store.domain}`
+        : `https://force-web-sigma.vercel.app/${store.slug}`;
+
+      // Dispatch notifications for each user — fire-and-forget per user
+      for (const item of wishlistItems) {
+        const user = item.wishlist.user;
+        const productUrl = `${storeBase}/products/${item.product.slug}`;
+        const customerName =
+          [user.firstName, user.lastName].filter(Boolean).join(' ') || 'Valued Customer';
+
+        notificationDispatcher.dispatch(storeId, 'back_in_stock', {
+          customerName,
+          customerPhone: user.phone ?? undefined,
+          orderNumber: '', // not applicable
+          storeId,
+          storeName: store.name,
+          productName,
+          productUrl,
+        });
+      }
+    } catch (err) {
+      logger.error(
+        { err, storeId, productId },
+        '[InventoryService] fireBackInStockNotifications error'
+      );
+    }
   }
 }
