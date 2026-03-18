@@ -1,0 +1,351 @@
+/**
+ * Loyalty Automation Service
+ *
+ * Runs daily cron jobs for automated loyalty program actions:
+ *   1. Birthday bonus  — award birthdayBonus points to customers whose birthday is today
+ *   2. Point expiration — deduct expired points and create 'expire' transactions
+ *
+ * Processing lifecycle:
+ *   startCron() → setInterval (daily) → runDailyAutomation()
+ *     ├─ processBirthdayBonuses()
+ *     └─ processPointExpiration()
+ */
+
+import { prisma } from '@force/database';
+import { featureService } from './feature.service';
+import logger from '../lib/logger';
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const DEFAULT_BIRTHDAY_BONUS = 500;
+const DEFAULT_EXPIRATION_MONTHS = 12;
+
+// ─── Service ──────────────────────────────────────────────────────────────────
+
+class LoyaltyAutomationService {
+  private intervalHandle: ReturnType<typeof setInterval> | null = null;
+
+  // ──────────────────────────────────────────
+  // Lifecycle
+  // ──────────────────────────────────────────
+
+  startCron(intervalMs = 24 * 60 * 60 * 1000): void {
+    if (this.intervalHandle) {
+      logger.warn('[LoyaltyAutomation] Already running — ignoring startCron() call');
+      return;
+    }
+
+    logger.info({ intervalMs }, '[LoyaltyAutomation] Starting daily cron');
+
+    // Run once at startup then on each interval
+    this.runDailyAutomation().catch(err => {
+      logger.error({ err }, '[LoyaltyAutomation] Error on initial run');
+    });
+
+    this.intervalHandle = setInterval(() => {
+      this.runDailyAutomation().catch(err => {
+        logger.error({ err }, '[LoyaltyAutomation] Unhandled error in runDailyAutomation()');
+      });
+    }, intervalMs);
+  }
+
+  stopCron(): void {
+    if (this.intervalHandle) {
+      clearInterval(this.intervalHandle);
+      this.intervalHandle = null;
+      logger.info('[LoyaltyAutomation] Cron stopped');
+    }
+  }
+
+  // ──────────────────────────────────────────
+  // Main Daily Runner
+  // ──────────────────────────────────────────
+
+  async runDailyAutomation(): Promise<void> {
+    logger.info('[LoyaltyAutomation] Running daily automation');
+
+    await Promise.allSettled([this.processBirthdayBonuses(), this.processPointExpiration()]);
+
+    logger.info('[LoyaltyAutomation] Daily automation complete');
+  }
+
+  // ──────────────────────────────────────────
+  // 1. Birthday Bonus
+  // ──────────────────────────────────────────
+
+  async processBirthdayBonuses(): Promise<void> {
+    const now = new Date();
+    const todayMonth = now.getMonth() + 1; // 1-12
+    const todayDay = now.getDate(); // 1-31
+    const thisYear = now.getFullYear();
+
+    logger.info(
+      { month: todayMonth, day: todayDay },
+      '[LoyaltyAutomation] Processing birthday bonuses'
+    );
+
+    try {
+      // Find all stores with loyalty enabled
+      const stores = await prisma.store.findMany({
+        where: { loyaltyEnabled: true, deletedAt: null },
+        select: { id: true, loyaltySettings: true },
+      });
+
+      for (const store of stores) {
+        // Check feature flag
+        const loyaltyEnabled = await featureService.isFeatureEnabled(store.id, 'loyalty');
+        if (!loyaltyEnabled) continue;
+
+        const settings = store.loyaltySettings as Record<string, unknown> | null;
+        const birthdayBonus =
+          typeof settings?.birthdayBonus === 'number'
+            ? settings.birthdayBonus
+            : DEFAULT_BIRTHDAY_BONUS;
+        const expirationMonths =
+          typeof settings?.expirationMonths === 'number'
+            ? settings.expirationMonths
+            : DEFAULT_EXPIRATION_MONTHS;
+
+        if (birthdayBonus <= 0) continue;
+
+        // Find loyalty members in this store whose birthday is today
+        const loyaltyMembers = await prisma.loyaltyPoints.findMany({
+          where: { storeId: store.id },
+          select: {
+            id: true,
+            customerId: true,
+            points: true,
+            totalEarned: true,
+            tier: true,
+            customer: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                dateOfBirth: true,
+              },
+            },
+          },
+        });
+
+        // Filter to customers whose birthday is today
+        const birthdayMembers = loyaltyMembers.filter(m => {
+          const dob = m.customer.dateOfBirth;
+          if (!dob) return false;
+          return dob.getMonth() + 1 === todayMonth && dob.getDate() === todayDay;
+        });
+
+        for (const member of birthdayMembers) {
+          try {
+            // Check if birthday bonus already awarded this year
+            const yearStart = new Date(thisYear, 0, 1);
+            const existingBonus = await prisma.loyaltyTransaction.findFirst({
+              where: {
+                storeId: store.id,
+                customerId: member.customerId,
+                type: 'earn_birthday',
+                createdAt: { gte: yearStart },
+              },
+            });
+
+            if (existingBonus) {
+              logger.debug(
+                { storeId: store.id, customerId: member.customerId },
+                '[LoyaltyAutomation] Birthday bonus already awarded this year — skipping'
+              );
+              continue;
+            }
+
+            // Award birthday bonus
+            const expiresAt =
+              expirationMonths > 0
+                ? new Date(Date.now() + expirationMonths * 30 * 24 * 60 * 60 * 1000)
+                : null;
+
+            await prisma.$transaction([
+              prisma.loyaltyPoints.update({
+                where: { id: member.id },
+                data: {
+                  points: { increment: birthdayBonus },
+                  totalEarned: { increment: birthdayBonus },
+                },
+              }),
+              prisma.loyaltyTransaction.create({
+                data: {
+                  storeId: store.id,
+                  customerId: member.customerId,
+                  type: 'earn_birthday',
+                  points: birthdayBonus,
+                  description: `Happy Birthday! ${birthdayBonus} bonus points`,
+                  expiresAt,
+                },
+              }),
+            ]);
+
+            logger.info(
+              {
+                storeId: store.id,
+                customerId: member.customerId,
+                points: birthdayBonus,
+              },
+              '[LoyaltyAutomation] Birthday bonus awarded'
+            );
+          } catch (err) {
+            logger.error(
+              { err, storeId: store.id, customerId: member.customerId },
+              '[LoyaltyAutomation] Failed to award birthday bonus'
+            );
+          }
+        }
+      }
+    } catch (err) {
+      logger.error({ err }, '[LoyaltyAutomation] processBirthdayBonuses failed');
+    }
+  }
+
+  // ──────────────────────────────────────────
+  // 2. Point Expiration
+  // ──────────────────────────────────────────
+
+  async processPointExpiration(): Promise<void> {
+    const now = new Date();
+
+    logger.info('[LoyaltyAutomation] Processing point expiration');
+
+    try {
+      // Find all positive (earn) transactions that have expired and haven't been
+      // processed yet. We detect "already processed" by checking that no
+      // 'expire' transaction with a matching description exists.
+      //
+      // To keep this simple and safe, we group by storeId+customerId:
+      // aggregate total expired points per member then create a single deduction.
+
+      // Get all expired positive transactions (earn types) not yet expired
+      const expiredTxns = await prisma.loyaltyTransaction.findMany({
+        where: {
+          expiresAt: { lt: now },
+          points: { gt: 0 }, // Only earn transactions can expire
+          type: {
+            in: [
+              'earn_purchase',
+              'earn_signup',
+              'earn_referral',
+              'earn_review',
+              'earn_birthday',
+              'earn_manual',
+            ],
+          },
+        },
+        select: {
+          id: true,
+          storeId: true,
+          customerId: true,
+          points: true,
+          expiresAt: true,
+        },
+      });
+
+      if (expiredTxns.length === 0) {
+        logger.debug('[LoyaltyAutomation] No expired transactions found');
+        return;
+      }
+
+      // Group by storeId+customerId
+      const grouped = new Map<
+        string,
+        { storeId: string; customerId: string; totalExpired: number; txnIds: string[] }
+      >();
+
+      for (const txn of expiredTxns) {
+        const key = `${txn.storeId}:${txn.customerId}`;
+        const existing = grouped.get(key);
+        if (existing) {
+          existing.totalExpired += txn.points;
+          existing.txnIds.push(txn.id);
+        } else {
+          grouped.set(key, {
+            storeId: txn.storeId,
+            customerId: txn.customerId,
+            totalExpired: txn.points,
+            txnIds: [txn.id],
+          });
+        }
+      }
+
+      for (const [, group] of grouped) {
+        try {
+          // Check if an expiration transaction was already created for these txn IDs
+          // We use description to carry txn IDs reference, but the safest idempotency
+          // guard is: mark expired transactions by nulling their expiresAt after processing.
+          // We do that by setting expiresAt to a sentinel value (null means "processed").
+          // Actually safest: we update expiresAt to null on the source txns after processing.
+
+          const loyaltyRecord = await prisma.loyaltyPoints.findUnique({
+            where: {
+              storeId_customerId: {
+                storeId: group.storeId,
+                customerId: group.customerId,
+              },
+            },
+          });
+
+          if (!loyaltyRecord) continue;
+
+          // Deduct from balance (never go below 0)
+          const deduction = Math.min(group.totalExpired, loyaltyRecord.points);
+          if (deduction <= 0) {
+            // Still null-out the expiresAt so we don't re-process
+            await prisma.loyaltyTransaction.updateMany({
+              where: { id: { in: group.txnIds } },
+              data: { expiresAt: null },
+            });
+            continue;
+          }
+
+          await prisma.$transaction([
+            prisma.loyaltyPoints.update({
+              where: { id: loyaltyRecord.id },
+              data: {
+                points: { decrement: deduction },
+                totalRedeemed: { increment: deduction },
+              },
+            }),
+            prisma.loyaltyTransaction.create({
+              data: {
+                storeId: group.storeId,
+                customerId: group.customerId,
+                type: 'expire',
+                points: -deduction,
+                description: `${deduction} points expired`,
+              },
+            }),
+            // Null out expiresAt to mark as processed (idempotency)
+            prisma.loyaltyTransaction.updateMany({
+              where: { id: { in: group.txnIds } },
+              data: { expiresAt: null },
+            }),
+          ]);
+
+          logger.info(
+            {
+              storeId: group.storeId,
+              customerId: group.customerId,
+              deduction,
+              txnsProcessed: group.txnIds.length,
+            },
+            '[LoyaltyAutomation] Points expired'
+          );
+        } catch (err) {
+          logger.error(
+            { err, storeId: group.storeId, customerId: group.customerId },
+            '[LoyaltyAutomation] Failed to process expiration for member'
+          );
+        }
+      }
+    } catch (err) {
+      logger.error({ err }, '[LoyaltyAutomation] processPointExpiration failed');
+    }
+  }
+}
+
+export const loyaltyAutomationService = new LoyaltyAutomationService();

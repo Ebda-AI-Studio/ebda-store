@@ -32,6 +32,7 @@ model User {
   status           UserStatus @default(active)
   emailVerified    Boolean    @default(false) @map("email_verified")
   avatar           String?
+  dateOfBirth      DateTime?  @map("date_of_birth") // For birthday bonus automation
   language         String     @default("en") // en, ar
   lastLoginAt      DateTime?  @map("last_login_at")
   createdAt        DateTime   @default(now()) @map("created_at")

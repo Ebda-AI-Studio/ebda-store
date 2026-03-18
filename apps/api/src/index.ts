@@ -24,6 +24,7 @@ import { smsQueue } from './services/sms-queue.service';
 import { abandonedCartService } from './services/abandoned-cart.service';
 import { recommendationService } from './services/recommendation.service';
 import { shippingCarrierService } from './services/shipping-carrier.service';
+import { loyaltyAutomationService } from './services/loyalty-automation.service';
 import { SentryService } from './services/sentry.service';
 import logger from './lib/logger';
 
@@ -46,6 +47,7 @@ smsQueue.startProcessing(2000);
 abandonedCartService.startProcessing(900000); // 15 minutes
 recommendationService.startFBTCron(86400000, []); // daily; storeIds populated per-trigger
 shippingCarrierService.startTrackingCron(1800000); // every 30 minutes
+loyaltyAutomationService.startCron(86400000); // daily: birthday bonuses + point expiration
 
 // Request ID for tracing
 app.use(requestId);
@@ -299,6 +301,7 @@ async function gracefulShutdown(signal: string) {
       abandonedCartService.stopProcessing();
       recommendationService.stopFBTCron();
       shippingCarrierService.stopTrackingCron();
+      loyaltyAutomationService.stopCron();
       socketService.close();
       await prisma.$disconnect();
       await redis.disconnect();

@@ -525,6 +525,107 @@ export class LoyaltyService {
   }
 
   /**
+   * Award review bonus points when a review is approved.
+   * Idempotent: no-ops if the customer already has an earn_review transaction
+   * referencing this reviewId in the description.
+   */
+  static async awardReviewBonus(
+    storeId: string,
+    customerId: string,
+    productId: string,
+    reviewId: string
+  ): Promise<{ awarded: boolean; points: number }> {
+    const [store, loyaltyEnabled] = await Promise.all([
+      prisma.store.findUnique({
+        where: { id: storeId },
+        select: { loyaltySettings: true, loyaltyEnabled: true },
+      }),
+      featureService.isFeatureEnabled(storeId, 'loyalty'),
+    ]);
+
+    if (!store || !store.loyaltyEnabled || !loyaltyEnabled) {
+      return { awarded: false, points: 0 };
+    }
+
+    const settings = {
+      ...DEFAULT_LOYALTY_SETTINGS,
+      ...(store.loyaltySettings as Partial<LoyaltySettings>),
+    };
+
+    const reviewBonus = settings.reviewBonus;
+    if (reviewBonus <= 0) {
+      return { awarded: false, points: 0 };
+    }
+
+    // Idempotency: check if already awarded for this review
+    const existingBonus = await prisma.loyaltyTransaction.findFirst({
+      where: {
+        storeId,
+        customerId,
+        type: 'earn_review',
+        description: { contains: reviewId },
+      },
+    });
+
+    if (existingBonus) {
+      return { awarded: false, points: 0 };
+    }
+
+    // Also check: one review bonus per product (not per review submission)
+    const existingProductBonus = await prisma.loyaltyTransaction.findFirst({
+      where: {
+        storeId,
+        customerId,
+        type: 'earn_review',
+        description: { contains: productId },
+      },
+    });
+
+    if (existingProductBonus) {
+      return { awarded: false, points: 0 };
+    }
+
+    // Get or create loyalty record
+    let loyalty = await prisma.loyaltyPoints.findUnique({
+      where: { storeId_customerId: { storeId, customerId } },
+    });
+
+    if (!loyalty) {
+      loyalty = await prisma.loyaltyPoints.create({
+        data: { storeId, customerId, points: 0, totalEarned: 0, tier: 'bronze' },
+      });
+    }
+
+    const expiresAt =
+      settings.expirationMonths > 0
+        ? new Date(Date.now() + settings.expirationMonths * 30 * 24 * 60 * 60 * 1000)
+        : null;
+
+    await prisma.$transaction([
+      prisma.loyaltyPoints.update({
+        where: { id: loyalty.id },
+        data: {
+          points: { increment: reviewBonus },
+          totalEarned: { increment: reviewBonus },
+          tier: this.calculateTier(loyalty.totalEarned + reviewBonus, settings),
+        },
+      }),
+      prisma.loyaltyTransaction.create({
+        data: {
+          storeId,
+          customerId,
+          type: 'earn_review',
+          points: reviewBonus,
+          description: `Review bonus for product ${productId} (review ${reviewId})`,
+          expiresAt,
+        },
+      }),
+    ]);
+
+    return { awarded: true, points: reviewBonus };
+  }
+
+  /**
    * Get customer's transaction history
    */
   static async getTransactionHistory(

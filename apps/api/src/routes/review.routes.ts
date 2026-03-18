@@ -4,6 +4,8 @@ import { authenticate } from '../middleware/auth';
 import { requireStore } from '../middleware/store';
 import { requireFeature } from '../middleware/feature-gate';
 import { ReviewService } from '../services/review.service';
+import { LoyaltyService } from '../services/loyalty.service';
+import logger from '../lib/logger';
 
 const router = Router();
 
@@ -247,6 +249,21 @@ router.post(
 
       const { id } = req.params;
       const review = await ReviewService.approve(req.storeId!, id);
+
+      // Award review bonus points if the review has a customer
+      if (review.customerId) {
+        try {
+          await LoyaltyService.awardReviewBonus(
+            req.storeId!,
+            review.customerId,
+            review.productId,
+            id
+          );
+        } catch (err) {
+          // Non-fatal: log and continue
+          logger.warn({ err, reviewId: id }, '[ReviewRoutes] Failed to award review bonus points');
+        }
+      }
 
       res.json({
         success: true,
