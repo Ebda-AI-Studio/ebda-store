@@ -23,6 +23,7 @@ import variantRoutes from './variant.routes';
 import categoryRoutes from './category.routes';
 import wishlistRoutes from './wishlist.routes';
 import addressRoutes from './address.routes';
+import featureRoutes from './feature.routes';
 
 const router = Router();
 
@@ -41,6 +42,10 @@ router.use('/uploads', uploadRoutes);
 
 // Admin routes (super_admin only)
 router.use('/admin', adminRoutes);
+
+// Feature management routes (super_admin: /admin/stores/:id/features, store_admin: /stores/:storeId/my-features)
+router.use('/admin', featureRoutes);
+router.use('/stores', featureRoutes);
 
 // Store routes
 router.use('/stores', storeRoutes);
