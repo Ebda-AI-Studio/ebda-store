@@ -6,6 +6,7 @@ import { Button, useToast } from '@force/ui';
 import { Header, Footer } from '../../components';
 import { useCart } from '../../contexts/CartContext';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';
+import { useFeatures } from '../../contexts/FeatureContext';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { api } from '@/lib/api';
 import { formatPrice } from '@/lib/format';
@@ -20,6 +21,7 @@ export default function CartClient() {
   } = useCart();
   const { store } = useStore();
   const storeUrl = useStoreUrl();
+  const { isEnabled } = useFeatures();
   const { language, t } = useLanguage();
   const [promoCode, setPromoCode] = useState('');
   const [promoApplied, setPromoApplied] = useState(false);
@@ -391,56 +393,61 @@ export default function CartClient() {
                   </h2>
 
                   {/* Promo Code */}
-                  <div className="mt-6">
-                    <label className="text-sm font-medium text-foreground">
-                      {t('Promo Code', '\u0643\u0648\u062f \u0627\u0644\u062e\u0635\u0645')}
-                    </label>
-                    <div className="mt-2 flex gap-2">
-                      <input
-                        type="text"
-                        value={promoCode}
-                        onChange={e => setPromoCode(e.target.value)}
-                        placeholder={t(
-                          'Enter code',
-                          '\u0623\u062f\u062e\u0644 \u0627\u0644\u0643\u0648\u062f'
-                        )}
-                        disabled={promoApplied}
-                        className="h-10 flex-1 rounded-lg border border-border bg-background px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
-                      />
-                      <button
-                        onClick={applyPromoCode}
-                        disabled={promoApplied || !promoCode || isValidating}
-                        className="h-10 rounded-lg bg-muted px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {promoApplied
-                          ? t('Applied', '\u062a\u0645 \u0627\u0644\u062a\u0637\u0628\u064a\u0642')
-                          : isValidating
-                            ? t(
-                                'Validating...',
-                                '\u062c\u0627\u0631\u064a \u0627\u0644\u062a\u062d\u0642\u0642...'
-                              )
-                            : t('Apply', '\u062a\u0637\u0628\u064a\u0642')}
-                      </button>
-                    </div>
-                    {promoApplied && (
-                      <p className="mt-2 flex items-center gap-1 text-xs text-emerald-600">
-                        <svg
-                          className="h-3.5 w-3.5"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
+                  {isEnabled('coupons') && (
+                    <div className="mt-6">
+                      <label className="text-sm font-medium text-foreground">
+                        {t('Promo Code', '\u0643\u0648\u062f \u0627\u0644\u062e\u0635\u0645')}
+                      </label>
+                      <div className="mt-2 flex gap-2">
+                        <input
+                          type="text"
+                          value={promoCode}
+                          onChange={e => setPromoCode(e.target.value)}
+                          placeholder={t(
+                            'Enter code',
+                            '\u0623\u062f\u062e\u0644 \u0627\u0644\u0643\u0648\u062f'
+                          )}
+                          disabled={promoApplied}
+                          className="h-10 flex-1 rounded-lg border border-border bg-background px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
+                        />
+                        <button
+                          onClick={applyPromoCode}
+                          disabled={promoApplied || !promoCode || isValidating}
+                          className="h-10 rounded-lg bg-muted px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M5 13l4 4L19 7"
-                          />
-                        </svg>
-                        {promoCode.toUpperCase()} - {promoName} ({formatPrice(discount)} off)
-                      </p>
-                    )}
-                  </div>
+                          {promoApplied
+                            ? t(
+                                'Applied',
+                                '\u062a\u0645 \u0627\u0644\u062a\u0637\u0628\u064a\u0642'
+                              )
+                            : isValidating
+                              ? t(
+                                  'Validating...',
+                                  '\u062c\u0627\u0631\u064a \u0627\u0644\u062a\u062d\u0642\u0642...'
+                                )
+                              : t('Apply', '\u062a\u0637\u0628\u064a\u0642')}
+                        </button>
+                      </div>
+                      {promoApplied && (
+                        <p className="mt-2 flex items-center gap-1 text-xs text-emerald-600">
+                          <svg
+                            className="h-3.5 w-3.5"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M5 13l4 4L19 7"
+                            />
+                          </svg>
+                          {promoCode.toUpperCase()} - {promoName} ({formatPrice(discount)} off)
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   {/* Price Breakdown */}
                   <div className="mt-6 space-y-3">

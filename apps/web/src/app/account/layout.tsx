@@ -7,6 +7,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { Button } from '@force/ui';
 import { useAuth } from '../../contexts/AuthContext';
 import { useStoreUrl } from '../../contexts/StoreContext';
+import { useFeatures } from '../../contexts/FeatureContext';
 
 const accountNav = [
   {
@@ -41,6 +42,7 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
   const router = useRouter();
   const storeUrl = useStoreUrl();
   const { user, isLoading, isAuthenticated, logout } = useAuth();
+  const { isEnabled } = useFeatures();
 
   // Redirect to login if not authenticated once loading completes
   useEffect(() => {
@@ -111,35 +113,41 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
 
               {/* Navigation */}
               <nav className="mt-6 space-y-1">
-                {accountNav.map(item => {
-                  const isActive = pathname === item.href;
-                  return (
-                    <Link
-                      key={item.name}
-                      href={storeUrl(item.href)}
-                      className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
-                        isActive
-                          ? 'bg-primary/10 text-primary'
-                          : 'text-muted-foreground hover:bg-muted'
-                      }`}
-                    >
-                      <svg
-                        className="h-5 w-5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
+                {accountNav
+                  .filter(item => {
+                    if (item.href === '/account/loyalty') return isEnabled('loyalty');
+                    if (item.href === '/account/returns') return isEnabled('returns');
+                    return true;
+                  })
+                  .map(item => {
+                    const isActive = pathname === item.href;
+                    return (
+                      <Link
+                        key={item.name}
+                        href={storeUrl(item.href)}
+                        className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
+                          isActive
+                            ? 'bg-primary/10 text-primary'
+                            : 'text-muted-foreground hover:bg-muted'
+                        }`}
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={1.5}
-                          d={item.icon}
-                        />
-                      </svg>
-                      {item.name}
-                    </Link>
-                  );
-                })}
+                        <svg
+                          className="h-5 w-5"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={1.5}
+                            d={item.icon}
+                          />
+                        </svg>
+                        {item.name}
+                      </Link>
+                    );
+                  })}
               </nav>
 
               <div className="mt-6 pt-6 border-t">

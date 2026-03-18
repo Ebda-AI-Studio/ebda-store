@@ -8,6 +8,7 @@ import { Button, Badge, useToast } from '@force/ui';
 import { api, type Product, type ProductVariant } from '@/lib/api';
 import { useCart } from '../../../contexts/CartContext';
 import { useStore, useStoreUrl } from '../../../contexts/StoreContext';
+import { useFeatures } from '../../../contexts/FeatureContext';
 import { Header, Footer } from '../../../components';
 import { useLanguage, translations } from '../../../contexts/LanguageContext';
 import { trackViewContent, trackAddToCart } from '../../../components/MarketingPixels';
@@ -60,6 +61,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
   const { addItem } = useCart();
   const { store } = useStore();
   const storeUrl = useStoreUrl();
+  const { isEnabled } = useFeatures();
   const { language, t } = useLanguage();
 
   useEffect(() => {
@@ -483,7 +485,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
         </div>
 
         {/* Product Reviews */}
-        {product && store.id && store.id !== 'demo' && (
+        {isEnabled('reviews') && product && store.id && store.id !== 'demo' && (
           <ReviewSection storeId={store.id} productId={product.id} />
         )}
 

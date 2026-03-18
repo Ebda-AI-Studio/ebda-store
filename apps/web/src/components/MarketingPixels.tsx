@@ -4,6 +4,7 @@ import Script from 'next/script';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useEffect, Suspense } from 'react';
 import type { MarketingPixels } from '@force/shared';
+import { useFeatures } from '../contexts/FeatureContext';
 
 interface MarketingPixelsProps {
   pixels: MarketingPixels;
@@ -25,8 +26,11 @@ function isValidPixelId(id: string | undefined): id is string {
  * Uses Next.js Script component for safe script loading.
  */
 function MarketingPixelsInner({ pixels }: MarketingPixelsProps) {
+  const { isEnabled } = useFeatures();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+
+  if (!isEnabled('marketing_pixels')) return null;
 
   // Track page views on route change
   useEffect(() => {
