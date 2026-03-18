@@ -4,6 +4,7 @@ import { AppError } from '../middleware/error-handler';
 import { CartService } from './cart.service';
 import { EmailService, type OrderEmailData } from './email.service';
 import { socketService } from './socket.service';
+import { notificationDispatcher } from './notification-dispatcher.service';
 import logger from '../lib/logger';
 
 interface CreateOrderData {
@@ -305,6 +306,22 @@ export class OrderService {
       // Don't throw - order was created successfully
     }
 
+    // Dispatch to WhatsApp/SMS/Push channels (fire-and-forget)
+    const storeForNotification = await prisma.store
+      .findUnique({ where: { id: storeId }, select: { name: true } })
+      .catch(() => null);
+    notificationDispatcher
+      .dispatch(storeId, 'order_confirmed', {
+        customerName:
+          `${order.customer.firstName} ${order.customer.lastName}`.trim() || order.customer.email,
+        customerPhone: data.shippingAddress.phone ?? undefined,
+        orderNumber: order.orderNumber,
+        total: order.total,
+        storeId,
+        storeName: storeForNotification?.name ?? storeId,
+      })
+      .catch(err => logger.error({ err }, 'Notification dispatch failed'));
+
     // Send real-time notification to store admins
     try {
       socketService.newOrderNotification(storeId, {
@@ -464,6 +481,66 @@ export class OrderService {
     } catch (emailError) {
       logger.error({ err: emailError }, 'Failed to send order status email');
       // Don't throw - status was updated successfully
+    }
+
+    // Dispatch to WhatsApp/SMS/Push channels (fire-and-forget)
+    {
+      const customerName =
+        `${updatedOrder.customer.firstName} ${updatedOrder.customer.lastName}`.trim() ||
+        updatedOrder.customer.email;
+      const shippingAddr = updatedOrder.shippingAddress as { phone?: string } | null;
+      const customerPhone = shippingAddr?.phone ?? undefined;
+
+      const storeForNotification = await prisma.store
+        .findUnique({ where: { id: storeId }, select: { name: true } })
+        .catch(() => null);
+      const storeName = storeForNotification?.name ?? storeId;
+
+      if (status === 'shipped') {
+        notificationDispatcher
+          .dispatch(storeId, 'order_shipped', {
+            customerName,
+            customerPhone,
+            orderNumber: updatedOrder.orderNumber,
+            total: updatedOrder.total,
+            storeId,
+            storeName,
+          })
+          .catch(err => logger.error({ err }, 'Notification dispatch failed (shipped)'));
+      } else if (status === 'delivered') {
+        notificationDispatcher
+          .dispatch(storeId, 'order_delivered', {
+            customerName,
+            customerPhone,
+            orderNumber: updatedOrder.orderNumber,
+            total: updatedOrder.total,
+            storeId,
+            storeName,
+          })
+          .catch(err => logger.error({ err }, 'Notification dispatch failed (delivered)'));
+      } else if (status === 'cancelled') {
+        notificationDispatcher
+          .dispatch(storeId, 'order_cancelled', {
+            customerName,
+            customerPhone,
+            orderNumber: updatedOrder.orderNumber,
+            total: updatedOrder.total,
+            storeId,
+            storeName,
+          })
+          .catch(err => logger.error({ err }, 'Notification dispatch failed (cancelled)'));
+      } else if (status === 'refunded') {
+        notificationDispatcher
+          .dispatch(storeId, 'refund_processed', {
+            customerName,
+            customerPhone,
+            orderNumber: updatedOrder.orderNumber,
+            amount: updatedOrder.total,
+            storeId,
+            storeName,
+          })
+          .catch(err => logger.error({ err }, 'Notification dispatch failed (refunded)'));
+      }
     }
 
     // Send real-time notification to customer
