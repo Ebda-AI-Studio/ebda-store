@@ -9,9 +9,18 @@ import { useAuth } from '../lib/auth';
 import { apiGet } from '../lib/api';
 import { NotificationBell } from './NotificationBell';
 import { useStore } from '../contexts/StoreContext';
+import { useFeatures } from '../hooks/useFeatures';
+
+interface NavItem {
+  name: string;
+  href: string;
+  icon: string;
+  /** When set, this nav item is hidden unless the named feature is enabled. */
+  featureKey?: string;
+}
 
 // Super Admin navigation (Force Media platform admin)
-const superAdminNav = [
+const superAdminNav: NavItem[] = [
   {
     name: 'Dashboard',
     href: '/',
@@ -37,7 +46,8 @@ const superAdminNav = [
 // Store Admin navigation factory — returns nav items scoped to the given storeId.
 // Using a function instead of a static array ensures that Customers and Analytics
 // link to the correct store-scoped URLs rather than the super-admin root pages.
-function buildStoreAdminNav(storeId: string) {
+// Items with a `featureKey` will be filtered out when that feature is disabled.
+function buildStoreAdminNav(storeId: string): NavItem[] {
   return [
     {
       name: 'Dashboard',
@@ -110,6 +120,7 @@ export function AdminLayout({
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { user, logout, isLoading } = useAuth();
   const { selectedStoreId: globalStoreId } = useStore();
+  const { isEnabled: isFeatureEnabled } = useFeatures();
 
   // Extract store ID from prop, URL path, or global store selector
   const currentStoreId = useMemo(() => {
@@ -149,7 +160,11 @@ export function AdminLayout({
   // Store admin nav is computed dynamically so that Customers and Analytics
   // resolve to store-scoped URLs (/stores/:id/customers, /stores/:id/analytics)
   // rather than the super-admin root pages (/customers, /analytics).
-  const navItems = mode === 'super_admin' ? superAdminNav : buildStoreAdminNav(storeId ?? '');
+  // Items with a `featureKey` are hidden when that feature is disabled.
+  const allNavItems = mode === 'super_admin' ? superAdminNav : buildStoreAdminNav(storeId ?? '');
+  const navItems = allNavItems.filter(
+    item => !item.featureKey || isFeatureEnabled(item.featureKey)
+  );
   const isStoreAdminWithBranding = mode === 'store_admin' && storeBranding;
 
   // Memoize sidebar content

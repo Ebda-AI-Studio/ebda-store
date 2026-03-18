@@ -3,6 +3,7 @@
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { useFeatures } from '../../../../hooks/useFeatures';
 
 interface SettingsCard {
   title: string;
@@ -10,11 +11,14 @@ interface SettingsCard {
   href: string;
   icon: React.ReactNode;
   color: string;
+  /** If set, this card is only shown when the named feature is enabled. */
+  featureKey?: string;
 }
 
 export default function StoreSettingsPage() {
   const params = useParams();
   const storeId = params?.id as string;
+  const { isEnabled } = useFeatures();
 
   const cards: SettingsCard[] = [
     {
@@ -54,6 +58,7 @@ export default function StoreSettingsPage() {
       description: 'Meta titles, meta descriptions and search engine optimization',
       href: `/stores/${storeId}/seo`,
       color: 'bg-blue-100 text-blue-600',
+      featureKey: 'seo',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
@@ -134,6 +139,7 @@ export default function StoreSettingsPage() {
       description: 'Tax rates, tax calculation rules and exemptions',
       href: `/stores/${storeId}/tax`,
       color: 'bg-teal-100 text-teal-600',
+      featureKey: 'tax',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
@@ -150,6 +156,7 @@ export default function StoreSettingsPage() {
       description: 'Progressive Web App configuration for mobile users',
       href: `/stores/${storeId}/pwa`,
       color: 'bg-violet-100 text-violet-600',
+      featureKey: 'pwa',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
@@ -214,6 +221,7 @@ export default function StoreSettingsPage() {
       description: 'Facebook Pixel, Google Analytics, TikTok Pixel and other tracking codes',
       href: `/stores/${storeId}/marketing-pixels`,
       color: 'bg-purple-100 text-purple-600',
+      featureKey: 'marketing_pixels',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
@@ -240,25 +248,27 @@ export default function StoreSettingsPage() {
       }
     >
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {cards.map(card => (
-          <Link
-            key={card.href}
-            href={card.href}
-            className="group flex items-start gap-4 rounded-xl border bg-white p-6 shadow-sm transition-all hover:border-primary hover:shadow-md"
-          >
-            <div
-              className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl ${card.color} transition-transform group-hover:scale-110`}
+        {cards
+          .filter(card => !card.featureKey || isEnabled(card.featureKey))
+          .map(card => (
+            <Link
+              key={card.href}
+              href={card.href}
+              className="group flex items-start gap-4 rounded-xl border bg-white p-6 shadow-sm transition-all hover:border-primary hover:shadow-md"
             >
-              {card.icon}
-            </div>
-            <div className="min-w-0">
-              <h3 className="font-semibold text-gray-900 group-hover:text-primary transition-colors">
-                {card.title}
-              </h3>
-              <p className="mt-1 text-sm text-gray-500 leading-snug">{card.description}</p>
-            </div>
-          </Link>
-        ))}
+              <div
+                className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl ${card.color} transition-transform group-hover:scale-110`}
+              >
+                {card.icon}
+              </div>
+              <div className="min-w-0">
+                <h3 className="font-semibold text-gray-900 group-hover:text-primary transition-colors">
+                  {card.title}
+                </h3>
+                <p className="mt-1 text-sm text-gray-500 leading-snug">{card.description}</p>
+              </div>
+            </Link>
+          ))}
       </div>
     </AdminLayout>
   );
