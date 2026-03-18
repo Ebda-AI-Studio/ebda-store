@@ -8,6 +8,7 @@ import { VercelDomainService } from '../services/vercel-domain.service';
 import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
 import { getAuthUser } from '../utils/store-helpers';
+import { requireFeature } from '../middleware/feature-gate';
 
 const router = Router();
 
@@ -595,6 +596,7 @@ router.put(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('marketing_pixels'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;

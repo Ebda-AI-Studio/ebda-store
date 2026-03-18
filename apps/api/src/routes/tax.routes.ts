@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
+import { requireFeature } from '../middleware/feature-gate';
 import { TaxService } from '../services/tax.service';
 
 const router = Router();
@@ -32,6 +33,7 @@ router.get(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('tax'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -54,6 +56,7 @@ router.put(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('tax'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -77,6 +80,7 @@ router.get(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('tax'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -100,6 +104,7 @@ router.get(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('tax'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, id } = req.params;
@@ -122,6 +127,7 @@ router.post(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('tax'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -145,6 +151,7 @@ router.put(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('tax'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, id } = req.params;
@@ -168,6 +175,7 @@ router.delete(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('tax'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, id } = req.params;
@@ -190,6 +198,7 @@ router.patch(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('tax'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, id } = req.params;

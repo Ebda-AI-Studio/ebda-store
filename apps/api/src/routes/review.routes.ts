@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { authenticate } from '../middleware/auth';
 import { requireStore } from '../middleware/store';
+import { requireFeature } from '../middleware/feature-gate';
 import { ReviewService } from '../services/review.service';
 
 const router = Router();
@@ -30,6 +31,7 @@ const updateReviewSchema = z.object({
 router.get(
   '/product/:productId',
   requireStore,
+  requireFeature('reviews'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { productId } = req.params;
@@ -55,6 +57,7 @@ router.get(
 router.get(
   '/product/:productId/stats',
   requireStore,
+  requireFeature('reviews'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { productId } = req.params;
@@ -75,6 +78,7 @@ router.post(
   '/',
   requireStore,
   authenticate,
+  requireFeature('reviews'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const data = createReviewSchema.parse(req.body);
@@ -97,6 +101,7 @@ router.post(
 router.post(
   '/:id/helpful',
   requireStore,
+  requireFeature('reviews'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
@@ -117,6 +122,7 @@ router.get(
   '/can-review/:productId',
   requireStore,
   authenticate,
+  requireFeature('reviews'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { productId } = req.params;
@@ -137,6 +143,7 @@ router.get(
   '/my-reviews',
   requireStore,
   authenticate,
+  requireFeature('reviews'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const reviews = await ReviewService.getCustomerReviews(req.storeId!, req.user!.userId);
@@ -160,6 +167,7 @@ router.get(
   '/admin',
   authenticate,
   requireStore,
+  requireFeature('reviews'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       // Check if user is store admin
@@ -195,6 +203,7 @@ router.put(
   '/admin/:id',
   authenticate,
   requireStore,
+  requireFeature('reviews'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (req.user!.role !== 'super_admin' && req.user!.role !== 'store_admin') {
@@ -225,6 +234,7 @@ router.post(
   '/admin/:id/approve',
   authenticate,
   requireStore,
+  requireFeature('reviews'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (req.user!.role !== 'super_admin' && req.user!.role !== 'store_admin') {
@@ -254,6 +264,7 @@ router.post(
   '/admin/:id/reject',
   authenticate,
   requireStore,
+  requireFeature('reviews'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (req.user!.role !== 'super_admin' && req.user!.role !== 'store_admin') {
@@ -283,6 +294,7 @@ router.delete(
   '/admin/:id',
   authenticate,
   requireStore,
+  requireFeature('reviews'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (req.user!.role !== 'super_admin' && req.user!.role !== 'store_admin') {

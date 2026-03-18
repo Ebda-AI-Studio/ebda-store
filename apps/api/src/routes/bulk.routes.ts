@@ -2,11 +2,14 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
+import { requireFeature } from '../middleware/feature-gate';
 import { BulkService } from '../services/bulk.service';
 import { ProductStatus } from '@force/database';
 import { auditLog, writeLimiter } from '../middleware/security';
 
 const router = Router();
+
+router.use(requireFeature('bulk_operations'));
 
 // Validation schemas
 const bulkDeleteSchema = z.object({

@@ -2,10 +2,13 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
+import { requireFeature } from '../middleware/feature-gate';
 import { InventoryService } from '../services/inventory.service';
 import { InventoryChangeType } from '@force/database';
 
 const router = Router();
+
+router.use(requireFeature('inventory'));
 
 // Validation schemas
 const adjustInventorySchema = z.object({

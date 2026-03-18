@@ -5,6 +5,7 @@ import { requirePermission } from '../middleware/rbac';
 import { ReturnService } from '../services/return.service';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { requireStoreAccess } from '../middleware/store-access';
+import { requireFeature } from '../middleware/feature-gate';
 
 const router = Router({ mergeParams: true });
 
@@ -32,31 +33,37 @@ const createReturnSchema = z.object({
 // Customer Routes
 
 // GET /stores/:storeId/returns - List customer returns
-router.get('/', authenticate, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { storeId } = req.params;
-    const { page, limit, status } = req.query;
+router.get(
+  '/',
+  authenticate,
+  requireFeature('returns'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const { page, limit, status } = req.query;
 
-    const result = await ReturnService.getCustomerReturns(storeId, req.user!.userId, {
-      page: page ? parseInt(page as string) : undefined,
-      limit: limit ? parseInt(limit as string) : undefined,
-      status: status as string,
-    });
+      const result = await ReturnService.getCustomerReturns(storeId, req.user!.userId, {
+        page: page ? parseInt(page as string) : undefined,
+        limit: limit ? parseInt(limit as string) : undefined,
+        status: status as string,
+      });
 
-    res.json({
-      success: true,
-      data: result,
-    });
-  } catch (error) {
-    next(error);
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 // POST /stores/:storeId/returns - Create return request
 router.post(
   '/',
   authenticate,
   writeLimiter,
+  requireFeature('returns'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -89,29 +96,34 @@ router.post(
 );
 
 // GET /stores/:storeId/returns/:id - Get return details
-router.get('/:id', authenticate, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { storeId, id } = req.params;
+router.get(
+  '/:id',
+  authenticate,
+  requireFeature('returns'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, id } = req.params;
 
-    const returnRequest = await ReturnService.getById(storeId, id);
+      const returnRequest = await ReturnService.getById(storeId, id);
 
-    // Check if customer owns this return
-    if (returnRequest.customerId !== req.user!.userId && req.user!.role === 'customer') {
-      res.status(403).json({
-        success: false,
-        error: { code: 'FORBIDDEN', message: 'Access denied' },
+      // Check if customer owns this return
+      if (returnRequest.customerId !== req.user!.userId && req.user!.role === 'customer') {
+        res.status(403).json({
+          success: false,
+          error: { code: 'FORBIDDEN', message: 'Access denied' },
+        });
+        return;
+      }
+
+      res.json({
+        success: true,
+        data: { return: returnRequest },
       });
-      return;
+    } catch (error) {
+      next(error);
     }
-
-    res.json({
-      success: true,
-      data: { return: returnRequest },
-    });
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 // Admin Routes
 
@@ -121,6 +133,7 @@ router.get(
   authenticate,
   requirePermission('returns:read'),
   requireStoreAccess,
+  requireFeature('returns'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -149,6 +162,7 @@ router.get(
   authenticate,
   requirePermission('returns:read'),
   requireStoreAccess,
+  requireFeature('returns'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -171,6 +185,7 @@ router.post(
   requirePermission('returns:write'),
   requireStoreAccess,
   writeLimiter,
+  requireFeature('returns'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, id } = req.params;
@@ -206,6 +221,7 @@ router.post(
   requirePermission('returns:write'),
   requireStoreAccess,
   writeLimiter,
+  requireFeature('returns'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, id } = req.params;
@@ -249,6 +265,7 @@ router.post(
   requirePermission('returns:write'),
   requireStoreAccess,
   writeLimiter,
+  requireFeature('returns'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, id } = req.params;
@@ -283,6 +300,7 @@ router.post(
   requirePermission('returns:write'),
   requireStoreAccess,
   writeLimiter,
+  requireFeature('returns'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, id } = req.params;
@@ -330,6 +348,7 @@ router.put(
   authenticate,
   requirePermission('returns:write'),
   requireStoreAccess,
+  requireFeature('returns'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, id } = req.params;
