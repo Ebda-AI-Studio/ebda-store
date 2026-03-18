@@ -28,6 +28,7 @@ import notificationRoutes from './notification.routes';
 import abandonedCartRoutes from './abandoned-cart.routes';
 import recommendationRoutes from './recommendation.routes';
 import shippingCarrierRoutes from './shipping-carrier.routes';
+import affiliateRoutes from './affiliate.routes';
 
 const router = Router();
 
@@ -114,6 +115,10 @@ router.use('/public', recommendationRoutes);
 // Shipping carrier routes (admin + public tracking)
 router.use('/stores', shippingCarrierRoutes);
 router.use('/public', shippingCarrierRoutes);
+
+// Affiliate routes (admin + public apply/track)
+router.use('/stores', affiliateRoutes);
+router.use('/public', affiliateRoutes);
 
 // Wishlist routes (user-scoped)
 router.use('/wishlist', wishlistRoutes);
