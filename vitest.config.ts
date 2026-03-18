@@ -26,7 +26,7 @@ export default defineConfig({
         statements: 50,
       },
     },
-    setupFiles: ['./tests/setup.ts'],
+    setupFiles: ['./tests/setup.ts', './tests/setup-e2e.ts'],
     testTimeout: 30000,
     hookTimeout: 30000,
     // Run integration tests sequentially to avoid port conflicts
