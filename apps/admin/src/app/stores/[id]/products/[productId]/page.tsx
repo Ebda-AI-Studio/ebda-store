@@ -162,6 +162,11 @@ export default function ProductDetailPage() {
               Manage Variants
             </Button>
           </Link>
+          <Link href={`/stores/${storeId}/products/${product.id}/recommendations`}>
+            <Button variant="outline" size="sm">
+              Recommendations
+            </Button>
+          </Link>
           <Button variant="destructive" size="sm" onClick={() => setIsDeleteModalOpen(true)}>
             Delete
           </Button>
