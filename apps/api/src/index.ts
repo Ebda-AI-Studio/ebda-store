@@ -22,6 +22,7 @@ import { emailQueue } from './services/email-queue.service';
 import { whatsappQueue } from './services/whatsapp-queue.service';
 import { smsQueue } from './services/sms-queue.service';
 import { abandonedCartService } from './services/abandoned-cart.service';
+import { recommendationService } from './services/recommendation.service';
 import { SentryService } from './services/sentry.service';
 import logger from './lib/logger';
 
@@ -42,6 +43,7 @@ emailQueue.startProcessing();
 whatsappQueue.startProcessing(2000);
 smsQueue.startProcessing(2000);
 abandonedCartService.startProcessing(900000); // 15 minutes
+recommendationService.startFBTCron(86400000, []); // daily; storeIds populated per-trigger
 
 // Request ID for tracing
 app.use(requestId);
@@ -293,6 +295,7 @@ async function gracefulShutdown(signal: string) {
       whatsappQueue.stopProcessing();
       smsQueue.stopProcessing();
       abandonedCartService.stopProcessing();
+      recommendationService.stopFBTCron();
       socketService.close();
       await prisma.$disconnect();
       await redis.disconnect();

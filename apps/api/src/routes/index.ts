@@ -26,6 +26,7 @@ import addressRoutes from './address.routes';
 import featureRoutes from './feature.routes';
 import notificationRoutes from './notification.routes';
 import abandonedCartRoutes from './abandoned-cart.routes';
+import recommendationRoutes from './recommendation.routes';
 
 const router = Router();
 
@@ -104,6 +105,10 @@ router.use('/public', notificationRoutes);
 // Abandoned cart routes (admin + public recovery)
 router.use('/stores', abandonedCartRoutes);
 router.use('/public', abandonedCartRoutes);
+
+// Recommendation routes (admin + public)
+router.use('/stores', recommendationRoutes);
+router.use('/public', recommendationRoutes);
 
 // Wishlist routes (user-scoped)
 router.use('/wishlist', wishlistRoutes);

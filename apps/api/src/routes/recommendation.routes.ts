@@ -1,0 +1,215 @@
+import { Router, Request, Response, NextFunction } from 'express';
+import { authenticate, authorize } from '../middleware/auth';
+import { requireStoreAccess } from '../middleware/store-access';
+import { requireFeature } from '../middleware/feature-gate';
+import { featureService } from '../services/feature.service';
+import { recommendationService } from '../services/recommendation.service';
+
+const router = Router();
+
+// ==========================================
+// Admin Routes
+// authenticate + authorize + requireStoreAccess + requireFeature
+// ==========================================
+
+// GET /:storeId/products/:productId/relations
+router.get(
+  '/:storeId/products/:productId/relations',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  requireFeature('upsell_crosssell'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, productId } = req.params;
+      const relations = await recommendationService.getRelations(storeId, productId);
+      res.json({ success: true, data: { relations } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// PUT /:storeId/products/:productId/relations — bulk replace
+router.put(
+  '/:storeId/products/:productId/relations',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  requireFeature('upsell_crosssell'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, productId } = req.params;
+      const { relations } = req.body;
+
+      if (!Array.isArray(relations)) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'INVALID_BODY', message: 'relations must be an array' },
+        });
+        return;
+      }
+
+      await recommendationService.setProductRelations(storeId, productId, relations);
+      const updated = await recommendationService.getRelations(storeId, productId);
+      res.json({ success: true, data: { relations: updated } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// POST /:storeId/products/:productId/relations — add single relation
+router.post(
+  '/:storeId/products/:productId/relations',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  requireFeature('upsell_crosssell'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, productId } = req.params;
+      const { targetProductId, type, position } = req.body;
+
+      if (!targetProductId || !type) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'MISSING_FIELDS', message: 'targetProductId and type are required' },
+        });
+        return;
+      }
+
+      const relation = await recommendationService.addRelation(storeId, productId, {
+        targetProductId,
+        type,
+        position,
+      });
+
+      res.status(201).json({ success: true, data: { relation } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// DELETE /:storeId/products/:productId/relations/:relationId
+router.delete(
+  '/:storeId/products/:productId/relations/:relationId',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  requireFeature('upsell_crosssell'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, productId, relationId } = req.params;
+      await recommendationService.removeRelation(storeId, productId, relationId);
+      res.json({ success: true, data: { message: 'Relation deleted successfully' } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// POST /:storeId/recommendations/recalculate — trigger FBT recalculation
+router.post(
+  '/:storeId/recommendations/recalculate',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  requireFeature('upsell_crosssell'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+
+      // Kick off async — don't await so request returns immediately
+      recommendationService.recalculateFBT(storeId).catch(err => {
+        const logger = require('../lib/logger').default;
+        logger.error({ err, storeId }, '[FBT] Manual recalculation failed');
+      });
+
+      res.json({ success: true, data: { message: 'FBT recalculation started' } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// GET /:storeId/recommendations/stats
+router.get(
+  '/:storeId/recommendations/stats',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  requireFeature('upsell_crosssell'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const stats = await recommendationService.getStats(storeId);
+      res.json({ success: true, data: { stats } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// ==========================================
+// Public Routes — feature check inline (return empty arrays if disabled)
+// ==========================================
+
+// GET /public/:storeId/products/:productId/recommendations
+router.get(
+  '/public/:storeId/products/:productId/recommendations',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, productId } = req.params;
+
+      const enabled = await featureService.isFeatureEnabled(storeId, 'upsell_crosssell');
+      if (!enabled) {
+        res.json({ success: true, data: { crossSell: [], upsell: [], alsoLike: [] } });
+        return;
+      }
+
+      const recommendations = await recommendationService.getProductRecommendations(
+        storeId,
+        productId
+      );
+      res.json({ success: true, data: recommendations });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// GET /public/:storeId/cart/recommendations?products=id1,id2
+router.get(
+  '/public/:storeId/cart/recommendations',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const productsParam = req.query.products as string | undefined;
+
+      const enabled = await featureService.isFeatureEnabled(storeId, 'upsell_crosssell');
+      if (!enabled) {
+        res.json({ success: true, data: { recommendations: [] } });
+        return;
+      }
+
+      const productIds = productsParam
+        ? productsParam
+            .split(',')
+            .map(id => id.trim())
+            .filter(Boolean)
+        : [];
+
+      const recommendations = await recommendationService.getCartRecommendations(
+        storeId,
+        productIds
+      );
+      res.json({ success: true, data: { recommendations } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+export default router;
