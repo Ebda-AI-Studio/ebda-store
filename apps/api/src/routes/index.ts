@@ -24,6 +24,7 @@ import categoryRoutes from './category.routes';
 import wishlistRoutes from './wishlist.routes';
 import addressRoutes from './address.routes';
 import featureRoutes from './feature.routes';
+import notificationRoutes from './notification.routes';
 
 const router = Router();
 
@@ -94,6 +95,10 @@ router.use('/stores', bulkRoutes);
 
 // Variant routes
 router.use('/stores', variantRoutes);
+
+// Notification routes (admin + public push)
+router.use('/stores', notificationRoutes);
+router.use('/public', notificationRoutes);
 
 // Wishlist routes (user-scoped)
 router.use('/wishlist', wishlistRoutes);
