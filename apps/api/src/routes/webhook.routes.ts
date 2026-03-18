@@ -8,6 +8,7 @@ import { config } from '../config';
 import { auditLog } from '../middleware/security';
 import logger from '../lib/logger';
 import { whatsappService } from '../services/whatsapp.service';
+import { shippingCarrierService } from '../services/shipping-carrier.service';
 
 const router = Router();
 
@@ -440,6 +441,44 @@ router.post('/whatsapp', express.json(), async (req: Request, res: Response) => 
   } catch (err) {
     logger.error({ err }, '[WEBHOOK] WhatsApp webhook error');
     res.sendStatus(200); // Always 200 — never trigger Meta retries
+  }
+});
+
+// ==========================================
+// Shipping Carrier Webhooks
+// ==========================================
+
+/**
+ * POST /webhooks/shipping/icarry
+ * Receive push notifications from iCarry
+ */
+router.post('/shipping/icarry', express.json(), async (req: Request, res: Response) => {
+  try {
+    const headers = Object.fromEntries(
+      Object.entries(req.headers).map(([k, v]) => [k, String(v ?? '')])
+    );
+    await shippingCarrierService.processWebhook('icarry', req.body, headers);
+    res.sendStatus(200);
+  } catch (err) {
+    logger.error({ err }, '[WEBHOOK] iCarry shipping webhook error');
+    res.sendStatus(200); // Always 200 to prevent carrier retries
+  }
+});
+
+/**
+ * POST /webhooks/shipping/aramex
+ * Receive push notifications from Aramex
+ */
+router.post('/shipping/aramex', express.json(), async (req: Request, res: Response) => {
+  try {
+    const headers = Object.fromEntries(
+      Object.entries(req.headers).map(([k, v]) => [k, String(v ?? '')])
+    );
+    await shippingCarrierService.processWebhook('aramex', req.body, headers);
+    res.sendStatus(200);
+  } catch (err) {
+    logger.error({ err }, '[WEBHOOK] Aramex shipping webhook error');
+    res.sendStatus(200); // Always 200 to prevent carrier retries
   }
 });
 

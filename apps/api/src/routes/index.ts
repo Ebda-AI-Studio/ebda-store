@@ -27,6 +27,7 @@ import featureRoutes from './feature.routes';
 import notificationRoutes from './notification.routes';
 import abandonedCartRoutes from './abandoned-cart.routes';
 import recommendationRoutes from './recommendation.routes';
+import shippingCarrierRoutes from './shipping-carrier.routes';
 
 const router = Router();
 
@@ -109,6 +110,10 @@ router.use('/public', abandonedCartRoutes);
 // Recommendation routes (admin + public)
 router.use('/stores', recommendationRoutes);
 router.use('/public', recommendationRoutes);
+
+// Shipping carrier routes (admin + public tracking)
+router.use('/stores', shippingCarrierRoutes);
+router.use('/public', shippingCarrierRoutes);
 
 // Wishlist routes (user-scoped)
 router.use('/wishlist', wishlistRoutes);
