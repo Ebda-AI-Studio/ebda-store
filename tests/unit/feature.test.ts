@@ -1,0 +1,183 @@
+/**
+ * Feature Toggle Engine — Unit Tests
+ * Tests for the feature registry (shared) and requireFeature middleware
+ */
+
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { createMockRequest, createMockResponse, createMockNext, mockStore } from '../setup';
+
+// Feature registry — import from direct path since @force/shared points to dist/
+import {
+  FEATURE_KEYS_ARRAY,
+  featureKeySchema,
+  featureUpdatesSchema,
+} from '../../packages/shared/src/features';
+
+// Mock the feature service before importing the middleware
+vi.mock('../../apps/api/src/services/feature.service', () => ({
+  featureService: {
+    isFeatureEnabled: vi.fn(),
+  },
+}));
+
+// Mock logger to suppress output during tests
+vi.mock('../../apps/api/src/lib/logger', () => ({
+  default: {
+    warn: vi.fn(),
+    debug: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+  },
+}));
+
+import { requireFeature } from '../../apps/api/src/middleware/feature-gate';
+import { featureService } from '../../apps/api/src/services/feature.service';
+
+// ============================================================
+// Feature Registry Tests
+// ============================================================
+
+describe('Feature Registry', () => {
+  describe('FEATURE_KEYS_ARRAY', () => {
+    it('has exactly 21 entries', () => {
+      expect(FEATURE_KEYS_ARRAY).toHaveLength(21);
+    });
+  });
+
+  describe('featureKeySchema', () => {
+    it('validates known key: coupons', () => {
+      const result = featureKeySchema.safeParse('coupons');
+      expect(result.success).toBe(true);
+    });
+
+    it('validates known key: loyalty', () => {
+      const result = featureKeySchema.safeParse('loyalty');
+      expect(result.success).toBe(true);
+    });
+
+    it('validates known key: whatsapp', () => {
+      const result = featureKeySchema.safeParse('whatsapp');
+      expect(result.success).toBe(true);
+    });
+
+    it('rejects unknown key: unknown_feature', () => {
+      const result = featureKeySchema.safeParse('unknown_feature');
+      expect(result.success).toBe(false);
+    });
+
+    it('rejects empty string', () => {
+      const result = featureKeySchema.safeParse('');
+      expect(result.success).toBe(false);
+    });
+
+    it('rejects non-string input: 123', () => {
+      const result = featureKeySchema.safeParse(123);
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe('featureUpdatesSchema', () => {
+    it('validates valid updates: {coupons: true, loyalty: false}', () => {
+      const result = featureUpdatesSchema.safeParse({ coupons: true, loyalty: false });
+      expect(result.success).toBe(true);
+    });
+
+    it('rejects updates with unknown keys: {unknown: true}', () => {
+      const result = featureUpdatesSchema.safeParse({ unknown: true });
+      expect(result.success).toBe(false);
+    });
+
+    it('rejects empty object: {}', () => {
+      const result = featureUpdatesSchema.safeParse({});
+      expect(result.success).toBe(false);
+    });
+  });
+});
+
+// ============================================================
+// requireFeature Middleware Tests
+// ============================================================
+
+describe('requireFeature Middleware', () => {
+  const mockIsFeatureEnabled = featureService.isFeatureEnabled as ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    mockIsFeatureEnabled.mockReset();
+  });
+
+  it('should call next() when feature is enabled', async () => {
+    mockIsFeatureEnabled.mockResolvedValue(true);
+
+    const req = createMockRequest({ params: { storeId: mockStore.id } });
+    const res = createMockResponse();
+    const next = createMockNext();
+
+    const middleware = requireFeature('coupons');
+    await middleware(req as any, res as any, next);
+
+    expect(next).toHaveBeenCalledOnce();
+    expect(res.status).not.toHaveBeenCalled();
+  });
+
+  it('should return 403 with FEATURE_DISABLED code when feature is disabled', async () => {
+    mockIsFeatureEnabled.mockResolvedValue(false);
+
+    const req = createMockRequest({ params: { storeId: mockStore.id } });
+    const res = createMockResponse();
+    const next = createMockNext();
+
+    const middleware = requireFeature('coupons');
+    await middleware(req as any, res as any, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ code: 'FEATURE_DISABLED' }));
+  });
+
+  it('should fail closed (403) when no storeId available — empty params, no headers', async () => {
+    const req = createMockRequest({ params: {}, headers: {} });
+    const res = createMockResponse();
+    const next = createMockNext();
+
+    const middleware = requireFeature('loyalty');
+    await middleware(req as any, res as any, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ code: 'FEATURE_DISABLED' }));
+    // Service should not be called at all when storeId is missing
+    expect(mockIsFeatureEnabled).not.toHaveBeenCalled();
+  });
+
+  it('should fail closed (403) on service error', async () => {
+    mockIsFeatureEnabled.mockRejectedValue(new Error('Redis connection failed'));
+
+    const req = createMockRequest({ params: { storeId: mockStore.id } });
+    const res = createMockResponse();
+    const next = createMockNext();
+
+    const middleware = requireFeature('whatsapp');
+    await middleware(req as any, res as any, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ code: 'FEATURE_DISABLED' }));
+  });
+
+  it('should resolve storeId from x-store-id header when not in params', async () => {
+    mockIsFeatureEnabled.mockResolvedValue(true);
+
+    const req = createMockRequest({
+      params: {},
+      headers: { 'x-store-id': mockStore.id },
+    });
+    const res = createMockResponse();
+    const next = createMockNext();
+
+    const middleware = requireFeature('seo');
+    await middleware(req as any, res as any, next);
+
+    expect(mockIsFeatureEnabled).toHaveBeenCalledWith(mockStore.id, 'seo');
+    expect(next).toHaveBeenCalledOnce();
+  });
+});
