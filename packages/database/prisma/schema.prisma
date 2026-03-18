@@ -51,6 +51,7 @@ model User {
   returns             Return[]
   loyaltyPoints       LoyaltyPoints[]
   loyaltyTransactions LoyaltyTransaction[]
+  featureToggles      StoreFeature[]       @relation("FeatureToggledBy")
 
   @@index([role])
   @@index([status])
@@ -200,6 +201,7 @@ model Store {
   inventoryHistory InventoryHistory[]
   tags           Tag[]
   auditLogs      AuditLog[]
+  features       StoreFeature[]
 
   @@index([ownerId])
   @@index([status])
@@ -852,6 +854,27 @@ model SystemSetting {
 
   @@index([category])
   @@map("system_settings")
+}
+
+// ==========================================
+// Feature Toggles (Per-Store)
+// ==========================================
+
+model StoreFeature {
+  id         String    @id @default(uuid())
+  storeId    String    @map("store_id")
+  featureKey String    @map("feature_key")
+  enabled    Boolean   @default(false)
+  enabledAt  DateTime? @map("enabled_at")
+  enabledBy  String?   @map("enabled_by")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  user  User? @relation("FeatureToggledBy", fields: [enabledBy], references: [id], onDelete: SetNull)
+
+  @@unique([storeId, featureKey])
+  @@index([storeId])
+  @@map("store_features")
 }
 
 // ==========================================
