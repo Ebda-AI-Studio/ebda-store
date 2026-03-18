@@ -1,5 +1,6 @@
 import { prisma, Prisma, LoyaltyTransactionType } from '@force/database';
 import { AppError } from '../middleware/error-handler';
+import { featureService } from './feature.service';
 
 // Default loyalty settings structure
 interface LoyaltySettings {
@@ -142,7 +143,7 @@ export class LoyaltyService {
     storeId: string,
     customerId: string
   ): Promise<CustomerPointsInfo | null> {
-    const [loyalty, store] = await Promise.all([
+    const [loyalty, store, loyaltyEnabled] = await Promise.all([
       prisma.loyaltyPoints.findUnique({
         where: {
           storeId_customerId: { storeId, customerId },
@@ -151,13 +152,13 @@ export class LoyaltyService {
       prisma.store.findUnique({
         where: { id: storeId },
         select: {
-          loyaltyEnabled: true,
           loyaltySettings: true,
         },
       }),
+      featureService.isFeatureEnabled(storeId, 'loyalty'),
     ]);
 
-    if (!store || !store.loyaltyEnabled) {
+    if (!store || !loyaltyEnabled) {
       return null;
     }
 
@@ -194,19 +195,21 @@ export class LoyaltyService {
     customerId: string,
     giveSignupBonus = true
   ): Promise<CustomerPointsInfo> {
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: {
-        loyaltyEnabled: true,
-        loyaltySettings: true,
-      },
-    });
+    const [store, loyaltyEnabled] = await Promise.all([
+      prisma.store.findUnique({
+        where: { id: storeId },
+        select: {
+          loyaltySettings: true,
+        },
+      }),
+      featureService.isFeatureEnabled(storeId, 'loyalty'),
+    ]);
 
     if (!store) {
       throw new AppError(404, 'NOT_FOUND', 'Store not found');
     }
 
-    if (!store.loyaltyEnabled) {
+    if (!loyaltyEnabled) {
       throw new AppError(400, 'LOYALTY_DISABLED', 'Loyalty program is not enabled for this store');
     }
 
@@ -281,15 +284,17 @@ export class LoyaltyService {
     orderId: string,
     orderTotalFils: number
   ): Promise<{ pointsEarned: number; newBalance: number }> {
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: {
-        loyaltyEnabled: true,
-        loyaltySettings: true,
-      },
-    });
+    const [store, loyaltyEnabled] = await Promise.all([
+      prisma.store.findUnique({
+        where: { id: storeId },
+        select: {
+          loyaltySettings: true,
+        },
+      }),
+      featureService.isFeatureEnabled(storeId, 'loyalty'),
+    ]);
 
-    if (!store || !store.loyaltyEnabled) {
+    if (!store || !loyaltyEnabled) {
       return { pointsEarned: 0, newBalance: 0 };
     }
 
@@ -367,15 +372,17 @@ export class LoyaltyService {
     orderId: string,
     pointsToRedeem: number
   ): Promise<{ discountFils: number; newBalance: number }> {
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: {
-        loyaltyEnabled: true,
-        loyaltySettings: true,
-      },
-    });
+    const [store, loyaltyEnabled] = await Promise.all([
+      prisma.store.findUnique({
+        where: { id: storeId },
+        select: {
+          loyaltySettings: true,
+        },
+      }),
+      featureService.isFeatureEnabled(storeId, 'loyalty'),
+    ]);
 
-    if (!store || !store.loyaltyEnabled) {
+    if (!store || !loyaltyEnabled) {
       throw new AppError(400, 'LOYALTY_DISABLED', 'Loyalty program is not enabled');
     }
 
@@ -447,15 +454,17 @@ export class LoyaltyService {
     type: LoyaltyTransactionType,
     description?: string
   ): Promise<{ newBalance: number }> {
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: {
-        loyaltyEnabled: true,
-        loyaltySettings: true,
-      },
-    });
+    const [store, loyaltyEnabled] = await Promise.all([
+      prisma.store.findUnique({
+        where: { id: storeId },
+        select: {
+          loyaltySettings: true,
+        },
+      }),
+      featureService.isFeatureEnabled(storeId, 'loyalty'),
+    ]);
 
-    if (!store || !store.loyaltyEnabled) {
+    if (!store || !loyaltyEnabled) {
       throw new AppError(400, 'LOYALTY_DISABLED', 'Loyalty program is not enabled');
     }
 

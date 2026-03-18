@@ -1,5 +1,6 @@
 import { prisma, Prisma } from '@force/database';
 import { AppError } from '../middleware/error-handler';
+import { featureService } from './feature.service';
 
 interface CreateTaxRateData {
   name: string;
@@ -196,9 +197,12 @@ export class TaxService {
     taxRate: number;
     taxBreakdown: Array<{ name: string; rate: number; amount: number }>;
   }> {
-    const settings = await this.getSettings(storeId);
+    const [settings, taxEnabled] = await Promise.all([
+      this.getSettings(storeId),
+      featureService.isFeatureEnabled(storeId, 'tax'),
+    ]);
 
-    if (!settings.taxEnabled) {
+    if (!taxEnabled) {
       return { taxAmount: 0, taxRate: 0, taxBreakdown: [] };
     }
 

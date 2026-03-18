@@ -1,5 +1,6 @@
 import { prisma, Prisma } from '@force/database';
 import { AppError } from '../middleware/error-handler';
+import { featureService } from './feature.service';
 
 // PWA Settings structure
 interface PWASettings {
@@ -141,16 +142,18 @@ export class PWAService {
    * Generate PWA manifest JSON
    */
   static async generateManifest(storeId: string): Promise<object | null> {
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: {
-        name: true,
-        pwaEnabled: true,
-        pwaSettings: true,
-      },
-    });
+    const [store, pwaEnabled] = await Promise.all([
+      prisma.store.findUnique({
+        where: { id: storeId },
+        select: {
+          name: true,
+          pwaSettings: true,
+        },
+      }),
+      featureService.isFeatureEnabled(storeId, 'pwa'),
+    ]);
 
-    if (!store || !store.pwaEnabled) {
+    if (!store || !pwaEnabled) {
       return null;
     }
 
@@ -232,15 +235,17 @@ export class PWAService {
     offlineEnabled: boolean;
     pushEnabled: boolean;
   }> {
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: {
-        pwaEnabled: true,
-        pwaSettings: true,
-      },
-    });
+    const [store, pwaEnabled] = await Promise.all([
+      prisma.store.findUnique({
+        where: { id: storeId },
+        select: {
+          pwaSettings: true,
+        },
+      }),
+      featureService.isFeatureEnabled(storeId, 'pwa'),
+    ]);
 
-    if (!store || !store.pwaEnabled) {
+    if (!store || !pwaEnabled) {
       return {
         enabled: false,
         offlineEnabled: false,
@@ -266,16 +271,18 @@ export class PWAService {
     splashColor: string;
     title: string;
   } | null> {
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: {
-        name: true,
-        pwaEnabled: true,
-        pwaSettings: true,
-      },
-    });
+    const [store, pwaEnabled] = await Promise.all([
+      prisma.store.findUnique({
+        where: { id: storeId },
+        select: {
+          name: true,
+          pwaSettings: true,
+        },
+      }),
+      featureService.isFeatureEnabled(storeId, 'pwa'),
+    ]);
 
-    if (!store || !store.pwaEnabled) {
+    if (!store || !pwaEnabled) {
       return null;
     }
 
