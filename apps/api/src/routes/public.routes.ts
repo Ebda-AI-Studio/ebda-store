@@ -16,6 +16,7 @@ import {
 import { getStoreIdFromRequest } from '../utils/store-helpers';
 import { redis } from '../services/redis.service';
 import logger from '../lib/logger';
+import { featureService } from '../services/feature.service';
 
 const router = Router();
 
@@ -478,9 +479,11 @@ router.get('/stores/:slugOrId', async (req: Request, res: Response, next: NextFu
       return;
     }
 
+    const enabledFeatures = await featureService.getEnabledFeatureKeys(store.id);
+
     res.json({
       success: true,
-      data: { store },
+      data: { store, enabledFeatures },
     });
   } catch (error) {
     next(error);
