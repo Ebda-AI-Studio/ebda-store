@@ -124,6 +124,12 @@ export class CartService {
       }
     );
 
+    // Track activity for abandonment detection
+    await prisma.cart.update({
+      where: { id: cart.id, storeId },
+      data: { lastActivityAt: new Date() },
+    });
+
     return this.getOrCreate(storeId, sessionId, customerId);
   }
 
@@ -158,6 +164,12 @@ export class CartService {
       });
     }
 
+    // Track activity for abandonment detection
+    await prisma.cart.update({
+      where: { id: cart.id, storeId },
+      data: { lastActivityAt: new Date() },
+    });
+
     return this.getOrCreate(storeId, sessionId, customerId);
   }
 
@@ -174,6 +186,12 @@ export class CartService {
 
     await prisma.cartItem.delete({ where: { id: itemId } });
 
+    // Track activity for abandonment detection
+    await prisma.cart.update({
+      where: { id: cart.id, storeId },
+      data: { lastActivityAt: new Date() },
+    });
+
     return this.getOrCreate(storeId, sessionId, customerId);
   }
 
@@ -182,6 +200,12 @@ export class CartService {
 
     await prisma.cartItem.deleteMany({
       where: { cartId: cart.id },
+    });
+
+    // Track activity for abandonment detection
+    await prisma.cart.update({
+      where: { id: cart.id, storeId },
+      data: { lastActivityAt: new Date() },
     });
 
     return this.getOrCreate(storeId, sessionId, customerId);
