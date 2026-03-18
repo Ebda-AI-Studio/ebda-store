@@ -199,6 +199,7 @@ circuitBreaker.register('email', { failureThreshold: 5, timeout: 30000 });
 circuitBreaker.register('sms', { failureThreshold: 5, timeout: 30000 });
 circuitBreaker.register('storage', { failureThreshold: 5, timeout: 30000 });
 circuitBreaker.register('ai', { failureThreshold: 3, timeout: 60000 });
+circuitBreaker.register('whatsapp', { failureThreshold: 5, timeout: 30000 });
 
 /**
  * Decorator function to wrap async operations with circuit breaker
