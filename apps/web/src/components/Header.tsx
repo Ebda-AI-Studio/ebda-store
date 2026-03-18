@@ -15,6 +15,8 @@ import { useLanguage, translations } from '../contexts/LanguageContext';
 import { useCart } from '../contexts/CartContext';
 import { useStore, useStoreUrl } from '../contexts/StoreContext';
 import { LanguageSwitcher } from './LanguageSwitcher';
+import { SearchAutocomplete } from './SearchAutocomplete';
+import { useFeatures } from '../contexts/FeatureContext';
 
 interface HeaderProps {
   cartCount?: number;
@@ -31,6 +33,8 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const { t } = useLanguage();
   const storeUrl = useStoreUrl();
+  const { isEnabled } = useFeatures();
+  const autocompleteEnabled = isEnabled('search_autocomplete');
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
 
@@ -181,32 +185,43 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
 
             {/* Search Bar - Desktop */}
             <div className="hidden flex-1 max-w-md lg:block">
-              <form onSubmit={handleSearch} role="search" className="search-box">
-                <svg
-                  className="h-5 w-5 text-muted-foreground"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              <div className="relative">
+                <form onSubmit={handleSearch} role="search" className="search-box">
+                  <svg
+                    className="h-5 w-5 text-muted-foreground"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                    />
+                  </svg>
+                  <input
+                    type="text"
+                    placeholder="Search products..."
+                    className="search-input"
+                    aria-label="Search products"
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
                   />
-                </svg>
-                <input
-                  type="text"
-                  placeholder="Search products..."
-                  className="search-input"
-                  aria-label="Search products"
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                />
-                <kbd className="hidden rounded bg-muted px-2 py-1 text-xs font-medium text-muted-foreground sm:block">
-                  ⌘K
-                </kbd>
-              </form>
+                  <kbd className="hidden rounded bg-muted px-2 py-1 text-xs font-medium text-muted-foreground sm:block">
+                    ⌘K
+                  </kbd>
+                </form>
+                {autocompleteEnabled && (
+                  <SearchAutocomplete
+                    query={searchQuery}
+                    onSelect={() => {
+                      setSearchQuery('');
+                      setIsSearchOpen(false);
+                    }}
+                  />
+                )}
+              </div>
             </div>
 
             {/* Right Actions */}
@@ -500,30 +515,41 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
           />
           <div className="fixed inset-x-0 top-0 z-50 bg-background p-4 shadow-lg lg:hidden animate-slide-down">
             <div className="flex items-center gap-3">
-              <form onSubmit={handleSearch} role="search" className="search-box flex-1">
-                <svg
-                  className="h-5 w-5 text-muted-foreground"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              <div className="relative flex-1">
+                <form onSubmit={handleSearch} role="search" className="search-box">
+                  <svg
+                    className="h-5 w-5 text-muted-foreground"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                    />
+                  </svg>
+                  <input
+                    type="text"
+                    placeholder="Search products..."
+                    className="search-input"
+                    aria-label="Search products"
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    autoFocus
                   />
-                </svg>
-                <input
-                  type="text"
-                  placeholder="Search products..."
-                  className="search-input"
-                  aria-label="Search products"
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  autoFocus
-                />
-              </form>
+                </form>
+                {autocompleteEnabled && (
+                  <SearchAutocomplete
+                    query={searchQuery}
+                    onSelect={() => {
+                      setSearchQuery('');
+                      setIsSearchOpen(false);
+                    }}
+                  />
+                )}
+              </div>
               <button
                 onClick={() => setIsSearchOpen(false)}
                 className="flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground"
