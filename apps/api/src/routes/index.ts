@@ -25,6 +25,7 @@ import wishlistRoutes from './wishlist.routes';
 import addressRoutes from './address.routes';
 import featureRoutes from './feature.routes';
 import notificationRoutes from './notification.routes';
+import abandonedCartRoutes from './abandoned-cart.routes';
 
 const router = Router();
 
@@ -99,6 +100,10 @@ router.use('/stores', variantRoutes);
 // Notification routes (admin + public push)
 router.use('/stores', notificationRoutes);
 router.use('/public', notificationRoutes);
+
+// Abandoned cart routes (admin + public recovery)
+router.use('/stores', abandonedCartRoutes);
+router.use('/public', abandonedCartRoutes);
 
 // Wishlist routes (user-scoped)
 router.use('/wishlist', wishlistRoutes);
