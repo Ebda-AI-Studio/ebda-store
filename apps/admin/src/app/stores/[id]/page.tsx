@@ -7,6 +7,7 @@ import { Button, Badge, Input, Label } from '@force/ui';
 import { AdminLayout } from '../../../components/AdminLayout';
 import { formatPrice, formatDate } from '../../../lib/format';
 import { apiGet, apiPut, apiPatch } from '../../../lib/api';
+import { useAuth } from '../../../lib/auth';
 
 interface Store {
   id: string;
@@ -275,6 +276,8 @@ function DomainSection({
 export default function StoreDetailPage() {
   const params = useParams();
   const storeId = params?.id as string;
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === 'super_admin';
   const [store, setStore] = useState<Store | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
@@ -752,6 +755,33 @@ export default function StoreDetailPage() {
               <p className="text-xs text-muted-foreground">View store metrics</p>
             </div>
           </Link>
+
+          {isSuperAdmin && (
+            <Link
+              href={`/stores/${store.id}/features`}
+              className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm transition hover:border-primary hover:shadow-md"
+            >
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-100">
+                <svg
+                  className="h-5 w-5 text-indigo-600"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 6h16M4 10h16M4 14h16M4 18h16"
+                  />
+                </svg>
+              </div>
+              <div>
+                <p className="font-medium text-foreground">Manage Features</p>
+                <p className="text-xs text-muted-foreground">Toggle store capabilities</p>
+              </div>
+            </Link>
+          )}
         </div>
       </div>
 
