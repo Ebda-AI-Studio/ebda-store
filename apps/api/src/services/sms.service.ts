@@ -51,7 +51,7 @@ class SmsService {
       throw new Error(`Unifonic API error: ${response.status} ${response.statusText}`);
     }
 
-    const result: UnifonicResponse = await response.json();
+    const result = (await response.json()) as UnifonicResponse;
 
     if (!result.success) {
       logger.error(
