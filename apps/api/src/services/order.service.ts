@@ -275,6 +275,34 @@ export class OrderService {
       // Clear cart
       await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
 
+      // Check for abandoned cart recovery
+      try {
+        const abandonedCart = await tx.abandonedCart.findFirst({
+          where: {
+            storeId,
+            OR: [
+              { cartId: cart.id },
+              { customerId: cart.customerId, status: { not: 'recovered' } },
+            ],
+            status: { in: ['pending', 'step1_sent', 'step2_sent', 'step3_sent'] },
+          },
+        });
+        if (abandonedCart) {
+          await tx.abandonedCart.update({
+            where: { id: abandonedCart.id },
+            data: {
+              status: 'recovered',
+              recoveredAt: new Date(),
+              recoveredOrderId: newOrder.id,
+            },
+          });
+          logger.info(`Abandoned cart ${abandonedCart.id} recovered by order ${newOrder.id}`);
+        }
+      } catch (err) {
+        logger.error('Abandoned cart recovery detection failed:', err);
+        // Never fail order creation
+      }
+
       return newOrder;
     });
 
