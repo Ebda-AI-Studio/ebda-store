@@ -14,6 +14,8 @@ import { useLanguage, translations } from '../../../contexts/LanguageContext';
 import { trackViewContent, trackAddToCart } from '../../../components/MarketingPixels';
 import { VariantSelector } from '../../../components/VariantSelector';
 import ReviewSection from '../../../components/ReviewSection';
+import { FrequentlyBoughtTogether } from '../../../components/FrequentlyBoughtTogether';
+import { YouMightAlsoLike } from '../../../components/YouMightAlsoLike';
 import { formatPrice } from '@/lib/format';
 
 function ProductSkeleton() {
@@ -487,6 +489,14 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
         {/* Product Reviews */}
         {isEnabled('reviews') && product && store.id && store.id !== 'demo' && (
           <ReviewSection storeId={store.id} productId={product.id} />
+        )}
+
+        {/* Upsell / Cross-sell recommendations */}
+        {isEnabled('upsell_crosssell') && product && store.id && store.id !== 'demo' && (
+          <>
+            <FrequentlyBoughtTogether storeId={store.id} productId={product.id} />
+            <YouMightAlsoLike storeId={store.id} productId={product.id} />
+          </>
         )}
 
         {/* Related Products */}
