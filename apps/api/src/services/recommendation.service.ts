@@ -1,0 +1,495 @@
+import { prisma } from '@force/database';
+import { redis } from './redis.service';
+import logger from '../lib/logger';
+
+// ==========================================
+// Recommendation Service
+// Handles manual product relations (cross-sell, upsell)
+// and auto-calculated Frequently Bought Together (FBT)
+// ==========================================
+
+const CACHE_TTL_SECONDS = 300; // 5 minutes
+const FBT_WINDOW_DAYS = 90;
+const FBT_MIN_THRESHOLD = 2;
+const FBT_LOCK_TTL_SECONDS = 300;
+
+// Minimal product shape returned in recommendation lists
+const productSelect = {
+  id: true,
+  name: true,
+  nameAr: true,
+  slug: true,
+  price: true,
+  compareAtPrice: true,
+  images: {
+    take: 1,
+    orderBy: { position: 'asc' as const },
+    select: { url: true, alt: true },
+  },
+};
+
+// FBT cron handle
+let fbtCronTimer: ReturnType<typeof setInterval> | null = null;
+
+// ==========================================
+// Recommendation Service Class
+// ==========================================
+
+class RecommendationService {
+  // ----------------------------------------
+  // getProductRecommendations
+  // ----------------------------------------
+  async getProductRecommendations(storeId: string, productId: string) {
+    const cacheKey = `recommendations:product:${storeId}:${productId}`;
+
+    // 1. Check cache
+    const cached = await redis.get<{
+      crossSell: unknown[];
+      upsell: unknown[];
+      alsoLike: unknown[];
+    }>(cacheKey, true);
+    if (cached) {
+      return cached;
+    }
+
+    // 2. Cross-sell: manual relations first, fall back to FBT
+    let crossSell: unknown[] = [];
+
+    const manualCrossSell = await prisma.productRelation.findMany({
+      where: { storeId, sourceProductId: productId, type: 'cross_sell' },
+      orderBy: { position: 'asc' },
+      take: 4,
+      select: {
+        id: true,
+        targetProduct: { select: productSelect },
+        position: true,
+      },
+    });
+
+    if (manualCrossSell.length > 0) {
+      crossSell = manualCrossSell.map(r => ({
+        relationId: r.id,
+        position: r.position,
+        ...r.targetProduct,
+      }));
+    } else {
+      // FBT fallback
+      const fbtRows = await prisma.frequentlyBoughtTogether.findMany({
+        where: {
+          storeId,
+          OR: [{ productId1: productId }, { productId2: productId }],
+        },
+        orderBy: { coOccurrenceCount: 'desc' },
+        take: 4,
+        select: {
+          productId1: true,
+          productId2: true,
+          coOccurrenceCount: true,
+          product1: { select: productSelect },
+          product2: { select: productSelect },
+        },
+      });
+
+      crossSell = fbtRows.map(row => {
+        const isSource = row.productId1 === productId;
+        return {
+          coOccurrenceCount: row.coOccurrenceCount,
+          ...(isSource ? row.product2 : row.product1),
+        };
+      });
+    }
+
+    // 3. Upsell: manual relations
+    const upsellRows = await prisma.productRelation.findMany({
+      where: { storeId, sourceProductId: productId, type: 'upsell' },
+      orderBy: { position: 'asc' },
+      take: 4,
+      select: {
+        id: true,
+        targetProduct: { select: productSelect },
+        position: true,
+      },
+    });
+    const upsell = upsellRows.map(r => ({
+      relationId: r.id,
+      position: r.position,
+      ...r.targetProduct,
+    }));
+
+    // 4. Also Like: products from same categories
+    const alreadyReturnedIds = new Set<string>([
+      productId,
+      ...crossSell.map((p: any) => p.id),
+      ...upsell.map((p: any) => p.id),
+    ]);
+
+    const productCategories = await prisma.productCategory.findMany({
+      where: { productId },
+      select: { categoryId: true },
+    });
+    const categoryIds = productCategories.map(pc => pc.categoryId);
+
+    let alsoLike: unknown[] = [];
+    if (categoryIds.length > 0) {
+      const alsoLikeRows = await prisma.product.findMany({
+        where: {
+          storeId,
+          status: 'active',
+          deletedAt: null,
+          id: { notIn: Array.from(alreadyReturnedIds) },
+          categories: {
+            some: { categoryId: { in: categoryIds } },
+          },
+        },
+        take: 6,
+        select: productSelect,
+      });
+      alsoLike = alsoLikeRows;
+    }
+
+    const result = { crossSell, upsell, alsoLike };
+
+    // 5. Cache result
+    await redis.set(cacheKey, result, CACHE_TTL_SECONDS);
+
+    return result;
+  }
+
+  // ----------------------------------------
+  // getCartRecommendations (not cached)
+  // ----------------------------------------
+  async getCartRecommendations(storeId: string, productIds: string[]) {
+    if (!productIds.length) return [];
+
+    const scoreMap = new Map<string, number>();
+
+    for (const productId of productIds) {
+      // Manual cross-sell first
+      const manual = await prisma.productRelation.findMany({
+        where: { storeId, sourceProductId: productId, type: 'cross_sell' },
+        orderBy: { position: 'asc' },
+        take: 8,
+        select: { targetProductId: true },
+      });
+
+      if (manual.length > 0) {
+        for (const r of manual) {
+          if (!productIds.includes(r.targetProductId)) {
+            scoreMap.set(r.targetProductId, (scoreMap.get(r.targetProductId) ?? 0) + 1);
+          }
+        }
+      } else {
+        // FBT fallback
+        const fbtRows = await prisma.frequentlyBoughtTogether.findMany({
+          where: {
+            storeId,
+            OR: [{ productId1: productId }, { productId2: productId }],
+          },
+          orderBy: { coOccurrenceCount: 'desc' },
+          take: 8,
+          select: { productId1: true, productId2: true },
+        });
+
+        for (const row of fbtRows) {
+          const targetId = row.productId1 === productId ? row.productId2 : row.productId1;
+          if (!productIds.includes(targetId)) {
+            scoreMap.set(targetId, (scoreMap.get(targetId) ?? 0) + 1);
+          }
+        }
+      }
+    }
+
+    // Sort by reference count, take top 4
+    const sortedIds = Array.from(scoreMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4)
+      .map(([id]) => id);
+
+    if (!sortedIds.length) return [];
+
+    const products = await prisma.product.findMany({
+      where: {
+        id: { in: sortedIds },
+        storeId,
+        status: 'active',
+        deletedAt: null,
+      },
+      select: productSelect,
+    });
+
+    // Preserve score order
+    return sortedIds.map(id => products.find((p: any) => p.id === id)).filter(Boolean);
+  }
+
+  // ----------------------------------------
+  // setProductRelations — bulk replace
+  // ----------------------------------------
+  async setProductRelations(
+    storeId: string,
+    productId: string,
+    relations: Array<{ targetProductId: string; type: string; position?: number }>
+  ) {
+    await prisma.productRelation.deleteMany({
+      where: { storeId, sourceProductId: productId },
+    });
+
+    if (relations.length > 0) {
+      await prisma.productRelation.createMany({
+        data: relations.map((r, idx) => ({
+          storeId,
+          sourceProductId: productId,
+          targetProductId: r.targetProductId,
+          type: r.type,
+          position: r.position ?? idx,
+        })),
+        skipDuplicates: true,
+      });
+    }
+
+    await this.invalidateCache(storeId, productId);
+  }
+
+  // ----------------------------------------
+  // addRelation — single
+  // ----------------------------------------
+  async addRelation(
+    storeId: string,
+    productId: string,
+    relation: { targetProductId: string; type: string; position?: number }
+  ) {
+    // Count existing to set position
+    const count = await prisma.productRelation.count({
+      where: { storeId, sourceProductId: productId, type: relation.type },
+    });
+
+    const created = await prisma.productRelation.create({
+      data: {
+        storeId,
+        sourceProductId: productId,
+        targetProductId: relation.targetProductId,
+        type: relation.type,
+        position: relation.position ?? count,
+      },
+    });
+
+    await this.invalidateCache(storeId, productId);
+    return created;
+  }
+
+  // ----------------------------------------
+  // removeRelation — single
+  // ----------------------------------------
+  async removeRelation(storeId: string, productId: string, relationId: string) {
+    const relation = await prisma.productRelation.findFirst({
+      where: { id: relationId, storeId, sourceProductId: productId },
+    });
+
+    if (!relation) {
+      throw Object.assign(new Error('Relation not found'), { statusCode: 404 });
+    }
+
+    await prisma.productRelation.delete({ where: { id: relationId } });
+    await this.invalidateCache(storeId, productId);
+  }
+
+  // ----------------------------------------
+  // getRelations — all relations with target details
+  // ----------------------------------------
+  async getRelations(storeId: string, productId: string) {
+    return prisma.productRelation.findMany({
+      where: { storeId, sourceProductId: productId },
+      orderBy: [{ type: 'asc' }, { position: 'asc' }],
+      select: {
+        id: true,
+        type: true,
+        position: true,
+        createdAt: true,
+        targetProduct: { select: productSelect },
+      },
+    });
+  }
+
+  // ----------------------------------------
+  // recalculateFBT
+  // ----------------------------------------
+  async recalculateFBT(storeId: string) {
+    const lockName = `fbt:calculating:${storeId}`;
+    const acquired = await redis.acquireLock(lockName, FBT_LOCK_TTL_SECONDS);
+
+    if (!acquired) {
+      logger.info({ storeId }, '[FBT] Calculation already in progress, skipping');
+      return;
+    }
+
+    try {
+      logger.info({ storeId }, '[FBT] Starting recalculation');
+
+      const since = new Date(Date.now() - FBT_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+
+      // Fetch completed orders with 2+ items in the window
+      const orders = await prisma.order.findMany({
+        where: {
+          storeId,
+          status: { in: ['delivered', 'shipped', 'processing', 'confirmed'] },
+          createdAt: { gte: since },
+          items: { some: {} },
+        },
+        select: {
+          id: true,
+          items: { select: { productId: true } },
+        },
+      });
+
+      // Count co-occurrences
+      const pairCounts = new Map<string, number>();
+      for (const order of orders) {
+        const productIds = [...new Set(order.items.map((i: any) => i.productId))];
+        if (productIds.length < 2) continue;
+
+        for (let i = 0; i < productIds.length; i++) {
+          for (let j = i + 1; j < productIds.length; j++) {
+            const a = productIds[i];
+            const b = productIds[j];
+            // Normalize: smaller ID first
+            const key = a < b ? `${a}:${b}` : `${b}:${a}`;
+            pairCounts.set(key, (pairCounts.get(key) ?? 0) + 1);
+          }
+        }
+      }
+
+      // Upsert pairs that meet threshold
+      const validPairs = Array.from(pairCounts.entries()).filter(
+        ([, count]) => count >= FBT_MIN_THRESHOLD
+      );
+      const upsertedPairKeys = new Set<string>();
+
+      for (const [key, count] of validPairs) {
+        const [productId1, productId2] = key.split(':');
+        upsertedPairKeys.add(key);
+
+        await prisma.frequentlyBoughtTogether.upsert({
+          where: { storeId_productId1_productId2: { storeId, productId1, productId2 } },
+          update: { coOccurrenceCount: count, lastCalculatedAt: new Date() },
+          create: {
+            storeId,
+            productId1,
+            productId2,
+            coOccurrenceCount: count,
+            lastCalculatedAt: new Date(),
+          },
+        });
+      }
+
+      // Delete stale rows (pairs no longer meeting threshold)
+      const existingRows = await prisma.frequentlyBoughtTogether.findMany({
+        where: { storeId },
+        select: { id: true, productId1: true, productId2: true },
+      });
+
+      const staleIds = existingRows
+        .filter(row => {
+          const key = `${row.productId1}:${row.productId2}`;
+          return !upsertedPairKeys.has(key);
+        })
+        .map(row => row.id);
+
+      if (staleIds.length > 0) {
+        await prisma.frequentlyBoughtTogether.deleteMany({ where: { id: { in: staleIds } } });
+      }
+
+      // Invalidate all recommendation caches for this store
+      await this.invalidateStoreCache(storeId);
+
+      logger.info(
+        { storeId, pairsCalculated: validPairs.length, staleRemoved: staleIds.length },
+        '[FBT] Recalculation complete'
+      );
+    } finally {
+      await redis.releaseLock(lockName);
+    }
+  }
+
+  // ----------------------------------------
+  // FBT Cron
+  // ----------------------------------------
+  startFBTCron(intervalMs: number, storeIds: string[]) {
+    if (fbtCronTimer) {
+      logger.warn('[FBT] Cron already running, skipping start');
+      return;
+    }
+
+    fbtCronTimer = setInterval(async () => {
+      logger.info({ storeIds }, '[FBT] Running scheduled recalculation');
+      for (const storeId of storeIds) {
+        try {
+          await this.recalculateFBT(storeId);
+        } catch (err) {
+          logger.error({ err, storeId }, '[FBT] Scheduled recalculation failed');
+        }
+      }
+    }, intervalMs);
+
+    logger.info({ intervalMs }, '[FBT] Cron started');
+  }
+
+  stopFBTCron() {
+    if (fbtCronTimer) {
+      clearInterval(fbtCronTimer);
+      fbtCronTimer = null;
+      logger.info('[FBT] Cron stopped');
+    }
+  }
+
+  // ----------------------------------------
+  // getStats
+  // ----------------------------------------
+  async getStats(storeId: string) {
+    const fbtCount = await prisma.frequentlyBoughtTogether.count({ where: { storeId } });
+
+    const lastRow = await prisma.frequentlyBoughtTogether.findFirst({
+      where: { storeId },
+      orderBy: { lastCalculatedAt: 'desc' },
+      select: { lastCalculatedAt: true },
+    });
+
+    return {
+      fbtPairCount: fbtCount,
+      lastCalculatedAt: lastRow?.lastCalculatedAt ?? null,
+    };
+  }
+
+  // ----------------------------------------
+  // Cache helpers
+  // ----------------------------------------
+  private async invalidateCache(storeId: string, productId: string) {
+    await redis.delete(`recommendations:product:${storeId}:${productId}`);
+  }
+
+  private async invalidateStoreCache(storeId: string) {
+    // Best-effort: individual product caches expire within 5 min anyway.
+    // If Redis client is available, use scan to remove all matching keys.
+    const client = redis.getClient();
+    if (!client) return;
+
+    try {
+      let cursor = '0';
+      do {
+        const [nextCursor, keys] = await client.scan(
+          cursor,
+          'MATCH',
+          `cache:recommendations:product:${storeId}:*`,
+          'COUNT',
+          100
+        );
+        cursor = nextCursor;
+        if (keys.length > 0) {
+          await client.del(...keys);
+        }
+      } while (cursor !== '0');
+    } catch (err) {
+      logger.warn({ err, storeId }, '[FBT] Failed to invalidate store recommendation cache');
+    }
+  }
+}
+
+export const recommendationService = new RecommendationService();
