@@ -210,6 +210,8 @@ model Store {
   notificationLogs         NotificationLog[]
   abandonedCarts           AbandonedCart[]
   abandonedCartConfig      AbandonedCartConfig?
+  productRelations         ProductRelation[]
+  frequentlyBoughtTogether FrequentlyBoughtTogether[]
 
   @@index([ownerId])
   @@index([status])
@@ -340,6 +342,10 @@ model Product {
   inventoryHistory InventoryHistory[]
   options          ProductOption[]
   variants         ProductVariant[]
+  relationsAsSource ProductRelation[] @relation("ProductRelationSource")
+  relationsAsTarget ProductRelation[] @relation("ProductRelationTarget")
+  fbtAsProduct1    FrequentlyBoughtTogether[] @relation("FBTProduct1")
+  fbtAsProduct2    FrequentlyBoughtTogether[] @relation("FBTProduct2")
 
   @@unique([storeId, slug])
   @@unique([storeId, sku])    // Prevent duplicate SKUs within a store (null values are excluded)
@@ -1026,6 +1032,48 @@ model AbandonedCartConfig {
   store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
   @@map("abandoned_cart_configs")
+}
+
+// ==========================================
+// Upsell / Cross-sell
+// ==========================================
+
+model ProductRelation {
+  id              String   @id @default(uuid())
+  storeId         String   @map("store_id")
+  sourceProductId String   @map("source_product_id")
+  targetProductId String   @map("target_product_id")
+  type            String
+  position        Int      @default(0)
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  store         Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  sourceProduct Product @relation("ProductRelationSource", fields: [sourceProductId], references: [id], onDelete: Cascade)
+  targetProduct Product @relation("ProductRelationTarget", fields: [targetProductId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, sourceProductId, targetProductId, type])
+  @@index([storeId, sourceProductId])
+  @@index([storeId, targetProductId])
+  @@map("product_relations")
+}
+
+model FrequentlyBoughtTogether {
+  id                String   @id @default(uuid())
+  storeId           String   @map("store_id")
+  productId1        String   @map("product_id_1")
+  productId2        String   @map("product_id_2")
+  coOccurrenceCount Int      @default(0) @map("co_occurrence_count")
+  lastCalculatedAt  DateTime @default(now()) @map("last_calculated_at")
+
+  store    Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  product1 Product @relation("FBTProduct1", fields: [productId1], references: [id], onDelete: Cascade)
+  product2 Product @relation("FBTProduct2", fields: [productId2], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, productId1, productId2])
+  @@index([storeId, productId1])
+  @@index([storeId, productId2])
+  @@index([coOccurrenceCount])
+  @@map("frequently_bought_together")
 }
 
 // ==========================================
