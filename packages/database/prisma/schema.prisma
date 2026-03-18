@@ -212,6 +212,8 @@ model Store {
   abandonedCartConfig      AbandonedCartConfig?
   productRelations         ProductRelation[]
   frequentlyBoughtTogether FrequentlyBoughtTogether[]
+  shippingCarrierConfigs   ShippingCarrierConfig[]
+  shipments                Shipment[]
 
   @@index([ownerId])
   @@index([status])
@@ -616,6 +618,7 @@ model Order {
   reviews             Review[]
   returns             Return[]
   loyaltyTransactions LoyaltyTransaction[]
+  shipment            Shipment?
 
   @@index([storeId])
   @@index([customerId])
@@ -1074,6 +1077,57 @@ model FrequentlyBoughtTogether {
   @@index([storeId, productId2])
   @@index([coOccurrenceCount])
   @@map("frequently_bought_together")
+}
+
+// ==========================================
+// Shipping Carrier Integrations
+// ==========================================
+
+model ShippingCarrierConfig {
+  id          String   @id @default(uuid())
+  storeId     String   @map("store_id")
+  carrier     String   // 'icarry' | 'aramex'
+  credentials String   @default("") // Encrypted JSON string
+  enabled     Boolean  @default(false)
+  isDefault   Boolean  @default(false) @map("is_default")
+  settings    Json     @default("{}") // pickup address, default weight, etc.
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, carrier])
+  @@index([storeId])
+  @@map("shipping_carrier_configs")
+}
+
+model Shipment {
+  id                  String    @id @default(uuid())
+  storeId             String    @map("store_id")
+  orderId             String    @unique @map("order_id")
+  carrier             String
+  trackingNumber      String?   @map("tracking_number")
+  trackingUrl         String?   @map("tracking_url")
+  labelUrl            String?   @map("label_url")
+  status              String    @default("created")
+  carrierShipmentId   String?   @map("carrier_shipment_id")
+  pickupAddress       Json      @map("pickup_address")
+  deliveryAddress     Json      @map("delivery_address")
+  weight              Decimal?  @db.Decimal(8, 2)
+  dimensions          Json?
+  estimatedDeliveryAt DateTime? @map("estimated_delivery_at")
+  statusHistory       Json      @default("[]") @map("status_history")
+  error               String?
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([storeId])
+  @@index([trackingNumber])
+  @@index([storeId, status])
+  @@map("shipments")
 }
 
 // ==========================================
