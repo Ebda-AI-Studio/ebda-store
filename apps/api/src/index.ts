@@ -19,6 +19,8 @@ import { prisma } from '@force/database';
 import { redis } from './services/redis.service';
 import { circuitBreaker } from './services/circuit-breaker.service';
 import { emailQueue } from './services/email-queue.service';
+import { whatsappQueue } from './services/whatsapp-queue.service';
+import { smsQueue } from './services/sms-queue.service';
 import { SentryService } from './services/sentry.service';
 import logger from './lib/logger';
 
@@ -36,6 +38,8 @@ socketService.initialize(httpServer);
 
 // Start email queue processor
 emailQueue.startProcessing();
+whatsappQueue.startProcessing(2000);
+smsQueue.startProcessing(2000);
 
 // Request ID for tracing
 app.use(requestId);
@@ -284,6 +288,8 @@ async function gracefulShutdown(signal: string) {
 
     try {
       emailQueue.stopProcessing();
+      whatsappQueue.stopProcessing();
+      smsQueue.stopProcessing();
       socketService.close();
       await prisma.$disconnect();
       await redis.disconnect();
