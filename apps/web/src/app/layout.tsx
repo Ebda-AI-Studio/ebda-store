@@ -10,6 +10,7 @@ import { getStore } from '../lib/store-resolver';
 import { MarketingPixelsProvider } from '../components/MarketingPixels';
 import { ServiceWorkerRegistration } from '../components/ServiceWorkerRegistration';
 import { PushNotificationPrompt } from '../components/PushNotificationPrompt';
+import { AffiliateTracker } from '../components/AffiliateTracker';
 import { type MarketingPixels, themeToCssVars } from '@force/shared';
 import '../styles/globals.css';
 
@@ -176,6 +177,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             )}
             <ServiceWorkerRegistration />
             <PushNotificationPrompt />
+            <AffiliateTracker />
           </FeatureProvider>
         </StoreProvider>
       </body>
