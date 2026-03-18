@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import express from 'express';
 import crypto from 'crypto';
 import { prisma } from '@force/database';
 import { PaymentService } from '../services/payment-providers/payment.factory';
@@ -6,6 +7,7 @@ import { PaymentProvider } from '../services/payment-providers/types';
 import { config } from '../config';
 import { auditLog } from '../middleware/security';
 import logger from '../lib/logger';
+import { whatsappService } from '../services/whatsapp.service';
 
 const router = Router();
 
@@ -388,6 +390,57 @@ router.get('/payment/error', async (req: Request, res: Response) => {
   res.redirect(
     `${config.webUrl}/checkout/error?reason=${encodeURIComponent(String(message || error || 'payment_failed'))}`
   );
+});
+
+// ==========================================
+// WhatsApp Webhooks (Meta Cloud API)
+// ==========================================
+
+/**
+ * GET /webhooks/whatsapp
+ * Meta sends a GET request to verify the webhook endpoint.
+ * Responds with the hub.challenge value on success.
+ */
+router.get('/whatsapp', (req: Request, res: Response) => {
+  const mode = req.query['hub.mode'] as string;
+  const token = req.query['hub.verify_token'] as string;
+  const challenge = req.query['hub.challenge'] as string;
+
+  const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN || 'verify';
+  const result = whatsappService.verifyWebhook(mode, token, challenge, verifyToken);
+
+  if (result) {
+    return res.status(200).send(result);
+  }
+
+  return res.status(403).send('Forbidden');
+});
+
+/**
+ * POST /webhooks/whatsapp
+ * Receives delivery status updates from Meta.
+ * Always responds 200 — Meta retries on any non-200.
+ */
+router.post('/whatsapp', express.json(), async (req: Request, res: Response) => {
+  try {
+    const statuses = whatsappService.processWebhookEvent(req.body);
+
+    for (const status of statuses) {
+      // Update NotificationLog where providerMessageId matches.
+      // No ordering guard here — the service layer already filters to
+      // known statuses (sent | delivered | read | failed).
+      await prisma.notificationLog.updateMany({
+        where: { providerMessageId: status.messageId },
+        data: { status: status.status, updatedAt: new Date() },
+      });
+    }
+
+    logger.info({ count: statuses.length }, '[WEBHOOK] WhatsApp status updates processed');
+    res.sendStatus(200);
+  } catch (err) {
+    logger.error({ err }, '[WEBHOOK] WhatsApp webhook error');
+    res.sendStatus(200); // Always 200 — never trigger Meta retries
+  }
 });
 
 export default router;
