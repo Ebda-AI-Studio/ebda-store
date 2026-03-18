@@ -21,6 +21,7 @@ import { circuitBreaker } from './services/circuit-breaker.service';
 import { emailQueue } from './services/email-queue.service';
 import { whatsappQueue } from './services/whatsapp-queue.service';
 import { smsQueue } from './services/sms-queue.service';
+import { abandonedCartService } from './services/abandoned-cart.service';
 import { SentryService } from './services/sentry.service';
 import logger from './lib/logger';
 
@@ -40,6 +41,7 @@ socketService.initialize(httpServer);
 emailQueue.startProcessing();
 whatsappQueue.startProcessing(2000);
 smsQueue.startProcessing(2000);
+abandonedCartService.startProcessing(900000); // 15 minutes
 
 // Request ID for tracing
 app.use(requestId);
@@ -290,6 +292,7 @@ async function gracefulShutdown(signal: string) {
       emailQueue.stopProcessing();
       whatsappQueue.stopProcessing();
       smsQueue.stopProcessing();
+      abandonedCartService.stopProcessing();
       socketService.close();
       await prisma.$disconnect();
       await redis.disconnect();
