@@ -49,6 +49,7 @@ export interface Store {
   status: StoreStatus;
   plan?: StorePlan;
   settings?: StoreSettings | Record<string, unknown>;
+  enabledFeatures?: string[];
   owner?: {
     id: string;
     email: string;
