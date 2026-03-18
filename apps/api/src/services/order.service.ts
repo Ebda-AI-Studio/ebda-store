@@ -5,6 +5,8 @@ import { CartService } from './cart.service';
 import { EmailService, type OrderEmailData } from './email.service';
 import { socketService } from './socket.service';
 import { notificationDispatcher } from './notification-dispatcher.service';
+import { featureService } from './feature.service';
+import { shippingCarrierService } from './shipping-carrier.service';
 import logger from '../lib/logger';
 
 interface CreateOrderData {
@@ -456,6 +458,20 @@ export class OrderService {
           });
         }
       });
+    }
+
+    // Auto-ship on confirmation (fire-and-forget)
+    if (status === 'confirmed') {
+      featureService
+        .isFeatureEnabled(storeId, 'shipping_carriers')
+        .then(shippingEnabled => {
+          if (shippingEnabled) {
+            shippingCarrierService
+              .createShipmentForOrder(storeId, orderId)
+              .catch(err => logger.error({ err, storeId, orderId }, 'Auto-ship failed'));
+          }
+        })
+        .catch(err => logger.error({ err, storeId }, 'Auto-ship feature check failed'));
     }
 
     // Send status update emails
