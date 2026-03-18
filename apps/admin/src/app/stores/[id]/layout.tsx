@@ -1,8 +1,9 @@
 'use client';
 
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { AdminFeatureProvider } from '../../../hooks/useFeatures';
+import { useNotifications } from '../../../contexts/NotificationContext';
 
 /**
  * Store-level layout.
@@ -10,10 +11,23 @@ import { AdminFeatureProvider } from '../../../hooks/useFeatures';
  * Wraps all pages under /stores/[id]/ with AdminFeatureProvider so that every
  * child page can call useFeatures() to gate UI elements based on the store's
  * active feature flags.
+ *
+ * Also subscribes to WebSocket notifications for the current store so the
+ * NotificationBell in AdminLayout receives real-time events (new orders,
+ * low stock, reviews, etc.) while any store page is mounted.
  */
 export default function StoreLayout({ children }: { children: ReactNode }) {
   const params = useParams();
   const storeId = params?.id as string;
+  const { subscribeToStore, unsubscribeFromStore } = useNotifications();
+
+  useEffect(() => {
+    if (!storeId) return;
+    subscribeToStore(storeId);
+    return () => {
+      unsubscribeFromStore(storeId);
+    };
+  }, [storeId, subscribeToStore, unsubscribeFromStore]);
 
   return <AdminFeatureProvider storeId={storeId}>{children}</AdminFeatureProvider>;
 }
