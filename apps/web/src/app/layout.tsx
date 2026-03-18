@@ -5,6 +5,7 @@ import { LanguageProvider } from '../contexts/LanguageContext';
 import { StoreProvider } from '../contexts/StoreContext';
 import { CartProvider } from '../contexts/CartContext';
 import { AuthProvider } from '../contexts/AuthContext';
+import { FeatureProvider } from '../contexts/FeatureContext';
 import { getStore } from '../lib/store-resolver';
 import { MarketingPixelsProvider } from '../components/MarketingPixels';
 import { ServiceWorkerRegistration } from '../components/ServiceWorkerRegistration';
@@ -154,24 +155,26 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         className={`${plusJakarta.variable} ${ibmPlexArabic.variable} font-sans antialiased bg-background text-foreground`}
       >
         <StoreProvider initialStore={store}>
-          <AuthProvider>
-            <LanguageProvider
-              defaultLanguage={
-                (store.settings as Record<string, unknown>)?.defaultLanguage as
-                  | 'en'
-                  | 'ar'
-                  | undefined
-              }
-            >
-              <CartProvider>
-                <ToastProvider>{children}</ToastProvider>
-              </CartProvider>
-            </LanguageProvider>
-          </AuthProvider>
-          {store.marketingPixels && Object.keys(store.marketingPixels).length > 0 && (
-            <MarketingPixelsProvider pixels={store.marketingPixels as MarketingPixels} />
-          )}
-          <ServiceWorkerRegistration />
+          <FeatureProvider>
+            <AuthProvider>
+              <LanguageProvider
+                defaultLanguage={
+                  (store.settings as Record<string, unknown>)?.defaultLanguage as
+                    | 'en'
+                    | 'ar'
+                    | undefined
+                }
+              >
+                <CartProvider>
+                  <ToastProvider>{children}</ToastProvider>
+                </CartProvider>
+              </LanguageProvider>
+            </AuthProvider>
+            {store.marketingPixels && Object.keys(store.marketingPixels).length > 0 && (
+              <MarketingPixelsProvider pixels={store.marketingPixels as MarketingPixels} />
+            )}
+            <ServiceWorkerRegistration />
+          </FeatureProvider>
         </StoreProvider>
       </body>
     </html>

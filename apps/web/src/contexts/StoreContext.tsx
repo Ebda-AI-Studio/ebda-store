@@ -76,6 +76,7 @@ export interface StoreData {
   metaDescription?: string;
   metaDescriptionAr?: string;
   settings?: Record<string, unknown>;
+  enabledFeatures?: string[];
 }
 
 interface StoreContextValue {
