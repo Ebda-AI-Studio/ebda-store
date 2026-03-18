@@ -109,7 +109,19 @@ router.post('/', authenticate, async (req: Request, res: Response, next: NextFun
     const sessionId = getSessionId(req);
     const data = createOrderSchema.parse(req.body);
 
-    const order = await OrderService.create(storeId, getAuthUser(req).userId, sessionId, data);
+    // Affiliate referral code from body or header
+    const referralCode: string | undefined =
+      (req.body.affiliateRef as string | undefined) ||
+      (req.headers['x-affiliate-ref'] as string | undefined) ||
+      undefined;
+
+    const order = await OrderService.create(
+      storeId,
+      getAuthUser(req).userId,
+      sessionId,
+      data,
+      referralCode
+    );
 
     res.status(201).json({
       success: true,

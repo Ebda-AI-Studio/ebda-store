@@ -7,6 +7,7 @@ import { socketService } from './socket.service';
 import { notificationDispatcher } from './notification-dispatcher.service';
 import { featureService } from './feature.service';
 import { shippingCarrierService } from './shipping-carrier.service';
+import { affiliateService } from './affiliate.service';
 import logger from '../lib/logger';
 
 interface CreateOrderData {
@@ -141,7 +142,8 @@ export class OrderService {
     storeId: string,
     customerId: string,
     sessionId: string,
-    data: CreateOrderData
+    data: CreateOrderData,
+    referralCode?: string
   ) {
     // Get cart
     const cart = await CartService.getOrCreate(storeId, sessionId, customerId);
@@ -308,6 +310,13 @@ export class OrderService {
       return newOrder;
     });
 
+    // Link order to affiliate referral (fire-and-forget)
+    if (referralCode) {
+      affiliateService
+        .linkOrderToReferral(storeId, order.id, referralCode)
+        .catch(err => logger.error({ err }, 'Affiliate referral link failed'));
+    }
+
     // Send order confirmation email
     try {
       const emailData: OrderEmailData = {
@@ -458,6 +467,13 @@ export class OrderService {
           });
         }
       });
+    }
+
+    // Process affiliate commission on delivery (fire-and-forget)
+    if (status === 'delivered') {
+      affiliateService
+        .processCommission(storeId, orderId)
+        .catch(err => logger.error({ err }, 'Affiliate commission processing failed'));
     }
 
     // Auto-ship on confirmation (fire-and-forget)
