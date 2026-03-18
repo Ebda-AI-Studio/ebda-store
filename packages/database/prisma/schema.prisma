@@ -53,6 +53,7 @@ model User {
   loyaltyTransactions LoyaltyTransaction[]
   featureToggles      StoreFeature[]       @relation("FeatureToggledBy")
   pushSubscriptions   PushSubscription[]   @relation("UserPushSubscriptions")
+  abandonedCarts      AbandonedCart[]      @relation("AbandonedCartCustomer")
 
   @@index([role])
   @@index([status])
@@ -207,6 +208,8 @@ model Store {
   notificationEventConfigs NotificationEventConfig[]
   pushSubscriptions        PushSubscription[]
   notificationLogs         NotificationLog[]
+  abandonedCarts           AbandonedCart[]
+  abandonedCartConfig      AbandonedCartConfig?
 
   @@index([ownerId])
   @@index([status])
@@ -524,23 +527,26 @@ model ProductVariantOption {
 // ==========================================
 
 model Cart {
-  id         String   @id @default(uuid())
-  storeId    String   @map("store_id")
-  customerId String?  @map("customer_id")
-  sessionId  String   @map("session_id")
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+  id             String   @id @default(uuid())
+  storeId        String   @map("store_id")
+  customerId     String?  @map("customer_id")
+  sessionId      String   @map("session_id")
+  lastActivityAt DateTime @default(now()) @map("last_activity_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
   // Relations
-  store    Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  customer User?      @relation(fields: [customerId], references: [id])
-  items    CartItem[]
+  store         Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  customer      User?         @relation(fields: [customerId], references: [id])
+  items         CartItem[]
+  abandonedCart AbandonedCart?
 
   @@unique([storeId, sessionId])
   @@index([storeId])
   @@index([customerId])
   @@index([sessionId])
   @@index([updatedAt])
+  @@index([lastActivityAt])
   @@map("carts")
 }
 
@@ -962,6 +968,67 @@ model NotificationLog {
 }
 
 // ==========================================
+// Abandoned Cart Recovery
+// ==========================================
+
+model AbandonedCart {
+  id            String    @id @default(uuid())
+  storeId       String    @map("store_id")
+  cartId        String    @unique @map("cart_id")
+  customerId    String?   @map("customer_id")
+  sessionId     String?   @map("session_id")
+  customerEmail String?   @map("customer_email")
+  customerPhone String?   @map("customer_phone")
+  cartTotal     Decimal   @map("cart_total") @db.Decimal(12, 3)
+  cartItemCount Int       @map("cart_item_count")
+  cartItems     Json      @map("cart_items")
+  status        String    @default("pending")
+  step1SentAt   DateTime? @map("step1_sent_at")
+  step2SentAt   DateTime? @map("step2_sent_at")
+  step3SentAt   DateTime? @map("step3_sent_at")
+  recoveredAt   DateTime? @map("recovered_at")
+  recoveredOrderId String? @map("recovered_order_id")
+  couponId      String?   @map("coupon_id")
+  nextStepAt    DateTime? @map("next_step_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  store    Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  cart     Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  customer User?   @relation("AbandonedCartCustomer", fields: [customerId], references: [id], onDelete: SetNull)
+  coupon   Coupon? @relation(fields: [couponId], references: [id], onDelete: SetNull)
+
+  @@unique([storeId, cartId])
+  @@index([storeId])
+  @@index([storeId, status])
+  @@index([nextStepAt])
+  @@map("abandoned_carts")
+}
+
+model AbandonedCartConfig {
+  id                    String   @id @default(uuid())
+  storeId               String   @unique @map("store_id")
+  step1Enabled          Boolean  @default(true) @map("step1_enabled")
+  step1DelayMinutes     Int      @default(60) @map("step1_delay_minutes")
+  step2Enabled          Boolean  @default(true) @map("step2_enabled")
+  step2DelayMinutes     Int      @default(240) @map("step2_delay_minutes")
+  step3Enabled          Boolean  @default(true) @map("step3_enabled")
+  step3DelayMinutes     Int      @default(1440) @map("step3_delay_minutes")
+  autoCouponEnabled     Boolean  @default(true) @map("auto_coupon_enabled")
+  couponDiscountPercent Int      @default(10) @map("coupon_discount_percent")
+  couponMaxDiscount     Decimal? @map("coupon_max_discount") @db.Decimal(12, 3)
+  couponExpiryHours     Int      @default(48) @map("coupon_expiry_hours")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@map("abandoned_cart_configs")
+}
+
+// ==========================================
 // Audit Logging
 // ==========================================
 
@@ -1085,7 +1152,8 @@ model Coupon {
   createdAt        DateTime     @default(now()) @map("created_at")
   updatedAt        DateTime     @updatedAt @map("updated_at")
 
-  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  store         Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  abandonedCarts AbandonedCart[]
 
   @@unique([storeId, code])
   @@index([code])
