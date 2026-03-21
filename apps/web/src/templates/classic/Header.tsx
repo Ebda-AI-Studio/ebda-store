@@ -33,7 +33,7 @@ export default function ClassicHeader({
   const rightNav = navigation.slice(mid);
 
   return (
-    <header className="bg-white dark:bg-background shadow-sm" dir={isRtl ? 'rtl' : 'ltr'}>
+    <header className="bg-background shadow-sm" dir={isRtl ? 'rtl' : 'ltr'}>
       {/* Top utility bar */}
       <div className="hidden md:block bg-foreground text-background py-2">
         <div className="container mx-auto px-4 flex items-center justify-between text-xs tracking-wide">

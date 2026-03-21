@@ -278,52 +278,61 @@ export default function CheckoutClient() {
 
     // Email validation
     if (!formData.email.trim()) {
-      errors.email = 'Email is required';
+      errors.email = t('Email is required', 'البريد الإلكتروني مطلوب');
     } else if (!isValidEmail(formData.email)) {
-      errors.email = 'Please enter a valid email address';
+      errors.email = t('Please enter a valid email address', 'يرجى إدخال بريد إلكتروني صحيح');
     }
 
     // First name validation
     if (!formData.firstName.trim()) {
-      errors.firstName = 'First name is required';
+      errors.firstName = t('First name is required', 'الاسم الأول مطلوب');
     } else if (formData.firstName.trim().length < 2) {
-      errors.firstName = 'First name must be at least 2 characters';
+      errors.firstName = t(
+        'First name must be at least 2 characters',
+        'الاسم الأول يجب أن يكون حرفين على الأقل'
+      );
     }
 
     // Last name validation
     if (!formData.lastName.trim()) {
-      errors.lastName = 'Last name is required';
+      errors.lastName = t('Last name is required', 'الاسم الأخير مطلوب');
     } else if (formData.lastName.trim().length < 2) {
-      errors.lastName = 'Last name must be at least 2 characters';
+      errors.lastName = t(
+        'Last name must be at least 2 characters',
+        'الاسم الأخير يجب أن يكون حرفين على الأقل'
+      );
     }
 
     // Phone validation (Kuwait format)
     if (!formData.phone.trim()) {
-      errors.phone = 'Phone number is required';
+      errors.phone = t('Phone number is required', 'رقم الهاتف مطلوب');
     } else {
       // Remove spaces, dashes and plus sign for validation
       const cleanPhone = formData.phone.replace(/[\s\-+]/g, '');
       // Kuwait numbers: 965 + 8 digits OR just 8 digits starting with 5,6,9
       if (!/^(965)?[569]\d{7}$/.test(cleanPhone)) {
-        errors.phone = 'Please enter a valid Kuwait phone number';
+        errors.phone = t(
+          'Please enter a valid Kuwait phone number',
+          'يرجى إدخال رقم هاتف كويتي صحيح'
+        );
       }
     }
 
     // Area validation
     if (!formData.area) {
-      errors.area = 'Please select a delivery area';
+      errors.area = t('Please select a delivery area', 'يرجى اختيار منطقة التوصيل');
     }
 
     // Address validation
     if (!formData.address.trim()) {
-      errors.address = 'Block & Street address is required';
+      errors.address = t('Block & Street address is required', 'عنوان القطعة والشارع مطلوب');
     } else if (formData.address.trim().length < 5) {
-      errors.address = 'Please enter a complete address';
+      errors.address = t('Please enter a complete address', 'يرجى إدخال عنوان كامل');
     }
 
     // City validation (optional but recommended)
     if (!formData.city.trim()) {
-      errors.city = 'City is required';
+      errors.city = t('City is required', 'المدينة مطلوبة');
     }
 
     setFormErrors(errors);
@@ -449,7 +458,12 @@ export default function CheckoutClient() {
   if (isLoading) {
     return (
       <main className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <div className="flex flex-col items-center gap-3">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          <p className="text-sm text-muted-foreground">
+            {t('Loading checkout...', 'جارٍ التحميل...')}
+          </p>
+        </div>
       </main>
     );
   }

@@ -280,15 +280,22 @@ export default function StoreDetailPage() {
   const isSuperAdmin = user?.role === 'super_admin';
   const [store, setStore] = useState<Store | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [storeError, setStoreError] = useState<'not_found' | 'network' | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isChangingStatus, setIsChangingStatus] = useState(false);
   const [editForm, setEditForm] = useState({ name: '', slug: '', plan: '', status: '' });
   const [formErrors, setFormErrors] = useState<{ name?: string; slug?: string }>({});
 
   const fetchStore = useCallback(async () => {
     if (!storeId) return;
     try {
-      const { data } = await apiGet<{ store: Store }>(`/api/v1/stores/${storeId}`);
+      setStoreError(null);
+      const { data, error } = await apiGet<{ store: Store }>(`/api/v1/stores/${storeId}`);
+      if (error) {
+        setStoreError(error.status === 404 ? 'not_found' : 'network');
+        return;
+      }
       if (data?.store) {
         setStore(data.store);
         setEditForm({
@@ -300,6 +307,7 @@ export default function StoreDetailPage() {
       }
     } catch (error) {
       console.error('Failed to fetch store:', error);
+      setStoreError('network');
     } finally {
       setIsLoading(false);
     }
@@ -369,8 +377,13 @@ export default function StoreDetailPage() {
   }
 
   async function handleStatusChange(newStatus: string) {
-    await apiPatch(`/api/v1/stores/${storeId}/status`, { status: newStatus });
-    fetchStore();
+    setIsChangingStatus(true);
+    try {
+      await apiPatch(`/api/v1/stores/${storeId}/status`, { status: newStatus });
+      await fetchStore();
+    } finally {
+      setIsChangingStatus(false);
+    }
   }
 
   if (isLoading) {
@@ -417,12 +430,33 @@ export default function StoreDetailPage() {
   }
 
   if (!store) {
+    const isNotFound = storeError === 'not_found';
     return (
-      <AdminLayout title="Store Not Found" subtitle="The requested store could not be found">
-        <div className="text-center py-12">
-          <Link href="/stores" className="text-primary hover:underline">
-            Back to Stores
-          </Link>
+      <AdminLayout
+        title={isNotFound ? 'Store Not Found' : 'Error Loading Store'}
+        subtitle={
+          isNotFound
+            ? 'The requested store could not be found'
+            : 'A network error occurred while loading this store'
+        }
+      >
+        <div className="text-center py-12 space-y-4">
+          {!isNotFound && (
+            <button
+              onClick={() => {
+                setIsLoading(true);
+                fetchStore();
+              }}
+              className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors cursor-pointer"
+            >
+              Retry
+            </button>
+          )}
+          <div>
+            <Link href="/stores" className="text-primary hover:underline text-sm">
+              Back to Stores
+            </Link>
+          </div>
         </div>
       </AdminLayout>
     );
@@ -693,6 +727,7 @@ export default function StoreDetailPage() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {store.status === 'active' ? (
             <button
+              disabled={isChangingStatus}
               onClick={() => {
                 if (
                   window.confirm(
@@ -702,22 +737,26 @@ export default function StoreDetailPage() {
                   handleStatusChange('suspended');
                 }
               }}
-              className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm transition-all duration-200 hover:border-red-300 hover:shadow-md cursor-pointer text-left"
+              className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm transition-all duration-200 hover:border-red-300 hover:shadow-md cursor-pointer text-left disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-100">
-                <svg
-                  className="h-5 w-5 text-red-600"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
-                  />
-                </svg>
+                {isChangingStatus ? (
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-red-300 border-t-red-600" />
+                ) : (
+                  <svg
+                    className="h-5 w-5 text-red-600"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
+                    />
+                  </svg>
+                )}
               </div>
               <div>
                 <p className="font-medium text-foreground">Suspend Store</p>
@@ -726,23 +765,28 @@ export default function StoreDetailPage() {
             </button>
           ) : (
             <button
+              disabled={isChangingStatus}
               onClick={() => handleStatusChange('active')}
-              className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm transition-all duration-200 hover:border-green-300 hover:shadow-md cursor-pointer text-left"
+              className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm transition-all duration-200 hover:border-green-300 hover:shadow-md cursor-pointer text-left disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100">
-                <svg
-                  className="h-5 w-5 text-green-600"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
+                {isChangingStatus ? (
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-green-300 border-t-green-600" />
+                ) : (
+                  <svg
+                    className="h-5 w-5 text-green-600"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                )}
               </div>
               <div>
                 <p className="font-medium text-foreground">Activate Store</p>

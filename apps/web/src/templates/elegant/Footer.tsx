@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useState } from 'react';
 import type { FooterProps } from '../types';
 import { getSocialLinks } from '../shared/icons';
 
@@ -20,6 +21,7 @@ export default function ElegantFooter({
   const displayAddress = isRtl && contact.addressAr ? contact.addressAr : contact.address;
 
   const socialLinks = getSocialLinks(socials);
+  const [subscribed, setSubscribed] = useState(false);
 
   return (
     <footer className="bg-muted border-t border-border mt-auto" dir={isRtl ? 'rtl' : 'ltr'}>
@@ -35,21 +37,34 @@ export default function ElegantFooter({
                 ? 'اشترك لتصلك آخر الأخبار والعروض الحصرية'
                 : 'Subscribe for exclusive offers and new arrivals'}
             </p>
-            <form className="flex gap-0 max-w-md mx-auto">
-              <input
-                type="email"
-                placeholder={isRtl ? 'البريد الإلكتروني' : 'Enter your email'}
-                aria-label={isRtl ? 'البريد الإلكتروني' : 'Email address'}
-                className="flex-1 px-6 py-4 bg-background border border-border focus:border-foreground focus:outline-none text-xs tracking-[0.1em] placeholder:text-muted-foreground/40 transition-colors duration-500"
-                dir={isRtl ? 'rtl' : 'ltr'}
-              />
-              <button
-                type="submit"
-                className="px-8 py-4 bg-foreground text-background text-[10px] tracking-[0.25em] uppercase hover:bg-foreground/80 transition-colors duration-300 cursor-pointer"
+            {subscribed ? (
+              <p className="text-sm text-primary font-medium tracking-wide">
+                {isRtl ? 'شكراً لاشتراكك!' : 'Thank you for subscribing!'}
+              </p>
+            ) : (
+              <form
+                className="flex gap-0 max-w-md mx-auto"
+                onSubmit={e => {
+                  e.preventDefault();
+                  setSubscribed(true);
+                }}
               >
-                {isRtl ? 'اشتراك' : 'Subscribe'}
-              </button>
-            </form>
+                <input
+                  type="email"
+                  placeholder={isRtl ? 'البريد الإلكتروني' : 'Enter your email'}
+                  aria-label={isRtl ? 'البريد الإلكتروني' : 'Email address'}
+                  className="flex-1 px-6 py-4 bg-background border border-border focus:border-foreground focus:outline-none text-xs tracking-[0.1em] placeholder:text-muted-foreground/40 transition-colors duration-500"
+                  dir={isRtl ? 'rtl' : 'ltr'}
+                  required
+                />
+                <button
+                  type="submit"
+                  className="px-8 py-4 bg-foreground text-background text-[10px] tracking-[0.25em] uppercase hover:bg-foreground/80 transition-colors duration-300 cursor-pointer"
+                >
+                  {isRtl ? 'اشتراك' : 'Subscribe'}
+                </button>
+              </form>
+            )}
           </div>
         </div>
       </div>

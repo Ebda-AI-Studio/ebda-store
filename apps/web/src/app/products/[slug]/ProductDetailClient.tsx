@@ -404,14 +404,20 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                     <div className="flex items-center rounded-lg border border-border">
                       <button
                         onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                        className="px-4 py-2 text-muted-foreground hover:bg-muted"
+                        className="px-4 py-2 text-muted-foreground hover:bg-muted cursor-pointer"
                       >
                         -
                       </button>
                       <span className="w-12 text-center font-medium">{quantity}</span>
                       <button
-                        onClick={() => setQuantity(quantity + 1)}
-                        className="px-4 py-2 text-muted-foreground hover:bg-muted"
+                        onClick={() => {
+                          const maxQty =
+                            effectiveInventory != null && effectiveInventory > 0
+                              ? Math.min(effectiveInventory, 10)
+                              : 10;
+                          setQuantity(Math.min(quantity + 1, maxQty));
+                        }}
+                        className="px-4 py-2 text-muted-foreground hover:bg-muted cursor-pointer"
                       >
                         +
                       </button>

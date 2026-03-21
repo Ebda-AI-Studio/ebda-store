@@ -13,7 +13,7 @@ export default function ElegantCategoryCard({
   return (
     <Link
       href={`${urlPrefix}/products?category=${category.slug}`}
-      className="group block outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+      className="group block outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 cursor-pointer"
     >
       {/* Image container with elegant aspect ratio */}
       <div className="relative aspect-[2/3] overflow-hidden bg-muted mb-6">
@@ -21,7 +21,7 @@ export default function ElegantCategoryCard({
           <img
             src={category.image}
             alt={displayName}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
             loading="lazy"
           />
         ) : (

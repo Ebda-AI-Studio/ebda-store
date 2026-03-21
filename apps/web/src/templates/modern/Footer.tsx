@@ -15,6 +15,7 @@ export default function ModernFooter({
   urlPrefix = '',
 }: FooterProps) {
   const [email, setEmail] = useState('');
+  const [subscribed, setSubscribed] = useState(false);
 
   const {
     name: displayName,
@@ -29,6 +30,7 @@ export default function ModernFooter({
   const handleNewsletter = (e: React.FormEvent) => {
     e.preventDefault();
     setEmail('');
+    setSubscribed(true);
   };
 
   return (
@@ -208,24 +210,30 @@ export default function ModernFooter({
                 ? 'اشترك للحصول على آخر العروض والأخبار'
                 : 'Subscribe for the latest offers and news'}
             </p>
-            <form onSubmit={handleNewsletter} className="space-y-2">
-              <input
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                placeholder={isRtl ? 'البريد الإلكتروني' : 'Email address'}
-                aria-label={isRtl ? 'البريد الإلكتروني' : 'Email address'}
-                className="w-full px-4 py-2.5 bg-white/8 rounded-lg border border-white/10 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 text-sm text-white placeholder:text-gray-500 transition-colors duration-200"
-                dir={isRtl ? 'rtl' : 'ltr'}
-                required
-              />
-              <button
-                type="submit"
-                className="w-full px-4 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors duration-200 font-semibold text-sm cursor-pointer"
-              >
-                {isRtl ? 'اشتراك' : 'Subscribe'}
-              </button>
-            </form>
+            {subscribed ? (
+              <p className="text-sm text-primary font-medium">
+                {isRtl ? 'شكراً لاشتراكك!' : 'Thank you for subscribing!'}
+              </p>
+            ) : (
+              <form onSubmit={handleNewsletter} className="space-y-2">
+                <input
+                  type="email"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder={isRtl ? 'البريد الإلكتروني' : 'Email address'}
+                  aria-label={isRtl ? 'البريد الإلكتروني' : 'Email address'}
+                  className="w-full px-4 py-2.5 bg-white/8 rounded-lg border border-white/10 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 text-sm text-white placeholder:text-gray-500 transition-colors duration-200"
+                  dir={isRtl ? 'rtl' : 'ltr'}
+                  required
+                />
+                <button
+                  type="submit"
+                  className="w-full px-4 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors duration-200 font-semibold text-sm cursor-pointer"
+                >
+                  {isRtl ? 'اشتراك' : 'Subscribe'}
+                </button>
+              </form>
+            )}
           </div>
         </div>
 

@@ -326,7 +326,7 @@ export function AdminLayout({
             </div>
             <button
               onClick={logout}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+              className="flex h-10 w-10 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
               aria-label="Log out"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -351,7 +351,7 @@ export function AdminLayout({
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
           <div className="relative">
-            <div className="h-12 w-12 animate-spin rounded-full border-4 border-muted border-t-primary" />
+            <div className="h-12 w-12 motion-safe:animate-spin rounded-full border-4 border-muted border-t-primary" />
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="h-6 w-6 rounded-full bg-gradient-to-br from-primary to-orange-600 animate-pulse" />
             </div>
@@ -426,7 +426,7 @@ export function AdminLayout({
             {showBackButton && (
               <button
                 onClick={() => router.back()}
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                className="flex h-10 w-10 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 aria-label="Go back"
               >
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

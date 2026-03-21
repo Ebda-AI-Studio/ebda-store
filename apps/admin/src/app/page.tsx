@@ -42,11 +42,13 @@ export default function DashboardPage() {
   const [recentStores, setRecentStores] = useState<RecentStore[]>([]);
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
       try {
         setIsLoading(true);
+        setHasError(false);
         const params = new URLSearchParams();
         if (selectedStoreId !== 'all') params.append('storeId', selectedStoreId);
         const qs = params.toString() ? `?${params}` : '';
@@ -62,6 +64,7 @@ export default function DashboardPage() {
         }
       } catch (error) {
         console.error('Failed to fetch dashboard data:', error);
+        setHasError(true);
       } finally {
         setIsLoading(false);
       }
@@ -203,6 +206,28 @@ export default function DashboardPage() {
     },
   ];
 
+  if (hasError) {
+    return (
+      <AdminLayout
+        title="Platform Dashboard"
+        subtitle="Overview of all stores and platform metrics"
+      >
+        <div className="flex flex-col items-center justify-center py-24 text-center">
+          <p className="text-muted-foreground mb-4">Failed to load dashboard data.</p>
+          <button
+            onClick={() => {
+              setHasError(false);
+              setIsLoading(true);
+            }}
+            className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors cursor-pointer"
+          >
+            Retry
+          </button>
+        </div>
+      </AdminLayout>
+    );
+  }
+
   return (
     <AdminLayout
       title="Platform Dashboard"
@@ -246,7 +271,7 @@ export default function DashboardPage() {
           {statCards.map((stat, index) => (
             <div
               key={stat.name}
-              className="force-stat-card group"
+              className="force-stat-card"
               style={{ animationDelay: `${index * 0.1}s` }}
             >
               <div className="flex items-start justify-between">
@@ -259,7 +284,7 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <div
-                  className={`flex h-12 w-12 items-center justify-center rounded-2xl ${stat.iconBg} text-white shadow-lg transition-transform duration-200 group-hover:scale-110`}
+                  className={`flex h-12 w-12 items-center justify-center rounded-2xl ${stat.iconBg} text-white shadow-lg`}
                 >
                   {stat.icon}
                 </div>
@@ -303,7 +328,7 @@ export default function DashboardPage() {
                 <Link
                   key={store.id}
                   href={`/stores/${store.id}`}
-                  className="flex items-center justify-between px-6 py-4 transition-colors hover:bg-muted/30"
+                  className="flex items-center justify-between px-6 py-4 transition-colors hover:bg-muted/30 cursor-pointer"
                 >
                   <div className="flex items-center gap-4">
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 font-bold text-primary">

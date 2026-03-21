@@ -230,16 +230,6 @@ export default function CartClient() {
           </div>
         ) : (
           <>
-            {/* Cart Recommendations — shown before order summary when feature is enabled */}
-            {isEnabled('upsell_crosssell') &&
-              cartItems.length > 0 &&
-              store.id &&
-              store.id !== 'demo' && (
-                <div className="mt-8">
-                  <CartRecommendations storeId={store.id} productIds={cartItems.map(i => i.id)} />
-                </div>
-              )}
-
             <div className="mt-8 lg:grid lg:grid-cols-12 lg:gap-8">
               {/* Cart Items */}
               <div className="lg:col-span-8">
@@ -324,7 +314,7 @@ export default function CartClient() {
                               className={`flex h-9 w-9 items-center justify-center transition-colors ${
                                 item.quantity <= 1
                                   ? 'text-muted-foreground/40 cursor-not-allowed'
-                                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                                  : 'text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer'
                               }`}
                               aria-label="Decrease quantity"
                             >
@@ -351,7 +341,7 @@ export default function CartClient() {
                               className={`flex h-9 w-9 items-center justify-center transition-colors ${
                                 item.quantity >= 10
                                   ? 'text-muted-foreground/40 cursor-not-allowed'
-                                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                                  : 'text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer'
                               }`}
                               aria-label="Increase quantity"
                             >
@@ -436,7 +426,7 @@ export default function CartClient() {
                           <button
                             onClick={applyPromoCode}
                             disabled={promoApplied || !promoCode || isValidating}
-                            className="h-10 rounded-lg bg-muted px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="h-10 rounded-lg bg-muted px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
                           >
                             {promoApplied
                               ? t(
@@ -637,6 +627,16 @@ export default function CartClient() {
                 </div>
               </div>
             </div>
+
+            {/* Cart Recommendations — shown below cart grid on all screen sizes */}
+            {isEnabled('upsell_crosssell') &&
+              cartItems.length > 0 &&
+              store.id &&
+              store.id !== 'demo' && (
+                <div className="mt-8">
+                  <CartRecommendations storeId={store.id} productIds={cartItems.map(i => i.id)} />
+                </div>
+              )}
           </>
         )}
       </div>

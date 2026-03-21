@@ -60,7 +60,7 @@ export default function ModernAnnouncementBar({
       <div className="py-2 px-4">
         <div ref={containerRef} className="flex items-center justify-center gap-3 overflow-hidden">
           <div
-            className={`flex items-center gap-3 ${shouldMarquee ? 'animate-marquee whitespace-nowrap' : ''}`}
+            className={`flex items-center gap-3 ${shouldMarquee ? 'motion-safe:animate-marquee whitespace-nowrap' : ''}`}
           >
             <span ref={textRef} className="text-sm font-medium tracking-wide">
               {displayText}
