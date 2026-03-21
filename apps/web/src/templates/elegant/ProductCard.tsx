@@ -4,12 +4,13 @@ import { useState } from 'react';
 import Link from 'next/link';
 import type { ProductCardProps } from '../types';
 import { Price, ProductBadge, ProductBadgeGroup, AddToCartButton, cn } from '@force/ui';
+import { PlaceholderImageIcon } from '../shared/icons';
 
 /**
  * Elegant Template - Product Card
  *
- * Fashion-forward design with refined transitions.
- * Uses shared components from @force/ui.
+ * Luxury fashion aesthetic: no borders, portrait aspect ratio, ultra-subtle
+ * hover states. Uses shared components from @force/ui.
  */
 export default function ElegantProductCard({
   product,
@@ -30,7 +31,7 @@ export default function ElegantProductCard({
   const handleWishlist = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsWishlisted(!isWishlisted);
+    setIsWishlisted(prev => !prev);
     onAddToWishlist?.(product.id);
   };
 
@@ -39,26 +40,32 @@ export default function ElegantProductCard({
   return (
     <Link
       href={`${urlPrefix}/products/${product.slug}`}
-      className="group block"
+      className="group block cursor-pointer"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Image */}
-      <div className="relative aspect-[3/4] overflow-hidden bg-muted/20 mb-4">
+      {/* Image — fashion portrait ratio */}
+      <div className="relative aspect-[3/4] overflow-hidden bg-gray-50 mb-4">
         {product.images?.[0]?.url ? (
           <>
             <img
               src={product.images[0].url}
               alt={isRtl && product.nameAr ? product.nameAr : product.name}
-              className="w-full h-full object-cover transition-opacity duration-700"
-              style={{ opacity: isHovered && product.images[1]?.url ? 0 : 1 }}
+              className={cn(
+                'w-full h-full object-cover transition-all duration-500',
+                isHovered ? 'brightness-95 scale-[1.02]' : 'brightness-100 scale-100'
+              )}
+              style={{
+                opacity: isHovered && product.images[1]?.url ? 0 : 1,
+                transition: 'opacity 500ms, filter 500ms, transform 500ms',
+              }}
               loading="lazy"
             />
             {product.images[1]?.url && (
               <img
                 src={product.images[1].url}
                 alt={isRtl && product.nameAr ? product.nameAr : product.name}
-                className="absolute inset-0 w-full h-full object-cover transition-opacity duration-700"
+                className="absolute inset-0 w-full h-full object-cover transition-opacity duration-500"
                 style={{ opacity: isHovered ? 1 : 0 }}
                 loading="lazy"
               />
@@ -66,20 +73,7 @@ export default function ElegantProductCard({
           </>
         ) : (
           <div className="w-full h-full flex items-center justify-center text-muted-foreground/20">
-            <svg
-              className="w-16 h-16"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              strokeWidth={0.5}
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-              />
-            </svg>
+            <PlaceholderImageIcon className="w-16 h-16" strokeWidth={0.5} />
           </div>
         )}
 
@@ -87,7 +81,7 @@ export default function ElegantProductCard({
         <button
           onClick={handleWishlist}
           className={cn(
-            'absolute top-4 p-2 transition-all duration-300',
+            'absolute top-4 p-2 transition-all duration-300 cursor-pointer',
             isRtl ? 'left-4' : 'right-4',
             isHovered || isWishlisted ? 'opacity-100' : 'opacity-0'
           )}
@@ -96,8 +90,8 @@ export default function ElegantProductCard({
         >
           <svg
             className={cn(
-              'w-5 h-5 transition-colors',
-              isWishlisted ? 'text-primary fill-primary' : 'text-foreground'
+              'w-5 h-5 transition-colors duration-300',
+              isWishlisted ? 'text-foreground fill-foreground' : 'text-foreground'
             )}
             fill={isWishlisted ? 'currentColor' : 'none'}
             stroke="currentColor"
@@ -120,7 +114,7 @@ export default function ElegantProductCard({
               variant="new"
               isRtl={isRtl}
               size="sm"
-              className="text-[10px] tracking-[0.2em] uppercase rounded-none bg-foreground text-background"
+              className="text-[9px] tracking-[0.2em] uppercase rounded-none bg-foreground text-background font-normal"
               label={isRtl ? 'جديد' : 'New'}
             />
           )}
@@ -129,13 +123,13 @@ export default function ElegantProductCard({
               variant="sale"
               isRtl={isRtl}
               size="sm"
-              className="text-[10px] tracking-[0.2em] uppercase rounded-none"
+              className="text-[9px] tracking-[0.2em] uppercase rounded-none font-normal"
               label={isRtl ? 'تخفيض' : 'Sale'}
             />
           )}
         </ProductBadgeGroup>
 
-        {/* Quick Add */}
+        {/* Quick Add — slides up from bottom */}
         <div
           className={cn(
             'absolute bottom-0 inset-x-0 bg-background/95 backdrop-blur-sm transition-all duration-300',
@@ -152,8 +146,8 @@ export default function ElegantProductCard({
             showQuantityBadge={false}
             variant="ghost"
             className={cn(
-              'w-full py-4 text-xs tracking-[0.2em] uppercase',
-              'hover:bg-primary hover:text-primary-foreground rounded-none'
+              'w-full py-4 text-[10px] tracking-[0.25em] uppercase font-normal rounded-none',
+              'hover:bg-foreground hover:text-background transition-colors duration-300'
             )}
             labels={{
               addToCart: isRtl ? 'أضف للسلة' : 'Add to Bag',
@@ -165,9 +159,9 @@ export default function ElegantProductCard({
         </div>
       </div>
 
-      {/* Content */}
-      <div className="text-center space-y-2">
-        <h3 className="text-sm tracking-wide group-hover:text-primary transition-colors">
+      {/* Content — refined, centered */}
+      <div className="text-center space-y-1.5">
+        <h3 className="text-xs tracking-[0.15em] uppercase text-foreground/80 group-hover:text-foreground transition-colors duration-300 line-clamp-1">
           {isRtl && product.nameAr ? product.nameAr : product.name}
         </h3>
         <Price
@@ -177,7 +171,7 @@ export default function ElegantProductCard({
           isRtl={isRtl}
           size="sm"
           showDiscount={false}
-          className="justify-center"
+          className="justify-center text-muted-foreground font-light"
         />
       </div>
     </Link>

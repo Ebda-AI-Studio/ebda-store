@@ -7,9 +7,9 @@ import { Price } from '@force/ui';
 /**
  * Minimal Template - Product Card
  *
- * Ultra-clean design with maximum whitespace.
- * No hover effects, no badges - pure product focus.
- * Uses shared components from @force/ui.
+ * Apple-inspired: no borders, no shadows, no badges.
+ * aspect-[3/4] image, huge whitespace, name + price only.
+ * Hover: subtle opacity fade on image only.
  */
 export default function MinimalProductCard({
   product,
@@ -18,20 +18,20 @@ export default function MinimalProductCard({
   urlPrefix = '',
 }: ProductCardProps) {
   return (
-    <Link href={`${urlPrefix}/products/${product.slug}`} className="group block">
-      {/* Image - Full bleed, no borders */}
-      <div className="relative aspect-[3/4] overflow-hidden bg-muted/30 mb-6">
+    <Link href={`${urlPrefix}/products/${product.slug}`} className="group block cursor-pointer">
+      {/* Image — no border, no shadow, subtle opacity on hover */}
+      <div className="relative aspect-[3/4] overflow-hidden bg-muted/30 mb-5">
         {product.images?.[0]?.url ? (
           <img
             src={product.images[0].url}
             alt={isRtl && product.nameAr ? product.nameAr : product.name}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover group-hover:opacity-80 transition-opacity duration-300 ease-out"
             loading="lazy"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-muted-foreground/30">
+          <div className="w-full h-full flex items-center justify-center text-muted-foreground/20">
             <svg
-              className="w-12 h-12"
+              className="w-10 h-10"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -48,9 +48,9 @@ export default function MinimalProductCard({
         )}
       </div>
 
-      {/* Content - Minimal text */}
-      <div className="space-y-1">
-        <h3 className="text-xs tracking-wide uppercase font-light text-muted-foreground group-hover:text-foreground transition-colors">
+      {/* Text — name + price, ultra-minimal */}
+      <div className={`space-y-1 ${isRtl ? 'text-right' : 'text-left'}`}>
+        <h3 className="text-xs tracking-wide uppercase font-light text-muted-foreground group-hover:text-foreground transition-colors duration-200 leading-snug">
           {isRtl && product.nameAr ? product.nameAr : product.name}
         </h3>
         <Price
@@ -59,7 +59,7 @@ export default function MinimalProductCard({
           isRtl={isRtl}
           size="sm"
           showDiscount={false}
-          className="text-xs tracking-wide font-light"
+          className="text-[11px] tracking-wide font-light text-muted-foreground"
         />
       </div>
     </Link>

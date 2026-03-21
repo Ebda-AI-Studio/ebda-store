@@ -23,46 +23,51 @@ export default function ClassicHero({
     isRtl && ctaTextAr ? ctaTextAr : ctaText || (isRtl ? 'استكشف المجموعة' : 'Explore Collection');
 
   return (
-    <section className="relative min-h-[600px] lg:min-h-[700px] bg-background overflow-hidden">
-      {/* Decorative Border Frame */}
-      <div className="absolute inset-4 md:inset-8 border border-border/50 pointer-events-none" />
-      <div className="absolute inset-6 md:inset-12 border border-border/30 pointer-events-none" />
-
-      <div className="container mx-auto px-4 h-full">
-        <div className="grid lg:grid-cols-2 gap-0 min-h-[600px] lg:min-h-[700px]">
-          {/* Content - Centered with elegant typography */}
+    <section className="bg-white dark:bg-background overflow-hidden" dir={isRtl ? 'rtl' : 'ltr'}>
+      <div className="container mx-auto px-4">
+        <div className="grid lg:grid-cols-2 min-h-[560px] lg:min-h-[640px] items-center gap-0">
+          {/* Text column */}
           <div
-            className={`flex flex-col justify-center py-16 lg:py-24 ${isRtl ? 'lg:order-2 lg:pr-12' : 'lg:order-1 lg:pl-4'}`}
+            className={`flex flex-col justify-center py-16 lg:py-24 ${
+              isRtl ? 'lg:order-2 lg:pe-12' : 'lg:order-1 lg:pe-12'
+            }`}
           >
-            {/* Decorative Line */}
-            <div className={`w-16 h-px bg-primary mb-8 ${isRtl ? 'mr-0 ml-auto' : 'ml-0'}`} />
+            {/* Accent rule */}
+            <div className={`w-12 h-px bg-foreground mb-8 ${isRtl ? 'ms-auto' : 'ms-0'}`} />
 
-            {/* Title with Serif Styling */}
+            {/* Serif heading */}
             <h1
-              className={`text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-serif font-normal text-foreground leading-[1.1] tracking-tight mb-6 ${isRtl ? 'text-right' : 'text-left'}`}
+              className={`text-4xl md:text-5xl lg:text-6xl font-serif font-normal text-foreground leading-[1.1] tracking-tight mb-6 ${
+                isRtl ? 'text-right' : 'text-left'
+              }`}
             >
               {displayTitle}
             </h1>
 
             {/* Subtitle */}
             <p
-              className={`text-lg md:text-xl text-muted-foreground font-light tracking-wide mb-10 max-w-md ${isRtl ? 'text-right mr-0 ml-auto' : 'text-left'}`}
+              className={`text-base md:text-lg text-muted-foreground font-light leading-relaxed mb-10 max-w-sm ${
+                isRtl ? 'text-right ms-auto' : 'text-left'
+              }`}
             >
               {displaySubtitle}
             </p>
 
-            {/* CTA Button - Elegant underline style */}
-            <div className={`${isRtl ? 'text-right' : 'text-left'}`}>
+            {/* CTA — outlined button with classic serif treatment */}
+            <div className={isRtl ? 'text-right' : 'text-left'}>
               <Link
                 href={ctaLink}
-                className="group inline-flex items-center gap-4 text-foreground font-medium tracking-widest uppercase text-sm border-b-2 border-foreground pb-2 hover:border-primary hover:text-primary transition-colors duration-300"
+                className="group inline-flex items-center gap-3 border border-foreground px-8 py-3 font-serif text-sm tracking-widest uppercase text-foreground hover:bg-foreground hover:text-background transition-colors duration-300 cursor-pointer"
               >
                 <span>{displayCta}</span>
                 <svg
-                  className={`w-5 h-5 group-hover:translate-x-1 transition-transform ${isRtl ? 'rotate-180 group-hover:-translate-x-1' : ''}`}
+                  className={`w-4 h-4 transition-transform duration-300 ${
+                    isRtl ? 'rotate-180 group-hover:-translate-x-1' : 'group-hover:translate-x-1'
+                  }`}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
+                  aria-hidden="true"
                 >
                   <path
                     strokeLinecap="round"
@@ -74,28 +79,31 @@ export default function ClassicHero({
               </Link>
             </div>
 
-            {/* Decorative Element */}
-            <div className={`mt-16 ${isRtl ? 'text-right' : 'text-left'}`}>
+            {/* Established note */}
+            <div className={`mt-14 ${isRtl ? 'text-right' : 'text-left'}`}>
               <span className="text-xs tracking-[0.3em] text-muted-foreground uppercase">
                 {isRtl ? 'منذ ١٩٩٠' : 'Est. 1990'}
               </span>
             </div>
           </div>
 
-          {/* Image - Full height with elegant frame */}
-          <div className={`relative ${isRtl ? 'lg:order-1' : 'lg:order-2'} hidden lg:block`}>
-            <div className="absolute inset-0 m-8">
+          {/* Image column */}
+          <div
+            className={`relative hidden lg:block self-stretch ${isRtl ? 'lg:order-1' : 'lg:order-2'}`}
+          >
+            <div className="absolute inset-0 m-6">
               {image ? (
-                <Image src={image} alt={displayTitle} fill className="object-cover" />
+                <Image src={image} alt={displayTitle} fill className="object-cover" priority />
               ) : (
-                <div className="w-full h-full bg-gradient-to-br from-primary/5 to-background flex items-center justify-center">
+                <div className="w-full h-full bg-muted flex items-center justify-center">
                   <div className="text-center p-8">
-                    <div className="w-20 h-20 mx-auto mb-4 border border-border/50 flex items-center justify-center">
+                    <div className="w-16 h-16 mx-auto mb-4 border border-border flex items-center justify-center">
                       <svg
-                        className="w-10 h-10 text-muted-foreground/50"
+                        className="w-8 h-8 text-muted-foreground/40"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
+                        aria-hidden="true"
                       >
                         <path
                           strokeLinecap="round"
@@ -105,25 +113,16 @@ export default function ClassicHero({
                         />
                       </svg>
                     </div>
-                    <p className="text-muted-foreground text-sm tracking-wide">
+                    <p className="text-xs text-muted-foreground tracking-widest uppercase">
                       {isRtl ? 'صورة البانر' : 'Hero Image'}
                     </p>
                   </div>
                 </div>
               )}
             </div>
-
-            {/* Overlay Pattern */}
-            <div className="absolute inset-0 m-8 bg-gradient-to-l from-transparent via-transparent to-background/20 pointer-events-none" />
           </div>
         </div>
       </div>
-
-      {/* Corner Ornaments */}
-      <div className="absolute top-12 left-12 w-8 h-8 border-l-2 border-t-2 border-border/40" />
-      <div className="absolute top-12 right-12 w-8 h-8 border-r-2 border-t-2 border-border/40" />
-      <div className="absolute bottom-12 left-12 w-8 h-8 border-l-2 border-b-2 border-border/40" />
-      <div className="absolute bottom-12 right-12 w-8 h-8 border-r-2 border-b-2 border-border/40" />
     </section>
   );
 }

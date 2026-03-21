@@ -14,6 +14,7 @@ export default function BoldHero({
   ctaTextAr,
   ctaLink = '/products',
   isRtl = false,
+  urlPrefix = '',
 }: HeroProps) {
   const displayTitle = isRtl && titleAr ? titleAr : title || (isRtl ? 'اكتشف الجديد' : 'GO BOLD');
   const displaySubtitle =
@@ -22,138 +23,96 @@ export default function BoldHero({
       : subtitle || (isRtl ? 'تميز بأسلوبك' : 'Stand out from the crowd');
   const displayCta = isRtl && ctaTextAr ? ctaTextAr : ctaText || (isRtl ? 'تسوق الآن' : 'Shop Now');
 
+  const resolvedCtaLink = ctaLink.startsWith('/') && urlPrefix ? `${urlPrefix}${ctaLink}` : ctaLink;
+
   return (
     <section
-      className="relative min-h-[100vh] bg-primary overflow-hidden"
+      className="relative min-h-screen bg-gray-950 overflow-hidden"
       dir={isRtl ? 'rtl' : 'ltr'}
     >
-      {/* Dynamic Background Pattern */}
-      <div className="absolute inset-0 opacity-20">
-        <div className="absolute top-0 left-0 w-96 h-96 bg-white rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
-        <div className="absolute bottom-0 right-0 w-[600px] h-[600px] bg-black rounded-full blur-3xl translate-x-1/3 translate-y-1/3" />
-        <div className="absolute top-1/2 left-1/2 w-72 h-72 bg-white rounded-full blur-2xl -translate-x-1/2 -translate-y-1/2" />
-      </div>
+      {/* Full-screen hero image with dark overlay */}
+      {image && (
+        <div className="absolute inset-0">
+          <Image src={image} alt={displayTitle} fill className="object-cover" priority />
+          <div className="absolute inset-0 bg-gray-950/65" />
+        </div>
+      )}
 
-      {/* Diagonal stripes pattern */}
-      <div className="absolute inset-0 opacity-5">
-        <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <pattern
-              id="bold-stripes"
-              width="60"
-              height="60"
-              patternUnits="userSpaceOnUse"
-              patternTransform="rotate(45)"
-            >
-              <line x1="0" y1="0" x2="0" y2="60" stroke="white" strokeWidth="20" />
-            </pattern>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#bold-stripes)" />
-        </svg>
-      </div>
-
-      <div className="container mx-auto px-4 h-full relative z-10">
-        <div className="min-h-[100vh] flex flex-col lg:flex-row items-center justify-center gap-8 lg:gap-16 py-20">
-          {/* Content */}
-          <div className={`flex-1 ${isRtl ? 'lg:order-2' : 'lg:order-1'} text-center lg:text-left`}>
-            {/* Animated Label */}
-            <div className="inline-block mb-6 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-full">
-              <span className="text-sm font-bold text-white tracking-wider uppercase">
-                {isRtl ? '✨ جديد' : '✨ New Drop'}
-              </span>
-            </div>
-
-            {/* Title - Extra Bold */}
-            <h1 className="text-6xl md:text-7xl lg:text-8xl xl:text-9xl font-black text-white leading-[0.9] tracking-tighter mb-6">
-              {displayTitle.split(' ').map((word, i) => (
-                <span key={i} className={`block ${i % 2 === 1 ? 'text-black/20' : ''}`}>
-                  {word}
-                </span>
-              ))}
-            </h1>
-
-            {/* Subtitle */}
-            <p className="text-xl md:text-2xl text-white/80 font-medium max-w-md mx-auto lg:mx-0 mb-10">
-              {displaySubtitle}
-            </p>
-
-            {/* CTA Button - Chunky */}
-            <Link
-              href={ctaLink}
-              className="inline-flex items-center gap-3 px-10 py-5 bg-white text-primary rounded-2xl font-black text-lg uppercase tracking-wider hover:bg-black hover:text-white transition-all duration-300 hover:scale-105 shadow-2xl shadow-black/30"
-            >
-              {displayCta}
-              <svg
-                className={`w-6 h-6 ${isRtl ? 'rotate-180' : ''}`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+      {/* Background pattern when no image */}
+      {!image && (
+        <div className="absolute inset-0 opacity-10">
+          <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <pattern
+                id="bold-stripes"
+                width="60"
+                height="60"
+                patternUnits="userSpaceOnUse"
+                patternTransform="rotate(45)"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={3}
-                  d="M13 7l5 5m0 0l-5 5m5-5H6"
-                />
-              </svg>
-            </Link>
+                <line x1="0" y1="0" x2="0" y2="60" stroke="white" strokeWidth="20" />
+              </pattern>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#bold-stripes)" />
+          </svg>
+        </div>
+      )}
+
+      {/* Content */}
+      <div className="relative z-10 container mx-auto px-4 min-h-screen flex flex-col justify-center py-24">
+        <div
+          className={`max-w-3xl ${isRtl ? 'mr-auto ml-0 text-right' : 'ml-0 text-left'}`}
+          style={{ animation: 'boldSlideIn 0.6s ease-out both' }}
+        >
+          {/* Label */}
+          <div className="inline-flex items-center gap-2 mb-8 px-4 py-2 border border-white/20 rounded-full">
+            <span className="text-xs font-bold text-white/70 tracking-[0.2em] uppercase">
+              {isRtl ? 'مجموعة جديدة' : 'New Drop'}
+            </span>
           </div>
 
-          {/* Image - Dynamic angle */}
-          <div
-            className={`flex-1 ${isRtl ? 'lg:order-1' : 'lg:order-2'} w-full max-w-lg lg:max-w-none`}
+          {/* Headline — massive */}
+          <h1 className="text-6xl md:text-8xl font-black uppercase tracking-tight text-white leading-[0.9] mb-8">
+            {displayTitle}
+          </h1>
+
+          {/* Subtitle */}
+          <p className="text-lg md:text-xl text-white/60 font-medium max-w-lg mb-12 leading-relaxed">
+            {displaySubtitle}
+          </p>
+
+          {/* CTA */}
+          <Link
+            href={resolvedCtaLink}
+            className="inline-flex items-center gap-3 px-10 py-5 bg-primary text-primary-foreground rounded-none font-black text-base uppercase tracking-wider hover:bg-primary/90 hover:scale-[1.02] transition-all duration-200 shadow-2xl shadow-primary/30 cursor-pointer"
           >
-            <div className="relative">
-              {/* Background shape */}
-              <div className="absolute inset-0 bg-white/10 rounded-3xl rotate-6 scale-105" />
-              <div className="absolute inset-0 bg-black/20 rounded-3xl -rotate-3 scale-102" />
-
-              {/* Image container */}
-              <div className="relative aspect-square rounded-3xl overflow-hidden shadow-2xl">
-                {image ? (
-                  <Image src={image} alt={displayTitle} fill className="object-cover" />
-                ) : (
-                  <div className="w-full h-full bg-white/10 flex items-center justify-center">
-                    <div className="text-center p-8">
-                      <div className="w-24 h-24 mx-auto mb-4 rounded-2xl bg-white/10 flex items-center justify-center">
-                        <svg
-                          className="w-12 h-12 text-white"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                          />
-                        </svg>
-                      </div>
-                      <p className="text-white/70 font-bold">
-                        {isRtl ? 'صورة البانر' : 'Hero Image'}
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Floating badge */}
-              <div className="absolute -bottom-4 -left-4 px-6 py-3 bg-black text-white rounded-2xl font-bold shadow-xl">
-                🔥 {isRtl ? 'رائج' : 'Trending'}
-              </div>
-            </div>
-          </div>
+            {displayCta}
+            <svg
+              className={`w-5 h-5 ${isRtl ? 'rotate-180' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={3}
+                d="M13 7l5 5m0 0l-5 5m5-5H6"
+              />
+            </svg>
+          </Link>
         </div>
       </div>
 
       {/* Scroll indicator */}
       <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
         <svg
-          className="w-8 h-8 text-white/50"
+          className="w-6 h-6 text-white/30"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
+          aria-hidden="true"
         >
           <path
             strokeLinecap="round"
@@ -163,6 +122,13 @@ export default function BoldHero({
           />
         </svg>
       </div>
+
+      <style>{`
+        @keyframes boldSlideIn {
+          from { opacity: 0; transform: translateX(${isRtl ? '40px' : '-40px'}); }
+          to { opacity: 1; transform: translateX(0); }
+        }
+      `}</style>
     </section>
   );
 }

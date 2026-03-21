@@ -23,127 +23,149 @@ export default function ClassicFooter({
 
   const socialLinks = getSocialLinks(socials);
 
-  return (
-    <footer className="bg-muted/30 border-t border-border mt-auto" dir={isRtl ? 'rtl' : 'ltr'}>
-      {/* Top Decorative Border */}
-      <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+  // Split nav into up to 4 columns of roughly equal size
+  const chunkSize = Math.ceil(navigation.length / 4);
+  const navChunks: (typeof navigation)[] = [];
+  for (let i = 0; i < navigation.length; i += chunkSize) {
+    navChunks.push(navigation.slice(i, i + chunkSize));
+  }
 
-      <div className="container mx-auto px-4 py-16">
-        {/* Main Content - Centered elegant layout */}
-        <div className="max-w-4xl mx-auto text-center mb-12">
-          {/* Logo/Name */}
-          <div className="mb-8">
+  return (
+    <footer
+      className="bg-gray-50 dark:bg-muted/30 border-t border-border mt-auto"
+      dir={isRtl ? 'rtl' : 'ltr'}
+    >
+      <div className="container mx-auto px-4 pt-16 pb-8">
+        {/* Main grid — brand + up to 4 nav columns */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10 lg:gap-12 mb-12">
+          {/* Brand column */}
+          <div className="lg:col-span-2 space-y-5">
             {displayLogo ? (
               <img
                 src={displayLogo}
                 alt={displayName}
-                className="h-10 max-h-10 w-auto object-contain mx-auto"
+                className="h-10 max-h-10 w-auto object-contain"
               />
             ) : (
-              <h3 className="text-2xl font-serif font-normal text-foreground">{displayName}</h3>
+              <h3 className="text-xl font-serif font-normal text-foreground">{displayName}</h3>
+            )}
+
+            {displayDescription && (
+              <p className="text-sm text-muted-foreground leading-relaxed max-w-xs">
+                {displayDescription}
+              </p>
+            )}
+
+            {/* Contact details */}
+            <ul className="space-y-2 text-sm text-muted-foreground">
+              {contact.email && (
+                <li>
+                  <a
+                    href={`mailto:${contact.email}`}
+                    className="hover:text-foreground transition-colors duration-200"
+                  >
+                    {contact.email}
+                  </a>
+                </li>
+              )}
+              {displayPhone && (
+                <li>
+                  <a
+                    href={`tel:${contact.phone}`}
+                    className="hover:text-foreground transition-colors duration-200"
+                    dir="ltr"
+                  >
+                    {displayPhone}
+                  </a>
+                </li>
+              )}
+              {displayAddress && <li>{displayAddress}</li>}
+            </ul>
+
+            {/* Social icons */}
+            {socialLinks.length > 0 && (
+              <div className="flex flex-wrap gap-3 pt-1">
+                {socialLinks.map(({ key, icon, url }) => (
+                  <a
+                    key={key}
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer"
+                    aria-label={key}
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="currentColor"
+                      viewBox="0 0 24 24"
+                      aria-hidden="true"
+                    >
+                      <path d={icon} />
+                    </svg>
+                  </a>
+                ))}
+              </div>
             )}
           </div>
 
-          {/* Description */}
-          {displayDescription && (
-            <p className="text-muted-foreground max-w-md mx-auto mb-8 leading-relaxed">
-              {displayDescription}
-            </p>
-          )}
-
-          {/* Navigation - Horizontal centered */}
-          {navigation.length > 0 && (
-            <nav className="flex flex-wrap justify-center gap-x-8 gap-y-3 mb-8">
-              {navigation.map(item => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors tracking-wide"
-                >
-                  {isRtl && item.labelAr ? item.labelAr : item.label}
-                </Link>
-              ))}
-            </nav>
-          )}
-
-          {/* Social Links */}
-          {socialLinks.length > 0 && (
-            <div className="flex justify-center gap-6 mb-8">
-              {socialLinks.map(({ key, icon, url }) => (
-                <a
-                  key={key}
-                  href={url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-muted-foreground hover:text-primary transition-colors"
-                  aria-label={key}
-                >
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d={icon} />
-                  </svg>
-                </a>
-              ))}
+          {/* Navigation columns */}
+          {navChunks.map((chunk, ci) => (
+            <div key={ci}>
+              <h4 className="font-serif text-xs uppercase tracking-[0.2em] text-foreground mb-5">
+                {ci === 0
+                  ? isRtl
+                    ? 'روابط'
+                    : 'Links'
+                  : ci === 1
+                    ? isRtl
+                      ? 'تسوق'
+                      : 'Shop'
+                    : ci === 2
+                      ? isRtl
+                        ? 'مساعدة'
+                        : 'Help'
+                      : isRtl
+                        ? 'المزيد'
+                        : 'More'}
+              </h4>
+              <ul className="space-y-3">
+                {chunk.map(item => (
+                  <li key={item.href}>
+                    <Link
+                      href={item.href}
+                      className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200"
+                    >
+                      {isRtl && item.labelAr ? item.labelAr : item.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
             </div>
-          )}
+          ))}
         </div>
 
-        {/* Contact Grid */}
-        <div className="grid md:grid-cols-3 gap-8 max-w-3xl mx-auto text-center border-t border-border/50 pt-12 mb-12">
-          {/* Email */}
-          {contact.email && (
-            <div>
-              <h4 className="text-xs uppercase tracking-[0.2em] text-muted-foreground mb-3">
-                {isRtl ? 'البريد الإلكتروني' : 'Email'}
-              </h4>
-              <a
-                href={`mailto:${contact.email}`}
-                className="text-foreground hover:text-primary transition-colors"
-              >
-                {contact.email}
-              </a>
-            </div>
-          )}
+        {/* Divider */}
+        <div className="h-px bg-border mb-6" />
 
-          {/* Phone */}
-          {displayPhone && (
-            <div>
-              <h4 className="text-xs uppercase tracking-[0.2em] text-muted-foreground mb-3">
-                {isRtl ? 'الهاتف' : 'Phone'}
-              </h4>
-              <a
-                href={`tel:${contact.phone}`}
-                className="text-foreground hover:text-primary transition-colors"
-                dir="ltr"
-              >
-                {displayPhone}
-              </a>
-            </div>
-          )}
-
-          {/* Address */}
-          {displayAddress && (
-            <div>
-              <h4 className="text-xs uppercase tracking-[0.2em] text-muted-foreground mb-3">
-                {isRtl ? 'العنوان' : 'Address'}
-              </h4>
-              <p className="text-foreground">{displayAddress}</p>
-            </div>
-          )}
-        </div>
-
-        {/* Bottom Bar */}
-        <div className="text-center pt-8 border-t border-border/30">
-          <p className="text-sm text-muted-foreground">
+        {/* Copyright bar */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
+          <p>
             {isRtl
               ? `© ${new Date().getFullYear()} ${displayName}. جميع الحقوق محفوظة.`
               : `© ${new Date().getFullYear()} ${displayName}. All rights reserved.`}
           </p>
-          <div className="flex justify-center gap-6 mt-4 text-xs text-muted-foreground">
-            <Link href={`${urlPrefix}/privacy`} className="hover:text-foreground transition-colors">
+          <div className="flex items-center gap-5">
+            <Link
+              href={`${urlPrefix}/privacy`}
+              className="hover:text-foreground transition-colors duration-200"
+            >
               {isRtl ? 'سياسة الخصوصية' : 'Privacy Policy'}
             </Link>
-            <span>·</span>
-            <Link href={`${urlPrefix}/terms`} className="hover:text-foreground transition-colors">
+            <span aria-hidden="true">·</span>
+            <Link
+              href={`${urlPrefix}/terms`}
+              className="hover:text-foreground transition-colors duration-200"
+            >
               {isRtl ? 'الشروط والأحكام' : 'Terms & Conditions'}
             </Link>
           </div>

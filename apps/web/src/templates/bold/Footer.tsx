@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import type { FooterProps } from '../types';
+import { getSocialLinks } from '../shared/icons';
 
 export default function BoldFooter({
   branding,
@@ -18,28 +19,14 @@ export default function BoldFooter({
   const displayPhone = isRtl && contact.phoneAr ? contact.phoneAr : contact.phone;
   const displayAddress = isRtl && contact.addressAr ? contact.addressAr : contact.address;
 
-  const socialLinks = [
-    { key: 'instagram', label: 'IG', url: socials.instagram },
-    { key: 'tiktok', label: 'TK', url: socials.tiktok },
-    { key: 'twitter', label: 'X', url: socials.twitter },
-    { key: 'whatsapp', label: 'WA', url: socials.whatsapp },
-  ].filter(s => s.url);
+  const socialLinks = getSocialLinks(socials);
 
   return (
-    <footer
-      className="bg-foreground text-background mt-auto relative overflow-hidden"
-      dir={isRtl ? 'rtl' : 'ltr'}
-    >
-      {/* Background Pattern */}
-      <div className="absolute inset-0 opacity-5">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-primary rounded-full blur-3xl" />
-        <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-primary rounded-full blur-3xl" />
-      </div>
-
-      <div className="container mx-auto px-4 py-16 relative z-10">
-        {/* Main Grid */}
+    <footer className="bg-gray-950 text-white mt-auto" dir={isRtl ? 'rtl' : 'ltr'}>
+      <div className="container mx-auto px-4 py-16">
+        {/* Main grid */}
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-12 mb-16">
-          {/* Brand - Big and Bold */}
+          {/* Brand */}
           <div className="lg:col-span-2">
             {displayLogo ? (
               <img
@@ -48,25 +35,36 @@ export default function BoldFooter({
                 className="h-10 max-h-10 w-auto object-contain mb-6 brightness-0 invert"
               />
             ) : (
-              <h3 className="text-4xl font-black mb-6 tracking-tight">{displayName}</h3>
+              <h3 className="text-3xl font-black uppercase tracking-wider mb-6 text-white">
+                {displayName}
+              </h3>
             )}
             {displayDescription && (
-              <p className="text-background/70 text-lg max-w-md mb-8">{displayDescription}</p>
+              <p className="text-white/50 text-sm leading-relaxed max-w-sm mb-8">
+                {displayDescription}
+              </p>
             )}
 
-            {/* Social - Bold Labels */}
+            {/* Social icons — bright accent on hover */}
             {socialLinks.length > 0 && (
-              <div className="flex gap-3">
-                {socialLinks.map(({ key, label, url }) => (
+              <div className="flex flex-wrap gap-3">
+                {socialLinks.map(({ key, icon, url }) => (
                   <a
                     key={key}
                     href={url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="px-4 py-2 bg-background/10 hover:bg-primary rounded-xl font-bold text-sm transition-colors"
+                    className="w-10 h-10 flex items-center justify-center bg-white/10 hover:bg-primary rounded-lg transition-colors duration-200 cursor-pointer"
                     aria-label={key}
                   >
-                    {label}
+                    <svg
+                      className="w-4 h-4 text-white"
+                      fill="currentColor"
+                      viewBox="0 0 24 24"
+                      aria-hidden="true"
+                    >
+                      <path d={icon} />
+                    </svg>
                   </a>
                 ))}
               </div>
@@ -75,7 +73,7 @@ export default function BoldFooter({
 
           {/* Quick Links */}
           <div>
-            <h4 className="text-lg font-black uppercase tracking-wider mb-6">
+            <h4 className="text-xs font-black uppercase tracking-[0.2em] mb-6 text-white">
               {isRtl ? 'روابط سريعة' : 'Quick Links'}
             </h4>
             <ul className="space-y-3">
@@ -83,9 +81,9 @@ export default function BoldFooter({
                 <li key={item.href}>
                   <Link
                     href={item.href}
-                    className="text-background/70 hover:text-primary transition-colors font-medium inline-flex items-center gap-2 group"
+                    className="text-sm text-white/50 hover:text-primary transition-colors duration-200 font-medium inline-flex items-center gap-2 group cursor-pointer"
                   >
-                    <span className="w-0 group-hover:w-4 h-0.5 bg-primary transition-all duration-300" />
+                    <span className="w-0 group-hover:w-3 h-0.5 bg-primary transition-all duration-200 shrink-0" />
                     {isRtl && item.labelAr ? item.labelAr : item.label}
                   </Link>
                 </li>
@@ -95,15 +93,15 @@ export default function BoldFooter({
 
           {/* Contact */}
           <div>
-            <h4 className="text-lg font-black uppercase tracking-wider mb-6">
+            <h4 className="text-xs font-black uppercase tracking-[0.2em] mb-6 text-white">
               {isRtl ? 'تواصل معنا' : 'Get in Touch'}
             </h4>
-            <ul className="space-y-4">
+            <ul className="space-y-3">
               {contact.email && (
                 <li>
                   <a
                     href={`mailto:${contact.email}`}
-                    className="text-background/70 hover:text-primary transition-colors font-medium"
+                    className="text-sm text-white/50 hover:text-primary transition-colors duration-200 font-medium cursor-pointer"
                   >
                     {contact.email}
                   </a>
@@ -113,33 +111,33 @@ export default function BoldFooter({
                 <li>
                   <a
                     href={`tel:${contact.phone}`}
-                    className="text-background/70 hover:text-primary transition-colors font-medium"
+                    className="text-sm text-white/50 hover:text-primary transition-colors duration-200 font-medium cursor-pointer"
                     dir="ltr"
                   >
                     {displayPhone}
                   </a>
                 </li>
               )}
-              {displayAddress && <li className="text-background/70">{displayAddress}</li>}
+              {displayAddress && <li className="text-sm text-white/50">{displayAddress}</li>}
             </ul>
           </div>
         </div>
 
-        {/* Bottom Bar - Chunky */}
-        <div className="pt-8 border-t border-background/10 flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-background/50 font-medium">
+        {/* Bottom bar */}
+        <div className="pt-8 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-4">
+          <p className="text-xs text-white/30 font-medium">
             © {new Date().getFullYear()} {displayName}
           </p>
           <div className="flex gap-6">
             <Link
               href={`${urlPrefix}/privacy`}
-              className="text-background/50 hover:text-primary transition-colors font-medium"
+              className="text-xs text-white/30 hover:text-primary transition-colors duration-200 font-medium cursor-pointer"
             >
               {isRtl ? 'الخصوصية' : 'Privacy'}
             </Link>
             <Link
               href={`${urlPrefix}/terms`}
-              className="text-background/50 hover:text-primary transition-colors font-medium"
+              className="text-xs text-white/30 hover:text-primary transition-colors duration-200 font-medium cursor-pointer"
             >
               {isRtl ? 'الشروط' : 'Terms'}
             </Link>

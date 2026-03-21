@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import type { HeaderProps } from '../types';
 
 export default function ElegantHeader({
@@ -22,6 +21,7 @@ export default function ElegantHeader({
     e.preventDefault();
     if (onSearch && searchQuery.trim()) {
       onSearch(searchQuery);
+      setIsSearchOpen(false);
     }
   };
 
@@ -29,82 +29,74 @@ export default function ElegantHeader({
   const displayLogo = isRtl && branding.logoAr ? branding.logoAr : branding.logo;
 
   return (
-    <header className="bg-background border-b border-border/30 border-b-2 border-b-primary/20">
+    <header className="bg-background border-b border-gray-200" dir={isRtl ? 'rtl' : 'ltr'}>
       <div className="container mx-auto px-4">
-        {/* Top Bar */}
-        <div className="hidden md:flex items-center justify-between py-2 text-xs border-b border-border/30">
-          <div className="flex items-center gap-6">
-            <span className="text-muted-foreground">
-              {isRtl ? 'شحن مجاني للطلبات فوق 25 د.ك' : 'Free shipping on orders over 25 KD'}
-            </span>
-          </div>
+        {/* Top utility bar */}
+        <div className="hidden md:flex items-center justify-between py-2 text-[11px] tracking-[0.15em] uppercase text-muted-foreground border-b border-gray-100">
+          <span>
+            {isRtl ? 'شحن مجاني للطلبات فوق 25 د.ك' : 'Complimentary shipping on orders over 25 KD'}
+          </span>
           <div className="flex items-center gap-6">
             <Link
               href={`${urlPrefix}/contact`}
-              className="text-muted-foreground hover:text-primary transition-colors"
+              className="hover:text-foreground transition-opacity duration-300 cursor-pointer"
             >
               {isRtl ? 'تواصل معنا' : 'Contact'}
             </Link>
             <Link
               href={`${urlPrefix}/wishlist`}
-              className="text-muted-foreground hover:text-primary transition-colors"
+              className="hover:text-foreground transition-opacity duration-300 cursor-pointer"
             >
               {isRtl ? 'المفضلة' : 'Wishlist'}
             </Link>
           </div>
         </div>
 
-        {/* Main Header */}
-        <div className="flex items-center justify-between py-6">
-          {/* Mobile Menu */}
+        {/* Main header row */}
+        <div className="flex items-center justify-between py-6 gap-6">
+          {/* Mobile menu trigger */}
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="md:hidden"
-            aria-label="Menu"
+            className="md:hidden text-foreground/60 hover:text-foreground transition-opacity duration-300 cursor-pointer"
+            aria-label={isRtl ? 'القائمة' : 'Menu'}
+            aria-expanded={isMenuOpen}
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              {isMenuOpen ? (
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              ) : (
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1}
-                  d="M4 6h16M4 12h16M4 18h16"
-                />
-              )}
+            <svg
+              className="w-6 h-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              strokeWidth={1}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d={isMenuOpen ? 'M6 18L18 6M6 6l12 12' : 'M4 6h16M4 12h16M4 18h16'}
+              />
             </svg>
           </button>
 
-          {/* Desktop Navigation - Left (spacer for centering logo) */}
+          {/* Spacer for logo centering on desktop */}
           <div className="hidden md:flex flex-1" />
 
-          {/* Logo - Center */}
-          <Link href={urlPrefix || '/'} className="flex-shrink-0">
+          {/* Logo — center */}
+          <Link href={urlPrefix || '/'} className="flex-shrink-0 cursor-pointer">
             {displayLogo ? (
-              <Image
-                src={displayLogo}
-                alt={displayName}
-                width={160}
-                height={80}
-                className="h-20 max-h-20 w-auto"
-              />
+              <img src={displayLogo} alt={displayName} className="h-20 max-h-20 w-auto" />
             ) : (
-              <span className="text-3xl font-light tracking-[0.2em]">{displayName}</span>
+              <span className="text-3xl font-light tracking-[0.25em] text-foreground">
+                {displayName}
+              </span>
             )}
           </Link>
 
-          {/* Actions - Right */}
-          <div className="flex items-center gap-6 flex-1 justify-end">
+          {/* Actions — right */}
+          <div className="flex items-center gap-5 flex-1 justify-end">
+            {/* Search */}
             <button
               onClick={() => setIsSearchOpen(!isSearchOpen)}
-              className="hidden md:block text-muted-foreground hover:text-primary transition-colors"
-              aria-label="Search"
+              className="hidden md:block text-foreground/50 hover:text-foreground transition-opacity duration-300 cursor-pointer"
+              aria-label={isRtl ? 'بحث' : 'Search'}
             >
               <svg
                 className="w-5 h-5"
@@ -112,6 +104,7 @@ export default function ElegantHeader({
                 stroke="currentColor"
                 viewBox="0 0 24 24"
                 strokeWidth={1}
+                aria-hidden="true"
               >
                 <path
                   strokeLinecap="round"
@@ -120,10 +113,12 @@ export default function ElegantHeader({
                 />
               </svg>
             </button>
+
+            {/* Account */}
             <Link
               href={isLoggedIn ? `${urlPrefix}/account` : `${urlPrefix}/auth/login`}
-              className="hidden md:block text-muted-foreground hover:text-primary transition-colors"
-              aria-label="Account"
+              className="hidden md:block text-foreground/50 hover:text-foreground transition-opacity duration-300 cursor-pointer"
+              aria-label={isRtl ? 'الحساب' : 'Account'}
             >
               <svg
                 className="w-5 h-5"
@@ -131,6 +126,7 @@ export default function ElegantHeader({
                 stroke="currentColor"
                 viewBox="0 0 24 24"
                 strokeWidth={1}
+                aria-hidden="true"
               >
                 <path
                   strokeLinecap="round"
@@ -139,10 +135,12 @@ export default function ElegantHeader({
                 />
               </svg>
             </Link>
+
+            {/* Cart */}
             <Link
               href={`${urlPrefix}/cart`}
-              className="relative text-muted-foreground hover:text-primary transition-colors"
-              aria-label="Cart"
+              className="relative text-foreground/50 hover:text-foreground transition-opacity duration-300 cursor-pointer"
+              aria-label={isRtl ? `السلة (${cartItemCount})` : `Cart (${cartItemCount})`}
             >
               <svg
                 className="w-5 h-5"
@@ -150,6 +148,7 @@ export default function ElegantHeader({
                 stroke="currentColor"
                 viewBox="0 0 24 24"
                 strokeWidth={1}
+                aria-hidden="true"
               >
                 <path
                   strokeLinecap="round"
@@ -158,53 +157,55 @@ export default function ElegantHeader({
                 />
               </svg>
               {cartItemCount > 0 && (
-                <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-[10px] w-4 h-4 rounded-full flex items-center justify-center">
-                  {cartItemCount}
+                <span
+                  className={`absolute -top-2 ${isRtl ? '-left-2' : '-right-2'} bg-foreground text-background text-[9px] font-medium w-4 h-4 rounded-full flex items-center justify-center`}
+                >
+                  {cartItemCount > 9 ? '9+' : cartItemCount}
                 </span>
               )}
             </Link>
           </div>
         </div>
 
-        {/* Desktop Navigation - Bottom */}
-        <nav className="hidden md:flex items-center justify-center gap-8 pb-4 border-b border-border/30">
+        {/* Desktop navigation — below logo */}
+        <nav className="hidden md:flex items-center justify-center gap-10 pb-5">
           {navigation.map(item => (
             <Link
               key={item.href}
               href={item.href}
-              className="text-xs tracking-[0.15em] uppercase text-muted-foreground hover:text-primary transition-colors"
+              className="text-[11px] tracking-[0.2em] uppercase text-muted-foreground hover:text-foreground transition-opacity duration-300 cursor-pointer"
             >
               {isRtl && item.labelAr ? item.labelAr : item.label}
             </Link>
           ))}
         </nav>
 
-        {/* Search */}
-        {isSearchOpen && (
-          <div className="py-6 border-t border-border/30">
-            <form onSubmit={handleSearch} className="max-w-lg mx-auto relative">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                placeholder={isRtl ? 'ما الذي تبحث عنه؟' : 'What are you looking for?'}
-                className="w-full px-0 py-3 bg-transparent border-b border-border focus:outline-none focus:border-primary text-center text-sm tracking-wide transition-colors"
-                dir={isRtl ? 'rtl' : 'ltr'}
-                autoFocus
-              />
-            </form>
-          </div>
-        )}
+        {/* Search field — expands below nav */}
+        <div
+          className={`overflow-hidden transition-all duration-500 ${isSearchOpen ? 'max-h-24 opacity-100 py-6 border-t border-gray-100' : 'max-h-0 opacity-0 py-0'}`}
+        >
+          <form onSubmit={handleSearch} className="max-w-lg mx-auto">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder={isRtl ? 'ما الذي تبحث عنه؟' : 'What are you looking for?'}
+              className="w-full px-0 py-3 bg-transparent border-0 border-b border-gray-300 focus:outline-none focus:border-foreground text-center text-sm tracking-[0.1em] placeholder:text-muted-foreground/50 transition-colors duration-500"
+              dir={isRtl ? 'rtl' : 'ltr'}
+              autoFocus={isSearchOpen}
+            />
+          </form>
+        </div>
 
-        {/* Mobile Menu */}
+        {/* Mobile menu */}
         {isMenuOpen && (
-          <nav className="md:hidden py-6 border-t border-border/30">
-            <ul className="space-y-4 text-center">
+          <nav className="md:hidden py-6 border-t border-gray-100">
+            <ul className="space-y-5 text-center">
               {navigation.map(item => (
                 <li key={item.href}>
                   <Link
                     href={item.href}
-                    className="text-sm tracking-[0.1em] uppercase text-muted-foreground hover:text-primary transition-colors"
+                    className="text-[11px] tracking-[0.2em] uppercase text-muted-foreground hover:text-foreground transition-opacity duration-300 cursor-pointer"
                     onClick={() => setIsMenuOpen(false)}
                   >
                     {isRtl && item.labelAr ? item.labelAr : item.label}
