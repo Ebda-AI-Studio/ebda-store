@@ -133,7 +133,7 @@ export default function ClassicFooter({
                   <li key={item.href}>
                     <Link
                       href={item.href}
-                      className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200"
+                      className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                     >
                       {isRtl && item.labelAr ? item.labelAr : item.label}
                     </Link>
@@ -157,14 +157,14 @@ export default function ClassicFooter({
           <div className="flex items-center gap-5">
             <Link
               href={`${urlPrefix}/privacy`}
-              className="hover:text-foreground transition-colors duration-200"
+              className="hover:text-foreground transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
             >
               {isRtl ? 'سياسة الخصوصية' : 'Privacy Policy'}
             </Link>
             <span aria-hidden="true">·</span>
             <Link
               href={`${urlPrefix}/terms`}
-              className="hover:text-foreground transition-colors duration-200"
+              className="hover:text-foreground transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
             >
               {isRtl ? 'الشروط والأحكام' : 'Terms & Conditions'}
             </Link>

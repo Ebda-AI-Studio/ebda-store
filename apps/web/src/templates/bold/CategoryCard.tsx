@@ -11,7 +11,10 @@ export default function BoldCategoryCard({
   const displayName = isRtl && category.nameAr ? category.nameAr : category.name;
 
   return (
-    <Link href={`${urlPrefix}/products?category=${category.slug}`} className="group block relative">
+    <Link
+      href={`${urlPrefix}/products?category=${category.slug}`}
+      className="group block relative outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+    >
       {/* Card with dynamic hover */}
       <div className="relative aspect-[3/4] rounded-3xl overflow-hidden bg-primary shadow-xl transition-transform duration-300 group-hover:scale-[1.02] group-hover:-rotate-1">
         {/* Image */}
@@ -20,6 +23,7 @@ export default function BoldCategoryCard({
             src={category.image}
             alt={displayName}
             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+            loading="lazy"
           />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">

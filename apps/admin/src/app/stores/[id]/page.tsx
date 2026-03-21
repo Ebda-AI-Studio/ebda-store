@@ -693,7 +693,15 @@ export default function StoreDetailPage() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {store.status === 'active' ? (
             <button
-              onClick={() => handleStatusChange('suspended')}
+              onClick={() => {
+                if (
+                  window.confirm(
+                    `Are you sure you want to suspend "${store.name}"? This will disable customer access to the store.`
+                  )
+                ) {
+                  handleStatusChange('suspended');
+                }
+              }}
               className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm transition-all duration-200 hover:border-red-300 hover:shadow-md cursor-pointer text-left"
             >
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-100">

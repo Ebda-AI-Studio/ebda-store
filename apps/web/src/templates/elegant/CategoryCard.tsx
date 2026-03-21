@@ -11,7 +11,10 @@ export default function ElegantCategoryCard({
   const displayName = isRtl && category.nameAr ? category.nameAr : category.name;
 
   return (
-    <Link href={`${urlPrefix}/products?category=${category.slug}`} className="group block">
+    <Link
+      href={`${urlPrefix}/products?category=${category.slug}`}
+      className="group block outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+    >
       {/* Image container with elegant aspect ratio */}
       <div className="relative aspect-[2/3] overflow-hidden bg-muted mb-6">
         {category.image ? (
@@ -19,6 +22,7 @@ export default function ElegantCategoryCard({
             src={category.image}
             alt={displayName}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
+            loading="lazy"
           />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">

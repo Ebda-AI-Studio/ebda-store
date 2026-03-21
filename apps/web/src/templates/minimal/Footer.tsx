@@ -90,13 +90,13 @@ export default function MinimalFooter({
           <div className={`flex items-center gap-5 ${isRtl ? 'flex-row-reverse' : ''}`}>
             <Link
               href={`${urlPrefix}/privacy`}
-              className="hover:text-foreground transition-colors duration-200"
+              className="hover:text-foreground transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
             >
               {isRtl ? 'الخصوصية' : 'Privacy'}
             </Link>
             <Link
               href={`${urlPrefix}/terms`}
-              className="hover:text-foreground transition-colors duration-200"
+              className="hover:text-foreground transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
             >
               {isRtl ? 'الشروط' : 'Terms'}
             </Link>

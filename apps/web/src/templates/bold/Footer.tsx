@@ -40,7 +40,7 @@ export default function BoldFooter({
               </h3>
             )}
             {displayDescription && (
-              <p className="text-white/50 text-sm leading-relaxed max-w-sm mb-8">
+              <p className="text-gray-300 text-sm leading-relaxed max-w-sm mb-8">
                 {displayDescription}
               </p>
             )}
@@ -81,7 +81,7 @@ export default function BoldFooter({
                 <li key={item.href}>
                   <Link
                     href={item.href}
-                    className="text-sm text-white/50 hover:text-primary transition-colors duration-200 font-medium inline-flex items-center gap-2 group cursor-pointer"
+                    className="text-sm text-gray-300 hover:text-primary transition-colors duration-200 font-medium inline-flex items-center gap-2 group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                   >
                     <span className="w-0 group-hover:w-3 h-0.5 bg-primary transition-all duration-200 shrink-0" />
                     {isRtl && item.labelAr ? item.labelAr : item.label}
@@ -101,7 +101,7 @@ export default function BoldFooter({
                 <li>
                   <a
                     href={`mailto:${contact.email}`}
-                    className="text-sm text-white/50 hover:text-primary transition-colors duration-200 font-medium cursor-pointer"
+                    className="text-sm text-gray-300 hover:text-primary transition-colors duration-200 font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                   >
                     {contact.email}
                   </a>
@@ -111,33 +111,33 @@ export default function BoldFooter({
                 <li>
                   <a
                     href={`tel:${contact.phone}`}
-                    className="text-sm text-white/50 hover:text-primary transition-colors duration-200 font-medium cursor-pointer"
+                    className="text-sm text-gray-300 hover:text-primary transition-colors duration-200 font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                     dir="ltr"
                   >
                     {displayPhone}
                   </a>
                 </li>
               )}
-              {displayAddress && <li className="text-sm text-white/50">{displayAddress}</li>}
+              {displayAddress && <li className="text-sm text-gray-300">{displayAddress}</li>}
             </ul>
           </div>
         </div>
 
         {/* Bottom bar */}
         <div className="pt-8 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-xs text-white/30 font-medium">
+          <p className="text-xs text-gray-400 font-medium">
             © {new Date().getFullYear()} {displayName}
           </p>
           <div className="flex gap-6">
             <Link
               href={`${urlPrefix}/privacy`}
-              className="text-xs text-white/30 hover:text-primary transition-colors duration-200 font-medium cursor-pointer"
+              className="text-xs text-gray-400 hover:text-primary transition-colors duration-200 font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
             >
               {isRtl ? 'الخصوصية' : 'Privacy'}
             </Link>
             <Link
               href={`${urlPrefix}/terms`}
-              className="text-xs text-white/30 hover:text-primary transition-colors duration-200 font-medium cursor-pointer"
+              className="text-xs text-gray-400 hover:text-primary transition-colors duration-200 font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
             >
               {isRtl ? 'الشروط' : 'Terms'}
             </Link>

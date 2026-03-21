@@ -59,7 +59,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
   const [isTogglingWishlist, setIsTogglingWishlist] = useState(false);
   // Selected variant from VariantSelector (null = no variant chosen or invalid combo)
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
-  const { success: toastSuccess } = useToast();
+  const { success: toastSuccess, error: toastError } = useToast();
   const { addItem } = useCart();
   const { store } = useStore();
   const storeUrl = useStoreUrl();
@@ -158,7 +158,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
         toastSuccess('Added to wishlist', `${product.name} added to your wishlist`);
       }
     } catch {
-      toastSuccess('Error', 'Failed to update wishlist. Please try again.');
+      toastError('Error', 'Failed to update wishlist. Please try again.');
     } finally {
       setIsTogglingWishlist(false);
     }

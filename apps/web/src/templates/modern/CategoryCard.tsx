@@ -14,7 +14,7 @@ export default function ModernCategoryCard({
   return (
     <Link
       href={`${urlPrefix}/products?category=${category.slug}`}
-      className="group relative aspect-[4/3] rounded-xl overflow-hidden bg-muted block cursor-pointer"
+      className="group relative aspect-[4/3] rounded-xl overflow-hidden bg-muted block cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
     >
       {/* Image */}
       {category.image ? (
@@ -40,7 +40,7 @@ export default function ModernCategoryCard({
             {displayName}
           </h3>
           {category.productCount !== undefined && (
-            <p className="text-white/65 text-xs font-medium">
+            <p className="text-white/90 text-xs font-medium">
               {isRtl ? `${category.productCount} منتج` : `${category.productCount} products`}
             </p>
           )}

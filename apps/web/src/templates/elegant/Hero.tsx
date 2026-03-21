@@ -28,7 +28,7 @@ export default function ElegantHero({
 
   return (
     <section
-      className="relative overflow-hidden"
+      className="relative overflow-hidden motion-reduce:animate-none"
       dir={isRtl ? 'rtl' : 'ltr'}
       style={{ animation: 'elegantFadeIn 0.5s ease-out both' }}
     >
@@ -162,6 +162,9 @@ export default function ElegantHero({
         @keyframes elegantFadeIn {
           from { opacity: 0; }
           to { opacity: 1; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .motion-reduce\\:animate-none { animation: none !important; }
         }
       `}</style>
     </section>

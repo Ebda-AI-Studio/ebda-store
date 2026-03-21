@@ -214,6 +214,7 @@ export default function MinimalHeader({
               className="w-full text-center text-xs tracking-wide bg-transparent border-b border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground pb-2 transition-colors duration-200"
               dir={isRtl ? 'rtl' : 'ltr'}
               autoFocus={isSearchOpen}
+              aria-label={isRtl ? 'بحث عن المنتجات' : 'Search products'}
             />
           </form>
         </div>

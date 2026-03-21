@@ -13,7 +13,7 @@ export default function ClassicCategoryCard({
   return (
     <Link
       href={`${urlPrefix}/products?category=${category.slug}`}
-      className="group block text-center"
+      className="group block text-center outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
     >
       {/* Image with elegant border */}
       <div className="relative aspect-[3/4] mb-6 overflow-hidden border border-border/50 bg-muted">
@@ -22,6 +22,7 @@ export default function ClassicCategoryCard({
             src={category.image}
             alt={displayName}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
+            loading="lazy"
           />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">

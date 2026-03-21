@@ -29,10 +29,10 @@ export default function ElegantHeader({
   const displayLogo = isRtl && branding.logoAr ? branding.logoAr : branding.logo;
 
   return (
-    <header className="bg-background border-b border-gray-200" dir={isRtl ? 'rtl' : 'ltr'}>
+    <header className="bg-background border-b border-border" dir={isRtl ? 'rtl' : 'ltr'}>
       <div className="container mx-auto px-4">
         {/* Top utility bar */}
-        <div className="hidden md:flex items-center justify-between py-2 text-[11px] tracking-[0.15em] uppercase text-muted-foreground border-b border-gray-100">
+        <div className="hidden md:flex items-center justify-between py-2 text-[11px] tracking-[0.15em] uppercase text-muted-foreground border-b border-border/50">
           <span>
             {isRtl ? 'شحن مجاني للطلبات فوق 25 د.ك' : 'Complimentary shipping on orders over 25 KD'}
           </span>
@@ -182,7 +182,7 @@ export default function ElegantHeader({
 
         {/* Search field — expands below nav */}
         <div
-          className={`overflow-hidden transition-all duration-500 ${isSearchOpen ? 'max-h-24 opacity-100 py-6 border-t border-gray-100' : 'max-h-0 opacity-0 py-0'}`}
+          className={`overflow-hidden transition-all duration-500 ${isSearchOpen ? 'max-h-24 opacity-100 py-6 border-t border-border/50' : 'max-h-0 opacity-0 py-0'}`}
         >
           <form onSubmit={handleSearch} className="max-w-lg mx-auto">
             <input
@@ -190,16 +190,17 @@ export default function ElegantHeader({
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder={isRtl ? 'ما الذي تبحث عنه؟' : 'What are you looking for?'}
-              className="w-full px-0 py-3 bg-transparent border-0 border-b border-gray-300 focus:outline-none focus:border-foreground text-center text-sm tracking-[0.1em] placeholder:text-muted-foreground/50 transition-colors duration-500"
+              className="w-full px-0 py-3 bg-transparent border-0 border-b border-border focus:outline-none focus:border-foreground text-center text-sm tracking-[0.1em] placeholder:text-muted-foreground/50 transition-colors duration-500"
               dir={isRtl ? 'rtl' : 'ltr'}
               autoFocus={isSearchOpen}
+              aria-label={isRtl ? 'بحث عن المنتجات' : 'Search products'}
             />
           </form>
         </div>
 
         {/* Mobile menu */}
         {isMenuOpen && (
-          <nav className="md:hidden py-6 border-t border-gray-100">
+          <nav className="md:hidden py-6 border-t border-border/50">
             <ul className="space-y-5 text-center">
               {navigation.map(item => (
                 <li key={item.href}>

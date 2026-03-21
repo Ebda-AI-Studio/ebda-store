@@ -86,7 +86,7 @@ export default function ModernFooter({
                 <li key={item.href}>
                   <Link
                     href={item.href}
-                    className="text-sm text-gray-400 hover:text-white transition-colors duration-200"
+                    className="text-sm text-gray-400 hover:text-white transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                   >
                     {isRtl && item.labelAr ? item.labelAr : item.label}
                   </Link>
@@ -214,6 +214,7 @@ export default function ModernFooter({
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 placeholder={isRtl ? 'البريد الإلكتروني' : 'Email address'}
+                aria-label={isRtl ? 'البريد الإلكتروني' : 'Email address'}
                 className="w-full px-4 py-2.5 bg-white/8 rounded-lg border border-white/10 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 text-sm text-white placeholder:text-gray-500 transition-colors duration-200"
                 dir={isRtl ? 'rtl' : 'ltr'}
                 required
@@ -238,13 +239,13 @@ export default function ModernFooter({
           <div className="flex items-center gap-5">
             <Link
               href={`${urlPrefix}/privacy`}
-              className="text-xs text-gray-500 hover:text-gray-300 transition-colors duration-200"
+              className="text-xs text-gray-500 hover:text-gray-300 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
             >
               {isRtl ? 'سياسة الخصوصية' : 'Privacy Policy'}
             </Link>
             <Link
               href={`${urlPrefix}/terms`}
-              className="text-xs text-gray-500 hover:text-gray-300 transition-colors duration-200"
+              className="text-xs text-gray-500 hover:text-gray-300 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
             >
               {isRtl ? 'الشروط والأحكام' : 'Terms & Conditions'}
             </Link>

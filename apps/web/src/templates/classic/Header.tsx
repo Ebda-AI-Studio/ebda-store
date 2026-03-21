@@ -276,6 +276,7 @@ export default function ClassicHeader({
             placeholder={isRtl ? 'ابحث في مجموعتنا...' : 'Search our collection...'}
             className="w-full py-1.5 px-0 border-b border-border bg-transparent font-serif text-sm text-center text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors duration-200"
             dir={isRtl ? 'rtl' : 'ltr'}
+            aria-label={isRtl ? 'بحث عن المنتجات' : 'Search products'}
           />
         </form>
       </div>
@@ -306,6 +307,7 @@ export default function ClassicHeader({
                 placeholder={isRtl ? 'بحث...' : 'Search...'}
                 className="w-full py-2 px-0 border-b border-border bg-transparent text-sm font-serif text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors duration-200"
                 dir={isRtl ? 'rtl' : 'ltr'}
+                aria-label={isRtl ? 'بحث عن المنتجات' : 'Search products'}
               />
             </form>
           </nav>

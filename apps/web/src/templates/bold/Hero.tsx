@@ -63,6 +63,7 @@ export default function BoldHero({
         <div
           className={`max-w-3xl ${isRtl ? 'mr-auto ml-0 text-right' : 'ml-0 text-left'}`}
           style={{ animation: 'boldSlideIn 0.6s ease-out both' }}
+          className="motion-reduce:animate-none"
         >
           {/* Label */}
           <div className="inline-flex items-center gap-2 mb-8 px-4 py-2 border border-white/20 rounded-full">
@@ -106,7 +107,7 @@ export default function BoldHero({
       </div>
 
       {/* Scroll indicator */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
+      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce motion-reduce:animate-none">
         <svg
           className="w-6 h-6 text-white/30"
           fill="none"
@@ -127,6 +128,9 @@ export default function BoldHero({
         @keyframes boldSlideIn {
           from { opacity: 0; transform: translateX(${isRtl ? '40px' : '-40px'}); }
           to { opacity: 1; transform: translateX(0); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .motion-reduce\\:animate-none { animation: none !important; }
         }
       `}</style>
     </section>
