@@ -228,37 +228,73 @@ export default function StoreOrdersPage() {
       {/* Orders Table */}
       <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
         {isLoading ? (
-          <div className="space-y-4 p-6">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-4 animate-pulse">
-                <div className="h-10 w-10 rounded-xl bg-gray-200" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 w-32 rounded bg-gray-200" />
-                  <div className="h-3 w-48 rounded bg-gray-200" />
-                </div>
-                <div className="h-6 w-24 rounded-full bg-gray-200" />
-              </div>
-            ))}
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-muted border-b">
+                <tr>
+                  {['Order', 'Customer', 'Total', 'Status', 'Date', 'Actions'].map(h => (
+                    <th
+                      key={h}
+                      className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/50">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i}>
+                    <td className="px-6 py-4">
+                      <div className="h-4 w-24 force-skeleton" />
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="space-y-1.5">
+                        <div className="h-4 w-32 force-skeleton" />
+                        <div className="h-3 w-40 force-skeleton" />
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="h-4 w-20 force-skeleton" />
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="h-6 w-24 rounded-full force-skeleton" />
+                    </td>
+                    <td className="px-6 py-4 hidden md:table-cell">
+                      <div className="h-4 w-24 force-skeleton" />
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="h-7 w-20 rounded-lg force-skeleton ml-auto" />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         ) : filteredOrders.length === 0 ? (
-          <div className="py-16 text-center">
-            <svg
-              className="mx-auto h-12 w-12 text-gray-300"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1}
-                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-              />
-            </svg>
-            <p className="mt-4 text-muted-foreground">
+          <div className="force-empty-state">
+            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
+              <svg
+                className="h-8 w-8 text-muted-foreground"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                />
+              </svg>
+            </div>
+            <p className="font-semibold text-foreground">
+              {search || statusFilter !== 'all' ? 'No matching orders' : 'No orders yet'}
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
               {search || statusFilter !== 'all'
-                ? 'No orders match your filters'
-                : 'No orders yet for this store'}
+                ? 'Try adjusting your search or filters'
+                : 'Orders will appear here when customers make purchases'}
             </p>
           </div>
         ) : (
@@ -292,7 +328,10 @@ export default function StoreOrdersPage() {
                   const transitions = validTransitions[order.status] ?? [];
                   const isUpdating = updatingId === order.id;
                   return (
-                    <tr key={order.id} className="hover:bg-muted transition-colors">
+                    <tr
+                      key={order.id}
+                      className="hover:bg-muted/50 transition-colors duration-150 cursor-pointer"
+                    >
                       <td className="px-6 py-4">
                         <p className="font-semibold text-primary">
                           {order.orderNumber || `#${order.id.slice(0, 8).toUpperCase()}`}

@@ -270,18 +270,22 @@ export function AdminLayout({
                   <Link
                     href={item.href}
                     onClick={() => setIsSidebarOpen(false)}
-                    className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
+                    className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
                       isActive
-                        ? 'bg-primary/10 text-primary shadow-sm'
-                        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                        ? 'bg-primary/8 text-primary'
+                        : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'
                     }`}
                     aria-current={isActive ? 'page' : undefined}
                   >
+                    {/* Left border active indicator */}
+                    {isActive && (
+                      <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-full bg-primary" />
+                    )}
                     <span
                       className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-200 ${
                         isActive
-                          ? 'bg-primary text-white shadow-md shadow-primary/25'
-                          : 'bg-muted/80 text-muted-foreground group-hover:bg-muted group-hover:text-foreground'
+                          ? 'bg-primary/15 text-primary'
+                          : 'text-muted-foreground group-hover:bg-muted group-hover:text-foreground'
                       }`}
                     >
                       <svg
@@ -300,9 +304,6 @@ export function AdminLayout({
                       </svg>
                     </span>
                     <span className={isActive ? 'font-semibold' : ''}>{item.name}</span>
-                    {isActive && (
-                      <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-                    )}
                   </Link>
                 </li>
               );

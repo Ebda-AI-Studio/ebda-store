@@ -226,31 +226,48 @@ export default function DashboardPage() {
       }
     >
       {/* Stats Grid */}
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 stagger-animation">
-        {statCards.map((stat, index) => (
-          <div
-            key={stat.name}
-            className="force-stat-card group"
-            style={{ animationDelay: `${index * 0.1}s` }}
-          >
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <p className="text-sm font-medium text-muted-foreground">{stat.name}</p>
-                <div className="mt-2">
-                  <p className="text-3xl font-bold tracking-tight text-foreground">
-                    {stat.isRevenue ? stat.value : formatNumber(stat.value as number)}
-                  </p>
+      {isLoading ? (
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="force-stat-card">
+              <div className="flex items-start justify-between">
+                <div className="flex-1 space-y-3">
+                  <div className="h-3 w-24 force-skeleton" />
+                  <div className="h-8 w-32 force-skeleton" />
+                  <div className="h-3 w-16 force-skeleton" />
                 </div>
-              </div>
-              <div
-                className={`flex h-12 w-12 items-center justify-center rounded-2xl ${stat.iconBg} text-white shadow-lg transition-transform group-hover:scale-110`}
-              >
-                {stat.icon}
+                <div className="h-12 w-12 rounded-2xl force-skeleton" />
               </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      ) : (
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 stagger-animation">
+          {statCards.map((stat, index) => (
+            <div
+              key={stat.name}
+              className="force-stat-card group"
+              style={{ animationDelay: `${index * 0.1}s` }}
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-muted-foreground">{stat.name}</p>
+                  <div className="mt-2">
+                    <p className="text-3xl font-bold tracking-tight text-foreground">
+                      {stat.isRevenue ? stat.value : formatNumber(stat.value as number)}
+                    </p>
+                  </div>
+                </div>
+                <div
+                  className={`flex h-12 w-12 items-center justify-center rounded-2xl ${stat.iconBg} text-white shadow-lg transition-transform duration-200 group-hover:scale-110`}
+                >
+                  {stat.icon}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Recent Activity Section */}
       <div className="mt-8 grid gap-6 lg:grid-cols-2">

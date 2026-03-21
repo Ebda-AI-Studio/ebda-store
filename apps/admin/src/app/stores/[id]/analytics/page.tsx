@@ -122,18 +122,36 @@ function SimpleBarChart({
   );
 }
 
+// Stat card skeleton
+function StatCardSkeleton() {
+  return (
+    <div className="force-stat-card">
+      <div className="flex items-start justify-between">
+        <div className="flex-1 space-y-3">
+          <div className="h-3 w-24 force-skeleton" />
+          <div className="h-8 w-32 force-skeleton" />
+          <div className="h-3 w-16 force-skeleton" />
+        </div>
+        <div className="h-12 w-12 rounded-2xl force-skeleton" />
+      </div>
+    </div>
+  );
+}
+
 // Stat card component
 function StatCard({
   title,
   value,
   change,
   icon,
+  iconBg = 'bg-primary',
   format = 'number',
 }: {
   title: string;
   value: number;
   change?: number;
   icon: React.ReactNode;
+  iconBg?: string;
   format?: 'number' | 'currency' | 'percentage';
 }) {
   const displayValue =
@@ -143,21 +161,40 @@ function StatCard({
         ? `${value.toFixed(1)}%`
         : formatNumber(value);
 
+  const isPositive = change !== undefined && change >= 0;
+
   return (
-    <div className="bg-card rounded-xl border p-6 shadow-sm">
-      <div className="flex items-center justify-between mb-4">
-        <span className="text-muted-foreground text-sm font-medium">{title}</span>
-        <div className="p-2 bg-orange-50 rounded-lg text-orange-600">{icon}</div>
-      </div>
-      <div className="flex items-end gap-2">
-        <span className="text-2xl font-bold text-foreground">{displayValue}</span>
-        {change !== undefined && (
-          <span
-            className={`text-sm font-medium ${change >= 0 ? 'text-green-600' : 'text-red-600'}`}
-          >
-            {change >= 0 ? '↑' : '↓'} {Math.abs(change).toFixed(1)}%
-          </span>
-        )}
+    <div className="force-stat-card group">
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <p className="text-sm font-medium text-muted-foreground">{title}</p>
+          <p className="mt-2 text-3xl font-bold tracking-tight text-foreground">{displayValue}</p>
+          {change !== undefined && (
+            <div className="mt-2 flex items-center gap-1">
+              <span
+                className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs font-semibold ${
+                  isPositive ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
+                }`}
+              >
+                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2.5}
+                    d={isPositive ? 'M5 10l7-7m0 0l7 7m-7-7v18' : 'M19 14l-7 7m0 0l-7-7m7 7V3'}
+                  />
+                </svg>
+                {Math.abs(change).toFixed(1)}%
+              </span>
+              <span className="text-xs text-muted-foreground">vs last period</span>
+            </div>
+          )}
+        </div>
+        <div
+          className={`flex h-12 w-12 items-center justify-center rounded-2xl ${iconBg} text-white shadow-lg transition-transform duration-200 group-hover:scale-110`}
+        >
+          {icon}
+        </div>
       </div>
     </div>
   );
@@ -234,15 +271,15 @@ export default function AnalyticsPage() {
   return (
     <AdminLayout title="Analytics" subtitle="Store performance and insights">
       {/* Period Selector */}
-      <div className="mb-6 flex items-center gap-2">
+      <div className="mb-6 flex items-center gap-1 rounded-xl bg-muted p-1 w-fit">
         {(['week', 'month', 'year'] as Period[]).map(p => (
           <button
             key={p}
             onClick={() => setPeriod(p)}
-            className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+            className={`cursor-pointer rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 ${
               period === p
-                ? 'bg-orange-500 text-white'
-                : 'bg-card text-muted-foreground border hover:bg-muted'
+                ? 'bg-card text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             {p === 'week' ? 'Last 7 Days' : p === 'month' ? 'This Month' : 'This Year'}
@@ -251,18 +288,47 @@ export default function AnalyticsPage() {
       </div>
 
       {isLoading ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500" />
-        </div>
+        <>
+          {/* Skeleton Stats Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <StatCardSkeleton key={i} />
+            ))}
+          </div>
+          {/* Skeleton Chart */}
+          <div className="bg-card rounded-xl border p-6 shadow-sm mb-8">
+            <div className="h-6 w-40 force-skeleton mb-6" />
+            <div className="h-40 force-skeleton rounded-lg" />
+          </div>
+          {/* Skeleton 3-col */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="bg-card rounded-xl border p-6 shadow-sm space-y-4">
+                <div className="h-5 w-32 force-skeleton" />
+                {Array.from({ length: 4 }).map((_, j) => (
+                  <div key={j} className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-lg force-skeleton" />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-3 w-28 force-skeleton" />
+                      <div className="h-3 w-20 force-skeleton" />
+                    </div>
+                    <div className="h-5 w-16 force-skeleton" />
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </>
       ) : (
         <>
           {/* Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 stagger-animation">
             <StatCard
               title="Total Revenue"
               value={stats?.totalRevenue || 0}
               change={stats?.revenueChange}
               format="currency"
+              iconBg="bg-primary"
               icon={
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path
@@ -278,6 +344,7 @@ export default function AnalyticsPage() {
               title="Total Orders"
               value={stats?.totalOrders || 0}
               change={stats?.ordersChange}
+              iconBg="bg-violet-500"
               icon={
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path
@@ -293,6 +360,7 @@ export default function AnalyticsPage() {
               title="Total Customers"
               value={stats?.totalCustomers || 0}
               change={stats?.customersChange}
+              iconBg="bg-emerald-500"
               icon={
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path
@@ -308,6 +376,7 @@ export default function AnalyticsPage() {
               title="Avg Order Value"
               value={stats?.averageOrderValue || 0}
               format="currency"
+              iconBg="bg-blue-500"
               icon={
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path
@@ -324,24 +393,33 @@ export default function AnalyticsPage() {
           {/* Sales Chart */}
           <div className="bg-card rounded-xl border p-6 shadow-sm mb-8">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-semibold text-foreground">Sales Overview</h2>
-              <div className="flex gap-2">
+              <div>
+                <h2 className="text-lg font-semibold text-foreground">Sales Overview</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {period === 'week'
+                    ? 'Last 7 days'
+                    : period === 'month'
+                      ? 'This month'
+                      : 'This year'}
+                </p>
+              </div>
+              <div className="flex items-center gap-1 rounded-lg bg-muted p-1">
                 <button
                   onClick={() => setChartType('revenue')}
-                  className={`px-3 py-1 text-sm rounded ${
+                  className={`cursor-pointer rounded-md px-3 py-1 text-xs font-medium transition-all duration-200 ${
                     chartType === 'revenue'
-                      ? 'bg-orange-100 text-orange-600'
-                      : 'text-muted-foreground'
+                      ? 'bg-card text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   Revenue
                 </button>
                 <button
                   onClick={() => setChartType('orders')}
-                  className={`px-3 py-1 text-sm rounded ${
+                  className={`cursor-pointer rounded-md px-3 py-1 text-xs font-medium transition-all duration-200 ${
                     chartType === 'orders'
-                      ? 'bg-orange-100 text-orange-600'
-                      : 'text-muted-foreground'
+                      ? 'bg-card text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   Orders

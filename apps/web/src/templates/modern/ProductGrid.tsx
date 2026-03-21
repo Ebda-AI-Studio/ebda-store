@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import ProductCard from './ProductCard';
 import type { ProductGridProps } from '../types';
 import { cn } from '@force/ui';
@@ -9,7 +10,8 @@ import { NoProductsIcon } from '../shared/icons';
  * Modern Template - Product Grid
  *
  * Renders a responsive grid of ProductCards with:
- * - Responsive column layout
+ * - Responsive column layout (2 mobile → 3 tablet → 4 desktop)
+ * - Staggered fade-in animation on mount
  * - Empty state handling
  * - Cart quantity tracking per product
  */
@@ -23,7 +25,23 @@ export default function ModernProductGrid({
   onAddToWishlist,
   urlPrefix = '',
 }: ProductGridProps) {
-  const gridCols = {
+  const [visibleCount, setVisibleCount] = useState(0);
+
+  useEffect(() => {
+    if (products.length === 0) return;
+    let i = 0;
+    const step = () => {
+      i += 1;
+      setVisibleCount(i);
+      if (i < products.length) {
+        setTimeout(step, 60);
+      }
+    };
+    const id = setTimeout(step, 80);
+    return () => clearTimeout(id);
+  }, [products.length]);
+
+  const gridCols: Record<2 | 3 | 4, string> = {
     2: 'grid-cols-2',
     3: 'grid-cols-2 md:grid-cols-3',
     4: 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4',
@@ -32,17 +50,17 @@ export default function ModernProductGrid({
   if (products.length === 0) {
     return (
       <div
-        className="py-16 text-center"
+        className="py-20 text-center"
         role="status"
         aria-label={isRtl ? 'لا توجد منتجات' : 'No products found'}
       >
-        <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-muted flex items-center justify-center">
-          <NoProductsIcon />
+        <div className="w-20 h-20 mx-auto mb-5 rounded-full bg-muted flex items-center justify-center text-muted-foreground/50">
+          <NoProductsIcon className="w-9 h-9" />
         </div>
-        <h3 className="text-lg font-semibold text-foreground mb-2">
+        <h3 className="text-base font-semibold text-foreground mb-1.5">
           {isRtl ? 'لا توجد منتجات' : 'No products found'}
         </h3>
-        <p className="text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           {isRtl ? 'لم نتمكن من العثور على أي منتجات' : "We couldn't find any products"}
         </p>
       </div>
@@ -54,9 +72,18 @@ export default function ModernProductGrid({
       className={cn('grid gap-4 md:gap-6', gridCols[columns])}
       role="list"
       aria-label={isRtl ? 'قائمة المنتجات' : 'Product list'}
+      dir={isRtl ? 'rtl' : 'ltr'}
     >
-      {products.map(product => (
-        <div key={product.id} role="listitem">
+      {products.map((product, index) => (
+        <div
+          key={product.id}
+          role="listitem"
+          className="transition-all duration-500 ease-out"
+          style={{
+            opacity: index < visibleCount ? 1 : 0,
+            transform: index < visibleCount ? 'translateY(0)' : 'translateY(16px)',
+          }}
+        >
           <ProductCard
             product={product}
             isRtl={isRtl}

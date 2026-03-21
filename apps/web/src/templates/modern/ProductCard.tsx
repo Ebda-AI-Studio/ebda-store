@@ -44,18 +44,18 @@ export default function ModernProductCard({
   return (
     <Link
       href={`${urlPrefix}/products/${product.slug}`}
-      className="group relative bg-background rounded-xl overflow-hidden border border-border hover:border-primary/30 hover:shadow-xl transition-all duration-300"
+      className="group relative bg-background rounded-xl overflow-hidden border border-border/60 hover:border-primary/20 hover:shadow-xl hover:shadow-black/5 hover:-translate-y-0.5 transition-all duration-300 flex flex-col cursor-pointer"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
       {/* Image Container */}
-      <div className="relative aspect-square overflow-hidden bg-muted">
+      <div className="relative aspect-[3/4] overflow-hidden bg-muted">
         {product.images?.[0]?.url ? (
           <>
             <img
               src={product.images[0].url}
               alt={product.images[0].alt || product.name}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
               loading="lazy"
             />
             {/* Second image on hover */}
@@ -72,12 +72,12 @@ export default function ModernProductCard({
             )}
           </>
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-            <PlaceholderImageIcon />
+          <div className="w-full h-full flex items-center justify-center text-muted-foreground/40">
+            <PlaceholderImageIcon className="w-20 h-20" />
           </div>
         )}
 
-        {/* Badges using shared ProductBadge component */}
+        {/* Badges */}
         <ProductBadgeGroup absolute position={isRtl ? 'top-right' : 'top-left'} isRtl={isRtl}>
           {discount > 0 && (
             <ProductBadge variant="sale" discount={discount} isRtl={isRtl} size="sm" />
@@ -86,27 +86,27 @@ export default function ModernProductCard({
           {product.inStock === false && <ProductBadge variant="soldOut" isRtl={isRtl} size="sm" />}
         </ProductBadgeGroup>
 
-        {/* Quick Actions */}
+        {/* Wishlist Button */}
         <div
           className={cn(
             'absolute top-3 flex flex-col gap-2 transition-all duration-300',
             isRtl ? 'left-3' : 'right-3',
-            isHovered ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4'
+            isHovered ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-3'
           )}
         >
           <button
             onClick={handleWishlist}
             className={cn(
-              'w-9 h-9 rounded-full flex items-center justify-center transition-colors',
+              'w-9 h-9 rounded-full flex items-center justify-center shadow-md transition-all duration-200 cursor-pointer',
               isWishlisted
-                ? 'bg-red-500 text-white'
-                : 'bg-background/90 text-foreground hover:bg-primary hover:text-primary-foreground'
+                ? 'bg-red-500 text-white scale-110'
+                : 'bg-white/95 text-foreground hover:bg-white hover:scale-110'
             )}
             aria-label={isRtl ? 'إضافة للمفضلة' : 'Add to wishlist'}
             aria-pressed={isWishlisted}
           >
             <svg
-              className="w-5 h-5"
+              className="w-4 h-4"
               fill={isWishlisted ? 'currentColor' : 'none'}
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -122,29 +122,30 @@ export default function ModernProductCard({
           </button>
         </div>
 
-        {/* Add to Cart Button Overlay */}
+        {/* Quick Add Button — slides up from bottom */}
         <div
           className={cn(
-            'absolute bottom-0 inset-x-0 p-3 bg-gradient-to-t from-black/60 to-transparent transition-all duration-300',
-            isHovered ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+            'absolute bottom-0 inset-x-0 transition-all duration-300 ease-out',
+            isHovered ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-full'
           )}
           onClick={e => e.preventDefault()}
         >
-          <AddToCartButton
-            productId={product.id}
-            inStock={product.inStock !== false}
-            quantityInCart={quantityInCart}
-            isRtl={isRtl}
-            onAddToCart={handleAddToCart}
-            showQuantityBadge={false}
-            className="w-full py-2.5 text-sm"
-          />
+          <div className="bg-gradient-to-t from-black/50 via-black/20 to-transparent pt-8 px-3 pb-3">
+            <AddToCartButton
+              productId={product.id}
+              inStock={product.inStock !== false}
+              quantityInCart={quantityInCart}
+              isRtl={isRtl}
+              onAddToCart={handleAddToCart}
+              showQuantityBadge={false}
+              className="w-full py-2.5 text-sm font-semibold rounded-lg"
+            />
+          </div>
         </div>
       </div>
 
       {/* Content */}
-      <div className="p-4">
-        {/* Rating using shared Rating component */}
+      <div className="p-4 flex flex-col gap-2 flex-1">
         {product.rating !== undefined && (
           <Rating
             value={product.rating}
@@ -152,24 +153,25 @@ export default function ModernProductCard({
             size="sm"
             isRtl={isRtl}
             showCount
-            className="mb-2"
           />
         )}
 
-        {/* Name */}
-        <h3 className="font-medium text-foreground group-hover:text-primary transition-colors line-clamp-2 mb-2">
+        <h3
+          className={`font-semibold text-sm text-foreground group-hover:text-primary transition-colors duration-200 line-clamp-2 leading-snug ${isRtl ? 'text-right' : ''}`}
+        >
           {isRtl && product.nameAr ? product.nameAr : product.name}
         </h3>
 
-        {/* Price using shared Price component */}
-        <Price
-          price={product.price}
-          compareAtPrice={product.compareAtPrice}
-          currency={currency}
-          isRtl={isRtl}
-          size="md"
-          showDiscount={false}
-        />
+        <div className="mt-auto pt-1">
+          <Price
+            price={product.price}
+            compareAtPrice={product.compareAtPrice}
+            currency={currency}
+            isRtl={isRtl}
+            size="md"
+            showDiscount={false}
+          />
+        </div>
       </div>
     </Link>
   );

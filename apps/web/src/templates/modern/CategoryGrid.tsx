@@ -12,8 +12,19 @@ export default function ModernCategoryGrid({
     return null;
   }
 
+  // Auto-size grid based on category count for balanced layouts
+  const getGridCols = (count: number): string => {
+    if (count === 1) return 'grid-cols-1';
+    if (count === 2) return 'grid-cols-2';
+    if (count === 3) return 'grid-cols-2 md:grid-cols-3';
+    return 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4';
+  };
+
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+    <div
+      className={`grid gap-4 md:gap-6 ${getGridCols(categories.length)}`}
+      dir={isRtl ? 'rtl' : 'ltr'}
+    >
       {categories.map(category => (
         <CategoryCard key={category.id} category={category} isRtl={isRtl} urlPrefix={urlPrefix} />
       ))}

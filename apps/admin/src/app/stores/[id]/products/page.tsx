@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { Button, Input, Badge, Modal, useToast } from '@force/ui';
+import { Button, Input, Modal, useToast } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { useAuth } from '../../../../lib/auth';
 import { apiGet, apiDelete } from '../../../../lib/api';
@@ -132,23 +132,95 @@ export default function StoreProductsPage() {
   };
 
   const getStatusBadge = (status: string) => {
+    const base = 'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium';
     switch (status) {
       case 'active':
-        return <Badge className="bg-green-100 text-green-700">Active</Badge>;
+        return (
+          <span className={`${base} bg-emerald-50 text-emerald-700`}>
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            Active
+          </span>
+        );
       case 'draft':
-        return <Badge variant="secondary">Draft</Badge>;
+        return (
+          <span className={`${base} bg-amber-50 text-amber-700`}>
+            <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+            Draft
+          </span>
+        );
       case 'archived':
-        return <Badge variant="destructive">Archived</Badge>;
+        return (
+          <span className={`${base} bg-gray-100 text-gray-600`}>
+            <span className="h-1.5 w-1.5 rounded-full bg-gray-400" />
+            Archived
+          </span>
+        );
       default:
-        return <Badge variant="secondary">{status}</Badge>;
+        return (
+          <span className={`${base} bg-muted text-muted-foreground`}>
+            <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/50" />
+            {status}
+          </span>
+        );
     }
   };
 
   if (loading && !store) {
     return (
-      <AdminLayout title="Loading..." subtitle="">
-        <div className="flex items-center justify-center py-12">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+      <AdminLayout title="Products" subtitle="Loading...">
+        <div className="space-y-6">
+          {/* Skeleton filters */}
+          <div className="flex items-center justify-between">
+            <div className="h-9 w-64 force-skeleton rounded-lg" />
+            <div className="h-9 w-32 force-skeleton rounded-lg" />
+          </div>
+          {/* Skeleton table */}
+          <div className="rounded-xl border bg-card overflow-hidden">
+            <table className="w-full">
+              <thead className="bg-muted border-b">
+                <tr>
+                  {['Product', 'SKU', 'Price', 'Inventory', 'Status', 'Actions'].map(h => (
+                    <th
+                      key={h}
+                      className="px-4 py-3 text-left text-sm font-medium text-muted-foreground"
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i}>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-lg force-skeleton" />
+                        <div className="h-4 w-36 force-skeleton" />
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="h-4 w-20 force-skeleton" />
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="h-4 w-16 force-skeleton" />
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="h-4 w-10 force-skeleton" />
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="h-6 w-16 rounded-full force-skeleton" />
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex justify-end gap-2">
+                        <div className="h-8 w-14 rounded-lg force-skeleton" />
+                        <div className="h-8 w-14 rounded-lg force-skeleton" />
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </AdminLayout>
     );
@@ -196,32 +268,49 @@ export default function StoreProductsPage() {
     >
       {/* Filters */}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <form onSubmit={handleSearch} className="flex gap-2">
-          <Input
-            placeholder="Search products..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-64"
-          />
-          <Button type="submit" variant="outline">
-            Search
-          </Button>
-        </form>
-
         <div className="flex gap-2">
-          <select
-            value={statusFilter}
-            onChange={e => {
-              setStatusFilter(e.target.value);
-              setPage(1);
-            }}
-            className="rounded-md border border-input bg-background px-3 py-2 text-sm"
-          >
-            <option value="all">All Status</option>
-            <option value="active">Active</option>
-            <option value="draft">Draft</option>
-            <option value="archived">Archived</option>
-          </select>
+          <div className="relative">
+            <svg
+              className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
+            <form onSubmit={handleSearch}>
+              <Input
+                placeholder="Search products..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="w-64 pl-9"
+              />
+            </form>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1 rounded-xl bg-muted p-1">
+          {['all', 'active', 'draft', 'archived'].map(s => (
+            <button
+              key={s}
+              onClick={() => {
+                setStatusFilter(s);
+                setPage(1);
+              }}
+              className={`cursor-pointer rounded-lg px-3 py-1.5 text-xs font-medium capitalize transition-all duration-200 ${
+                statusFilter === s
+                  ? 'bg-card text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {s === 'all' ? 'All' : s}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -250,43 +339,73 @@ export default function StoreProductsPage() {
           </thead>
           <tbody className="divide-y">
             {loading ? (
-              <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
-                  <div className="flex items-center justify-center">
-                    <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent mr-2"></div>
-                    Loading products...
-                  </div>
-                </td>
-              </tr>
+              Array.from({ length: 5 }).map((_, i) => (
+                <tr key={i}>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-lg force-skeleton" />
+                      <div className="h-4 w-36 force-skeleton" />
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="h-4 w-20 force-skeleton" />
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="h-4 w-16 force-skeleton" />
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="h-4 w-10 force-skeleton" />
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="h-6 w-16 rounded-full force-skeleton" />
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex justify-end gap-2">
+                      <div className="h-8 w-14 rounded-lg force-skeleton" />
+                      <div className="h-8 w-14 rounded-lg force-skeleton" />
+                    </div>
+                  </td>
+                </tr>
+              ))
             ) : products.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-12 text-center">
-                  <div className="flex flex-col items-center">
-                    <svg
-                      className="h-12 w-12 text-gray-300 mb-3"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={1}
-                        d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                      />
-                    </svg>
-                    <p className="text-muted-foreground font-medium">No products found</p>
-                    <p className="text-sm text-gray-400 mt-1">
+                <td colSpan={6} className="px-4 py-16 text-center">
+                  <div className="force-empty-state py-0">
+                    <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted mx-auto">
+                      <svg
+                        className="h-8 w-8 text-muted-foreground"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1.5}
+                          d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                        />
+                      </svg>
+                    </div>
+                    <p className="font-semibold text-foreground">No products found</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
                       {search || statusFilter !== 'all'
                         ? 'Try adjusting your search or filters.'
                         : 'Add your first product to get started.'}
                     </p>
+                    {!search && statusFilter === 'all' && (
+                      <Link href={`/stores/${storeId}/products/new`} className="mt-4 inline-block">
+                        <Button size="sm">Add Product</Button>
+                      </Link>
+                    )}
                   </div>
                 </td>
               </tr>
             ) : (
               products.map(product => (
-                <tr key={product.id} className="hover:bg-muted">
+                <tr
+                  key={product.id}
+                  className="hover:bg-muted/50 transition-colors duration-150 cursor-pointer"
+                >
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <div className="h-10 w-10 rounded-lg bg-gray-100 overflow-hidden">
