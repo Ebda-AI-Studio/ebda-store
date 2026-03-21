@@ -61,6 +61,23 @@ module.exports = {
       fontFamily: {
         sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
       },
+      keyframes: {
+        shimmer: {
+          '100%': { transform: 'translateX(100%)' },
+        },
+        'toast-slide-in': {
+          from: { transform: 'translateX(100%)', opacity: '0' },
+          to: { transform: 'translateX(0)', opacity: '1' },
+        },
+        'toast-progress': {
+          from: { width: '100%' },
+          to: { width: '0%' },
+        },
+      },
+      animation: {
+        shimmer: 'shimmer 1.5s infinite',
+        'toast-in': 'toast-slide-in 0.3s ease-out',
+      },
     },
   },
   plugins: [],

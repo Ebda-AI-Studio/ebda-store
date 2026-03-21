@@ -21,17 +21,17 @@ export interface PriceProps extends React.HTMLAttributes<HTMLDivElement> {
 }
 
 const sizeStyles = {
-  sm: 'text-sm',
-  md: 'text-base',
-  lg: 'text-lg',
-  xl: 'text-2xl',
+  sm: 'text-sm font-semibold',
+  md: 'text-lg font-bold',
+  lg: 'text-xl font-bold',
+  xl: 'text-3xl font-bold',
 };
 
 const compareSizeStyles = {
   sm: 'text-xs',
   md: 'text-sm',
-  lg: 'text-base',
-  xl: 'text-lg',
+  lg: 'text-sm',
+  xl: 'text-base',
 };
 
 /**
@@ -84,14 +84,14 @@ export const Price = forwardRef<HTMLDivElement, PriceProps>(
 
         {/* Compare At Price */}
         {hasDiscount && (
-          <span className={cn('text-muted-foreground line-through', compareSizeStyles[size])}>
+          <span className={cn('text-muted-foreground/60 line-through', compareSizeStyles[size])}>
             {formatPrice(compareAtPrice!)}
           </span>
         )}
 
         {/* Discount Badge */}
         {hasDiscount && showDiscount && (
-          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-destructive text-destructive-foreground">
             {discountLabel || (isRtl ? `${discount}% خصم` : `-${discount}%`)}
           </span>
         )}

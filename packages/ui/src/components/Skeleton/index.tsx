@@ -10,9 +10,19 @@ interface SkeletonProps {
   className?: string;
 }
 
-// Base Skeleton
+// Base Skeleton — shimmer animation via inline keyframe style injection
 export function Skeleton({ className }: SkeletonProps) {
-  return <div className={cn('animate-pulse bg-gray-200 rounded', className)} />;
+  return (
+    <div
+      className={cn(
+        'relative overflow-hidden rounded bg-muted',
+        'before:absolute before:inset-0 before:-translate-x-full',
+        'before:animate-shimmer',
+        'before:bg-gradient-to-r before:from-transparent before:via-white/20 before:to-transparent',
+        className
+      )}
+    />
+  );
 }
 
 // Text Skeleton
@@ -26,8 +36,8 @@ export function SkeletonText({ lines = 3, className }: { lines?: number; classNa
   );
 }
 
-// Avatar Skeleton
-export function SkeletonAvatar({
+// Circle Skeleton (avatar, icon)
+export function SkeletonCircle({
   size = 'md',
   className,
 }: {
@@ -43,6 +53,17 @@ export function SkeletonAvatar({
   return <Skeleton className={cn('rounded-full', sizeClasses[size], className)} />;
 }
 
+// Avatar Skeleton (alias for SkeletonCircle — backward compat)
+export function SkeletonAvatar({
+  size = 'md',
+  className,
+}: {
+  size?: 'sm' | 'md' | 'lg';
+  className?: string;
+}) {
+  return <SkeletonCircle size={size} className={className} />;
+}
+
 // Button Skeleton
 export function SkeletonButton({ className }: SkeletonProps) {
   return <Skeleton className={cn('h-10 w-24 rounded-lg', className)} />;
@@ -51,7 +72,12 @@ export function SkeletonButton({ className }: SkeletonProps) {
 // Card Skeleton
 export function SkeletonCard({ className }: SkeletonProps) {
   return (
-    <div className={cn('bg-white rounded-lg border p-4 space-y-4', className)}>
+    <div
+      className={cn(
+        'rounded-xl border border-border/50 bg-card p-4 space-y-4 shadow-sm',
+        className
+      )}
+    >
       <Skeleton className="h-40 w-full rounded-lg" />
       <Skeleton className="h-4 w-3/4" />
       <Skeleton className="h-4 w-1/2" />
@@ -66,8 +92,13 @@ export function SkeletonCard({ className }: SkeletonProps) {
 // Product Card Skeleton
 export function SkeletonProductCard({ className }: SkeletonProps) {
   return (
-    <div className={cn('bg-white rounded-lg border overflow-hidden', className)}>
-      <Skeleton className="h-48 w-full" />
+    <div
+      className={cn(
+        'rounded-xl border border-border/50 bg-card overflow-hidden shadow-sm',
+        className
+      )}
+    >
+      <Skeleton className="h-48 w-full rounded-none" />
       <div className="p-4 space-y-3">
         <Skeleton className="h-4 w-3/4" />
         <Skeleton className="h-3 w-full" />
@@ -111,9 +142,14 @@ export function SkeletonTable({
   className?: string;
 }) {
   return (
-    <div className={cn('bg-white rounded-lg border overflow-hidden', className)}>
+    <div
+      className={cn(
+        'rounded-xl border border-border/50 bg-card overflow-hidden shadow-sm',
+        className
+      )}
+    >
       <table className="w-full">
-        <thead className="bg-gray-50 border-b">
+        <thead className="bg-muted/50 border-b">
           <tr>
             {Array.from({ length: columns }).map((_, i) => (
               <th key={i} className="px-4 py-3 text-left">
@@ -135,7 +171,7 @@ export function SkeletonTable({
 // Stats Card Skeleton
 export function SkeletonStats({ className }: SkeletonProps) {
   return (
-    <div className={cn('bg-white rounded-lg border p-6', className)}>
+    <div className={cn('rounded-xl border border-border/50 bg-card p-6 shadow-sm', className)}>
       <div className="flex justify-between items-start mb-4">
         <Skeleton className="h-4 w-24" />
         <Skeleton className="h-8 w-8 rounded" />
@@ -186,13 +222,16 @@ export function SkeletonList({ items = 5, className }: { items?: number; classNa
   return (
     <div className={cn('space-y-3', className)}>
       {Array.from({ length: items }).map((_, i) => (
-        <div key={i} className="flex items-center gap-4 p-3 bg-white rounded-lg border">
-          <SkeletonAvatar size="sm" />
+        <div
+          key={i}
+          className="flex items-center gap-4 p-3 rounded-xl border border-border/50 bg-card shadow-sm"
+        >
+          <SkeletonCircle size="sm" />
           <div className="flex-1 space-y-2">
             <Skeleton className="h-4 w-1/3" />
             <Skeleton className="h-3 w-2/3" />
           </div>
-          <Skeleton className="h-8 w-16 rounded" />
+          <Skeleton className="h-8 w-16 rounded-lg" />
         </div>
       ))}
     </div>

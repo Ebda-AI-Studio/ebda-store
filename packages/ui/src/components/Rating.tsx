@@ -31,7 +31,7 @@ export interface RatingProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 
 const sizeStyles = {
   sm: {
     star: 'w-3.5 h-3.5',
-    gap: 'gap-0.5',
+    gap: 'gap-1',
     text: 'text-xs',
   },
   md: {
@@ -41,7 +41,7 @@ const sizeStyles = {
   },
   lg: {
     star: 'w-5 h-5',
-    gap: 'gap-1',
+    gap: 'gap-1.5',
     text: 'text-base',
   },
 };
@@ -199,7 +199,7 @@ export const Rating = forwardRef<HTMLDivElement, RatingProps>(
                   filled={starState === 'filled'}
                   half={starState === 'half'}
                   size={styles.star}
-                  filledColor={starState !== 'empty' ? 'rgb(250 204 21)' : 'rgb(209 213 219)'}
+                  filledColor={starState !== 'empty' ? 'rgb(251 191 36)' : 'rgb(209 213 219)'}
                   emptyColor="rgb(209 213 219)"
                 />
               </span>
@@ -208,7 +208,9 @@ export const Rating = forwardRef<HTMLDivElement, RatingProps>(
         </div>
 
         {showCount && formattedCount && (
-          <span className={cn('text-muted-foreground', styles.text)}>{formattedCount}</span>
+          <span className={cn('text-muted-foreground/70 tabular-nums', styles.text)}>
+            {formattedCount}
+          </span>
         )}
       </div>
     );
@@ -245,7 +247,7 @@ export const RatingSummary = forwardRef<HTMLDivElement, RatingSummaryProps>(
         <StarIcon
           filled
           size={styles.star}
-          filledColor="rgb(250 204 21)"
+          filledColor="rgb(251 191 36)"
           emptyColor="rgb(209 213 219)"
         />
         <span className={cn('font-medium', styles.text)}>{average.toFixed(1)}</span>
