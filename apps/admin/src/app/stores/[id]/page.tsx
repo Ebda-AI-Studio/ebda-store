@@ -468,27 +468,6 @@ export default function StoreDetailPage() {
       subtitle={store.domain || `force-web-sigma.vercel.app/${store.slug}`}
       actions={
         <div className="flex gap-2">
-          <a
-            href={
-              store.domain
-                ? `https://${store.domain}`
-                : `${process.env.NEXT_PUBLIC_WEB_URL || 'https://force-web-sigma.vercel.app'}/${store.slug}`
-            }
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Button variant="outline" size="sm">
-              <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                />
-              </svg>
-              Visit Store
-            </Button>
-          </a>
           {!isEditing && (
             <Button size="sm" onClick={() => setIsEditing(true)}>
               Edit Store
