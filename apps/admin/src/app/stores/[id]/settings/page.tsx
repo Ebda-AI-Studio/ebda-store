@@ -18,7 +18,7 @@ interface SettingsCard {
 export default function StoreSettingsPage() {
   const params = useParams();
   const storeId = params?.id as string;
-  const { isEnabled } = useFeatures();
+  const { isEnabled, isLoading } = useFeatures();
 
   const cards: SettingsCard[] = [
     {
@@ -355,27 +355,40 @@ export default function StoreSettingsPage() {
       }
     >
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {cards
-          .filter(card => !card.featureKey || isEnabled(card.featureKey))
-          .map(card => (
-            <Link
-              key={card.href}
-              href={card.href}
-              className="group flex items-start gap-4 rounded-xl border bg-white p-6 shadow-sm transition-all hover:border-primary hover:shadow-md"
-            >
+        {isLoading
+          ? Array.from({ length: 9 }).map((_, i) => (
               <div
-                className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl ${card.color} transition-transform group-hover:scale-110`}
+                key={i}
+                className="flex items-start gap-4 rounded-xl border bg-white p-6 shadow-sm animate-pulse"
               >
-                {card.icon}
+                <div className="h-12 w-12 flex-shrink-0 rounded-xl bg-gray-200" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 w-24 rounded bg-gray-200" />
+                  <div className="h-3 w-full rounded bg-gray-100" />
+                </div>
               </div>
-              <div className="min-w-0">
-                <h3 className="font-semibold text-gray-900 group-hover:text-primary transition-colors">
-                  {card.title}
-                </h3>
-                <p className="mt-1 text-sm text-gray-500 leading-snug">{card.description}</p>
-              </div>
-            </Link>
-          ))}
+            ))
+          : cards
+              .filter(card => !card.featureKey || isEnabled(card.featureKey))
+              .map(card => (
+                <Link
+                  key={card.href}
+                  href={card.href}
+                  className="group flex items-start gap-4 rounded-xl border bg-white p-6 shadow-sm transition-all hover:border-primary hover:shadow-md"
+                >
+                  <div
+                    className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl ${card.color} transition-transform group-hover:scale-110`}
+                  >
+                    {card.icon}
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="font-semibold text-gray-900 group-hover:text-primary transition-colors">
+                      {card.title}
+                    </h3>
+                    <p className="mt-1 text-sm text-gray-500 leading-snug">{card.description}</p>
+                  </div>
+                </Link>
+              ))}
       </div>
     </AdminLayout>
   );
