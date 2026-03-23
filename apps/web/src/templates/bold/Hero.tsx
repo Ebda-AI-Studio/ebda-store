@@ -61,9 +61,8 @@ export default function BoldHero({
       {/* Content */}
       <div className="relative z-10 container mx-auto px-4 min-h-screen flex flex-col justify-center py-24">
         <div
-          className={`max-w-3xl ${isRtl ? 'mr-auto ml-0 text-right' : 'ml-0 text-left'}`}
+          className={`max-w-3xl motion-reduce:animate-none ${isRtl ? 'mr-auto ml-0 text-right' : 'ml-0 text-left'}`}
           style={{ animation: 'boldSlideIn 0.6s ease-out both' }}
-          className="motion-reduce:animate-none"
         >
           {/* Label */}
           <div className="inline-flex items-center gap-2 mb-8 px-4 py-2 border border-white/20 rounded-full">
