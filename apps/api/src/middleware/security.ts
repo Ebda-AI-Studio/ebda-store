@@ -94,6 +94,14 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
     return next();
   }
 
+  // Skip for public routes. These are unauthenticated endpoints (affiliate
+  // apply, contact form, cart operations, etc.) that don't use cookies or
+  // sessions, so they are not vulnerable to CSRF. They have their own
+  // rate limiting for abuse protection.
+  if (req.path.includes('/public/')) {
+    return next();
+  }
+
   // Skip for Bearer token authenticated requests. CSRF attacks exploit
   // cookies that the browser attaches automatically. Bearer tokens in the
   // Authorization header are never sent automatically by the browser, so
