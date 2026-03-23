@@ -1,4 +1,4 @@
-const CACHE_NAME = 'force-store-v1';
+const CACHE_NAME = 'force-store-v2';
 const STATIC_ASSETS = ['/', '/favicon.svg'];
 
 self.addEventListener('install', event => {
@@ -23,8 +23,8 @@ self.addEventListener('fetch', event => {
   // Only handle http/https requests (skip chrome-extension://, etc.)
   if (!url.startsWith('http')) return;
 
-  // Network-first for API calls, cache-first for assets
-  if (url.includes('/api/')) {
+  // Network-first for API calls and Next.js chunks, cache-first for other assets
+  if (url.includes('/api/') || url.includes('/_next/')) {
     event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
   } else if (event.request.method === 'GET') {
     event.respondWith(
