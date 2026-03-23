@@ -678,9 +678,11 @@ router.get(
         return;
       }
 
+      const enabledFeatures = await featureService.getEnabledFeatureKeys(store.id);
+
       res.json({
         success: true,
-        data: { store },
+        data: { store, enabledFeatures },
       });
     } catch (error) {
       next(error);

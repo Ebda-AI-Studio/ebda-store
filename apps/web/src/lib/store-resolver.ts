@@ -53,6 +53,9 @@ export interface ResolvedStore {
 
   // General Settings (footer links, etc.)
   settings?: Record<string, unknown>;
+
+  // Feature flags
+  enabledFeatures?: string[];
 }
 
 /**
@@ -123,6 +126,9 @@ async function fetchStoreByDomain(domain: string): Promise<ResolvedStore | null>
     }
 
     const storeData = data.data.store;
+    const enabledFeatures: string[] | undefined = Array.isArray(data.data.enabledFeatures)
+      ? data.data.enabledFeatures
+      : undefined;
 
     // Merge theme with template defaults
     const templateTheme = getTemplateTheme(storeData.template || 'modern');
@@ -159,6 +165,7 @@ async function fetchStoreByDomain(domain: string): Promise<ResolvedStore | null>
       marketingPixels:
         typeof storeData.marketingPixels === 'object' ? storeData.marketingPixels : undefined,
       settings: typeof storeData.settings === 'object' ? storeData.settings : undefined,
+      enabledFeatures,
     };
   } catch (error) {
     console.error(`Error fetching store for domain ${domain}:`, error);
@@ -212,6 +219,9 @@ async function fetchStoreBySlug(slug: string): Promise<ResolvedStore | null> {
     }
 
     const storeData = data.data.store;
+    const enabledFeatures: string[] | undefined = Array.isArray(data.data.enabledFeatures)
+      ? data.data.enabledFeatures
+      : undefined;
     const templateTheme = getTemplateTheme(storeData.template || 'modern');
     const customTheme = typeof storeData.theme === 'object' ? storeData.theme : {};
 
@@ -246,6 +256,7 @@ async function fetchStoreBySlug(slug: string): Promise<ResolvedStore | null> {
       marketingPixels:
         typeof storeData.marketingPixels === 'object' ? storeData.marketingPixels : undefined,
       settings: typeof storeData.settings === 'object' ? storeData.settings : undefined,
+      enabledFeatures,
     };
   } catch (error) {
     console.error(`Error fetching store for slug ${slug}:`, error);

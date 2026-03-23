@@ -250,40 +250,6 @@ export default function StoreSettingsPage() {
       ),
     },
     {
-      title: 'Search Autocomplete',
-      description: 'Real-time search suggestions for customers',
-      href: `/stores/${storeId}/products`,
-      color: 'bg-sky-100 text-sky-600',
-      featureKey: 'search_autocomplete',
-      icon: (
-        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"
-          />
-        </svg>
-      ),
-    },
-    {
-      title: 'Recommendations',
-      description: 'Product cross-sell, upsell, and auto-suggestions',
-      href: `/stores/${storeId}/products`,
-      color: 'bg-purple-100 text-purple-600',
-      featureKey: 'upsell_crosssell',
-      icon: (
-        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM14 11a1 1 0 011 1v1h1a1 1 0 110 2h-1v1a1 1 0 11-2 0v-1h-1a1 1 0 110-2h1v-1a1 1 0 011-1z"
-          />
-        </svg>
-      ),
-    },
-    {
       title: 'Affiliate Program',
       description: 'Influencer referral commissions and tracking',
       href: `/stores/${storeId}/affiliates`,
