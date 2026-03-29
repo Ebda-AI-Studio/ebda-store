@@ -255,10 +255,13 @@ function SearchContent() {
 
         {/* Error */}
         {error && (
-          <div role="alert" className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <div
+            role="alert"
+            className="mb-6 p-4 bg-destructive/10 border border-destructive/30 rounded-lg"
+          >
             <div className="flex items-center gap-3">
               <svg
-                className="h-5 w-5 text-red-500 flex-shrink-0"
+                className="h-5 w-5 text-destructive flex-shrink-0"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -270,10 +273,10 @@ function SearchContent() {
                   d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
                 />
               </svg>
-              <p className="text-red-700 flex-1">{error}</p>
+              <p className="text-destructive flex-1">{error}</p>
               <button
                 onClick={() => performSearch(committedQuery, categoryFilter)}
-                className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
+                className="px-3 py-1 text-sm bg-destructive/20 text-destructive rounded hover:bg-destructive/30 transition-colors"
               >
                 {t(
                   'Retry',
@@ -345,7 +348,7 @@ function SearchContent() {
                         </div>
                       )}
                       {product.compareAtPrice && product.compareAtPrice > product.price && (
-                        <span className="absolute top-2 left-2 rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold uppercase text-white">
+                        <span className="absolute top-2 left-2 rounded-full bg-destructive px-2 py-0.5 text-[10px] font-bold uppercase text-white">
                           Sale
                         </span>
                       )}

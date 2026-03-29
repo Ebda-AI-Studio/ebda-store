@@ -29,7 +29,7 @@ export function ProductListItem({
       {/* Image */}
       <div className="relative h-32 w-32 flex-shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-primary/5 to-primary/10">
         {product.compareAtPrice && product.compareAtPrice > product.price && (
-          <span className="absolute left-2 top-2 rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold uppercase text-white">
+          <span className="absolute left-2 top-2 rounded-full bg-destructive px-2 py-0.5 text-[10px] font-bold uppercase text-white">
             Sale
           </span>
         )}

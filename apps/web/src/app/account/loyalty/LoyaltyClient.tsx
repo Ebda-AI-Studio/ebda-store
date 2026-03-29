@@ -109,13 +109,13 @@ export default function LoyaltyClient() {
   function tierColor(tier?: string) {
     switch (tier?.toLowerCase()) {
       case 'gold':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-[hsl(var(--warning))]/20 text-[hsl(var(--warning))]';
       case 'silver':
         return 'bg-muted text-foreground';
       case 'platinum':
         return 'bg-purple-100 text-purple-800';
       default:
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-[hsl(var(--info))]/20 text-[hsl(var(--info))]';
     }
   }
 
@@ -196,7 +196,7 @@ export default function LoyaltyClient() {
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
         </div>
       ) : pointsError ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-destructive">
           {pointsError}
         </div>
       ) : loyaltyPoints ? (
@@ -257,7 +257,7 @@ export default function LoyaltyClient() {
           </div>
         ) : historyError ? (
           <div className="p-6">
-            <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
+            <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-destructive">
               {historyError}
             </div>
           </div>
@@ -318,7 +318,7 @@ export default function LoyaltyClient() {
                       <td className="px-6 py-4 text-foreground">{txn.description || '-'}</td>
                       <td
                         className={`px-6 py-4 text-right font-semibold ${
-                          isPositive ? 'text-green-600' : 'text-red-600'
+                          isPositive ? 'text-[hsl(var(--success))]' : 'text-destructive'
                         }`}
                       >
                         {isPositive ? '+' : ''}

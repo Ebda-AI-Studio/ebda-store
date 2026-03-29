@@ -59,10 +59,10 @@ export default function PaymentStep({
     <div className="space-y-6">
       {/* Checkout Error Display */}
       {checkoutError && (
-        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4">
+        <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 p-4">
           <div className="flex items-start gap-3">
             <svg
-              className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5"
+              className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -75,15 +75,15 @@ export default function PaymentStep({
               />
             </svg>
             <div className="flex-1">
-              <h3 className="text-sm font-medium text-red-800">
+              <h3 className="text-sm font-medium text-destructive">
                 {t('Checkout Error', 'خطأ في الدفع')}
               </h3>
-              <p className="mt-1 text-sm text-red-700">{checkoutError}</p>
+              <p className="mt-1 text-sm text-destructive">{checkoutError}</p>
             </div>
             <button
               type="button"
               onClick={onClearError}
-              className="text-red-500 hover:text-red-700"
+              className="text-destructive hover:text-destructive/80"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path

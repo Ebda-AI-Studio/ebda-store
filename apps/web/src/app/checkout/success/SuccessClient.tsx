@@ -87,9 +87,9 @@ function SuccessContent() {
       <div className="mx-auto max-w-2xl px-4 py-16 sm:px-6 lg:px-8">
         <div className="text-center">
           {/* Success Icon */}
-          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-green-100">
+          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-[hsl(var(--success))]/20">
             <svg
-              className="h-10 w-10 text-green-600"
+              className="h-10 w-10 text-[hsl(var(--success))]"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"

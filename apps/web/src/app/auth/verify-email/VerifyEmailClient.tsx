@@ -75,7 +75,7 @@ export default function VerifyEmailClient() {
         <div className="rounded-xl border bg-card p-8 shadow-sm">
           {state === 'loading' && (
             <>
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-blue-50">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[hsl(var(--info))]/10">
                 <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
               </div>
               <h1 className="mt-6 text-2xl font-bold text-foreground">
@@ -95,9 +95,9 @@ export default function VerifyEmailClient() {
 
           {state === 'success' && (
             <>
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[hsl(var(--success))]/20">
                 <svg
-                  className="h-8 w-8 text-green-600"
+                  className="h-8 w-8 text-[hsl(var(--success))]"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -138,9 +138,9 @@ export default function VerifyEmailClient() {
 
           {state === 'error' && (
             <>
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-red-100">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-destructive/20">
                 <svg
-                  className="h-8 w-8 text-red-600"
+                  className="h-8 w-8 text-destructive"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"

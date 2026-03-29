@@ -138,7 +138,9 @@ export function VariantSelector({ variants, options, onVariantSelect }: VariantS
               </div>
               <span
                 className={`font-medium ${
-                  (currentVariant.inventory ?? 1) > 0 ? 'text-emerald-600' : 'text-red-600'
+                  (currentVariant.inventory ?? 1) > 0
+                    ? 'text-[hsl(var(--success))]'
+                    : 'text-destructive'
                 }`}
               >
                 {(currentVariant.inventory ?? 1) > 0

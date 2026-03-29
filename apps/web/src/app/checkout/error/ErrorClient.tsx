@@ -49,9 +49,9 @@ export default function ErrorClient() {
         </Link>
 
         <div className="rounded-xl border bg-card p-8 shadow-sm">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-red-100">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-destructive/20">
             <svg
-              className="h-8 w-8 text-red-600"
+              className="h-8 w-8 text-destructive"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"

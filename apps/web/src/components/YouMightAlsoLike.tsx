@@ -144,7 +144,7 @@ export function YouMightAlsoLike({ storeId, productId }: YouMightAlsoLikeProps) 
                   </div>
                 )}
                 {product.compareAtPrice && product.compareAtPrice > product.price && (
-                  <span className="absolute left-2 top-2 rounded bg-red-500 px-1.5 py-0.5 text-xs font-medium text-white">
+                  <span className="absolute left-2 top-2 rounded bg-destructive px-1.5 py-0.5 text-xs font-medium text-white">
                     {t('Sale', 'تخفيض')}
                   </span>
                 )}

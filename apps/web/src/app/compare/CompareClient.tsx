@@ -160,7 +160,7 @@ export default function CompareClient() {
               '\u0645\u0642\u0627\u0631\u0646\u0629 \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a'
             )}
           </h1>
-          <button onClick={clearAll} className="text-red-600 hover:text-red-700 text-sm">
+          <button onClick={clearAll} className="text-destructive hover:text-destructive/80 text-sm">
             {t('Clear All', '\u0645\u0633\u062d \u0627\u0644\u0643\u0644')}
           </button>
         </div>
@@ -177,7 +177,7 @@ export default function CompareClient() {
                     <div className="relative">
                       <button
                         onClick={() => removeProduct(product.id)}
-                        className="absolute -top-2 -right-2 p-1 bg-red-100 rounded-full text-red-600 hover:bg-red-200"
+                        className="absolute -top-2 -right-2 p-1 bg-destructive/20 rounded-full text-destructive hover:bg-destructive/30"
                       >
                         <svg
                           className="w-4 h-4"

@@ -11,9 +11,9 @@ export default function Error({
 }) {
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center px-4 text-center">
-      <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-red-50">
+      <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-destructive/10">
         <svg
-          className="h-10 w-10 text-red-500"
+          className="h-10 w-10 text-destructive"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"

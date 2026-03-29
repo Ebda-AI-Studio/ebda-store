@@ -106,7 +106,10 @@ export default function RegisterClient() {
         {/* Form */}
         <div className="rounded-xl border bg-card p-8 shadow-sm">
           {error && (
-            <div role="alert" className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">
+            <div
+              role="alert"
+              className="mb-4 rounded-lg bg-destructive/10 p-3 text-sm text-destructive"
+            >
               {error}
             </div>
           )}

@@ -383,7 +383,7 @@ export default function AddressesClient() {
                 )}
                 <button
                   onClick={() => handleDelete(address.id)}
-                  className="text-sm text-red-600 hover:underline"
+                  className="text-sm text-destructive hover:underline"
                 >
                   {t('Delete', '\u062d\u0630\u0641')}
                 </button>

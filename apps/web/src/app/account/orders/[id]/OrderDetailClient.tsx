@@ -138,21 +138,21 @@ export default function OrderDetailClient() {
   }
 
   const orderStatusColors: Record<string, string> = {
-    pending: 'bg-yellow-100 text-yellow-800',
-    confirmed: 'bg-blue-100 text-blue-800',
-    processing: 'bg-blue-100 text-blue-800',
+    pending: 'bg-[hsl(var(--warning))]/20 text-[hsl(var(--warning))]',
+    confirmed: 'bg-[hsl(var(--info))]/20 text-[hsl(var(--info))]',
+    processing: 'bg-[hsl(var(--info))]/20 text-[hsl(var(--info))]',
     shipped: 'bg-purple-100 text-purple-800',
-    delivered: 'bg-green-100 text-green-800',
-    cancelled: 'bg-red-100 text-red-800',
+    delivered: 'bg-[hsl(var(--success))]/20 text-[hsl(var(--success))]',
+    cancelled: 'bg-destructive/20 text-destructive',
     refunded: 'bg-muted text-foreground',
   };
 
   const paymentStatusColors: Record<string, string> = {
-    unpaid: 'bg-yellow-100 text-yellow-800',
-    paid: 'bg-green-100 text-green-800',
+    unpaid: 'bg-[hsl(var(--warning))]/20 text-[hsl(var(--warning))]',
+    paid: 'bg-[hsl(var(--success))]/20 text-[hsl(var(--success))]',
     partially_paid: 'bg-orange-100 text-orange-800',
     refunded: 'bg-muted text-foreground',
-    failed: 'bg-red-100 text-red-800',
+    failed: 'bg-destructive/20 text-destructive',
   };
 
   function formatLabel(value: string) {
@@ -224,10 +224,10 @@ export default function OrderDetailClient() {
             </h1>
           </div>
         </div>
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4">
           <div className="flex items-center gap-3">
             <svg
-              className="h-5 w-5 text-red-500 flex-shrink-0"
+              className="h-5 w-5 text-destructive flex-shrink-0"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -239,10 +239,10 @@ export default function OrderDetailClient() {
                 d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
               />
             </svg>
-            <p className="text-red-700 flex-1">{error}</p>
+            <p className="text-destructive flex-1">{error}</p>
             <button
               onClick={() => fetchOrder()}
-              className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
+              className="px-3 py-1 text-sm bg-destructive/20 text-destructive rounded hover:bg-destructive/30 transition-colors"
             >
               {t(
                 'Retry',
@@ -490,7 +490,7 @@ export default function OrderDetailClient() {
                 <span className="text-muted-foreground">
                   {t('Discount', '\u0627\u0644\u062e\u0635\u0645')}
                 </span>
-                <span className="text-green-600">-{formatPrice(order.discount)}</span>
+                <span className="text-[hsl(var(--success))]">-{formatPrice(order.discount)}</span>
               </div>
             )}
             {order.couponCode && order.couponDiscount > 0 && (
@@ -498,7 +498,9 @@ export default function OrderDetailClient() {
                 <span className="text-muted-foreground">
                   {t('Coupon', '\u0643\u0648\u0628\u0648\u0646')} ({order.couponCode})
                 </span>
-                <span className="text-green-600">-{formatPrice(order.couponDiscount)}</span>
+                <span className="text-[hsl(var(--success))]">
+                  -{formatPrice(order.couponDiscount)}
+                </span>
               </div>
             )}
             <div className="border-t pt-3 flex justify-between">
@@ -577,10 +579,10 @@ export default function OrderDetailClient() {
                       <span
                         className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
                           payment.status === 'completed' || payment.status === 'paid'
-                            ? 'bg-green-100 text-green-800'
+                            ? 'bg-[hsl(var(--success))]/20 text-[hsl(var(--success))]'
                             : payment.status === 'pending'
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : 'bg-red-100 text-red-800'
+                              ? 'bg-[hsl(var(--warning))]/20 text-[hsl(var(--warning))]'
+                              : 'bg-destructive/20 text-destructive'
                         }`}
                       >
                         {formatLabel(payment.status)}
@@ -691,7 +693,7 @@ export default function OrderDetailClient() {
                 }
                 className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
                   canTrack
-                    ? 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer'
+                    ? 'bg-[hsl(var(--info))] text-white hover:bg-[hsl(var(--info))]/90 cursor-pointer'
                     : 'bg-muted text-muted-foreground/70 cursor-not-allowed'
                 }`}
               >

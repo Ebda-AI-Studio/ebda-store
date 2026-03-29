@@ -160,8 +160,8 @@ export default function SharedWishlistClient({ userId }: Props) {
       <main className="flex min-h-screen flex-col bg-background">
         <Header />
         <div className="container mx-auto px-4 py-8 flex-1">
-          <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-red-700">{error}</p>
+          <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg">
+            <p className="text-destructive">{error}</p>
           </div>
         </div>
         <Footer />
@@ -181,12 +181,12 @@ export default function SharedWishlistClient({ userId }: Props) {
         {actionError && (
           <div
             role="alert"
-            className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-center justify-between gap-3"
+            className="mb-6 p-4 bg-[hsl(var(--warning))]/10 border border-[hsl(var(--warning))]/30 rounded-lg flex items-center justify-between gap-3"
           >
-            <p className="text-yellow-700">{actionError}</p>
+            <p className="text-[hsl(var(--warning))]">{actionError}</p>
             <button
               onClick={() => setActionError(null)}
-              className="p-1 text-yellow-500 hover:text-yellow-700"
+              className="p-1 text-[hsl(var(--warning))] hover:text-[hsl(var(--warning))]"
               aria-label={t('Dismiss', 'إغلاق')}
             >
               <svg
@@ -290,7 +290,7 @@ export default function SharedWishlistClient({ userId }: Props) {
                       )}
                   </div>
                   {item.product.status !== 'active' && (
-                    <span className="text-red-500 text-sm">
+                    <span className="text-destructive text-sm">
                       {t('Currently unavailable', 'غير متوفر حالياً')}
                     </span>
                   )}

@@ -109,10 +109,12 @@ export function OrderSummary({
         {/* Coupon */}
         <div className="mt-6 border-t pt-6">
           {appliedCoupon ? (
-            <div className="flex items-center justify-between bg-green-50 p-3 rounded-lg">
+            <div className="flex items-center justify-between bg-[hsl(var(--success))]/10 p-3 rounded-lg">
               <div>
-                <span className="text-sm font-medium text-green-700">{appliedCoupon.code}</span>
-                <span className="text-sm text-green-600 ml-2">
+                <span className="text-sm font-medium text-[hsl(var(--success))]">
+                  {appliedCoupon.code}
+                </span>
+                <span className="text-sm text-[hsl(var(--success))] ml-2">
                   {appliedCoupon.type === 'percentage'
                     ? `${appliedCoupon.value}% ${t('off', '\u062e\u0635\u0645')}`
                     : appliedCoupon.type === 'free_shipping'
@@ -120,7 +122,10 @@ export function OrderSummary({
                       : `${formatPrice(appliedCoupon.value)} ${t('off', '\u062e\u0635\u0645')}`}
                 </span>
               </div>
-              <button onClick={onRemoveCoupon} className="text-green-600 hover:text-green-800">
+              <button
+                onClick={onRemoveCoupon}
+                className="text-[hsl(var(--success))] hover:text-[hsl(var(--success))]/80"
+              >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path
                     strokeLinecap="round"
@@ -144,7 +149,7 @@ export function OrderSummary({
               </Button>
             </div>
           )}
-          {couponError && <p className="mt-2 text-sm text-red-600">{couponError}</p>}
+          {couponError && <p className="mt-2 text-sm text-destructive">{couponError}</p>}
         </div>
 
         {/* Totals */}
@@ -155,15 +160,17 @@ export function OrderSummary({
           </div>
           {discount > 0 && (
             <div className="flex justify-between text-sm">
-              <span className="text-green-600">
+              <span className="text-[hsl(var(--success))]">
                 {t('Discount', '\u0627\u0644\u062e\u0635\u0645')}
               </span>
-              <span className="font-medium text-green-600">-{formatPrice(discount)}</span>
+              <span className="font-medium text-[hsl(var(--success))]">
+                -{formatPrice(discount)}
+              </span>
             </div>
           )}
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">{t('Shipping', translations['Shipping'])}</span>
-            <span className={`font-medium ${freeShipping ? 'text-green-600' : ''}`}>
+            <span className={`font-medium ${freeShipping ? 'text-[hsl(var(--success))]' : ''}`}>
               {freeShipping
                 ? t('Free', translations['Free'])
                 : shipping > 0

@@ -122,9 +122,9 @@ export default function AffiliatePage() {
     return (
       <main className="min-h-screen flex items-center justify-center bg-background px-4">
         <div className="max-w-md w-full text-center">
-          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
             <svg
-              className="w-8 h-8 text-gray-400"
+              className="w-8 h-8 text-muted-foreground"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -140,7 +140,7 @@ export default function AffiliatePage() {
           <h1 className="text-xl font-semibold text-foreground mb-2">
             Affiliate Program Unavailable
           </h1>
-          <p className="text-gray-500">
+          <p className="text-muted-foreground">
             The affiliate program is not currently available for this store.
           </p>
         </div>
@@ -169,17 +169,17 @@ export default function AffiliatePage() {
             </svg>
           </div>
           <h1 className="text-2xl font-bold text-foreground mb-2">Join Our Affiliate Program</h1>
-          <p className="text-gray-500">
+          <p className="text-muted-foreground">
             Partner with {store?.name || 'us'} and earn commissions for every sale you refer.
           </p>
         </div>
 
         {/* Success State */}
         {success ? (
-          <div className="bg-green-50 border border-green-200 rounded-xl p-8 text-center">
-            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <div className="bg-[hsl(var(--success))]/10 border border-[hsl(var(--success))]/30 rounded-xl p-8 text-center">
+            <div className="w-12 h-12 bg-[hsl(var(--success))]/20 rounded-full flex items-center justify-center mx-auto mb-4">
               <svg
-                className="w-6 h-6 text-green-600"
+                className="w-6 h-6 text-[hsl(var(--success))]"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -192,8 +192,10 @@ export default function AffiliatePage() {
                 />
               </svg>
             </div>
-            <h2 className="text-lg font-semibold text-green-800 mb-2">Application Submitted!</h2>
-            <p className="text-green-700">
+            <h2 className="text-lg font-semibold text-[hsl(var(--success))] mb-2">
+              Application Submitted!
+            </h2>
+            <p className="text-[hsl(var(--success))]">
               {"We'll review it shortly and get back to you via email."}
             </p>
           </div>
@@ -201,7 +203,7 @@ export default function AffiliatePage() {
           /* Signup Form */
           <div className="bg-card rounded-xl border border-border shadow-sm p-8">
             {error && (
-              <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+              <div className="mb-4 p-4 bg-destructive/10 border border-destructive/30 rounded-lg text-sm text-destructive">
                 {error}
               </div>
             )}
@@ -209,7 +211,7 @@ export default function AffiliatePage() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label htmlFor="name" className="block text-sm font-medium text-foreground mb-1">
-                  Full Name <span className="text-red-500">*</span>
+                  Full Name <span className="text-destructive">*</span>
                 </label>
                 <input
                   id="name"
@@ -225,7 +227,7 @@ export default function AffiliatePage() {
 
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-foreground mb-1">
-                  Email Address <span className="text-red-500">*</span>
+                  Email Address <span className="text-destructive">*</span>
                 </label>
                 <input
                   id="email"

@@ -42,7 +42,7 @@ function StarDisplay({ rating, size = 'sm' }: { rating: number; size?: 'sm' | 'l
       {[1, 2, 3, 4, 5].map(star => (
         <svg
           key={star}
-          className={`${cls} ${star <= rating ? 'text-yellow-400' : 'text-gray-200'}`}
+          className={`${cls} ${star <= rating ? 'text-[hsl(var(--warning))]' : 'text-muted'}`}
           fill="currentColor"
           viewBox="0 0 20 20"
         >
@@ -70,7 +70,7 @@ function StarSelector({ value, onChange }: { value: number; onChange: (rating: n
         >
           <svg
             className={`h-8 w-8 transition-colors ${
-              star <= (hovered || value) ? 'text-yellow-400' : 'text-gray-200'
+              star <= (hovered || value) ? 'text-[hsl(var(--warning))]' : 'text-muted'
             }`}
             fill="currentColor"
             viewBox="0 0 20 20"
@@ -269,8 +269,8 @@ export default function ReviewSection({ storeId, productId }: Props) {
               <div
                 className={`mb-4 rounded-lg p-4 ${
                   submitMessage.type === 'success'
-                    ? 'bg-green-50 text-green-800'
-                    : 'bg-red-50 text-red-800'
+                    ? 'bg-[hsl(var(--success))]/10 text-[hsl(var(--success))]'
+                    : 'bg-destructive/10 text-destructive'
                 }`}
               >
                 {submitMessage.text}
@@ -288,8 +288,8 @@ export default function ReviewSection({ storeId, productId }: Props) {
               <div
                 className={`mb-4 rounded-lg p-4 ${
                   submitMessage.type === 'success'
-                    ? 'bg-green-50 text-green-800'
-                    : 'bg-red-50 text-red-800'
+                    ? 'bg-[hsl(var(--success))]/10 text-[hsl(var(--success))]'
+                    : 'bg-destructive/10 text-destructive'
                 }`}
               >
                 {submitMessage.text}
@@ -299,7 +299,7 @@ export default function ReviewSection({ storeId, productId }: Props) {
             <form onSubmit={handleSubmitReview} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
-                  Your Rating <span className="text-red-500">*</span>
+                  Your Rating <span className="text-destructive">*</span>
                 </label>
                 <StarSelector value={rating} onChange={setRating} />
               </div>

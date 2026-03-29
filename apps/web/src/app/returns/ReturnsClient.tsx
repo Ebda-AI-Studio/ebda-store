@@ -218,9 +218,9 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
   if (submitResult?.type === 'success') {
     return (
       <section className="rounded-xl border bg-card p-8 shadow-sm text-center">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-green-100">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[hsl(var(--success))]/20">
           <svg
-            className="h-7 w-7 text-green-600"
+            className="h-7 w-7 text-[hsl(var(--success))]"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -275,7 +275,7 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
       </p>
 
       {submitResult?.type === 'error' && (
-        <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
           {submitResult.text}
         </div>
       )}
@@ -284,7 +284,7 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
         <div>
           <label htmlFor="return-order" className="block text-sm font-medium text-foreground mb-1">
             {t('Select Order', '\u0627\u062e\u062a\u0631 \u0627\u0644\u0637\u0644\u0628')}{' '}
-            <span className="text-red-500">*</span>
+            <span className="text-destructive">*</span>
           </label>
           {isLoadingOrders ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -340,7 +340,7 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
                 'Select Items to Return',
                 '\u0627\u062e\u062a\u0631 \u0627\u0644\u0639\u0646\u0627\u0635\u0631 \u0644\u0644\u0625\u0631\u062c\u0627\u0639'
               )}{' '}
-              <span className="text-red-500">*</span>
+              <span className="text-destructive">*</span>
             </p>
             <div className="space-y-2">
               {selectedOrder.items.map(item => (
@@ -450,9 +450,9 @@ export default function ReturnsClient() {
         <div className="mt-12 space-y-8">
           <section className="rounded-xl border bg-card p-6 shadow-sm">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[hsl(var(--success))]/20">
                 <svg
-                  className="h-5 w-5 text-green-600"
+                  className="h-5 w-5 text-[hsl(var(--success))]"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"

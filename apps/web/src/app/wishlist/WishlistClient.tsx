@@ -335,7 +335,7 @@ export default function WishlistClient() {
               {/* Twitter/X */}
               <button
                 onClick={shareOnTwitter}
-                className="flex items-center gap-2 px-3 py-2 bg-black text-white rounded-lg text-sm hover:bg-gray-800 transition-colors"
+                className="flex items-center gap-2 px-3 py-2 bg-black text-white rounded-lg text-sm hover:bg-foreground transition-colors"
                 aria-label="Share on X (Twitter)"
               >
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -349,10 +349,13 @@ export default function WishlistClient() {
 
         {/* Error Display */}
         {error && (
-          <div role="alert" className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <div
+            role="alert"
+            className="mb-6 p-4 bg-destructive/10 border border-destructive/30 rounded-lg"
+          >
             <div className="flex items-center gap-3">
               <svg
-                className="h-5 w-5 text-red-500 flex-shrink-0"
+                className="h-5 w-5 text-destructive flex-shrink-0"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -364,10 +367,10 @@ export default function WishlistClient() {
                   d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
                 />
               </svg>
-              <p className="text-red-700 flex-1">{error}</p>
+              <p className="text-destructive flex-1">{error}</p>
               <button
                 onClick={() => loadWishlist()}
-                className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
+                className="px-3 py-1 text-sm bg-destructive/20 text-destructive rounded hover:bg-destructive/30 transition-colors"
               >
                 Retry
               </button>
@@ -377,10 +380,13 @@ export default function WishlistClient() {
 
         {/* Action Error Toast */}
         {actionError && (
-          <div role="alert" className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <div
+            role="alert"
+            className="mb-6 p-4 bg-[hsl(var(--warning))]/10 border border-[hsl(var(--warning))]/30 rounded-lg"
+          >
             <div className="flex items-center gap-3">
               <svg
-                className="h-5 w-5 text-yellow-500 flex-shrink-0"
+                className="h-5 w-5 text-[hsl(var(--warning))] flex-shrink-0"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -392,10 +398,10 @@ export default function WishlistClient() {
                   d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
                 />
               </svg>
-              <p className="text-yellow-700 flex-1">{actionError}</p>
+              <p className="text-[hsl(var(--warning))] flex-1">{actionError}</p>
               <button
                 onClick={() => setActionError(null)}
-                className="p-1 text-yellow-500 hover:text-yellow-700"
+                className="p-1 text-[hsl(var(--warning))] hover:text-[hsl(var(--warning))]/80"
                 aria-label={t('Dismiss', '\u0625\u063a\u0644\u0627\u0642')}
               >
                 <svg
@@ -519,7 +525,7 @@ export default function WishlistClient() {
                       )}
                   </div>
                   {item.product.status !== 'active' && (
-                    <span className="text-red-500 text-sm">
+                    <span className="text-destructive text-sm">
                       {t(
                         'Currently unavailable',
                         '\u063a\u064a\u0631 \u0645\u062a\u0648\u0641\u0631 \u062d\u0627\u0644\u064a\u0627\u064b'
@@ -538,7 +544,7 @@ export default function WishlistClient() {
                   </button>
                   <button
                     onClick={() => removeFromWishlist(item.id)}
-                    className="p-2 text-muted-foreground/70 hover:text-red-500"
+                    className="p-2 text-muted-foreground/70 hover:text-destructive"
                     title={t(
                       'Remove from wishlist',
                       '\u0625\u0632\u0627\u0644\u0629 \u0645\u0646 \u0627\u0644\u0645\u0641\u0636\u0644\u0629'
