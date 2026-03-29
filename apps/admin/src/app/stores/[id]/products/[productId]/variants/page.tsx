@@ -250,8 +250,8 @@ export default function ProductVariantsPage() {
     return (
       <AdminLayout title="Loading..." subtitle="Please wait">
         <div className="animate-pulse space-y-6">
-          <div className="h-24 bg-gray-200 rounded-xl" />
-          <div className="h-64 bg-gray-200 rounded-xl" />
+          <div className="h-24 bg-muted rounded-xl" />
+          <div className="h-64 bg-muted rounded-xl" />
         </div>
       </AdminLayout>
     );
@@ -348,7 +348,7 @@ export default function ProductVariantsPage() {
                       </div>
                       <button
                         onClick={() => handleDeleteOption(option.id)}
-                        className="text-gray-400 hover:text-red-600"
+                        className="text-muted-foreground hover:text-destructive"
                       >
                         <svg
                           className="h-4 w-4"
@@ -369,12 +369,12 @@ export default function ProductVariantsPage() {
                       {option.values.map(value => (
                         <span
                           key={value.id}
-                          className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-1 text-xs"
+                          className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1 text-xs"
                         >
                           {value.value}
                           <button
                             onClick={() => handleDeleteValue(value.id)}
-                            className="text-gray-400 hover:text-red-600"
+                            className="text-muted-foreground hover:text-destructive"
                           >
                             <svg
                               className="h-3 w-3"
@@ -430,7 +430,7 @@ export default function ProductVariantsPage() {
           {variants.length === 0 ? (
             <div className="p-6 text-center text-muted-foreground">
               <svg
-                className="mx-auto h-12 w-12 text-gray-400"
+                className="mx-auto h-12 w-12 text-muted-foreground"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -474,11 +474,11 @@ export default function ProductVariantsPage() {
                         {variant.price ? (
                           formatPrice(variant.price)
                         ) : (
-                          <span className="text-gray-400">Base</span>
+                          <span className="text-muted-foreground">Base</span>
                         )}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <span className={variant.inventory <= 0 ? 'text-red-600' : ''}>
+                        <span className={variant.inventory <= 0 ? 'text-destructive' : ''}>
                           {variant.inventory}
                         </span>
                       </td>
@@ -491,7 +491,7 @@ export default function ProductVariantsPage() {
                         <div className="flex gap-2 justify-end">
                           <button
                             onClick={() => openEditVariant(variant)}
-                            className="text-gray-400 hover:text-primary"
+                            className="text-muted-foreground hover:text-primary"
                           >
                             <svg
                               className="h-4 w-4"
@@ -509,7 +509,7 @@ export default function ProductVariantsPage() {
                           </button>
                           <button
                             onClick={() => handleDeleteVariant(variant.id)}
-                            className="text-gray-400 hover:text-red-600"
+                            className="text-muted-foreground hover:text-destructive"
                           >
                             <svg
                               className="h-4 w-4"

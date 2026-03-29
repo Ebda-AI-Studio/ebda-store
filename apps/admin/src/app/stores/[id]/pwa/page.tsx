@@ -260,7 +260,7 @@ export default function PWASettingsPage() {
             className={`px-4 py-2 rounded-lg font-medium transition-colors ${
               pwaEnabled
                 ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                : 'bg-muted text-muted-foreground hover:bg-muted/80'
             }`}
           >
             {pwaEnabled ? 'Enabled' : 'Disabled'}
@@ -288,7 +288,7 @@ export default function PWASettingsPage() {
                 <div>
                   <p className="font-medium text-foreground">
                     {storeInfo.name}
-                    {storeInfo.nameAr && <span className="text-gray-500 mx-2">|</span>}
+                    {storeInfo.nameAr && <span className="text-muted-foreground mx-2">|</span>}
                     {storeInfo.nameAr && <span dir="rtl">{storeInfo.nameAr}</span>}
                   </p>
                   <p className="text-sm text-muted-foreground">
@@ -578,7 +578,7 @@ export default function PWASettingsPage() {
                   <img
                     src={settings.icon192}
                     alt="Icon 192"
-                    className="mt-2 w-12 h-12 rounded-lg object-contain bg-gray-50 border"
+                    className="mt-2 w-12 h-12 rounded-lg object-contain bg-muted border"
                   />
                 )}
                 <p className="text-xs text-muted-foreground mt-1">Standard icon for app</p>
@@ -599,7 +599,7 @@ export default function PWASettingsPage() {
                   <img
                     src={settings.icon512}
                     alt="Icon 512"
-                    className="mt-2 w-12 h-12 rounded-lg object-contain bg-gray-50 border"
+                    className="mt-2 w-12 h-12 rounded-lg object-contain bg-muted border"
                   />
                 )}
                 <p className="text-xs text-muted-foreground mt-1">
@@ -622,7 +622,7 @@ export default function PWASettingsPage() {
                   <img
                     src={settings.maskableIcon}
                     alt="Maskable"
-                    className="mt-2 w-12 h-12 rounded-lg object-contain bg-gray-50 border"
+                    className="mt-2 w-12 h-12 rounded-lg object-contain bg-muted border"
                   />
                 )}
                 <p className="text-xs text-muted-foreground mt-1">Adaptive icon with safe zone</p>

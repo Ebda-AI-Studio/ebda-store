@@ -105,7 +105,10 @@ export default function ProductDetailPage() {
     switch (status) {
       case 'active':
         return (
-          <Badge variant="default" className="bg-green-100 text-green-700">
+          <Badge
+            variant="default"
+            className="bg-[hsl(var(--success))]/10 text-[hsl(var(--success))]"
+          >
             Active
           </Badge>
         );
@@ -203,7 +206,7 @@ export default function ProductDetailPage() {
             {product.description && (
               <div className="mt-4">
                 <label className="text-sm font-medium text-muted-foreground">Description</label>
-                <p className="mt-1 text-gray-700">{product.description}</p>
+                <p className="mt-1 text-foreground">{product.description}</p>
               </div>
             )}
             {product.descriptionAr && (
@@ -211,7 +214,7 @@ export default function ProductDetailPage() {
                 <label className="text-sm font-medium text-muted-foreground">
                   Description (Arabic)
                 </label>
-                <p className="mt-1 text-gray-700" dir="rtl">
+                <p className="mt-1 text-foreground" dir="rtl">
                   {product.descriptionAr}
                 </p>
               </div>
@@ -241,7 +244,7 @@ export default function ProductDetailPage() {
               {product.costPrice && (
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Cost Price</label>
-                  <p className="mt-1 text-lg text-gray-700">{formatPrice(product.costPrice)}</p>
+                  <p className="mt-1 text-lg text-foreground">{formatPrice(product.costPrice)}</p>
                 </div>
               )}
             </div>
@@ -264,10 +267,10 @@ export default function ProductDetailPage() {
                 <p
                   className={`mt-1 text-lg font-semibold ${
                     product.inventory === 0
-                      ? 'text-red-600'
+                      ? 'text-destructive'
                       : product.inventory <= product.lowStockThreshold
                         ? 'text-yellow-600'
-                        : 'text-green-600'
+                        : 'text-[hsl(var(--success))]'
                   }`}
                 >
                   {product.inventory} in stock

@@ -177,7 +177,7 @@ export default function StorePaymentSettingsPage() {
       <AdminLayout title="Payment Settings" subtitle="Configure payment providers for this store">
         <div className="space-y-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-24 animate-pulse rounded-xl bg-gray-200" />
+            <div key={i} className="h-24 animate-pulse rounded-xl bg-muted" />
           ))}
         </div>
       </AdminLayout>
@@ -190,7 +190,7 @@ export default function StorePaymentSettingsPage() {
       subtitle="Configure payment providers for this store"
       actions={
         <Link href={`/stores/${storeId}/settings`}>
-          <button className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 font-medium">
+          <button className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted font-medium">
             Back to Settings
           </button>
         </Link>
@@ -215,7 +215,7 @@ export default function StorePaymentSettingsPage() {
           return (
             <div
               key={provider.id}
-              className={`rounded-xl border bg-white shadow-sm overflow-hidden transition-all ${
+              className={`rounded-xl border bg-card shadow-sm overflow-hidden transition-all ${
                 form.isEnabled ? 'border-l-4' : ''
               }`}
               style={form.isEnabled ? { borderLeftColor: provider.color } : undefined}
@@ -230,15 +230,15 @@ export default function StorePaymentSettingsPage() {
                     {provider.id[0].toUpperCase()}
                   </div>
                   <div>
-                    <h3 className="font-semibold text-gray-900">{provider.name}</h3>
-                    <p className="text-xs text-gray-500">{provider.nameAr}</p>
+                    <h3 className="font-semibold text-foreground">{provider.name}</h3>
+                    <p className="text-xs text-muted-foreground">{provider.nameAr}</p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-4">
                   {/* Enabled toggle */}
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-500">
+                    <span className="text-sm text-muted-foreground">
                       {form.isEnabled ? 'Enabled' : 'Disabled'}
                     </span>
                     <label className="relative inline-flex cursor-pointer items-center">
@@ -249,14 +249,14 @@ export default function StorePaymentSettingsPage() {
                         disabled={isSavingThis}
                         className="sr-only peer"
                       />
-                      <div className="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-emerald-500 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-emerald-400/30 peer-disabled:opacity-50" />
+                      <div className="peer h-6 w-11 rounded-full bg-muted after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-border after:bg-white after:transition-all after:content-[''] peer-checked:bg-emerald-500 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-emerald-400/30 peer-disabled:opacity-50" />
                     </label>
                   </div>
 
                   {/* Expand/collapse button */}
                   <button
                     onClick={() => setExpanded(prev => ({ ...prev, [provider.id]: !isExpanded }))}
-                    className="flex items-center gap-1 px-3 py-1.5 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                    className="flex items-center gap-1 px-3 py-1.5 text-sm text-muted-foreground border border-border rounded-lg hover:bg-muted transition-colors"
                   >
                     Configure
                     <svg
@@ -278,10 +278,10 @@ export default function StorePaymentSettingsPage() {
 
               {/* Config form (expanded) */}
               {isExpanded && (
-                <div className="border-t bg-gray-50 p-6 space-y-5">
+                <div className="border-t bg-muted p-6 space-y-5">
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-sm font-medium text-foreground mb-1">
                         API Key
                       </label>
                       <input
@@ -289,11 +289,11 @@ export default function StorePaymentSettingsPage() {
                         value={form.apiKey || ''}
                         onChange={e => updateForm(provider.id, 'apiKey', e.target.value)}
                         placeholder="Enter API key"
-                        className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                        className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-sm font-medium text-foreground mb-1">
                         Secret Key
                       </label>
                       <input
@@ -301,11 +301,11 @@ export default function StorePaymentSettingsPage() {
                         value={form.secretKey || ''}
                         onChange={e => updateForm(provider.id, 'secretKey', e.target.value)}
                         placeholder="Enter secret key"
-                        className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                        className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-sm font-medium text-foreground mb-1">
                         Webhook Secret
                       </label>
                       <input
@@ -313,11 +313,11 @@ export default function StorePaymentSettingsPage() {
                         value={form.webhookSecret || ''}
                         onChange={e => updateForm(provider.id, 'webhookSecret', e.target.value)}
                         placeholder="Enter webhook secret"
-                        className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                        className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-sm font-medium text-foreground mb-1">
                         Merchant ID
                       </label>
                       <input
@@ -325,7 +325,7 @@ export default function StorePaymentSettingsPage() {
                         value={form.merchantId || ''}
                         onChange={e => updateForm(provider.id, 'merchantId', e.target.value)}
                         placeholder="Enter merchant ID (if applicable)"
-                        className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                        className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                       />
                     </div>
                   </div>
@@ -339,7 +339,7 @@ export default function StorePaymentSettingsPage() {
                         onChange={e => updateForm(provider.id, 'testMode', e.target.checked)}
                         className="sr-only peer"
                       />
-                      <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-amber-500 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+                      <div className="peer h-5 w-9 rounded-full bg-muted after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-border after:bg-white after:transition-all after:content-[''] peer-checked:bg-amber-500 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
                     </label>
                     <div>
                       <p className="text-sm font-medium text-amber-800">

@@ -119,7 +119,11 @@ export default function NewProductPage() {
   return (
     <AdminLayout title="Add New Product" subtitle="Create a new product for your store">
       <form onSubmit={handleSubmit}>
-        {error && <div className="mb-6 rounded-lg bg-red-50 p-4 text-sm text-red-600">{error}</div>}
+        {error && (
+          <div className="mb-6 rounded-lg bg-destructive/10 p-4 text-sm text-destructive">
+            {error}
+          </div>
+        )}
 
         <div className="grid gap-6 lg:grid-cols-3">
           {/* Main Content */}

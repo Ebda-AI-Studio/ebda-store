@@ -163,7 +163,7 @@ export default function ReviewsPage() {
       </div>
 
       {/* Reviews List */}
-      <div className="rounded-xl border bg-white shadow-sm">
+      <div className="rounded-xl border bg-card shadow-sm">
         {isLoading ? (
           <div className="p-8 text-center text-gray-500">Loading reviews...</div>
         ) : reviews.length === 0 ? (
@@ -270,7 +270,7 @@ export default function ReviewsPage() {
       {/* Delete Confirmation Dialog */}
       {deleteTarget && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
+          <div className="bg-card rounded-xl shadow-xl w-full max-w-sm p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-2">Delete Review</h2>
             <p className="text-sm text-gray-600 mb-6">
               Are you sure you want to delete this review? This action cannot be undone.

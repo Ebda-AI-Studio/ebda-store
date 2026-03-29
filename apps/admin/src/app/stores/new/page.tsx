@@ -185,9 +185,9 @@ export default function CreateStorePage() {
       <AdminLayout title="Store Created!" subtitle="Your new store is ready">
         <div className="mx-auto max-w-2xl">
           <div className="rounded-xl border bg-card p-8 shadow-sm text-center">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[hsl(var(--success))]/10">
               <svg
-                className="h-8 w-8 text-green-600"
+                className="h-8 w-8 text-[hsl(var(--success))]"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -217,7 +217,7 @@ export default function CreateStorePage() {
                 {success.store.domain && (
                   <div className="flex justify-between">
                     <dt className="text-muted-foreground">Default URL:</dt>
-                    <dd className="font-medium text-gray-400">
+                    <dd className="font-medium text-muted-foreground">
                       {success.store.slug}.forcemediakw.com
                     </dd>
                   </div>
@@ -384,8 +384,8 @@ export default function CreateStorePage() {
 
               <div className="mt-6 space-y-4">
                 <div>
-                  <label htmlFor="storeName" className="block text-sm font-medium text-gray-700">
-                    Store Name <span className="text-red-500">*</span>
+                  <label htmlFor="storeName" className="block text-sm font-medium text-foreground">
+                    Store Name <span className="text-destructive">*</span>
                   </label>
                   <Input
                     id="storeName"
@@ -395,13 +395,13 @@ export default function CreateStorePage() {
                     className={`mt-1 ${validationErrors.storeName ? 'border-red-500' : ''}`}
                   />
                   {validationErrors.storeName && (
-                    <p className="mt-1 text-sm text-red-500">{validationErrors.storeName}</p>
+                    <p className="mt-1 text-sm text-destructive">{validationErrors.storeName}</p>
                   )}
                 </div>
 
                 <div>
-                  <label htmlFor="storeSlug" className="block text-sm font-medium text-gray-700">
-                    Store URL <span className="text-red-500">*</span>
+                  <label htmlFor="storeSlug" className="block text-sm font-medium text-foreground">
+                    Store URL <span className="text-destructive">*</span>
                   </label>
                   <div
                     className={`mt-1 flex rounded-lg border overflow-hidden ${validationErrors.storeSlug ? 'border-red-500' : ''}`}
@@ -425,13 +425,16 @@ export default function CreateStorePage() {
                     </span>
                   </div>
                   {validationErrors.storeSlug && (
-                    <p className="mt-1 text-sm text-red-500">{validationErrors.storeSlug}</p>
+                    <p className="mt-1 text-sm text-destructive">{validationErrors.storeSlug}</p>
                   )}
                 </div>
 
                 <div>
-                  <label htmlFor="customDomain" className="block text-sm font-medium text-gray-700">
-                    Custom Domain <span className="text-xs text-gray-400">(optional)</span>
+                  <label
+                    htmlFor="customDomain"
+                    className="block text-sm font-medium text-foreground"
+                  >
+                    Custom Domain <span className="text-xs text-muted-foreground">(optional)</span>
                   </label>
                   <Input
                     id="customDomain"
@@ -461,8 +464,8 @@ export default function CreateStorePage() {
 
               <div className="mt-6 space-y-4">
                 <div>
-                  <label htmlFor="ownerName" className="block text-sm font-medium text-gray-700">
-                    Owner Name <span className="text-red-500">*</span>
+                  <label htmlFor="ownerName" className="block text-sm font-medium text-foreground">
+                    Owner Name <span className="text-destructive">*</span>
                   </label>
                   <Input
                     id="ownerName"
@@ -475,13 +478,13 @@ export default function CreateStorePage() {
                     className={`mt-1 ${validationErrors.ownerName ? 'border-red-500' : ''}`}
                   />
                   {validationErrors.ownerName && (
-                    <p className="mt-1 text-sm text-red-500">{validationErrors.ownerName}</p>
+                    <p className="mt-1 text-sm text-destructive">{validationErrors.ownerName}</p>
                   )}
                 </div>
 
                 <div>
-                  <label htmlFor="ownerEmail" className="block text-sm font-medium text-gray-700">
-                    Email Address <span className="text-red-500">*</span>
+                  <label htmlFor="ownerEmail" className="block text-sm font-medium text-foreground">
+                    Email Address <span className="text-destructive">*</span>
                   </label>
                   <Input
                     id="ownerEmail"
@@ -495,16 +498,16 @@ export default function CreateStorePage() {
                     className={`mt-1 ${validationErrors.ownerEmail ? 'border-red-500' : ''}`}
                   />
                   {validationErrors.ownerEmail && (
-                    <p className="mt-1 text-sm text-red-500">{validationErrors.ownerEmail}</p>
+                    <p className="mt-1 text-sm text-destructive">{validationErrors.ownerEmail}</p>
                   )}
                 </div>
 
                 <div>
                   <label
                     htmlFor="ownerPassword"
-                    className="block text-sm font-medium text-gray-700"
+                    className="block text-sm font-medium text-foreground"
                   >
-                    Temporary Password <span className="text-red-500">*</span>
+                    Temporary Password <span className="text-destructive">*</span>
                   </label>
                   <Input
                     id="ownerPassword"
@@ -518,7 +521,9 @@ export default function CreateStorePage() {
                     className={`mt-1 ${validationErrors.ownerPassword ? 'border-red-500' : ''}`}
                   />
                   {validationErrors.ownerPassword && (
-                    <p className="mt-1 text-sm text-red-500">{validationErrors.ownerPassword}</p>
+                    <p className="mt-1 text-sm text-destructive">
+                      {validationErrors.ownerPassword}
+                    </p>
                   )}
                   <p className="mt-1 text-xs text-muted-foreground">
                     The owner will be prompted to change this on first login
@@ -589,7 +594,9 @@ export default function CreateStorePage() {
               </div>
 
               {error && (
-                <div className="mt-6 rounded-lg bg-red-50 p-4 text-sm text-red-600">{error}</div>
+                <div className="mt-6 rounded-lg bg-destructive/10 p-4 text-sm text-destructive">
+                  {error}
+                </div>
               )}
             </div>
           )}

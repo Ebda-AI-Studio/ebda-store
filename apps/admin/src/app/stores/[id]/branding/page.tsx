@@ -296,7 +296,7 @@ export default function StoreBrandingPage() {
   if (!branding) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-500">Store not found</p>
+        <p className="text-muted-foreground">Store not found</p>
         <Link href="/stores" className="text-primary hover:underline mt-2 inline-block">
           Back to stores
         </Link>
@@ -333,7 +333,7 @@ export default function StoreBrandingPage() {
               className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
                 activeTab === tab.id
                   ? 'border-primary text-primary'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
               {tab.label}
@@ -346,7 +346,7 @@ export default function StoreBrandingPage() {
           <div className="bg-card rounded-xl border p-6 space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Store Name</label>
+                <label className="block text-sm font-medium text-foreground mb-1">Store Name</label>
                 <input
                   type="text"
                   value={branding.name}
@@ -355,7 +355,7 @@ export default function StoreBrandingPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Store Name (Arabic)
                 </label>
                 <input
@@ -370,7 +370,7 @@ export default function StoreBrandingPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Logo</label>
+                <label className="block text-sm font-medium text-foreground mb-2">Logo</label>
                 <ImageUpload
                   value={branding.logo}
                   onUpload={url => setBranding({ ...branding, logo: url })}
@@ -381,7 +381,7 @@ export default function StoreBrandingPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-foreground mb-2">
                   Logo (Arabic)
                 </label>
                 <ImageUpload
@@ -394,7 +394,7 @@ export default function StoreBrandingPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Favicon</label>
+                <label className="block text-sm font-medium text-foreground mb-2">Favicon</label>
                 <ImageUpload
                   value={branding.favicon}
                   onUpload={url => setBranding({ ...branding, favicon: url })}
@@ -408,7 +408,9 @@ export default function StoreBrandingPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <label className="block text-sm font-medium text-foreground mb-1">
+                  Description
+                </label>
                 <textarea
                   value={branding.description || ''}
                   onChange={e => setBranding({ ...branding, description: e.target.value })}
@@ -417,7 +419,7 @@ export default function StoreBrandingPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Description (Arabic)
                 </label>
                 <textarea
@@ -436,7 +438,9 @@ export default function StoreBrandingPage() {
         {activeTab === 'theme' && (
           <div className="bg-card rounded-xl border p-6 space-y-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-3">Primary Color</label>
+              <label className="block text-sm font-medium text-foreground mb-3">
+                Primary Color
+              </label>
               <div className="flex flex-wrap gap-3">
                 {colorPresets.map(preset => {
                   const currentHex = hslToHex(branding.theme.primaryColor).toUpperCase();
@@ -452,7 +456,7 @@ export default function StoreBrandingPage() {
                       }
                       className={`w-10 h-10 rounded-full border-2 transition-all ${
                         isSelected
-                          ? 'border-gray-900 scale-110'
+                          ? 'border-foreground scale-110'
                           : 'border-transparent hover:scale-105'
                       }`}
                       style={{ backgroundColor: preset.hex }}
@@ -474,7 +478,7 @@ export default function StoreBrandingPage() {
                   className="w-10 h-10 rounded-lg border border-border cursor-pointer p-0.5"
                 />
                 <div>
-                  <label className="block text-[10px] text-gray-400 mb-0.5">HEX</label>
+                  <label className="block text-[10px] text-muted-foreground mb-0.5">HEX</label>
                   <input
                     type="text"
                     value={hslToHex(branding.theme.primaryColor).toUpperCase()}
@@ -496,7 +500,7 @@ export default function StoreBrandingPage() {
                   const rgb = hexToRgb(hslToHex(branding.theme.primaryColor));
                   return (
                     <div key={channel}>
-                      <label className="block text-[10px] text-gray-400 mb-0.5">
+                      <label className="block text-[10px] text-muted-foreground mb-0.5">
                         {channel.toUpperCase()}
                       </label>
                       <input
@@ -522,7 +526,7 @@ export default function StoreBrandingPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-3">
+              <label className="block text-sm font-medium text-foreground mb-3">
                 Secondary Color
               </label>
               <div className="flex flex-wrap items-center gap-3">
@@ -538,7 +542,7 @@ export default function StoreBrandingPage() {
                   className="w-10 h-10 rounded-lg border border-border cursor-pointer p-0.5"
                 />
                 <div>
-                  <label className="block text-[10px] text-gray-400 mb-0.5">HEX</label>
+                  <label className="block text-[10px] text-muted-foreground mb-0.5">HEX</label>
                   <input
                     type="text"
                     value={hslToHex(branding.theme.secondaryColor).toUpperCase()}
@@ -560,7 +564,7 @@ export default function StoreBrandingPage() {
                   const rgb = hexToRgb(hslToHex(branding.theme.secondaryColor));
                   return (
                     <div key={channel}>
-                      <label className="block text-[10px] text-gray-400 mb-0.5">
+                      <label className="block text-[10px] text-muted-foreground mb-0.5">
                         {channel.toUpperCase()}
                       </label>
                       <input
@@ -587,7 +591,9 @@ export default function StoreBrandingPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Font Family</label>
+                <label className="block text-sm font-medium text-foreground mb-1">
+                  Font Family
+                </label>
                 <select
                   value={branding.theme.fontFamily}
                   onChange={e =>
@@ -606,7 +612,7 @@ export default function StoreBrandingPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Border Radius
                 </label>
                 <select
@@ -630,7 +636,7 @@ export default function StoreBrandingPage() {
 
             {/* Preview */}
             <div className="mt-8 pt-6 border-t">
-              <h3 className="text-sm font-medium text-gray-700 mb-4">Preview</h3>
+              <h3 className="text-sm font-medium text-foreground mb-4">Preview</h3>
               <div
                 className="p-6 bg-muted rounded-xl"
                 style={{ '--primary': branding.theme.primaryColor } as React.CSSProperties}
@@ -642,7 +648,7 @@ export default function StoreBrandingPage() {
                   >
                     Primary Button
                   </button>
-                  <button className="px-4 py-2 border border-border rounded-lg hover:bg-gray-100">
+                  <button className="px-4 py-2 border border-border rounded-lg hover:bg-muted">
                     Secondary Button
                   </button>
                 </div>
@@ -659,7 +665,7 @@ export default function StoreBrandingPage() {
           <div className="bg-card rounded-xl border p-6 space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <label className="block text-sm font-medium text-foreground mb-1">Email</label>
                 <input
                   type="email"
                   value={branding.email || ''}
@@ -669,7 +675,7 @@ export default function StoreBrandingPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   WhatsApp Number
                 </label>
                 <input
@@ -684,7 +690,7 @@ export default function StoreBrandingPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                <label className="block text-sm font-medium text-foreground mb-1">Phone</label>
                 <input
                   type="tel"
                   value={branding.phone || ''}
@@ -694,7 +700,7 @@ export default function StoreBrandingPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Phone (Arabic Display)
                 </label>
                 <input
@@ -710,7 +716,7 @@ export default function StoreBrandingPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                <label className="block text-sm font-medium text-foreground mb-1">Address</label>
                 <textarea
                   value={branding.address || ''}
                   onChange={e => setBranding({ ...branding, address: e.target.value })}
@@ -720,7 +726,7 @@ export default function StoreBrandingPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Address (Arabic)
                 </label>
                 <textarea
@@ -760,7 +766,7 @@ export default function StoreBrandingPage() {
               },
             ].map(social => (
               <div key={social.key}>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   {social.label}
                 </label>
                 <input

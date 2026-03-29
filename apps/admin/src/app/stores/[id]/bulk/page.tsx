@@ -169,7 +169,7 @@ export default function BulkOperationsPage() {
             className={`pb-3 text-sm font-medium transition ${
               activeTab === 'import'
                 ? 'border-b-2 border-primary text-primary'
-                : 'text-muted-foreground hover:text-gray-700'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             <svg
@@ -192,7 +192,7 @@ export default function BulkOperationsPage() {
             className={`pb-3 text-sm font-medium transition ${
               activeTab === 'export'
                 ? 'border-b-2 border-primary text-primary'
-                : 'text-muted-foreground hover:text-gray-700'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             <svg
@@ -258,7 +258,7 @@ export default function BulkOperationsPage() {
                   className="hidden"
                 />
                 <svg
-                  className="mx-auto h-12 w-12 text-gray-400"
+                  className="mx-auto h-12 w-12 text-muted-foreground"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -274,7 +274,7 @@ export default function BulkOperationsPage() {
                   {csvContent ? 'File loaded. Click to change.' : 'Click to upload CSV file'}
                 </p>
                 {csvContent && (
-                  <p className="mt-1 text-xs text-green-600">
+                  <p className="mt-1 text-xs text-[hsl(var(--success))]">
                     ✓ {csvContent.split('\n').filter(l => l.trim()).length - 1} products ready for
                     import
                   </p>
@@ -359,31 +359,33 @@ export default function BulkOperationsPage() {
                   <p className="text-2xl font-bold text-foreground">{importResult.total}</p>
                   <p className="text-xs text-muted-foreground">Total Rows</p>
                 </div>
-                <div className="text-center p-4 bg-green-50 rounded-lg">
-                  <p className="text-2xl font-bold text-green-600">{importResult.created}</p>
+                <div className="text-center p-4 bg-[hsl(var(--success))]/10 rounded-lg">
+                  <p className="text-2xl font-bold text-[hsl(var(--success))]">
+                    {importResult.created}
+                  </p>
                   <p className="text-xs text-muted-foreground">Created</p>
                 </div>
                 <div className="text-center p-4 bg-blue-50 rounded-lg">
                   <p className="text-2xl font-bold text-blue-600">{importResult.updated}</p>
                   <p className="text-xs text-muted-foreground">Updated</p>
                 </div>
-                <div className="text-center p-4 bg-red-50 rounded-lg">
-                  <p className="text-2xl font-bold text-red-600">{importResult.failed}</p>
+                <div className="text-center p-4 bg-destructive/10 rounded-lg">
+                  <p className="text-2xl font-bold text-destructive">{importResult.failed}</p>
                   <p className="text-xs text-muted-foreground">Failed</p>
                 </div>
               </div>
 
               {importResult.errors.length > 0 && (
                 <div className="mt-4">
-                  <h4 className="text-sm font-medium text-red-900 mb-2">Errors:</h4>
-                  <div className="max-h-48 overflow-y-auto rounded-lg border border-red-200 bg-red-50">
+                  <h4 className="text-sm font-medium text-destructive mb-2">Errors:</h4>
+                  <div className="max-h-48 overflow-y-auto rounded-lg border border-destructive/20 bg-destructive/10">
                     {importResult.errors.map((error, i) => (
                       <div
                         key={i}
                         className="px-4 py-2 border-b border-red-100 last:border-0 text-sm"
                       >
-                        <span className="font-medium text-red-700">Row {error.row}:</span>{' '}
-                        <span className="text-red-600">{error.error}</span>
+                        <span className="font-medium text-destructive">Row {error.row}:</span>{' '}
+                        <span className="text-destructive">{error.error}</span>
                       </div>
                     ))}
                   </div>
@@ -391,8 +393,8 @@ export default function BulkOperationsPage() {
               )}
 
               {importResult.created > 0 || importResult.updated > 0 ? (
-                <div className="mt-4 p-3 bg-green-50 rounded-lg text-center">
-                  <p className="text-sm text-green-700">
+                <div className="mt-4 p-3 bg-[hsl(var(--success))]/10 rounded-lg text-center">
+                  <p className="text-sm text-[hsl(var(--success))]">
                     ✓ Import completed successfully!{' '}
                     <button
                       onClick={() => router.push(`/stores/${storeId}/products`)}
@@ -509,7 +511,7 @@ export default function BulkOperationsPage() {
             <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
               <li className="flex items-start gap-2">
                 <svg
-                  className="h-5 w-5 text-green-500 flex-shrink-0"
+                  className="h-5 w-5 text-[hsl(var(--success))] flex-shrink-0"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -525,7 +527,7 @@ export default function BulkOperationsPage() {
               </li>
               <li className="flex items-start gap-2">
                 <svg
-                  className="h-5 w-5 text-green-500 flex-shrink-0"
+                  className="h-5 w-5 text-[hsl(var(--success))] flex-shrink-0"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -541,7 +543,7 @@ export default function BulkOperationsPage() {
               </li>
               <li className="flex items-start gap-2">
                 <svg
-                  className="h-5 w-5 text-green-500 flex-shrink-0"
+                  className="h-5 w-5 text-[hsl(var(--success))] flex-shrink-0"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -557,7 +559,7 @@ export default function BulkOperationsPage() {
               </li>
               <li className="flex items-start gap-2">
                 <svg
-                  className="h-5 w-5 text-green-500 flex-shrink-0"
+                  className="h-5 w-5 text-[hsl(var(--success))] flex-shrink-0"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"

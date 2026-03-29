@@ -78,7 +78,7 @@ const statusColors: Record<string, string> = {
   received: 'bg-indigo-100 text-indigo-800',
   inspecting: 'bg-cyan-100 text-cyan-800',
   completed: 'bg-green-100 text-green-800',
-  cancelled: 'bg-gray-100 text-gray-800',
+  cancelled: 'bg-muted text-foreground',
 };
 
 const typeLabels: Record<string, string> = {
@@ -278,7 +278,7 @@ export default function ReturnsPage() {
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
                       <span className="font-semibold text-foreground">#{ret.returnNumber}</span>
-                      <Badge className={statusColors[ret.status] || 'bg-gray-100 text-gray-800'}>
+                      <Badge className={statusColors[ret.status] || 'bg-muted text-foreground'}>
                         {ret.status}
                       </Badge>
                       <Badge variant="outline">{typeLabels[ret.type] || ret.type}</Badge>
@@ -294,7 +294,7 @@ export default function ReturnsPage() {
                     <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
                       <span>{formatDate(ret.createdAt)}</span>
                       <span>{ret.items.length} item(s)</span>
-                      <span className="font-medium text-gray-700">
+                      <span className="font-medium text-foreground">
                         {formatCurrency(ret.refundAmount)}
                       </span>
                     </div>
@@ -402,7 +402,7 @@ export default function ReturnsPage() {
               </div>
               <button
                 onClick={() => setShowDetails(false)}
-                className="text-gray-400 hover:text-muted-foreground"
+                className="text-muted-foreground hover:text-muted-foreground"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path
@@ -418,7 +418,7 @@ export default function ReturnsPage() {
               {/* Status & Type */}
               <div className="flex items-center gap-3">
                 <Badge
-                  className={statusColors[selectedReturn.status] || 'bg-gray-100 text-gray-800'}
+                  className={statusColors[selectedReturn.status] || 'bg-muted text-foreground'}
                 >
                   {selectedReturn.status}
                 </Badge>
@@ -460,9 +460,9 @@ export default function ReturnsPage() {
                           className="w-12 h-12 rounded object-cover"
                         />
                       ) : (
-                        <div className="w-12 h-12 rounded bg-gray-200 flex items-center justify-center">
+                        <div className="w-12 h-12 rounded bg-muted flex items-center justify-center">
                           <svg
-                            className="w-6 h-6 text-gray-400"
+                            className="w-6 h-6 text-muted-foreground"
                             fill="none"
                             viewBox="0 0 24 24"
                             stroke="currentColor"

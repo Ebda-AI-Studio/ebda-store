@@ -179,7 +179,7 @@ export default function StoreCustomersPage() {
 
         <div className="relative w-full sm:w-72">
           <svg
-            className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+            className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -203,7 +203,7 @@ export default function StoreCustomersPage() {
 
       {/* Error */}
       {error && (
-        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <div className="mb-6 rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive">
           {error}
           <button className="ml-4 font-medium underline" onClick={fetchCustomers}>
             Retry
@@ -217,20 +217,20 @@ export default function StoreCustomersPage() {
           <div className="space-y-4 p-6">
             {Array.from({ length: 5 }).map((_, i) => (
               <div key={i} className="flex items-center gap-4 animate-pulse">
-                <div className="h-10 w-10 rounded-full bg-gray-200" />
+                <div className="h-10 w-10 rounded-full bg-muted" />
                 <div className="flex-1 space-y-2">
-                  <div className="h-4 w-32 rounded bg-gray-200" />
-                  <div className="h-3 w-48 rounded bg-gray-200" />
+                  <div className="h-4 w-32 rounded bg-muted" />
+                  <div className="h-3 w-48 rounded bg-muted" />
                 </div>
-                <div className="h-6 w-20 rounded bg-gray-200" />
-                <div className="h-6 w-20 rounded bg-gray-200" />
+                <div className="h-6 w-20 rounded bg-muted" />
+                <div className="h-6 w-20 rounded bg-muted" />
               </div>
             ))}
           </div>
         ) : filteredCustomers.length === 0 ? (
           <div className="py-16 text-center">
             <svg
-              className="mx-auto h-12 w-12 text-gray-300"
+              className="mx-auto h-12 w-12 text-muted-foreground"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -271,7 +271,7 @@ export default function StoreCustomersPage() {
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-border">
                 {filteredCustomers.map(customer => (
                   <tr key={customer.id} className="hover:bg-muted transition-colors">
                     <td className="px-6 py-4">
@@ -304,7 +304,7 @@ export default function StoreCustomersPage() {
                       {/* Link to store orders filtered by this customer's name/email */}
                       <Link
                         href={`/stores/${storeId}/orders`}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-muted transition-colors"
+                        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-foreground border border-border rounded-lg hover:bg-muted transition-colors"
                         title="View orders for this customer"
                       >
                         <svg

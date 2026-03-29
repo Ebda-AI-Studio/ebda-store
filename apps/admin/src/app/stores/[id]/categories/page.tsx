@@ -232,7 +232,7 @@ export default function StoreCategoriesPage() {
       )}
 
       {/* Categories List */}
-      <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
+      <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
         <CategoryTable
           categories={categories}
           isLoading={isLoading}
@@ -246,9 +246,9 @@ export default function StoreCategoriesPage() {
       {/* Delete Confirmation Dialog */}
       {deleteTarget && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-2">Delete Category</h2>
-            <p className="text-sm text-gray-600 mb-6">
+          <div className="bg-card rounded-xl shadow-xl w-full max-w-sm p-6">
+            <h2 className="text-lg font-semibold text-foreground mb-2">Delete Category</h2>
+            <p className="text-sm text-muted-foreground mb-6">
               Delete category &quot;{deleteTarget.name}&quot;? This cannot be undone.
             </p>
             <div className="flex items-center justify-end gap-3">

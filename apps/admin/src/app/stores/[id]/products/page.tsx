@@ -150,8 +150,8 @@ export default function StoreProductsPage() {
         );
       case 'archived':
         return (
-          <span className={`${base} bg-gray-100 text-gray-600`}>
-            <span className="h-1.5 w-1.5 rounded-full bg-gray-400" />
+          <span className={`${base} bg-muted text-muted-foreground`}>
+            <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground" />
             Archived
           </span>
         );
@@ -408,7 +408,7 @@ export default function StoreProductsPage() {
                 >
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-lg bg-gray-100 overflow-hidden">
+                      <div className="h-10 w-10 rounded-lg bg-muted overflow-hidden">
                         {product.images?.[0] ? (
                           <img
                             src={product.images[0].url}
@@ -416,7 +416,7 @@ export default function StoreProductsPage() {
                             className="h-full w-full object-cover"
                           />
                         ) : (
-                          <div className="h-full w-full flex items-center justify-center text-gray-400">
+                          <div className="h-full w-full flex items-center justify-center text-muted-foreground">
                             <svg
                               className="h-5 w-5"
                               fill="none"
@@ -449,10 +449,10 @@ export default function StoreProductsPage() {
                     <span
                       className={`text-sm font-medium ${
                         product.inventory === 0
-                          ? 'text-red-600'
+                          ? 'text-destructive'
                           : product.inventory < 10
                             ? 'text-yellow-600'
-                            : 'text-green-600'
+                            : 'text-[hsl(var(--success))]'
                       }`}
                     >
                       {product.inventory}

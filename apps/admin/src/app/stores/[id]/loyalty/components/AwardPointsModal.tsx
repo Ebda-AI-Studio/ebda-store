@@ -36,7 +36,7 @@ export function AwardPointsModal({ member, saving, onSubmit, onClose }: AwardPoi
       <div className="bg-card rounded-xl shadow-xl w-full max-w-md">
         <div className="flex items-center justify-between p-6 border-b border-border">
           <h2 className="text-xl font-semibold text-foreground">Award Points</h2>
-          <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600">
+          <button onClick={onClose} className="p-2 text-muted-foreground hover:text-foreground">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
@@ -60,7 +60,7 @@ export function AwardPointsModal({ member, saving, onSubmit, onClose }: AwardPoi
 
           <div>
             <label className="block text-sm font-medium text-muted-foreground mb-2">
-              Points <span className="text-red-500">*</span>
+              Points <span className="text-destructive">*</span>
             </label>
             <input
               type="number"
@@ -85,7 +85,7 @@ export function AwardPointsModal({ member, saving, onSubmit, onClose }: AwardPoi
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-gray-700 border border-border rounded-lg hover:bg-muted"
+              className="px-4 py-2 text-foreground border border-border rounded-lg hover:bg-muted"
             >
               Cancel
             </button>

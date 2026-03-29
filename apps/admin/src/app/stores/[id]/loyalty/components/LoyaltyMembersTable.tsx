@@ -46,7 +46,7 @@ export function LoyaltyMembersTable({
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors capitalize ${
               tierFilter === t
                 ? 'bg-orange-500 text-white'
-                : 'bg-card text-gray-700 hover:bg-gray-100 border border-border'
+                : 'bg-card text-foreground hover:bg-muted border border-border'
             }`}
           >
             {t}
@@ -57,9 +57,9 @@ export function LoyaltyMembersTable({
       {/* Members Table */}
       {members.length === 0 ? (
         <div className="p-12 text-center">
-          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
             <svg
-              className="w-8 h-8 text-gray-400"
+              className="w-8 h-8 text-muted-foreground"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -73,7 +73,7 @@ export function LoyaltyMembersTable({
             </svg>
           </div>
           <h3 className="text-lg font-semibold text-foreground mb-2">No Members Yet</h3>
-          <p className="text-gray-600">
+          <p className="text-muted-foreground">
             Customers will appear here when they join your loyalty program
           </p>
         </div>

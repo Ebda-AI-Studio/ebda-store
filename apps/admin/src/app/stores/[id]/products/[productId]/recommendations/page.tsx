@@ -108,7 +108,7 @@ function ProductSearch({
 
   return (
     <div ref={containerRef} className="relative">
-      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+      <label className="block text-sm font-medium text-foreground mb-1">{label}</label>
       <div className="relative">
         <Input
           value={query}
@@ -125,15 +125,15 @@ function ProductSearch({
       </div>
 
       {open && results.length > 0 && (
-        <div className="absolute z-10 mt-1 w-full rounded-lg border bg-white shadow-lg max-h-60 overflow-y-auto">
+        <div className="absolute z-10 mt-1 w-full rounded-lg border bg-card shadow-lg max-h-60 overflow-y-auto">
           {results.map(product => (
             <button
               key={product.id}
               type="button"
               onClick={() => handleSelect(product)}
-              className="flex w-full items-center gap-3 px-3 py-2 hover:bg-gray-50 text-left"
+              className="flex w-full items-center gap-3 px-3 py-2 hover:bg-muted text-left"
             >
-              <div className="h-8 w-8 rounded-md bg-gray-100 overflow-hidden flex-shrink-0">
+              <div className="h-8 w-8 rounded-md bg-muted overflow-hidden flex-shrink-0">
                 {product.images?.[0] ? (
                   <img
                     src={product.images[0].url}
@@ -141,7 +141,7 @@ function ProductSearch({
                     className="h-full w-full object-cover"
                   />
                 ) : (
-                  <div className="h-full w-full flex items-center justify-center text-gray-300">
+                  <div className="h-full w-full flex items-center justify-center text-muted-foreground">
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path
                         strokeLinecap="round"
@@ -153,14 +153,14 @@ function ProductSearch({
                   </div>
                 )}
               </div>
-              <span className="text-sm text-gray-800 truncate">{product.name}</span>
+              <span className="text-sm text-foreground truncate">{product.name}</span>
             </button>
           ))}
         </div>
       )}
 
       {open && !searching && query.trim() && results.length === 0 && (
-        <div className="absolute z-10 mt-1 w-full rounded-lg border bg-white shadow-lg px-3 py-4 text-center text-sm text-gray-500">
+        <div className="absolute z-10 mt-1 w-full rounded-lg border bg-card shadow-lg px-3 py-4 text-center text-sm text-muted-foreground">
           No products found
         </div>
       )}
@@ -177,8 +177,8 @@ interface SelectedProductCardProps {
 
 function SelectedProductCard({ product, onRemove }: SelectedProductCardProps) {
   return (
-    <div className="flex items-center gap-3 rounded-lg border bg-white px-3 py-2">
-      <div className="h-10 w-10 rounded-md bg-gray-100 overflow-hidden flex-shrink-0">
+    <div className="flex items-center gap-3 rounded-lg border bg-card px-3 py-2">
+      <div className="h-10 w-10 rounded-md bg-muted overflow-hidden flex-shrink-0">
         {product.images?.[0] ? (
           <img
             src={product.images[0].url}
@@ -186,7 +186,7 @@ function SelectedProductCard({ product, onRemove }: SelectedProductCardProps) {
             className="h-full w-full object-cover"
           />
         ) : (
-          <div className="h-full w-full flex items-center justify-center text-gray-300">
+          <div className="h-full w-full flex items-center justify-center text-muted-foreground">
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
                 strokeLinecap="round"
@@ -198,11 +198,11 @@ function SelectedProductCard({ product, onRemove }: SelectedProductCardProps) {
           </div>
         )}
       </div>
-      <span className="flex-1 text-sm font-medium text-gray-800 truncate">{product.name}</span>
+      <span className="flex-1 text-sm font-medium text-foreground truncate">{product.name}</span>
       <button
         type="button"
         onClick={onRemove}
-        className="flex-shrink-0 rounded-md p-1 text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors"
+        className="flex-shrink-0 rounded-md p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
         aria-label={`Remove ${product.name}`}
       >
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -386,7 +386,9 @@ export default function ProductRecommendationsPage() {
       }
     >
       {error && (
-        <div className="mb-6 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">{error}</div>
+        <div className="mb-6 rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {error}
+        </div>
       )}
 
       <div className="grid gap-6 lg:grid-cols-2">

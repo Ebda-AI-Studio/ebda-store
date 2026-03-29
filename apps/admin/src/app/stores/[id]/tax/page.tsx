@@ -319,7 +319,7 @@ export default function TaxSettingsPage() {
                       className="w-32 px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                       disabled={!settings.taxEnabled}
                     />
-                    <span className="text-gray-500">%</span>
+                    <span className="text-muted-foreground">%</span>
                   </div>
                 </div>
               </div>
@@ -360,7 +360,7 @@ export default function TaxSettingsPage() {
                     className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                       filter === f
                         ? 'bg-orange-500 text-white'
-                        : 'bg-card text-gray-700 hover:bg-gray-100 border border-border'
+                        : 'bg-card text-foreground hover:bg-muted border border-border'
                     }`}
                   >
                     {f.charAt(0).toUpperCase() + f.slice(1)}
@@ -371,9 +371,9 @@ export default function TaxSettingsPage() {
               {/* Rates List */}
               {rates.length === 0 ? (
                 <div className="p-12 text-center">
-                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
                     <svg
-                      className="w-8 h-8 text-gray-400"
+                      className="w-8 h-8 text-muted-foreground"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -387,7 +387,7 @@ export default function TaxSettingsPage() {
                     </svg>
                   </div>
                   <h3 className="text-lg font-semibold text-foreground mb-2">No Tax Rates</h3>
-                  <p className="text-gray-600 mb-6">
+                  <p className="text-muted-foreground mb-6">
                     {settings.taxEnabled
                       ? 'Create tax rates for specific regions or product categories'
                       : 'Enable tax collection to start adding tax rates'}
@@ -474,8 +474,8 @@ export default function TaxSettingsPage() {
                             onClick={() => handleToggle(rate)}
                             className={`px-2 py-1 rounded-full text-xs font-medium ${
                               rate.isActive
-                                ? 'bg-green-100 text-green-700'
-                                : 'bg-gray-100 text-gray-600'
+                                ? 'bg-[hsl(var(--success))]/10 text-[hsl(var(--success))]'
+                                : 'bg-muted text-muted-foreground'
                             }`}
                           >
                             {rate.isActive ? 'Active' : 'Inactive'}
@@ -485,7 +485,7 @@ export default function TaxSettingsPage() {
                           <div className="flex items-center justify-end gap-2">
                             <button
                               onClick={() => handleOpenModal(rate)}
-                              className="p-2 text-gray-500 hover:text-orange-500 transition-colors"
+                              className="p-2 text-muted-foreground hover:text-orange-500 transition-colors"
                               title="Edit"
                             >
                               <svg
@@ -504,7 +504,7 @@ export default function TaxSettingsPage() {
                             </button>
                             <button
                               onClick={() => handleDelete(rate)}
-                              className="p-2 text-gray-500 hover:text-red-500 transition-colors"
+                              className="p-2 text-muted-foreground hover:text-destructive transition-colors"
                               title="Delete"
                             >
                               <svg
@@ -570,7 +570,7 @@ export default function TaxSettingsPage() {
                 </h2>
                 <button
                   onClick={handleCloseModal}
-                  className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                  className="p-2 text-muted-foreground hover:text-foreground transition-colors"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
@@ -596,7 +596,7 @@ export default function TaxSettingsPage() {
                           key={template.name}
                           type="button"
                           onClick={() => applyTaxTemplate(template)}
-                          className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200 transition-colors"
+                          className="px-3 py-1.5 bg-muted text-foreground rounded-lg text-sm hover:bg-muted/80 transition-colors"
                         >
                           {template.name} ({template.rate}%)
                         </button>
@@ -609,7 +609,7 @@ export default function TaxSettingsPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-muted-foreground mb-2">
-                      Tax Name <span className="text-red-500">*</span>
+                      Tax Name <span className="text-destructive">*</span>
                     </label>
                     <input
                       type="text"
@@ -638,7 +638,7 @@ export default function TaxSettingsPage() {
                 {/* Rate */}
                 <div>
                   <label className="block text-sm font-medium text-muted-foreground mb-2">
-                    Tax Rate (%) <span className="text-red-500">*</span>
+                    Tax Rate (%) <span className="text-destructive">*</span>
                   </label>
                   <div className="flex items-center gap-3">
                     <input
@@ -652,7 +652,7 @@ export default function TaxSettingsPage() {
                       className="w-32 px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                       required
                     />
-                    <span className="text-gray-500">%</span>
+                    <span className="text-muted-foreground">%</span>
                   </div>
                 </div>
 
@@ -722,7 +722,7 @@ export default function TaxSettingsPage() {
                       <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-500"></div>
                     </label>
                     <div>
-                      <span className="text-sm text-gray-900 font-medium">Compound Tax</span>
+                      <span className="text-sm text-foreground font-medium">Compound Tax</span>
                       <p className="text-xs text-muted-foreground">
                         Calculate on subtotal + previous taxes
                       </p>
@@ -739,7 +739,7 @@ export default function TaxSettingsPage() {
                       />
                       <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div>
                     </label>
-                    <span className="text-sm text-gray-700">Active</span>
+                    <span className="text-sm text-foreground">Active</span>
                   </div>
                 </div>
 
@@ -748,7 +748,7 @@ export default function TaxSettingsPage() {
                   <button
                     type="button"
                     onClick={handleCloseModal}
-                    className="px-4 py-2 text-gray-700 border border-border rounded-lg hover:bg-muted transition-colors"
+                    className="px-4 py-2 text-foreground border border-border rounded-lg hover:bg-muted transition-colors"
                   >
                     Cancel
                   </button>

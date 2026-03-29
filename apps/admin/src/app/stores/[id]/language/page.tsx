@@ -67,7 +67,7 @@ export default function LanguagePage() {
     return (
       <AdminLayout title="Language Settings" subtitle="Loading...">
         <div className="animate-pulse space-y-4">
-          <div className="h-40 rounded-xl bg-gray-200" />
+          <div className="h-40 rounded-xl bg-muted" />
         </div>
       </AdminLayout>
     );
@@ -80,7 +80,7 @@ export default function LanguagePage() {
       actions={
         <div className="flex gap-2">
           <Link href={`/stores/${storeId}/settings`}>
-            <button className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 font-medium">
+            <button className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted font-medium">
               Back to Settings
             </button>
           </Link>
@@ -95,10 +95,10 @@ export default function LanguagePage() {
       }
     >
       <div className="space-y-6">
-        <div className="rounded-xl border bg-white p-6 shadow-sm space-y-4">
+        <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
           <div>
-            <h2 className="font-semibold text-gray-900">Default Storefront Language</h2>
-            <p className="mt-1 text-sm text-gray-500">
+            <h2 className="font-semibold text-foreground">Default Storefront Language</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
               New visitors will see the storefront in this language. They can still switch languages
               manually.
             </p>
@@ -111,13 +111,13 @@ export default function LanguagePage() {
               className={`flex items-center gap-3 rounded-xl border-2 p-4 transition-all ${
                 defaultLanguage === 'en'
                   ? 'border-primary bg-primary/5'
-                  : 'border-gray-200 hover:border-gray-300'
+                  : 'border-border hover:border-border'
               }`}
             >
               <span className="text-2xl">🇬🇧</span>
               <div className="text-left">
-                <p className="font-medium text-gray-900">English</p>
-                <p className="text-sm text-gray-500">Left-to-right layout</p>
+                <p className="font-medium text-foreground">English</p>
+                <p className="text-sm text-muted-foreground">Left-to-right layout</p>
               </div>
               {defaultLanguage === 'en' && (
                 <svg
@@ -140,13 +140,13 @@ export default function LanguagePage() {
               className={`flex items-center gap-3 rounded-xl border-2 p-4 transition-all ${
                 defaultLanguage === 'ar'
                   ? 'border-primary bg-primary/5'
-                  : 'border-gray-200 hover:border-gray-300'
+                  : 'border-border hover:border-border'
               }`}
             >
               <span className="text-2xl">🇰🇼</span>
               <div className="text-left">
-                <p className="font-medium text-gray-900">العربية</p>
-                <p className="text-sm text-gray-500">Right-to-left layout</p>
+                <p className="font-medium text-foreground">العربية</p>
+                <p className="text-sm text-muted-foreground">Right-to-left layout</p>
               </div>
               {defaultLanguage === 'ar' && (
                 <svg
@@ -169,8 +169,8 @@ export default function LanguagePage() {
           <div
             className={`rounded-xl p-4 text-sm ${
               message.type === 'success'
-                ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
-                : 'bg-red-50 border border-red-200 text-red-700'
+                ? 'bg-[hsl(var(--success))]/10 border border-[hsl(var(--success))]/20 text-[hsl(var(--success))]'
+                : 'bg-destructive/10 border border-destructive/20 text-destructive'
             }`}
           >
             {message.text}

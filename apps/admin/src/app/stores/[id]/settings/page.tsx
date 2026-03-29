@@ -314,7 +314,7 @@ export default function StoreSettingsPage() {
       subtitle="Configure all aspects of this store"
       actions={
         <Link href={`/stores/${storeId}`}>
-          <button className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 font-medium">
+          <button className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted font-medium">
             Back to Store
           </button>
         </Link>
@@ -325,12 +325,12 @@ export default function StoreSettingsPage() {
           ? Array.from({ length: 9 }).map((_, i) => (
               <div
                 key={i}
-                className="flex items-start gap-4 rounded-xl border bg-white p-6 shadow-sm animate-pulse"
+                className="flex items-start gap-4 rounded-xl border bg-card p-6 shadow-sm animate-pulse"
               >
-                <div className="h-12 w-12 flex-shrink-0 rounded-xl bg-gray-200" />
+                <div className="h-12 w-12 flex-shrink-0 rounded-xl bg-muted" />
                 <div className="flex-1 space-y-2">
-                  <div className="h-4 w-24 rounded bg-gray-200" />
-                  <div className="h-3 w-full rounded bg-gray-100" />
+                  <div className="h-4 w-24 rounded bg-muted" />
+                  <div className="h-3 w-full rounded bg-muted" />
                 </div>
               </div>
             ))
@@ -340,7 +340,7 @@ export default function StoreSettingsPage() {
                 <Link
                   key={card.href}
                   href={card.href}
-                  className="group flex items-start gap-4 rounded-xl border bg-white p-6 shadow-sm transition-all hover:border-primary hover:shadow-md"
+                  className="group flex items-start gap-4 rounded-xl border bg-card p-6 shadow-sm transition-all hover:border-primary hover:shadow-md"
                 >
                   <div
                     className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl ${card.color} transition-transform group-hover:scale-110`}
@@ -348,10 +348,12 @@ export default function StoreSettingsPage() {
                     {card.icon}
                   </div>
                   <div className="min-w-0">
-                    <h3 className="font-semibold text-gray-900 group-hover:text-primary transition-colors">
+                    <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">
                       {card.title}
                     </h3>
-                    <p className="mt-1 text-sm text-gray-500 leading-snug">{card.description}</p>
+                    <p className="mt-1 text-sm text-muted-foreground leading-snug">
+                      {card.description}
+                    </p>
                   </div>
                 </Link>
               ))}

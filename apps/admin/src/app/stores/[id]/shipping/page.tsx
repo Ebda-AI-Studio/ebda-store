@@ -241,7 +241,7 @@ export default function ShippingSettingsPage() {
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                 filter === f
                   ? 'bg-orange-500 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  : 'bg-muted text-foreground hover:bg-muted/80'
               }`}
             >
               {f.charAt(0).toUpperCase() + f.slice(1)}
@@ -256,9 +256,9 @@ export default function ShippingSettingsPage() {
           </div>
         ) : zones.length === 0 ? (
           <div className="bg-card rounded-xl border border-border p-12 text-center">
-            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
               <svg
-                className="w-8 h-8 text-gray-400"
+                className="w-8 h-8 text-muted-foreground"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -328,13 +328,13 @@ export default function ShippingSettingsPage() {
                         {zone.areas.slice(0, 3).map((area, i) => (
                           <span
                             key={i}
-                            className="px-2 py-0.5 bg-gray-100 text-gray-700 text-xs rounded"
+                            className="px-2 py-0.5 bg-muted text-foreground text-xs rounded"
                           >
                             {area}
                           </span>
                         ))}
                         {zone.areas.length > 3 && (
-                          <span className="px-2 py-0.5 bg-gray-100 text-gray-500 text-xs rounded">
+                          <span className="px-2 py-0.5 bg-muted text-muted-foreground text-xs rounded">
                             +{zone.areas.length - 3} more
                           </span>
                         )}
@@ -351,7 +351,7 @@ export default function ShippingSettingsPage() {
                           Over {(zone.freeShippingThreshold / 1000).toFixed(3)} KWD
                         </span>
                       ) : (
-                        <span className="text-gray-400">-</span>
+                        <span className="text-muted-foreground">-</span>
                       )}
                     </td>
                     <td className="px-6 py-4 text-sm text-muted-foreground">
@@ -363,7 +363,7 @@ export default function ShippingSettingsPage() {
                         className={`px-2 py-1 rounded-full text-xs font-medium ${
                           zone.isActive
                             ? 'bg-green-100 text-green-700'
-                            : 'bg-gray-100 text-gray-600'
+                            : 'bg-muted text-muted-foreground'
                         }`}
                       >
                         {zone.isActive ? 'Active' : 'Inactive'}
@@ -373,7 +373,7 @@ export default function ShippingSettingsPage() {
                       <div className="flex items-center justify-end gap-2">
                         <button
                           onClick={() => handleOpenModal(zone)}
-                          className="p-2 text-gray-500 hover:text-orange-500 transition-colors"
+                          className="p-2 text-muted-foreground hover:text-orange-500 transition-colors"
                           title="Edit"
                         >
                           <svg
@@ -392,7 +392,7 @@ export default function ShippingSettingsPage() {
                         </button>
                         <button
                           onClick={() => handleDelete(zone)}
-                          className="p-2 text-gray-500 hover:text-red-500 transition-colors"
+                          className="p-2 text-muted-foreground hover:text-destructive transition-colors"
                           title="Delete"
                         >
                           <svg
@@ -428,7 +428,7 @@ export default function ShippingSettingsPage() {
                 </h2>
                 <button
                   onClick={handleCloseModal}
-                  className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                  className="p-2 text-muted-foreground hover:text-foreground transition-colors"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
@@ -581,7 +581,7 @@ export default function ShippingSettingsPage() {
                     />
                     <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div>
                   </label>
-                  <span className="text-sm text-gray-700">Active</span>
+                  <span className="text-sm text-foreground">Active</span>
                 </div>
 
                 {/* Actions */}
@@ -589,7 +589,7 @@ export default function ShippingSettingsPage() {
                   <button
                     type="button"
                     onClick={handleCloseModal}
-                    className="px-4 py-2 text-gray-700 border border-border rounded-lg hover:bg-muted transition-colors"
+                    className="px-4 py-2 text-foreground border border-border rounded-lg hover:bg-muted transition-colors"
                   >
                     Cancel
                   </button>

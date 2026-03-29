@@ -139,7 +139,7 @@ export default function StoreTemplatePage() {
   if (!store) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-500">Store not found</p>
+        <p className="text-muted-foreground">Store not found</p>
         <Link href="/stores" className="text-primary hover:underline mt-2 inline-block">
           Back to stores
         </Link>
@@ -155,7 +155,7 @@ export default function StoreTemplatePage() {
         <div className="flex items-center gap-3">
           <Link
             href={`/stores/${storeId}`}
-            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+            className="px-4 py-2 border border-border rounded-lg hover:bg-muted"
           >
             Cancel
           </Link>
@@ -180,10 +180,10 @@ export default function StoreTemplatePage() {
               <button
                 key={template.id}
                 onClick={() => setSelectedTemplate(template.id)}
-                className={`relative text-left bg-white rounded-2xl border-2 overflow-hidden transition-all hover:shadow-lg ${
+                className={`relative text-left bg-card rounded-2xl border-2 overflow-hidden transition-all hover:shadow-lg ${
                   isSelected
                     ? 'border-primary ring-4 ring-primary/20'
-                    : 'border-gray-200 hover:border-gray-300'
+                    : 'border-border hover:border-border'
                 }`}
               >
                 {/* Preview */}
@@ -212,20 +212,20 @@ export default function StoreTemplatePage() {
 
                 {/* Info */}
                 <div className="p-4">
-                  <p className="text-gray-600 text-sm mb-3">{template.description}</p>
+                  <p className="text-muted-foreground text-sm mb-3">{template.description}</p>
 
                   <div className="flex flex-wrap gap-2 mb-3">
                     {template.tags.map(tag => (
                       <span
                         key={tag}
-                        className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded-full"
+                        className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full"
                       >
                         {tag}
                       </span>
                     ))}
                   </div>
 
-                  <p className="text-xs text-gray-400">{template.bestFor}</p>
+                  <p className="text-xs text-muted-foreground">{template.bestFor}</p>
                 </div>
 
                 {/* Selection Indicator */}

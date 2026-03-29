@@ -231,7 +231,11 @@ export default function EditProductPage() {
       subtitle={`Store: ${product?.store?.name || 'Unknown'}`}
     >
       <form onSubmit={handleSubmit}>
-        {error && <div className="mb-6 rounded-lg bg-red-50 p-4 text-sm text-red-600">{error}</div>}
+        {error && (
+          <div className="mb-6 rounded-lg bg-destructive/10 p-4 text-sm text-destructive">
+            {error}
+          </div>
+        )}
 
         <div className="grid gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2 space-y-6">
@@ -353,18 +357,18 @@ export default function EditProductPage() {
                     type="checkbox"
                     checked={formData.isFeatured}
                     onChange={e => updateField('isFeatured', e.target.checked)}
-                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
                   />
-                  <span className="text-sm text-gray-700">Featured Product</span>
+                  <span className="text-sm text-foreground">Featured Product</span>
                 </label>
                 <label className="flex items-center gap-3 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={formData.isNew}
                     onChange={e => updateField('isNew', e.target.checked)}
-                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
                   />
-                  <span className="text-sm text-gray-700">New Arrival</span>
+                  <span className="text-sm text-foreground">New Arrival</span>
                 </label>
               </div>
             </div>

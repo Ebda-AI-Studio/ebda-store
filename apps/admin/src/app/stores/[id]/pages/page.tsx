@@ -154,9 +154,9 @@ export default function StorePagesPage() {
     links: FooterLink[]
   ) {
     return (
-      <div className="rounded-xl border bg-white p-6 shadow-sm">
+      <div className="rounded-xl border bg-card p-6 shadow-sm">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+          <h2 className="text-lg font-semibold text-foreground">{title}</h2>
           <button
             onClick={() => addLink(section)}
             className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
@@ -281,10 +281,10 @@ export default function StorePagesPage() {
         {renderLinkEditor('Company Links', 'company', companyLinks)}
 
         {/* Newsletter Toggle */}
-        <div className="rounded-xl border bg-white p-6 shadow-sm">
+        <div className="rounded-xl border bg-card p-6 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">Newsletter Section</h2>
+              <h2 className="text-lg font-semibold text-foreground">Newsletter Section</h2>
               <p className="text-sm text-gray-500 mt-1">
                 Show or hide the newsletter signup form in the footer.
               </p>

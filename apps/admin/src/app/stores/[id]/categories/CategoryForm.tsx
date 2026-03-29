@@ -39,9 +39,9 @@ export function CategoryForm({
   slugify,
 }: CategoryFormProps) {
   return (
-    <div className="mb-6 rounded-xl border bg-white shadow-sm">
+    <div className="mb-6 rounded-xl border bg-card shadow-sm">
       <div className="flex items-center justify-between border-b p-4">
-        <h2 className="font-semibold text-gray-900">
+        <h2 className="font-semibold text-foreground">
           {editingId ? 'Edit Category' : 'Add Category'}
         </h2>
         <button

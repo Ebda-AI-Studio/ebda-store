@@ -28,7 +28,7 @@ export default function LoginPage() {
 
   if (authLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+      <div className="flex min-h-screen items-center justify-center bg-muted">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
       </div>
     );
@@ -43,15 +43,21 @@ export default function LoginPage() {
             <div className="flex justify-center">
               <Image src="/logo.svg" alt="Force Media" width={48} height={36} unoptimized />
             </div>
-            <h2 className="mt-6 text-3xl font-bold text-gray-900">Admin Login</h2>
-            <p className="mt-2 text-sm text-gray-600">Sign in to access the Force Platform</p>
+            <h2 className="mt-6 text-3xl font-bold text-foreground">Admin Login</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Sign in to access the Force Platform
+            </p>
           </div>
 
           <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-            {error && <div className="rounded-lg bg-red-50 p-4 text-sm text-red-600">{error}</div>}
+            {error && (
+              <div className="rounded-lg bg-destructive/10 p-4 text-sm text-destructive">
+                {error}
+              </div>
+            )}
 
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="email" className="block text-sm font-medium text-foreground">
                 Email address
               </label>
               <Input
@@ -68,7 +74,7 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="password" className="block text-sm font-medium text-foreground">
                 Password
               </label>
               <Input
@@ -110,7 +116,9 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          <p className="mt-8 text-center text-xs text-gray-500">Force Platform Admin Panel</p>
+          <p className="mt-8 text-center text-xs text-muted-foreground">
+            Force Platform Admin Panel
+          </p>
         </div>
       </div>
 

@@ -71,7 +71,7 @@ function ToggleSwitch({
       onClick={() => !disabled && onChange(!enabled)}
       disabled={disabled}
       className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${
-        enabled ? 'bg-orange-500' : 'bg-gray-200'
+        enabled ? 'bg-orange-500' : 'bg-muted'
       }`}
     >
       <span
@@ -279,9 +279,9 @@ export default function StoreFeaturesPage() {
     return (
       <AdminLayout title="Store Features" subtitle="Manage feature toggles for this store">
         <div className="flex flex-col items-center justify-center h-64 gap-4">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
+          <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center">
             <svg
-              className="w-8 h-8 text-red-500"
+              className="w-8 h-8 text-destructive"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -294,7 +294,7 @@ export default function StoreFeaturesPage() {
               />
             </svg>
           </div>
-          <p className="text-gray-600">{error || 'Failed to load features.'}</p>
+          <p className="text-muted-foreground">{error || 'Failed to load features.'}</p>
           <button
             onClick={fetchFeatures}
             className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
@@ -330,7 +330,7 @@ export default function StoreFeaturesPage() {
             <button
               onClick={() => setLocalState({})}
               disabled={saving}
-              className="px-4 py-2 text-sm font-medium text-gray-700 border border-border rounded-lg hover:bg-muted transition-colors disabled:opacity-50"
+              className="px-4 py-2 text-sm font-medium text-foreground border border-border rounded-lg hover:bg-muted transition-colors disabled:opacity-50"
             >
               Discard
             </button>
@@ -432,7 +432,7 @@ export default function StoreFeaturesPage() {
                 <button
                   onClick={() => setLocalState({})}
                   disabled={saving}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 border border-border rounded-lg hover:bg-muted transition-colors disabled:opacity-50"
+                  className="px-4 py-2 text-sm font-medium text-foreground border border-border rounded-lg hover:bg-muted transition-colors disabled:opacity-50"
                 >
                   Discard
                 </button>

@@ -336,7 +336,7 @@ export default function MarketingPixelsPage() {
               <div
                 key={platform.id}
                 className={`bg-card rounded-xl border transition-all ${
-                  isEnabled ? 'border-primary/30 shadow-sm' : 'border-gray-200'
+                  isEnabled ? 'border-primary/30 shadow-sm' : 'border-border'
                 }`}
               >
                 {/* Platform Header */}
@@ -357,9 +357,7 @@ export default function MarketingPixelsPage() {
                     {/* Status Badge */}
                     <span
                       className={`px-2 py-1 text-xs font-medium rounded-full ${
-                        isEnabled
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-gray-100 text-muted-foreground'
+                        isEnabled ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground'
                       }`}
                     >
                       {isEnabled ? 'Active' : 'Inactive'}
@@ -382,7 +380,7 @@ export default function MarketingPixelsPage() {
                     </button>
                     {/* Expand Icon */}
                     <svg
-                      className={`w-5 h-5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                      className={`w-5 h-5 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`}
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -399,10 +397,10 @@ export default function MarketingPixelsPage() {
 
                 {/* Platform Config (Expanded) */}
                 {isExpanded && (
-                  <div className="border-t border-gray-100 p-4 space-y-4 bg-muted/50">
+                  <div className="border-t border-border p-4 space-y-4 bg-muted/50">
                     {/* Main ID Field */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-sm font-medium text-foreground mb-1">
                         {platform.idLabel}
                       </label>
                       <input
@@ -411,14 +409,14 @@ export default function MarketingPixelsPage() {
                         onChange={e => updatePixel(platform.id, getIdField(), e.target.value)}
                         placeholder={platform.idPlaceholder}
                         disabled={!isEnabled}
-                        className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:bg-muted disabled:cursor-not-allowed"
                       />
                     </div>
 
                     {/* Access Token (for Meta, TikTok) */}
                     {platform.hasAccessToken && (
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label className="block text-sm font-medium text-foreground mb-1">
                           Access Token (Optional - for Conversions API)
                         </label>
                         <input
@@ -427,7 +425,7 @@ export default function MarketingPixelsPage() {
                           onChange={e => updatePixel(platform.id, 'accessToken', e.target.value)}
                           placeholder="Enter access token for server-side tracking"
                           disabled={!isEnabled}
-                          className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:bg-gray-100 disabled:cursor-not-allowed"
+                          className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:bg-muted disabled:cursor-not-allowed"
                         />
                         <p className="text-xs text-muted-foreground mt-1">
                           Access tokens enable server-side event tracking for better accuracy
@@ -438,7 +436,7 @@ export default function MarketingPixelsPage() {
                     {/* Conversion Label (for Google Ads) */}
                     {platform.hasConversionLabel && (
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label className="block text-sm font-medium text-foreground mb-1">
                           Conversion Label (Optional)
                         </label>
                         <input
@@ -449,7 +447,7 @@ export default function MarketingPixelsPage() {
                           }
                           placeholder="e.g., AbC123def456"
                           disabled={!isEnabled}
-                          className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:bg-gray-100 disabled:cursor-not-allowed"
+                          className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:bg-muted disabled:cursor-not-allowed"
                         />
                       </div>
                     )}

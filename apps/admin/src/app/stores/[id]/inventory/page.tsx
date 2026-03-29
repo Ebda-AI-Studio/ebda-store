@@ -283,7 +283,7 @@ export default function InventoryPage() {
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                 activeTab === 'products'
                   ? 'bg-orange-500 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  : 'bg-muted text-foreground hover:bg-muted/80'
               }`}
             >
               Products
@@ -293,7 +293,7 @@ export default function InventoryPage() {
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                 activeTab === 'history'
                   ? 'bg-orange-500 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  : 'bg-muted text-foreground hover:bg-muted/80'
               }`}
             >
               History
@@ -303,7 +303,7 @@ export default function InventoryPage() {
               className={`px-4 py-2 rounded-lg font-medium transition-colors relative ${
                 activeTab === 'alerts'
                   ? 'bg-orange-500 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  : 'bg-muted text-foreground hover:bg-muted/80'
               }`}
             >
               Alerts
@@ -337,7 +337,7 @@ export default function InventoryPage() {
                       className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                         stockFilter === filter
                           ? 'bg-orange-500 text-white'
-                          : 'bg-card text-gray-700 hover:bg-gray-100 border border-border'
+                          : 'bg-card text-foreground hover:bg-muted border border-border'
                       }`}
                     >
                       {filter === 'all' ? 'All' : STOCK_STATUS_STYLES[filter].label}
@@ -616,7 +616,7 @@ export default function InventoryPage() {
                   setShowAdjustModal(false);
                   setSelectedProduct(null);
                 }}
-                className="p-2 text-gray-400 hover:text-gray-600"
+                className="p-2 text-muted-foreground hover:text-foreground"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
@@ -638,7 +638,7 @@ export default function InventoryPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-foreground mb-2">
                   Adjustment Type
                 </label>
                 <select
@@ -655,7 +655,7 @@ export default function InventoryPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-foreground mb-2">
                   Quantity <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -680,7 +680,7 @@ export default function InventoryPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Reason</label>
+                <label className="block text-sm font-medium text-foreground mb-2">Reason</label>
                 <input
                   type="text"
                   value={adjustReason}
@@ -697,7 +697,7 @@ export default function InventoryPage() {
                     setShowAdjustModal(false);
                     setSelectedProduct(null);
                   }}
-                  className="px-4 py-2 text-gray-700 border border-border rounded-lg hover:bg-muted"
+                  className="px-4 py-2 text-foreground border border-border rounded-lg hover:bg-muted"
                 >
                   Cancel
                 </button>
