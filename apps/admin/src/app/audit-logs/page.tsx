@@ -141,6 +141,7 @@ export default function AuditLogsPage() {
         <select
           value={entityFilter}
           onChange={e => setEntityFilter(e.target.value)}
+          aria-label="Filter by entity"
           className="rounded-lg border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
         >
           <option value="all">All Entities</option>
@@ -154,6 +155,7 @@ export default function AuditLogsPage() {
         <select
           value={actionFilter}
           onChange={e => setActionFilter(e.target.value)}
+          aria-label="Filter by action"
           className="rounded-lg border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
         >
           <option value="all">All Actions</option>
@@ -166,17 +168,17 @@ export default function AuditLogsPage() {
       </div>
 
       {/* Logs List */}
-      <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
+      <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
         <div className="divide-y">
           {isLoading ? (
             Array.from({ length: 10 }).map((_, i) => (
               <div key={i} className="p-4 flex items-start gap-4">
-                <div className="h-10 w-10 bg-gray-200 rounded-lg animate-pulse" />
+                <div className="h-10 w-10 bg-muted rounded-lg animate-pulse" />
                 <div className="flex-1 space-y-2">
-                  <div className="h-4 w-3/4 bg-gray-200 rounded animate-pulse" />
-                  <div className="h-3 w-1/2 bg-gray-200 rounded animate-pulse" />
+                  <div className="h-4 w-3/4 bg-muted rounded animate-pulse" />
+                  <div className="h-3 w-1/2 bg-muted rounded animate-pulse" />
                 </div>
-                <div className="h-4 w-32 bg-gray-200 rounded animate-pulse" />
+                <div className="h-4 w-32 bg-muted rounded animate-pulse" />
               </div>
             ))
           ) : logs.length > 0 ? (
@@ -184,9 +186,9 @@ export default function AuditLogsPage() {
               <div key={log.id} className="p-4">
                 <div className="flex items-start gap-4">
                   {/* Entity Icon */}
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
                     <svg
-                      className="h-5 w-5 text-gray-600"
+                      className="h-5 w-5 text-muted-foreground"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -204,7 +206,9 @@ export default function AuditLogsPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <Badge variant={getActionColor(log.action)}>{log.action}</Badge>
-                      <span className="text-sm text-gray-500 capitalize">{log.entityType}</span>
+                      <span className="text-sm text-muted-foreground capitalize">
+                        {log.entityType}
+                      </span>
                       {log.store && (
                         <Link
                           href={`/stores/${log.store.id}`}
@@ -214,7 +218,7 @@ export default function AuditLogsPage() {
                         </Link>
                       )}
                     </div>
-                    <p className="mt-1 text-sm text-gray-900">
+                    <p className="mt-1 text-sm text-foreground">
                       {log.user ? (
                         <Link
                           href={`/users/${log.user.id}`}
@@ -223,14 +227,17 @@ export default function AuditLogsPage() {
                           {log.user.firstName} {log.user.lastName}
                         </Link>
                       ) : (
-                        <span className="font-medium text-gray-500">System</span>
+                        <span className="font-medium text-muted-foreground">System</span>
                       )}{' '}
                       {log.action.toLowerCase()} {log.entityType}
                       {log.entityId && (
-                        <span className="text-gray-500"> (ID: {log.entityId.slice(0, 8)}...)</span>
+                        <span className="text-muted-foreground">
+                          {' '}
+                          (ID: {log.entityId.slice(0, 8)}...)
+                        </span>
                       )}
                     </p>
-                    <p className="mt-1 text-xs text-gray-400">
+                    <p className="mt-1 text-xs text-muted-foreground">
                       {log.ipAddress} | {log.userAgent?.slice(0, 50)}...
                     </p>
 
@@ -244,7 +251,7 @@ export default function AuditLogsPage() {
                       </button>
                     )}
                     {expandedLog === log.id && (
-                      <pre className="mt-2 p-3 bg-gray-50 rounded-lg text-xs text-gray-700 overflow-x-auto">
+                      <pre className="mt-2 p-3 bg-muted rounded-lg text-xs text-foreground overflow-x-auto">
                         {JSON.stringify(log.details, null, 2)}
                       </pre>
                     )}
@@ -252,7 +259,7 @@ export default function AuditLogsPage() {
 
                   {/* Timestamp */}
                   <div className="text-right flex-shrink-0">
-                    <p className="text-sm text-gray-500">{formatDateTime(log.createdAt)}</p>
+                    <p className="text-sm text-muted-foreground">{formatDateTime(log.createdAt)}</p>
                   </div>
                 </div>
               </div>
@@ -260,7 +267,7 @@ export default function AuditLogsPage() {
           ) : (
             <div className="p-12 text-center">
               <svg
-                className="mx-auto h-12 w-12 text-gray-400"
+                className="mx-auto h-12 w-12 text-muted-foreground"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -272,7 +279,7 @@ export default function AuditLogsPage() {
                   d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                 />
               </svg>
-              <p className="mt-4 text-gray-500">No audit logs found</p>
+              <p className="mt-4 text-muted-foreground">No audit logs found</p>
             </div>
           )}
         </div>
@@ -280,7 +287,7 @@ export default function AuditLogsPage() {
         {/* Pagination */}
         {pagination.totalPages > 1 && (
           <div className="flex items-center justify-between border-t px-6 py-3">
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-muted-foreground">
               Showing {(pagination.page - 1) * pagination.limit + 1} to{' '}
               {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total}{' '}
               logs

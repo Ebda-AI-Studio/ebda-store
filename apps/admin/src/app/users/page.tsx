@@ -144,6 +144,7 @@ export default function UsersPage() {
           <select
             value={roleFilter}
             onChange={e => setRoleFilter(e.target.value)}
+            aria-label="Filter by role"
             className="rounded-lg border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           >
             <option value="all">All Roles</option>

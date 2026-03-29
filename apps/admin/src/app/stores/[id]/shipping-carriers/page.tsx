@@ -84,14 +84,14 @@ const DEFAULT_CONFIGS: CarrierConfigs = {
 
 function ShipmentStatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
-    created: 'bg-gray-100 text-gray-700',
+    created: 'bg-muted text-foreground',
     picked_up: 'bg-blue-100 text-blue-700',
     in_transit: 'bg-yellow-100 text-yellow-700',
     out_for_delivery: 'bg-orange-100 text-orange-700',
     delivered: 'bg-green-100 text-green-700',
     failed: 'bg-red-100 text-red-700',
     returned: 'bg-purple-100 text-purple-700',
-    cancelled: 'bg-gray-100 text-gray-500',
+    cancelled: 'bg-muted text-muted-foreground',
   };
   const labels: Record<string, string> = {
     created: 'Created',
@@ -103,7 +103,7 @@ function ShipmentStatusBadge({ status }: { status: string }) {
     returned: 'Returned',
     cancelled: 'Cancelled',
   };
-  const cls = colors[status] || 'bg-gray-100 text-gray-700';
+  const cls = colors[status] || 'bg-muted text-foreground';
   return (
     <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${cls}`}>
       {labels[status] || status}
@@ -611,7 +611,7 @@ export default function ShippingCarriersPage() {
               <button
                 onClick={() => handleTestConnection('icarry')}
                 disabled={testingCarrier === 'icarry'}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
+                className="px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-muted/80 transition-colors disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
               >
                 Test Connection
               </button>
@@ -619,7 +619,7 @@ export default function ShippingCarriersPage() {
                 <button
                   onClick={() => handleSetDefault('icarry')}
                   disabled={settingDefault === 'icarry'}
-                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
+                  className="px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-muted/80 transition-colors disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
                 >
                   {settingDefault === 'icarry' && (
                     <span className="animate-spin inline-block h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
@@ -763,7 +763,7 @@ export default function ShippingCarriersPage() {
               <button
                 onClick={() => handleTestConnection('aramex')}
                 disabled={testingCarrier === 'aramex'}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
+                className="px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-muted/80 transition-colors disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
               >
                 Test Connection
               </button>
@@ -771,7 +771,7 @@ export default function ShippingCarriersPage() {
                 <button
                   onClick={() => handleSetDefault('aramex')}
                   disabled={settingDefault === 'aramex'}
-                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
+                  className="px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-muted/80 transition-colors disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
                 >
                   {settingDefault === 'aramex' && (
                     <span className="animate-spin inline-block h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
@@ -799,6 +799,7 @@ export default function ShippingCarriersPage() {
                     setCarrierFilter(e.target.value);
                     setShipmentsPage(1);
                   }}
+                  aria-label="Filter by carrier"
                   className="px-3 py-1.5 text-sm border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                 >
                   <option value="all">All carriers</option>
@@ -811,6 +812,7 @@ export default function ShippingCarriersPage() {
                     setStatusFilter(e.target.value);
                     setShipmentsPage(1);
                   }}
+                  aria-label="Filter by status"
                   className="px-3 py-1.5 text-sm border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                 >
                   <option value="all">All statuses</option>
@@ -828,9 +830,9 @@ export default function ShippingCarriersPage() {
 
             {shipments.length === 0 ? (
               <div className="p-12 text-center">
-                <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center mx-auto mb-3">
                   <svg
-                    className="w-6 h-6 text-gray-400"
+                    className="w-6 h-6 text-muted-foreground"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"

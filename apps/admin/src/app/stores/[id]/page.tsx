@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { Button, Badge, Input, Label } from '@force/ui';
+import { Button, Badge, Input, Label, Modal } from '@force/ui';
 import { AdminLayout } from '../../../components/AdminLayout';
 import { formatPrice, formatDate } from '../../../lib/format';
 import { apiGet, apiPut, apiPatch } from '../../../lib/api';
@@ -180,9 +180,9 @@ function DomainSection({
                     setDomainError('');
                   }}
                   placeholder="shop.example.com"
-                  className={`mt-1 ${domainError ? 'border-red-500' : ''}`}
+                  className={`mt-1 ${domainError ? 'border-destructive' : ''}`}
                 />
-                {domainError && <p className="mt-1 text-sm text-red-500">{domainError}</p>}
+                {domainError && <p className="mt-1 text-sm text-destructive">{domainError}</p>}
                 <p className="mt-1 text-xs text-muted-foreground">
                   Leave empty and save to remove the custom domain.
                 </p>
@@ -257,7 +257,7 @@ function DomainSection({
               )}
 
               {domainStatus?.verified && (
-                <p className="text-sm text-green-600">
+                <p className="text-sm text-[hsl(var(--success))]">
                   Domain is verified and SSL is active. Your store is accessible at https://{domain}
                 </p>
               )}
@@ -284,6 +284,7 @@ export default function StoreDetailPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isChangingStatus, setIsChangingStatus] = useState(false);
+  const [showSuspendModal, setShowSuspendModal] = useState(false);
   const [editForm, setEditForm] = useState({ name: '', slug: '', plan: '', status: '' });
   const [formErrors, setFormErrors] = useState<{ name?: string; slug?: string }>({});
 
@@ -577,10 +578,10 @@ export default function StoreDetailPage() {
                       setEditForm(prev => ({ ...prev, name: e.target.value }));
                       if (formErrors.name) setFormErrors(prev => ({ ...prev, name: undefined }));
                     }}
-                    className={`mt-1 ${formErrors.name ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
+                    className={`mt-1 ${formErrors.name ? 'border-destructive focus:border-destructive focus:ring-destructive' : ''}`}
                   />
                   {formErrors.name && (
-                    <p className="mt-1 text-sm text-red-500">{formErrors.name}</p>
+                    <p className="mt-1 text-sm text-destructive">{formErrors.name}</p>
                   )}
                 </div>
                 <div>
@@ -593,11 +594,11 @@ export default function StoreDetailPage() {
                       setEditForm(prev => ({ ...prev, slug: value }));
                       if (formErrors.slug) setFormErrors(prev => ({ ...prev, slug: undefined }));
                     }}
-                    className={`mt-1 ${formErrors.slug ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
+                    className={`mt-1 ${formErrors.slug ? 'border-destructive focus:border-destructive focus:ring-destructive' : ''}`}
                     placeholder="my-store-name"
                   />
                   {formErrors.slug && (
-                    <p className="mt-1 text-sm text-red-500">{formErrors.slug}</p>
+                    <p className="mt-1 text-sm text-destructive">{formErrors.slug}</p>
                   )}
                   <p className="mt-1 text-xs text-muted-foreground">
                     Your store will be at: {editForm.slug || 'your-slug'}.forcemediakw.com
@@ -707,15 +708,7 @@ export default function StoreDetailPage() {
           {store.status === 'active' ? (
             <button
               disabled={isChangingStatus}
-              onClick={() => {
-                if (
-                  window.confirm(
-                    `Are you sure you want to suspend "${store.name}"? This will disable customer access to the store.`
-                  )
-                ) {
-                  handleStatusChange('suspended');
-                }
-              }}
+              onClick={() => setShowSuspendModal(true)}
               className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm transition-all duration-200 hover:border-red-300 hover:shadow-md cursor-pointer text-left disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-100">
@@ -887,9 +880,9 @@ export default function StoreDetailPage() {
           className="flex items-center justify-between rounded-xl border bg-card p-5 shadow-sm transition hover:border-primary hover:shadow-md group"
         >
           <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gray-100 transition-transform group-hover:scale-110">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted transition-transform group-hover:scale-110">
               <svg
-                className="h-6 w-6 text-gray-600"
+                className="h-6 w-6 text-muted-foreground"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -918,7 +911,7 @@ export default function StoreDetailPage() {
             </div>
           </div>
           <svg
-            className="h-5 w-5 text-gray-400 group-hover:text-primary transition-colors"
+            className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -927,6 +920,37 @@ export default function StoreDetailPage() {
           </svg>
         </Link>
       </div>
+
+      {/* Suspend Store Confirmation Modal */}
+      <Modal
+        isOpen={showSuspendModal}
+        onClose={() => setShowSuspendModal(false)}
+        title="Suspend Store"
+      >
+        <p className="text-sm text-muted-foreground">
+          Are you sure you want to suspend <strong>{store.name}</strong>? This will disable customer
+          access to the store.
+        </p>
+        <div className="mt-6 flex justify-end gap-3">
+          <Button
+            variant="outline"
+            onClick={() => setShowSuspendModal(false)}
+            disabled={isChangingStatus}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={() => {
+              setShowSuspendModal(false);
+              handleStatusChange('suspended');
+            }}
+            disabled={isChangingStatus}
+          >
+            {isChangingStatus ? 'Suspending...' : 'Suspend Store'}
+          </Button>
+        </div>
+      </Modal>
     </AdminLayout>
   );
 }

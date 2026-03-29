@@ -49,7 +49,7 @@ const statusStyles: Record<string, { bg: string; text: string; dot: string }> = 
   shipped: { bg: 'bg-violet-50', text: 'text-violet-700', dot: 'bg-violet-500' },
   delivered: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
   cancelled: { bg: 'bg-red-50', text: 'text-red-700', dot: 'bg-red-500' },
-  refunded: { bg: 'bg-gray-100', text: 'text-muted-foreground', dot: 'bg-gray-400' },
+  refunded: { bg: 'bg-muted', text: 'text-muted-foreground', dot: 'bg-muted-foreground' },
 };
 
 function getStatusStyle(status: string) {
@@ -170,7 +170,7 @@ export default function StoreOrdersPage() {
     >
       {/* Status Filter Tabs */}
       <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex items-center gap-1 rounded-xl bg-gray-100 p-1 overflow-x-auto">
+        <div className="flex items-center gap-1 rounded-xl bg-muted p-1 overflow-x-auto">
           {['all', 'pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'].map(
             status => (
               <button
@@ -182,7 +182,7 @@ export default function StoreOrdersPage() {
                 className={`whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium transition-all ${
                   statusFilter === status
                     ? 'bg-card text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-gray-700'
+                    : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 {status === 'all' ? 'All Orders' : status.charAt(0).toUpperCase() + status.slice(1)}
@@ -193,7 +193,7 @@ export default function StoreOrdersPage() {
 
         <div className="relative w-full sm:w-72">
           <svg
-            className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+            className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -322,7 +322,7 @@ export default function StoreOrdersPage() {
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-border">
                 {filteredOrders.map(order => {
                   const style = getStatusStyle(order.status);
                   const transitions = validTransitions[order.status] ?? [];
@@ -358,7 +358,8 @@ export default function StoreOrdersPage() {
                               {order.status}
                             </span>
                             <select
-                              className="rounded-lg border border-border px-2 py-1 text-xs text-gray-700 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                              aria-label="Update order status"
+                              className="rounded-lg border border-border px-2 py-1 text-xs text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                               disabled={isUpdating}
                               defaultValue=""
                               onChange={e => {
@@ -396,7 +397,7 @@ export default function StoreOrdersPage() {
                       <td className="px-6 py-4 text-right">
                         <button
                           onClick={() => openInvoice(order.id)}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-700 border border-border rounded-lg hover:bg-muted transition-colors"
+                          className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-foreground border border-border rounded-lg hover:bg-muted transition-colors"
                           title="View Invoice"
                         >
                           <svg

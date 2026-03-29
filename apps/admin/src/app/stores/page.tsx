@@ -181,7 +181,7 @@ export default function StoresPage() {
                 onClick={() => setStatusFilter(status)}
                 className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
                   statusFilter === status
-                    ? 'bg-white text-foreground shadow-sm'
+                    ? 'bg-card text-foreground shadow-sm'
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
@@ -194,6 +194,7 @@ export default function StoresPage() {
           <select
             value={statusFilter}
             onChange={e => setStatusFilter(e.target.value)}
+            aria-label="Filter by status"
             className="rounded-xl border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 sm:hidden"
           >
             <option value="all">All Status</option>
@@ -208,7 +209,7 @@ export default function StoresPage() {
               onClick={() => setViewMode('grid')}
               className={`rounded-lg p-2 transition-all ${
                 viewMode === 'grid'
-                  ? 'bg-white text-primary shadow-sm'
+                  ? 'bg-card text-primary shadow-sm'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
               title="Grid view"
@@ -226,7 +227,7 @@ export default function StoresPage() {
               onClick={() => setViewMode('table')}
               className={`rounded-lg p-2 transition-all ${
                 viewMode === 'table'
-                  ? 'bg-white text-primary shadow-sm'
+                  ? 'bg-card text-primary shadow-sm'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
               title="Table view"

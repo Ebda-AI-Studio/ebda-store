@@ -460,6 +460,7 @@ export default function AbandonedCartsPage() {
                   setStatusFilter(e.target.value);
                   setPage(1);
                 }}
+                aria-label="Filter by status"
                 className="px-3 py-1.5 text-sm border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
               >
                 <option value="all">All statuses</option>

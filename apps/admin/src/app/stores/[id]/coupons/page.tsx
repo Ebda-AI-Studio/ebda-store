@@ -197,7 +197,7 @@ export default function CouponsPage() {
   }
 
   function getCouponStatus(coupon: Coupon): { label: string; color: string } {
-    if (!coupon.isActive) return { label: 'Inactive', color: 'bg-gray-100 text-gray-800' };
+    if (!coupon.isActive) return { label: 'Inactive', color: 'bg-muted text-foreground' };
 
     const now = new Date();
     if (coupon.startsAt && new Date(coupon.startsAt) > now) {
@@ -258,6 +258,7 @@ export default function CouponsPage() {
               setFilterActive(e.target.value as typeof filterActive);
               setTimeout(fetchCoupons, 0);
             }}
+            aria-label="Filter by status"
             className="px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
           >
             <option value="all">All Status</option>
@@ -270,9 +271,9 @@ export default function CouponsPage() {
         <div className="bg-card rounded-xl border overflow-hidden">
           {coupons.length === 0 ? (
             <div className="text-center py-12">
-              <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+              <div className="mx-auto w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
                 <svg
-                  className="w-8 h-8 text-gray-400"
+                  className="w-8 h-8 text-muted-foreground"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -285,7 +286,7 @@ export default function CouponsPage() {
                   />
                 </svg>
               </div>
-              <p className="text-gray-500">No coupons found</p>
+              <p className="text-muted-foreground">No coupons found</p>
               <button
                 onClick={() => {
                   resetForm();
@@ -323,13 +324,13 @@ export default function CouponsPage() {
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="divide-y divide-border">
                 {coupons.map(coupon => {
                   const status = getCouponStatus(coupon);
                   return (
                     <tr key={coupon.id} className="hover:bg-muted">
                       <td className="px-6 py-4">
-                        <span className="font-mono text-sm bg-gray-100 px-2 py-1 rounded">
+                        <span className="font-mono text-sm bg-muted px-2 py-1 rounded">
                           {coupon.code}
                         </span>
                       </td>
@@ -407,7 +408,7 @@ export default function CouponsPage() {
                           </button>
                           <button
                             onClick={() => openEditModal(coupon)}
-                            className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+                            className="p-2 text-muted-foreground hover:bg-muted rounded-lg"
                             title="Edit"
                           >
                             <svg
@@ -467,7 +468,7 @@ export default function CouponsPage() {
                 {/* Basic Info */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       Coupon Code *
                     </label>
                     <input
@@ -482,7 +483,7 @@ export default function CouponsPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
+                    <label className="block text-sm font-medium text-foreground mb-1">Name *</label>
                     <input
                       type="text"
                       required
@@ -496,7 +497,7 @@ export default function CouponsPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       Name (Arabic)
                     </label>
                     <input
@@ -509,7 +510,7 @@ export default function CouponsPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       Description
                     </label>
                     <input
@@ -525,7 +526,7 @@ export default function CouponsPage() {
                 {/* Discount Type & Value */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       Discount Type *
                     </label>
                     <select
@@ -541,7 +542,7 @@ export default function CouponsPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       {formData.type === 'percentage' ? 'Percentage (%)' : 'Amount (KWD)'} *
                     </label>
                     <input
@@ -554,7 +555,7 @@ export default function CouponsPage() {
                         setFormData({ ...formData, value: parseFloat(e.target.value) || 0 })
                       }
                       disabled={formData.type === 'free_shipping'}
-                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:bg-gray-100"
+                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:bg-muted"
                     />
                   </div>
                 </div>
@@ -562,7 +563,7 @@ export default function CouponsPage() {
                 {/* Limits */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       Minimum Order (KWD)
                     </label>
                     <input
@@ -577,7 +578,7 @@ export default function CouponsPage() {
                   </div>
                   {formData.type === 'percentage' && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-sm font-medium text-foreground mb-1">
                         Max Discount (KWD)
                       </label>
                       <input
@@ -595,7 +596,7 @@ export default function CouponsPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       Total Usage Limit
                     </label>
                     <input
@@ -608,7 +609,7 @@ export default function CouponsPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       Limit Per Customer
                     </label>
                     <input
@@ -627,7 +628,7 @@ export default function CouponsPage() {
                 {/* Date Range */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       Start Date
                     </label>
                     <input
@@ -638,7 +639,7 @@ export default function CouponsPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       Expiry Date
                     </label>
                     <input
@@ -659,7 +660,7 @@ export default function CouponsPage() {
                     onChange={e => setFormData({ ...formData, isActive: e.target.checked })}
                     className="w-4 h-4 text-primary border-border rounded focus:ring-primary"
                   />
-                  <label htmlFor="isActive" className="text-sm font-medium text-gray-700">
+                  <label htmlFor="isActive" className="text-sm font-medium text-foreground">
                     Coupon is active
                   </label>
                 </div>
@@ -672,7 +673,7 @@ export default function CouponsPage() {
                       setShowModal(false);
                       resetForm();
                     }}
-                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-muted"
+                    className="flex-1 px-4 py-2 border border-border text-foreground rounded-lg hover:bg-muted"
                   >
                     Cancel
                   </button>
