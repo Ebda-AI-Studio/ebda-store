@@ -119,10 +119,10 @@ export default function ProductsClient({
           setProducts(response.data.products || []);
           setMeta(response.data.meta || null);
         } else {
-          setError(response.error?.message || 'Failed to load products');
+          setError(response.error?.message || 'LOAD_FAILED');
         }
       } catch {
-        setError('Unable to load products. Please check your connection.');
+        setError('CONNECTION_ERROR');
       } finally {
         setIsLoading(false);
       }
@@ -273,11 +273,13 @@ export default function ProductsClient({
             <div className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-xl bg-muted/30 p-4">
               <p className="text-sm text-muted-foreground">
                 {isLoading ? (
-                  'Loading...'
+                  t('Loading...', translations['Loading...'])
                 ) : (
                   <>
-                    Showing <span className="font-medium text-foreground">{products.length}</span>{' '}
-                    {meta ? `of ${meta.total}` : ''} products
+                    {t('Showing', 'عرض')}{' '}
+                    <span className="font-medium text-foreground">{products.length}</span>{' '}
+                    {meta ? t(`of ${meta.total}`, `من ${meta.total}`) : ''}{' '}
+                    {t('products', 'منتجات')}
                   </>
                 )}
               </p>
@@ -350,10 +352,13 @@ export default function ProductsClient({
 
             {/* Error State */}
             {error && (
-              <div role="alert" className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4">
+              <div
+                role="alert"
+                className="mb-6 rounded-xl border border-destructive/30 bg-destructive/10 p-4"
+              >
                 <div className="flex items-center gap-3">
                   <svg
-                    className="h-5 w-5 text-red-500 flex-shrink-0"
+                    className="h-5 w-5 text-destructive flex-shrink-0"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -365,12 +370,21 @@ export default function ProductsClient({
                       d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
                     />
                   </svg>
-                  <p className="text-red-700 flex-1">{error}</p>
+                  <p className="text-destructive flex-1">
+                    {error === 'LOAD_FAILED'
+                      ? t('Failed to load products', 'فشل في تحميل المنتجات')
+                      : error === 'CONNECTION_ERROR'
+                        ? t(
+                            'Unable to load products. Please check your connection.',
+                            'تعذر تحميل المنتجات. يرجى التحقق من اتصالك.'
+                          )
+                        : error}
+                  </p>
                   <button
                     onClick={() => fetchProducts(page)}
-                    className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200"
+                    className="px-3 py-1 text-sm bg-destructive/20 text-destructive rounded hover:bg-destructive/30"
                   >
-                    Retry
+                    {t('Retry', 'إعادة المحاولة')}
                   </button>
                 </div>
               </div>
