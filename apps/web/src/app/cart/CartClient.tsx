@@ -41,10 +41,16 @@ export default function CartClient() {
     if (newQuantity < 1) {
       removeCartItem(itemId);
       if (item) {
-        info('Item removed', `${item.name} removed from cart`);
+        info(
+          t('Item removed', 'تمت الإزالة'),
+          t(`${item.name} removed from cart`, `تمت إزالة ${item.name} من السلة`)
+        );
       }
     } else if (newQuantity > 10) {
-      info('Limit reached', 'Maximum 10 items per product');
+      info(
+        t('Limit reached', 'تم الوصول للحد'),
+        t('Maximum 10 items per product', 'الحد الأقصى 10 قطع لكل منتج')
+      );
     } else {
       updateCartQuantity(itemId, newQuantity);
     }
@@ -54,7 +60,10 @@ export default function CartClient() {
     const item = cartItems.find(i => i.id === itemId);
     removeCartItem(itemId);
     if (item) {
-      success('Item removed', `${item.name} has been removed from your cart`);
+      success(
+        t('Item removed', 'تمت الإزالة'),
+        t(`${item.name} has been removed from your cart`, `تمت إزالة ${item.name} من سلة التسوق`)
+      );
     }
   };
 
@@ -75,17 +84,30 @@ export default function CartClient() {
         setPromoName(result.data.coupon.name);
         setPromoType(result.data.coupon.type);
         setPromoValue(result.data.coupon.value);
-        success('Promo applied', `${result.data.coupon.name} discount has been applied`);
+        success(
+          t('Promo applied', 'تم تطبيق الخصم'),
+          t(
+            `${result.data.coupon.name} discount has been applied`,
+            `تم تطبيق خصم ${result.data.coupon.name}`
+          )
+        );
       } else {
-        const message = result.error?.message || 'The promo code is not valid';
-        info('Invalid code', message);
+        const message =
+          result.error?.message || t('The promo code is not valid', 'كود الخصم غير صالح');
+        info(t('Invalid code', 'كود غير صالح'), message);
       }
     } catch {
-      errorToast('Error', 'Failed to validate promo code. Please try again.');
+      errorToast(
+        t('Error', 'خطأ'),
+        t(
+          'Failed to validate promo code. Please try again.',
+          'فشل التحقق من كود الخصم. يرجى المحاولة مرة أخرى.'
+        )
+      );
     } finally {
       setIsValidating(false);
     }
-  }, [promoCode, isValidating, store.id, cartTotal, success, info, errorToast]);
+  }, [promoCode, isValidating, store.id, cartTotal, success, info, errorToast, t]);
 
   // Fetch shipping zones on mount
   useEffect(() => {
@@ -286,7 +308,7 @@ export default function CartClient() {
                           </div>
                           <button
                             onClick={() => handleRemoveItem(item.id)}
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-500"
+                            className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                             aria-label="Remove item"
                           >
                             <svg
@@ -442,7 +464,7 @@ export default function CartClient() {
                           </button>
                         </div>
                         {promoApplied && (
-                          <p className="mt-2 flex items-center gap-1 text-xs text-emerald-600">
+                          <p className="mt-2 flex items-center gap-1 text-xs text-[hsl(var(--success))]">
                             <svg
                               className="h-3.5 w-3.5"
                               fill="none"
@@ -476,11 +498,11 @@ export default function CartClient() {
                       </div>
                       {promoApplied && (
                         <div className="flex justify-between text-sm">
-                          <span className="text-emerald-600">
+                          <span className="text-[hsl(var(--success))]">
                             {t('Discount', '\u0627\u0644\u062e\u0635\u0645')} (
                             {promoType === 'percentage' ? `${promoValue}%` : promoName})
                           </span>
-                          <span className="font-medium text-emerald-600">
+                          <span className="font-medium text-[hsl(var(--success))]">
                             -{formatPrice(discount)}
                           </span>
                         </div>
@@ -490,7 +512,7 @@ export default function CartClient() {
                           {t('Shipping', '\u0627\u0644\u0634\u062d\u0646')}
                         </span>
                         {shipping === 0 ? (
-                          <span className="font-medium text-emerald-600">
+                          <span className="font-medium text-[hsl(var(--success))]">
                             {t('Free', '\u0645\u062c\u0627\u0646\u064a')}
                           </span>
                         ) : (

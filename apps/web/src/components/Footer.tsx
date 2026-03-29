@@ -1,7 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useToast } from '@force/ui';
 import { useStore, useStoreUrl } from '../contexts/StoreContext';
 import { useLanguage } from '../contexts/LanguageContext';
 
@@ -10,6 +12,8 @@ export function Footer() {
   const storeUrl = useStoreUrl();
   const { language, t } = useLanguage();
   const currentYear = new Date().getFullYear();
+  const { success } = useToast();
+  const [newsletterEmail, setNewsletterEmail] = useState('');
 
   const socialLinks = store.socialLinks as Record<string, string> | undefined;
   const storeSettings = store.settings as Record<string, unknown> | undefined;
@@ -40,16 +44,16 @@ export function Footer() {
   const newsletterEnabled = footerConfig?.newsletterEnabled !== false;
 
   const defaultSupportLinks = [
-    { name: 'Contact Us', href: '/contact' },
-    { name: 'FAQ', href: '/faq' },
-    { name: 'Shipping Info', href: '/shipping' },
-    { name: 'Returns & Refunds', href: '/returns' },
+    { name: 'Contact Us', nameAr: 'اتصل بنا', href: '/contact' },
+    { name: 'FAQ', nameAr: 'الأسئلة الشائعة', href: '/faq' },
+    { name: 'Shipping Info', nameAr: 'معلومات الشحن', href: '/shipping' },
+    { name: 'Returns & Refunds', nameAr: 'المرتجعات والاستبدال', href: '/returns' },
   ];
 
   const defaultCompanyLinks = [
-    { name: 'About Us', href: '/about' },
-    { name: 'Privacy Policy', href: '/privacy' },
-    { name: 'Terms of Service', href: '/terms' },
+    { name: 'About Us', nameAr: 'من نحن', href: '/about' },
+    { name: 'Privacy Policy', nameAr: 'سياسة الخصوصية', href: '/privacy' },
+    { name: 'Terms of Service', nameAr: 'الشروط والأحكام', href: '/terms' },
   ];
 
   const supportLinks = (footerConfig?.support ?? defaultSupportLinks)
@@ -94,7 +98,10 @@ export function Footer() {
             </Link>
             <p className="mt-4 max-w-sm text-sm leading-relaxed text-muted-foreground">
               {store.description ||
-                `Your trusted online shopping destination. Quality products, fast delivery, and exceptional customer service.`}
+                t(
+                  'Your trusted online shopping destination. Quality products, fast delivery, and exceptional customer service.',
+                  'وجهتك الموثوقة للتسوق عبر الإنترنت. منتجات عالية الجودة، توصيل سريع، وخدمة عملاء استثنائية.'
+                )}
             </p>
 
             {/* Contact Info */}
@@ -293,10 +300,30 @@ export function Footer() {
                 <p className="mt-2 text-xs text-muted-foreground">
                   {t('Get updates on new products and offers.', 'احصل على آخر التحديثات والعروض')}
                 </p>
-                <form className="mt-3 flex gap-2">
+                <form
+                  className="mt-3 flex gap-2"
+                  onSubmit={e => {
+                    e.preventDefault();
+                    if (!newsletterEmail.trim()) return;
+                    setNewsletterEmail('');
+                    success(
+                      t(
+                        'Subscribed!',
+                        '\u062a\u0645 \u0627\u0644\u0627\u0634\u062a\u0631\u0627\u0643!'
+                      ),
+                      t(
+                        'Thank you for subscribing to our newsletter.',
+                        '\u0634\u0643\u0631\u0627\u064b \u0644\u0627\u0634\u062a\u0631\u0627\u0643\u0643 \u0641\u064a \u0646\u0634\u0631\u062a\u0646\u0627 \u0627\u0644\u0628\u0631\u064a\u062f\u064a\u0629.'
+                      )
+                    );
+                  }}
+                >
                   <input
                     type="email"
                     placeholder={t('Email', 'البريد الإلكتروني')}
+                    aria-label="Email address for newsletter"
+                    value={newsletterEmail}
+                    onChange={e => setNewsletterEmail(e.target.value)}
                     className="h-9 flex-1 rounded-lg border border-border bg-background px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                   />
                   <button

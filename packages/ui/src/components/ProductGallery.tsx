@@ -193,13 +193,19 @@ export const ProductGallery = forwardRef<HTMLDivElement, ProductGalleryProps>(
           )}
 
           {/* Main Image */}
-          <div className="flex-1 relative">
+          <div className="flex-1 relative group">
             <div
               className={cn(
                 'relative overflow-hidden rounded-lg bg-muted cursor-pointer',
                 aspectRatioStyles[aspectRatio]
               )}
               onClick={() => enableLightbox && setIsLightboxOpen(true)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setIsLightboxOpen(true);
+                }
+              }}
               onMouseEnter={() => enableZoom && setIsZooming(true)}
               onMouseLeave={() => setIsZooming(false)}
               onMouseMove={handleMouseMove}
@@ -236,7 +242,7 @@ export const ProductGallery = forwardRef<HTMLDivElement, ProductGalleryProps>(
                     className={cn(
                       'absolute top-1/2 -translate-y-1/2 p-2 rounded-full',
                       'bg-background/80 backdrop-blur-sm hover:bg-background',
-                      'transition-opacity opacity-0 group-hover:opacity-100',
+                      'transition-opacity opacity-0 group-hover:opacity-100 focus:opacity-100',
                       isRtl ? 'right-2' : 'left-2'
                     )}
                     aria-label={isRtl ? 'الصورة السابقة' : 'Previous image'}
@@ -258,7 +264,7 @@ export const ProductGallery = forwardRef<HTMLDivElement, ProductGalleryProps>(
                     className={cn(
                       'absolute top-1/2 -translate-y-1/2 p-2 rounded-full',
                       'bg-background/80 backdrop-blur-sm hover:bg-background',
-                      'transition-opacity opacity-0 group-hover:opacity-100',
+                      'transition-opacity opacity-0 group-hover:opacity-100 focus:opacity-100',
                       isRtl ? 'left-2' : 'right-2'
                     )}
                     aria-label={isRtl ? 'الصورة التالية' : 'Next image'}

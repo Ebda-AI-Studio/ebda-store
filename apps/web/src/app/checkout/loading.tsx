@@ -17,7 +17,7 @@ export default function Loading() {
               <div className="h-6 w-48 rounded bg-muted" />
               <div className="space-y-3">
                 <div className="h-10 rounded bg-muted" />
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="h-10 rounded bg-muted" />
                   <div className="h-10 rounded bg-muted" />
                 </div>

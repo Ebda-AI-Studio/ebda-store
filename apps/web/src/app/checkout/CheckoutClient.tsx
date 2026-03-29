@@ -359,10 +359,10 @@ export default function CheckoutClient() {
           setShippingCost(0);
         }
       } else {
-        setCouponError(data.error?.message || 'Invalid coupon');
+        setCouponError(data.error?.message || t('Invalid coupon', 'كوبون غير صالح'));
       }
     } catch {
-      setCouponError('Failed to apply coupon');
+      setCouponError(t('Failed to apply coupon', 'فشل تطبيق الكوبون'));
     }
   };
 
@@ -600,18 +600,18 @@ export default function CheckoutClient() {
                         onChange={e => updateField('email', e.target.value)}
                         className={
                           formErrors.email
-                            ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                            ? 'border-destructive focus:border-destructive focus:ring-destructive'
                             : ''
                         }
                       />
                       {formErrors.email && (
-                        <p role="alert" className="mt-1 text-sm text-red-500">
+                        <p role="alert" className="mt-1 text-sm text-destructive">
                           {formErrors.email}
                         </p>
                       )}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div data-error={!!formErrors.firstName}>
                         <Input
                           label={t(
@@ -622,12 +622,12 @@ export default function CheckoutClient() {
                           onChange={e => updateField('firstName', e.target.value)}
                           className={
                             formErrors.firstName
-                              ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                              ? 'border-destructive focus:border-destructive focus:ring-destructive'
                               : ''
                           }
                         />
                         {formErrors.firstName && (
-                          <p role="alert" className="mt-1 text-sm text-red-500">
+                          <p role="alert" className="mt-1 text-sm text-destructive">
                             {formErrors.firstName}
                           </p>
                         )}
@@ -642,12 +642,12 @@ export default function CheckoutClient() {
                           onChange={e => updateField('lastName', e.target.value)}
                           className={
                             formErrors.lastName
-                              ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                              ? 'border-destructive focus:border-destructive focus:ring-destructive'
                               : ''
                           }
                         />
                         {formErrors.lastName && (
-                          <p role="alert" className="mt-1 text-sm text-red-500">
+                          <p role="alert" className="mt-1 text-sm text-destructive">
                             {formErrors.lastName}
                           </p>
                         )}
@@ -663,12 +663,12 @@ export default function CheckoutClient() {
                         onChange={e => updateField('phone', e.target.value)}
                         className={
                           formErrors.phone
-                            ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                            ? 'border-destructive focus:border-destructive focus:ring-destructive'
                             : ''
                         }
                       />
                       {formErrors.phone && (
-                        <p role="alert" className="mt-1 text-sm text-red-500">
+                        <p role="alert" className="mt-1 text-sm text-destructive">
                           {formErrors.phone}
                         </p>
                       )}
@@ -697,12 +697,12 @@ export default function CheckoutClient() {
                         ]}
                         className={
                           formErrors.area
-                            ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                            ? 'border-destructive focus:border-destructive focus:ring-destructive'
                             : ''
                         }
                       />
                       {formErrors.area && (
-                        <p role="alert" className="mt-1 text-sm text-red-500">
+                        <p role="alert" className="mt-1 text-sm text-destructive">
                           {formErrors.area}
                         </p>
                       )}
@@ -718,12 +718,12 @@ export default function CheckoutClient() {
                         onChange={e => updateField('address', e.target.value)}
                         className={
                           formErrors.address
-                            ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                            ? 'border-destructive focus:border-destructive focus:ring-destructive'
                             : ''
                         }
                       />
                       {formErrors.address && (
-                        <p role="alert" className="mt-1 text-sm text-red-500">
+                        <p role="alert" className="mt-1 text-sm text-destructive">
                           {formErrors.address}
                         </p>
                       )}
@@ -749,25 +749,29 @@ export default function CheckoutClient() {
                         )}
                         className={
                           formErrors.city
-                            ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                            ? 'border-destructive focus:border-destructive focus:ring-destructive'
                             : ''
                         }
                       />
                       {formErrors.city && (
-                        <p role="alert" className="mt-1 text-sm text-red-500">
+                        <p role="alert" className="mt-1 text-sm text-destructive">
                           {formErrors.city}
                         </p>
                       )}
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-foreground mb-1">
+                      <label
+                        htmlFor="order-notes"
+                        className="block text-sm font-medium text-foreground mb-1"
+                      >
                         {t(
                           'Order Notes (optional)',
                           '\u0645\u0644\u0627\u062d\u0638\u0627\u062a \u0627\u0644\u0637\u0644\u0628 (\u0627\u062e\u062a\u064a\u0627\u0631\u064a)'
                         )}
                       </label>
                       <textarea
+                        id="order-notes"
                         value={formData.notes}
                         onChange={e => updateField('notes', e.target.value)}
                         rows={3}

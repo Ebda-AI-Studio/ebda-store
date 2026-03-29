@@ -296,11 +296,13 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
                   />
                 </svg>
                 <span className="sr-only">{`${t('Cart', translations['Cart'])} ${cartCount}`}</span>
-                {cartCount > 0 && (
-                  <span className="absolute -end-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white shadow-lg shadow-primary/25">
-                    {cartCount > 99 ? '99+' : cartCount}
-                  </span>
-                )}
+                <span aria-live="polite" className="absolute -end-1 -top-1">
+                  {cartCount > 0 && (
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white shadow-lg shadow-primary/25">
+                      {cartCount > 99 ? '99+' : cartCount}
+                    </span>
+                  )}
+                </span>
               </Link>
 
               {/* User Account / Sign In */}
@@ -337,8 +339,8 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
       {/* Mobile Menu */}
       <div
         ref={mobileMenuRef}
-        className={`fixed inset-y-0 left-0 z-50 w-80 max-w-[85vw] transform bg-background shadow-2xl transition-transform duration-300 ease-out lg:hidden ${
-          isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+        className={`fixed inset-y-0 start-0 z-50 w-80 max-w-[85vw] transform bg-background shadow-2xl transition-transform duration-300 ease-out lg:hidden ${
+          isMobileMenuOpen ? 'translate-x-0' : 'ltr:-translate-x-full rtl:translate-x-full'
         }`}
         onKeyDown={handleMobileMenuKeyDown}
       >

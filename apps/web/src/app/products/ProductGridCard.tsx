@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import type { Product } from '@/lib/api';
@@ -22,17 +23,26 @@ export function ProductGridCard({
   onAddToCart,
 }: ProductGridCardProps) {
   const { t } = useLanguage();
+  const [isAdding, setIsAdding] = useState(false);
+
+  // Treat inventory === 0 as out of stock; undefined/null means untracked (in stock)
+  const isOutOfStock =
+    product.inventory !== undefined && product.inventory !== null && product.inventory <= 0;
 
   return (
     <Link
       href={`/products/${product.slug}`}
-      className="product-card group"
+      className={`product-card group ${isOutOfStock ? 'opacity-60' : ''}`}
       style={{ animationDelay: `${index * 50}ms` }}
     >
-      {/* Badge */}
-      {product.compareAtPrice && product.compareAtPrice > product.price && (
-        <span className="product-badge bg-red-500">Sale</span>
-      )}
+      {/* Badges */}
+      {isOutOfStock ? (
+        <span className="product-badge bg-muted-foreground text-white">
+          {t('Sold Out', '\u0646\u0641\u0630')}
+        </span>
+      ) : product.compareAtPrice && product.compareAtPrice > product.price ? (
+        <span className="product-badge bg-destructive">Sale</span>
+      ) : null}
 
       {/* Wishlist Button */}
       <button
@@ -126,19 +136,61 @@ export function ProductGridCard({
         )}
 
         {/* Quick Actions */}
-        <div className="absolute inset-x-0 bottom-0 translate-y-full p-3 transition-transform duration-300 group-hover:translate-y-0">
-          <button className="add-to-cart-btn" onClick={e => onAddToCart(product, e)}>
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
-              />
-            </svg>
-            {t('Add to Cart', translations['Add to Cart'])}
-          </button>
-        </div>
+        {!isOutOfStock && (
+          <div className="absolute inset-x-0 bottom-0 translate-y-full p-3 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
+            <button
+              className="add-to-cart-btn"
+              disabled={isAdding}
+              onClick={async e => {
+                e.preventDefault();
+                if (isAdding) return;
+                setIsAdding(true);
+                try {
+                  onAddToCart(product, e);
+                } finally {
+                  // Brief delay so user sees the loading state
+                  setTimeout(() => setIsAdding(false), 600);
+                }
+              }}
+            >
+              {isAdding ? (
+                <>
+                  <svg className="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                    />
+                  </svg>
+                  {t(
+                    'Adding...',
+                    '\u062c\u0627\u0631\u064a \u0627\u0644\u0625\u0636\u0627\u0641\u0629...'
+                  )}
+                </>
+              ) : (
+                <>
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
+                    />
+                  </svg>
+                  {t('Add to Cart', translations['Add to Cart'])}
+                </>
+              )}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Content */}
