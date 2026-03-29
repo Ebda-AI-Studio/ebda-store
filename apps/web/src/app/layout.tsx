@@ -156,6 +156,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body
         className={`${plusJakarta.variable} ${ibmPlexArabic.variable} font-sans antialiased bg-background text-foreground`}
       >
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[9999] focus:bg-white focus:text-black focus:px-4 focus:py-2 focus:rounded-lg focus:shadow-lg focus:text-sm focus:font-medium"
+        >
+          Skip to main content
+        </a>
         <StoreProvider initialStore={store}>
           <FeatureProvider>
             <AuthProvider>
@@ -168,7 +174,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 }
               >
                 <CartProvider>
-                  <ToastProvider>{children}</ToastProvider>
+                  <ToastProvider>
+                    <div id="main-content">{children}</div>
+                  </ToastProvider>
                 </CartProvider>
               </LanguageProvider>
             </AuthProvider>
