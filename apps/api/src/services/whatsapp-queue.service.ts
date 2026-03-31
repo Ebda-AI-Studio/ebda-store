@@ -7,7 +7,7 @@ import crypto from 'crypto';
 import { prisma } from '@force/database';
 import { redis } from './redis.service';
 import { whatsappService, WhatsAppConfig } from './whatsapp.service';
-import { withCircuitBreaker } from './circuit-breaker.service';
+import { withCircuitBreaker, circuitBreaker } from './circuit-breaker.service';
 import logger from '../lib/logger';
 
 export interface QueuedWhatsAppMessage {
@@ -151,7 +151,14 @@ class WhatsAppQueueService {
       .digest('hex');
 
     try {
-      const result = await withCircuitBreaker('whatsapp', async () => {
+      // Per-store circuit breaker prevents one store's failing API key
+      // from tripping the breaker for all stores
+      const breakerKey = `whatsapp:${message.storeId}`;
+      if (!circuitBreaker.getState(breakerKey)) {
+        circuitBreaker.register(breakerKey, { failureThreshold: 5, timeout: 30000 });
+      }
+
+      const result = await withCircuitBreaker(breakerKey, async () => {
         return whatsappService.sendTemplateMessage(
           message.config,
           message.recipientPhone,

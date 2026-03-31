@@ -7,7 +7,7 @@ import crypto from 'crypto';
 import { prisma } from '@force/database';
 import { redis } from './redis.service';
 import { smsService, SmsConfig } from './sms.service';
-import { withCircuitBreaker } from './circuit-breaker.service';
+import { withCircuitBreaker, circuitBreaker } from './circuit-breaker.service';
 import logger from '../lib/logger';
 
 export interface QueuedSms {
@@ -143,7 +143,14 @@ class SmsQueueService {
     const recipientPhoneHash = crypto.createHash('sha256').update(sms.recipientPhone).digest('hex');
 
     try {
-      const result = await withCircuitBreaker('sms', async () => {
+      // Per-store circuit breaker prevents one store's failing API key
+      // from tripping the breaker for all stores
+      const breakerKey = `sms:${sms.storeId}`;
+      if (!circuitBreaker.getState(breakerKey)) {
+        circuitBreaker.register(breakerKey, { failureThreshold: 5, timeout: 30000 });
+      }
+
+      const result = await withCircuitBreaker(breakerKey, async () => {
         return smsService.sendSms(sms.config, sms.recipientPhone, sms.messageText);
       });
 

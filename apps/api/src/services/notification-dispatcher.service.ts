@@ -11,6 +11,7 @@ import { notificationConfigService } from './notification-config.service';
 import { whatsappQueue } from './whatsapp-queue.service';
 import { smsQueue } from './sms-queue.service';
 import { pushService } from './push.service';
+import { redis } from './redis.service';
 import { prisma } from '@force/database';
 import logger from '../lib/logger';
 import {
@@ -25,6 +26,13 @@ import type { WhatsAppConfig } from './whatsapp.service';
 import type { SmsConfig } from './sms.service';
 
 // ==========================================
+// Rate Limiting Constants
+// ==========================================
+
+const RATE_LIMIT_WINDOW_SECONDS = 3600; // 1 hour
+const RATE_LIMIT_MAX_PER_WINDOW = 100; // 100 notifications per hour per store per channel
+
+// ==========================================
 // Notification Dispatcher
 // ==========================================
 
@@ -35,6 +43,67 @@ interface EventConfig {
 }
 
 class NotificationDispatcherService {
+  // ==========================================
+  // Rate Limiting
+  // ==========================================
+
+  /**
+   * Checks and increments the rate limit counter for a store+channel pair.
+   * Returns true if the request is within limits, false if rate limited.
+   */
+  private async checkRateLimit(storeId: string, channel: string): Promise<boolean> {
+    const key = `notify:rate:${storeId}:${channel}`;
+    const count = await redis.incrementRateLimit(key, RATE_LIMIT_WINDOW_SECONDS);
+
+    if (count > RATE_LIMIT_MAX_PER_WINDOW) {
+      logger.warn(
+        { storeId, channel, count, limit: RATE_LIMIT_MAX_PER_WINDOW },
+        '[NotificationDispatcher] Rate limit exceeded'
+      );
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Validates that a channel's credentials contain non-empty required fields.
+   * Returns true if credentials appear configured, false otherwise.
+   */
+  private hasValidCredentials(
+    config: { credentials: Record<string, unknown>; enabled: boolean } | null,
+    channel: string,
+    storeId: string
+  ): boolean {
+    if (!config || !config.enabled) {
+      return false;
+    }
+
+    const creds = config.credentials;
+    if (!creds || typeof creds !== 'object' || Object.keys(creds).length === 0) {
+      logger.warn(
+        { storeId, channel },
+        '[NotificationDispatcher] Channel credentials are empty or missing — skipping'
+      );
+      return false;
+    }
+
+    // Check that at least one credential value is a non-empty string
+    const hasNonEmptyValue = Object.values(creds).some(
+      v => typeof v === 'string' && v.trim().length > 0
+    );
+
+    if (!hasNonEmptyValue) {
+      logger.warn(
+        { storeId, channel },
+        '[NotificationDispatcher] All credential values are empty — skipping'
+      );
+      return false;
+    }
+
+    return true;
+  }
+
   // ==========================================
   // Public API
   // ==========================================
@@ -116,15 +185,17 @@ class NotificationDispatcherService {
       );
     } else if (!eventConfig.whatsapp) {
       logger.debug({ storeId, event }, '[NotificationDispatcher] WhatsApp skipped: event_disabled');
-    } else if (!whatsappConfig || !whatsappConfig.enabled) {
+    } else if (!this.hasValidCredentials(whatsappConfig, 'whatsapp', storeId)) {
       logger.debug({ storeId, event }, '[NotificationDispatcher] WhatsApp skipped: not_configured');
     } else if (!data.customerPhone) {
       logger.debug({ storeId, event }, '[NotificationDispatcher] WhatsApp skipped: no_phone');
+    } else if (!(await this.checkRateLimit(storeId, 'whatsapp'))) {
+      logger.debug({ storeId, event }, '[NotificationDispatcher] WhatsApp skipped: rate_limited');
     } else {
       try {
         const template = WHATSAPP_TEMPLATES[event];
         const variables = template.variables(data);
-        const config = whatsappConfig.credentials as unknown as WhatsAppConfig;
+        const waConfig = whatsappConfig!.credentials as unknown as WhatsAppConfig;
 
         await whatsappQueue.enqueue({
           storeId,
@@ -132,8 +203,8 @@ class NotificationDispatcherService {
           recipientPhone: data.customerPhone,
           templateName: template.name,
           variables,
-          config,
-          idempotencyKey: `whatsapp_${storeId}_${event}_${data.orderNumber}_${Date.now()}`,
+          config: waConfig,
+          idempotencyKey: `whatsapp_${storeId}_${event}_${data.orderNumber}`,
         });
 
         logger.info({ storeId, event }, '[NotificationDispatcher] WhatsApp queued');
@@ -147,24 +218,26 @@ class NotificationDispatcherService {
       logger.debug({ storeId, event }, '[NotificationDispatcher] SMS skipped: feature_disabled');
     } else if (!eventConfig.sms) {
       logger.debug({ storeId, event }, '[NotificationDispatcher] SMS skipped: event_disabled');
-    } else if (!smsConfig || !smsConfig.enabled) {
+    } else if (!this.hasValidCredentials(smsConfig, 'sms', storeId)) {
       logger.debug({ storeId, event }, '[NotificationDispatcher] SMS skipped: not_configured');
     } else if (!data.customerPhone) {
       logger.debug({ storeId, event }, '[NotificationDispatcher] SMS skipped: no_phone');
+    } else if (!(await this.checkRateLimit(storeId, 'sms'))) {
+      logger.debug({ storeId, event }, '[NotificationDispatcher] SMS skipped: rate_limited');
     } else {
       try {
         const smsTemplate = SMS_TEMPLATES[event];
         // Default to English; locale selection can be extended later
         const messageText = renderSmsTemplate(smsTemplate.en, data);
-        const config = smsConfig.credentials as unknown as SmsConfig;
+        const smsCredentials = smsConfig!.credentials as unknown as SmsConfig;
 
         await smsQueue.enqueue({
           storeId,
           event,
           recipientPhone: data.customerPhone,
           messageText,
-          config,
-          idempotencyKey: `sms_${storeId}_${event}_${data.orderNumber}_${Date.now()}`,
+          config: smsCredentials,
+          idempotencyKey: `sms_${storeId}_${event}_${data.orderNumber}`,
         });
 
         logger.info({ storeId, event }, '[NotificationDispatcher] SMS queued');
@@ -178,8 +251,10 @@ class NotificationDispatcherService {
       logger.debug({ storeId, event }, '[NotificationDispatcher] Push skipped: feature_disabled');
     } else if (!eventConfig.push) {
       logger.debug({ storeId, event }, '[NotificationDispatcher] Push skipped: event_disabled');
-    } else if (!pushConfig || !pushConfig.enabled) {
+    } else if (!this.hasValidCredentials(pushConfig, 'push', storeId)) {
       logger.debug({ storeId, event }, '[NotificationDispatcher] Push skipped: not_configured');
+    } else if (!(await this.checkRateLimit(storeId, 'push'))) {
+      logger.debug({ storeId, event }, '[NotificationDispatcher] Push skipped: rate_limited');
     } else {
       try {
         const pushTemplate = PUSH_TEMPLATES[event];
