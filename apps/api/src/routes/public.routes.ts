@@ -20,6 +20,45 @@ import { featureService } from '../services/feature.service';
 
 const router = Router();
 
+// ==========================================
+// Cache-aside helper (uses Redis with in-memory fallback)
+// ==========================================
+
+const memoryCache = new Map<string, { data: unknown; expiresAt: number }>();
+
+async function getCached<T>(key: string, ttl: number, fetchFn: () => Promise<T>): Promise<T> {
+  // Try Redis first
+  try {
+    const cached = await redis.get<string>(key);
+    if (cached) {
+      return typeof cached === 'string' ? JSON.parse(cached) : (cached as T);
+    }
+  } catch {
+    // Redis unavailable, fall through to memory cache
+  }
+
+  // Try in-memory cache
+  const memEntry = memoryCache.get(key);
+  if (memEntry && memEntry.expiresAt > Date.now()) {
+    return memEntry.data as T;
+  }
+
+  // Fetch fresh data
+  const data = await fetchFn();
+
+  // Write to Redis (best-effort)
+  try {
+    await redis.set(key, JSON.stringify(data), ttl);
+  } catch {
+    // Redis unavailable, use memory cache as fallback
+  }
+
+  // Always write to memory cache as fallback
+  memoryCache.set(key, { data, expiresAt: Date.now() + ttl * 1000 });
+
+  return data;
+}
+
 // Apply public rate limiter to all routes
 router.use(publicLimiter);
 
@@ -82,19 +121,24 @@ const createOrderSchema = z.object({
   notes: z.string().optional(),
 });
 
-// GET /products - List all public products
+// GET /products - List all public products (cached 30s)
 router.get('/products', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { page, limit, category, search, featured } = req.query;
     const storeId = await getStoreIdFromRequest(req);
 
-    const result = await ProductService.listPublic(storeId, {
-      page: page ? parseInt(page as string) : undefined,
-      limit: limit ? parseInt(limit as string) : undefined,
-      category: category as string,
-      search: search as string,
-      featured: featured === 'true',
-    });
+    // Build a cache key from query params so different filters get their own entry
+    const cacheKey = `public:products:${storeId}:${page || 1}:${limit || 20}:${category || ''}:${search || ''}:${featured || ''}`;
+
+    const result = await getCached(cacheKey, 30, () =>
+      ProductService.listPublic(storeId, {
+        page: page ? parseInt(page as string) : undefined,
+        limit: limit ? parseInt(limit as string) : undefined,
+        category: category as string,
+        search: search as string,
+        featured: featured === 'true',
+      })
+    );
 
     res.json({
       success: true,
@@ -127,11 +171,13 @@ router.get('/products/:slugOrId', async (req: Request, res: Response, next: Next
   }
 });
 
-// GET /categories - List all categories
+// GET /categories - List all categories (cached 120s)
 router.get('/categories', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const storeId = await getStoreIdFromRequest(req);
-    const categories = await ProductService.getCategories(storeId);
+    const categories = await getCached(`public:categories:${storeId}`, 120, () =>
+      ProductService.getCategories(storeId)
+    );
 
     res.json({
       success: true,
@@ -491,53 +537,62 @@ router.get('/stores', async (req: Request, res: Response, next: NextFunction) =>
   }
 });
 
-// GET /stores/:slugOrId - Get store by slug or ID (public)
+// GET /stores/:slugOrId - Get store by slug or ID (public, cached 60s)
 router.get('/stores/:slugOrId', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { slugOrId } = req.params;
 
-    // Check if it's a UUID (ID) or slug
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slugOrId);
+    const result = await getCached(`public:store:${slugOrId}`, 60, async () => {
+      // Check if it's a UUID (ID) or slug
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        slugOrId
+      );
 
-    const store = await prisma.store.findFirst({
-      where: {
-        ...(isUuid ? { id: slugOrId } : { slug: slugOrId }),
-        status: 'active',
-      },
-      select: {
-        id: true,
-        name: true,
-        nameAr: true,
-        slug: true,
-        domain: true,
-        logo: true,
-        logoAr: true,
-        favicon: true,
-        description: true,
-        descriptionAr: true,
-        currency: true,
-        timezone: true,
-        template: true,
-        theme: true,
-        socialLinks: true,
-        email: true,
-        phone: true,
-        phoneAr: true,
-        whatsapp: true,
-        address: true,
-        addressAr: true,
-        announcementBar: true,
-        metaTitle: true,
-        metaTitleAr: true,
-        metaDescription: true,
-        metaDescriptionAr: true,
-        settings: true,
-        marketingPixels: true,
-        createdAt: true,
-      },
+      const store = await prisma.store.findFirst({
+        where: {
+          ...(isUuid ? { id: slugOrId } : { slug: slugOrId }),
+          status: 'active',
+        },
+        select: {
+          id: true,
+          name: true,
+          nameAr: true,
+          slug: true,
+          domain: true,
+          logo: true,
+          logoAr: true,
+          favicon: true,
+          description: true,
+          descriptionAr: true,
+          currency: true,
+          timezone: true,
+          template: true,
+          theme: true,
+          socialLinks: true,
+          email: true,
+          phone: true,
+          phoneAr: true,
+          whatsapp: true,
+          address: true,
+          addressAr: true,
+          announcementBar: true,
+          metaTitle: true,
+          metaTitleAr: true,
+          metaDescription: true,
+          metaDescriptionAr: true,
+          settings: true,
+          marketingPixels: true,
+          createdAt: true,
+        },
+      });
+
+      if (!store) return null;
+
+      const enabledFeatures = await featureService.getEnabledFeatureKeys(store.id);
+      return { store, enabledFeatures };
     });
 
-    if (!store) {
+    if (!result) {
       res.status(404).json({
         success: false,
         error: { code: 'NOT_FOUND', message: 'Store not found' },
@@ -545,11 +600,9 @@ router.get('/stores/:slugOrId', async (req: Request, res: Response, next: NextFu
       return;
     }
 
-    const enabledFeatures = await featureService.getEnabledFeatureKeys(store.id);
-
     res.json({
       success: true,
-      data: { store, enabledFeatures },
+      data: result,
     });
   } catch (error) {
     next(error);

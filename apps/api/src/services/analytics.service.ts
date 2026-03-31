@@ -1,4 +1,46 @@
 import { prisma, Prisma } from '@force/database';
+import { redis } from './redis.service';
+
+// ==========================================
+// Simple cache-aside helper for analytics queries (60s TTL).
+// Uses Redis when available, falls back to an in-memory Map.
+// ==========================================
+
+const analyticsMemCache = new Map<string, { data: unknown; expiresAt: number }>();
+
+async function getCachedAnalytics<T>(
+  key: string,
+  ttl: number,
+  fetchFn: () => Promise<T>
+): Promise<T> {
+  // Try Redis
+  try {
+    const cached = await redis.get<string>(key);
+    if (cached) {
+      return typeof cached === 'string' ? JSON.parse(cached) : (cached as T);
+    }
+  } catch {
+    // Redis unavailable
+  }
+
+  // Try in-memory
+  const memEntry = analyticsMemCache.get(key);
+  if (memEntry && memEntry.expiresAt > Date.now()) {
+    return memEntry.data as T;
+  }
+
+  const data = await fetchFn();
+
+  // Write to Redis (best-effort)
+  try {
+    await redis.set(key, JSON.stringify(data), ttl);
+  } catch {
+    // Redis unavailable
+  }
+
+  analyticsMemCache.set(key, { data, expiresAt: Date.now() + ttl * 1000 });
+  return data;
+}
 
 interface DateRange {
   startDate: Date;
@@ -67,6 +109,19 @@ export class AnalyticsService {
     const startDate = dateRange?.startDate || new Date(now.getFullYear(), now.getMonth(), 1);
     const endDate = dateRange?.endDate || now;
 
+    // Build a cache key that includes the date range so different periods don't collide
+    const cacheKey = `analytics:dashboard:${storeId}:${startDate.toISOString()}:${endDate.toISOString()}`;
+
+    return getCachedAnalytics(cacheKey, 60, async () => {
+      return this._computeDashboardStats(storeId, startDate, endDate);
+    });
+  }
+
+  private static async _computeDashboardStats(
+    storeId: string,
+    startDate: Date,
+    endDate: Date
+  ): Promise<DashboardStats> {
     // Calculate previous period for comparison
     const periodLength = endDate.getTime() - startDate.getTime();
     const prevStartDate = new Date(startDate.getTime() - periodLength);
