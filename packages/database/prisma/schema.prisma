@@ -101,6 +101,7 @@ model VerificationToken {
 
   @@index([token])
   @@index([userId])
+  @@index([type])
   @@map("verification_tokens")
 }
 
@@ -589,7 +590,7 @@ model CartItem {
 model Order {
   id              String             @id @default(uuid())
   storeId         String             @map("store_id")
-  customerId      String             @map("customer_id")
+  customerId      String?            @map("customer_id")
   orderNumber     String             @unique @map("order_number")
   status          OrderStatus        @default(pending)
   paymentStatus   OrderPaymentStatus @default(unpaid) @map("payment_status")
@@ -616,8 +617,8 @@ model Order {
   webhookProcessedAt DateTime?       @map("webhook_processed_at")
 
   // Relations
-  store               Store       @relation(fields: [storeId], references: [id])
-  customer            User        @relation(fields: [customerId], references: [id])
+  store               Store       @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  customer            User        @relation(fields: [customerId], references: [id], onDelete: SetNull)
   items               OrderItem[]
   payments            Payment[]
   reviews             Review[]
@@ -779,7 +780,7 @@ model ReturnItem {
   condition   String? // new, opened, damaged
 
   return      Return     @relation(fields: [returnId], references: [id], onDelete: Cascade)
-  orderItem   OrderItem  @relation(fields: [orderItemId], references: [id])
+  orderItem   OrderItem  @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
   product     Product    @relation(fields: [productId], references: [id])
 
   @@index([returnId])
@@ -1272,7 +1273,7 @@ model AuditLog {
 model Address {
   id         String   @id @default(uuid())
   userId     String   @map("user_id")
-  type       String   @default("shipping") // shipping, billing
+  type       String   @default("shipping") // Valid values: "shipping" | "billing". Not an enum to avoid migrations on value changes.
   firstName  String   @map("first_name")
   lastName   String   @map("last_name")
   company    String?
@@ -1440,7 +1441,7 @@ model LoyaltyPoints {
   points        Int      @default(0) // Current point balance
   totalEarned   Int      @default(0) @map("total_earned") // Lifetime earned
   totalRedeemed Int      @default(0) @map("total_redeemed") // Lifetime redeemed
-  tier          String   @default("bronze") // bronze, silver, gold, platinum
+  tier          String   @default("bronze") // Valid values: "bronze" | "silver" | "gold" | "platinum". Not an enum to avoid migrations on tier changes.
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
