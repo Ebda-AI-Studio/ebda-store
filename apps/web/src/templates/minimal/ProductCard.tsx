@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import type { ProductCardProps } from '../types';
 import { Price } from '@force/ui';
 
@@ -22,10 +23,12 @@ export default function MinimalProductCard({
       {/* Image — no border, no shadow, subtle opacity on hover */}
       <div className="relative aspect-[3/4] overflow-hidden bg-muted/30 mb-5">
         {product.images?.[0]?.url ? (
-          <img
+          <Image
             src={product.images[0].url}
             alt={isRtl && product.nameAr ? product.nameAr : product.name}
             className="w-full h-full object-cover group-hover:opacity-80 transition-opacity duration-300 ease-out"
+            fill
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
             loading="lazy"
           />
         ) : (

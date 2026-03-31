@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import type { ProductCardProps } from '../types';
 import { Price, ProductBadge, ProductBadgeGroup, AddToCartButton, cn } from '@force/ui';
 import { calculateDiscount } from '../shared/display-helpers';
@@ -39,13 +40,15 @@ export default function BoldProductCard({
       {/* Image */}
       <div className="relative aspect-square overflow-hidden bg-muted">
         {product.images?.[0]?.url ? (
-          <img
+          <Image
             src={product.images[0].url}
             alt={isRtl && product.nameAr ? product.nameAr : product.name}
             className={cn(
-              'w-full h-full object-cover transition-transform duration-200',
+              'object-cover transition-transform duration-200',
               isHovered && 'scale-110'
             )}
+            fill
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
             loading="lazy"
           />
         ) : (

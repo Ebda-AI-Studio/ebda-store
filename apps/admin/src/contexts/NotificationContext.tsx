@@ -1,7 +1,15 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
-import { io, Socket } from 'socket.io-client';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useCallback,
+  useRef,
+  useMemo,
+} from 'react';
+import type { Socket } from 'socket.io-client';
 import { useAuth } from '@/lib/auth';
 import { getApiUrl } from '@/lib/api';
 
@@ -42,43 +50,50 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     }
 
     const apiUrl = getApiUrl();
+    let cancelled = false;
 
-    socketRef.current = io(apiUrl, {
-      withCredentials: true,
-      reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
-    });
+    // Dynamically import socket.io-client to keep it out of the initial bundle
+    import('socket.io-client').then(({ io }) => {
+      if (cancelled) return;
 
-    socketRef.current.on('connect', () => {
-      setIsConnected(true);
-
-      // Resubscribe to stores on reconnect
-      subscribedStoresRef.current.forEach(storeId => {
-        socketRef.current?.emit('subscribe:store', storeId);
+      socketRef.current = io(apiUrl, {
+        withCredentials: true,
+        reconnection: true,
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000,
       });
-    });
 
-    socketRef.current.on('disconnect', () => {
-      setIsConnected(false);
-    });
+      socketRef.current.on('connect', () => {
+        setIsConnected(true);
 
-    socketRef.current.on('notification', (notification: Omit<Notification, 'id' | 'read'>) => {
-      const newNotification: Notification = {
-        ...notification,
-        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        read: false,
-        createdAt: new Date(notification.createdAt),
-      };
+        // Resubscribe to stores on reconnect
+        subscribedStoresRef.current.forEach(storeId => {
+          socketRef.current?.emit('subscribe:store', storeId);
+        });
+      });
 
-      setNotifications(prev => [newNotification, ...prev].slice(0, 50)); // Keep last 50
-    });
+      socketRef.current.on('disconnect', () => {
+        setIsConnected(false);
+      });
 
-    socketRef.current.on('connect_error', error => {
-      console.error('Socket connection error:', error.message);
-    });
+      socketRef.current.on('notification', (notification: Omit<Notification, 'id' | 'read'>) => {
+        const newNotification: Notification = {
+          ...notification,
+          id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          read: false,
+          createdAt: new Date(notification.createdAt),
+        };
+
+        setNotifications(prev => [newNotification, ...prev].slice(0, 50)); // Keep last 50
+      });
+
+      socketRef.current.on('connect_error', error => {
+        console.error('Socket connection error:', error.message);
+      });
+    }); // end dynamic import .then()
 
     return () => {
+      cancelled = true;
       socketRef.current?.disconnect();
       socketRef.current = null;
     };
@@ -110,7 +125,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     setNotifications([]);
   }, []);
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const unreadCount = useMemo(() => notifications.filter(n => !n.read).length, [notifications]);
 
   return (
     <NotificationContext.Provider

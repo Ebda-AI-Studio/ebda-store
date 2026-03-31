@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import type { ProductCardProps } from '../types';
 import { Price, ProductBadge, ProductBadgeGroup, Rating, AddToCartButton, cn } from '@force/ui';
 import { calculateDiscount } from '../shared/display-helpers';
@@ -52,21 +53,25 @@ export default function ModernProductCard({
       <div className="relative aspect-[3/4] overflow-hidden bg-muted">
         {product.images?.[0]?.url ? (
           <>
-            <img
+            <Image
               src={product.images[0].url}
               alt={product.images[0].alt || product.name}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
+              fill
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
               loading="lazy"
             />
             {/* Second image on hover */}
             {product.images[1]?.url && (
-              <img
+              <Image
                 src={product.images[1].url}
                 alt={product.images[1].alt || product.name}
                 className={cn(
-                  'absolute inset-0 w-full h-full object-cover transition-opacity duration-500',
+                  'object-cover transition-opacity duration-500',
                   isHovered ? 'opacity-100' : 'opacity-0'
                 )}
+                fill
+                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
                 loading="lazy"
               />
             )}

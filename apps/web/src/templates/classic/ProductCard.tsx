@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import type { ProductCardProps } from '../types';
 import { Price, ProductBadge, AddToCartButton, cn } from '@force/ui';
 import { PlaceholderImageIcon } from '../shared/icons';
@@ -29,10 +30,12 @@ export default function ClassicProductCard({
       {/* Image container — aspect-square, clean border */}
       <div className="relative aspect-square overflow-hidden bg-muted border border-border group-hover:border-foreground/30 group-hover:shadow-md transition-all duration-300 mb-4">
         {product.images?.[0]?.url ? (
-          <img
+          <Image
             src={product.images[0].url}
             alt={isRtl && product.nameAr ? product.nameAr : product.name}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
+            fill
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
             loading="lazy"
           />
         ) : (

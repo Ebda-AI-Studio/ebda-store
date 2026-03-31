@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
+import dynamic from 'next/dynamic';
 import { Button, Badge, useToast } from '@force/ui';
 import { api, type Product, type ProductVariant } from '@/lib/api';
 import { useCart } from '../../../contexts/CartContext';
@@ -13,10 +14,18 @@ import { Header, Footer } from '../../../components';
 import { useLanguage, translations } from '../../../contexts/LanguageContext';
 import { trackViewContent, trackAddToCart } from '../../../components/MarketingPixels';
 import { VariantSelector } from '../../../components/VariantSelector';
-import ReviewSection from '../../../components/ReviewSection';
-import { FrequentlyBoughtTogether } from '../../../components/FrequentlyBoughtTogether';
-import { YouMightAlsoLike } from '../../../components/YouMightAlsoLike';
 import { formatPrice } from '@/lib/format';
+
+// Lazy-load heavy below-the-fold components to reduce initial bundle size
+const ReviewSection = dynamic(() => import('../../../components/ReviewSection'), { ssr: false });
+const FrequentlyBoughtTogether = dynamic(() =>
+  import('../../../components/FrequentlyBoughtTogether').then(mod => ({
+    default: mod.FrequentlyBoughtTogether,
+  }))
+);
+const YouMightAlsoLike = dynamic(() =>
+  import('../../../components/YouMightAlsoLike').then(mod => ({ default: mod.YouMightAlsoLike }))
+);
 
 function ProductSkeleton() {
   return (

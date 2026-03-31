@@ -2,6 +2,7 @@
 
 import { forwardRef, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import Image from 'next/image';
 import { cn } from '../utils/cn';
 import { Button } from './Button';
 import { Price } from './Price';
@@ -249,11 +250,14 @@ export const CartDrawer = forwardRef<HTMLDivElement, CartDrawerProps>(
                     >
                       {/* Image */}
                       {item.image ? (
-                        <div className="h-20 w-20 flex-shrink-0 overflow-hidden rounded-lg bg-muted">
-                          <img
+                        <div className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-lg bg-muted">
+                          <Image
                             src={item.image}
                             alt={isRtl && item.nameAr ? item.nameAr : item.name}
-                            className="h-full w-full object-cover"
+                            className="object-cover"
+                            fill
+                            sizes="80px"
+                            loading="lazy"
                           />
                         </div>
                       ) : (

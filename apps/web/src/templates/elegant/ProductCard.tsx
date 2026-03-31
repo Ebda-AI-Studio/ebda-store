@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import type { ProductCardProps } from '../types';
 import { Price, ProductBadge, ProductBadgeGroup, AddToCartButton, cn } from '@force/ui';
 import { PlaceholderImageIcon } from '../shared/icons';
@@ -48,25 +49,29 @@ export default function ElegantProductCard({
       <div className="relative aspect-[3/4] overflow-hidden bg-gray-50 mb-4">
         {product.images?.[0]?.url ? (
           <>
-            <img
+            <Image
               src={product.images[0].url}
               alt={isRtl && product.nameAr ? product.nameAr : product.name}
               className={cn(
-                'w-full h-full object-cover transition-all duration-500',
+                'object-cover transition-all duration-500',
                 isHovered ? 'brightness-95 scale-[1.02]' : 'brightness-100 scale-100'
               )}
               style={{
                 opacity: isHovered && product.images[1]?.url ? 0 : 1,
                 transition: 'opacity 500ms, filter 500ms, transform 500ms',
               }}
+              fill
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
               loading="lazy"
             />
             {product.images[1]?.url && (
-              <img
+              <Image
                 src={product.images[1].url}
                 alt={isRtl && product.nameAr ? product.nameAr : product.name}
-                className="absolute inset-0 w-full h-full object-cover transition-opacity duration-500"
+                className="object-cover transition-opacity duration-500"
                 style={{ opacity: isHovered ? 1 : 0 }}
+                fill
+                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
                 loading="lazy"
               />
             )}
