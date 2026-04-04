@@ -29,6 +29,7 @@ import abandonedCartRoutes from './abandoned-cart.routes';
 import recommendationRoutes from './recommendation.routes';
 import shippingCarrierRoutes from './shipping-carrier.routes';
 import affiliateRoutes from './affiliate.routes';
+import { tenantContext } from '../middleware/tenant-context';
 
 const router = Router();
 
@@ -45,85 +46,59 @@ router.use('/payment-settings', paymentSettingsRoutes);
 // Upload routes
 router.use('/uploads', uploadRoutes);
 
-// Admin routes (super_admin only)
-router.use('/admin', adminRoutes);
+// Admin routes (super_admin only — tenantContext activates per-route via :id param)
+router.use('/admin', tenantContext, adminRoutes);
 
 // Feature management routes (super_admin: /admin/stores/:id/features, store_admin: /stores/:storeId/my-features)
-router.use('/admin', featureRoutes);
-router.use('/stores', featureRoutes);
+router.use('/admin', tenantContext, featureRoutes);
+router.use('/stores', tenantContext, featureRoutes);
 
-// Store routes
-router.use('/stores', storeRoutes);
+// Store routes (tenantContext activates when :storeId or :id is present)
+router.use('/stores', tenantContext, storeRoutes);
 
-// Product routes (scoped to store)
-router.use('/stores/:storeId/products', productRoutes);
+// Store-scoped routes — tenantContext wraps all downstream handlers in an RLS transaction
+router.use('/stores/:storeId/products', tenantContext, productRoutes);
+router.use('/stores/:storeId/categories', tenantContext, categoryRoutes);
+router.use('/stores/:storeId/cart', tenantContext, cartRoutes);
+router.use('/stores/:storeId/orders', tenantContext, orderRoutes);
+router.use('/stores/:storeId/reviews', tenantContext, reviewRoutes);
+router.use('/stores/:storeId/analytics', tenantContext, analyticsRoutes);
+router.use('/stores/:storeId/returns', tenantContext, returnRoutes);
 
-// Category routes (scoped to store)
-router.use('/stores/:storeId/categories', categoryRoutes);
-
-// Cart routes
-router.use('/stores/:storeId/cart', cartRoutes);
-
-// Order routes
-router.use('/stores/:storeId/orders', orderRoutes);
-
-// Review routes
-router.use('/stores/:storeId/reviews', reviewRoutes);
-
-// Analytics routes
-router.use('/stores/:storeId/analytics', analyticsRoutes);
-
-// Return routes
-router.use('/stores/:storeId/returns', returnRoutes);
-
-// Coupon routes
-router.use('/stores', couponRoutes);
-
-// Shipping routes
-router.use('/stores', shippingRoutes);
-
-// Tax routes
-router.use('/stores', taxRoutes);
-
-// Loyalty routes
-router.use('/stores', loyaltyRoutes);
-
-// PWA routes
-router.use('/stores', pwaRoutes);
-
-// Inventory routes
-router.use('/stores', inventoryRoutes);
-
-// Bulk import/export routes
-router.use('/stores', bulkRoutes);
-
-// Variant routes
-router.use('/stores', variantRoutes);
+// Store-scoped routes mounted under /stores (storeId in sub-route params)
+router.use('/stores', tenantContext, couponRoutes);
+router.use('/stores', tenantContext, shippingRoutes);
+router.use('/stores', tenantContext, taxRoutes);
+router.use('/stores', tenantContext, loyaltyRoutes);
+router.use('/stores', tenantContext, pwaRoutes);
+router.use('/stores', tenantContext, inventoryRoutes);
+router.use('/stores', tenantContext, bulkRoutes);
+router.use('/stores', tenantContext, variantRoutes);
 
 // Notification routes (admin + public push)
-router.use('/stores', notificationRoutes);
+router.use('/stores', tenantContext, notificationRoutes);
 router.use('/public', notificationRoutes);
 
 // Abandoned cart routes (admin + public recovery)
-router.use('/stores', abandonedCartRoutes);
+router.use('/stores', tenantContext, abandonedCartRoutes);
 router.use('/public', abandonedCartRoutes);
 
 // Recommendation routes (admin + public)
-router.use('/stores', recommendationRoutes);
+router.use('/stores', tenantContext, recommendationRoutes);
 router.use('/public', recommendationRoutes);
 
 // Shipping carrier routes (admin + public tracking)
-router.use('/stores', shippingCarrierRoutes);
+router.use('/stores', tenantContext, shippingCarrierRoutes);
 router.use('/public', shippingCarrierRoutes);
 
 // Affiliate routes (admin + public apply/track)
-router.use('/stores', affiliateRoutes);
+router.use('/stores', tenantContext, affiliateRoutes);
 router.use('/public', affiliateRoutes);
 
-// Wishlist routes (user-scoped)
+// Wishlist routes (user-scoped, no store context)
 router.use('/wishlist', wishlistRoutes);
 
-// Address routes (user-scoped)
+// Address routes (user-scoped, no store context)
 router.use('/addresses', addressRoutes);
 
 export default router;

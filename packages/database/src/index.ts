@@ -1,12 +1,13 @@
 // Database Package - Prisma Client Export
 import { PrismaClient } from '@prisma/client';
+import { AsyncLocalStorage } from 'node:async_hooks';
 
 // Prevent multiple instances in development
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
-export const prisma =
+const basePrisma =
   globalForPrisma.prisma ??
   new PrismaClient({
     log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
@@ -46,8 +47,64 @@ function appendPoolParams(url: string | undefined): string | undefined {
 }
 
 if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma;
+  globalForPrisma.prisma = basePrisma;
 }
+
+// ---------------------------------------------------------------------------
+// Tenant-scoped RLS via AsyncLocalStorage
+// ---------------------------------------------------------------------------
+
+type TenantTx = Omit<
+  PrismaClient,
+  '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'
+>;
+
+/** Stores the active tenant transaction for the current async context. */
+const tenantStorage = new AsyncLocalStorage<TenantTx>();
+
+/**
+ * Model-level property names on PrismaClient (e.g. `user`, `product`, `store`).
+ * When a tenant transaction is active, reads of these properties are proxied
+ * to the transaction client so every query runs inside the SET LOCAL scope.
+ *
+ * We also proxy `$queryRaw`, `$executeRaw`, and `$queryRawUnsafe` /
+ * `$executeRawUnsafe` so raw queries respect the tenant context too.
+ */
+const PROXIED_PRISMA_METHODS = new Set([
+  // Raw query helpers
+  '$queryRaw',
+  '$queryRawUnsafe',
+  '$executeRaw',
+  '$executeRawUnsafe',
+]);
+
+function isProxiedProp(prop: string | symbol): boolean {
+  if (typeof prop !== 'string') return false;
+  // Proxy model accessors (lowercase, no $ prefix) and raw query helpers
+  if (PROXIED_PRISMA_METHODS.has(prop)) return true;
+  // Model accessors: lowercase first letter, no $ prefix (e.g. 'user', 'product')
+  return prop.length > 0 && prop[0] !== '$' && prop[0] === prop[0].toLowerCase();
+}
+
+/**
+ * Proxy-wrapped Prisma client.
+ *
+ * When called inside `runInTenantContext`, model accessors and raw query
+ * helpers transparently delegate to the tenant-scoped transaction that
+ * already has `SET LOCAL app.current_store_id` applied.
+ *
+ * Outside a tenant context the proxy passes through to the base client,
+ * so cross-tenant operations (super_admin, migrations, crons) work unchanged.
+ */
+export const prisma = new Proxy(basePrisma, {
+  get(target, prop, receiver) {
+    const tx = tenantStorage.getStore();
+    if (tx && isProxiedProp(prop)) {
+      return Reflect.get(tx, prop, tx);
+    }
+    return Reflect.get(target, prop, receiver);
+  },
+}) as PrismaClient;
 
 // Re-export everything from Prisma client (types, enums, Prisma namespace)
 export * from '@prisma/client';
@@ -77,28 +134,47 @@ export {
 export { prisma as db };
 
 /**
- * Execute a callback within a tenant-scoped transaction.
- * Sets `app.current_store_id` so that RLS policies restrict access
- * to only the specified store's data.
+ * Run a callback inside a Prisma interactive transaction with
+ * `app.current_store_id` set via SET LOCAL. All Prisma queries executed
+ * through the `prisma` export (the proxy) within the callback
+ * automatically use this transaction — no code changes needed in services.
  *
- * Usage:
- *   const products = await withTenantContext(storeId, async (tx) => {
- *     return tx.product.findMany();
+ * The tenant context is stored in AsyncLocalStorage, so it flows through
+ * any async operations within the callback.
+ *
+ * If the callback throws, the transaction rolls back automatically.
+ *
+ * @example
+ *   // In Express middleware:
+ *   await runInTenantContext(storeId, async () => {
+ *     // All prisma.product.findMany() etc. calls inside here
+ *     // are scoped to this storeId via RLS
+ *     await handler(req, res);
  *   });
- *
- * For super_admin operations that need cross-tenant access, call
- * prisma directly without this wrapper.
+ */
+export async function runInTenantContext<T>(storeId: string, fn: () => Promise<T>): Promise<T> {
+  return basePrisma.$transaction(
+    async tx => {
+      await tx.$executeRawUnsafe(
+        `SET LOCAL app.current_store_id = '${storeId.replace(/'/g, "''")}'`
+      );
+      return tenantStorage.run(tx, fn);
+    },
+    { timeout: 30000 }
+  );
+}
+
+/**
+ * Execute a callback within a tenant-scoped transaction (explicit tx version).
+ * Prefer `runInTenantContext` for automatic proxy-based scoping.
+ * This version passes the transaction client directly for cases where
+ * you need explicit control.
  */
 export async function withTenantContext<T>(
   storeId: string,
-  fn: (
-    tx: Omit<
-      PrismaClient,
-      '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'
-    >
-  ) => Promise<T>
+  fn: (tx: TenantTx) => Promise<T>
 ): Promise<T> {
-  return prisma.$transaction(async tx => {
+  return basePrisma.$transaction(async tx => {
     await tx.$executeRawUnsafe(`SET LOCAL app.current_store_id = '${storeId.replace(/'/g, "''")}'`);
     return fn(tx);
   });
