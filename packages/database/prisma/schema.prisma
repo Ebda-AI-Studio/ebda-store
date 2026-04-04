@@ -618,7 +618,7 @@ model Order {
 
   // Relations
   store               Store       @relation(fields: [storeId], references: [id], onDelete: Restrict)
-  customer            User        @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customer            User?       @relation(fields: [customerId], references: [id], onDelete: SetNull)
   items               OrderItem[]
   payments            Payment[]
   reviews             Review[]
