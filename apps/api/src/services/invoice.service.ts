@@ -93,8 +93,8 @@ export class InvoiceService {
   <div class="addresses">
     <div class="address-block">
       <h3>Bill To</h3>
-      <p><strong>${escapeHtml(order.customer.firstName)} ${escapeHtml(order.customer.lastName)}</strong></p>
-      <p>${escapeHtml(order.customer.email)}</p>
+      <p><strong>${escapeHtml(order.customer?.firstName || '')} ${escapeHtml(order.customer?.lastName || '')}</strong></p>
+      <p>${escapeHtml(order.customer?.email || '')}</p>
     </div>
     ${
       shippingAddr

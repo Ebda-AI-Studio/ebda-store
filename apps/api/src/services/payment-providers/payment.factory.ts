@@ -745,9 +745,11 @@ export class PaymentService {
         amount: order.total,
         currency: order.currency as Currency,
         customer: {
-          id: order.customerId,
-          name: `${order.customer.firstName} ${order.customer.lastName}`,
-          email: order.customer.email,
+          id: order.customerId!,
+          name:
+            `${order.customer?.firstName || ''} ${order.customer?.lastName || ''}`.trim() ||
+            'Customer',
+          email: order.customer?.email || '',
         },
         items: order.items.map(item => ({
           name: item.productName,

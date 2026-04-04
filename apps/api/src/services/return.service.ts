@@ -205,8 +205,9 @@ export class ReturnService {
 
     // Send confirmation email
     await EmailService.sendReturnConfirmation({
-      email: order.customer.email,
-      customerName: `${order.customer.firstName} ${order.customer.lastName}`,
+      email: order.customer?.email || '',
+      customerName:
+        `${order.customer?.firstName || ''} ${order.customer?.lastName || ''}`.trim() || 'Customer',
       storeName: order.store.name,
       returnNumber,
       orderNumber: order.orderNumber,
@@ -218,7 +219,9 @@ export class ReturnService {
       socketService.newReturnNotification(storeId, {
         returnNumber,
         orderNumber: order.orderNumber,
-        customerName: `${order.customer.firstName} ${order.customer.lastName}`.trim(),
+        customerName:
+          `${order.customer?.firstName || ''} ${order.customer?.lastName || ''}`.trim() ||
+          'Customer',
       });
     } catch (notifyError) {
       logger.error({ err: notifyError }, 'Failed to send return notification');

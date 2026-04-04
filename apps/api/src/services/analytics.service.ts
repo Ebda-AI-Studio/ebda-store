@@ -528,7 +528,9 @@ export class AnalyticsService {
     ]);
 
     // Resolve customer details for the top spenders in a single query
-    const topCustomerIds = topOrderGroups.map(g => g.customerId);
+    const topCustomerIds = topOrderGroups
+      .map(g => g.customerId)
+      .filter((id): id is string => id != null);
     const customerDetails = await prisma.user.findMany({
       where: { id: { in: topCustomerIds } },
       select: { id: true, email: true, firstName: true, lastName: true },
@@ -538,7 +540,7 @@ export class AnalyticsService {
 
     const topCustomers = topOrderGroups
       .map(g => {
-        const customer = customerById.get(g.customerId);
+        const customer = g.customerId ? customerById.get(g.customerId) : undefined;
         if (!customer) return null;
         return {
           id: customer.id,

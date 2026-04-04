@@ -322,8 +322,10 @@ export class OrderService {
       const emailData: OrderEmailData = {
         orderNumber: order.orderNumber,
         customerName:
-          `${order.customer.firstName} ${order.customer.lastName}`.trim() || order.customer.email,
-        customerEmail: order.customer.email,
+          `${order.customer?.firstName || ''} ${order.customer?.lastName || ''}`.trim() ||
+          order.customer?.email ||
+          'Customer',
+        customerEmail: order.customer?.email || '',
         items: order.items.map(item => ({
           name: item.productName,
           quantity: item.quantity,
@@ -352,7 +354,9 @@ export class OrderService {
     notificationDispatcher
       .dispatch(storeId, 'order_confirmed', {
         customerName:
-          `${order.customer.firstName} ${order.customer.lastName}`.trim() || order.customer.email,
+          `${order.customer?.firstName || ''} ${order.customer?.lastName || ''}`.trim() ||
+          order.customer?.email ||
+          'Customer',
         customerPhone: data.shippingAddress.phone ?? undefined,
         orderNumber: order.orderNumber,
         total: order.total,
@@ -367,7 +371,9 @@ export class OrderService {
         orderNumber: order.orderNumber,
         total: order.total,
         customerName:
-          `${order.customer.firstName} ${order.customer.lastName}`.trim() || order.customer.email,
+          `${order.customer?.firstName || ''} ${order.customer?.lastName || ''}`.trim() ||
+          order.customer?.email ||
+          'Customer',
       });
     } catch (notifyError) {
       logger.error({ err: notifyError }, 'Failed to send order notification');
@@ -492,10 +498,11 @@ export class OrderService {
 
     // Send status update emails
     try {
-      const customerEmail = updatedOrder.customer.email;
+      const customerEmail = updatedOrder.customer?.email || '';
       const customerName =
-        `${updatedOrder.customer.firstName} ${updatedOrder.customer.lastName}`.trim() ||
-        customerEmail;
+        `${updatedOrder.customer?.firstName || ''} ${updatedOrder.customer?.lastName || ''}`.trim() ||
+        customerEmail ||
+        'Customer';
 
       if (status === 'shipped') {
         await EmailService.sendOrderShipped({
@@ -546,8 +553,9 @@ export class OrderService {
     // Dispatch to WhatsApp/SMS/Push channels (fire-and-forget)
     {
       const customerName =
-        `${updatedOrder.customer.firstName} ${updatedOrder.customer.lastName}`.trim() ||
-        updatedOrder.customer.email;
+        `${updatedOrder.customer?.firstName || ''} ${updatedOrder.customer?.lastName || ''}`.trim() ||
+        updatedOrder.customer?.email ||
+        'Customer';
       const shippingAddr = updatedOrder.shippingAddress as { phone?: string } | null;
       const customerPhone = shippingAddr?.phone ?? undefined;
 
@@ -605,7 +613,7 @@ export class OrderService {
 
     // Send real-time notification to customer
     try {
-      socketService.orderStatusNotification(updatedOrder.customerId, {
+      socketService.orderStatusNotification(updatedOrder.customerId!, {
         orderNumber: updatedOrder.orderNumber,
         status,
       });

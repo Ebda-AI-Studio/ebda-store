@@ -148,8 +148,10 @@ router.post(
           currency: order.currency as Currency,
           customer: {
             id: user.userId,
-            name: `${order.customer.firstName} ${order.customer.lastName}`,
-            email: order.customer.email,
+            name:
+              `${order.customer?.firstName || ''} ${order.customer?.lastName || ''}`.trim() ||
+              'Customer',
+            email: order.customer?.email || '',
           },
           items: order.items.map(item => ({
             name: item.productName,
