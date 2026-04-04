@@ -31,15 +31,15 @@ export function slugify(text: string): string {
 }
 
 /**
- * Generate random string for IDs, tokens, etc.
+ * Generate cryptographically random string for IDs, tokens, etc.
  */
 export function generateId(length = 12): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let result = '';
-  for (let i = 0; i < length; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
+  const bytes =
+    typeof globalThis.crypto !== 'undefined' && globalThis.crypto.getRandomValues
+      ? globalThis.crypto.getRandomValues(new Uint8Array(length))
+      : require('crypto').randomBytes(length);
+  return Array.from(bytes as Uint8Array, (b: number) => chars[b % chars.length]).join('');
 }
 
 /**

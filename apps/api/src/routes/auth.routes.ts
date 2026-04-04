@@ -125,9 +125,11 @@ router.post('/register', authLimiter, async (req: Request, res: Response, next: 
     // Set access token as HTTP-only cookie for cookie-based auth
     setTokenCookie(res, result.accessToken);
 
+    // Don't expose accessToken in body — it's set as HTTP-only cookie
+    const { accessToken: _at, ...safeResult } = result;
     res.status(201).json({
       success: true,
-      data: result,
+      data: safeResult,
     });
   } catch (error) {
     next(error);
@@ -203,10 +205,12 @@ router.post('/login', authLimiter, async (req: Request, res: Response, next: Nex
     // Set access token as HTTP-only cookie for cookie-based auth
     setTokenCookie(res, result.accessToken);
 
+    // Don't expose accessToken in body — it's set as HTTP-only cookie
+    const { accessToken: _at, ...safeLoginResult } = result;
     res.json({
       success: true,
       data: {
-        ...result,
+        ...safeLoginResult,
         csrfToken,
       },
     });
@@ -339,6 +343,7 @@ router.put('/me', authenticate, async (req: Request, res: Response, next: NextFu
 // POST /auth/change-password
 router.post(
   '/change-password',
+  authLimiter,
   authenticate,
   async (req: Request, res: Response, next: NextFunction) => {
     try {

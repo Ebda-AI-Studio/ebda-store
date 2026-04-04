@@ -76,10 +76,12 @@ function slugify(text: string): string {
 }
 
 function randomChars(length: number): string {
+  const crypto = require('crypto');
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  const bytes = crypto.randomBytes(length);
   let result = '';
   for (let i = 0; i < length; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
+    result += chars.charAt(bytes[i] % chars.length);
   }
   return result;
 }

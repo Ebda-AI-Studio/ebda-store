@@ -407,7 +407,10 @@ router.get('/whatsapp', (req: Request, res: Response) => {
   const token = req.query['hub.verify_token'] as string;
   const challenge = req.query['hub.challenge'] as string;
 
-  const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN || 'verify';
+  const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN;
+  if (!verifyToken) {
+    return res.status(500).send('WhatsApp verify token not configured');
+  }
   const result = whatsappService.verifyWebhook(mode, token, challenge, verifyToken);
 
   if (result) {

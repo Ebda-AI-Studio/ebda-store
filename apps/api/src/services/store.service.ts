@@ -34,13 +34,16 @@ export class StoreService {
     }
   }
 
-  static async list(options: { page?: number; limit?: number } = {}) {
+  static async list(options: { page?: number; limit?: number; ownerId?: string } = {}) {
     const page = Math.max(1, options.page || 1);
     const limit = Math.min(100, Math.max(1, options.limit || 20));
     const skip = (page - 1) * limit;
 
+    const where = options.ownerId ? { ownerId: options.ownerId } : {};
+
     const [stores, total] = await Promise.all([
       prisma.store.findMany({
+        where,
         skip,
         take: limit,
         include: {
@@ -51,7 +54,7 @@ export class StoreService {
         },
         orderBy: { createdAt: 'desc' },
       }),
-      prisma.store.count(),
+      prisma.store.count({ where }),
     ]);
 
     return {

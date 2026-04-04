@@ -31,8 +31,8 @@ class SocketService {
     this.io = new Server(httpServer, {
       cors: {
         origin: (origin, callback) => {
-          // Allow requests with no origin
-          if (!origin) return callback(null, true);
+          // Reject requests with no origin (prevents sandboxed iframe attacks)
+          if (!origin) return callback(null, false);
 
           // Always allow platform URLs
           const platformOrigins = [config.webUrl, config.adminUrl].filter(Boolean);
@@ -41,7 +41,8 @@ class SocketService {
           // Allow Vercel preview/production deployments
           if (
             origin.endsWith('.vercel.app') &&
-            (origin.includes('force-web') || origin.includes('force-admin'))
+            (/^https:\/\/force-web(-[a-z0-9]+)?\.vercel\.app$/.test(origin) ||
+              /^https:\/\/force-admin(-[a-z0-9]+)?\.vercel\.app$/.test(origin))
           ) {
             return callback(null, true);
           }

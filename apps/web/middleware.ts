@@ -128,7 +128,7 @@ export function middleware(request: NextRequest) {
       request: { headers: requestHeaders },
     });
     // Persist store slug in cookie so subsequent pages (e.g. /products) keep store context
-    response.cookies.set('x-store-slug', slugInfo.slug, { path: '/', httpOnly: false });
+    response.cookies.set('x-store-slug', slugInfo.slug, { path: '/', httpOnly: true });
     return response;
   }
 

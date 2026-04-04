@@ -20,7 +20,6 @@ const upload = multer({
       'image/png',
       'image/gif',
       'image/webp',
-      'image/svg+xml',
       'image/x-icon',
       'image/vnd.microsoft.icon',
     ];
@@ -175,7 +174,6 @@ router.post(
         'image/png',
         'image/gif',
         'image/webp',
-        'image/svg+xml',
         'image/x-icon',
         'image/vnd.microsoft.icon',
       ];
@@ -234,7 +232,7 @@ router.delete(
         return;
       }
 
-      if (!key.includes(storeId)) {
+      if (!key.startsWith(storeId + '/') && !key.startsWith('stores/' + storeId + '/')) {
         res.status(403).json({
           success: false,
           error: { code: 'FORBIDDEN', message: 'Cannot delete files from another store' },

@@ -130,6 +130,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // The access token is set as an HTTP-only cookie by the API response.
     // Only store the refresh token in localStorage.
     localStorage.setItem('refreshToken', data.data.refreshToken);
+    // Store CSRF token for state-changing requests
+    if (data.data.csrfToken) {
+      localStorage.setItem('csrfToken', data.data.csrfToken);
+    }
+    // Set session indicator cookie so middleware can gate admin pages
+    document.cookie = 'force-session=1; path=/; max-age=' + 7 * 24 * 60 * 60 + '; SameSite=Lax';
     setUser(data.data.user);
     router.push('/');
   }
@@ -151,6 +157,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     localStorage.removeItem('refreshToken');
+    localStorage.removeItem('csrfToken');
+    // Clear session indicator cookie
+    document.cookie = 'force-session=; path=/; max-age=0';
     setUser(null);
     router.push('/login');
   }

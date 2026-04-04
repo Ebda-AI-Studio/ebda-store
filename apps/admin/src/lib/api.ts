@@ -54,11 +54,22 @@ export async function apiRequest<T = unknown>(
   const url = endpoint.startsWith('http') ? endpoint : `${getApiUrl()}${endpoint}`;
 
   try {
+    // Include CSRF token for state-changing requests
+    const method = (options.method || 'GET').toUpperCase();
+    const csrfHeaders: Record<string, string> = {};
+    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+      const csrfToken = typeof window !== 'undefined' ? localStorage.getItem('csrfToken') : null;
+      if (csrfToken) {
+        csrfHeaders['X-CSRF-Token'] = csrfToken;
+      }
+    }
+
     const response = await fetch(url, {
       ...options,
       credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
+        ...csrfHeaders,
         ...options.headers,
       },
     });

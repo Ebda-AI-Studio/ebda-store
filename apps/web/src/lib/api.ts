@@ -209,6 +209,15 @@ class ApiClient {
       (headers as Record<string, string>)['X-Store-ID'] = this.storeId;
     }
 
+    // Include CSRF token for state-changing requests
+    const method = (options.method || 'GET').toUpperCase();
+    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) && typeof window !== 'undefined') {
+      const csrfToken = localStorage.getItem('csrfToken');
+      if (csrfToken) {
+        (headers as Record<string, string>)['X-CSRF-Token'] = csrfToken;
+      }
+    }
+
     try {
       const response = await fetch(`${this.baseUrl}${endpoint}`, {
         ...options,
@@ -264,6 +273,9 @@ class ApiClient {
       // Only store the refresh token in localStorage.
       if (typeof window !== 'undefined') {
         localStorage.setItem('refreshToken', result.data.refreshToken);
+        if ((result.data as any).csrfToken) {
+          localStorage.setItem('csrfToken', (result.data as any).csrfToken);
+        }
       }
     }
 

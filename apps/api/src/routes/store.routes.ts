@@ -178,6 +178,7 @@ router.get(
       const result = await StoreService.list({
         page: page ? parseInt(page as string) : undefined,
         limit: limit ? parseInt(limit as string) : undefined,
+        ownerId: req.user!.role === 'store_admin' ? req.user!.userId : undefined,
       });
 
       res.json({

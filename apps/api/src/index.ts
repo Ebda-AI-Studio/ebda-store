@@ -115,10 +115,11 @@ app.use(
       const platformOrigins = [config.webUrl, config.adminUrl].filter(Boolean);
       if (platformOrigins.includes(origin)) return callback(null, true);
 
-      // Allow Vercel preview/production deployments for the project
+      // Allow Vercel preview/production deployments for the project (strict prefix match)
       if (
         origin.endsWith('.vercel.app') &&
-        (origin.includes('force-web') || origin.includes('force-admin'))
+        (/^https:\/\/force-web(-[a-z0-9]+)?\.vercel\.app$/.test(origin) ||
+          /^https:\/\/force-admin(-[a-z0-9]+)?\.vercel\.app$/.test(origin))
       ) {
         return callback(null, true);
       }
@@ -205,7 +206,7 @@ app.get('/health', (_req, res) => {
 app.get(
   '/api/v1/health',
   authenticate,
-  requireRole(['store_admin', 'super_admin']),
+  requireRole(['super_admin']),
   async (_req: Request, res: Response) => {
     const checks: Record<string, { status: string; latency?: number }> = {};
 

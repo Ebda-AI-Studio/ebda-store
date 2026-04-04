@@ -39,8 +39,10 @@ export default function LoginClient() {
       // Sync local cart to backend after login
       await syncCartToBackend();
 
-      // Redirect to the original page or home
-      const redirectTo = searchParams.get('redirect') || '/';
+      // Redirect to the original page or home (validate to prevent open redirect)
+      const rawRedirect = searchParams.get('redirect') || '/';
+      const redirectTo =
+        rawRedirect.startsWith('/') && !rawRedirect.startsWith('//') ? rawRedirect : '/';
       router.push(storeUrl(redirectTo));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to login');

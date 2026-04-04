@@ -75,3 +75,31 @@ export {
 } from '@prisma/client';
 
 export { prisma as db };
+
+/**
+ * Execute a callback within a tenant-scoped transaction.
+ * Sets `app.current_store_id` so that RLS policies restrict access
+ * to only the specified store's data.
+ *
+ * Usage:
+ *   const products = await withTenantContext(storeId, async (tx) => {
+ *     return tx.product.findMany();
+ *   });
+ *
+ * For super_admin operations that need cross-tenant access, call
+ * prisma directly without this wrapper.
+ */
+export async function withTenantContext<T>(
+  storeId: string,
+  fn: (
+    tx: Omit<
+      PrismaClient,
+      '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'
+    >
+  ) => Promise<T>
+): Promise<T> {
+  return prisma.$transaction(async tx => {
+    await tx.$executeRawUnsafe(`SET LOCAL app.current_store_id = '${storeId.replace(/'/g, "''")}'`);
+    return fn(tx);
+  });
+}

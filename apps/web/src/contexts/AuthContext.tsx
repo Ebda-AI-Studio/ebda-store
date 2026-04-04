@@ -62,6 +62,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Only store the refresh token in localStorage.
         if (typeof window !== 'undefined') {
           localStorage.setItem('refreshToken', result.data.refreshToken);
+          if (result.data.csrfToken) {
+            localStorage.setItem('csrfToken', result.data.csrfToken);
+          }
         }
         setUser(result.data.user);
         return { success: true };

@@ -279,7 +279,7 @@ export default function ShippingCarriersPage() {
           merged.icarry = {
             enabled: cfg.enabled ?? false,
             isDefault: cfg.isDefault ?? false,
-            apiKey: cfg.credentials?.apiKey ?? '',
+            apiKey: cfg.credentials?.apiKey ? '••••' + cfg.credentials.apiKey.slice(-4) : '',
             merchantId: cfg.credentials?.merchantId ?? '',
             pickup: {
               area: cfg.settings?.pickupArea ?? '',
@@ -293,11 +293,13 @@ export default function ShippingCarriersPage() {
             enabled: cfg.enabled ?? false,
             isDefault: cfg.isDefault ?? false,
             accountNumber: cfg.credentials?.accountNumber ?? '',
-            accountPin: cfg.credentials?.accountPin ?? '',
+            accountPin: cfg.credentials?.accountPin
+              ? '••••' + cfg.credentials.accountPin.slice(-4)
+              : '',
             accountEntity: cfg.credentials?.accountEntity ?? '',
             accountCountryCode: cfg.credentials?.accountCountryCode ?? 'KW',
             username: cfg.credentials?.username ?? '',
-            password: cfg.credentials?.password ?? '',
+            password: cfg.credentials?.password ? '••••' : '',
             pickup: {
               area: cfg.settings?.pickupArea ?? '',
               block: cfg.settings?.pickupBlock ?? '',

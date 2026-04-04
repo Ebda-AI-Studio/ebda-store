@@ -47,10 +47,17 @@ export function authenticate(req: Request, _res: Response, next: NextFunction): 
       algorithms: ['HS256'],
       issuer: 'force-api',
       audience: 'force-app',
-    }) as AuthPayload;
+    }) as AuthPayload & { type?: string };
+
+    // Reject refresh tokens used as access tokens
+    if (payload.type === 'refresh') {
+      throw new AppError(401, 'TOKEN_INVALID', 'Refresh tokens cannot be used for authentication');
+    }
+
     req.user = payload;
     next();
-  } catch {
+  } catch (err) {
+    if (err instanceof AppError) throw err;
     throw new AppError(401, 'TOKEN_INVALID', 'Invalid or expired token');
   }
 }
