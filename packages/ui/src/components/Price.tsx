@@ -2,6 +2,7 @@
 
 import { forwardRef } from 'react';
 import { cn } from '../utils/cn';
+import { formatPrice } from '@force/shared';
 
 export interface PriceProps extends React.HTMLAttributes<HTMLDivElement> {
   /** Price in fils (1 KWD = 1000 fils) */
@@ -53,17 +54,11 @@ export const Price = forwardRef<HTMLDivElement, PriceProps>(
     },
     ref
   ) => {
-    const formatPrice = (amount: number) => {
-      const decimals = currency === 'KWD' ? 3 : 2;
-      const divisor = currency === 'KWD' ? 1000 : 100;
-
-      return new Intl.NumberFormat(isRtl ? 'ar-KW' : 'en-KW', {
-        style: 'currency',
-        currency: currency,
-        minimumFractionDigits: decimals,
-        maximumFractionDigits: decimals,
-      }).format(amount / divisor);
-    };
+    const fmtPrice = (amount: number) =>
+      formatPrice(amount, {
+        currency,
+        locale: isRtl ? 'ar-KW' : 'en-KW',
+      });
 
     const discount =
       compareAtPrice && compareAtPrice > price
@@ -80,12 +75,12 @@ export const Price = forwardRef<HTMLDivElement, PriceProps>(
         {...props}
       >
         {/* Current Price */}
-        <span className={cn('font-bold text-primary', sizeStyles[size])}>{formatPrice(price)}</span>
+        <span className={cn('font-bold text-primary', sizeStyles[size])}>{fmtPrice(price)}</span>
 
         {/* Compare At Price */}
         {hasDiscount && (
           <span className={cn('text-muted-foreground/60 line-through', compareSizeStyles[size])}>
-            {formatPrice(compareAtPrice!)}
+            {fmtPrice(compareAtPrice!)}
           </span>
         )}
 
@@ -102,24 +97,5 @@ export const Price = forwardRef<HTMLDivElement, PriceProps>(
 
 Price.displayName = 'Price';
 
-/**
- * Utility function to format price outside of component
- */
-export function formatPrice(
-  amount: number,
-  options: {
-    currency?: string;
-    isRtl?: boolean;
-  } = {}
-): string {
-  const { currency = 'KWD', isRtl = false } = options;
-  const decimals = currency === 'KWD' ? 3 : 2;
-  const divisor = currency === 'KWD' ? 1000 : 100;
-
-  return new Intl.NumberFormat(isRtl ? 'ar-KW' : 'en-KW', {
-    style: 'currency',
-    currency: currency,
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  }).format(amount / divisor);
-}
+// Re-export the shared formatPrice for consumers that imported it from @force/ui
+export { formatPrice } from '@force/shared';

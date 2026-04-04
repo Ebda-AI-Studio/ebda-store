@@ -1,21 +1,18 @@
 /**
  * Communication Hub — Notification Unit Tests
- * Tests for notification types, templates, and Zod schemas
+ * Tests for notification types, templates, and rendering
  */
 
 import { describe, it, expect } from 'vitest';
 
 // Import directly from source (same pattern as feature.test.ts)
 import {
-  NOTIFICATION_EVENTS,
-  NOTIFICATION_CHANNELS,
   WHATSAPP_TEMPLATES,
   SMS_TEMPLATES,
   PUSH_TEMPLATES,
   renderSmsTemplate,
-  notificationChannelSchema,
-  notificationEventSchema,
   type NotificationData,
+  type NotificationEvent,
 } from '../../packages/shared/src/notifications';
 
 // ─── Sample data ──────────────────────────────────────────────────────────────
@@ -31,36 +28,19 @@ const sampleData: NotificationData = {
   storeName: 'Force Store',
 };
 
-// ─── NOTIFICATION_EVENTS ──────────────────────────────────────────────────────
-
-describe('NOTIFICATION_EVENTS', () => {
-  it('has exactly 6 entries', () => {
-    expect(NOTIFICATION_EVENTS).toHaveLength(6);
-  });
-
-  it('contains the expected event names', () => {
-    expect(NOTIFICATION_EVENTS).toContain('order_confirmed');
-    expect(NOTIFICATION_EVENTS).toContain('payment_success');
-    expect(NOTIFICATION_EVENTS).toContain('order_shipped');
-    expect(NOTIFICATION_EVENTS).toContain('order_delivered');
-    expect(NOTIFICATION_EVENTS).toContain('order_cancelled');
-    expect(NOTIFICATION_EVENTS).toContain('refund_processed');
-  });
-});
-
-// ─── NOTIFICATION_CHANNELS ────────────────────────────────────────────────────
-
-describe('NOTIFICATION_CHANNELS', () => {
-  it('has exactly 3 entries', () => {
-    expect(NOTIFICATION_CHANNELS).toHaveLength(3);
-  });
-
-  it('contains whatsapp, sms, and push', () => {
-    expect(NOTIFICATION_CHANNELS).toContain('whatsapp');
-    expect(NOTIFICATION_CHANNELS).toContain('sms');
-    expect(NOTIFICATION_CHANNELS).toContain('push');
-  });
-});
+// All notification events for iteration
+const ALL_EVENTS: NotificationEvent[] = [
+  'order_confirmed',
+  'payment_success',
+  'order_shipped',
+  'order_delivered',
+  'order_cancelled',
+  'refund_processed',
+  'cart_abandoned_step1',
+  'cart_abandoned_step2',
+  'cart_abandoned_step3',
+  'back_in_stock',
+];
 
 // ─── renderSmsTemplate ────────────────────────────────────────────────────────
 
@@ -121,14 +101,14 @@ describe('renderSmsTemplate', () => {
 // ─── SMS_TEMPLATES ────────────────────────────────────────────────────────────
 
 describe('SMS_TEMPLATES', () => {
-  it('has entries for all 6 events', () => {
-    for (const event of NOTIFICATION_EVENTS) {
+  it('has entries for all events', () => {
+    for (const event of ALL_EVENTS) {
       expect(SMS_TEMPLATES).toHaveProperty(event);
     }
   });
 
   it('each entry has en and ar strings', () => {
-    for (const event of NOTIFICATION_EVENTS) {
+    for (const event of ALL_EVENTS) {
       const template = SMS_TEMPLATES[event];
       expect(typeof template.en).toBe('string');
       expect(template.en.length).toBeGreaterThan(0);
@@ -141,14 +121,14 @@ describe('SMS_TEMPLATES', () => {
 // ─── WHATSAPP_TEMPLATES ───────────────────────────────────────────────────────
 
 describe('WHATSAPP_TEMPLATES', () => {
-  it('has entries for all 6 events', () => {
-    for (const event of NOTIFICATION_EVENTS) {
+  it('has entries for all events', () => {
+    for (const event of ALL_EVENTS) {
       expect(WHATSAPP_TEMPLATES).toHaveProperty(event);
     }
   });
 
   it('each entry has a name string and variables function', () => {
-    for (const event of NOTIFICATION_EVENTS) {
+    for (const event of ALL_EVENTS) {
       const template = WHATSAPP_TEMPLATES[event];
       expect(typeof template.name).toBe('string');
       expect(template.name.length).toBeGreaterThan(0);
@@ -168,14 +148,14 @@ describe('WHATSAPP_TEMPLATES', () => {
 // ─── PUSH_TEMPLATES ───────────────────────────────────────────────────────────
 
 describe('PUSH_TEMPLATES', () => {
-  it('has entries for all 6 events', () => {
-    for (const event of NOTIFICATION_EVENTS) {
+  it('has entries for all events', () => {
+    for (const event of ALL_EVENTS) {
       expect(PUSH_TEMPLATES).toHaveProperty(event);
     }
   });
 
   it('each entry has title and body with en and ar strings', () => {
-    for (const event of NOTIFICATION_EVENTS) {
+    for (const event of ALL_EVENTS) {
       const template = PUSH_TEMPLATES[event];
       expect(typeof template.title.en).toBe('string');
       expect(template.title.en.length).toBeGreaterThan(0);
@@ -186,57 +166,5 @@ describe('PUSH_TEMPLATES', () => {
       expect(typeof template.body.ar).toBe('string');
       expect(template.body.ar.length).toBeGreaterThan(0);
     }
-  });
-});
-
-// ─── notificationChannelSchema ────────────────────────────────────────────────
-
-describe('notificationChannelSchema', () => {
-  it('validates valid channel: whatsapp', () => {
-    expect(notificationChannelSchema.safeParse('whatsapp').success).toBe(true);
-  });
-
-  it('validates valid channel: sms', () => {
-    expect(notificationChannelSchema.safeParse('sms').success).toBe(true);
-  });
-
-  it('validates valid channel: push', () => {
-    expect(notificationChannelSchema.safeParse('push').success).toBe(true);
-  });
-
-  it('rejects invalid channel: email', () => {
-    expect(notificationChannelSchema.safeParse('email').success).toBe(false);
-  });
-
-  it('rejects empty string', () => {
-    expect(notificationChannelSchema.safeParse('').success).toBe(false);
-  });
-
-  it('rejects non-string input', () => {
-    expect(notificationChannelSchema.safeParse(42).success).toBe(false);
-  });
-});
-
-// ─── notificationEventSchema ──────────────────────────────────────────────────
-
-describe('notificationEventSchema', () => {
-  it('validates valid event: order_confirmed', () => {
-    expect(notificationEventSchema.safeParse('order_confirmed').success).toBe(true);
-  });
-
-  it('validates valid event: refund_processed', () => {
-    expect(notificationEventSchema.safeParse('refund_processed').success).toBe(true);
-  });
-
-  it('rejects invalid event: order_pending', () => {
-    expect(notificationEventSchema.safeParse('order_pending').success).toBe(false);
-  });
-
-  it('rejects empty string', () => {
-    expect(notificationEventSchema.safeParse('').success).toBe(false);
-  });
-
-  it('rejects non-string input', () => {
-    expect(notificationEventSchema.safeParse(null).success).toBe(false);
   });
 });

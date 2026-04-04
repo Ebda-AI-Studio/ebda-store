@@ -11,22 +11,14 @@ export * from './components/Table';
 export * from './components/Select';
 export * from './components/Textarea';
 export * from './components/Toast';
-export * from './components/ErrorBoundary';
 export * from './components/Skeleton';
 
 // Storefront Components
 export * from './components/Price';
 export * from './components/AddToCartButton';
-export * from './components/QuantitySelector';
 export * from './components/ProductBadge';
 export * from './components/Rating';
-export * from './components/CartDrawer';
-export * from './components/WishlistButton';
-export * from './components/ProductGallery';
-export * from './components/ProductFilters';
-export * from './components/SearchBar';
 export * from './components/Breadcrumb';
-export * from './components/MobileMenu';
 
 // Theme System
 export * from './theme';

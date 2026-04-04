@@ -211,20 +211,6 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
   },
 };
 
-export const FEATURE_CATEGORIES: Record<FeatureCategory, string> = {
-  commerce: 'Commerce',
-  marketing: 'Marketing',
-  operations: 'Operations',
-  storefront: 'Storefront',
-};
-
-export const FEATURE_CATEGORIES_AR: Record<FeatureCategory, string> = {
-  commerce: 'التجارة',
-  marketing: 'التسويق',
-  operations: 'العمليات',
-  storefront: 'واجهة المتجر',
-};
-
 // Zod Schemas
 export const featureKeySchema = z.enum(FEATURE_KEYS_ARRAY);
 

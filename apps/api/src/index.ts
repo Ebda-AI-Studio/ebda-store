@@ -40,14 +40,19 @@ let isShuttingDown = false;
 // Initialize Socket.io
 socketService.initialize(httpServer);
 
-// Start email queue processor
-emailQueue.startProcessing();
-whatsappQueue.startProcessing(2000);
-smsQueue.startProcessing(2000);
-abandonedCartService.startProcessing(900000); // 15 minutes
-recommendationService.startFBTCron(86400000, []); // daily; storeIds populated per-trigger
-shippingCarrierService.startTrackingCron(1800000); // every 30 minutes
-loyaltyAutomationService.startCron(86400000); // daily: birthday bonuses + point expiration
+// Connect Redis before starting queue processors
+(async () => {
+  await redis.connect();
+
+  // Start email queue processor
+  emailQueue.startProcessing();
+  whatsappQueue.startProcessing(2000);
+  smsQueue.startProcessing(2000);
+  abandonedCartService.startProcessing(900000); // 15 minutes
+  recommendationService.startFBTCron(86400000, []); // daily; storeIds populated per-trigger
+  shippingCarrierService.startTrackingCron(1800000); // every 30 minutes
+  loyaltyAutomationService.startCron(86400000); // daily: birthday bonuses + point expiration
+})();
 
 // Request ID for tracing
 app.use(requestId);

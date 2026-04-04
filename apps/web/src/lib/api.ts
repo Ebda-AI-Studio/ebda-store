@@ -445,17 +445,4 @@ class ApiClient {
 
 export const api = new ApiClient(API_URL);
 export { API_URL };
-export type {
-  ApiResponse,
-  User,
-  Product,
-  ProductVariant,
-  ProductOption,
-  ProductCategory,
-  Category,
-  Cart,
-  CartItem,
-  Order,
-  Store,
-  PaginationMeta,
-};
+export type { User, Product, ProductVariant, ProductOption, Category, Order, PaginationMeta };

@@ -1,26 +1,22 @@
-// Communication Hub — Notification Types, Templates, and Schemas
-import { z } from 'zod';
+// Communication Hub — Notification Types and Templates
 
 // ─── Channels ────────────────────────────────────────────────────────────────
 
-export const NOTIFICATION_CHANNELS = ['whatsapp', 'sms', 'push'] as const;
-export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number];
+export type NotificationChannel = 'whatsapp' | 'sms' | 'push';
 
 // ─── Events ──────────────────────────────────────────────────────────────────
 
-export const NOTIFICATION_EVENTS = [
-  'order_confirmed',
-  'payment_success',
-  'order_shipped',
-  'order_delivered',
-  'order_cancelled',
-  'refund_processed',
-  'cart_abandoned_step1',
-  'cart_abandoned_step2',
-  'cart_abandoned_step3',
-  'back_in_stock',
-] as const;
-export type NotificationEvent = (typeof NOTIFICATION_EVENTS)[number];
+export type NotificationEvent =
+  | 'order_confirmed'
+  | 'payment_success'
+  | 'order_shipped'
+  | 'order_delivered'
+  | 'order_cancelled'
+  | 'refund_processed'
+  | 'cart_abandoned_step1'
+  | 'cart_abandoned_step2'
+  | 'cart_abandoned_step3'
+  | 'back_in_stock';
 
 // ─── Notification Data ────────────────────────────────────────────────────────
 
@@ -288,17 +284,3 @@ export const PUSH_TEMPLATES: Record<NotificationEvent, PushTemplate> = {
     },
   },
 };
-
-// ─── Zod Schemas ──────────────────────────────────────────────────────────────
-
-export const notificationChannelSchema = z.enum(NOTIFICATION_CHANNELS);
-
-export const notificationEventSchema = z.enum(NOTIFICATION_EVENTS);
-
-export const notificationEventConfigSchema = z.object({
-  whatsapp: z.boolean(),
-  sms: z.boolean(),
-  push: z.boolean(),
-});
-
-export type NotificationEventConfig = z.infer<typeof notificationEventConfigSchema>;

@@ -22,7 +22,6 @@
   "devDependencies": {
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
-    "@types/swagger-ui-express": "^4.1.8",
     "autoprefixer": "^10.4.16",
     "@next/eslint-plugin-next": "^16.1.1",
     "eslint": "^9.0.0",

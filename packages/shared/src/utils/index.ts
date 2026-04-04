@@ -5,17 +5,29 @@ export * from './image';
 export * from './csv';
 
 /**
- * Format a price stored in fils (1 KWD = 1000 fils) as a localised currency string.
+ * Format a price value as a localised currency string.
  *
- * @param fils  - The price in the smallest currency unit (fils for KWD).
- * @param currency - ISO 4217 currency code. Defaults to `'KWD'`.
+ * By default the input is in fils (1 KWD = 1000 fils) and the output uses
+ * KWD with 3 decimal places.  Pass `{ unit: 'kwd' }` if the input is already
+ * in the major currency unit.
+ *
+ * @param amount   - The price amount (in fils by default, or KWD if `unit` is `'kwd'`).
+ * @param options  - Optional overrides for unit, currency, and locale.
  */
-export function formatPrice(fils: number, currency = 'KWD'): string {
-  return new Intl.NumberFormat('en-KW', {
+export function formatPrice(
+  amount: number,
+  options?: { unit?: 'fils' | 'kwd'; currency?: string; locale?: string }
+): string {
+  const { unit = 'fils', currency = 'KWD', locale = 'en-US' } = options ?? {};
+  const decimals = currency === 'KWD' ? 3 : 2;
+  const divisor = unit === 'fils' ? (currency === 'KWD' ? 1000 : 100) : 1;
+
+  return new Intl.NumberFormat(locale, {
     style: 'currency',
     currency,
-    minimumFractionDigits: 3,
-  }).format(fils / 1000);
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  }).format(amount / divisor);
 }
 
 /**

@@ -97,7 +97,7 @@ export const config = {
   storageSecretKey: process.env.STORAGE_SECRET_KEY || '',
   storageBucket: process.env.STORAGE_BUCKET || 'uploads',
   storagePublicUrl: process.env.STORAGE_PUBLIC_URL || '',
-  storageCdnUrl: process.env.STORAGE_CDN_URL || '',
+  whatsappVerifyToken: process.env.WHATSAPP_VERIFY_TOKEN || '',
 
   // Email
   smtpHost: process.env.SMTP_HOST || 'localhost',

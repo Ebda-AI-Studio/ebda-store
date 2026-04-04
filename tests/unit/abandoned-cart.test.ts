@@ -7,31 +7,10 @@ import { describe, it, expect } from 'vitest';
 import crypto from 'crypto';
 
 import {
-  NOTIFICATION_EVENTS,
   SMS_TEMPLATES,
   WHATSAPP_TEMPLATES,
   PUSH_TEMPLATES,
 } from '../../packages/shared/src/notifications';
-
-// ─── 1. NOTIFICATION_EVENTS includes all 3 cart events (total 9) ──────────────
-
-describe('NOTIFICATION_EVENTS — cart abandoned events', () => {
-  it('has exactly 9 entries', () => {
-    expect(NOTIFICATION_EVENTS).toHaveLength(9);
-  });
-
-  it('includes cart_abandoned_step1', () => {
-    expect(NOTIFICATION_EVENTS).toContain('cart_abandoned_step1');
-  });
-
-  it('includes cart_abandoned_step2', () => {
-    expect(NOTIFICATION_EVENTS).toContain('cart_abandoned_step2');
-  });
-
-  it('includes cart_abandoned_step3', () => {
-    expect(NOTIFICATION_EVENTS).toContain('cart_abandoned_step3');
-  });
-});
 
 // ─── 2. SMS_TEMPLATES has entries for all 3 cart events ───────────────────────
 

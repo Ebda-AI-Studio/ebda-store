@@ -18,11 +18,7 @@ class RedisService {
       this.client = new Redis(config.redisUrl, {
         maxRetriesPerRequest: 3,
         retryStrategy(times: number) {
-          if (times > 3) {
-            logger.warn('[REDIS] Max retries reached, falling back to in-memory');
-            return null;
-          }
-          return Math.min(times * 100, 3000);
+          return Math.min(times * 500, 30000);
         },
         lazyConnect: true,
       });

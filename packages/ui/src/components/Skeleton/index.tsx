@@ -25,70 +25,6 @@ export function Skeleton({ className }: SkeletonProps) {
   );
 }
 
-// Text Skeleton
-export function SkeletonText({ lines = 3, className }: { lines?: number; className?: string }) {
-  return (
-    <div className={cn('space-y-2', className)}>
-      {Array.from({ length: lines }).map((_, i) => (
-        <Skeleton key={i} className={cn('h-4', i === lines - 1 ? 'w-2/3' : 'w-full')} />
-      ))}
-    </div>
-  );
-}
-
-// Circle Skeleton (avatar, icon)
-export function SkeletonCircle({
-  size = 'md',
-  className,
-}: {
-  size?: 'sm' | 'md' | 'lg';
-  className?: string;
-}) {
-  const sizeClasses = {
-    sm: 'w-8 h-8',
-    md: 'w-12 h-12',
-    lg: 'w-16 h-16',
-  };
-
-  return <Skeleton className={cn('rounded-full', sizeClasses[size], className)} />;
-}
-
-// Avatar Skeleton (alias for SkeletonCircle — backward compat)
-export function SkeletonAvatar({
-  size = 'md',
-  className,
-}: {
-  size?: 'sm' | 'md' | 'lg';
-  className?: string;
-}) {
-  return <SkeletonCircle size={size} className={className} />;
-}
-
-// Button Skeleton
-export function SkeletonButton({ className }: SkeletonProps) {
-  return <Skeleton className={cn('h-10 w-24 rounded-lg', className)} />;
-}
-
-// Card Skeleton
-export function SkeletonCard({ className }: SkeletonProps) {
-  return (
-    <div
-      className={cn(
-        'rounded-xl border border-border/50 bg-card p-4 space-y-4 shadow-sm',
-        className
-      )}
-    >
-      <Skeleton className="h-40 w-full rounded-lg" />
-      <Skeleton className="h-4 w-3/4" />
-      <Skeleton className="h-4 w-1/2" />
-      <div className="flex justify-between items-center">
-        <Skeleton className="h-6 w-20" />
-        <Skeleton className="h-8 w-24 rounded-lg" />
-      </div>
-    </div>
-  );
-}
-
 // Product Card Skeleton
 export function SkeletonProductCard({ className }: SkeletonProps) {
   return (
@@ -112,14 +48,8 @@ export function SkeletonProductCard({ className }: SkeletonProps) {
   );
 }
 
-// Table Row Skeleton
-export function SkeletonTableRow({
-  columns = 4,
-  className,
-}: {
-  columns?: number;
-  className?: string;
-}) {
+// Table Row Skeleton (internal helper for SkeletonTable)
+function SkeletonTableRow({ columns = 4, className }: { columns?: number; className?: string }) {
   return (
     <tr className={cn('border-b', className)}>
       {Array.from({ length: columns }).map((_, i) => (
@@ -168,8 +98,8 @@ export function SkeletonTable({
   );
 }
 
-// Stats Card Skeleton
-export function SkeletonStats({ className }: SkeletonProps) {
+// Stats Card Skeleton (internal helper for SkeletonDashboardStats)
+function SkeletonStats({ className }: SkeletonProps) {
   return (
     <div className={cn('rounded-xl border border-border/50 bg-card p-6 shadow-sm', className)}>
       <div className="flex justify-between items-start mb-4">
@@ -195,58 +125,6 @@ export function SkeletonDashboardStats({
       {Array.from({ length: count }).map((_, i) => (
         <SkeletonStats key={i} />
       ))}
-    </div>
-  );
-}
-
-// Form Skeleton
-export function SkeletonForm({ fields = 4, className }: { fields?: number; className?: string }) {
-  return (
-    <div className={cn('space-y-6', className)}>
-      {Array.from({ length: fields }).map((_, i) => (
-        <div key={i} className="space-y-2">
-          <Skeleton className="h-4 w-24" />
-          <Skeleton className="h-10 w-full rounded-lg" />
-        </div>
-      ))}
-      <div className="flex gap-3 pt-4">
-        <Skeleton className="h-10 w-24 rounded-lg" />
-        <Skeleton className="h-10 w-20 rounded-lg" />
-      </div>
-    </div>
-  );
-}
-
-// List Skeleton
-export function SkeletonList({ items = 5, className }: { items?: number; className?: string }) {
-  return (
-    <div className={cn('space-y-3', className)}>
-      {Array.from({ length: items }).map((_, i) => (
-        <div
-          key={i}
-          className="flex items-center gap-4 p-3 rounded-xl border border-border/50 bg-card shadow-sm"
-        >
-          <SkeletonCircle size="sm" />
-          <div className="flex-1 space-y-2">
-            <Skeleton className="h-4 w-1/3" />
-            <Skeleton className="h-3 w-2/3" />
-          </div>
-          <Skeleton className="h-8 w-16 rounded-lg" />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// Page Header Skeleton
-export function SkeletonPageHeader({ className }: SkeletonProps) {
-  return (
-    <div className={cn('flex items-center justify-between mb-6', className)}>
-      <div className="space-y-2">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-4 w-64" />
-      </div>
-      <Skeleton className="h-10 w-32 rounded-lg" />
     </div>
   );
 }
