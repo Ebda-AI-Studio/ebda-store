@@ -4,6 +4,8 @@ import LoginClient from './LoginClient';
 
 export const metadata: Metadata = {
   title: 'Login',
+  description: 'Sign in to your account.',
+  robots: { index: false, follow: false },
 };
 
 export default function LoginPage() {

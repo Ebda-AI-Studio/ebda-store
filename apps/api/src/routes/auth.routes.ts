@@ -245,9 +245,11 @@ router.post('/refresh', authLimiter, async (req: Request, res: Response, next: N
     // Update the HTTP-only cookie with the new access token
     setTokenCookie(res, tokens.accessToken);
 
+    // Don't expose accessToken in body — it's set as HTTP-only cookie (matches login/register pattern)
+    const { accessToken: _at, ...safeTokens } = tokens;
     res.json({
       success: true,
-      data: tokens,
+      data: safeTokens,
     });
   } catch (error) {
     next(error);

@@ -39,8 +39,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             __html: `try{var s=localStorage.getItem('admin-theme');var p=window.matchMedia('(prefers-color-scheme:dark)').matches;if(s==='dark'||(!s&&p)){document.documentElement.classList.add('dark')}}catch(e){}`,
           }}
         />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
       <body className={`${plusJakarta.variable} ${ibmPlexArabic.variable} font-sans antialiased`}>
         <Providers>{children}</Providers>

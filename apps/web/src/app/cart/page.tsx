@@ -3,6 +3,8 @@ import CartClient from './CartClient';
 
 export const metadata: Metadata = {
   title: 'Cart',
+  description: 'Review items in your shopping cart.',
+  robots: { index: false, follow: false },
 };
 
 export default function CartPage() {

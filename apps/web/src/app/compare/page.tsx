@@ -10,7 +10,8 @@ const CompareClient = dynamic(() => import('./CompareClient'), {
 });
 
 export const metadata: Metadata = {
-  title: 'Compare',
+  title: 'Compare Products',
+  description: 'Compare products side by side.',
 };
 
 export default function ComparePage() {

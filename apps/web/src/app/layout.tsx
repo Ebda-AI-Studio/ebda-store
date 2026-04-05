@@ -8,6 +8,7 @@ import { CartProvider } from '../contexts/CartContext';
 import { AuthProvider } from '../contexts/AuthContext';
 import { FeatureProvider } from '../contexts/FeatureContext';
 import { getStore } from '../lib/store-resolver';
+import { organizationJsonLd, getSiteUrl } from '../lib/structured-data';
 import { MarketingPixelsProvider } from '../components/MarketingPixels';
 import { ServiceWorkerRegistration } from '../components/ServiceWorkerRegistration';
 import { PushNotificationPrompt } from '../components/PushNotificationPrompt';
@@ -96,14 +97,17 @@ export const viewport: Viewport = {
 
 export async function generateMetadata(): Promise<Metadata> {
   const store = await getStore();
+  const siteUrl = getSiteUrl(store);
+  const description =
+    store.metaDescription || `Shop online at ${store.name}. Free delivery on orders over 20 KWD.`;
 
   return {
+    metadataBase: new URL(siteUrl),
     title: {
       default: store.metaTitle || `${store.name} - Online Shopping in Kuwait`,
       template: `%s | ${store.name}`,
     },
-    description:
-      store.metaDescription || `Shop online at ${store.name}. Free delivery on orders over 20 KWD.`,
+    description,
     keywords: ['e-commerce', 'online store', 'shopping', 'Kuwait', 'KWD', 'delivery', store.name],
     authors: [{ name: store.name }],
     creator: store.name,
@@ -120,6 +124,12 @@ export async function generateMetadata(): Promise<Metadata> {
       siteName: store.name,
       images: store.logo ? [{ url: store.logo }] : undefined,
     },
+    twitter: {
+      card: 'summary_large_image',
+      title: store.metaTitle || `${store.name} - Online Shopping in Kuwait`,
+      description,
+      ...(store.logo ? { images: [store.logo] } : {}),
+    },
     robots: {
       index: true,
       follow: true,
@@ -131,6 +141,9 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   // Fetch store data server-side
   const store = await getStore();
+
+  // Organization JSON-LD for search engines
+  const orgJsonLd = organizationJsonLd(store);
 
   // Build a <style> tag that overrides the default orange theme in globals.css
   // Inline styles on <html> don't beat `:root {}` in @layer base, so we inject a :root rule instead
@@ -150,6 +163,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="en" dir="ltr" suppressHydrationWarning>
       <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }}
+        />
         {themeStyleTag && <style dangerouslySetInnerHTML={{ __html: themeStyleTag }} />}
         {/* Detect system dark mode preference and apply .dark class before paint */}
         <script

@@ -11,6 +11,7 @@ const SettingsClient = dynamic(() => import('./SettingsClient'), {
 
 export const metadata: Metadata = {
   title: 'Account Settings',
+  robots: { index: false, follow: false },
 };
 
 export default function SettingsPage() {

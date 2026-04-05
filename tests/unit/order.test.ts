@@ -33,6 +33,9 @@ vi.mock('@force/database', () => ({
     productVariant: {
       update: vi.fn(),
     },
+    store: {
+      findUnique: vi.fn().mockResolvedValue({ name: 'Test Store' }),
+    },
     taxRate: {
       findMany: vi.fn().mockResolvedValue([]),
     },
@@ -602,10 +605,12 @@ describe('OrderService', () => {
     it('should return all orders for a customer', async () => {
       const customerOrders = [mockOrder, { ...mockOrder, id: 'order-456' }];
       vi.mocked(prisma.order.findMany).mockResolvedValue(customerOrders as any);
+      vi.mocked(prisma.order.count).mockResolvedValue(2);
 
       const result = await OrderService.getCustomerOrders(mockStoreId, mockCustomerId);
 
-      expect(result).toHaveLength(2);
+      expect(result.orders).toHaveLength(2);
+      expect(result.meta.total).toBe(2);
       expect(prisma.order.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { storeId: mockStoreId, customerId: mockCustomerId },

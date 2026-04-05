@@ -152,7 +152,12 @@ export { prisma as db };
  *     await handler(req, res);
  *   });
  */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function runInTenantContext<T>(storeId: string, fn: () => Promise<T>): Promise<T> {
+  if (!UUID_RE.test(storeId)) {
+    throw new Error('Invalid store ID format');
+  }
   return basePrisma.$transaction(
     async tx => {
       await tx.$executeRawUnsafe(
@@ -174,6 +179,9 @@ export async function withTenantContext<T>(
   storeId: string,
   fn: (tx: TenantTx) => Promise<T>
 ): Promise<T> {
+  if (!UUID_RE.test(storeId)) {
+    throw new Error('Invalid store ID format');
+  }
   return basePrisma.$transaction(async tx => {
     await tx.$executeRawUnsafe(`SET LOCAL app.current_store_id = '${storeId.replace(/'/g, "''")}'`);
     return fn(tx);

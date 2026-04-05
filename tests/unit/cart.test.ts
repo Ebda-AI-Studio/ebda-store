@@ -13,6 +13,7 @@ vi.mock('@force/database', () => ({
     cart: {
       findFirst: vi.fn(),
       create: vi.fn(),
+      update: vi.fn(),
       delete: vi.fn(),
       findUnique: vi.fn(),
     },
@@ -26,6 +27,19 @@ vi.mock('@force/database', () => ({
     product: {
       findFirst: vi.fn(),
       update: vi.fn(),
+    },
+    $transaction: vi.fn().mockImplementation(async (fn: any) => {
+      if (typeof fn === 'function') {
+        // Pass the mocked prisma itself as the transaction client
+        const { prisma: mockPrisma } = await import('@force/database');
+        return fn(mockPrisma);
+      }
+      return fn;
+    }),
+  },
+  Prisma: {
+    TransactionIsolationLevel: {
+      Serializable: 'Serializable',
     },
   },
 }));

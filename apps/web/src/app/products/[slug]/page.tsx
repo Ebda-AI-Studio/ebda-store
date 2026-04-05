@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { getStore } from '../../../lib/store-resolver';
 import { API_URL } from '../../../lib/api';
+import { productJsonLd, breadcrumbJsonLd, getSiteUrl } from '../../../lib/structured-data';
 import ProductDetailClient from './ProductDetailClient';
 
 /**
@@ -132,5 +133,28 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
   const [{ slug }, store] = await Promise.all([params, getStore()]);
   const initialProduct = await fetchInitialProduct(slug, store);
 
-  return <ProductDetailClient initialProduct={initialProduct} />;
+  const siteUrl = getSiteUrl(store);
+  const jsonLdScripts = initialProduct
+    ? [
+        productJsonLd(initialProduct, store),
+        breadcrumbJsonLd([
+          { name: 'Home', url: siteUrl },
+          { name: 'Products', url: `${siteUrl}/products` },
+          { name: initialProduct.name, url: `${siteUrl}/products/${initialProduct.slug}` },
+        ]),
+      ]
+    : [];
+
+  return (
+    <>
+      {jsonLdScripts.map((jsonLd, i) => (
+        <script
+          key={i}
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      ))}
+      <ProductDetailClient initialProduct={initialProduct} />
+    </>
+  );
 }

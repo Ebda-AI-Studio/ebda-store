@@ -55,7 +55,7 @@ const nextConfig = {
   },
 
   experimental: {
-    optimizePackageImports: ['@force/ui'],
+    optimizePackageImports: ['@force/shared', '@force/ui'],
   },
 
   // Security headers

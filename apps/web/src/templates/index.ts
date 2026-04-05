@@ -80,10 +80,3 @@ export const TEMPLATE_IDS: TemplateId[] = ['modern', 'classic', 'minimal', 'bold
 // Re-export types
 export type { TemplateComponents } from './types';
 export * from './types';
-
-// Direct template exports for static imports
-export * as Modern from './modern';
-export * as Classic from './classic';
-export * as Minimal from './minimal';
-export * as Bold from './bold';
-export * as Elegant from './elegant';

@@ -77,7 +77,9 @@ class SocketService {
           return next(new Error('Authentication required'));
         }
 
-        const payload = jwt.verify(token, config.jwtSecret) as AuthPayload;
+        const payload = jwt.verify(token, config.jwtSecret, {
+          algorithms: ['HS256'],
+        }) as AuthPayload;
         socket.data.user = payload;
         next();
       } catch {

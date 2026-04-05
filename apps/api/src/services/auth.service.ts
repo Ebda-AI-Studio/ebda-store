@@ -251,9 +251,9 @@ export class AuthService {
       );
     }
 
-    // Find user
+    // Find user (exclude soft-deleted accounts)
     const user = await prisma.user.findUnique({
-      where: { email },
+      where: { email, deletedAt: null },
     });
 
     if (!user) {
@@ -318,6 +318,12 @@ export class AuthService {
     if (storedToken.expiresAt < new Date()) {
       await prisma.refreshToken.delete({ where: { id: storedToken.id } });
       throw new AppError(401, 'TOKEN_EXPIRED', 'Refresh token expired');
+    }
+
+    // Reject refresh if user has been soft-deleted
+    if (storedToken.user.deletedAt) {
+      await prisma.refreshToken.delete({ where: { id: storedToken.id } });
+      throw new AppError(401, 'ACCOUNT_DELETED', 'Account has been deleted');
     }
 
     // Delete old refresh token

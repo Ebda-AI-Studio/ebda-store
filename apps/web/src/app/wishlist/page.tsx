@@ -11,6 +11,8 @@ const WishlistClient = dynamic(() => import('./WishlistClient'), {
 
 export const metadata: Metadata = {
   title: 'Wishlist',
+  description: 'Your saved products and wishlist items.',
+  robots: { index: false, follow: false },
 };
 
 export default function WishlistPage() {

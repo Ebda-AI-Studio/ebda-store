@@ -5,6 +5,7 @@ import CategoriesClient from './CategoriesClient';
 
 export const metadata: Metadata = {
   title: 'Categories',
+  description: 'Explore product categories and find exactly what you are looking for.',
 };
 
 /**

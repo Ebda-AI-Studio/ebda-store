@@ -31,13 +31,7 @@ export interface UploadResult {
 }
 
 // Allowed image types
-const DEFAULT_ALLOWED_TYPES = [
-  'image/jpeg',
-  'image/png',
-  'image/gif',
-  'image/webp',
-  'image/svg+xml',
-];
+const DEFAULT_ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
 // Max file size: 10MB
 const DEFAULT_MAX_SIZE = 10 * 1024 * 1024;

@@ -6,6 +6,8 @@ import ProductsClient from './ProductsClient';
 
 export const metadata: Metadata = {
   title: 'Products',
+  description:
+    'Browse our full catalog of products. Find the best deals with fast delivery in Kuwait.',
 };
 
 async function fetchInitialData(store: { id: string; domain?: string }) {
