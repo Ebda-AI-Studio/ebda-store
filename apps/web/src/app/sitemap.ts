@@ -1,11 +1,20 @@
 import type { MetadataRoute } from 'next';
-import { getStore } from '../lib/store-resolver';
 import { getSiteUrl } from '../lib/structured-data';
 import { API_URL } from '../lib/api';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const store = await getStore();
-  const siteUrl = getSiteUrl(store);
+  const siteUrl = getSiteUrl();
+
+  // Try to resolve store for API headers — gracefully degrade if unavailable
+  let storeHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+  try {
+    const { getStore } = await import('../lib/store-resolver');
+    const store = await getStore();
+    if (store.domain) storeHeaders['x-store-domain'] = store.domain;
+    if (store.id && store.id !== 'demo') storeHeaders['X-Store-ID'] = store.id;
+  } catch {
+    // Store resolution failed — static pages only
+  }
 
   // Static pages
   const staticPages: MetadataRoute.Sitemap = [
@@ -72,12 +81,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
 
   // Fetch published products
-  const storeHeaders: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...(store.domain ? { 'x-store-domain': store.domain } : {}),
-    ...(store.id && store.id !== 'demo' ? { 'X-Store-ID': store.id } : {}),
-  };
-
   let productPages: MetadataRoute.Sitemap = [];
   let categoryPages: MetadataRoute.Sitemap = [];
 
