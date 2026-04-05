@@ -4,17 +4,7 @@ import Image from 'next/image';
 import { Button } from '@force/ui';
 import { getPaymentIcon, DEFAULT_PAYMENT_PROVIDERS } from '../../components/PaymentIcons';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
-
-interface PaymentProvider {
-  id: string;
-  name: string;
-  nameAr?: string;
-  description?: string;
-  descriptionAr?: string;
-  logo?: string;
-  methods?: string[];
-  enabled?: boolean;
-}
+import type { PaymentProvider } from './types';
 
 interface FormData {
   email: string;

@@ -49,7 +49,7 @@ interface Stats {
 
 const TIER_COLORS: Record<string, { bg: string; text: string; icon: string }> = {
   bronze: { bg: 'bg-amber-100', text: 'text-amber-700', icon: 'bg-amber-500' },
-  silver: { bg: 'bg-gray-100', text: 'text-gray-700', icon: 'bg-gray-400' },
+  silver: { bg: 'bg-muted', text: 'text-foreground', icon: 'bg-muted-foreground' },
   gold: { bg: 'bg-yellow-100', text: 'text-yellow-700', icon: 'bg-yellow-500' },
   platinum: { bg: 'bg-purple-100', text: 'text-purple-700', icon: 'bg-purple-500' },
 };
@@ -286,7 +286,7 @@ export default function LoyaltySettingsPage() {
                   {Object.entries(stats.tierBreakdown).map(([tier, count]) => (
                     <div
                       key={tier}
-                      className={`flex-1 h-2 rounded ${TIER_COLORS[tier]?.icon || 'bg-gray-300'}`}
+                      className={`flex-1 h-2 rounded ${TIER_COLORS[tier]?.icon || 'bg-muted-foreground'}`}
                       style={{ flex: count || 0.1 }}
                       title={`${tier}: ${count}`}
                     />
@@ -614,75 +614,77 @@ export default function LoyaltySettingsPage() {
                   </p>
                 </div>
               ) : (
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-muted border-b border-border">
-                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Member
-                      </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Tier
-                      </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Points Balance
-                      </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Total Earned
-                      </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Total Redeemed
-                      </th>
-                      <th className="text-right px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {members.map(member => (
-                      <tr key={member.id} className="hover:bg-muted">
-                        <td className="px-6 py-4">
-                          <div>
-                            <div className="font-medium text-foreground">
-                              {member.customer.firstName} {member.customer.lastName}
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              {member.customer.email}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span
-                            className={`px-2 py-1 rounded-full text-xs font-medium capitalize ${TIER_COLORS[member.tier]?.bg} ${TIER_COLORS[member.tier]?.text}`}
-                          >
-                            {member.tier}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="font-medium text-foreground">
-                            {member.points.toLocaleString()}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-green-600">
-                          +{member.totalEarned.toLocaleString()}
-                        </td>
-                        <td className="px-6 py-4 text-orange-600">
-                          -{member.totalRedeemed.toLocaleString()}
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <button
-                            onClick={() => {
-                              setSelectedMember(member);
-                              setShowAwardModal(true);
-                            }}
-                            className="text-orange-500 hover:text-orange-600 text-sm font-medium"
-                          >
-                            Award Points
-                          </button>
-                        </td>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-muted border-b border-border">
+                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          Member
+                        </th>
+                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          Tier
+                        </th>
+                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          Points Balance
+                        </th>
+                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          Total Earned
+                        </th>
+                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          Total Redeemed
+                        </th>
+                        <th className="text-right px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          Actions
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {members.map(member => (
+                        <tr key={member.id} className="hover:bg-muted">
+                          <td className="px-6 py-4">
+                            <div>
+                              <div className="font-medium text-foreground">
+                                {member.customer.firstName} {member.customer.lastName}
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                {member.customer.email}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span
+                              className={`px-2 py-1 rounded-full text-xs font-medium capitalize ${TIER_COLORS[member.tier]?.bg} ${TIER_COLORS[member.tier]?.text}`}
+                            >
+                              {member.tier}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="font-medium text-foreground">
+                              {member.points.toLocaleString()}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-green-600">
+                            +{member.totalEarned.toLocaleString()}
+                          </td>
+                          <td className="px-6 py-4 text-orange-600">
+                            -{member.totalRedeemed.toLocaleString()}
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <button
+                              onClick={() => {
+                                setSelectedMember(member);
+                                setShowAwardModal(true);
+                              }}
+                              className="text-orange-500 hover:text-orange-600 text-sm font-medium"
+                            >
+                              Award Points
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
           )}

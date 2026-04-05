@@ -4,30 +4,10 @@ import Image from 'next/image';
 import { Button, Input } from '@force/ui';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { formatPrice } from '@/lib/format';
-
-interface CartItem {
-  id: string;
-  productId: string;
-  quantity: number;
-  price: number;
-  product: {
-    id: string;
-    name: string;
-    slug: string;
-    images: { id: string; url: string; alt?: string }[];
-  };
-}
-
-interface Coupon {
-  id: string;
-  code: string;
-  name: string;
-  type: 'percentage' | 'fixed' | 'free_shipping';
-  value: number;
-}
+import type { CheckoutCartItem, Coupon } from './types';
 
 interface OrderSummaryProps {
-  items: CartItem[];
+  items: CheckoutCartItem[];
   subtotal: number;
   discount: number;
   shipping: number;

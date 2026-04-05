@@ -45,11 +45,11 @@ export function NotificationBell() {
       {/* Bell Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+        className="relative p-2 rounded-lg hover:bg-muted dark:hover:bg-foreground transition-colors"
         aria-label="Notifications"
       >
         <svg
-          className="w-6 h-6 text-gray-600 dark:text-gray-400"
+          className="w-6 h-6 text-muted-foreground dark:text-muted-foreground"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -72,7 +72,7 @@ export function NotificationBell() {
         {/* Connection Status Indicator */}
         <span
           className={`absolute bottom-1 right-1 w-2 h-2 rounded-full ${
-            isConnected ? 'bg-green-500' : 'bg-gray-400'
+            isConnected ? 'bg-green-500' : 'bg-muted-foreground'
           }`}
         />
       </button>
@@ -95,7 +95,7 @@ export function NotificationBell() {
               {notifications.length > 0 && (
                 <button
                   onClick={clearNotifications}
-                  className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  className="text-xs text-muted-foreground hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground"
                 >
                   Clear
                 </button>
@@ -108,7 +108,7 @@ export function NotificationBell() {
             {notifications.length === 0 ? (
               <div className="py-12 text-center">
                 <svg
-                  className="w-12 h-12 mx-auto text-gray-300 dark:text-gray-600"
+                  className="w-12 h-12 mx-auto text-muted-foreground/60 dark:text-muted-foreground"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -120,7 +120,7 @@ export function NotificationBell() {
                     d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
                   />
                 </svg>
-                <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">
+                <p className="mt-3 text-sm text-muted-foreground dark:text-muted-foreground">
                   No notifications yet
                 </p>
               </div>
@@ -130,7 +130,7 @@ export function NotificationBell() {
                   <li
                     key={notification.id}
                     onClick={() => markAsRead(notification.id)}
-                    className={`px-4 py-3 border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer transition-colors ${
+                    className={`px-4 py-3 border-b border-border dark:border-border hover:bg-muted dark:hover:bg-foreground/50 cursor-pointer transition-colors ${
                       !notification.read ? 'bg-primary/5' : ''
                     }`}
                   >
@@ -138,7 +138,7 @@ export function NotificationBell() {
                       {/* Icon */}
                       <div
                         className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-lg ${
-                          colorMap[notification.type] || 'bg-gray-100 text-gray-600'
+                          colorMap[notification.type] || 'bg-muted text-muted-foreground'
                         }`}
                       >
                         {iconMap[notification.type] || '🔔'}
@@ -147,17 +147,17 @@ export function NotificationBell() {
                       {/* Content */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2">
-                          <p className="font-medium text-sm text-gray-900 dark:text-white truncate">
+                          <p className="font-medium text-sm text-foreground dark:text-white truncate">
                             {notification.title}
                           </p>
                           {!notification.read && (
                             <span className="flex-shrink-0 w-2 h-2 bg-primary rounded-full mt-1.5" />
                           )}
                         </div>
-                        <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
+                        <p className="text-sm text-muted-foreground dark:text-muted-foreground line-clamp-2">
                           {notification.message}
                         </p>
-                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                        <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
                           {formatDistanceToNow(notification.createdAt, { addSuffix: true })}
                         </p>
                       </div>

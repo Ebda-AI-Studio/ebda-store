@@ -295,7 +295,7 @@ export function AdminLayout({
                   >
                     {/* Left border active indicator */}
                     {isActive && (
-                      <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-full bg-primary" />
+                      <span className="absolute start-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-full bg-primary" />
                     )}
                     <span
                       className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-200 ${
@@ -432,7 +432,7 @@ export function AdminLayout({
 
       {/* Mobile Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-72 transform border-r border-border/50 bg-card shadow-2xl transition-transform duration-300 ease-out lg:hidden ${
+        className={`fixed inset-y-0 start-0 z-50 w-72 transform border-r border-border/50 bg-card shadow-2xl transition-transform duration-300 ease-out lg:hidden ${
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -456,12 +456,12 @@ export function AdminLayout({
       </aside>
 
       {/* Desktop Sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 border-r border-border/50 bg-card lg:flex lg:flex-col">
+      <aside className="fixed inset-y-0 start-0 z-30 hidden w-72 border-r border-border/50 bg-card lg:flex lg:flex-col">
         {sidebarContent}
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 lg:ml-72">
+      <main className="flex-1 lg:ms-72">
         {/* Header */}
         <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-border/50 bg-card/80 px-4 backdrop-blur-md lg:px-6">
           <div className="flex items-center gap-4">

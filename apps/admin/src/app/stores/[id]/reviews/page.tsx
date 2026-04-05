@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
-import { Button, Badge, useToast } from '@force/ui';
+import { Button, Badge, Modal, useToast } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPost, apiDelete } from '../../../../lib/api';
 
@@ -42,7 +42,7 @@ function StarRating({ rating }: { rating: number }) {
       {Array.from({ length: 5 }).map((_, i) => (
         <svg
           key={i}
-          className={`h-4 w-4 ${i < rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`}
+          className={`h-4 w-4 ${i < rating ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground/60'}`}
           viewBox="0 0 20 20"
           fill="currentColor"
         >
@@ -165,9 +165,9 @@ export default function ReviewsPage() {
       {/* Reviews List */}
       <div className="rounded-xl border bg-card shadow-sm">
         {isLoading ? (
-          <div className="p-8 text-center text-gray-500">Loading reviews...</div>
+          <div className="p-8 text-center text-muted-foreground">Loading reviews...</div>
         ) : reviews.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">No reviews found</div>
+          <div className="p-8 text-center text-muted-foreground">No reviews found</div>
         ) : (
           <div className="divide-y">
             {reviews.map(review => (
@@ -187,21 +187,21 @@ export default function ReviewsPage() {
                     </div>
 
                     {review.title && (
-                      <h3 className="font-semibold text-gray-900 mb-1">{review.title}</h3>
+                      <h3 className="font-semibold text-foreground mb-1">{review.title}</h3>
                     )}
 
                     {review.comment && (
-                      <p className="text-gray-600 text-sm mb-3">{review.comment}</p>
+                      <p className="text-muted-foreground text-sm mb-3">{review.comment}</p>
                     )}
 
-                    <div className="flex items-center gap-4 text-xs text-gray-500">
+                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
                       <span>
                         Product:{' '}
-                        <span className="font-medium text-gray-700">{review.product.name}</span>
+                        <span className="font-medium text-foreground">{review.product.name}</span>
                       </span>
                       <span>
                         By:{' '}
-                        <span className="font-medium text-gray-700">
+                        <span className="font-medium text-foreground">
                           {review.customer
                             ? `${review.customer.firstName} ${review.customer.lastName}`
                             : 'Anonymous'}
@@ -241,7 +241,7 @@ export default function ReviewsPage() {
         {/* Pagination */}
         {meta.totalPages > 1 && (
           <div className="flex items-center justify-between border-t px-6 py-3">
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-muted-foreground">
               Showing {(meta.page - 1) * meta.limit + 1} to{' '}
               {Math.min(meta.page * meta.limit, meta.total)} of {meta.total} reviews
             </p>
@@ -268,28 +268,19 @@ export default function ReviewsPage() {
       </div>
 
       {/* Delete Confirmation Dialog */}
-      {deleteTarget && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-card rounded-xl shadow-xl w-full max-w-sm p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-2">Delete Review</h2>
-            <p className="text-sm text-gray-600 mb-6">
-              Are you sure you want to delete this review? This action cannot be undone.
-            </p>
-            <div className="flex items-center justify-end gap-3">
-              <Button variant="outline" size="sm" onClick={() => setDeleteTarget(null)}>
-                Cancel
-              </Button>
-              <Button
-                size="sm"
-                className="bg-red-600 hover:bg-red-700 text-white"
-                onClick={confirmDelete}
-              >
-                Delete
-              </Button>
-            </div>
-          </div>
+      <Modal isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Delete Review">
+        <p className="text-sm text-muted-foreground">
+          Are you sure you want to delete this review? This action cannot be undone.
+        </p>
+        <div className="mt-6 flex justify-end gap-3">
+          <Button variant="outline" size="sm" onClick={() => setDeleteTarget(null)}>
+            Cancel
+          </Button>
+          <Button variant="destructive" size="sm" onClick={confirmDelete}>
+            Delete
+          </Button>
         </div>
-      )}
+      </Modal>
     </AdminLayout>
   );
 }

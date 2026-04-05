@@ -202,7 +202,7 @@ export default function DashboardPage() {
           />
         </svg>
       ),
-      iconBg: 'bg-gray-100 text-gray-600',
+      iconBg: 'bg-muted text-muted-foreground',
     },
   ];
 

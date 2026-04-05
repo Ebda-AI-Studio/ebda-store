@@ -9,7 +9,7 @@ import { Button, Input, Select } from '@force/ui';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useCart } from '../../contexts/CartContext';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
-import { api, API_URL } from '../../lib/api';
+import { api } from '../../lib/api';
 import { trackInitiateCheckout } from '../../components/MarketingPixels';
 import { isValidEmail } from '@force/shared';
 import { OrderSummary } from './OrderSummary';
@@ -25,23 +25,11 @@ const PaymentStep = dynamic(() => import('./PaymentStep'), {
   ),
 });
 import { formatPrice } from '@/lib/format';
-
-interface CartItem {
-  id: string;
-  productId: string;
-  quantity: number;
-  price: number;
-  product: {
-    id: string;
-    name: string;
-    slug: string;
-    images: { id: string; url: string; alt?: string }[];
-  };
-}
+import type { CheckoutCartItem, Coupon, PaymentProvider } from './types';
 
 interface Cart {
   id: string;
-  items: CartItem[];
+  items: CheckoutCartItem[];
   subtotal: number;
   total: number;
 }
@@ -56,25 +44,6 @@ interface ShippingZone {
   freeShippingThreshold: number | null;
   estimatedDaysMin: number | null;
   estimatedDaysMax: number | null;
-}
-
-interface PaymentProvider {
-  id: string;
-  name: string;
-  nameAr?: string;
-  description?: string;
-  descriptionAr?: string;
-  logo?: string;
-  methods?: string[];
-  enabled?: boolean;
-}
-
-interface Coupon {
-  id: string;
-  code: string;
-  name: string;
-  type: 'percentage' | 'fixed' | 'free_shipping';
-  value: number;
 }
 
 const KUWAIT_AREAS = [
@@ -207,23 +176,23 @@ export default function CheckoutClient() {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        // Fetch shipping zones
-        if (store?.id) {
-          const shippingRes = await fetch(`${API_URL}/stores/public/${store.id}/shipping`);
-          if (shippingRes.ok) {
-            const shippingData = await shippingRes.json();
-            setShippingZones(shippingData.data?.zones || []);
-          }
+        // Fetch shipping zones and payment config in parallel
+        const [shippingResult, paymentResult] = await Promise.all([
+          store?.id
+            ? api.get<{ zones: ShippingZone[] }>(`/stores/public/${store.id}/shipping`)
+            : Promise.resolve(null),
+          api.get<{ providers: PaymentProvider[]; defaultProvider?: string }>('/payments/config'),
+        ]);
+
+        if (shippingResult?.success && shippingResult.data) {
+          setShippingZones(shippingResult.data.zones || []);
         }
 
-        // Fetch payment config
-        const paymentRes = await fetch(`${API_URL}/payments/config`);
-        if (paymentRes.ok) {
-          const paymentData = await paymentRes.json();
-          if (paymentData.data?.providers) {
-            setPaymentProviders(paymentData.data.providers);
-            if (paymentData.data.defaultProvider) {
-              setSelectedProvider(paymentData.data.defaultProvider);
+        if (paymentResult.success && paymentResult.data) {
+          if (paymentResult.data.providers) {
+            setPaymentProviders(paymentResult.data.providers);
+            if (paymentResult.data.defaultProvider) {
+              setSelectedProvider(paymentResult.data.defaultProvider);
             }
           }
         }
@@ -242,15 +211,13 @@ export default function CheckoutClient() {
     if (!selectedArea || !store?.id || !cart?.subtotal) return;
 
     try {
-      const res = await fetch(`${API_URL}/stores/public/${store.id}/shipping/calculate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ area: selectedArea, orderTotal: cart.subtotal }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setShippingCost(data.data?.shippingCost || 0);
-        setFreeShipping(data.data?.freeShipping || false);
+      const result = await api.post<{ shippingCost: number; freeShipping: boolean }>(
+        `/stores/public/${store.id}/shipping/calculate`,
+        { area: selectedArea, orderTotal: cart.subtotal }
+      );
+      if (result.success && result.data) {
+        setShippingCost(result.data.shippingCost || 0);
+        setFreeShipping(result.data.freeShipping || false);
       }
     } catch (error) {
       console.error('Failed to calculate shipping:', error);
@@ -345,21 +312,19 @@ export default function CheckoutClient() {
 
     setCouponError('');
     try {
-      const res = await fetch(`${API_URL}/stores/public/${store.id}/coupons/validate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: couponCode, orderTotal: cart.subtotal }),
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setAppliedCoupon(data.data.coupon);
-        setCouponDiscount(data.data.discount);
-        if (data.data.coupon.type === 'free_shipping') {
+      const result = await api.post<{ coupon: Coupon; discount: number }>(
+        `/stores/public/${store.id}/coupons/validate`,
+        { code: couponCode, orderTotal: cart.subtotal }
+      );
+      if (result.success && result.data) {
+        setAppliedCoupon(result.data.coupon);
+        setCouponDiscount(result.data.discount);
+        if (result.data.coupon.type === 'free_shipping') {
           setFreeShipping(true);
           setShippingCost(0);
         }
       } else {
-        setCouponError(data.error?.message || t('Invalid coupon', 'كوبون غير صالح'));
+        setCouponError(result.error?.message || t('Invalid coupon', 'كوبون غير صالح'));
       }
     } catch {
       setCouponError(t('Failed to apply coupon', 'فشل تطبيق الكوبون'));
@@ -423,28 +388,21 @@ export default function CheckoutClient() {
       const order = orderResult.data.order;
 
       // Create payment
-      const paymentRes = await fetch(`${API_URL}/payments/create`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orderId: order.id,
-          provider: selectedProvider,
-          successUrl: `${window.location.origin}/checkout/success?orderId=${order.id}`,
-          errorUrl: `${window.location.origin}/checkout/error?orderId=${order.id}`,
-        }),
+      const paymentResult = await api.post<{ paymentUrl?: string }>('/payments/create', {
+        orderId: order.id,
+        provider: selectedProvider,
+        successUrl: `${window.location.origin}/checkout/success?orderId=${order.id}`,
+        errorUrl: `${window.location.origin}/checkout/error?orderId=${order.id}`,
       });
 
-      const paymentData = await paymentRes.json();
-
-      if (paymentRes.ok && paymentData.data?.paymentUrl) {
+      if (paymentResult.success && paymentResult.data?.paymentUrl) {
         // Redirect to payment gateway
-        window.location.href = paymentData.data.paymentUrl;
+        window.location.href = paymentResult.data.paymentUrl;
       } else if (selectedProvider === 'cod') {
         // Cash on delivery - go straight to success
         router.push(storeUrl(`/checkout/success?orderId=${order.id}`));
       } else {
-        throw new Error(paymentData.error?.message || 'Failed to initiate payment');
+        throw new Error(paymentResult.error?.message || 'Failed to initiate payment');
       }
     } catch (error) {
       console.error('Checkout error:', error);

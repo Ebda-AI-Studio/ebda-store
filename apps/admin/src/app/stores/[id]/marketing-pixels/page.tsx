@@ -369,7 +369,7 @@ export default function MarketingPixelsPage() {
                         togglePlatform(platform.id);
                       }}
                       className={`relative w-11 h-6 rounded-full transition-colors ${
-                        isEnabled ? 'bg-primary' : 'bg-gray-300'
+                        isEnabled ? 'bg-primary' : 'bg-border'
                       }`}
                     >
                       <span

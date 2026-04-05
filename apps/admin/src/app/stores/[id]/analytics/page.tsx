@@ -110,7 +110,7 @@ function SimpleBarChart({
                 title={`${formatDate(item.date)}: ${dataKey === 'revenue' ? formatCurrency(item[dataKey]) : item[dataKey]}`}
               />
               {i % Math.ceil(data.length / 7) === 0 && (
-                <span className="text-[10px] text-gray-400 -rotate-45 origin-top-left whitespace-nowrap">
+                <span className="text-[10px] text-muted-foreground -rotate-45 origin-top-left whitespace-nowrap">
                   {formatDate(item.date)}
                 </span>
               )}
@@ -265,7 +265,7 @@ export default function AnalyticsPage() {
     shipped: 'bg-purple-100 text-purple-800',
     delivered: 'bg-green-100 text-green-800',
     cancelled: 'bg-red-100 text-red-800',
-    refunded: 'bg-gray-100 text-gray-800',
+    refunded: 'bg-muted text-foreground',
   };
 
   return (
@@ -444,7 +444,7 @@ export default function AnalyticsPage() {
                 <div className="space-y-4">
                   {topProducts.map((product, i) => (
                     <div key={product.id} className="flex items-center gap-3">
-                      <span className="text-sm font-medium text-gray-400 w-4">{i + 1}</span>
+                      <span className="text-sm font-medium text-muted-foreground w-4">{i + 1}</span>
                       {product.image ? (
                         <img
                           src={product.image}
@@ -452,9 +452,9 @@ export default function AnalyticsPage() {
                           className="w-10 h-10 rounded object-cover"
                         />
                       ) : (
-                        <div className="w-10 h-10 rounded bg-gray-100 flex items-center justify-center">
+                        <div className="w-10 h-10 rounded bg-muted flex items-center justify-center">
                           <svg
-                            className="w-5 h-5 text-gray-400"
+                            className="w-5 h-5 text-muted-foreground"
                             fill="none"
                             viewBox="0 0 24 24"
                             stroke="currentColor"
@@ -506,7 +506,7 @@ export default function AnalyticsPage() {
                         </p>
                         <span
                           className={`inline-block px-2 py-0.5 text-xs rounded-full ${
-                            statusColors[order.status] || 'bg-gray-100 text-gray-800'
+                            statusColors[order.status] || 'bg-muted text-foreground'
                           }`}
                         >
                           {order.status}
@@ -549,9 +549,9 @@ export default function AnalyticsPage() {
                           className="w-10 h-10 rounded object-cover"
                         />
                       ) : (
-                        <div className="w-10 h-10 rounded bg-gray-100 flex items-center justify-center">
+                        <div className="w-10 h-10 rounded bg-muted flex items-center justify-center">
                           <svg
-                            className="w-5 h-5 text-gray-400"
+                            className="w-5 h-5 text-muted-foreground"
                             fill="none"
                             viewBox="0 0 24 24"
                             stroke="currentColor"

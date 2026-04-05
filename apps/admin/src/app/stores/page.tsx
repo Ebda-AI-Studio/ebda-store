@@ -51,9 +51,9 @@ const statusConfig = {
   },
   inactive: {
     variant: 'secondary' as const,
-    bg: 'bg-gray-50',
-    text: 'text-gray-600',
-    dot: 'bg-gray-400',
+    bg: 'bg-muted',
+    text: 'text-muted-foreground',
+    dot: 'bg-muted-foreground',
   },
   suspended: {
     variant: 'destructive' as const,
@@ -64,7 +64,7 @@ const statusConfig = {
 };
 
 const planConfig = {
-  free: { bg: 'bg-gray-100', text: 'text-gray-700', icon: '🆓' },
+  free: { bg: 'bg-muted', text: 'text-foreground', icon: '🆓' },
   starter: { bg: 'bg-blue-50', text: 'text-blue-700', icon: '🚀' },
   professional: { bg: 'bg-violet-50', text: 'text-violet-700', icon: '💼' },
   enterprise: { bg: 'bg-amber-50', text: 'text-amber-700', icon: '👑' },
@@ -389,7 +389,7 @@ export default function StoresPage() {
 
           {/* Table View */}
           {viewMode === 'table' && (
-            <div className="force-card p-0 overflow-hidden">
+            <div className="force-card p-0 overflow-hidden overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-muted/50 border-b">
                   <tr>

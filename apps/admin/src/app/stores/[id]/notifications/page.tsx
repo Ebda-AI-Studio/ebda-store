@@ -122,7 +122,7 @@ function StatusBadge({ status }: { status: string }) {
     pending: 'bg-yellow-100 text-yellow-700',
     queued: 'bg-blue-100 text-blue-700',
   };
-  const cls = colors[status] || 'bg-gray-100 text-gray-700';
+  const cls = colors[status] || 'bg-muted text-foreground';
   return (
     <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${cls}`}>
       {status}
@@ -149,7 +149,7 @@ function Toggle({
       onClick={() => !disabled && onChange(!checked)}
       disabled={disabled}
       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 disabled:opacity-50 ${
-        checked ? 'bg-orange-500' : 'bg-gray-200'
+        checked ? 'bg-orange-500' : 'bg-muted'
       }`}
     >
       <span
@@ -495,7 +495,7 @@ export default function NotificationsPage() {
                 <button
                   onClick={() => handleTestConnection('whatsapp')}
                   disabled={testingChannel === 'whatsapp'}
-                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
+                  className="px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-muted transition-colors disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
                 >
                   Test Connection
                 </button>
@@ -581,7 +581,7 @@ export default function NotificationsPage() {
                 <button
                   onClick={() => handleTestConnection('sms')}
                   disabled={testingChannel === 'sms'}
-                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
+                  className="px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-muted transition-colors disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
                 >
                   Test Connection
                 </button>
@@ -665,7 +665,7 @@ export default function NotificationsPage() {
                 <button
                   onClick={() => handleTestConnection('push_notifications')}
                   disabled={testingChannel === 'push_notifications'}
-                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
+                  className="px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-muted transition-colors disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
                 >
                   Test Connection
                 </button>
@@ -805,9 +805,9 @@ export default function NotificationsPage() {
 
             {logs.length === 0 ? (
               <div className="p-12 text-center">
-                <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center mx-auto mb-3">
                   <svg
-                    className="w-6 h-6 text-gray-400"
+                    className="w-6 h-6 text-muted-foreground"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -824,56 +824,58 @@ export default function NotificationsPage() {
               </div>
             ) : (
               <>
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-muted border-b border-border">
-                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Timestamp
-                      </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Event
-                      </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Channel
-                      </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Recipient
-                      </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Status
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {logs.map(log => (
-                      <tr key={log.id} className="hover:bg-muted">
-                        <td className="px-6 py-3 text-sm text-muted-foreground whitespace-nowrap">
-                          {new Date(log.createdAt).toLocaleString()}
-                        </td>
-                        <td className="px-6 py-3 text-sm text-foreground capitalize">
-                          {log.event.replace(/_/g, ' ')}
-                        </td>
-                        <td className="px-6 py-3 text-sm text-foreground capitalize">
-                          {channelLabel(log.channel)}
-                        </td>
-                        <td className="px-6 py-3 text-sm text-muted-foreground">
-                          {log.recipient || '—'}
-                        </td>
-                        <td className="px-6 py-3">
-                          <StatusBadge status={log.status} />
-                          {log.error && (
-                            <p
-                              className="text-xs text-red-500 mt-1 truncate max-w-[200px]"
-                              title={log.error}
-                            >
-                              {log.error}
-                            </p>
-                          )}
-                        </td>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-muted border-b border-border">
+                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          Timestamp
+                        </th>
+                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          Event
+                        </th>
+                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          Channel
+                        </th>
+                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          Recipient
+                        </th>
+                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          Status
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {logs.map(log => (
+                        <tr key={log.id} className="hover:bg-muted">
+                          <td className="px-6 py-3 text-sm text-muted-foreground whitespace-nowrap">
+                            {new Date(log.createdAt).toLocaleString()}
+                          </td>
+                          <td className="px-6 py-3 text-sm text-foreground capitalize">
+                            {log.event.replace(/_/g, ' ')}
+                          </td>
+                          <td className="px-6 py-3 text-sm text-foreground capitalize">
+                            {channelLabel(log.channel)}
+                          </td>
+                          <td className="px-6 py-3 text-sm text-muted-foreground">
+                            {log.recipient || '—'}
+                          </td>
+                          <td className="px-6 py-3">
+                            <StatusBadge status={log.status} />
+                            {log.error && (
+                              <p
+                                className="text-xs text-red-500 mt-1 truncate max-w-[200px]"
+                                title={log.error}
+                              >
+                                {log.error}
+                              </p>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
 
                 {/* Pagination */}
                 {logsPages > 1 && (

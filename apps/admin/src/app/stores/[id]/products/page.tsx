@@ -52,14 +52,15 @@ export default function StoreProductsPage() {
   const { success: toastSuccess, error: toastError } = useToast();
 
   useEffect(() => {
+    if (!isAuthenticated) return;
     fetchStore();
+    fetchProducts();
   }, [storeId, isAuthenticated]);
 
   useEffect(() => {
-    if (store) {
-      fetchProducts();
-    }
-  }, [store, isAuthenticated, page, statusFilter, search]);
+    if (!isAuthenticated) return;
+    fetchProducts();
+  }, [page, statusFilter, search]);
 
   async function fetchStore() {
     if (!isAuthenticated) return;
@@ -175,7 +176,7 @@ export default function StoreProductsPage() {
             <div className="h-9 w-32 force-skeleton rounded-lg" />
           </div>
           {/* Skeleton table */}
-          <div className="rounded-xl border bg-card overflow-hidden">
+          <div className="rounded-xl border bg-card overflow-hidden overflow-x-auto">
             <table className="w-full">
               <thead className="bg-muted border-b">
                 <tr>
@@ -315,7 +316,7 @@ export default function StoreProductsPage() {
       </div>
 
       {/* Products Table */}
-      <div className="rounded-xl border bg-card overflow-hidden">
+      <div className="rounded-xl border bg-card overflow-hidden overflow-x-auto">
         <table className="w-full">
           <thead className="bg-muted border-b">
             <tr>

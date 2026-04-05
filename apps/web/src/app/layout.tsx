@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import { Suspense } from 'react';
 import { Plus_Jakarta_Sans, IBM_Plex_Sans_Arabic } from 'next/font/google';
 import { ToastProvider } from '@force/ui';
 import { LanguageProvider } from '../contexts/LanguageContext';
@@ -200,7 +201,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             )}
             <ServiceWorkerRegistration />
             <PushNotificationPrompt />
-            <AffiliateTracker />
+            <Suspense fallback={null}>
+              <AffiliateTracker />
+            </Suspense>
           </FeatureProvider>
         </StoreProvider>
       </body>

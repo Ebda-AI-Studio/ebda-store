@@ -69,14 +69,28 @@ export default function EditProductPage() {
   });
 
   useEffect(() => {
-    async function fetchProduct() {
+    async function fetchProductAndCategories() {
       if (!isAuthenticated || !storeId || !productId) return;
 
       try {
         setLoading(true);
-        const { data, error: apiError } = await apiGet<{ product?: Product } & Product>(
-          `/api/v1/stores/${storeId}/products/${productId}`
-        );
+
+        const [productResult, categoriesResult] = await Promise.all([
+          apiGet<{ product?: Product } & Product>(
+            `/api/v1/stores/${storeId}/products/${productId}`
+          ),
+          apiGet<{ categories: Category[] }>(`/api/v1/stores/${storeId}/categories`),
+        ]);
+
+        // Handle categories
+        if (categoriesResult.data?.categories) {
+          setCategories(categoriesResult.data.categories);
+        } else {
+          setCategories([]);
+        }
+
+        // Handle product
+        const { data, error: apiError } = productResult;
 
         if (apiError) {
           setError(apiError.status === 404 ? 'Product not found' : 'Failed to load product');
@@ -119,27 +133,8 @@ export default function EditProductPage() {
       }
     }
 
-    fetchProduct();
+    fetchProductAndCategories();
   }, [productId, storeId, isAuthenticated]);
-
-  useEffect(() => {
-    if (!storeId || !isAuthenticated) return;
-
-    async function fetchCategories() {
-      try {
-        const { data } = await apiGet<{ categories: Category[] }>(
-          `/api/v1/stores/${storeId}/categories`
-        );
-        if (data?.categories) {
-          setCategories(data.categories);
-        }
-      } catch {
-        setCategories([]);
-      }
-    }
-
-    fetchCategories();
-  }, [storeId, isAuthenticated]);
 
   const updateField = (field: string, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));

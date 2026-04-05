@@ -85,8 +85,8 @@ export default function AnnouncementPage() {
     return (
       <AdminLayout title="Announcement Bar" subtitle="Loading...">
         <div className="animate-pulse space-y-4">
-          <div className="h-20 rounded-xl bg-gray-200" />
-          <div className="h-64 rounded-xl bg-gray-200" />
+          <div className="h-20 rounded-xl bg-muted" />
+          <div className="h-64 rounded-xl bg-muted" />
         </div>
       </AdminLayout>
     );
@@ -99,7 +99,7 @@ export default function AnnouncementPage() {
       actions={
         <div className="flex gap-2">
           <Link href={`/stores/${storeId}/settings`}>
-            <button className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-gray-50 font-medium">
+            <button className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted font-medium">
               Back to Settings
             </button>
           </Link>
@@ -151,7 +151,7 @@ export default function AnnouncementPage() {
                 onChange={e => setSettings(prev => ({ ...prev, enabled: e.target.checked }))}
                 className="sr-only peer"
               />
-              <div className="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-border after:bg-card after:transition-all after:content-[''] peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/20" />
+              <div className="peer h-6 w-11 rounded-full bg-muted after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-border after:bg-card after:transition-all after:content-[''] peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/20" />
             </label>
           </div>
         </div>
@@ -162,7 +162,7 @@ export default function AnnouncementPage() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-foreground mb-1">
                 Announcement Text (English)
               </label>
               <input
@@ -174,7 +174,7 @@ export default function AnnouncementPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-foreground mb-1">
                 Announcement Text (Arabic)
               </label>
               <input
@@ -189,7 +189,7 @@ export default function AnnouncementPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-foreground mb-1">
               Link URL (optional)
             </label>
             <input
@@ -206,7 +206,7 @@ export default function AnnouncementPage() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-foreground mb-1">
                 Link Text (English)
               </label>
               <input
@@ -218,7 +218,7 @@ export default function AnnouncementPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-foreground mb-1">
                 Link Text (Arabic)
               </label>
               <input
@@ -239,7 +239,7 @@ export default function AnnouncementPage() {
 
           <div className="grid gap-6 sm:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-foreground mb-2">
                 Background Color
               </label>
               <div className="flex items-center gap-3">
@@ -269,7 +269,7 @@ export default function AnnouncementPage() {
                     onClick={() => setSettings(prev => ({ ...prev, backgroundColor: color }))}
                     className={`h-6 w-6 rounded-full border-2 transition-transform hover:scale-110 ${
                       settings.backgroundColor === color
-                        ? 'border-gray-900 scale-110'
+                        ? 'border-foreground scale-110'
                         : 'border-transparent'
                     }`}
                     style={{ backgroundColor: color }}
@@ -280,7 +280,7 @@ export default function AnnouncementPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Text Color</label>
+              <label className="block text-sm font-medium text-foreground mb-2">Text Color</label>
               <div className="flex items-center gap-3">
                 <input
                   type="color"
@@ -303,7 +303,7 @@ export default function AnnouncementPage() {
                     key={color}
                     onClick={() => setSettings(prev => ({ ...prev, textColor: color }))}
                     className={`h-6 w-6 rounded-full border-2 transition-transform hover:scale-110 ${
-                      settings.textColor === color ? 'border-gray-900 scale-110' : 'border-border'
+                      settings.textColor === color ? 'border-foreground scale-110' : 'border-border'
                     }`}
                     style={{ backgroundColor: color }}
                     title={color}

@@ -46,7 +46,7 @@ export function CategoryForm({
         </h2>
         <button
           onClick={onClose}
-          className="p-1 text-gray-400 hover:text-gray-600"
+          className="p-1 text-muted-foreground hover:text-muted-foreground"
           aria-label="Close"
         >
           <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -62,7 +62,7 @@ export function CategoryForm({
       <form onSubmit={onSubmit} className="p-6 space-y-4">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-foreground mb-1">
               Name (English) <span className="text-red-500">*</span>
             </label>
             <input
@@ -79,25 +79,25 @@ export function CategoryForm({
                 if (formErrors.name) onFormErrorChange(prev => ({ ...prev, name: '' }));
               }}
               placeholder="Electronics"
-              className={`w-full rounded-lg border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary ${formErrors.name ? 'border-red-500' : 'border-gray-300'}`}
+              className={`w-full rounded-lg border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary ${formErrors.name ? 'border-red-500' : 'border-border'}`}
             />
             {formErrors.name && <p className="mt-1 text-xs text-red-500">{formErrors.name}</p>}
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Name (Arabic)</label>
+            <label className="block text-sm font-medium text-foreground mb-1">Name (Arabic)</label>
             <input
               type="text"
               dir="rtl"
               value={form.nameAr}
               onChange={e => onFormChange(prev => ({ ...prev, nameAr: e.target.value }))}
               placeholder="إلكترونيات"
-              className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-foreground mb-1">
             URL Slug <span className="text-red-500">*</span>
           </label>
           <input
@@ -108,25 +108,27 @@ export function CategoryForm({
               if (formErrors.slug) onFormErrorChange(prev => ({ ...prev, slug: '' }));
             }}
             placeholder="electronics"
-            className={`w-full rounded-lg border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary ${formErrors.slug ? 'border-red-500' : 'border-gray-300'}`}
+            className={`w-full rounded-lg border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary ${formErrors.slug ? 'border-red-500' : 'border-border'}`}
           />
           {formErrors.slug && <p className="mt-1 text-xs text-red-500">{formErrors.slug}</p>}
-          <p className="mt-1 text-xs text-gray-500">Used in URLs: lowercase, hyphens only</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Used in URLs: lowercase, hyphens only
+          </p>
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <label className="block text-sm font-medium text-foreground mb-1">Description</label>
             <textarea
               value={form.description}
               onChange={e => onFormChange(prev => ({ ...prev, description: e.target.value }))}
               placeholder="Category description..."
               rows={3}
-              className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+              className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-foreground mb-1">
               Description (Arabic)
             </label>
             <textarea
@@ -135,13 +137,13 @@ export function CategoryForm({
               onChange={e => onFormChange(prev => ({ ...prev, descriptionAr: e.target.value }))}
               placeholder="وصف التصنيف..."
               rows={3}
-              className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+              className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Category Image</label>
+          <label className="block text-sm font-medium text-foreground mb-1">Category Image</label>
           <ImageUpload
             value={form.image || undefined}
             onUpload={url => onFormChange(prev => ({ ...prev, image: url }))}
@@ -161,11 +163,11 @@ export function CategoryForm({
           </p>
         )}
 
-        <div className="flex items-center justify-end gap-3 border-t border-gray-100 pt-4">
+        <div className="flex items-center justify-end gap-3 border-t border-border pt-4">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+            className="px-4 py-2 text-sm text-foreground border border-border rounded-lg hover:bg-muted"
           >
             Cancel
           </button>

@@ -192,7 +192,7 @@ export default function StoreCategoriesPage() {
       actions={
         <div className="flex gap-2">
           <Link href={`/stores/${storeId}`}>
-            <button className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 font-medium">
+            <button className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted font-medium">
               Back to Store
             </button>
           </Link>
@@ -254,7 +254,7 @@ export default function StoreCategoriesPage() {
             <div className="flex items-center justify-end gap-3">
               <button
                 onClick={() => setDeleteTarget(null)}
-                className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+                className="px-4 py-2 text-sm text-foreground border border-border rounded-lg hover:bg-muted"
               >
                 Cancel
               </button>

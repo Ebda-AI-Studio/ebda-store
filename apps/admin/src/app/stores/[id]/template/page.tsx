@@ -51,7 +51,7 @@ const templates: Template[] = [
     descriptionAr: 'مساحة بيضاء واسعة وتصميم يركز على المنتج. رائع للتصوير ومعارض الفن.',
     tags: ['Photography', 'Art', 'Design'],
     bestFor: 'Photography, art galleries, and design studios',
-    previewColor: 'from-gray-800 to-gray-900',
+    previewColor: 'from-neutral-800 to-neutral-900',
   },
   {
     id: 'bold',

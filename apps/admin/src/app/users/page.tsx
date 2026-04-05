@@ -115,7 +115,7 @@ export default function UsersPage() {
         <form onSubmit={handleSearch} className="flex flex-1 gap-2">
           <div className="relative flex-1 max-w-md">
             <svg
-              className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+              className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -162,7 +162,7 @@ export default function UsersPage() {
 
       {/* Users Table */}
       {!error && (
-        <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+        <div className="rounded-xl border bg-card shadow-sm overflow-hidden overflow-x-auto">
           <table className="w-full">
             <thead className="bg-muted border-b">
               <tr>
@@ -189,36 +189,36 @@ export default function UsersPage() {
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
+            <tbody className="divide-y divide-border">
               {isLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <tr key={i}>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 bg-gray-200 rounded-full animate-pulse" />
+                        <div className="h-10 w-10 bg-muted rounded-full animate-pulse" />
                         <div>
-                          <div className="h-4 w-32 bg-gray-200 rounded animate-pulse" />
-                          <div className="h-3 w-40 bg-gray-200 rounded animate-pulse mt-1" />
+                          <div className="h-4 w-32 bg-muted rounded animate-pulse" />
+                          <div className="h-3 w-40 bg-muted rounded animate-pulse mt-1" />
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="h-6 w-20 bg-gray-200 rounded animate-pulse" />
+                      <div className="h-6 w-20 bg-muted rounded animate-pulse" />
                     </td>
                     <td className="px-6 py-4">
-                      <div className="h-6 w-16 bg-gray-200 rounded animate-pulse" />
+                      <div className="h-6 w-16 bg-muted rounded animate-pulse" />
                     </td>
                     <td className="px-6 py-4">
-                      <div className="h-4 w-24 bg-gray-200 rounded animate-pulse" />
+                      <div className="h-4 w-24 bg-muted rounded animate-pulse" />
                     </td>
                     <td className="px-6 py-4">
-                      <div className="h-4 w-24 bg-gray-200 rounded animate-pulse" />
+                      <div className="h-4 w-24 bg-muted rounded animate-pulse" />
                     </td>
                     <td className="px-6 py-4">
-                      <div className="h-4 w-24 bg-gray-200 rounded animate-pulse" />
+                      <div className="h-4 w-24 bg-muted rounded animate-pulse" />
                     </td>
                     <td className="px-6 py-4">
-                      <div className="h-8 w-16 bg-gray-200 rounded animate-pulse ml-auto" />
+                      <div className="h-8 w-16 bg-muted rounded animate-pulse ml-auto" />
                     </td>
                   </tr>
                 ))
@@ -260,11 +260,13 @@ export default function UsersPage() {
                             </Link>
                           ))}
                           {user.stores.length > 2 && (
-                            <span className="text-gray-400">+{user.stores.length - 2} more</span>
+                            <span className="text-muted-foreground">
+                              +{user.stores.length - 2} more
+                            </span>
                           )}
                         </div>
                       ) : (
-                        <span className="text-gray-400">-</span>
+                        <span className="text-muted-foreground">-</span>
                       )}
                     </td>
                     <td className="px-6 py-4 text-sm text-muted-foreground">
@@ -287,7 +289,7 @@ export default function UsersPage() {
                   <td colSpan={7} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center">
                       <svg
-                        className="h-12 w-12 text-gray-400"
+                        className="h-12 w-12 text-muted-foreground"
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"

@@ -540,7 +540,7 @@ export default function AffiliatesPage() {
                     <button
                       onClick={() => setConfig({ ...config, autoApprove: !config.autoApprove })}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        config.autoApprove ? 'bg-orange-500' : 'bg-gray-300'
+                        config.autoApprove ? 'bg-orange-500' : 'bg-border'
                       }`}
                     >
                       <span
@@ -562,7 +562,7 @@ export default function AffiliatesPage() {
                         setConfig({ ...config, publicSignupEnabled: !config.publicSignupEnabled })
                       }
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        config.publicSignupEnabled ? 'bg-orange-500' : 'bg-gray-300'
+                        config.publicSignupEnabled ? 'bg-orange-500' : 'bg-border'
                       }`}
                     >
                       <span

@@ -174,7 +174,7 @@ export default function StorePagesPage() {
         </div>
 
         {links.length === 0 ? (
-          <p className="text-gray-500 text-sm py-4 text-center">
+          <p className="text-muted-foreground text-sm py-4 text-center">
             No links configured. Click &quot;Add Link&quot; to add one.
           </p>
         ) : (
@@ -186,7 +186,7 @@ export default function StorePagesPage() {
                     type="checkbox"
                     checked={link.enabled}
                     onChange={e => updateLink(section, index, 'enabled', e.target.checked)}
-                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
                   />
                 </label>
                 <input
@@ -194,7 +194,7 @@ export default function StorePagesPage() {
                   value={link.name}
                   onChange={e => updateLink(section, index, 'name', e.target.value)}
                   placeholder="Link name"
-                  className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  className="flex-1 rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 />
                 <input
                   type="text"
@@ -202,18 +202,18 @@ export default function StorePagesPage() {
                   onChange={e => updateLink(section, index, 'nameAr', e.target.value)}
                   placeholder="Arabic name (optional)"
                   dir="rtl"
-                  className="w-40 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  className="w-40 rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 />
                 <input
                   type="text"
                   value={link.href}
                   onChange={e => updateLink(section, index, 'href', e.target.value)}
                   placeholder="/page-path"
-                  className="w-40 rounded-lg border border-gray-200 px-3 py-2 text-sm font-mono focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  className="w-40 rounded-lg border border-border px-3 py-2 text-sm font-mono focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 />
                 <button
                   onClick={() => removeLink(section, index)}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-red-50 hover:text-red-500 transition-colors"
                   title="Remove link"
                 >
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -250,7 +250,7 @@ export default function StorePagesPage() {
       actions={
         <div className="flex gap-3">
           <Link href={`/stores/${storeId}/settings`}>
-            <button className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 font-medium">
+            <button className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted font-medium">
               Back to Settings
             </button>
           </Link>
@@ -285,7 +285,7 @@ export default function StorePagesPage() {
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-lg font-semibold text-foreground">Newsletter Section</h2>
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="text-sm text-muted-foreground mt-1">
                 Show or hide the newsletter signup form in the footer.
               </p>
             </div>
@@ -296,7 +296,7 @@ export default function StorePagesPage() {
                 onChange={e => setNewsletterEnabled(e.target.checked)}
                 className="sr-only peer"
               />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary" />
+              <div className="w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary" />
             </label>
           </div>
         </div>

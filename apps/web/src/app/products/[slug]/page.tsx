@@ -129,8 +129,7 @@ async function fetchInitialProduct(slug: string, store: { id: string; domain?: s
 }
 
 export default async function ProductDetailPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params;
-  const store = await getStore();
+  const [{ slug }, store] = await Promise.all([params, getStore()]);
   const initialProduct = await fetchInitialProduct(slug, store);
 
   return <ProductDetailClient initialProduct={initialProduct} />;

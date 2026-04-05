@@ -177,6 +177,7 @@ interface CreateOrderData {
 class ApiClient {
   private baseUrl: string;
   private storeId: string | null = null;
+  private refreshPromise: Promise<string | null> | null = null;
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl;
@@ -198,15 +199,57 @@ class ApiClient {
     return sessionId;
   }
 
-  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
-    const headers: HeadersInit = {
+  /**
+   * Attempt to refresh the access token using the stored refresh token.
+   * Deduplicates concurrent calls: if a refresh is already in-flight,
+   * subsequent callers await the same promise instead of firing a new one.
+   */
+  private refreshAccessToken(): Promise<string | null> {
+    if (this.refreshPromise) return this.refreshPromise;
+
+    this.refreshPromise = (async (): Promise<string | null> => {
+      const refreshToken =
+        typeof window !== 'undefined' ? localStorage.getItem('refreshToken') : null;
+      if (!refreshToken) return null;
+
+      try {
+        const res = await fetch(`${this.baseUrl}/auth/refresh`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken }),
+        });
+        if (!res.ok) return null;
+        const json = await res.json();
+        if (json.success && json.data) {
+          if (json.data.refreshToken && typeof window !== 'undefined') {
+            localStorage.setItem('refreshToken', json.data.refreshToken);
+          }
+          if (json.data.csrfToken && typeof window !== 'undefined') {
+            localStorage.setItem('csrfToken', json.data.csrfToken);
+          }
+          return json.data.accessToken ?? null;
+        }
+        return null;
+      } catch {
+        return null;
+      }
+    })().finally(() => {
+      this.refreshPromise = null;
+    });
+
+    return this.refreshPromise;
+  }
+
+  private buildHeaders(options: RequestInit = {}): Record<string, string> {
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'X-Session-ID': this.getSessionId(),
-      ...options.headers,
+      ...(options.headers as Record<string, string>),
     };
 
     if (this.storeId) {
-      (headers as Record<string, string>)['X-Store-ID'] = this.storeId;
+      headers['X-Store-ID'] = this.storeId;
     }
 
     // Include CSRF token for state-changing requests
@@ -214,9 +257,15 @@ class ApiClient {
     if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) && typeof window !== 'undefined') {
       const csrfToken = localStorage.getItem('csrfToken');
       if (csrfToken) {
-        (headers as Record<string, string>)['X-CSRF-Token'] = csrfToken;
+        headers['X-CSRF-Token'] = csrfToken;
       }
     }
+
+    return headers;
+  }
+
+  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
+    const headers = this.buildHeaders(options);
 
     try {
       const response = await fetch(`${this.baseUrl}${endpoint}`, {
@@ -224,6 +273,41 @@ class ApiClient {
         credentials: 'include',
         headers,
       });
+
+      // On 401, attempt a single token refresh and retry the request
+      if (response.status === 401 && !endpoint.startsWith('/auth/')) {
+        const newToken = await this.refreshAccessToken();
+        if (newToken) {
+          // Rebuild headers to pick up any new CSRF token set during refresh
+          const retryHeaders = this.buildHeaders(options);
+          const retryResponse = await fetch(`${this.baseUrl}${endpoint}`, {
+            ...options,
+            credentials: 'include',
+            headers: retryHeaders,
+          });
+
+          let retryData: ApiResponse<T>;
+          try {
+            retryData = await retryResponse.json();
+          } catch (e) {
+            if (e instanceof SyntaxError) {
+              return {
+                success: false,
+                error: { code: 'INVALID_RESPONSE', message: 'Server returned an invalid response' },
+              };
+            }
+            throw e;
+          }
+
+          if (!retryResponse.ok) {
+            return {
+              success: false,
+              error: retryData.error || { code: 'UNKNOWN', message: 'An error occurred' },
+            };
+          }
+          return retryData;
+        }
+      }
 
       let data: ApiResponse<T>;
       try {

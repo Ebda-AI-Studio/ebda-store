@@ -352,81 +352,85 @@ export default function InventoryPage() {
                   <p className="text-muted-foreground">No products found</p>
                 </div>
               ) : (
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-muted border-b border-border">
-                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Product
-                      </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        SKU
-                      </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Stock
-                      </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Threshold
-                      </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Status
-                      </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Value
-                      </th>
-                      <th className="text-right px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {products.map(product => (
-                      <tr key={product.id} className="hover:bg-muted">
-                        <td className="px-6 py-4">
-                          <div>
-                            <div className="font-medium text-foreground">{product.name}</div>
-                            {product.nameAr && (
-                              <div className="text-sm text-muted-foreground font-arabic">
-                                {product.nameAr}
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-muted-foreground">
-                          {product.sku || '-'}
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="font-semibold text-foreground">{product.inventory}</span>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-muted-foreground">
-                          {product.lowStockThreshold}
-                        </td>
-                        <td className="px-6 py-4">
-                          <span
-                            className={`px-2 py-1 rounded-full text-xs font-medium ${STOCK_STATUS_STYLES[product.stockStatus].bg} ${STOCK_STATUS_STYLES[product.stockStatus].text}`}
-                          >
-                            {STOCK_STATUS_STYLES[product.stockStatus].label}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-muted-foreground">
-                          {product.costPrice
-                            ? `${(product.stockValue / 1000).toFixed(3)} KWD`
-                            : '-'}
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <button
-                            onClick={() => {
-                              setSelectedProduct(product);
-                              setShowAdjustModal(true);
-                            }}
-                            className="text-orange-500 hover:text-orange-600 text-sm font-medium"
-                          >
-                            Adjust
-                          </button>
-                        </td>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-muted border-b border-border">
+                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          Product
+                        </th>
+                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          SKU
+                        </th>
+                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          Stock
+                        </th>
+                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          Threshold
+                        </th>
+                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          Status
+                        </th>
+                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          Value
+                        </th>
+                        <th className="text-right px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          Actions
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {products.map(product => (
+                        <tr key={product.id} className="hover:bg-muted">
+                          <td className="px-6 py-4">
+                            <div>
+                              <div className="font-medium text-foreground">{product.name}</div>
+                              {product.nameAr && (
+                                <div className="text-sm text-muted-foreground font-arabic">
+                                  {product.nameAr}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-muted-foreground">
+                            {product.sku || '-'}
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="font-semibold text-foreground">
+                              {product.inventory}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-muted-foreground">
+                            {product.lowStockThreshold}
+                          </td>
+                          <td className="px-6 py-4">
+                            <span
+                              className={`px-2 py-1 rounded-full text-xs font-medium ${STOCK_STATUS_STYLES[product.stockStatus].bg} ${STOCK_STATUS_STYLES[product.stockStatus].text}`}
+                            >
+                              {STOCK_STATUS_STYLES[product.stockStatus].label}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-muted-foreground">
+                            {product.costPrice
+                              ? `${(product.stockValue / 1000).toFixed(3)} KWD`
+                              : '-'}
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <button
+                              onClick={() => {
+                                setSelectedProduct(product);
+                                setShowAdjustModal(true);
+                              }}
+                              className="text-orange-500 hover:text-orange-600 text-sm font-medium"
+                            >
+                              Adjust
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
           )}
@@ -439,69 +443,73 @@ export default function InventoryPage() {
                   <p className="text-muted-foreground">No inventory history yet</p>
                 </div>
               ) : (
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-muted border-b border-border">
-                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Date
-                      </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Product
-                      </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Type
-                      </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Change
-                      </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Stock
-                      </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Reason
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {history.map(item => (
-                      <tr key={item.id} className="hover:bg-muted">
-                        <td className="px-6 py-4 text-sm text-muted-foreground">
-                          {new Date(item.createdAt).toLocaleDateString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="font-medium text-foreground">
-                            {item.product?.name || '-'}
-                          </div>
-                          {item.product?.sku && (
-                            <div className="text-xs text-muted-foreground">{item.product.sku}</div>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-muted-foreground">
-                          {formatChangeType(item.type)}
-                        </td>
-                        <td className="px-6 py-4">
-                          <span
-                            className={`font-medium ${item.quantity >= 0 ? 'text-green-600' : 'text-red-600'}`}
-                          >
-                            {item.quantity >= 0 ? '+' : ''}
-                            {item.quantity}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-muted-foreground">
-                          {item.previousStock} → {item.newStock}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-muted-foreground">
-                          {item.reason || '-'}
-                        </td>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-muted border-b border-border">
+                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          Date
+                        </th>
+                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          Product
+                        </th>
+                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          Type
+                        </th>
+                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          Change
+                        </th>
+                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          Stock
+                        </th>
+                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          Reason
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {history.map(item => (
+                        <tr key={item.id} className="hover:bg-muted">
+                          <td className="px-6 py-4 text-sm text-muted-foreground">
+                            {new Date(item.createdAt).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="font-medium text-foreground">
+                              {item.product?.name || '-'}
+                            </div>
+                            {item.product?.sku && (
+                              <div className="text-xs text-muted-foreground">
+                                {item.product.sku}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-muted-foreground">
+                            {formatChangeType(item.type)}
+                          </td>
+                          <td className="px-6 py-4">
+                            <span
+                              className={`font-medium ${item.quantity >= 0 ? 'text-green-600' : 'text-red-600'}`}
+                            >
+                              {item.quantity >= 0 ? '+' : ''}
+                              {item.quantity}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-muted-foreground">
+                            {item.previousStock} → {item.newStock}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-muted-foreground">
+                            {item.reason || '-'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
           )}
@@ -530,75 +538,77 @@ export default function InventoryPage() {
                   <p className="text-muted-foreground">No low stock or out of stock products</p>
                 </div>
               ) : (
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-muted border-b border-border">
-                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Product
-                      </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        SKU
-                      </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Current Stock
-                      </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Threshold
-                      </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Status
-                      </th>
-                      <th className="text-right px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {alerts.map(product => (
-                      <tr key={product.id} className="hover:bg-muted">
-                        <td className="px-6 py-4">
-                          <div className="font-medium text-foreground">{product.name}</div>
-                          {product.nameAr && (
-                            <div className="text-sm text-muted-foreground font-arabic">
-                              {product.nameAr}
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-muted-foreground">
-                          {product.sku || '-'}
-                        </td>
-                        <td className="px-6 py-4">
-                          <span
-                            className={`font-semibold ${product.inventory <= 0 ? 'text-red-600' : 'text-yellow-600'}`}
-                          >
-                            {product.inventory}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-muted-foreground">
-                          {product.lowStockThreshold}
-                        </td>
-                        <td className="px-6 py-4">
-                          <span
-                            className={`px-2 py-1 rounded-full text-xs font-medium ${STOCK_STATUS_STYLES[product.stockStatus].bg} ${STOCK_STATUS_STYLES[product.stockStatus].text}`}
-                          >
-                            {STOCK_STATUS_STYLES[product.stockStatus].label}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <button
-                            onClick={() => {
-                              setSelectedProduct(product);
-                              setShowAdjustModal(true);
-                            }}
-                            className="px-3 py-1 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm font-medium"
-                          >
-                            Restock
-                          </button>
-                        </td>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-muted border-b border-border">
+                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          Product
+                        </th>
+                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          SKU
+                        </th>
+                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          Current Stock
+                        </th>
+                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          Threshold
+                        </th>
+                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          Status
+                        </th>
+                        <th className="text-right px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          Actions
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {alerts.map(product => (
+                        <tr key={product.id} className="hover:bg-muted">
+                          <td className="px-6 py-4">
+                            <div className="font-medium text-foreground">{product.name}</div>
+                            {product.nameAr && (
+                              <div className="text-sm text-muted-foreground font-arabic">
+                                {product.nameAr}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-muted-foreground">
+                            {product.sku || '-'}
+                          </td>
+                          <td className="px-6 py-4">
+                            <span
+                              className={`font-semibold ${product.inventory <= 0 ? 'text-red-600' : 'text-yellow-600'}`}
+                            >
+                              {product.inventory}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-muted-foreground">
+                            {product.lowStockThreshold}
+                          </td>
+                          <td className="px-6 py-4">
+                            <span
+                              className={`px-2 py-1 rounded-full text-xs font-medium ${STOCK_STATUS_STYLES[product.stockStatus].bg} ${STOCK_STATUS_STYLES[product.stockStatus].text}`}
+                            >
+                              {STOCK_STATUS_STYLES[product.stockStatus].label}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <button
+                              onClick={() => {
+                                setSelectedProduct(product);
+                                setShowAdjustModal(true);
+                              }}
+                              className="px-3 py-1 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm font-medium"
+                            >
+                              Restock
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
           )}

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 import { getStore } from '../../lib/store-resolver';
 import { API_URL } from '../../lib/api';
 import ProductsClient from './ProductsClient';
@@ -41,10 +42,18 @@ export default async function ProductsPage() {
   const initialData = await fetchInitialData(store);
 
   return (
-    <ProductsClient
-      initialCategories={initialData.categories}
-      initialProducts={initialData.products}
-      initialMeta={initialData.meta}
-    />
+    <Suspense
+      fallback={
+        <main className="flex min-h-screen items-center justify-center bg-background">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        </main>
+      }
+    >
+      <ProductsClient
+        initialCategories={initialData.categories}
+        initialProducts={initialData.products}
+        initialMeta={initialData.meta}
+      />
+    </Suspense>
   );
 }

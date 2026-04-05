@@ -253,6 +253,23 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
   const categoryNameAr = cat0?.category?.nameAr;
   const categoryName = language === 'ar' && categoryNameAr ? categoryNameAr : categoryNameEn;
 
+  // Derived price values (variant-aware)
+  const displayPrice = selectedVariant ? selectedVariant.price : product.price;
+  const displayCompare = selectedVariant ? selectedVariant.compareAtPrice : product.compareAtPrice;
+
+  // Derived variant/option availability
+  const productVariants = product.variants ?? [];
+  const productOptions = product.options ?? [];
+  const hasVariants = productVariants.length > 0;
+  const hasOptions = productOptions.length > 0;
+
+  // Derived inventory (variant-aware)
+  const effectiveInventory = selectedVariant ? selectedVariant.inventory : product.inventory;
+
+  // Derived add-to-cart state
+  const variantRequired = hasVariants && !selectedVariant;
+  const outOfStock = effectiveInventory === 0;
+
   return (
     <main className="min-h-screen bg-background flex flex-col">
       <Header />
@@ -361,112 +378,78 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
             <h1 className="text-3xl font-bold text-foreground">{product.name}</h1>
 
             {/* Price -- shows variant price when a variant is selected */}
-            {(() => {
-              const displayPrice = selectedVariant ? selectedVariant.price : product.price;
-              const displayCompare = selectedVariant
-                ? selectedVariant.compareAtPrice
-                : product.compareAtPrice;
-              return (
-                <div className="mt-4 flex items-baseline gap-3">
-                  <span className="text-3xl font-bold text-primary">
-                    {formatPrice(displayPrice)}
-                  </span>
-                  {displayCompare && displayCompare > displayPrice && (
-                    <span className="text-xl text-muted-foreground line-through">
-                      {formatPrice(displayCompare)}
-                    </span>
-                  )}
-                </div>
-              );
-            })()}
+            <div className="mt-4 flex items-baseline gap-3">
+              <span className="text-3xl font-bold text-primary">{formatPrice(displayPrice)}</span>
+              {displayCompare && displayCompare > displayPrice && (
+                <span className="text-xl text-muted-foreground line-through">
+                  {formatPrice(displayCompare)}
+                </span>
+              )}
+            </div>
 
             {product.description && (
               <p className="mt-6 text-muted-foreground leading-relaxed">{product.description}</p>
             )}
 
             {/* Variant Selector -- rendered when the API returns variants and options */}
-            {(() => {
-              const productVariants = product.variants ?? [];
-              const productOptions = product.options ?? [];
-              if (productVariants.length === 0 || productOptions.length === 0) return null;
-              return (
-                <VariantSelector
-                  variants={productVariants}
-                  options={productOptions}
-                  onVariantSelect={setSelectedVariant}
-                />
-              );
-            })()}
+            {hasVariants && hasOptions && (
+              <VariantSelector
+                variants={productVariants}
+                options={productOptions}
+                onVariantSelect={setSelectedVariant}
+              />
+            )}
 
             {/* Quantity & Add to Cart */}
             <div className="mt-8 space-y-4">
-              {(() => {
-                // Use variant inventory when a variant is selected; fall back to product-level
-                const effectiveInventory = selectedVariant
-                  ? selectedVariant.inventory
-                  : product.inventory;
-                return (
-                  <div className="flex items-center gap-4">
-                    <span className="text-sm font-medium text-foreground">
-                      {t('Quantity', 'الكمية')}:
-                    </span>
-                    <div className="flex items-center rounded-lg border border-border">
-                      <button
-                        onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                        className="px-4 py-2 text-muted-foreground hover:bg-muted cursor-pointer"
-                      >
-                        -
-                      </button>
-                      <span className="w-12 text-center font-medium">{quantity}</span>
-                      <button
-                        onClick={() => {
-                          const maxQty =
-                            effectiveInventory != null && effectiveInventory > 0
-                              ? Math.min(effectiveInventory, 10)
-                              : 10;
-                          setQuantity(Math.min(quantity + 1, maxQty));
-                        }}
-                        className="px-4 py-2 text-muted-foreground hover:bg-muted cursor-pointer"
-                      >
-                        +
-                      </button>
-                    </div>
-                    {effectiveInventory !== undefined && effectiveInventory !== null && (
-                      <span className="text-sm text-muted-foreground">
-                        {effectiveInventory > 0
-                          ? `${effectiveInventory} ${t('in stock', 'متوفر')}`
-                          : t('Out of Stock', 'غير متوفر')}
-                      </span>
-                    )}
-                  </div>
-                );
-              })()}
+              <div className="flex items-center gap-4">
+                <span className="text-sm font-medium text-foreground">
+                  {t('Quantity', 'الكمية')}:
+                </span>
+                <div className="flex items-center rounded-lg border border-border">
+                  <button
+                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                    className="px-4 py-2 text-muted-foreground hover:bg-muted cursor-pointer"
+                  >
+                    -
+                  </button>
+                  <span className="w-12 text-center font-medium">{quantity}</span>
+                  <button
+                    onClick={() => {
+                      const maxQty =
+                        effectiveInventory != null && effectiveInventory > 0
+                          ? Math.min(effectiveInventory, 10)
+                          : 10;
+                      setQuantity(Math.min(quantity + 1, maxQty));
+                    }}
+                    className="px-4 py-2 text-muted-foreground hover:bg-muted cursor-pointer"
+                  >
+                    +
+                  </button>
+                </div>
+                {effectiveInventory !== undefined && effectiveInventory !== null && (
+                  <span className="text-sm text-muted-foreground">
+                    {effectiveInventory > 0
+                      ? `${effectiveInventory} ${t('in stock', 'متوفر')}`
+                      : t('Out of Stock', 'غير متوفر')}
+                  </span>
+                )}
+              </div>
 
               <div className="flex gap-4">
-                {(() => {
-                  const productVariants = product.variants ?? [];
-                  const effectiveInventory = selectedVariant
-                    ? selectedVariant.inventory
-                    : product.inventory;
-                  // Disable "Add to Cart" if the product requires a variant but none is selected
-                  const variantRequired = productVariants.length > 0 && !selectedVariant;
-                  const outOfStock = effectiveInventory === 0;
-                  return (
-                    <Button
-                      size="lg"
-                      className="flex-1"
-                      onClick={handleAddToCart}
-                      isLoading={isAdding}
-                      disabled={outOfStock || variantRequired}
-                    >
-                      {outOfStock
-                        ? t('Out of Stock', 'غير متوفر')
-                        : variantRequired
-                          ? t('Select Options', 'اختر الخيارات')
-                          : t('Add to Cart', translations['Add to Cart'])}
-                    </Button>
-                  );
-                })()}
+                <Button
+                  size="lg"
+                  className="flex-1"
+                  onClick={handleAddToCart}
+                  isLoading={isAdding}
+                  disabled={outOfStock || variantRequired}
+                >
+                  {outOfStock
+                    ? t('Out of Stock', 'غير متوفر')
+                    : variantRequired
+                      ? t('Select Options', 'اختر الخيارات')
+                      : t('Add to Cart', translations['Add to Cart'])}
+                </Button>
 
                 <Button
                   size="lg"

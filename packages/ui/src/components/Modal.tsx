@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, ReactNode } from 'react';
+import { Fragment, ReactNode, useEffect, useRef, useId, useCallback } from 'react';
 import { cn } from '../utils/cn';
 
 interface ModalProps {
@@ -19,7 +19,57 @@ const sizeClasses = {
   xl: 'max-w-4xl',
 };
 
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 export function Modal({ isOpen, onClose, children, title, className, size = 'md' }: ModalProps) {
+  const titleId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  // Escape key handler
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  // Focus trap
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key !== 'Tab' || !dialogRef.current) return;
+
+    const focusable = dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
+    if (focusable.length === 0) return;
+
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+
+    if (e.shiftKey) {
+      if (document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      }
+    } else {
+      if (document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  }, []);
+
+  // Auto-focus first focusable element on open
+  useEffect(() => {
+    if (!isOpen || !dialogRef.current) return;
+    const focusable = dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
+    if (focusable.length > 0) {
+      focusable[0].focus();
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   return (
@@ -29,24 +79,26 @@ export function Modal({ isOpen, onClose, children, title, className, size = 'md'
       {/* Modal */}
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div
+          ref={dialogRef}
           role="dialog"
           aria-modal="true"
-          aria-labelledby={title ? 'modal-title' : undefined}
+          aria-labelledby={title ? titleId : undefined}
           className={cn(
-            'relative w-full rounded-lg bg-white shadow-xl',
+            'relative w-full rounded-lg bg-background shadow-xl',
             sizeClasses[size],
             className
           )}
           onClick={e => e.stopPropagation()}
+          onKeyDown={handleKeyDown}
         >
           {title && (
             <div className="flex items-center justify-between border-b px-6 py-4">
-              <h2 id="modal-title" className="text-lg font-semibold text-gray-900">
+              <h2 id={titleId} className="text-lg font-semibold text-foreground">
                 {title}
               </h2>
               <button
                 onClick={onClose}
-                className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
               >
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path

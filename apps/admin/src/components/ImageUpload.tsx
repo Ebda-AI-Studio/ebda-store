@@ -144,7 +144,7 @@ export function ImageUpload({
   if (value) {
     return (
       <div className={`relative group ${className}`}>
-        <div className="rounded-lg border bg-gray-50 p-3">
+        <div className="rounded-lg border bg-muted p-3">
           <Image
             src={value}
             alt={label}
@@ -184,7 +184,7 @@ export function ImageUpload({
         onDrop={handleDrop}
         onClick={() => inputRef.current?.click()}
         className={`relative cursor-pointer rounded-lg border-2 border-dashed p-6 text-center transition-colors ${
-          dragOver ? 'border-primary bg-primary/5' : 'border-gray-300 hover:border-gray-400'
+          dragOver ? 'border-primary bg-primary/5' : 'border-border hover:border-muted-foreground'
         }`}
       >
         <input
@@ -198,8 +198,8 @@ export function ImageUpload({
         {uploading ? (
           <div className="space-y-2">
             <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-            <p className="text-sm text-gray-600">{progress}%</p>
-            <div className="mx-auto w-32 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+            <p className="text-sm text-muted-foreground">{progress}%</p>
+            <div className="mx-auto w-32 h-1.5 bg-muted rounded-full overflow-hidden">
               <div
                 className="h-full bg-primary rounded-full transition-all"
                 style={{ width: `${progress}%` }}
@@ -209,7 +209,7 @@ export function ImageUpload({
         ) : (
           <>
             <svg
-              className="mx-auto h-10 w-10 text-gray-400"
+              className="mx-auto h-10 w-10 text-muted-foreground"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -221,8 +221,8 @@ export function ImageUpload({
                 d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
               />
             </svg>
-            <p className="mt-1 text-sm text-gray-600">{label}</p>
-            <p className="text-xs text-gray-400">Drag & drop or click to browse</p>
+            <p className="mt-1 text-sm text-muted-foreground">{label}</p>
+            <p className="text-xs text-muted-foreground">Drag & drop or click to browse</p>
           </>
         )}
       </div>
@@ -375,7 +375,7 @@ export function MultiImageUpload({
           {values.map((url, i) => (
             <div
               key={url}
-              className="relative group aspect-square rounded-lg border bg-gray-50 overflow-hidden"
+              className="relative group aspect-square rounded-lg border bg-muted overflow-hidden"
             >
               <Image src={url} alt={`Image ${i + 1}`} fill className="object-cover" />
               {i === 0 && (
@@ -450,7 +450,7 @@ export function MultiImageUpload({
           onDrop={handleDrop}
           onClick={() => inputRef.current?.click()}
           className={`relative cursor-pointer rounded-lg border-2 border-dashed p-8 text-center transition-colors ${
-            dragOver ? 'border-primary bg-primary/5' : 'border-gray-300 hover:border-gray-400'
+            dragOver ? 'border-primary bg-primary/5' : 'border-border hover:border-muted-foreground'
           }`}
         >
           <input
@@ -465,8 +465,8 @@ export function MultiImageUpload({
           {uploading ? (
             <div className="space-y-2">
               <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              <p className="text-sm text-gray-600">Uploading... {progress}%</p>
-              <div className="mx-auto w-40 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+              <p className="text-sm text-muted-foreground">Uploading... {progress}%</p>
+              <div className="mx-auto w-40 h-1.5 bg-muted rounded-full overflow-hidden">
                 <div
                   className="h-full bg-primary rounded-full transition-all"
                   style={{ width: `${progress}%` }}
@@ -476,7 +476,7 @@ export function MultiImageUpload({
           ) : (
             <>
               <svg
-                className="mx-auto h-12 w-12 text-gray-400"
+                className="mx-auto h-12 w-12 text-muted-foreground"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -488,8 +488,8 @@ export function MultiImageUpload({
                   d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
                 />
               </svg>
-              <p className="mt-2 text-sm text-gray-600">{label}</p>
-              <p className="text-xs text-gray-400">
+              <p className="mt-2 text-sm text-muted-foreground">{label}</p>
+              <p className="text-xs text-muted-foreground">
                 Drag & drop or click to browse ({values.length}/{max})
               </p>
             </>

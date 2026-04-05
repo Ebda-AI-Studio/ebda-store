@@ -37,12 +37,12 @@ export function CategoryTable({
       <div className="space-y-4 p-6">
         {Array.from({ length: 4 }).map((_, i) => (
           <div key={i} className="flex items-center gap-4 animate-pulse">
-            <div className="h-10 w-10 rounded-xl bg-gray-200" />
+            <div className="h-10 w-10 rounded-xl bg-muted" />
             <div className="flex-1 space-y-2">
-              <div className="h-4 w-32 rounded bg-gray-200" />
-              <div className="h-3 w-20 rounded bg-gray-200" />
+              <div className="h-4 w-32 rounded bg-muted" />
+              <div className="h-3 w-20 rounded bg-muted" />
             </div>
-            <div className="h-8 w-20 rounded bg-gray-200" />
+            <div className="h-8 w-20 rounded bg-muted" />
           </div>
         ))}
       </div>
@@ -53,7 +53,7 @@ export function CategoryTable({
     return (
       <div className="py-16 text-center">
         <svg
-          className="mx-auto h-12 w-12 text-gray-300"
+          className="mx-auto h-12 w-12 text-muted-foreground/60"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -65,7 +65,7 @@ export function CategoryTable({
             d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
           />
         </svg>
-        <p className="mt-4 text-gray-500">No categories yet</p>
+        <p className="mt-4 text-muted-foreground">No categories yet</p>
         <button onClick={onAddFirst} className="mt-4 text-sm text-primary hover:underline">
           Add your first category
         </button>
@@ -76,28 +76,28 @@ export function CategoryTable({
   return (
     <div className="overflow-x-auto">
       <table className="w-full">
-        <thead className="bg-gray-50 border-b">
+        <thead className="bg-muted border-b">
           <tr>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
               Category
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
               Slug
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
               Products
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">
+            <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider hidden md:table-cell">
               Status
             </th>
-            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
               Actions
             </th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-100">
+        <tbody className="divide-y divide-border">
           {categories.map(cat => (
-            <tr key={cat.id} className="hover:bg-gray-50 transition-colors">
+            <tr key={cat.id} className="hover:bg-muted transition-colors">
               <td className="px-6 py-4">
                 <div className="flex items-center gap-3">
                   {cat.image ? (
@@ -112,32 +112,36 @@ export function CategoryTable({
                     </div>
                   )}
                   <div>
-                    <p className="font-medium text-gray-900">{cat.name}</p>
-                    {cat.nameAr && <p className="text-sm text-gray-500">{cat.nameAr}</p>}
+                    <p className="font-medium text-foreground">{cat.name}</p>
+                    {cat.nameAr && <p className="text-sm text-muted-foreground">{cat.nameAr}</p>}
                     {cat.description && (
-                      <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{cat.description}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                        {cat.description}
+                      </p>
                     )}
                   </div>
                 </div>
               </td>
               <td className="px-6 py-4">
-                <span className="font-mono text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded">
+                <span className="font-mono text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
                   {cat.slug}
                 </span>
               </td>
               <td className="px-6 py-4">
-                <span className="text-sm font-medium text-gray-900">
+                <span className="text-sm font-medium text-foreground">
                   {cat._count?.products ?? 0}
                 </span>
               </td>
               <td className="px-6 py-4 hidden md:table-cell">
                 <span
                   className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${
-                    cat.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-600'
+                    cat.isActive
+                      ? 'bg-emerald-50 text-emerald-700'
+                      : 'bg-muted text-muted-foreground'
                   }`}
                 >
                   <span
-                    className={`h-1.5 w-1.5 rounded-full ${cat.isActive ? 'bg-emerald-500' : 'bg-gray-400'}`}
+                    className={`h-1.5 w-1.5 rounded-full ${cat.isActive ? 'bg-emerald-500' : 'bg-muted-foreground'}`}
                   />
                   {cat.isActive ? 'Active' : 'Inactive'}
                 </span>
@@ -146,7 +150,7 @@ export function CategoryTable({
                 <div className="flex items-center justify-end gap-2">
                   <button
                     onClick={() => onEdit(cat)}
-                    className="px-3 py-1.5 text-xs font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                    className="px-3 py-1.5 text-xs font-medium text-foreground border border-border rounded-lg hover:bg-muted transition-colors"
                   >
                     Edit
                   </button>

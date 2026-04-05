@@ -37,7 +37,7 @@ function CharCount({ value, max }: { value: string; max: number }) {
   return (
     <span
       className={`text-xs ${
-        isOver ? 'text-red-500 font-medium' : isClose ? 'text-amber-500' : 'text-gray-400'
+        isOver ? 'text-red-500 font-medium' : isClose ? 'text-amber-500' : 'text-muted-foreground'
       }`}
     >
       {len}/{max}
@@ -111,8 +111,8 @@ export default function StoreSeoPage() {
     return (
       <AdminLayout title="SEO Settings" subtitle="Loading...">
         <div className="animate-pulse space-y-4">
-          <div className="h-64 rounded-xl bg-gray-200" />
-          <div className="h-64 rounded-xl bg-gray-200" />
+          <div className="h-64 rounded-xl bg-muted" />
+          <div className="h-64 rounded-xl bg-muted" />
         </div>
       </AdminLayout>
     );
@@ -125,7 +125,7 @@ export default function StoreSeoPage() {
       actions={
         <div className="flex gap-2">
           <Link href={`/stores/${storeId}/settings`}>
-            <button className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-gray-50 font-medium">
+            <button className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted font-medium">
               Back to Settings
             </button>
           </Link>
@@ -142,8 +142,8 @@ export default function StoreSeoPage() {
       {/* SERP Preview */}
       {settings.metaTitle && (
         <div className="mb-6 rounded-xl border bg-card p-6 shadow-sm">
-          <h2 className="mb-4 text-sm font-medium text-gray-700">Search Result Preview</h2>
-          <div className="rounded-lg border border-gray-200 p-4 max-w-xl">
+          <h2 className="mb-4 text-sm font-medium text-foreground">Search Result Preview</h2>
+          <div className="rounded-lg border border-border p-4 max-w-xl">
             <p className="text-xs text-muted-foreground mb-1">example.com</p>
             <p className="text-lg font-medium text-blue-700 leading-tight line-clamp-1">
               {settings.metaTitle}
@@ -169,7 +169,7 @@ export default function StoreSeoPage() {
 
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="text-sm font-medium text-gray-700">Meta Title</label>
+              <label className="text-sm font-medium text-foreground">Meta Title</label>
               <CharCount value={settings.metaTitle} max={TITLE_MAX} />
             </div>
             <input
@@ -182,7 +182,7 @@ export default function StoreSeoPage() {
                 settings.metaTitle.length > TITLE_MAX ? 'border-red-300' : 'border-border'
               }`}
             />
-            <p className="mt-1 text-xs text-gray-400">
+            <p className="mt-1 text-xs text-muted-foreground">
               Appears in browser tabs and search results. Keep under {TITLE_MAX} characters for best
               results.
             </p>
@@ -190,7 +190,7 @@ export default function StoreSeoPage() {
 
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="text-sm font-medium text-gray-700">Meta Description</label>
+              <label className="text-sm font-medium text-foreground">Meta Description</label>
               <CharCount value={settings.metaDescription} max={DESC_MAX} />
             </div>
             <textarea
@@ -203,7 +203,7 @@ export default function StoreSeoPage() {
                 settings.metaDescription.length > DESC_MAX ? 'border-red-300' : 'border-border'
               }`}
             />
-            <p className="mt-1 text-xs text-gray-400">
+            <p className="mt-1 text-xs text-muted-foreground">
               Shown in search result snippets. Keep under {DESC_MAX} characters for best results.
             </p>
           </div>
@@ -220,7 +220,7 @@ export default function StoreSeoPage() {
 
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="text-sm font-medium text-gray-700">Meta Title (Arabic)</label>
+              <label className="text-sm font-medium text-foreground">Meta Title (Arabic)</label>
               <CharCount value={settings.metaTitleAr} max={TITLE_MAX} />
             </div>
             <input
@@ -238,7 +238,9 @@ export default function StoreSeoPage() {
 
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="text-sm font-medium text-gray-700">Meta Description (Arabic)</label>
+              <label className="text-sm font-medium text-foreground">
+                Meta Description (Arabic)
+              </label>
               <CharCount value={settings.metaDescriptionAr} max={DESC_MAX} />
             </div>
             <textarea
@@ -260,7 +262,7 @@ export default function StoreSeoPage() {
           <h2 className="font-semibold text-foreground">Advanced</h2>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">OG Image URL</label>
+            <label className="block text-sm font-medium text-foreground mb-1">OG Image URL</label>
             <input
               type="url"
               value={settings.ogImage}
@@ -268,18 +270,18 @@ export default function StoreSeoPage() {
               placeholder="https://example.com/og-image.jpg"
               className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             />
-            <p className="mt-1 text-xs text-gray-400">
+            <p className="mt-1 text-xs text-muted-foreground">
               Image shown when your store is shared on social media. Recommended: 1200×630px.
             </p>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-foreground mb-1">
                 Twitter / X Handle
               </label>
               <div className="flex">
-                <span className="inline-flex items-center rounded-l-lg border border-r-0 border-border bg-gray-50 px-3 text-sm text-muted-foreground">
+                <span className="inline-flex items-center rounded-l-lg border border-r-0 border-border bg-muted px-3 text-sm text-muted-foreground">
                   @
                 </span>
                 <input
@@ -298,7 +300,7 @@ export default function StoreSeoPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-foreground mb-1">
                 Google Site Verification
               </label>
               <input
@@ -310,7 +312,9 @@ export default function StoreSeoPage() {
                 placeholder="Verification meta tag content"
                 className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               />
-              <p className="mt-1 text-xs text-gray-400">From Google Search Console verification</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                From Google Search Console verification
+              </p>
             </div>
           </div>
         </div>

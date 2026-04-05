@@ -27,7 +27,7 @@ const ROLE_LABELS: Record<string, string> = {
 
 const STATUS_STYLES: Record<string, { bg: string; text: string; dot: string }> = {
   active: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
-  inactive: { bg: 'bg-gray-100', text: 'text-muted-foreground', dot: 'bg-gray-400' },
+  inactive: { bg: 'bg-muted', text: 'text-muted-foreground', dot: 'bg-muted-foreground' },
   suspended: { bg: 'bg-red-50', text: 'text-red-700', dot: 'bg-red-500' },
 };
 
@@ -122,8 +122,8 @@ export default function UserDetailPage() {
     return (
       <AdminLayout title="Loading..." subtitle="Please wait">
         <div className="animate-pulse space-y-6">
-          <div className="h-40 bg-gray-200 rounded-xl" />
-          <div className="h-64 bg-gray-200 rounded-xl" />
+          <div className="h-40 bg-muted rounded-xl" />
+          <div className="h-64 bg-muted rounded-xl" />
         </div>
       </AdminLayout>
     );
@@ -154,7 +154,7 @@ export default function UserDetailPage() {
       subtitle={user.email}
       actions={
         <Link href="/users">
-          <button className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-muted font-medium">
+          <button className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted font-medium">
             Back to Users
           </button>
         </Link>
@@ -190,22 +190,24 @@ export default function UserDetailPage() {
 
               <div className="mt-6 space-y-3 text-left">
                 <div>
-                  <p className="text-xs font-medium uppercase tracking-wider text-gray-400">Role</p>
+                  <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Role
+                  </p>
                   <p className="mt-1 font-medium text-foreground">
                     {ROLE_LABELS[user.role] || user.role}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs font-medium uppercase tracking-wider text-gray-400">
+                  <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     Member Since
                   </p>
-                  <p className="mt-1 text-sm text-gray-700">{formatDate(user.createdAt)}</p>
+                  <p className="mt-1 text-sm text-foreground">{formatDate(user.createdAt)}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-medium uppercase tracking-wider text-gray-400">
+                  <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     Last Login
                   </p>
-                  <p className="mt-1 text-sm text-gray-700">{formatDate(user.lastLoginAt)}</p>
+                  <p className="mt-1 text-sm text-foreground">{formatDate(user.lastLoginAt)}</p>
                 </div>
               </div>
             </div>
@@ -247,47 +249,51 @@ export default function UserDetailPage() {
               {/* Read-only info */}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+                  <label className="block text-sm font-medium text-foreground mb-1">
+                    First Name
+                  </label>
                   <input
                     type="text"
                     value={user.firstName}
                     disabled
-                    className="w-full rounded-lg border border-gray-200 bg-muted px-4 py-2 text-sm text-muted-foreground cursor-not-allowed"
+                    className="w-full rounded-lg border border-border bg-muted px-4 py-2 text-sm text-muted-foreground cursor-not-allowed"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+                  <label className="block text-sm font-medium text-foreground mb-1">
+                    Last Name
+                  </label>
                   <input
                     type="text"
                     value={user.lastName}
                     disabled
-                    className="w-full rounded-lg border border-gray-200 bg-muted px-4 py-2 text-sm text-muted-foreground cursor-not-allowed"
+                    className="w-full rounded-lg border border-border bg-muted px-4 py-2 text-sm text-muted-foreground cursor-not-allowed"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Email Address
                 </label>
                 <input
                   type="email"
                   value={user.email}
                   disabled
-                  className="w-full rounded-lg border border-gray-200 bg-muted px-4 py-2 text-sm text-muted-foreground cursor-not-allowed"
+                  className="w-full rounded-lg border border-border bg-muted px-4 py-2 text-sm text-muted-foreground cursor-not-allowed"
                 />
-                <p className="mt-1 text-xs text-gray-400">
+                <p className="mt-1 text-xs text-muted-foreground">
                   Email cannot be changed from admin panel
                 </p>
               </div>
 
               {/* Editable fields */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                <label className="block text-sm font-medium text-foreground mb-1">Role</label>
                 <select
                   value={editRole}
                   onChange={e => setEditRole(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 >
                   <option value="customer">Customer</option>
                   <option value="store_admin">Store Admin</option>
@@ -299,13 +305,13 @@ export default function UserDetailPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Account Status
                 </label>
                 <select
                   value={editStatus}
                   onChange={e => setEditStatus(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 >
                   <option value="active">Active — User can log in and use the platform</option>
                   <option value="inactive">Inactive — Account disabled, cannot log in</option>
@@ -316,7 +322,7 @@ export default function UserDetailPage() {
               </div>
 
               {/* Status toggle as toggle switch for quick active/inactive */}
-              <div className="rounded-xl border border-gray-200 bg-muted p-4">
+              <div className="rounded-xl border border-border bg-muted p-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-medium text-foreground">Active Status</p>
@@ -331,7 +337,7 @@ export default function UserDetailPage() {
                       onChange={e => setEditStatus(e.target.checked ? 'active' : 'inactive')}
                       className="sr-only peer"
                     />
-                    <div className="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-card after:transition-all after:content-[''] peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/20" />
+                    <div className="peer h-6 w-11 rounded-full bg-muted after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-border after:bg-card after:transition-all after:content-[''] peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/20" />
                   </label>
                 </div>
               </div>
@@ -349,8 +355,8 @@ export default function UserDetailPage() {
                 </div>
               )}
 
-              <div className="flex items-center justify-between border-t border-gray-200 pt-6">
-                <p className="text-xs text-gray-400">
+              <div className="flex items-center justify-between border-t border-border pt-6">
+                <p className="text-xs text-muted-foreground">
                   User ID: <span className="font-mono">{user.id}</span>
                 </p>
                 <button

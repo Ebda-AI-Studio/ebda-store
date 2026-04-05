@@ -20,7 +20,7 @@ interface LoyaltySettings {
 
 const TIER_COLORS: Record<string, { bg: string; text: string; icon: string }> = {
   bronze: { bg: 'bg-amber-100', text: 'text-amber-700', icon: 'bg-amber-500' },
-  silver: { bg: 'bg-gray-100', text: 'text-gray-700', icon: 'bg-gray-400' },
+  silver: { bg: 'bg-muted', text: 'text-foreground', icon: 'bg-muted-foreground' },
   gold: { bg: 'bg-yellow-100', text: 'text-yellow-700', icon: 'bg-yellow-500' },
   platinum: { bg: 'bg-purple-100', text: 'text-purple-700', icon: 'bg-purple-500' },
 };

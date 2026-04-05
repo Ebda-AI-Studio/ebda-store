@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useStore } from '../../contexts/StoreContext';
 import { useFeatures } from '../../contexts/FeatureContext';
@@ -63,7 +63,7 @@ const EMPTY_FORM: FormData = {
   tiktok: '',
 };
 
-export default function AffiliatePage() {
+function AffiliatePageContent() {
   const { store } = useStore();
   const { isEnabled } = useFeatures();
   const storeId = store?.id;
@@ -314,5 +314,19 @@ export default function AffiliatePage() {
         )}
       </div>
     </main>
+  );
+}
+
+export default function AffiliatePage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen flex items-center justify-center bg-background">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        </main>
+      }
+    >
+      <AffiliatePageContent />
+    </Suspense>
   );
 }
