@@ -2,9 +2,6 @@
 const nextConfig = {
   reactStrictMode: true,
 
-  // Enable standalone output for containerized deployment
-  output: 'standalone',
-
   transpilePackages: ['@force/ui', '@force/shared'],
 
   images: {
