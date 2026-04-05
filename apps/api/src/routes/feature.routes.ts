@@ -94,7 +94,7 @@ router.put(
           success: false,
           error: {
             code: 'VALIDATION_ERROR',
-            message: parsed.error.errors[0]?.message ?? 'Invalid request body',
+            message: parsed.error.issues[0]?.message ?? 'Invalid request body',
           },
         });
         return;

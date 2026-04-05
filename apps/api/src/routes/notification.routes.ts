@@ -15,7 +15,7 @@ const router = Router();
 
 const upsertConfigSchema = z.object({
   provider: z.string().min(1),
-  credentials: z.record(z.unknown()),
+  credentials: z.record(z.string(), z.unknown()),
   enabled: z.boolean(),
 });
 

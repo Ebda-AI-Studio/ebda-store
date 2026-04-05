@@ -22,12 +22,12 @@ const createStoreSchema = z.object({
     .regex(/^[a-z0-9-]+$/)
     .optional(),
   domain: z.string().optional(),
-  settings: z.record(z.any()).optional(),
+  settings: z.record(z.string(), z.any()).optional(),
 });
 
 const updateStoreSchema = createStoreSchema.partial();
 
-const themeSchema = z.record(z.unknown()).refine(
+const themeSchema = z.record(z.string(), z.unknown()).refine(
   data => {
     // Validate known string fields have reasonable lengths
     const stringFields = [
@@ -121,7 +121,7 @@ const announcementSchema = z
   })
   .strip();
 
-const marketingPixelsSchema = z.record(z.unknown());
+const marketingPixelsSchema = z.record(z.string(), z.unknown());
 
 /**
  * @swagger
@@ -292,7 +292,10 @@ router.post(
     try {
       const data = createStoreSchema.parse(req.body);
 
-      const store = await StoreService.create(getAuthUser(req).userId, data);
+      const store = await StoreService.create(getAuthUser(req).userId, {
+        ...data,
+        settings: data.settings as Prisma.InputJsonValue,
+      });
 
       res.status(201).json({
         success: true,
@@ -315,7 +318,10 @@ router.put(
       const { id } = req.params;
       const data = updateStoreSchema.parse(req.body);
 
-      const store = await StoreService.update(id, data);
+      const store = await StoreService.update(id, {
+        ...data,
+        settings: data.settings as Prisma.InputJsonValue,
+      });
 
       res.json({
         success: true,

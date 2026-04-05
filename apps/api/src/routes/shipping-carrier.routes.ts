@@ -15,8 +15,8 @@ const router = Router();
 const carrierConfigSchema = z.object({
   enabled: z.boolean(),
   isDefault: z.boolean().optional(),
-  credentials: z.record(z.string()),
-  settings: z.record(z.unknown()).optional(),
+  credentials: z.record(z.string(), z.string()),
+  settings: z.record(z.string(), z.unknown()).optional(),
 });
 
 const shipOrderSchema = z.object({
