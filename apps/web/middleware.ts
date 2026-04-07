@@ -82,6 +82,12 @@ function extractStoreSlug(pathname: string): { slug: string; rewrittenPath: stri
     return null;
   }
 
+  // Skip anything that looks like a file (contains a dot) — e.g.
+  // robots.txt, sitemap.xml, favicon.ico, manifest.webmanifest, *.js
+  if (firstSegment.includes('.')) {
+    return null;
+  }
+
   // The first segment is a potential store slug
   const remainingSegments = segments.slice(1);
   const rewrittenPath = '/' + remainingSegments.join('/') || '/';
