@@ -7,6 +7,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 
 const DISMISSED_KEY = 'push-dismissed';
 const SUBSCRIBED_KEY = 'push-subscribed';
+const SESSION_SEEN_KEY = 'push-seen-this-session';
 
 export function PushNotificationPrompt() {
   const { isEnabled } = useFeatures();
@@ -18,26 +19,35 @@ export function PushNotificationPrompt() {
     // Feature guard
     if (!isEnabled('push_notifications')) return;
 
+    // Push won't work without a VAPID key — don't nag the user
+    if (!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) return;
+
     // Already dismissed permanently
     if (localStorage.getItem(DISMISSED_KEY)) return;
 
     // Already subscribed
     if (localStorage.getItem(SUBSCRIBED_KEY)) return;
 
+    // Already shown this session — don't pop up on every navigation
+    if (sessionStorage.getItem(SESSION_SEEN_KEY)) return;
+
     // Browser support check
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+
+    // Permission already granted/denied means OS-level decision was made already
+    if (Notification.permission !== 'default') return;
 
     // Check if already subscribed via SW registration
     navigator.serviceWorker.ready
       .then(registration => registration.pushManager.getSubscription())
       .then(subscription => {
         if (!subscription) {
+          sessionStorage.setItem(SESSION_SEEN_KEY, '1');
           setVisible(true);
         }
       })
       .catch(() => {
-        // If SW not ready or push check fails, show prompt anyway
-        setVisible(true);
+        // SW not ready — silently skip rather than showing a broken prompt
       });
   }, [isEnabled]);
 

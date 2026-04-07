@@ -217,6 +217,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 <CartProvider>
                   <ToastProvider>
                     <div id="main-content">{children}</div>
+                    <PushNotificationPrompt />
                   </ToastProvider>
                 </CartProvider>
               </LanguageProvider>
@@ -225,7 +226,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <MarketingPixelsProvider pixels={store.marketingPixels as MarketingPixels} />
             )}
             <ServiceWorkerRegistration />
-            <PushNotificationPrompt />
             <Suspense fallback={null}>
               <AffiliateTracker />
             </Suspense>
