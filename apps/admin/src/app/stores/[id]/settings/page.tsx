@@ -89,7 +89,7 @@ export default function StoreSettingsPage() {
     {
       title: 'Domain',
       description: 'Connect a custom domain to your store',
-      href: `/stores/${storeId}`,
+      href: `/stores/${storeId}/domain`,
       color: 'bg-indigo-100 text-indigo-600',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
