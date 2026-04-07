@@ -77,9 +77,6 @@
     "typescript": "^5.3.0",
     "vitest": "^4.0.18"
   },
-  "overrides": {
-    "teeny-request": "^10.1.2"
-  },
   "lint-staged": {
     "*.{ts,tsx,js,jsx}": [
       "prettier --write"

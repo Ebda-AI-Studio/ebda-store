@@ -18,8 +18,7 @@ interface ChannelConfig {
   // SMS
   appSid?: string;
   senderId?: string;
-  // Push
-  firebaseServiceAccount?: string;
+  // Push (web-push / VAPID is platform-wide — no per-store credentials)
   subscriberCount?: number;
 }
 
@@ -613,7 +612,7 @@ export default function NotificationsPage() {
                   <div>
                     <h2 className="text-lg font-semibold text-foreground">Push Notifications</h2>
                     <p className="text-sm text-muted-foreground">
-                      Web push via Firebase Cloud Messaging
+                      Standards-based Web Push (W3C Push API)
                     </p>
                   </div>
                 </div>
@@ -633,21 +632,10 @@ export default function NotificationsPage() {
                 </div>
               </div>
 
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-muted-foreground mb-2">
-                  Firebase Service Account JSON
-                </label>
-                <textarea
-                  value={configs.push_notifications.firebaseServiceAccount || ''}
-                  onChange={e =>
-                    updateConfig('push_notifications', { firebaseServiceAccount: e.target.value })
-                  }
-                  placeholder="Paste your Firebase service account JSON here…"
-                  rows={6}
-                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 font-mono text-sm resize-y"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Download from Firebase Console → Project Settings → Service Accounts
+              <div className="mb-4 p-4 bg-muted/50 border border-border rounded-lg">
+                <p className="text-sm text-muted-foreground">
+                  Push notifications use the platform VAPID configuration. No per-store setup needed
+                  — just toggle Enabled.
                 </p>
               </div>
 

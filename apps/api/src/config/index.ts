@@ -99,6 +99,11 @@ export const config = {
   storagePublicUrl: process.env.STORAGE_PUBLIC_URL || '',
   whatsappVerifyToken: process.env.WHATSAPP_VERIFY_TOKEN || '',
 
+  // Web Push (VAPID) - platform-wide keys for standards-based Web Push (RFC 8030)
+  vapidPublicKey: process.env.VAPID_PUBLIC_KEY || '',
+  vapidPrivateKey: process.env.VAPID_PRIVATE_KEY || '',
+  vapidSubject: process.env.VAPID_SUBJECT || 'mailto:contact@forcemediakw.com',
+
   // Email
   smtpHost: process.env.SMTP_HOST || 'localhost',
   smtpPort: parseInt(process.env.SMTP_PORT || '1025', 10),
