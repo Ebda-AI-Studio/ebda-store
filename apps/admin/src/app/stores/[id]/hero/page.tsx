@@ -1,0 +1,267 @@
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+import { useParams } from 'next/navigation';
+import Link from 'next/link';
+import { AdminLayout } from '../../../../components/AdminLayout';
+import { ImageUpload } from '../../../../components/ImageUpload';
+import { useToast } from '@force/ui';
+import { apiGet, apiPut } from '../../../../lib/api';
+
+interface StoreHero {
+  id: string;
+  name: string;
+  heroTitle?: string | null;
+  heroTitleAr?: string | null;
+  heroSubtitle?: string | null;
+  heroSubtitleAr?: string | null;
+  heroCtaText?: string | null;
+  heroCtaTextAr?: string | null;
+  heroCtaLink?: string | null;
+  heroImage?: string | null;
+}
+
+export default function StoreHeroPage() {
+  const params = useParams();
+  const storeId = params?.id as string;
+  const toast = useToast();
+
+  const [hero, setHero] = useState<StoreHero | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const fetchHero = useCallback(async () => {
+    try {
+      const { data, error } = await apiGet<{ store: StoreHero }>(`/api/v1/stores/${storeId}`);
+
+      if (error) {
+        toast.error('Failed to load hero', error.message || `Server error: ${error.status}`);
+        return;
+      }
+
+      if (data?.store) {
+        setHero({
+          id: data.store.id,
+          name: data.store.name,
+          heroTitle: data.store.heroTitle ?? '',
+          heroTitleAr: data.store.heroTitleAr ?? '',
+          heroSubtitle: data.store.heroSubtitle ?? '',
+          heroSubtitleAr: data.store.heroSubtitleAr ?? '',
+          heroCtaText: data.store.heroCtaText ?? '',
+          heroCtaTextAr: data.store.heroCtaTextAr ?? '',
+          heroCtaLink: data.store.heroCtaLink ?? '',
+          heroImage: data.store.heroImage ?? '',
+        });
+      }
+    } catch (err) {
+      console.error('Failed to fetch hero:', err);
+      toast.error('Connection error', 'Failed to connect to the server');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [storeId, toast]);
+
+  useEffect(() => {
+    fetchHero();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeId]);
+
+  async function handleSave() {
+    if (!hero) return;
+    setIsSaving(true);
+    try {
+      const { error } = await apiPut(`/api/v1/stores/${storeId}`, {
+        heroTitle: hero.heroTitle || null,
+        heroTitleAr: hero.heroTitleAr || null,
+        heroSubtitle: hero.heroSubtitle || null,
+        heroSubtitleAr: hero.heroSubtitleAr || null,
+        heroCtaText: hero.heroCtaText || null,
+        heroCtaTextAr: hero.heroCtaTextAr || null,
+        heroCtaLink: hero.heroCtaLink || null,
+        heroImage: hero.heroImage || null,
+      });
+
+      if (error) {
+        if (error.status === 403) {
+          toast.error('Access denied', 'You do not have permission to update this store');
+        } else if (error.status === 401) {
+          toast.error('Session expired', 'Please log in again');
+        } else {
+          toast.error('Failed to save hero', error.message || 'Server error');
+        }
+        return;
+      }
+
+      toast.success('Hero saved', 'Your homepage hero has been updated');
+    } catch (err) {
+      console.error('Failed to save hero:', err);
+      toast.error('Connection error', 'Failed to connect to the server. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <AdminLayout
+        title="Hero Section"
+        subtitle="Customize your storefront homepage hero"
+        mode="store_admin"
+        storeId={storeId}
+      >
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  if (!hero) {
+    return (
+      <AdminLayout
+        title="Hero Section"
+        subtitle="Customize your storefront homepage hero"
+        mode="store_admin"
+        storeId={storeId}
+      >
+        <div className="text-center py-12">
+          <p className="text-muted-foreground">Store not found</p>
+          <Link href="/stores" className="text-primary hover:underline mt-2 inline-block">
+            Back to stores
+          </Link>
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  return (
+    <AdminLayout
+      title="Hero Section"
+      subtitle="Customize your storefront homepage hero"
+      mode="store_admin"
+      storeId={storeId}
+      actions={
+        <button
+          onClick={handleSave}
+          disabled={isSaving}
+          className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 font-medium"
+        >
+          {isSaving ? 'Saving...' : 'Save Changes'}
+        </button>
+      }
+    >
+      <div className="space-y-6">
+        <div className="bg-card rounded-xl border p-6 space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">
+                Title (English)
+              </label>
+              <input
+                type="text"
+                value={hero.heroTitle || ''}
+                onChange={e => setHero({ ...hero, heroTitle: e.target.value })}
+                placeholder="Shop the Future of E-Commerce"
+                className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">
+                Title (Arabic)
+              </label>
+              <input
+                type="text"
+                dir="rtl"
+                value={hero.heroTitleAr || ''}
+                onChange={e => setHero({ ...hero, heroTitleAr: e.target.value })}
+                placeholder="اكتشف مجموعتنا"
+                className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">
+                Subtitle (English)
+              </label>
+              <textarea
+                value={hero.heroSubtitle || ''}
+                onChange={e => setHero({ ...hero, heroSubtitle: e.target.value })}
+                rows={3}
+                placeholder="Premium products, fast delivery, and secure payments"
+                className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">
+                Subtitle (Arabic)
+              </label>
+              <textarea
+                dir="rtl"
+                value={hero.heroSubtitleAr || ''}
+                onChange={e => setHero({ ...hero, heroSubtitleAr: e.target.value })}
+                rows={3}
+                placeholder="أفضل المنتجات بأفضل الأسعار"
+                className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">
+                CTA Button Text (English)
+              </label>
+              <input
+                type="text"
+                value={hero.heroCtaText || ''}
+                onChange={e => setHero({ ...hero, heroCtaText: e.target.value })}
+                placeholder="Shop Now"
+                className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">
+                CTA Button Text (Arabic)
+              </label>
+              <input
+                type="text"
+                dir="rtl"
+                value={hero.heroCtaTextAr || ''}
+                onChange={e => setHero({ ...hero, heroCtaTextAr: e.target.value })}
+                placeholder="تسوق الآن"
+                className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">CTA Link</label>
+              <input
+                type="text"
+                value={hero.heroCtaLink || ''}
+                onChange={e => setHero({ ...hero, heroCtaLink: e.target.value })}
+                placeholder="/products"
+                className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">Hero Image</label>
+            <ImageUpload
+              value={hero.heroImage || undefined}
+              onUpload={url => setHero({ ...hero, heroImage: url })}
+              onRemove={() => setHero({ ...hero, heroImage: '' })}
+              folder="hero"
+              label="Upload Hero Image"
+              accept="image/jpeg,image/png,image/webp"
+            />
+            <p className="mt-2 text-xs text-muted-foreground">
+              Recommended: 1200x900px, JPG or PNG. Leave empty to use the default visual.
+            </p>
+          </div>
+        </div>
+      </div>
+    </AdminLayout>
+  );
+}

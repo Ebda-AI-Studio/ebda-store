@@ -25,7 +25,19 @@ const createStoreSchema = z.object({
   settings: z.record(z.string(), z.any()).optional(),
 });
 
-const updateStoreSchema = createStoreSchema.partial();
+const heroNullableStr = (maxLen: number) =>
+  z.preprocess(v => (v === '' ? null : v), z.string().max(maxLen).nullable().optional());
+
+const updateStoreSchema = createStoreSchema.partial().extend({
+  heroTitle: heroNullableStr(200),
+  heroTitleAr: heroNullableStr(200),
+  heroSubtitle: heroNullableStr(500),
+  heroSubtitleAr: heroNullableStr(500),
+  heroCtaText: heroNullableStr(100),
+  heroCtaTextAr: heroNullableStr(100),
+  heroCtaLink: heroNullableStr(500),
+  heroImage: heroNullableStr(1000),
+});
 
 const themeSchema = z.record(z.string(), z.unknown()).refine(
   data => {

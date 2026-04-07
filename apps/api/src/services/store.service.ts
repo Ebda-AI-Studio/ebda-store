@@ -11,7 +11,16 @@ interface CreateStoreData {
   settings?: Prisma.InputJsonValue;
 }
 
-type UpdateStoreData = Partial<CreateStoreData>;
+type UpdateStoreData = Partial<CreateStoreData> & {
+  heroTitle?: string | null;
+  heroTitleAr?: string | null;
+  heroSubtitle?: string | null;
+  heroSubtitleAr?: string | null;
+  heroCtaText?: string | null;
+  heroCtaTextAr?: string | null;
+  heroCtaLink?: string | null;
+  heroImage?: string | null;
+};
 
 export class StoreService {
   /**
@@ -212,6 +221,14 @@ export class StoreService {
         slug: data.slug,
         domain: data.domain,
         settings: mergedSettings,
+        ...(data.heroTitle !== undefined && { heroTitle: data.heroTitle }),
+        ...(data.heroTitleAr !== undefined && { heroTitleAr: data.heroTitleAr }),
+        ...(data.heroSubtitle !== undefined && { heroSubtitle: data.heroSubtitle }),
+        ...(data.heroSubtitleAr !== undefined && { heroSubtitleAr: data.heroSubtitleAr }),
+        ...(data.heroCtaText !== undefined && { heroCtaText: data.heroCtaText }),
+        ...(data.heroCtaTextAr !== undefined && { heroCtaTextAr: data.heroCtaTextAr }),
+        ...(data.heroCtaLink !== undefined && { heroCtaLink: data.heroCtaLink }),
+        ...(data.heroImage !== undefined && { heroImage: data.heroImage }),
       },
       include: {
         owner: {

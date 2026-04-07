@@ -127,6 +127,15 @@ model Store {
   logo        String?
   logoAr      String?     @map("logo_ar")
   favicon     String?
+  // Hero customization
+  heroTitle         String?  @map("hero_title")
+  heroTitleAr       String?  @map("hero_title_ar")
+  heroSubtitle      String?  @map("hero_subtitle")
+  heroSubtitleAr    String?  @map("hero_subtitle_ar")
+  heroCtaText       String?  @map("hero_cta_text")
+  heroCtaTextAr     String?  @map("hero_cta_text_ar")
+  heroCtaLink       String?  @map("hero_cta_link")
+  heroImage         String?  @map("hero_image")
   description String?
   descriptionAr String?   @map("description_ar")
   currency    String      @default("KWD")

@@ -77,6 +77,14 @@ export interface StoreData {
   metaDescriptionAr?: string;
   settings?: Record<string, unknown>;
   enabledFeatures?: string[];
+  heroTitle?: string | null;
+  heroTitleAr?: string | null;
+  heroSubtitle?: string | null;
+  heroSubtitleAr?: string | null;
+  heroCtaText?: string | null;
+  heroCtaTextAr?: string | null;
+  heroCtaLink?: string | null;
+  heroImage?: string | null;
 }
 
 interface StoreContextValue {

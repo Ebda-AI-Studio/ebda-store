@@ -132,6 +132,17 @@ export default function HomePage() {
   const templateProducts = featuredProducts.map(toTemplateProduct);
   const templateCategories = categories.map(toTemplateCategory);
 
+  // Hero customization (per-store, with fallbacks)
+  const heroTitleEn = store.heroTitle || 'Shop the Future of E-Commerce';
+  const heroTitleArVal = store.heroTitleAr || 'اكتشف مجموعتنا';
+  const heroSubtitleEn =
+    store.heroSubtitle || 'Premium products, fast delivery, and secure payments in Kuwait';
+  const heroSubtitleArVal = store.heroSubtitleAr || 'أفضل المنتجات بأفضل الأسعار في الكويت';
+  const heroCtaEn = store.heroCtaText || 'Shop Now';
+  const heroCtaArVal = store.heroCtaTextAr || 'تسوق الآن';
+  const heroCtaLink = store.heroCtaLink ? storeUrl(store.heroCtaLink) : storeUrl('/products');
+  const heroImage = store.heroImage || undefined;
+
   // If template components are loaded, use them
   if (T && !templateLoading) {
     return (
@@ -161,17 +172,14 @@ export default function HomePage() {
         )}
 
         <T.Hero
-          title={isRtl ? 'اكتشف مجموعتنا' : 'Shop the Future of E-Commerce'}
-          titleAr="اكتشف مجموعتنا"
-          subtitle={
-            isRtl
-              ? 'أفضل المنتجات بأفضل الأسعار في الكويت'
-              : 'Premium products, fast delivery, and secure payments in Kuwait'
-          }
-          subtitleAr="أفضل المنتجات بأفضل الأسعار في الكويت"
-          ctaText="Shop Now"
-          ctaTextAr="تسوق الآن"
-          ctaLink={storeUrl('/products')}
+          title={heroTitleEn}
+          titleAr={heroTitleArVal}
+          subtitle={heroSubtitleEn}
+          subtitleAr={heroSubtitleArVal}
+          image={heroImage}
+          ctaText={heroCtaEn}
+          ctaTextAr={heroCtaArVal}
+          ctaLink={heroCtaLink}
           isRtl={isRtl}
         />
 
@@ -275,20 +283,15 @@ export default function HomePage() {
           <div className="grid gap-12 lg:grid-cols-2 lg:gap-8 items-center">
             <div className="text-center lg:text-left animate-slide-up">
               <h1 className="text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl lg:text-6xl leading-[1.15]">
-                <span className="block">{isRtl ? 'اكتشف مجموعتنا' : 'Shop the Future'}</span>
-                <span className="mt-2 block bg-gradient-to-r from-primary via-primary/70 to-primary bg-clip-text text-transparent leading-[1.15] pb-2">
-                  {isRtl ? 'من التجارة الإلكترونية' : 'of E-Commerce'}
-                </span>
+                <span className="block">{isRtl ? heroTitleArVal : heroTitleEn}</span>
               </h1>
               <p className="mx-auto mt-6 max-w-xl text-lg text-muted-foreground lg:mx-0">
-                {isRtl
-                  ? 'أفضل المنتجات بأفضل الأسعار في الكويت'
-                  : "Discover Kuwait's premier online shopping destination. Premium products, fast delivery, and secure payments."}
+                {isRtl ? heroSubtitleArVal : heroSubtitleEn}
               </p>
               <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:justify-center lg:justify-start">
-                <Link href={storeUrl('/products')}>
+                <Link href={heroCtaLink}>
                   <Button size="lg" className="w-full gap-2 shadow-lg shadow-primary/25 sm:w-auto">
-                    {isRtl ? 'تسوق الآن' : 'Shop Now'}
+                    {isRtl ? heroCtaArVal : heroCtaEn}
                   </Button>
                 </Link>
                 <Link href={storeUrl('/categories')}>
@@ -303,28 +306,39 @@ export default function HomePage() {
               <div className="relative mx-auto w-full max-w-lg">
                 <div className="relative z-10 rounded-3xl bg-card p-6 shadow-2xl">
                   <div className="aspect-square overflow-hidden rounded-2xl bg-gradient-to-br from-primary/5 to-primary/10">
-                    <div className="flex h-full items-center justify-center">
-                      <div className="text-center">
-                        <div className="mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-full bg-primary/20">
-                          <svg
-                            className="h-12 w-12 text-primary"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={1.5}
-                              d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                            />
-                          </svg>
+                    {heroImage ? (
+                      <Image
+                        src={heroImage}
+                        alt={isRtl ? heroTitleArVal : heroTitleEn}
+                        width={600}
+                        height={600}
+                        className="h-full w-full object-cover"
+                        priority
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center">
+                        <div className="text-center">
+                          <div className="mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-full bg-primary/20">
+                            <svg
+                              className="h-12 w-12 text-primary"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={1.5}
+                                d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                              />
+                            </svg>
+                          </div>
+                          <span className="text-lg font-medium text-muted-foreground">
+                            {isRtl ? 'المنتجات المميزة' : 'Featured Products'}
+                          </span>
                         </div>
-                        <span className="text-lg font-medium text-muted-foreground">
-                          {isRtl ? 'المنتجات المميزة' : 'Featured Products'}
-                        </span>
                       </div>
-                    </div>
+                    )}
                   </div>
                 </div>
                 <div className="absolute -bottom-6 -left-6 h-full w-full rounded-3xl bg-primary/10" />

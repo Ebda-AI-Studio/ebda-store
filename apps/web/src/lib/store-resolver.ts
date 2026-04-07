@@ -56,6 +56,16 @@ export interface ResolvedStore {
 
   // Feature flags
   enabledFeatures?: string[];
+
+  // Hero customization
+  heroTitle?: string | null;
+  heroTitleAr?: string | null;
+  heroSubtitle?: string | null;
+  heroSubtitleAr?: string | null;
+  heroCtaText?: string | null;
+  heroCtaTextAr?: string | null;
+  heroCtaLink?: string | null;
+  heroImage?: string | null;
 }
 
 /**
@@ -71,6 +81,14 @@ const DEFAULT_STORE: ResolvedStore = {
   template: 'modern',
   theme: DEFAULT_THEME,
   socialLinks: {},
+  heroTitle: null,
+  heroTitleAr: null,
+  heroSubtitle: null,
+  heroSubtitleAr: null,
+  heroCtaText: null,
+  heroCtaTextAr: null,
+  heroCtaLink: null,
+  heroImage: null,
 };
 
 // Simple in-memory cache for store resolution
@@ -166,6 +184,14 @@ async function fetchStoreByDomain(domain: string): Promise<ResolvedStore | null>
         typeof storeData.marketingPixels === 'object' ? storeData.marketingPixels : undefined,
       settings: typeof storeData.settings === 'object' ? storeData.settings : undefined,
       enabledFeatures,
+      heroTitle: storeData.heroTitle ?? null,
+      heroTitleAr: storeData.heroTitleAr ?? null,
+      heroSubtitle: storeData.heroSubtitle ?? null,
+      heroSubtitleAr: storeData.heroSubtitleAr ?? null,
+      heroCtaText: storeData.heroCtaText ?? null,
+      heroCtaTextAr: storeData.heroCtaTextAr ?? null,
+      heroCtaLink: storeData.heroCtaLink ?? null,
+      heroImage: storeData.heroImage ?? null,
     };
   } catch (error) {
     console.error(`Error fetching store for domain ${domain}:`, error);
@@ -257,6 +283,14 @@ async function fetchStoreBySlug(slug: string): Promise<ResolvedStore | null> {
         typeof storeData.marketingPixels === 'object' ? storeData.marketingPixels : undefined,
       settings: typeof storeData.settings === 'object' ? storeData.settings : undefined,
       enabledFeatures,
+      heroTitle: storeData.heroTitle ?? null,
+      heroTitleAr: storeData.heroTitleAr ?? null,
+      heroSubtitle: storeData.heroSubtitle ?? null,
+      heroSubtitleAr: storeData.heroSubtitleAr ?? null,
+      heroCtaText: storeData.heroCtaText ?? null,
+      heroCtaTextAr: storeData.heroCtaTextAr ?? null,
+      heroCtaLink: storeData.heroCtaLink ?? null,
+      heroImage: storeData.heroImage ?? null,
     };
   } catch (error) {
     console.error(`Error fetching store for slug ${slug}:`, error);
@@ -373,6 +407,14 @@ export async function getStoreById(storeId: string): Promise<ResolvedStore | nul
       marketingPixels:
         typeof storeData.marketingPixels === 'object' ? storeData.marketingPixels : undefined,
       settings: typeof storeData.settings === 'object' ? storeData.settings : undefined,
+      heroTitle: storeData.heroTitle ?? null,
+      heroTitleAr: storeData.heroTitleAr ?? null,
+      heroSubtitle: storeData.heroSubtitle ?? null,
+      heroSubtitleAr: storeData.heroSubtitleAr ?? null,
+      heroCtaText: storeData.heroCtaText ?? null,
+      heroCtaTextAr: storeData.heroCtaTextAr ?? null,
+      heroCtaLink: storeData.heroCtaLink ?? null,
+      heroImage: storeData.heroImage ?? null,
     };
   } catch (error) {
     console.error(`Error fetching store ${storeId}:`, error);
