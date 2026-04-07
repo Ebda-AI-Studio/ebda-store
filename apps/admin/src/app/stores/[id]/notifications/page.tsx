@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
-import { useToast } from '@force/ui';
+import { Button, useToast } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPut, apiPost } from '../../../../lib/api';
 import { useFeatures } from '../../../../hooks/useFeatures';
@@ -115,11 +115,11 @@ const DEFAULT_EVENTS: EventConfig[] = [
 
 function StatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
-    sent: 'bg-green-100 text-green-700',
-    delivered: 'bg-green-100 text-green-700',
-    failed: 'bg-red-100 text-red-700',
-    pending: 'bg-yellow-100 text-yellow-700',
-    queued: 'bg-blue-100 text-blue-700',
+    sent: 'bg-[hsl(var(--success)/0.1)] text-[hsl(var(--success))]',
+    delivered: 'bg-[hsl(var(--success)/0.1)] text-[hsl(var(--success))]',
+    failed: 'bg-destructive/10 text-destructive',
+    pending: 'bg-muted text-muted-foreground',
+    queued: 'bg-primary/10 text-primary',
   };
   const cls = colors[status] || 'bg-muted text-foreground';
   return (
@@ -147,8 +147,8 @@ function Toggle({
       aria-checked={checked}
       onClick={() => !disabled && onChange(!checked)}
       disabled={disabled}
-      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 disabled:opacity-50 ${
-        checked ? 'bg-orange-500' : 'bg-muted'
+      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 ${
+        checked ? 'bg-primary' : 'bg-muted'
       }`}
     >
       <span
@@ -173,7 +173,7 @@ function ConnectionStatus({ status }: { status: 'idle' | 'testing' | 'success' |
     );
   if (status === 'success')
     return (
-      <span className="flex items-center gap-1.5 text-sm text-green-600">
+      <span className="flex items-center gap-1.5 text-sm text-[hsl(var(--success))]">
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
         </svg>
@@ -181,7 +181,7 @@ function ConnectionStatus({ status }: { status: 'idle' | 'testing' | 'success' |
       </span>
     );
   return (
-    <span className="flex items-center gap-1.5 text-sm text-red-600">
+    <span className="flex items-center gap-1.5 text-sm text-destructive">
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path
           strokeLinecap="round"
@@ -385,14 +385,14 @@ export default function NotificationsPage() {
     >
       {loading ? (
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500" />
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
         </div>
       ) : !anyChannelEnabled ? (
         // ── Empty state ──────────────────────────────────────────────────────
         <div className="flex flex-col items-center justify-center py-24 text-center">
-          <div className="w-16 h-16 bg-teal-100 rounded-full flex items-center justify-center mb-4">
+          <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
             <svg
-              className="w-8 h-8 text-teal-600"
+              className="w-8 h-8 text-primary"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -451,7 +451,7 @@ export default function NotificationsPage() {
                     value={configs.whatsapp.phoneNumberId || ''}
                     onChange={e => updateConfig('whatsapp', { phoneNumberId: e.target.value })}
                     placeholder="e.g. 123456789012345"
-                    className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                    className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   />
                 </div>
                 <div>
@@ -463,7 +463,7 @@ export default function NotificationsPage() {
                     value={configs.whatsapp.wabaId || ''}
                     onChange={e => updateConfig('whatsapp', { wabaId: e.target.value })}
                     placeholder="WhatsApp Business Account ID"
-                    className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                    className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   />
                 </div>
                 <div className="md:col-span-2">
@@ -475,29 +475,30 @@ export default function NotificationsPage() {
                     value={configs.whatsapp.accessToken || ''}
                     onChange={e => updateConfig('whatsapp', { accessToken: e.target.value })}
                     placeholder="Meta permanent access token"
-                    className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                    className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   />
                 </div>
               </div>
 
               <div className="flex items-center gap-3">
-                <button
+                <Button
                   onClick={() => handleSaveChannel('whatsapp')}
                   disabled={savingChannel === 'whatsapp'}
-                  className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
+                  size="sm"
                 >
                   {savingChannel === 'whatsapp' && (
-                    <span className="animate-spin inline-block h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                    <span className="animate-spin inline-block h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
                   )}
                   Save
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => handleTestConnection('whatsapp')}
                   disabled={testingChannel === 'whatsapp'}
-                  className="px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-muted transition-colors disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
                 >
                   Test Connection
-                </button>
+                </Button>
                 <ConnectionStatus status={testStatus.whatsapp} />
               </div>
             </div>
@@ -549,7 +550,7 @@ export default function NotificationsPage() {
                     value={configs.sms.appSid || ''}
                     onChange={e => updateConfig('sms', { appSid: e.target.value })}
                     placeholder="Unifonic App SID"
-                    className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                    className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   />
                 </div>
                 <div>
@@ -561,29 +562,30 @@ export default function NotificationsPage() {
                     value={configs.sms.senderId || ''}
                     onChange={e => updateConfig('sms', { senderId: e.target.value })}
                     placeholder="e.g. MyStore"
-                    className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                    className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   />
                 </div>
               </div>
 
               <div className="flex items-center gap-3">
-                <button
+                <Button
                   onClick={() => handleSaveChannel('sms')}
                   disabled={savingChannel === 'sms'}
-                  className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
+                  size="sm"
                 >
                   {savingChannel === 'sms' && (
-                    <span className="animate-spin inline-block h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                    <span className="animate-spin inline-block h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
                   )}
                   Save
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => handleTestConnection('sms')}
                   disabled={testingChannel === 'sms'}
-                  className="px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-muted transition-colors disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
                 >
                   Test Connection
-                </button>
+                </Button>
                 <ConnectionStatus status={testStatus.sms} />
               </div>
             </div>
@@ -640,23 +642,24 @@ export default function NotificationsPage() {
               </div>
 
               <div className="flex items-center gap-3">
-                <button
+                <Button
                   onClick={() => handleSaveChannel('push_notifications')}
                   disabled={savingChannel === 'push_notifications'}
-                  className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
+                  size="sm"
                 >
                   {savingChannel === 'push_notifications' && (
-                    <span className="animate-spin inline-block h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                    <span className="animate-spin inline-block h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
                   )}
                   Save
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => handleTestConnection('push_notifications')}
                   disabled={testingChannel === 'push_notifications'}
-                  className="px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-muted transition-colors disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
                 >
                   Test Connection
-                </button>
+                </Button>
                 <ConnectionStatus status={testStatus.push_notifications} />
               </div>
             </div>
@@ -705,7 +708,7 @@ export default function NotificationsPage() {
                             type="checkbox"
                             checked={ev.whatsapp}
                             onChange={() => toggleEventChannel(idx, 'whatsapp')}
-                            className="h-4 w-4 rounded border-border text-orange-500 focus:ring-orange-500"
+                            className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
                           />
                         </td>
                       )}
@@ -715,7 +718,7 @@ export default function NotificationsPage() {
                             type="checkbox"
                             checked={ev.sms}
                             onChange={() => toggleEventChannel(idx, 'sms')}
-                            className="h-4 w-4 rounded border-border text-orange-500 focus:ring-orange-500"
+                            className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
                           />
                         </td>
                       )}
@@ -725,7 +728,7 @@ export default function NotificationsPage() {
                             type="checkbox"
                             checked={ev.push_notifications}
                             onChange={() => toggleEventChannel(idx, 'push_notifications')}
-                            className="h-4 w-4 rounded border-border text-orange-500 focus:ring-orange-500"
+                            className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
                           />
                         </td>
                       )}
@@ -736,16 +739,12 @@ export default function NotificationsPage() {
             </div>
 
             <div className="px-6 py-4 border-t border-border flex justify-end">
-              <button
-                onClick={handleSaveEvents}
-                disabled={savingEvents}
-                className="px-6 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
-              >
+              <Button onClick={handleSaveEvents} disabled={savingEvents} size="sm">
                 {savingEvents && (
-                  <span className="animate-spin inline-block h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                  <span className="animate-spin inline-block h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
                 )}
                 Save Event Config
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -766,7 +765,7 @@ export default function NotificationsPage() {
                     setLogsPage(1);
                   }}
                   aria-label="Filter by channel"
-                  className="px-3 py-1.5 text-sm border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="px-3 py-1.5 text-sm border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                 >
                   <option value="all">All channels</option>
                   {whatsappEnabled && <option value="whatsapp">WhatsApp</option>}
@@ -780,7 +779,7 @@ export default function NotificationsPage() {
                     setLogsPage(1);
                   }}
                   aria-label="Filter by status"
-                  className="px-3 py-1.5 text-sm border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="px-3 py-1.5 text-sm border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                 >
                   <option value="all">All statuses</option>
                   <option value="sent">Sent</option>
@@ -852,7 +851,7 @@ export default function NotificationsPage() {
                             <StatusBadge status={log.status} />
                             {log.error && (
                               <p
-                                className="text-xs text-red-500 mt-1 truncate max-w-[200px]"
+                                className="text-xs text-destructive mt-1 truncate max-w-[200px]"
                                 title={log.error}
                               >
                                 {log.error}
@@ -872,20 +871,22 @@ export default function NotificationsPage() {
                       Page {logsPage} of {logsPages} ({logsTotal} total)
                     </p>
                     <div className="flex items-center gap-2">
-                      <button
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={() => setLogsPage(p => Math.max(1, p - 1))}
                         disabled={logsPage === 1}
-                        className="px-3 py-1.5 text-sm border border-border rounded-lg hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Previous
-                      </button>
-                      <button
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={() => setLogsPage(p => Math.min(logsPages, p + 1))}
                         disabled={logsPage === logsPages}
-                        className="px-3 py-1.5 text-sm border border-border rounded-lg hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Next
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 )}
