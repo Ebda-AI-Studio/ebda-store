@@ -140,7 +140,7 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
       })
     );
 
-    res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
+    res.setHeader('Cache-Control', 'private, max-age=60');
     res.json({
       success: true,
       data: result,
@@ -163,7 +163,7 @@ router.get('/products/:slugOrId', async (req: Request, res: Response, next: Next
       ? await ProductService.getPublicById(storeId, slugOrId)
       : await ProductService.getPublicBySlug(storeId, slugOrId);
 
-    res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
+    res.setHeader('Cache-Control', 'private, max-age=60');
     res.json({
       success: true,
       data: { product },
@@ -181,7 +181,7 @@ router.get('/categories', async (req: Request, res: Response, next: NextFunction
       ProductService.getCategories(storeId)
     );
 
-    res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
+    res.setHeader('Cache-Control', 'private, max-age=60');
     res.json({
       success: true,
       data: { categories },
@@ -525,7 +525,7 @@ router.get('/stores', async (req: Request, res: Response, next: NextFunction) =>
       }),
     ]);
 
-    res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
+    res.setHeader('Cache-Control', 'private, max-age=60');
     res.json({
       success: true,
       data: stores,
@@ -604,7 +604,7 @@ router.get('/stores/:slugOrId', async (req: Request, res: Response, next: NextFu
       return;
     }
 
-    res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
+    res.setHeader('Cache-Control', 'private, max-age=60');
     res.json({
       success: true,
       data: result,
@@ -665,7 +665,7 @@ router.get('/store', async (_req: Request, res: Response, next: NextFunction) =>
       );
     }
 
-    res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
+    res.setHeader('Cache-Control', 'private, max-age=60');
     res.json({
       success: true,
       data: { store },
@@ -739,7 +739,7 @@ router.get(
 
       const enabledFeatures = await featureService.getEnabledFeatureKeys(store.id);
 
-      res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
+      res.setHeader('Cache-Control', 'private, max-age=60');
       res.json({
         success: true,
         data: { store, enabledFeatures },
