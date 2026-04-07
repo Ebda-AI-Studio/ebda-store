@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Button } from '@force/ui';
 import { useStore } from '../contexts/StoreContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import { API_URL } from '../lib/api';
 
 interface Review {
@@ -101,6 +102,7 @@ function getReviewerName(review: Review): string {
 
 export default function ReviewSection({ storeId, productId }: Props) {
   const { store } = useStore();
+  const { t } = useLanguage();
 
   const [reviews, setReviews] = useState<Review[]>([]);
   const [averageRating, setAverageRating] = useState<number>(0);
@@ -159,7 +161,10 @@ export default function ReviewSection({ storeId, productId }: Props) {
   async function handleSubmitReview(e: React.FormEvent) {
     e.preventDefault();
     if (rating === 0) {
-      setSubmitMessage({ type: 'error', text: 'Please select a star rating.' });
+      setSubmitMessage({
+        type: 'error',
+        text: t('Please select a star rating.', 'يرجى اختيار تقييم بالنجوم.'),
+      });
       return;
     }
 
@@ -176,7 +181,10 @@ export default function ReviewSection({ storeId, productId }: Props) {
 
       const json = await res.json();
       if (res.ok && json.success) {
-        setSubmitMessage({ type: 'success', text: 'Your review has been submitted. Thank you!' });
+        setSubmitMessage({
+          type: 'success',
+          text: t('Your review has been submitted. Thank you!', 'تم إرسال مراجعتك. شكراً لك!'),
+        });
         setRating(0);
         setComment('');
         setShowForm(false);
@@ -185,13 +193,21 @@ export default function ReviewSection({ storeId, productId }: Props) {
       } else {
         setSubmitMessage({
           type: 'error',
-          text: json.error?.message || 'Failed to submit review. Please try again.',
+          text:
+            json.error?.message ||
+            t(
+              'Failed to submit review. Please try again.',
+              'فشل إرسال المراجعة. يرجى المحاولة مرة أخرى.'
+            ),
         });
       }
     } catch {
       setSubmitMessage({
         type: 'error',
-        text: 'Failed to submit review. Please check your connection.',
+        text: t(
+          'Failed to submit review. Please check your connection.',
+          'فشل إرسال المراجعة. يرجى التحقق من اتصالك.'
+        ),
       });
     } finally {
       setIsSubmitting(false);
@@ -199,11 +215,13 @@ export default function ReviewSection({ storeId, productId }: Props) {
   }
 
   // Derive the store name for display - fallback gracefully
-  const storeName = store?.name || 'Store';
+  const storeName = store?.name || t('Store', 'المتجر');
 
   return (
     <section className="mt-16 border-t border-border pt-12">
-      <h2 className="text-2xl font-bold text-foreground">Customer Reviews</h2>
+      <h2 className="text-2xl font-bold text-foreground">
+        {t('Customer Reviews', 'مراجعات العملاء')}
+      </h2>
 
       {/* Average rating summary */}
       {!isLoading && totalCount > 0 && (
@@ -212,7 +230,10 @@ export default function ReviewSection({ storeId, productId }: Props) {
           <div>
             <StarDisplay rating={Math.round(averageRating)} size="lg" />
             <p className="mt-1 text-sm text-muted-foreground">
-              Based on {totalCount} {totalCount === 1 ? 'review' : 'reviews'}
+              {t(
+                `Based on ${totalCount} ${totalCount === 1 ? 'review' : 'reviews'}`,
+                `بناءً على ${totalCount} ${totalCount === 1 ? 'مراجعة' : 'مراجعات'}`
+              )}
             </p>
           </div>
         </div>
@@ -250,7 +271,10 @@ export default function ReviewSection({ storeId, productId }: Props) {
       {/* Empty state */}
       {!isLoading && reviews.length === 0 && (
         <p className="mt-6 text-muted-foreground">
-          No reviews yet for this product. Be the first to share your thoughts!
+          {t(
+            'No reviews yet for this product. Be the first to share your thoughts!',
+            'لا توجد مراجعات بعد لهذا المنتج. كن أول من يشارك رأيه!'
+          )}
         </p>
       )}
 
@@ -259,9 +283,9 @@ export default function ReviewSection({ storeId, productId }: Props) {
         {!isLoggedIn ? (
           <p className="text-muted-foreground">
             <Link href="/auth/login" className="font-medium text-primary hover:underline">
-              Log in
+              {t('Log in', 'تسجيل الدخول')}
             </Link>{' '}
-            to write a review.
+            {t('to write a review.', 'لكتابة مراجعة.')}
           </p>
         ) : !showForm ? (
           <div>
@@ -277,12 +301,14 @@ export default function ReviewSection({ storeId, productId }: Props) {
               </div>
             )}
             <Button onClick={() => setShowForm(true)} variant="outline">
-              Write a Review
+              {t('Write a Review', 'اكتب مراجعة')}
             </Button>
           </div>
         ) : (
           <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
-            <h3 className="text-lg font-semibold text-foreground mb-4">Write a Review</h3>
+            <h3 className="text-lg font-semibold text-foreground mb-4">
+              {t('Write a Review', 'اكتب مراجعة')}
+            </h3>
 
             {submitMessage && (
               <div
@@ -299,7 +325,7 @@ export default function ReviewSection({ storeId, productId }: Props) {
             <form onSubmit={handleSubmitReview} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
-                  Your Rating <span className="text-destructive">*</span>
+                  {t('Your Rating', 'تقييمك')} <span className="text-destructive">*</span>
                 </label>
                 <StarSelector value={rating} onChange={setRating} />
               </div>
@@ -309,21 +335,24 @@ export default function ReviewSection({ storeId, productId }: Props) {
                   htmlFor="review-comment"
                   className="block text-sm font-medium text-foreground mb-1"
                 >
-                  Your Review (optional)
+                  {t('Your Review (optional)', 'مراجعتك (اختياري)')}
                 </label>
                 <textarea
                   id="review-comment"
                   rows={4}
                   value={comment}
                   onChange={e => setComment(e.target.value)}
-                  placeholder={`Share your experience with this product from ${storeName}...`}
+                  placeholder={t(
+                    `Share your experience with this product from ${storeName}...`,
+                    `شارك تجربتك مع هذا المنتج من ${storeName}...`
+                  )}
                   className="w-full rounded-lg border border-border bg-background px-4 py-3 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
                 />
               </div>
 
               <div className="flex gap-3">
                 <Button type="submit" isLoading={isSubmitting}>
-                  Submit Review
+                  {t('Submit Review', 'إرسال المراجعة')}
                 </Button>
                 <Button
                   type="button"
@@ -335,7 +364,7 @@ export default function ReviewSection({ storeId, productId }: Props) {
                     setComment('');
                   }}
                 >
-                  Cancel
+                  {t('Cancel', 'إلغاء')}
                 </Button>
               </div>
             </form>

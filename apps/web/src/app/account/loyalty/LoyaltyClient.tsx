@@ -123,8 +123,12 @@ export default function LoyaltyClient() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Loyalty Program</h1>
-          <p className="mt-1 text-muted-foreground">Your points and rewards</p>
+          <h1 className="text-2xl font-bold text-foreground">
+            {t('Loyalty Program', 'برنامج الولاء')}
+          </h1>
+          <p className="mt-1 text-muted-foreground">
+            {t('Your points and rewards', 'نقاطك ومكافآتك')}
+          </p>
         </div>
         <div className="flex justify-center py-12">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
@@ -137,8 +141,12 @@ export default function LoyaltyClient() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Loyalty Program</h1>
-          <p className="mt-1 text-muted-foreground">Your points and rewards</p>
+          <h1 className="text-2xl font-bold text-foreground">
+            {t('Loyalty Program', 'برنامج الولاء')}
+          </h1>
+          <p className="mt-1 text-muted-foreground">
+            {t('Your points and rewards', 'نقاطك ومكافآتك')}
+          </p>
         </div>
         <div className="rounded-xl border bg-card p-10 text-center shadow-sm">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-muted">

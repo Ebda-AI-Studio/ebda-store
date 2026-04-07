@@ -104,7 +104,7 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
     <>
       <nav
         className="sticky top-0 z-50 border-b border-border/50 bg-background/95 backdrop-blur-lg"
-        aria-label="Main navigation"
+        aria-label={t('Main navigation', 'التنقل الرئيسي')}
       >
         {/* Top Bar - Optional Announcement */}
         <div className="hidden bg-primary text-center text-xs text-white sm:block">
@@ -131,7 +131,7 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
             <button
               onClick={() => setIsMobileMenuOpen(true)}
               className="flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:hidden"
-              aria-label="Open menu"
+              aria-label={t('Open menu', 'فتح القائمة')}
             >
               <svg
                 className="h-6 w-6"
@@ -147,7 +147,7 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
                   d="M4 6h16M4 12h16M4 18h16"
                 />
               </svg>
-              <span className="sr-only">Open menu</span>
+              <span className="sr-only">{t('Open menu', 'فتح القائمة')}</span>
             </button>
 
             {/* Logo */}
@@ -202,9 +202,9 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
                   </svg>
                   <input
                     type="text"
-                    placeholder="Search products..."
+                    placeholder={t('Search products...', 'ابحث عن المنتجات...')}
                     className="search-input"
-                    aria-label="Search products"
+                    aria-label={t('Search products', 'ابحث عن المنتجات')}
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
                   />
@@ -371,7 +371,7 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
               ref={closeButtonRef}
               onClick={() => setIsMobileMenuOpen(false)}
               className="flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground"
-              aria-label="Close menu"
+              aria-label={t('Close menu', 'إغلاق القائمة')}
             >
               <svg
                 className="h-5 w-5"
@@ -387,7 +387,7 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
                   d="M6 18L18 6M6 6l12 12"
                 />
               </svg>
-              <span className="sr-only">Close menu</span>
+              <span className="sr-only">{t('Close menu', 'إغلاق القائمة')}</span>
             </button>
           </div>
 
@@ -409,9 +409,9 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
               </svg>
               <input
                 type="text"
-                placeholder="Search products..."
+                placeholder={t('Search products...', 'ابحث عن المنتجات...')}
                 className="search-input"
-                aria-label="Search products"
+                aria-label={t('Search products', 'ابحث عن المنتجات')}
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
               />
@@ -419,7 +419,10 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 overflow-y-auto px-4 py-4" aria-label="Mobile navigation">
+          <nav
+            className="flex-1 overflow-y-auto px-4 py-4"
+            aria-label={t('Mobile navigation', 'تنقل الجوال')}
+          >
             <ul className="space-y-1">
               {navigation.map(item => (
                 <li key={item.name}>
@@ -534,9 +537,9 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
                   </svg>
                   <input
                     type="text"
-                    placeholder="Search products..."
+                    placeholder={t('Search products...', 'ابحث عن المنتجات...')}
                     className="search-input"
-                    aria-label="Search products"
+                    aria-label={t('Search products', 'ابحث عن المنتجات')}
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
                     autoFocus
@@ -555,7 +558,7 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
               <button
                 onClick={() => setIsSearchOpen(false)}
                 className="flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground"
-                aria-label="Close search"
+                aria-label={t('Close search', 'إغلاق البحث')}
               >
                 <svg
                   className="h-5 w-5"
@@ -571,7 +574,7 @@ export function Header({ cartCount: cartCountProp }: HeaderProps) {
                     d="M6 18L18 6M6 6l12 12"
                   />
                 </svg>
-                <span className="sr-only">Close search</span>
+                <span className="sr-only">{t('Close search', 'إغلاق البحث')}</span>
               </button>
             </div>
           </div>

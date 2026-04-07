@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useStore } from '../../contexts/StoreContext';
 import { useFeatures } from '../../contexts/FeatureContext';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { API_URL } from '../../lib/api';
 
 // ==========================================
@@ -66,6 +67,7 @@ const EMPTY_FORM: FormData = {
 function AffiliatePageContent() {
   const { store } = useStore();
   const { isEnabled } = useFeatures();
+  const { t } = useLanguage();
   const storeId = store?.id;
 
   useReferralTracking();
@@ -104,14 +106,21 @@ function AffiliatePageContent() {
       const json = await res.json();
 
       if (!res.ok || !json.success) {
-        const msg = json?.error?.message || 'Something went wrong. Please try again.';
+        const msg =
+          json?.error?.message ||
+          t('Something went wrong. Please try again.', 'حدث خطأ ما. يرجى المحاولة مرة أخرى.');
         setError(msg);
       } else {
         setSuccess(true);
         setForm(EMPTY_FORM);
       }
     } catch {
-      setError('Network error. Please check your connection and try again.');
+      setError(
+        t(
+          'Network error. Please check your connection and try again.',
+          'خطأ في الشبكة. يرجى التحقق من اتصالك والمحاولة مرة أخرى.'
+        )
+      );
     } finally {
       setSubmitting(false);
     }
@@ -138,10 +147,13 @@ function AffiliatePageContent() {
             </svg>
           </div>
           <h1 className="text-xl font-semibold text-foreground mb-2">
-            Affiliate Program Unavailable
+            {t('Affiliate Program Unavailable', 'برنامج الشراكة غير متاح')}
           </h1>
           <p className="text-muted-foreground">
-            The affiliate program is not currently available for this store.
+            {t(
+              'The affiliate program is not currently available for this store.',
+              'برنامج الشراكة غير متاح حالياً لهذا المتجر.'
+            )}
           </p>
         </div>
       </main>
@@ -168,9 +180,14 @@ function AffiliatePageContent() {
               />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-foreground mb-2">Join Our Affiliate Program</h1>
+          <h1 className="text-2xl font-bold text-foreground mb-2">
+            {t('Join Our Affiliate Program', 'انضم إلى برنامج الشراكة')}
+          </h1>
           <p className="text-muted-foreground">
-            Partner with {store?.name || 'us'} and earn commissions for every sale you refer.
+            {t(
+              `Partner with ${store?.name || 'us'} and earn commissions for every sale you refer.`,
+              `كن شريكاً مع ${store?.name || 'نا'} واكسب عمولات على كل عملية بيع تحيلها.`
+            )}
           </p>
         </div>
 
@@ -193,10 +210,13 @@ function AffiliatePageContent() {
               </svg>
             </div>
             <h2 className="text-lg font-semibold text-[hsl(var(--success))] mb-2">
-              Application Submitted!
+              {t('Application Submitted!', 'تم إرسال الطلب!')}
             </h2>
             <p className="text-[hsl(var(--success))]">
-              {"We'll review it shortly and get back to you via email."}
+              {t(
+                "We'll review it shortly and get back to you via email.",
+                'سنقوم بمراجعته قريباً والرد عليك عبر البريد الإلكتروني.'
+              )}
             </p>
           </div>
         ) : (
@@ -211,7 +231,7 @@ function AffiliatePageContent() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label htmlFor="name" className="block text-sm font-medium text-foreground mb-1">
-                  Full Name <span className="text-destructive">*</span>
+                  {t('Full Name', 'الاسم الكامل')} <span className="text-destructive">*</span>
                 </label>
                 <input
                   id="name"
@@ -219,7 +239,7 @@ function AffiliatePageContent() {
                   type="text"
                   value={form.name}
                   onChange={handleChange}
-                  placeholder="Your full name"
+                  placeholder={t('Your full name', 'اسمك الكامل')}
                   required
                   className="w-full px-4 py-2.5 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                 />
@@ -227,7 +247,8 @@ function AffiliatePageContent() {
 
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-foreground mb-1">
-                  Email Address <span className="text-destructive">*</span>
+                  {t('Email Address', 'البريد الإلكتروني')}{' '}
+                  <span className="text-destructive">*</span>
                 </label>
                 <input
                   id="email"
@@ -243,7 +264,7 @@ function AffiliatePageContent() {
 
               <div>
                 <label htmlFor="phone" className="block text-sm font-medium text-foreground mb-1">
-                  Phone Number
+                  {t('Phone Number', 'رقم الهاتف')}
                 </label>
                 <input
                   id="phone"
@@ -261,7 +282,7 @@ function AffiliatePageContent() {
                   htmlFor="instagram"
                   className="block text-sm font-medium text-foreground mb-1"
                 >
-                  Instagram Handle
+                  {t('Instagram Handle', 'حساب إنستغرام')}
                 </label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
@@ -273,7 +294,7 @@ function AffiliatePageContent() {
                     type="text"
                     value={form.instagram}
                     onChange={handleChange}
-                    placeholder="yourhandle"
+                    placeholder={t('yourhandle', 'حسابك')}
                     className="w-full pl-8 pr-4 py-2.5 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                   />
                 </div>
@@ -281,7 +302,7 @@ function AffiliatePageContent() {
 
               <div>
                 <label htmlFor="tiktok" className="block text-sm font-medium text-foreground mb-1">
-                  TikTok Handle
+                  {t('TikTok Handle', 'حساب تيك توك')}
                 </label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
@@ -293,7 +314,7 @@ function AffiliatePageContent() {
                     type="text"
                     value={form.tiktok}
                     onChange={handleChange}
-                    placeholder="yourhandle"
+                    placeholder={t('yourhandle', 'حسابك')}
                     className="w-full pl-8 pr-4 py-2.5 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                   />
                 </div>
@@ -307,7 +328,7 @@ function AffiliatePageContent() {
                 {submitting && (
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current" />
                 )}
-                {submitting ? 'Submitting...' : 'Apply Now'}
+                {submitting ? t('Submitting...', 'جاري الإرسال...') : t('Apply Now', 'قدّم الآن')}
               </button>
             </form>
           </div>

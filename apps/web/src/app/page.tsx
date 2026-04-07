@@ -321,7 +321,7 @@ export default function HomePage() {
                           </svg>
                         </div>
                         <span className="text-lg font-medium text-muted-foreground">
-                          Featured Products
+                          {isRtl ? 'المنتجات المميزة' : 'Featured Products'}
                         </span>
                       </div>
                     </div>
@@ -340,14 +340,18 @@ export default function HomePage() {
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="mb-10 flex items-end justify-between">
               <div>
-                <h2 className="text-2xl font-bold text-foreground lg:text-3xl">Shop by Category</h2>
-                <p className="mt-2 text-muted-foreground">Find what you&apos;re looking for</p>
+                <h2 className="text-2xl font-bold text-foreground lg:text-3xl">
+                  {isRtl ? 'تسوق حسب الفئة' : 'Shop by Category'}
+                </h2>
+                <p className="mt-2 text-muted-foreground">
+                  {isRtl ? 'ابحث عما تريد' : "Find what you're looking for"}
+                </p>
               </div>
               <Link
                 href={storeUrl('/categories')}
                 className="hidden text-sm font-medium text-primary hover:text-primary/80 sm:block"
               >
-                View all categories →
+                {isRtl ? 'عرض جميع الفئات →' : 'View all categories →'}
               </Link>
             </div>
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
@@ -371,7 +375,9 @@ export default function HomePage() {
                     <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-6">
                       <h3 className="text-lg font-bold text-white">{category.name}</h3>
                       {category.productCount !== undefined && (
-                        <p className="text-sm text-white/80">{category.productCount} products</p>
+                        <p className="text-sm text-white/80">
+                          {category.productCount} {isRtl ? 'منتج' : 'products'}
+                        </p>
                       )}
                     </div>
                   </div>
@@ -387,14 +393,18 @@ export default function HomePage() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mb-10 flex items-end justify-between">
             <div>
-              <h2 className="text-2xl font-bold text-foreground lg:text-3xl">Featured Products</h2>
-              <p className="mt-2 text-muted-foreground">Check out our latest arrivals</p>
+              <h2 className="text-2xl font-bold text-foreground lg:text-3xl">
+                {isRtl ? 'المنتجات المميزة' : 'Featured Products'}
+              </h2>
+              <p className="mt-2 text-muted-foreground">
+                {isRtl ? 'اطلع على أحدث وصولاتنا' : 'Check out our latest arrivals'}
+              </p>
             </div>
             <Link
               href={storeUrl('/products')}
               className="text-sm font-medium text-primary hover:text-primary/80"
             >
-              View all products →
+              {isRtl ? 'عرض جميع المنتجات →' : 'View all products →'}
             </Link>
           </div>
 
@@ -468,9 +478,13 @@ export default function HomePage() {
             </div>
           ) : (
             <div className="text-center py-12">
-              <p className="text-muted-foreground">No products available yet.</p>
+              <p className="text-muted-foreground">
+                {isRtl ? 'لا توجد منتجات متاحة بعد.' : 'No products available yet.'}
+              </p>
               <Link href={storeUrl('/products')}>
-                <Button className="mt-4">Browse All Products</Button>
+                <Button className="mt-4">
+                  {isRtl ? 'تصفح جميع المنتجات' : 'Browse All Products'}
+                </Button>
               </Link>
             </div>
           )}

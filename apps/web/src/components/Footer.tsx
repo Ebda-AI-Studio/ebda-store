@@ -321,7 +321,10 @@ export function Footer() {
                   <input
                     type="email"
                     placeholder={t('Email', 'البريد الإلكتروني')}
-                    aria-label="Email address for newsletter"
+                    aria-label={t(
+                      'Email address for newsletter',
+                      'البريد الإلكتروني للنشرة الإخبارية'
+                    )}
                     value={newsletterEmail}
                     onChange={e => setNewsletterEmail(e.target.value)}
                     className="h-9 flex-1 rounded-lg border border-border bg-background px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"

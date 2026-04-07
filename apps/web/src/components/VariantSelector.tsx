@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { formatPrice } from '@/lib/format';
 import type { ProductVariant, ProductOption } from '@/lib/api';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface VariantSelectorProps {
   variants: ProductVariant[];
@@ -11,6 +12,7 @@ interface VariantSelectorProps {
 }
 
 export function VariantSelector({ variants, options, onVariantSelect }: VariantSelectorProps) {
+  const { t } = useLanguage();
   // Track selected value per option name
   const [selected, setSelected] = useState<Record<string, string>>({});
 
@@ -80,7 +82,7 @@ export function VariantSelector({ variants, options, onVariantSelect }: VariantS
                   onClick={() => handleSelect(option.name, value)}
                   disabled={!available}
                   aria-pressed={isSelected}
-                  title={!available ? 'Out of stock' : undefined}
+                  title={!available ? t('Out of Stock', 'غير متوفر') : undefined}
                   className={[
                     'relative min-w-[2.75rem] rounded-lg border px-3 py-2 text-sm font-medium transition-all',
                     isSelected
@@ -145,14 +147,17 @@ export function VariantSelector({ variants, options, onVariantSelect }: VariantS
               >
                 {(currentVariant.inventory ?? 1) > 0
                   ? currentVariant.inventory !== undefined
-                    ? `${currentVariant.inventory} in stock`
-                    : 'In stock'
-                  : 'Out of stock'}
+                    ? `${currentVariant.inventory} ${t('in stock', 'متوفر')}`
+                    : t('In Stock', 'متوفر')
+                  : t('Out of Stock', 'غير متوفر')}
               </span>
             </div>
           ) : (
             <p className="text-muted-foreground">
-              This combination is not available. Please choose a different option.
+              {t(
+                'This combination is not available. Please choose a different option.',
+                'هذه التركيبة غير متوفرة. يرجى اختيار خيار آخر.'
+              )}
             </p>
           )}
         </div>

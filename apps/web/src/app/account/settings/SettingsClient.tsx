@@ -191,8 +191,12 @@ export default function SettingsClient() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Account Settings</h1>
-          <p className="mt-1 text-muted-foreground">Manage your profile and security</p>
+          <h1 className="text-2xl font-bold text-foreground">
+            {t('Account Settings', 'إعدادات الحساب')}
+          </h1>
+          <p className="mt-1 text-muted-foreground">
+            {t('Manage your profile and security', 'إدارة ملفك الشخصي والأمان')}
+          </p>
         </div>
         <div className="flex justify-center py-12">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />

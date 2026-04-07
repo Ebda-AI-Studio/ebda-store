@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useFeatures } from '../contexts/FeatureContext';
 import { useStore } from '../contexts/StoreContext';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const DISMISSED_KEY = 'push-dismissed';
 const SUBSCRIBED_KEY = 'push-subscribed';
@@ -10,6 +11,7 @@ const SUBSCRIBED_KEY = 'push-subscribed';
 export function PushNotificationPrompt() {
   const { isEnabled } = useFeatures();
   const { store } = useStore();
+  const { t } = useLanguage();
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -75,7 +77,7 @@ export function PushNotificationPrompt() {
   return (
     <div
       role="dialog"
-      aria-label="Enable push notifications"
+      aria-label={t('Enable push notifications', 'تفعيل الإشعارات')}
       style={{
         position: 'fixed',
         bottom: '1rem',
@@ -96,7 +98,7 @@ export function PushNotificationPrompt() {
       }}
     >
       <span style={{ flex: 1, fontSize: '0.875rem' }}>
-        Enable notifications to get order updates
+        {t('Enable notifications to get order updates', 'فعّل الإشعارات لتلقي تحديثات الطلبات')}
       </span>
       <button
         onClick={handleAccept}
@@ -112,11 +114,11 @@ export function PushNotificationPrompt() {
           whiteSpace: 'nowrap',
         }}
       >
-        Accept
+        {t('Accept', 'السماح')}
       </button>
       <button
         onClick={handleDismiss}
-        aria-label="Dismiss notification prompt"
+        aria-label={t('Dismiss notification prompt', 'تجاهل إشعار التنبيه')}
         style={{
           padding: '0.375rem 0.5rem',
           borderRadius: '0.375rem',
@@ -128,7 +130,7 @@ export function PushNotificationPrompt() {
           whiteSpace: 'nowrap',
         }}
       >
-        Dismiss
+        {t('Dismiss', 'ليس الآن')}
       </button>
     </div>
   );

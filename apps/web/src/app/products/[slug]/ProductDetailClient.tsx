@@ -372,7 +372,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                   {Math.round((1 - product.price / product.compareAtPrice) * 100)}% OFF
                 </Badge>
               )}
-              {product.status === 'draft' && <Badge variant="outline">Draft</Badge>}
+              {product.status === 'draft' && <Badge variant="outline">{t('Draft', 'مسودة')}</Badge>}
             </div>
 
             <h1 className="text-3xl font-bold text-foreground">{product.name}</h1>

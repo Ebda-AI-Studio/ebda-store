@@ -99,9 +99,9 @@ export default function BoldProductCard({
               'bg-gray-950 text-white hover:bg-primary hover:text-primary-foreground transition-colors duration-200'
             )}
             labels={{
-              addToCart: isRtl ? 'أضف للسلة' : 'Add to Cart',
-              addedToCart: isRtl ? 'تمت!' : 'Added!',
-              outOfStock: isRtl ? 'نفذ!' : 'Sold Out!',
+              addToCart: isRtl ? 'أضف إلى السلة' : 'Add to cart',
+              addedToCart: isRtl ? 'تمت الإضافة' : 'Added to cart',
+              outOfStock: isRtl ? 'نفد المخزون' : 'Out of stock',
               adding: isRtl ? '...' : '...',
             }}
           />
