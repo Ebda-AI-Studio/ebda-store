@@ -214,8 +214,13 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
 // Zod Schemas
 export const featureKeySchema = z.enum(FEATURE_KEYS_ARRAY);
 
+// Use generic string keys + manual validation so partial updates work in
+// Zod 3.23+ (enum-keyed records require all keys to be present otherwise).
 export const featureUpdatesSchema = z
-  .record(featureKeySchema, z.boolean())
+  .record(z.string(), z.boolean())
   .refine(val => Object.keys(val).length > 0, {
     message: 'At least one feature update must be provided.',
+  })
+  .refine(val => Object.keys(val).every(k => FEATURE_KEYS_ARRAY.includes(k as FeatureKey)), {
+    message: 'Unknown feature key in update.',
   });
