@@ -37,7 +37,7 @@ export interface DomainStatus {
 }
 
 export class VercelDomainService {
-  private static isConfigured(): boolean {
+  static isConfigured(): boolean {
     return !!(config.vercelApiToken && config.vercelProjectId);
   }
 

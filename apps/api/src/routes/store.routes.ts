@@ -690,6 +690,20 @@ router.put(
 
       // Add new domain to Vercel
       if (domain && domain !== oldDomain) {
+        // Check platform configuration first — domain feature is unusable
+        // without the Vercel API credentials configured on the API
+        if (!VercelDomainService.isConfigured()) {
+          res.status(503).json({
+            success: false,
+            error: {
+              code: 'DOMAIN_FEATURE_UNAVAILABLE',
+              message:
+                'Custom domain feature is not configured on this platform. Please contact support.',
+            },
+          });
+          return;
+        }
+
         // Check uniqueness
         const existingStore = await StoreService.getByDomain(domain).catch(() => null);
         if (existingStore && existingStore.id !== id) {
@@ -700,13 +714,17 @@ router.put(
           return;
         }
 
-        try {
-          await VercelDomainService.addDomain(domain);
-        } catch (error) {
-          logger.error(
-            { err: error instanceof Error ? error.message : 'Unknown error', domain },
-            '[STORE] Failed to add domain to Vercel'
-          );
+        const vercelResult = await VercelDomainService.addDomain(domain);
+        if (!vercelResult) {
+          res.status(502).json({
+            success: false,
+            error: {
+              code: 'DOMAIN_PROVISION_FAILED',
+              message:
+                'Failed to register domain with the platform. Please try again or contact support.',
+            },
+          });
+          return;
         }
       }
 
