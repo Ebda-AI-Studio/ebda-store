@@ -2,21 +2,26 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 /**
- * Platform domains that should NOT be treated as custom store domains
- * These are used for the main platform, admin, and development
+ * Platform hostnames — exact match only.
+ * These are the platform's marketing/admin/app domains. Any OTHER subdomain
+ * of forcemediakw.com (e.g. shop.forcemediakw.com) is a CUSTOM STORE domain
+ * that store owners can configure.
  */
-const PLATFORM_DOMAINS = [
+const PLATFORM_HOSTS = new Set([
   'localhost',
   '127.0.0.1',
   'forcemediakw.com',
   'www.forcemediakw.com',
   'admin.forcemediakw.com',
   'app.forcemediakw.com',
-  'vercel.app',
-  'netlify.app',
-  'ngrok.io',
-  'ngrok-free.app',
-];
+]);
+
+/**
+ * Hosting provider suffixes — any subdomain is platform (preview deploys, tunnels).
+ * These are used for development/staging only. Production custom domains never
+ * end with these suffixes.
+ */
+const PLATFORM_SUFFIXES = ['vercel.app', 'netlify.app', 'ngrok.io', 'ngrok-free.app'];
 
 /**
  * Check if a hostname is a platform domain (not a custom store domain)
@@ -25,7 +30,8 @@ function isPlatformDomain(hostname: string): boolean {
   // Remove port if present
   const host = hostname.split(':')[0];
 
-  return PLATFORM_DOMAINS.some(domain => host === domain || host.endsWith(`.${domain}`));
+  if (PLATFORM_HOSTS.has(host)) return true;
+  return PLATFORM_SUFFIXES.some(suffix => host.endsWith(`.${suffix}`));
 }
 
 /**
