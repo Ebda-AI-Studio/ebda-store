@@ -354,7 +354,7 @@ export function Footer() {
       </div>
 
       {/* Features Bar */}
-      <div className="border-t border-border/50 bg-background/50">
+      <div className="border-t border-border/50 bg-card">
         <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
             {[

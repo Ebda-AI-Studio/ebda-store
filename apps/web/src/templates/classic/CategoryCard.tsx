@@ -25,9 +25,9 @@ export default function ClassicCategoryCard({
             loading="lazy"
           />
         ) : (
-          <div className="w-full h-full bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
-            <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
-              <span className="text-3xl font-light text-primary/60 tracking-wide">
+          <div className="w-full h-full bg-muted flex items-center justify-center">
+            <div className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center">
+              <span className="text-3xl font-light text-primary tracking-wide">
                 {displayName.charAt(0).toUpperCase()}
               </span>
             </div>

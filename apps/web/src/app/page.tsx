@@ -274,25 +274,26 @@ export default function HomePage() {
         <div className="relative mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
           <div className="grid gap-12 lg:grid-cols-2 lg:gap-8 items-center">
             <div className="text-center lg:text-left animate-slide-up">
-              <h1 className="text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl lg:text-6xl">
-                <span className="block">Shop the Future</span>
-                <span className="mt-2 block bg-gradient-to-r from-primary via-primary/70 to-primary bg-clip-text text-transparent">
-                  of E-Commerce
+              <h1 className="text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl lg:text-6xl leading-[1.15]">
+                <span className="block">{isRtl ? 'اكتشف مجموعتنا' : 'Shop the Future'}</span>
+                <span className="mt-2 block bg-gradient-to-r from-primary via-primary/70 to-primary bg-clip-text text-transparent leading-[1.15] pb-2">
+                  {isRtl ? 'من التجارة الإلكترونية' : 'of E-Commerce'}
                 </span>
               </h1>
               <p className="mx-auto mt-6 max-w-xl text-lg text-muted-foreground lg:mx-0">
-                Discover Kuwait&apos;s premier online shopping destination. Premium products, fast
-                delivery, and secure payments.
+                {isRtl
+                  ? 'أفضل المنتجات بأفضل الأسعار في الكويت'
+                  : "Discover Kuwait's premier online shopping destination. Premium products, fast delivery, and secure payments."}
               </p>
               <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:justify-center lg:justify-start">
                 <Link href={storeUrl('/products')}>
                   <Button size="lg" className="w-full gap-2 shadow-lg shadow-primary/25 sm:w-auto">
-                    Shop Now
+                    {isRtl ? 'تسوق الآن' : 'Shop Now'}
                   </Button>
                 </Link>
                 <Link href={storeUrl('/categories')}>
                   <Button variant="outline" size="lg" className="w-full gap-2 sm:w-auto">
-                    Browse Categories
+                    {isRtl ? 'تصفح الفئات' : 'Browse Categories'}
                   </Button>
                 </Link>
               </div>
@@ -480,9 +481,13 @@ export default function HomePage() {
       <section className="force-gradient-primary py-16 lg:py-20">
         <div className="mx-auto max-w-7xl px-4 text-center sm:px-6 lg:px-8">
           <div className="mx-auto max-w-2xl">
-            <h2 className="text-3xl font-bold text-white lg:text-4xl">Ready to Start Shopping?</h2>
+            <h2 className="text-3xl font-bold text-white lg:text-4xl">
+              {isRtl ? 'جاهز للتسوق؟' : 'Ready to Start Shopping?'}
+            </h2>
             <p className="mx-auto mt-4 max-w-xl text-lg text-primary-foreground/80">
-              Join thousands of satisfied customers and discover our amazing products.
+              {isRtl
+                ? 'انضم إلى آلاف العملاء الراضين واكتشف منتجاتنا المميزة'
+                : 'Join thousands of satisfied customers and discover our amazing products.'}
             </p>
             <div className="mt-8">
               <Link href={storeUrl('/products')}>
@@ -491,7 +496,7 @@ export default function HomePage() {
                   variant="secondary"
                   className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 shadow-lg"
                 >
-                  Browse Products
+                  {isRtl ? 'تصفح المنتجات' : 'Browse Products'}
                 </Button>
               </Link>
             </div>

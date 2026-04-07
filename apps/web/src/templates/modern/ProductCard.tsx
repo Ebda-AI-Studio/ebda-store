@@ -31,6 +31,11 @@ export default function ModernProductCard({
 
   const discount = calculateDiscount(product.price, product.compareAtPrice);
 
+  if (process.env.NODE_ENV !== 'production' && !product.images?.[0]?.url) {
+    // eslint-disable-next-line no-console
+    console.warn(`[ProductCard] Missing image for product "${product.name}" (id: ${product.id})`);
+  }
+
   const handleWishlist = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -77,7 +82,7 @@ export default function ModernProductCard({
             )}
           </>
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-muted-foreground/40">
+          <div className="w-full h-full flex items-center justify-center bg-muted text-muted-foreground">
             <PlaceholderImageIcon className="w-20 h-20" />
           </div>
         )}

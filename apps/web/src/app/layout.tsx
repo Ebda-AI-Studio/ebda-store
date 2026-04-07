@@ -142,6 +142,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // Fetch store data server-side
   const store = await getStore();
 
+  // Resolve language/direction server-side to avoid LTR flash for RTL stores
+  const defaultLanguage = (store.settings as Record<string, unknown>)?.defaultLanguage as
+    | 'en'
+    | 'ar'
+    | undefined;
+  const lang = defaultLanguage === 'ar' ? 'ar' : 'en';
+  const dir = defaultLanguage === 'ar' ? 'rtl' : 'ltr';
+
   // Organization JSON-LD for search engines
   const orgJsonLd = organizationJsonLd(store);
 
@@ -161,7 +169,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     : '';
 
   return (
-    <html lang="en" dir="ltr" suppressHydrationWarning>
+    <html lang={lang} dir={dir} suppressHydrationWarning>
       <head>
         <script
           type="application/ld+json"

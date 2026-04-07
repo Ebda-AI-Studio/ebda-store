@@ -25,9 +25,9 @@ export default function MinimalCategoryCard({
             loading="lazy"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-              <span className="text-2xl font-light text-primary/60">
+          <div className="w-full h-full flex items-center justify-center bg-muted">
+            <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center">
+              <span className="text-2xl font-light text-primary">
                 {displayName.charAt(0).toUpperCase()}
               </span>
             </div>
