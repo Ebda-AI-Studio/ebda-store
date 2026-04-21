@@ -27,19 +27,23 @@ const PLATFORM_SUFFIXES = ['vercel.app', 'netlify.app', 'ngrok.io', 'ngrok-free.
  * Check if a hostname is a platform domain (not a custom store domain)
  */
 function isPlatformDomain(hostname: string): boolean {
-  // Remove port if present
-  const host = hostname.split(':')[0];
+  // Remove port if present, normalize to lowercase
+  const host = hostname.split(':')[0].toLowerCase();
 
   if (PLATFORM_HOSTS.has(host)) return true;
   return PLATFORM_SUFFIXES.some(suffix => host.endsWith(`.${suffix}`));
 }
 
 /**
- * Extract the store identifier from a custom domain
- * For custom domains, the entire domain is the identifier
+ * Extract the store identifier from a custom domain.
+ * Normalizes the domain: strips www prefix, lowercases, removes port.
+ * For custom domains, the normalized domain is the identifier.
  */
 function getStoreIdentifier(hostname: string): string | null {
-  const host = hostname.split(':')[0];
+  const host = hostname
+    .split(':')[0]
+    .toLowerCase()
+    .replace(/^www\./, '');
 
   if (isPlatformDomain(hostname)) {
     return null;
@@ -144,7 +148,20 @@ export function middleware(request: NextRequest) {
     return response;
   }
 
-  // No slug — check cookie for persisted store slug
+  // Bare root on platform domain — reset to default. Clear any sticky
+  // store cookie so users aren't trapped on the last store they visited.
+  if (request.nextUrl.pathname === '/') {
+    const response = NextResponse.next({
+      request: { headers: requestHeaders },
+    });
+    if (request.cookies.get('x-store-slug')) {
+      response.cookies.delete('x-store-slug');
+    }
+    return response;
+  }
+
+  // Subroute on platform domain (no slug in URL) — use cookie to maintain
+  // store context across navigation (e.g. /products, /cart after /palora).
   const cookieSlug = request.cookies.get('x-store-slug')?.value;
   if (cookieSlug) {
     requestHeaders.set('x-store-slug', cookieSlug);

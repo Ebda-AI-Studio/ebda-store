@@ -434,6 +434,29 @@ router.get(
     try {
       const { storeId, userId } = req.params;
 
+      // Validate UUID format to prevent enumeration attacks
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(storeId) || !uuidRegex.test(userId)) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'INVALID_ID', message: 'Invalid store or user ID' },
+        });
+        return;
+      }
+
+      // Verify store exists and is active before querying wishlists
+      const store = await prisma.store.findFirst({
+        where: { id: storeId, status: 'active' },
+        select: { id: true },
+      });
+      if (!store) {
+        res.status(404).json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'Store not found' },
+        });
+        return;
+      }
+
       const wishlist = await prisma.wishlist.findFirst({
         where: { userId, storeId },
         include: {
@@ -689,15 +712,19 @@ router.get(
   storeResolveLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const domain = req.headers['x-store-domain'] as string;
+      const rawDomain = req.headers['x-store-domain'] as string;
 
-      if (!domain) {
+      if (!rawDomain) {
         res.status(400).json({
           success: false,
           error: { code: 'MISSING_DOMAIN', message: 'x-store-domain header is required' },
         });
         return;
       }
+
+      // Normalize domain: strip www prefix, lowercase — matches how domains
+      // are stored in the DB and how the storefront middleware normalizes them.
+      const domain = rawDomain.toLowerCase().replace(/^www\./, '');
 
       // Find store by domain
       const store = await prisma.store.findFirst({

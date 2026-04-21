@@ -7,7 +7,7 @@ import { requirePermission } from '../middleware/rbac';
 import { prisma } from '@force/database';
 import { paymentLimiter, auditLog } from '../middleware/security';
 import { config } from '../config';
-import { getAuthUser, getStoreIdFromRequest } from '../utils/store-helpers';
+import { getAuthUser } from '../utils/store-helpers';
 
 const router = Router();
 
@@ -16,13 +16,15 @@ const router = Router();
 // ==========================================
 
 // Validate that a URL is either a relative path or an absolute URL whose origin
-// matches the platform's web URL. This prevents open-redirect attacks where an
-// attacker supplies an external domain as a callback URL.
+// matches the platform's web URL or a verified store domain. This prevents
+// open-redirect attacks where an attacker supplies an external domain as a callback URL.
 function platformUrlOrRelative(url: string): boolean {
   // Allow relative paths (must start with /)
   if (url.startsWith('/')) return true;
 
-  // For absolute URLs, only permit those pointing to our own web origin
+  // For absolute URLs, only permit those pointing to our own web origin.
+  // Store custom domain URLs are resolved server-side in the callback handler,
+  // so client-supplied absolute URLs must match the platform origin.
   try {
     const parsed = new URL(url);
     const allowed = new URL(config.webUrl);
@@ -71,20 +73,24 @@ const refundSchema = z.object({
  * GET /payments/config
  * Get payment configuration for Kuwait providers
  */
-router.get('/config', (_req: Request, res: Response) => {
-  const providers = PaymentService.getAvailableProviders();
+router.get('/config', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const providers = await PaymentService.getAvailableProviders();
 
-  res.json({
-    success: true,
-    data: {
-      providers,
-      defaultProvider: config.defaultPaymentProvider,
-      defaultCurrency: config.defaultCurrency,
-      supportedCurrencies: ['KWD', 'USD', 'EUR', 'GBP', 'AED', 'SAR', 'BHD'],
-      supportedMethods: ['knet', 'visa', 'mastercard', 'apple_pay', 'google_pay', 'samsung_pay'],
-      testMode: config.paymentTestMode,
-    },
-  });
+    res.json({
+      success: true,
+      data: {
+        providers,
+        defaultProvider: config.defaultPaymentProvider,
+        defaultCurrency: config.defaultCurrency,
+        supportedCurrencies: ['KWD', 'USD', 'EUR', 'GBP', 'AED', 'SAR', 'BHD'],
+        supportedMethods: ['knet', 'visa', 'mastercard', 'apple_pay', 'google_pay', 'samsung_pay'],
+        testMode: config.paymentTestMode,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 
 /**
@@ -121,13 +127,14 @@ router.post(
       const data = createPaymentSchema.parse(req.body);
       const user = getAuthUser(req);
 
-      // Verify the order belongs to the user
-      const storeId = await getStoreIdFromRequest(req);
+      // Derive storeId from the order itself — never rely on header fallback
+      // for payment operations. The order already has the correct storeId.
       const order = await prisma.order.findFirst({
-        where: { id: data.orderId, storeId, customerId: user.userId },
+        where: { id: data.orderId, customerId: user.userId },
         include: {
           items: { include: { product: true } },
           customer: true,
+          store: { select: { domain: true, slug: true } },
         },
       });
 
@@ -138,6 +145,13 @@ router.post(
         });
         return;
       }
+
+      // Resolve the correct storefront URL for payment callbacks
+      const storefrontBaseUrl = order.store?.domain
+        ? `https://${order.store.domain}`
+        : order.store?.slug
+          ? `${config.webUrl}/${order.store.slug}`
+          : config.webUrl;
 
       // Create payment
       const result = await PaymentService.createPayment(
@@ -159,8 +173,8 @@ router.post(
             unitPrice: item.price,
             sku: item.sku || undefined,
           })),
-          callbackUrl: data.successUrl || `${config.webUrl}/checkout/success`,
-          errorUrl: data.errorUrl || `${config.webUrl}/checkout/error`,
+          callbackUrl: data.successUrl || `${storefrontBaseUrl}/checkout/success`,
+          errorUrl: data.errorUrl || `${storefrontBaseUrl}/checkout/error`,
           webhookUrl: `${config.apiUrl}/webhooks/payment`,
         },
         data.provider
@@ -209,16 +223,18 @@ router.get(
       const user = getAuthUser(req);
       const provider = req.query.provider as PaymentProvider | undefined;
 
-      // Verify the user owns the associated order (or is admin)
-      if (user.role !== 'store_admin' && user.role !== 'super_admin') {
-        const storeId = await getStoreIdFromRequest(req);
+      // Verify authorization: customers can only see their own payments,
+      // store_admins can only see payments from their stores.
+      if (user.role === 'super_admin') {
+        // Super admin can view any payment
+      } else if (user.role === 'store_admin') {
+        // Store admin must own the store the order belongs to
         const order = await prisma.order.findFirst({
           where: {
-            storeId,
             payments: { some: { transactionId } },
+            store: { ownerId: user.userId },
           },
         });
-
         if (!order) {
           res.status(404).json({
             success: false,
@@ -226,11 +242,18 @@ router.get(
           });
           return;
         }
-
-        if (order.customerId !== user.userId) {
-          res.status(403).json({
+      } else {
+        // Customer — must own the order
+        const order = await prisma.order.findFirst({
+          where: {
+            customerId: user.userId,
+            payments: { some: { transactionId } },
+          },
+        });
+        if (!order) {
+          res.status(404).json({
             success: false,
-            error: { code: 'FORBIDDEN', message: 'Not authorized' },
+            error: { code: 'NOT_FOUND', message: 'Payment not found' },
           });
           return;
         }
@@ -260,6 +283,21 @@ router.post(
     try {
       const data = refundSchema.parse(req.body);
       const user = getAuthUser(req);
+
+      // Verify store ownership for store_admin — prevent refunding other stores' payments
+      if (user.role === 'store_admin') {
+        const payment = await prisma.payment.findFirst({
+          where: { transactionId: data.transactionId },
+          include: { order: { include: { store: { select: { ownerId: true } } } } },
+        });
+        if (!payment || payment.order.store.ownerId !== user.userId) {
+          res.status(404).json({
+            success: false,
+            error: { code: 'NOT_FOUND', message: 'Payment not found' },
+          });
+          return;
+        }
+      }
 
       const refund = await PaymentService.refund({
         transactionId: data.transactionId,
@@ -344,28 +382,26 @@ router.get(
       const { orderId } = req.params;
       const user = getAuthUser(req);
 
-      // Verify the order belongs to the user (or user is admin)
-      const storeId = await getStoreIdFromRequest(req);
-      const order = await prisma.order.findFirst({
-        where: { id: orderId, storeId },
-      });
+      // Verify authorization based on role — derive access from the order itself.
+      let order;
+      if (user.role === 'super_admin') {
+        order = await prisma.order.findUnique({ where: { id: orderId } });
+      } else if (user.role === 'store_admin') {
+        // Store admin can only see orders from stores they own
+        order = await prisma.order.findFirst({
+          where: { id: orderId, store: { ownerId: user.userId } },
+        });
+      } else {
+        // Customer — can only see their own orders
+        order = await prisma.order.findFirst({
+          where: { id: orderId, customerId: user.userId },
+        });
+      }
 
       if (!order) {
         res.status(404).json({
           success: false,
           error: { code: 'NOT_FOUND', message: 'Order not found' },
-        });
-        return;
-      }
-
-      if (
-        order.customerId !== user.userId &&
-        user.role !== 'store_admin' &&
-        user.role !== 'super_admin'
-      ) {
-        res.status(403).json({
-          success: false,
-          error: { code: 'FORBIDDEN', message: 'Not authorized' },
         });
         return;
       }

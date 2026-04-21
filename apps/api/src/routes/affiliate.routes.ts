@@ -219,7 +219,7 @@ router.patch(
       const affiliate = await affiliateService.approve(
         req.params.storeId,
         req.params.id,
-        (req as any).user.id
+        req.user!.userId
       );
       res.json({ success: true, data: { affiliate } });
     } catch (error) {
@@ -237,7 +237,7 @@ router.patch(
       const affiliate = await affiliateService.reject(
         req.params.storeId,
         req.params.id,
-        (req as any).user.id
+        req.user!.userId
       );
       res.json({ success: true, data: { affiliate } });
     } catch (error) {
@@ -255,7 +255,7 @@ router.patch(
       const affiliate = await affiliateService.suspend(
         req.params.storeId,
         req.params.id,
-        (req as any).user.id
+        req.user!.userId
       );
       res.json({ success: true, data: { affiliate } });
     } catch (error) {

@@ -102,9 +102,8 @@ app.use(
   })
 );
 
-// Cache for custom-domain CORS lookups: hostname -> { allowed, expiresAt }
-const corsDomainCache = new Map<string, { allowed: boolean; expiresAt: number }>();
-const CORS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+// CORS domain cache shared via module so store.routes.ts can bust it on domain changes
+import { corsDomainCache, CORS_CACHE_TTL_MS } from './lib/cors-cache';
 
 app.use(
   cors({
@@ -139,7 +138,8 @@ app.use(
       if (origin.startsWith('https://')) {
         let hostname: string;
         try {
-          hostname = new URL(origin).hostname;
+          // Normalize: lowercase + strip www (domains are stored normalized in DB)
+          hostname = new URL(origin).hostname.toLowerCase().replace(/^www\./, '');
         } catch {
           return callback(new Error('Not allowed by CORS'));
         }

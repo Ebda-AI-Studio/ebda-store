@@ -9,6 +9,7 @@ import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
 import { getAuthUser } from '../utils/store-helpers';
 import { requireFeature } from '../middleware/feature-gate';
+import { bustCorsCache } from '../lib/cors-cache';
 
 const router = Router();
 
@@ -683,7 +684,15 @@ router.put(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
-      const { domain } = req.body as { domain: string | null };
+      const rawDomain = (req.body as { domain: string | null }).domain;
+
+      // Normalize domain: lowercase, strip www prefix, trim whitespace
+      const domain = rawDomain
+        ? rawDomain
+            .toLowerCase()
+            .replace(/^www\./, '')
+            .trim()
+        : null;
 
       const store = await StoreService.getById(id);
       const oldDomain = store.domain;
@@ -741,7 +750,6 @@ router.put(
       }
 
       // Update domain in DB (use prisma directly for null clearing)
-      const { prisma } = await import('@force/database');
       const updated = domain
         ? await StoreService.update(id, { domain })
         : await prisma.store.update({
@@ -751,6 +759,10 @@ router.put(
               owner: { select: { id: true, email: true, firstName: true, lastName: true } },
             },
           });
+
+      // Bust CORS cache so the new domain works immediately
+      if (domain) bustCorsCache(domain);
+      if (oldDomain && oldDomain !== domain) bustCorsCache(oldDomain);
 
       // Get verification status
       let domainStatus: import('../services/vercel-domain.service').DomainStatus | null = null;

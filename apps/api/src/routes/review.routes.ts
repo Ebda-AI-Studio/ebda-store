@@ -1,7 +1,8 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { authenticate } from '../middleware/auth';
+import { authenticate, authorize } from '../middleware/auth';
 import { requireStore } from '../middleware/store';
+import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { ReviewService } from '../services/review.service';
 import { LoyaltyService } from '../services/loyalty.service';
@@ -168,19 +169,12 @@ router.get(
 router.get(
   '/admin',
   authenticate,
+  authorize('store_admin', 'super_admin'),
   requireStore,
+  requireStoreAccess,
   requireFeature('reviews'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // Check if user is store admin
-      if (req.user!.role !== 'super_admin' && req.user!.role !== 'store_admin') {
-        res.status(403).json({
-          success: false,
-          error: { code: 'FORBIDDEN', message: 'Admin access required' },
-        });
-        return;
-      }
-
       const { page, limit, status, productId } = req.query;
 
       const result = await ReviewService.listForStore(req.storeId!, {
@@ -204,18 +198,12 @@ router.get(
 router.put(
   '/admin/:id',
   authenticate,
+  authorize('store_admin', 'super_admin'),
   requireStore,
+  requireStoreAccess,
   requireFeature('reviews'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (req.user!.role !== 'super_admin' && req.user!.role !== 'store_admin') {
-        res.status(403).json({
-          success: false,
-          error: { code: 'FORBIDDEN', message: 'Admin access required' },
-        });
-        return;
-      }
-
       const { id } = req.params;
       const data = updateReviewSchema.parse(req.body);
 
@@ -235,18 +223,12 @@ router.put(
 router.post(
   '/admin/:id/approve',
   authenticate,
+  authorize('store_admin', 'super_admin'),
   requireStore,
+  requireStoreAccess,
   requireFeature('reviews'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (req.user!.role !== 'super_admin' && req.user!.role !== 'store_admin') {
-        res.status(403).json({
-          success: false,
-          error: { code: 'FORBIDDEN', message: 'Admin access required' },
-        });
-        return;
-      }
-
       const { id } = req.params;
       const review = await ReviewService.approve(req.storeId!, id);
 
@@ -280,18 +262,12 @@ router.post(
 router.post(
   '/admin/:id/reject',
   authenticate,
+  authorize('store_admin', 'super_admin'),
   requireStore,
+  requireStoreAccess,
   requireFeature('reviews'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (req.user!.role !== 'super_admin' && req.user!.role !== 'store_admin') {
-        res.status(403).json({
-          success: false,
-          error: { code: 'FORBIDDEN', message: 'Admin access required' },
-        });
-        return;
-      }
-
       const { id } = req.params;
       const review = await ReviewService.reject(req.storeId!, id);
 
@@ -310,18 +286,12 @@ router.post(
 router.delete(
   '/admin/:id',
   authenticate,
+  authorize('store_admin', 'super_admin'),
   requireStore,
+  requireStoreAccess,
   requireFeature('reviews'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (req.user!.role !== 'super_admin' && req.user!.role !== 'store_admin') {
-        res.status(403).json({
-          success: false,
-          error: { code: 'FORBIDDEN', message: 'Admin access required' },
-        });
-        return;
-      }
-
       const { id } = req.params;
       await ReviewService.delete(req.storeId!, id);
 

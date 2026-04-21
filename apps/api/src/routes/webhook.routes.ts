@@ -59,23 +59,18 @@ function verifyWebhookSignature(req: Request, res: Response, next: NextFunction)
  */
 async function checkIdempotency(idempotencyKey: string): Promise<{
   alreadyProcessed: boolean;
-  order?: {
-    id: string;
-    orderNumber: string;
-    webhookProcessedAt: Date | null;
-    paymentStatus: string;
-  } | null;
+  orderId?: string;
 }> {
   const order = await prisma.order.findUnique({
     where: { idempotencyKey },
-    select: { id: true, orderNumber: true, webhookProcessedAt: true, paymentStatus: true },
+    select: { id: true, webhookProcessedAt: true },
   });
 
   if (order && order.webhookProcessedAt) {
-    return { alreadyProcessed: true, order };
+    return { alreadyProcessed: true, orderId: order.id };
   }
 
-  return { alreadyProcessed: false, order };
+  return { alreadyProcessed: false, orderId: order?.id };
 }
 
 /**
@@ -154,7 +149,7 @@ router.post(
       const idempotencyKey = generateIdempotencyKey(provider, payload);
 
       // Check for duplicate webhook
-      const { alreadyProcessed, order } = await checkIdempotency(idempotencyKey);
+      const { alreadyProcessed, orderId } = await checkIdempotency(idempotencyKey);
 
       if (alreadyProcessed) {
         logger.info({ idempotencyKey }, '[WEBHOOK] Duplicate webhook detected');
@@ -162,25 +157,19 @@ router.post(
         await auditLog({
           action: 'WEBHOOK_DUPLICATE',
           resourceType: 'payment',
-          resourceId: order?.id,
+          resourceId: orderId,
           details: {
             provider,
             idempotencyKey,
-            orderNumber: order?.orderNumber ?? null,
-            previousStatus: order?.paymentStatus ?? null,
           },
           ip: req.ip,
           userAgent: req.headers['user-agent'],
         });
 
-        // Return success to prevent provider retries
+        // Return success to prevent provider retries — no order details in response
         res.json({
           success: true,
-          data: {
-            message: 'Webhook already processed',
-            orderId: order?.id,
-            orderNumber: order?.orderNumber,
-          },
+          data: { message: 'Webhook already processed' },
         });
         return;
       }
@@ -215,9 +204,10 @@ router.post(
         userAgent: req.headers['user-agent'],
       });
 
+      // Return minimal acknowledgment — no internal IDs or order details
       res.json({
         success: true,
-        data: result,
+        data: { message: 'Webhook processed', status: result.status || 'unknown' },
       });
     } catch (error) {
       logger.error({ err: error }, '[WEBHOOK ERROR] Failed to process webhook');
@@ -270,7 +260,7 @@ router.post('/payment', async (req: Request, res: Response, next: NextFunction) 
 
     // Idempotency check - same pattern as provider-specific handler
     const idempotencyKey = generateIdempotencyKey(provider, payload);
-    const { alreadyProcessed, order } = await checkIdempotency(idempotencyKey);
+    const { alreadyProcessed, orderId } = await checkIdempotency(idempotencyKey);
 
     if (alreadyProcessed) {
       logger.info({ idempotencyKey }, '[WEBHOOK] Duplicate auto-detected webhook detected');
@@ -278,24 +268,19 @@ router.post('/payment', async (req: Request, res: Response, next: NextFunction) 
       await auditLog({
         action: 'WEBHOOK_DUPLICATE',
         resourceType: 'payment',
-        resourceId: order?.id,
+        resourceId: orderId,
         details: {
           provider,
           idempotencyKey,
-          orderNumber: order?.orderNumber ?? null,
-          previousStatus: order?.paymentStatus ?? null,
         },
         ip: req.ip,
         userAgent: req.headers['user-agent'],
       });
 
+      // Return success to prevent provider retries — no order details in response
       res.json({
         success: true,
-        data: {
-          message: 'Webhook already processed',
-          orderId: order?.id,
-          orderNumber: order?.orderNumber,
-        },
+        data: { message: 'Webhook already processed' },
       });
       return;
     }
@@ -330,9 +315,10 @@ router.post('/payment', async (req: Request, res: Response, next: NextFunction) 
       userAgent: req.headers['user-agent'],
     });
 
+    // Return minimal acknowledgment — no internal IDs or order details
     res.json({
       success: true,
-      data: result,
+      data: { message: 'Webhook processed', status: result.status || 'unknown' },
     });
   } catch (error) {
     logger.error({ err: error }, '[WEBHOOK ERROR] Failed to process auto-detected webhook');
@@ -348,27 +334,44 @@ router.get('/payment/callback', async (req: Request, res: Response) => {
   const { tap_id, paymentId, Id, invoice_id } = req.query;
   const transactionId = (tap_id || paymentId || Id || invoice_id) as string;
 
+  // Resolve the correct storefront URL — custom domain if the store has one,
+  // otherwise fall back to the platform's web URL.
+  async function getStorefrontUrl(): Promise<string> {
+    try {
+      if (!transactionId) return config.webUrl;
+      const order = await prisma.order.findFirst({
+        where: {
+          OR: [{ idempotencyKey: { contains: transactionId } }, { id: transactionId }],
+        },
+        select: { store: { select: { domain: true, slug: true } } },
+      });
+      if (order?.store?.domain) return `https://${order.store.domain}`;
+      if (order?.store?.slug) return `${config.webUrl}/${order.store.slug}`;
+      return config.webUrl;
+    } catch {
+      return config.webUrl;
+    }
+  }
+
   if (!transactionId) {
     res.redirect(`${config.webUrl}/checkout/error?reason=missing_transaction`);
     return;
   }
 
   try {
-    // Get payment status
-    const status = await PaymentService.getPaymentStatus(transactionId);
+    const [status, baseUrl] = await Promise.all([
+      PaymentService.getPaymentStatus(transactionId),
+      getStorefrontUrl(),
+    ]);
 
     if (status.status === 'completed') {
-      res.redirect(
-        `${config.webUrl}/checkout/success?transaction=${encodeURIComponent(transactionId)}`
-      );
+      res.redirect(`${baseUrl}/checkout/success?transaction=${encodeURIComponent(transactionId)}`);
     } else if (status.status === 'failed' || status.status === 'cancelled') {
       res.redirect(
-        `${config.webUrl}/checkout/error?reason=${encodeURIComponent(status.failureReason || status.status)}`
+        `${baseUrl}/checkout/error?reason=${encodeURIComponent(status.failureReason || status.status)}`
       );
     } else {
-      res.redirect(
-        `${config.webUrl}/checkout/pending?transaction=${encodeURIComponent(transactionId)}`
-      );
+      res.redirect(`${baseUrl}/checkout/pending?transaction=${encodeURIComponent(transactionId)}`);
     }
   } catch (error) {
     logger.error({ err: error }, '[CALLBACK ERROR] Failed to process payment callback');
@@ -388,8 +391,28 @@ router.get('/payment/error', async (req: Request, res: Response) => {
     '[PAYMENT ERROR CALLBACK] Payment error callback received'
   );
 
+  // Resolve storefront URL for the order's store
+  let baseUrl = config.webUrl;
+  if (transaction_id) {
+    try {
+      const order = await prisma.order.findFirst({
+        where: {
+          OR: [
+            { idempotencyKey: { contains: String(transaction_id) } },
+            { id: String(transaction_id) },
+          ],
+        },
+        select: { store: { select: { domain: true, slug: true } } },
+      });
+      if (order?.store?.domain) baseUrl = `https://${order.store.domain}`;
+      else if (order?.store?.slug) baseUrl = `${config.webUrl}/${order.store.slug}`;
+    } catch {
+      // Fall back to platform URL
+    }
+  }
+
   res.redirect(
-    `${config.webUrl}/checkout/error?reason=${encodeURIComponent(String(message || error || 'payment_failed'))}`
+    `${baseUrl}/checkout/error?reason=${encodeURIComponent(String(message || error || 'payment_failed'))}`
   );
 });
 
