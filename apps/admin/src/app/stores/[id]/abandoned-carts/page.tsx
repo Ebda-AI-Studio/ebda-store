@@ -69,11 +69,11 @@ const DEFAULT_CONFIG: AbandonedCartConfig = {
 
 function StatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
-    pending: 'bg-yellow-100 text-yellow-700',
-    step1_sent: 'bg-blue-100 text-blue-700',
-    step2_sent: 'bg-blue-100 text-blue-700',
-    step3_sent: 'bg-blue-100 text-blue-700',
-    recovered: 'bg-green-100 text-green-700',
+    pending: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300',
+    step1_sent: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+    step2_sent: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+    step3_sent: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+    recovered: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
     expired: 'bg-muted text-muted-foreground',
   };
   const labels: Record<string, string> = {
@@ -110,8 +110,8 @@ function Toggle({
       aria-checked={checked}
       onClick={() => !disabled && onChange(!checked)}
       disabled={disabled}
-      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 disabled:opacity-50 ${
-        checked ? 'bg-orange-500' : 'bg-muted'
+      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 ${
+        checked ? 'bg-primary' : 'bg-muted'
       }`}
     >
       <span
@@ -249,13 +249,13 @@ export default function AbandonedCartsPage() {
     >
       {loading ? (
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500" />
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
         </div>
       ) : !featureEnabled ? (
         <div className="flex flex-col items-center justify-center py-24 text-center">
           <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mb-4">
             <svg
-              className="w-8 h-8 text-orange-600"
+              className="w-8 h-8 text-primary"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -310,7 +310,7 @@ export default function AbandonedCartsPage() {
                     value={config.step1DelayMinutes}
                     onChange={e => patchConfig({ step1DelayMinutes: Number(e.target.value) })}
                     disabled={!config.step1Enabled}
-                    className="w-20 px-3 py-1.5 border border-border rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500 disabled:opacity-50"
+                    className="w-20 px-3 py-1.5 border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-50"
                   />
                   <label className="text-sm text-muted-foreground">min</label>
                 </div>
@@ -333,7 +333,7 @@ export default function AbandonedCartsPage() {
                     value={config.step2DelayMinutes}
                     onChange={e => patchConfig({ step2DelayMinutes: Number(e.target.value) })}
                     disabled={!config.step2Enabled}
-                    className="w-20 px-3 py-1.5 border border-border rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500 disabled:opacity-50"
+                    className="w-20 px-3 py-1.5 border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-50"
                   />
                   <label className="text-sm text-muted-foreground">min</label>
                 </div>
@@ -356,7 +356,7 @@ export default function AbandonedCartsPage() {
                     value={config.step3DelayMinutes}
                     onChange={e => patchConfig({ step3DelayMinutes: Number(e.target.value) })}
                     disabled={!config.step3Enabled}
-                    className="w-20 px-3 py-1.5 border border-border rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500 disabled:opacity-50"
+                    className="w-20 px-3 py-1.5 border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-50"
                   />
                   <label className="text-sm text-muted-foreground">min</label>
                 </div>
@@ -384,7 +384,7 @@ export default function AbandonedCartsPage() {
                             onChange={e =>
                               patchConfig({ couponDiscountPercent: Number(e.target.value) })
                             }
-                            className="w-full px-3 py-1.5 border border-border rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                            className="w-full px-3 py-1.5 border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
                           />
                           <span className="text-sm text-muted-foreground">%</span>
                         </div>
@@ -405,7 +405,7 @@ export default function AbandonedCartsPage() {
                               })
                             }
                             placeholder="No limit"
-                            className="w-full px-3 py-1.5 border border-border rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                            className="w-full px-3 py-1.5 border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
                           />
                           <span className="text-sm text-muted-foreground">KWD</span>
                         </div>
@@ -420,7 +420,7 @@ export default function AbandonedCartsPage() {
                             onChange={e =>
                               patchConfig({ couponExpiryHours: Number(e.target.value) })
                             }
-                            className="w-full px-3 py-1.5 border border-border rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                            className="w-full px-3 py-1.5 border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
                           />
                           <span className="text-sm text-muted-foreground">hours</span>
                         </div>
@@ -435,7 +435,7 @@ export default function AbandonedCartsPage() {
               <button
                 onClick={handleSaveConfig}
                 disabled={savingConfig}
-                className="px-6 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
+                className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
               >
                 {savingConfig && (
                   <span className="animate-spin inline-block h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
@@ -461,7 +461,7 @@ export default function AbandonedCartsPage() {
                   setPage(1);
                 }}
                 aria-label="Filter by status"
-                className="px-3 py-1.5 text-sm border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                className="px-3 py-1.5 text-sm border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
               >
                 <option value="all">All statuses</option>
                 <option value="pending">Pending</option>
@@ -495,22 +495,37 @@ export default function AbandonedCartsPage() {
             ) : (
               <>
                 <div className="overflow-x-auto">
-                  <table className="w-full">
+                  <table className="w-full" aria-label="Abandoned carts">
                     <thead>
                       <tr className="bg-muted border-b border-border">
-                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                        >
                           Customer
                         </th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                        >
                           Total
                         </th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                        >
                           Items
                         </th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                        >
                           Status
                         </th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                        >
                           Date
                         </th>
                       </tr>

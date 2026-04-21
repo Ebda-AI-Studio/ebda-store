@@ -79,8 +79,16 @@ export function ProductGridCard({
 
       {/* Compare Button */}
       <button
-        aria-label={isInCompare ? 'Remove from compare' : 'Add to compare'}
-        title={isInCompare ? 'Remove from compare' : 'Add to compare'}
+        aria-label={
+          isInCompare
+            ? t('Remove from compare', 'إزالة من المقارنة')
+            : t('Add to compare', 'إضافة إلى المقارنة')
+        }
+        title={
+          isInCompare
+            ? t('Remove from compare', 'إزالة من المقارنة')
+            : t('Add to compare', 'إضافة إلى المقارنة')
+        }
         className={`absolute left-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full shadow-md backdrop-blur-sm transition-all opacity-0 group-hover:opacity-100 ${
           isInCompare
             ? 'bg-primary text-white'

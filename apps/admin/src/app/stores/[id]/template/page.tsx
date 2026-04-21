@@ -29,7 +29,7 @@ const templates: Template[] = [
     descriptionAr: 'خطوط نظيفة ولمسات جريئة وشعور معاصر. مثالي لماركات التكنولوجيا ونمط الحياة.',
     tags: ['Tech', 'Lifestyle', 'Gadgets'],
     bestFor: 'Tech, lifestyle, and modern brands',
-    previewColor: 'from-orange-500 to-orange-600',
+    previewColor: 'from-primary to-primary/90',
   },
   {
     id: 'classic',

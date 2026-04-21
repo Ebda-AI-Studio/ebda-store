@@ -237,7 +237,7 @@ export default function TaxSettingsPage() {
       <div className="space-y-6">
         {loading ? (
           <div className="flex items-center justify-center h-64">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
         ) : (
           <>
@@ -265,7 +265,7 @@ export default function TaxSettingsPage() {
                       className="sr-only peer"
                       disabled={savingSettings}
                     />
-                    <div className="w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div>
+                    <div className="w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/30 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
                   </label>
                 </div>
 
@@ -290,7 +290,7 @@ export default function TaxSettingsPage() {
                       disabled={savingSettings || !settings.taxEnabled}
                     />
                     <div
-                      className={`w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500 ${!settings.taxEnabled ? 'opacity-50' : ''}`}
+                      className={`w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/30 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary ${!settings.taxEnabled ? 'opacity-50' : ''}`}
                     ></div>
                   </label>
                 </div>
@@ -316,7 +316,7 @@ export default function TaxSettingsPage() {
                       }}
                       onBlur={() => handleSaveSettings({ defaultTaxRate: settings.defaultTaxRate })}
                       placeholder="e.g., 5.00"
-                      className="w-32 px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      className="w-32 px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                       disabled={!settings.taxEnabled}
                     />
                     <span className="text-muted-foreground">%</span>
@@ -336,7 +336,7 @@ export default function TaxSettingsPage() {
                 </div>
                 <button
                   onClick={() => handleOpenModal()}
-                  className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors flex items-center gap-2"
+                  className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-2"
                   disabled={!settings.taxEnabled}
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -359,7 +359,7 @@ export default function TaxSettingsPage() {
                     onClick={() => setFilter(f)}
                     className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                       filter === f
-                        ? 'bg-orange-500 text-white'
+                        ? 'bg-primary text-white'
                         : 'bg-card text-foreground hover:bg-muted border border-border'
                     }`}
                   >
@@ -395,7 +395,7 @@ export default function TaxSettingsPage() {
                   {settings.taxEnabled && (
                     <button
                       onClick={() => handleOpenModal()}
-                      className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+                      className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
                     >
                       Create First Rate
                     </button>
@@ -403,28 +403,49 @@ export default function TaxSettingsPage() {
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full">
+                  <table className="w-full" aria-label="Tax rules">
                     <thead>
                       <tr className="bg-muted border-b border-border">
-                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                        >
                           Name
                         </th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                        >
                           Rate
                         </th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                        >
                           Region
                         </th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                        >
                           Priority
                         </th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                        >
                           Type
                         </th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                        >
                           Status
                         </th>
-                        <th className="text-right px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="text-right px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                        >
                           Actions
                         </th>
                       </tr>
@@ -463,8 +484,8 @@ export default function TaxSettingsPage() {
                             <span
                               className={`px-2 py-1 rounded text-xs font-medium ${
                                 rate.isCompound
-                                  ? 'bg-purple-100 text-purple-700'
-                                  : 'bg-blue-100 text-blue-700'
+                                  ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
+                                  : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
                               }`}
                             >
                               {rate.isCompound ? 'Compound' : 'Standard'}
@@ -486,7 +507,7 @@ export default function TaxSettingsPage() {
                             <div className="flex items-center justify-end gap-2">
                               <button
                                 onClick={() => handleOpenModal(rate)}
-                                className="p-2 text-muted-foreground hover:text-orange-500 transition-colors"
+                                className="p-2 text-muted-foreground hover:text-primary transition-colors"
                                 title="Edit"
                               >
                                 <svg
@@ -618,7 +639,7 @@ export default function TaxSettingsPage() {
                       value={formData.name}
                       onChange={e => setFormData({ ...formData, name: e.target.value })}
                       placeholder="e.g., VAT"
-                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                       required
                     />
                   </div>
@@ -631,7 +652,7 @@ export default function TaxSettingsPage() {
                       value={formData.nameAr}
                       onChange={e => setFormData({ ...formData, nameAr: e.target.value })}
                       placeholder="e.g., ضريبة القيمة المضافة"
-                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                       dir="rtl"
                     />
                   </div>
@@ -651,7 +672,7 @@ export default function TaxSettingsPage() {
                       value={formData.rate}
                       onChange={e => setFormData({ ...formData, rate: e.target.value })}
                       placeholder="5.00"
-                      className="w-32 px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      className="w-32 px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                       required
                     />
                     <span className="text-muted-foreground">%</span>
@@ -672,7 +693,7 @@ export default function TaxSettingsPage() {
                       }
                       placeholder="e.g., KW"
                       maxLength={2}
-                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 uppercase"
+                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary uppercase"
                     />
                     <p className="text-xs text-muted-foreground mt-1">
                       Leave empty for all countries
@@ -687,7 +708,7 @@ export default function TaxSettingsPage() {
                       value={formData.state}
                       onChange={e => setFormData({ ...formData, state: e.target.value })}
                       placeholder="e.g., Capital"
-                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                     />
                     <p className="text-xs text-muted-foreground mt-1">Leave empty for all states</p>
                   </div>
@@ -704,7 +725,7 @@ export default function TaxSettingsPage() {
                     value={formData.priority}
                     onChange={e => setFormData({ ...formData, priority: e.target.value })}
                     placeholder="0"
-                    className="w-24 px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                    className="w-24 px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   />
                   <p className="text-xs text-muted-foreground mt-1">
                     Higher priority rates are applied first
@@ -721,7 +742,7 @@ export default function TaxSettingsPage() {
                         onChange={e => setFormData({ ...formData, isCompound: e.target.checked })}
                         className="sr-only peer"
                       />
-                      <div className="w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-500"></div>
+                      <div className="w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/30 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-500"></div>
                     </label>
                     <div>
                       <span className="text-sm text-foreground font-medium">Compound Tax</span>
@@ -739,7 +760,7 @@ export default function TaxSettingsPage() {
                         onChange={e => setFormData({ ...formData, isActive: e.target.checked })}
                         className="sr-only peer"
                       />
-                      <div className="w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div>
+                      <div className="w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/30 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
                     </label>
                     <span className="text-sm text-foreground">Active</span>
                   </div>
@@ -757,7 +778,7 @@ export default function TaxSettingsPage() {
                   <button
                     type="submit"
                     disabled={saving}
-                    className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                   >
                     {saving && (
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>

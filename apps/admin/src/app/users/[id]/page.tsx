@@ -347,8 +347,8 @@ export default function UserDetailPage() {
                 <div
                   className={`rounded-lg p-4 text-sm ${
                     saveMessage.type === 'success'
-                      ? 'bg-emerald-50 text-emerald-700'
-                      : 'bg-red-50 text-red-700'
+                      ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300'
+                      : 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300'
                   }`}
                 >
                   {saveMessage.text}

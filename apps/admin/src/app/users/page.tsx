@@ -6,6 +6,7 @@ import { Button, Badge } from '@force/ui';
 import { AdminLayout } from '../../components/AdminLayout';
 import { ErrorState } from '../../components/ErrorState';
 import { apiGet } from '../../lib/api';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 
 interface User {
   id: string;
@@ -58,6 +59,7 @@ export default function UsersPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search, 300);
   const [roleFilter, setRoleFilter] = useState<string>('all');
 
   const fetchUsers = useCallback(async () => {
@@ -68,7 +70,7 @@ export default function UsersPage() {
         limit: pagination.limit.toString(),
       });
       if (roleFilter !== 'all') params.append('role', roleFilter);
-      if (search) params.append('search', search);
+      if (debouncedSearch) params.append('search', debouncedSearch);
 
       const { data, error: apiError } = await apiGet<{
         users: User[];
@@ -86,7 +88,7 @@ export default function UsersPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [pagination.page, pagination.limit, roleFilter, search]);
+  }, [pagination.page, pagination.limit, roleFilter, debouncedSearch]);
 
   useEffect(() => {
     fetchUsers();
@@ -163,28 +165,49 @@ export default function UsersPage() {
       {/* Users Table */}
       {!error && (
         <div className="rounded-xl border bg-card shadow-sm overflow-hidden overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full" aria-label="Users">
             <thead className="bg-muted border-b">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                >
                   User
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                >
                   Role
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                >
                   Status
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                >
                   Stores
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                >
                   Joined
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                >
                   Last Login
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                >
                   Actions
                 </th>
               </tr>

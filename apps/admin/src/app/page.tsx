@@ -137,7 +137,7 @@ export default function DashboardPage() {
           />
         </svg>
       ),
-      color: 'from-primary to-orange-600',
+      color: 'from-primary to-primary/90',
       bgColor: 'bg-orange-50',
       iconBg: 'bg-primary',
       isRevenue: true,
@@ -154,7 +154,7 @@ export default function DashboardPage() {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
         </svg>
       ),
-      iconBg: 'bg-blue-100 text-blue-600',
+      iconBg: 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300',
     },
     {
       title: 'Manage Users',
@@ -170,7 +170,7 @@ export default function DashboardPage() {
           />
         </svg>
       ),
-      iconBg: 'bg-emerald-100 text-emerald-600',
+      iconBg: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300',
     },
     {
       title: 'Audit Logs',

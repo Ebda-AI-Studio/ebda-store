@@ -66,7 +66,7 @@ export function AwardPointsModal({ member, saving, onSubmit, onClose }: AwardPoi
               type="number"
               name="points"
               placeholder="Enter points (negative to deduct)"
-              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
               required
             />
           </div>
@@ -77,7 +77,7 @@ export function AwardPointsModal({ member, saving, onSubmit, onClose }: AwardPoi
               type="text"
               name="reason"
               placeholder="Optional reason for adjustment"
-              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
             />
           </div>
 
@@ -92,7 +92,7 @@ export function AwardPointsModal({ member, saving, onSubmit, onClose }: AwardPoi
             <button
               type="submit"
               disabled={saving}
-              className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 flex items-center gap-2"
+              className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 flex items-center gap-2"
             >
               {saving && (
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>

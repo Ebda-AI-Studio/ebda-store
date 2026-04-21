@@ -56,9 +56,9 @@ interface Meta {
 // ==========================================
 
 const STATUS_COLORS: Record<string, string> = {
-  pending: 'bg-yellow-100 text-yellow-700',
-  approved: 'bg-green-100 text-green-700',
-  rejected: 'bg-red-100 text-red-700',
+  pending: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300',
+  approved: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+  rejected: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
   suspended: 'bg-muted text-foreground',
 };
 
@@ -240,7 +240,7 @@ export default function AffiliatesPage() {
     <AdminLayout title="Affiliate Program" subtitle="Manage influencer referrals and commissions">
       {loading ? (
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500" />
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
         </div>
       ) : (
         <>
@@ -261,7 +261,7 @@ export default function AffiliatesPage() {
               </div>
               <div className="bg-card rounded-xl border border-border p-4">
                 <p className="text-sm text-muted-foreground">Total Paid</p>
-                <p className="text-2xl font-bold text-orange-600">
+                <p className="text-2xl font-bold text-primary">
                   {formatFils(stats.commissionPaid)}
                 </p>
               </div>
@@ -278,7 +278,7 @@ export default function AffiliatesPage() {
               onClick={() => setActiveTab('affiliates')}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                 activeTab === 'affiliates'
-                  ? 'bg-orange-500 text-white'
+                  ? 'bg-primary text-white'
                   : 'bg-muted text-foreground hover:bg-muted/80'
               }`}
             >
@@ -288,7 +288,7 @@ export default function AffiliatesPage() {
               onClick={() => setActiveTab('config')}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                 activeTab === 'config'
-                  ? 'bg-orange-500 text-white'
+                  ? 'bg-primary text-white'
                   : 'bg-muted text-foreground hover:bg-muted/80'
               }`}
             >
@@ -310,7 +310,7 @@ export default function AffiliatesPage() {
                     }}
                     className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors capitalize ${
                       statusFilter === s
-                        ? 'bg-orange-500 text-white'
+                        ? 'bg-primary text-white'
                         : 'bg-card text-foreground hover:bg-muted border border-border'
                     }`}
                   >
@@ -344,25 +344,43 @@ export default function AffiliatesPage() {
               ) : (
                 <>
                   <div className="overflow-x-auto">
-                    <table className="w-full">
+                    <table className="w-full" aria-label="Affiliates">
                       <thead>
                         <tr className="bg-muted border-b border-border">
-                          <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          <th
+                            scope="col"
+                            className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                          >
                             Name / Email
                           </th>
-                          <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          <th
+                            scope="col"
+                            className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                          >
                             Referral Code
                           </th>
-                          <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          <th
+                            scope="col"
+                            className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                          >
                             Status
                           </th>
-                          <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          <th
+                            scope="col"
+                            className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                          >
                             Total Earned
                           </th>
-                          <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          <th
+                            scope="col"
+                            className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                          >
                             Pending Balance
                           </th>
-                          <th className="text-right px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          <th
+                            scope="col"
+                            className="text-right px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                          >
                             Actions
                           </th>
                         </tr>
@@ -389,7 +407,7 @@ export default function AffiliatesPage() {
                             <td className="px-6 py-4 text-green-600 font-medium">
                               {formatFils(Number(affiliate.totalEarned))}
                             </td>
-                            <td className="px-6 py-4 text-orange-600 font-medium">
+                            <td className="px-6 py-4 text-primary font-medium">
                               {formatFils(Number(affiliate.pendingBalance))}
                             </td>
                             <td className="px-6 py-4">
@@ -417,7 +435,7 @@ export default function AffiliatesPage() {
                                     <button
                                       onClick={() => openPayoutModal(affiliate)}
                                       disabled={saving || Number(affiliate.pendingBalance) <= 0}
-                                      className="text-orange-500 hover:text-orange-600 text-sm font-medium disabled:opacity-30"
+                                      className="text-primary hover:text-primary/90 text-sm font-medium disabled:opacity-30"
                                     >
                                       Payout
                                     </button>
@@ -489,7 +507,7 @@ export default function AffiliatesPage() {
                           defaultCommissionRate: parseFloat(e.target.value) || 0,
                         })
                       }
-                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                     />
                   </div>
                   <div>
@@ -504,7 +522,7 @@ export default function AffiliatesPage() {
                       onChange={e =>
                         setConfig({ ...config, cookieDurationDays: parseInt(e.target.value) || 30 })
                       }
-                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                     />
                   </div>
                   <div>
@@ -518,7 +536,7 @@ export default function AffiliatesPage() {
                       onChange={e =>
                         setConfig({ ...config, minPayoutAmount: parseInt(e.target.value) || 0 })
                       }
-                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                     />
                     <p className="text-xs text-muted-foreground mt-1">
                       {formatFils(config.minPayoutAmount)} KWD equivalent
@@ -540,7 +558,7 @@ export default function AffiliatesPage() {
                     <button
                       onClick={() => setConfig({ ...config, autoApprove: !config.autoApprove })}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        config.autoApprove ? 'bg-orange-500' : 'bg-border'
+                        config.autoApprove ? 'bg-primary' : 'bg-border'
                       }`}
                     >
                       <span
@@ -562,7 +580,7 @@ export default function AffiliatesPage() {
                         setConfig({ ...config, publicSignupEnabled: !config.publicSignupEnabled })
                       }
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        config.publicSignupEnabled ? 'bg-orange-500' : 'bg-border'
+                        config.publicSignupEnabled ? 'bg-primary' : 'bg-border'
                       }`}
                     >
                       <span
@@ -579,7 +597,7 @@ export default function AffiliatesPage() {
                 <button
                   onClick={handleSaveConfig}
                   disabled={saving}
-                  className="px-6 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50 flex items-center gap-2"
+                  className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-2"
                 >
                   {saving && (
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
@@ -619,7 +637,7 @@ export default function AffiliatesPage() {
             <form onSubmit={handlePayout} className="p-6 space-y-4">
               <p className="text-sm text-muted-foreground">
                 Paying out to <strong>{payoutAffiliate.name}</strong>. Available balance:{' '}
-                <strong className="text-orange-600">
+                <strong className="text-primary">
                   {formatFils(Number(payoutAffiliate.pendingBalance))}
                 </strong>
               </p>
@@ -636,7 +654,7 @@ export default function AffiliatesPage() {
                   value={payoutAmount}
                   onChange={e => setPayoutAmount(e.target.value)}
                   placeholder="0.000"
-                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   required
                 />
               </div>
@@ -648,7 +666,7 @@ export default function AffiliatesPage() {
                 <select
                   value={payoutMethod}
                   onChange={e => setPayoutMethod(e.target.value)}
-                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                 >
                   <option value="bank_transfer">Bank Transfer</option>
                   <option value="knet">KNET</option>
@@ -666,7 +684,7 @@ export default function AffiliatesPage() {
                   onChange={e => setPayoutNotes(e.target.value)}
                   placeholder="Optional notes for this payout"
                   rows={3}
-                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 resize-none"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary resize-none"
                 />
               </div>
 
@@ -684,7 +702,7 @@ export default function AffiliatesPage() {
                 <button
                   type="submit"
                   disabled={saving || !payoutAmount}
-                  className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 flex items-center gap-2"
+                  className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 flex items-center gap-2"
                 >
                   {saving && (
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />

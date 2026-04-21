@@ -8,6 +8,7 @@ import { AdminLayout } from '../../../../components/AdminLayout';
 import { useAuth } from '../../../../lib/auth';
 import { apiGet, apiDelete } from '../../../../lib/api';
 import { formatPrice } from '../../../../lib/format';
+import { useDebouncedValue } from '../../../../hooks/useDebouncedValue';
 
 interface Product {
   id: string;
@@ -44,6 +45,7 @@ export default function StoreProductsPage() {
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search, 300);
   const [statusFilter, setStatusFilter] = useState('all');
   const [page, setPage] = useState(1);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -60,7 +62,7 @@ export default function StoreProductsPage() {
   useEffect(() => {
     if (!isAuthenticated) return;
     fetchProducts();
-  }, [page, statusFilter, search]);
+  }, [page, statusFilter, debouncedSearch]);
 
   async function fetchStore() {
     if (!isAuthenticated) return;
@@ -84,7 +86,7 @@ export default function StoreProductsPage() {
         limit: '20',
       });
       if (statusFilter !== 'all') queryParams.append('status', statusFilter);
-      if (search) queryParams.append('search', search);
+      if (debouncedSearch) queryParams.append('search', debouncedSearch);
 
       const { data } = await apiGet<{ products: Product[]; pagination: Pagination }>(
         `/api/v1/stores/${storeId}/products?${queryParams}`
@@ -137,14 +139,18 @@ export default function StoreProductsPage() {
     switch (status) {
       case 'active':
         return (
-          <span className={`${base} bg-emerald-50 text-emerald-700`}>
+          <span
+            className={`${base} bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300`}
+          >
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
             Active
           </span>
         );
       case 'draft':
         return (
-          <span className={`${base} bg-amber-50 text-amber-700`}>
+          <span
+            className={`${base} bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300`}
+          >
             <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
             Draft
           </span>
@@ -177,7 +183,7 @@ export default function StoreProductsPage() {
           </div>
           {/* Skeleton table */}
           <div className="rounded-xl border bg-card overflow-hidden overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full" aria-label="Products (loading)">
               <thead className="bg-muted border-b">
                 <tr>
                   {['Product', 'SKU', 'Price', 'Inventory', 'Status', 'Actions'].map(h => (
@@ -317,23 +323,43 @@ export default function StoreProductsPage() {
 
       {/* Products Table */}
       <div className="rounded-xl border bg-card overflow-hidden overflow-x-auto">
-        <table className="w-full">
+        <table className="w-full" aria-label="Products">
           <thead className="bg-muted border-b">
             <tr>
-              <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
+              <th
+                scope="col"
+                className="px-4 py-3 text-left text-sm font-medium text-muted-foreground"
+              >
                 Product
               </th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">SKU</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
+              <th
+                scope="col"
+                className="px-4 py-3 text-left text-sm font-medium text-muted-foreground"
+              >
+                SKU
+              </th>
+              <th
+                scope="col"
+                className="px-4 py-3 text-left text-sm font-medium text-muted-foreground"
+              >
                 Price
               </th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
+              <th
+                scope="col"
+                className="px-4 py-3 text-left text-sm font-medium text-muted-foreground"
+              >
                 Inventory
               </th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
+              <th
+                scope="col"
+                className="px-4 py-3 text-left text-sm font-medium text-muted-foreground"
+              >
                 Status
               </th>
-              <th className="px-4 py-3 text-right text-sm font-medium text-muted-foreground">
+              <th
+                scope="col"
+                className="px-4 py-3 text-right text-sm font-medium text-muted-foreground"
+              >
                 Actions
               </th>
             </tr>

@@ -447,15 +447,25 @@ export default function ProductVariantsPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-sm" aria-label="Product variants">
                 <thead className="bg-muted text-left text-xs uppercase text-muted-foreground">
                   <tr>
-                    <th className="px-4 py-3">Variant</th>
-                    <th className="px-4 py-3">SKU</th>
-                    <th className="px-4 py-3 text-right">Price</th>
-                    <th className="px-4 py-3 text-right">Stock</th>
-                    <th className="px-4 py-3 text-center">Status</th>
-                    <th className="px-4 py-3"></th>
+                    <th scope="col" className="px-4 py-3">
+                      Variant
+                    </th>
+                    <th scope="col" className="px-4 py-3">
+                      SKU
+                    </th>
+                    <th scope="col" className="px-4 py-3 text-right">
+                      Price
+                    </th>
+                    <th scope="col" className="px-4 py-3 text-right">
+                      Stock
+                    </th>
+                    <th scope="col" className="px-4 py-3 text-center">
+                      Status
+                    </th>
+                    <th scope="col" className="px-4 py-3"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">

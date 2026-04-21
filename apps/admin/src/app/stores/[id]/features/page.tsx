@@ -37,7 +37,7 @@ const CATEGORY_LABELS: Record<FeatureCategory, string> = {
 const CATEGORY_COLORS: Record<FeatureCategory, { icon: string; bg: string; text: string }> = {
   commerce: { icon: 'bg-blue-100', bg: 'bg-blue-500', text: 'text-blue-600' },
   marketing: { icon: 'bg-purple-100', bg: 'bg-purple-500', text: 'text-purple-600' },
-  operations: { icon: 'bg-orange-100', bg: 'bg-orange-500', text: 'text-orange-600' },
+  operations: { icon: 'bg-orange-100', bg: 'bg-primary', text: 'text-primary' },
   storefront: { icon: 'bg-green-100', bg: 'bg-green-500', text: 'text-green-600' },
 };
 
@@ -70,8 +70,8 @@ function ToggleSwitch({
       aria-checked={enabled}
       onClick={() => !disabled && onChange(!enabled)}
       disabled={disabled}
-      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${
-        enabled ? 'bg-orange-500' : 'bg-muted'
+      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${
+        enabled ? 'bg-primary' : 'bg-muted'
       }`}
     >
       <span
@@ -269,7 +269,7 @@ export default function StoreFeaturesPage() {
     return (
       <AdminLayout title="Store Features" subtitle="Manage feature toggles for this store">
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500" />
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
         </div>
       </AdminLayout>
     );
@@ -297,7 +297,7 @@ export default function StoreFeaturesPage() {
           <p className="text-muted-foreground">{error || 'Failed to load features.'}</p>
           <button
             onClick={fetchFeatures}
-            className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+            className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
           >
             Retry
           </button>
@@ -337,7 +337,7 @@ export default function StoreFeaturesPage() {
             <button
               onClick={handleSave}
               disabled={saving}
-              className="px-4 py-2 bg-orange-500 text-white text-sm font-medium rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50 flex items-center gap-2"
+              className="px-4 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-2"
             >
               {saving && (
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
@@ -388,7 +388,7 @@ export default function StoreFeaturesPage() {
                         <div className="flex items-center gap-2 mb-0.5">
                           <p className="font-medium text-foreground">{def.name}</p>
                           {isDirty && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-100 text-orange-700">
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-100 text-primary">
                               unsaved
                             </span>
                           )}
@@ -439,7 +439,7 @@ export default function StoreFeaturesPage() {
                 <button
                   onClick={handleSave}
                   disabled={saving}
-                  className="px-6 py-2 bg-orange-500 text-white text-sm font-medium rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50 flex items-center gap-2"
+                  className="px-6 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-2"
                 >
                   {saving && (
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />

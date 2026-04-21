@@ -333,7 +333,7 @@ export default function CartClient() {
                             <button
                               onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}
                               disabled={item.quantity <= 1}
-                              className={`flex h-9 w-9 items-center justify-center transition-colors ${
+                              className={`flex h-11 w-11 items-center justify-center transition-colors ${
                                 item.quantity <= 1
                                   ? 'text-muted-foreground/40 cursor-not-allowed'
                                   : 'text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer'
@@ -360,7 +360,7 @@ export default function CartClient() {
                             <button
                               onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
                               disabled={item.quantity >= 10}
-                              className={`flex h-9 w-9 items-center justify-center transition-colors ${
+                              className={`flex h-11 w-11 items-center justify-center transition-colors ${
                                 item.quantity >= 10
                                   ? 'text-muted-foreground/40 cursor-not-allowed'
                                   : 'text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer'
@@ -430,12 +430,17 @@ export default function CartClient() {
                     {/* Promo Code */}
                     {isEnabled('coupons') && (
                       <div className="mt-6">
-                        <label className="text-sm font-medium text-foreground">
+                        <label
+                          htmlFor="cart-promo-code"
+                          className="text-sm font-medium text-foreground"
+                        >
                           {t('Promo Code', '\u0643\u0648\u062f \u0627\u0644\u062e\u0635\u0645')}
                         </label>
                         <div className="mt-2 flex gap-2">
                           <input
+                            id="cart-promo-code"
                             type="text"
+                            autoComplete="off"
                             value={promoCode}
                             onChange={e => setPromoCode(e.target.value)}
                             placeholder={t(

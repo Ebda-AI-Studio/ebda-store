@@ -250,12 +250,18 @@ export default function CreateStorePage() {
                   Add the following DNS record to your domain provider to complete setup:
                 </p>
                 <div className="mt-3 overflow-hidden rounded-md border border-amber-200 bg-card">
-                  <table className="w-full text-sm">
+                  <table className="w-full text-sm" aria-label="DNS records required">
                     <thead>
                       <tr className="border-b bg-amber-50">
-                        <th className="px-3 py-2 text-left font-medium text-amber-900">Type</th>
-                        <th className="px-3 py-2 text-left font-medium text-amber-900">Name</th>
-                        <th className="px-3 py-2 text-left font-medium text-amber-900">Value</th>
+                        <th scope="col" className="px-3 py-2 text-left font-medium text-amber-900">
+                          Type
+                        </th>
+                        <th scope="col" className="px-3 py-2 text-left font-medium text-amber-900">
+                          Name
+                        </th>
+                        <th scope="col" className="px-3 py-2 text-left font-medium text-amber-900">
+                          Value
+                        </th>
                       </tr>
                     </thead>
                     <tbody>

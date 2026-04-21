@@ -144,7 +144,8 @@ export default function CheckoutClient() {
   // Payment
   const [selectedProvider, setSelectedProvider] = useState('');
 
-  // Form data
+  // Form data — persisted in sessionStorage so a page refresh mid-checkout
+  // doesn't wipe what the customer already typed.
   const [formData, setFormData] = useState({
     email: '',
     firstName: '',
@@ -156,6 +157,39 @@ export default function CheckoutClient() {
     area: '',
     notes: '',
   });
+
+  const checkoutStorageKey = store?.id ? `force-checkout-form-${store.id}` : null;
+
+  // Hydrate form from sessionStorage once the store id is known.
+  useEffect(() => {
+    if (!checkoutStorageKey || typeof window === 'undefined') return;
+    try {
+      const saved = window.sessionStorage.getItem(checkoutStorageKey);
+      if (!saved) return;
+      const parsed = JSON.parse(saved);
+      if (parsed && typeof parsed === 'object') {
+        setFormData(prev => ({ ...prev, ...parsed }));
+        if (typeof parsed.area === 'string' && parsed.area) {
+          setSelectedArea(parsed.area);
+        }
+      }
+    } catch {
+      // Corrupt JSON — drop it and start fresh.
+      window.sessionStorage.removeItem(checkoutStorageKey);
+    }
+  }, [checkoutStorageKey]);
+
+  // Persist form to sessionStorage on every change (skip empty default state).
+  useEffect(() => {
+    if (!checkoutStorageKey || typeof window === 'undefined') return;
+    const hasContent = Object.values(formData).some(v => typeof v === 'string' && v.trim() !== '');
+    if (!hasContent) return;
+    try {
+      window.sessionStorage.setItem(checkoutStorageKey, JSON.stringify(formData));
+    } catch {
+      // Quota exceeded or storage disabled — not fatal.
+    }
+  }, [formData, checkoutStorageKey]);
 
   // Form validation errors
   const [formErrors, setFormErrors] = useState<{
@@ -417,6 +451,15 @@ export default function CheckoutClient() {
         }
       );
 
+      // Order created — clear the saved checkout form before leaving the page.
+      if (checkoutStorageKey && typeof window !== 'undefined') {
+        try {
+          window.sessionStorage.removeItem(checkoutStorageKey);
+        } catch {
+          // Non-fatal
+        }
+      }
+
       if (paymentResult.success && paymentResult.data?.cod) {
         // Cash on delivery — go straight to success
         router.push(storeUrl(`/checkout/success?orderId=${order.id}&cod=1`));
@@ -578,6 +621,7 @@ export default function CheckoutClient() {
                         type="email"
                         value={formData.email}
                         onChange={e => updateField('email', e.target.value)}
+                        aria-invalid={formErrors.email ? true : undefined}
                         className={
                           formErrors.email
                             ? 'border-destructive focus:border-destructive focus:ring-destructive'
@@ -600,6 +644,7 @@ export default function CheckoutClient() {
                           )}
                           value={formData.firstName}
                           onChange={e => updateField('firstName', e.target.value)}
+                          aria-invalid={formErrors.firstName ? true : undefined}
                           className={
                             formErrors.firstName
                               ? 'border-destructive focus:border-destructive focus:ring-destructive'
@@ -620,6 +665,7 @@ export default function CheckoutClient() {
                           )}
                           value={formData.lastName}
                           onChange={e => updateField('lastName', e.target.value)}
+                          aria-invalid={formErrors.lastName ? true : undefined}
                           className={
                             formErrors.lastName
                               ? 'border-destructive focus:border-destructive focus:ring-destructive'
@@ -641,6 +687,7 @@ export default function CheckoutClient() {
                         placeholder="+965 XXXX XXXX"
                         value={formData.phone}
                         onChange={e => updateField('phone', e.target.value)}
+                        aria-invalid={formErrors.phone ? true : undefined}
                         className={
                           formErrors.phone
                             ? 'border-destructive focus:border-destructive focus:ring-destructive'
@@ -662,6 +709,7 @@ export default function CheckoutClient() {
                         )}
                         value={formData.area}
                         onChange={e => updateField('area', e.target.value)}
+                        aria-invalid={formErrors.area ? true : undefined}
                         options={[
                           {
                             value: '',
@@ -696,6 +744,7 @@ export default function CheckoutClient() {
                         )}
                         value={formData.address}
                         onChange={e => updateField('address', e.target.value)}
+                        aria-invalid={formErrors.address ? true : undefined}
                         className={
                           formErrors.address
                             ? 'border-destructive focus:border-destructive focus:ring-destructive'
@@ -723,6 +772,7 @@ export default function CheckoutClient() {
                         label={t('City', '\u0627\u0644\u0645\u062f\u064a\u0646\u0629')}
                         value={formData.city}
                         onChange={e => updateField('city', e.target.value)}
+                        aria-invalid={formErrors.city ? true : undefined}
                         placeholder={t(
                           'e.g., Kuwait City',
                           '\u0645\u062b\u0627\u0644: \u0645\u062f\u064a\u0646\u0629 \u0627\u0644\u0643\u0648\u064a\u062a'

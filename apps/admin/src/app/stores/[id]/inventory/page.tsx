@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPost } from '../../../../lib/api';
+import { useDebouncedValue } from '../../../../hooks/useDebouncedValue';
 
 interface InventoryStats {
   totalProducts: number;
@@ -68,6 +69,7 @@ export default function InventoryPage() {
     'all'
   );
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search, 300);
 
   const [showAdjustModal, setShowAdjustModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<ProductInventory | null>(null);
@@ -95,7 +97,7 @@ export default function InventoryPage() {
   const fetchProducts = useCallback(async () => {
     const params = new URLSearchParams();
     if (stockFilter !== 'all') params.set('stockFilter', stockFilter);
-    if (search) params.set('search', search);
+    if (debouncedSearch) params.set('search', debouncedSearch);
     params.set('sortBy', 'inventory');
     params.set('sortOrder', 'asc');
 
@@ -105,7 +107,7 @@ export default function InventoryPage() {
     if (data) {
       setProducts(data.products || []);
     }
-  }, [storeId, stockFilter, search]);
+  }, [storeId, stockFilter, debouncedSearch]);
 
   const fetchHistory = useCallback(async () => {
     const { data } = await apiGet<{ history: HistoryItem[] }>(
@@ -145,7 +147,7 @@ export default function InventoryPage() {
     if (!loading) {
       fetchProducts();
     }
-  }, [stockFilter, search]);
+  }, [stockFilter, debouncedSearch]);
 
   const handleAdjust = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -204,7 +206,7 @@ export default function InventoryPage() {
     <AdminLayout title="Inventory Management" subtitle="Track and manage your product stock levels">
       {loading ? (
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
       ) : (
         <>
@@ -268,7 +270,7 @@ export default function InventoryPage() {
                 </div>
                 <button
                   onClick={() => setActiveTab('alerts')}
-                  className="px-4 py-2 bg-yellow-100 text-yellow-800 rounded-lg hover:bg-yellow-200 text-sm font-medium"
+                  className="px-4 py-2 bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300 rounded-lg hover:bg-yellow-200 text-sm font-medium"
                 >
                   View Alerts
                 </button>
@@ -282,7 +284,7 @@ export default function InventoryPage() {
               onClick={() => setActiveTab('products')}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                 activeTab === 'products'
-                  ? 'bg-orange-500 text-white'
+                  ? 'bg-primary text-white'
                   : 'bg-muted text-foreground hover:bg-muted/80'
               }`}
             >
@@ -292,7 +294,7 @@ export default function InventoryPage() {
               onClick={() => setActiveTab('history')}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                 activeTab === 'history'
-                  ? 'bg-orange-500 text-white'
+                  ? 'bg-primary text-white'
                   : 'bg-muted text-foreground hover:bg-muted/80'
               }`}
             >
@@ -302,7 +304,7 @@ export default function InventoryPage() {
               onClick={() => setActiveTab('alerts')}
               className={`px-4 py-2 rounded-lg font-medium transition-colors relative ${
                 activeTab === 'alerts'
-                  ? 'bg-orange-500 text-white'
+                  ? 'bg-primary text-white'
                   : 'bg-muted text-foreground hover:bg-muted/80'
               }`}
             >
@@ -326,7 +328,7 @@ export default function InventoryPage() {
                     placeholder="Search products..."
                     value={search}
                     onChange={e => setSearch(e.target.value)}
-                    className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                    className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   />
                 </div>
                 <div className="flex gap-2">
@@ -336,7 +338,7 @@ export default function InventoryPage() {
                       onClick={() => setStockFilter(filter)}
                       className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                         stockFilter === filter
-                          ? 'bg-orange-500 text-white'
+                          ? 'bg-primary text-white'
                           : 'bg-card text-foreground hover:bg-muted border border-border'
                       }`}
                     >
@@ -353,28 +355,49 @@ export default function InventoryPage() {
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full">
+                  <table className="w-full" aria-label="Product inventory">
                     <thead>
                       <tr className="bg-muted border-b border-border">
-                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                        >
                           Product
                         </th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                        >
                           SKU
                         </th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                        >
                           Stock
                         </th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                        >
                           Threshold
                         </th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                        >
                           Status
                         </th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                        >
                           Value
                         </th>
-                        <th className="text-right px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="text-right px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                        >
                           Actions
                         </th>
                       </tr>
@@ -421,7 +444,7 @@ export default function InventoryPage() {
                                 setSelectedProduct(product);
                                 setShowAdjustModal(true);
                               }}
-                              className="text-orange-500 hover:text-orange-600 text-sm font-medium"
+                              className="text-primary hover:text-primary/90 text-sm font-medium"
                             >
                               Adjust
                             </button>
@@ -444,25 +467,43 @@ export default function InventoryPage() {
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full">
+                  <table className="w-full" aria-label="Inventory history">
                     <thead>
                       <tr className="bg-muted border-b border-border">
-                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                        >
                           Date
                         </th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                        >
                           Product
                         </th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                        >
                           Type
                         </th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                        >
                           Change
                         </th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                        >
                           Stock
                         </th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                        >
                           Reason
                         </th>
                       </tr>
@@ -539,25 +580,43 @@ export default function InventoryPage() {
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full">
+                  <table className="w-full" aria-label="Low stock and out of stock">
                     <thead>
                       <tr className="bg-muted border-b border-border">
-                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                        >
                           Product
                         </th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                        >
                           SKU
                         </th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                        >
                           Current Stock
                         </th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                        >
                           Threshold
                         </th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                        >
                           Status
                         </th>
-                        <th className="text-right px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="text-right px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                        >
                           Actions
                         </th>
                       </tr>
@@ -599,7 +658,7 @@ export default function InventoryPage() {
                                 setSelectedProduct(product);
                                 setShowAdjustModal(true);
                               }}
-                              className="px-3 py-1 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm font-medium"
+                              className="px-3 py-1 bg-primary text-white rounded-lg hover:bg-primary/90 text-sm font-medium"
                             >
                               Restock
                             </button>
@@ -654,7 +713,7 @@ export default function InventoryPage() {
                 <select
                   value={adjustType}
                   onChange={e => setAdjustType(e.target.value)}
-                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                 >
                   {ADJUSTMENT_TYPES.map(type => (
                     <option key={type.value} value={type.value}>
@@ -674,7 +733,7 @@ export default function InventoryPage() {
                   value={adjustQuantity}
                   onChange={e => setAdjustQuantity(e.target.value)}
                   placeholder="Enter quantity"
-                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   required
                 />
                 {adjustQuantity && (
@@ -696,7 +755,7 @@ export default function InventoryPage() {
                   value={adjustReason}
                   onChange={e => setAdjustReason(e.target.value)}
                   placeholder="Optional reason for adjustment"
-                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                 />
               </div>
 
@@ -714,7 +773,7 @@ export default function InventoryPage() {
                 <button
                   type="submit"
                   disabled={saving || !adjustQuantity}
-                  className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 flex items-center gap-2"
+                  className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 flex items-center gap-2"
                 >
                   {saving && (
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>

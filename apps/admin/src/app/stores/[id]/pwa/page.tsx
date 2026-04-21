@@ -229,7 +229,7 @@ export default function PWASettingsPage() {
             disabled={saving}
             className={`px-4 py-2 rounded-lg font-medium transition-colors ${
               pwaEnabled
-                ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 hover:bg-green-200'
                 : 'bg-muted text-muted-foreground hover:bg-muted/80'
             }`}
           >
@@ -240,7 +240,7 @@ export default function PWASettingsPage() {
     >
       {loading ? (
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
       ) : (
         <div className="space-y-6">
@@ -282,7 +282,7 @@ export default function PWASettingsPage() {
               <div className="flex items-start gap-3">
                 <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
                   <svg
-                    className="w-4 h-4 text-orange-600"
+                    className="w-4 h-4 text-primary"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -303,7 +303,7 @@ export default function PWASettingsPage() {
               <div className="flex items-start gap-3">
                 <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
                   <svg
-                    className="w-4 h-4 text-orange-600"
+                    className="w-4 h-4 text-primary"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -324,7 +324,7 @@ export default function PWASettingsPage() {
               <div className="flex items-start gap-3">
                 <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
                   <svg
-                    className="w-4 h-4 text-orange-600"
+                    className="w-4 h-4 text-primary"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -358,7 +358,7 @@ export default function PWASettingsPage() {
                   value={settings.appName}
                   onChange={e => setSettings({ ...settings, appName: e.target.value })}
                   placeholder="My Store"
-                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   disabled={!pwaEnabled}
                 />
               </div>
@@ -371,7 +371,7 @@ export default function PWASettingsPage() {
                   value={settings.appNameAr || ''}
                   onChange={e => setSettings({ ...settings, appNameAr: e.target.value })}
                   placeholder="متجري"
-                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   dir="rtl"
                   disabled={!pwaEnabled}
                 />
@@ -386,7 +386,7 @@ export default function PWASettingsPage() {
                   value={settings.shortName}
                   onChange={e => setSettings({ ...settings, shortName: e.target.value })}
                   placeholder="Store"
-                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   disabled={!pwaEnabled}
                 />
                 <p className="text-xs text-muted-foreground mt-1">Shown under home screen icon</p>
@@ -401,7 +401,7 @@ export default function PWASettingsPage() {
                   value={settings.shortNameAr || ''}
                   onChange={e => setSettings({ ...settings, shortNameAr: e.target.value })}
                   placeholder="المتجر"
-                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   dir="rtl"
                   disabled={!pwaEnabled}
                 />
@@ -414,7 +414,7 @@ export default function PWASettingsPage() {
                   value={settings.description}
                   onChange={e => setSettings({ ...settings, description: e.target.value })}
                   placeholder="Shop the latest products at amazing prices"
-                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   rows={2}
                   disabled={!pwaEnabled}
                 />
@@ -427,7 +427,7 @@ export default function PWASettingsPage() {
                   value={settings.descriptionAr || ''}
                   onChange={e => setSettings({ ...settings, descriptionAr: e.target.value })}
                   placeholder="تسوق أحدث المنتجات بأسعار مميزة"
-                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   rows={2}
                   dir="rtl"
                   disabled={!pwaEnabled}
@@ -493,7 +493,7 @@ export default function PWASettingsPage() {
                   onChange={e =>
                     setSettings({ ...settings, display: e.target.value as PWASettings['display'] })
                   }
-                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   disabled={!pwaEnabled}
                 >
                   {DISPLAY_OPTIONS.map(opt => (
@@ -515,7 +515,7 @@ export default function PWASettingsPage() {
                       orientation: e.target.value as PWASettings['orientation'],
                     })
                   }
-                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   disabled={!pwaEnabled}
                 >
                   {ORIENTATION_OPTIONS.map(opt => (
@@ -541,7 +541,7 @@ export default function PWASettingsPage() {
                   value={settings.icon192 || ''}
                   onChange={e => setSettings({ ...settings, icon192: e.target.value })}
                   placeholder="https://..."
-                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   disabled={!pwaEnabled}
                 />
                 {settings.icon192 && (
@@ -562,7 +562,7 @@ export default function PWASettingsPage() {
                   value={settings.icon512 || ''}
                   onChange={e => setSettings({ ...settings, icon512: e.target.value })}
                   placeholder="https://..."
-                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   disabled={!pwaEnabled}
                 />
                 {settings.icon512 && (
@@ -585,7 +585,7 @@ export default function PWASettingsPage() {
                   value={settings.maskableIcon || ''}
                   onChange={e => setSettings({ ...settings, maskableIcon: e.target.value })}
                   placeholder="https://..."
-                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   disabled={!pwaEnabled}
                 />
                 {settings.maskableIcon && (
@@ -622,7 +622,7 @@ export default function PWASettingsPage() {
                     disabled={!pwaEnabled}
                   />
                   <div
-                    className={`w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500 ${!pwaEnabled ? 'opacity-50' : ''}`}
+                    className={`w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/30 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary ${!pwaEnabled ? 'opacity-50' : ''}`}
                   ></div>
                 </label>
               </div>
@@ -641,7 +641,7 @@ export default function PWASettingsPage() {
                     disabled={!pwaEnabled}
                   />
                   <div
-                    className={`w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500 ${!pwaEnabled ? 'opacity-50' : ''}`}
+                    className={`w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/30 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary ${!pwaEnabled ? 'opacity-50' : ''}`}
                   ></div>
                 </label>
               </div>
@@ -664,7 +664,7 @@ export default function PWASettingsPage() {
                     disabled={!pwaEnabled}
                   />
                   <div
-                    className={`w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500 ${!pwaEnabled ? 'opacity-50' : ''}`}
+                    className={`w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/30 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary ${!pwaEnabled ? 'opacity-50' : ''}`}
                   ></div>
                 </label>
               </div>
@@ -687,7 +687,7 @@ export default function PWASettingsPage() {
                       iosStatusBarStyle: e.target.value as PWASettings['iosStatusBarStyle'],
                     })
                   }
-                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   disabled={!pwaEnabled}
                 >
                   {IOS_STATUS_OPTIONS.map(opt => (
@@ -740,7 +740,7 @@ export default function PWASettingsPage() {
               <button
                 onClick={handleSaveSettings}
                 disabled={saving}
-                className="px-6 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50 flex items-center gap-2"
+                className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-2"
               >
                 {saving && (
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>

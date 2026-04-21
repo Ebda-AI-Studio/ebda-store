@@ -85,8 +85,16 @@ export function ProductListItem({
           <div className="flex items-center gap-2">
             {/* Compare button for list view */}
             <button
-              aria-label={isInCompare ? 'Remove from compare' : 'Add to compare'}
-              title={isInCompare ? 'Remove from compare' : 'Add to compare'}
+              aria-label={
+                isInCompare
+                  ? t('Remove from compare', 'إزالة من المقارنة')
+                  : t('Add to compare', 'إضافة إلى المقارنة')
+              }
+              title={
+                isInCompare
+                  ? t('Remove from compare', 'إزالة من المقارنة')
+                  : t('Add to compare', 'إضافة إلى المقارنة')
+              }
               className={`flex h-10 w-10 items-center justify-center rounded-xl border transition-colors ${
                 isInCompare
                   ? 'border-primary bg-primary text-white'

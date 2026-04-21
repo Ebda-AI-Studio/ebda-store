@@ -15,13 +15,33 @@ interface StorePaymentConfig {
   webhookSecret: string | null;
   merchantId: string | null;
   testMode: boolean;
+  displayName?: string | null;
+  displayNameAr?: string | null;
+  fixedFee?: number;
 }
 
-const PROVIDERS = [
-  { id: 'tap', name: 'Tap Payments', nameAr: 'تاب للمدفوعات', color: '#00D4AA' },
-  { id: 'myfatoorah', name: 'MyFatoorah', nameAr: 'ماي فاتورة', color: '#00A651' },
-  { id: 'hesabe', name: 'Hesabe', nameAr: 'حسابي', color: '#E31837' },
-  { id: 'upayments', name: 'UPayments', nameAr: 'يو بيمنتس', color: '#1E88E5' },
+type ProviderKind = 'gateway' | 'cod';
+
+interface ProviderDef {
+  id: string;
+  name: string;
+  nameAr: string;
+  color: string;
+  kind: ProviderKind;
+}
+
+const PROVIDERS: ProviderDef[] = [
+  { id: 'tap', name: 'Tap Payments', nameAr: 'تاب للمدفوعات', color: '#00D4AA', kind: 'gateway' },
+  { id: 'myfatoorah', name: 'MyFatoorah', nameAr: 'ماي فاتورة', color: '#00A651', kind: 'gateway' },
+  { id: 'hesabe', name: 'Hesabe', nameAr: 'حسابي', color: '#E31837', kind: 'gateway' },
+  { id: 'upayments', name: 'UPayments', nameAr: 'يو بيمنتس', color: '#1E88E5', kind: 'gateway' },
+  {
+    id: 'cod',
+    name: 'Cash on Delivery',
+    nameAr: 'الدفع عند الاستلام',
+    color: '#64748B',
+    kind: 'cod',
+  },
 ];
 
 const emptyConfig = (provider: string): StorePaymentConfig => ({
@@ -31,7 +51,10 @@ const emptyConfig = (provider: string): StorePaymentConfig => ({
   secretKey: '',
   webhookSecret: '',
   merchantId: '',
-  testMode: true,
+  testMode: provider === 'cod' ? false : true,
+  displayName: provider === 'cod' ? 'Cash on Delivery' : '',
+  displayNameAr: provider === 'cod' ? 'الدفع عند الاستلام' : '',
+  fixedFee: 0,
 });
 
 export default function StorePaymentSettingsPage() {
@@ -94,7 +117,11 @@ export default function StorePaymentSettingsPage() {
     fetchConfigs();
   }, [fetchConfigs]);
 
-  function updateForm(provider: string, field: keyof StorePaymentConfig, value: string | boolean) {
+  function updateForm(
+    provider: string,
+    field: keyof StorePaymentConfig,
+    value: string | number | boolean | null
+  ) {
     setForms(prev => ({
       ...prev,
       [provider]: { ...prev[provider], [field]: value },
@@ -130,18 +157,37 @@ export default function StorePaymentSettingsPage() {
     const existingConfig = configs.find(c => c.provider === provider);
     const isNew = !existingConfig?.id;
 
+    const isCod = provider === 'cod';
+
     try {
-      const body = {
-        ...formData,
-        // Omit empty strings — treat as null
-        apiKey: formData.apiKey || null,
-        secretKey: formData.secretKey || null,
-        webhookSecret: formData.webhookSecret || null,
-        merchantId: formData.merchantId || null,
-      };
+      const body = isCod
+        ? {
+            provider,
+            isEnabled: formData.isEnabled,
+            displayName: formData.displayName || 'Cash on Delivery',
+            displayNameAr: formData.displayNameAr || 'الدفع عند الاستلام',
+            fixedFee: Math.max(0, Math.floor(Number(formData.fixedFee) || 0)),
+            testMode: false,
+            apiKey: null,
+            secretKey: null,
+            webhookSecret: null,
+            merchantId: null,
+          }
+        : {
+            ...formData,
+            // Omit empty strings — treat as null
+            apiKey: formData.apiKey || null,
+            secretKey: formData.secretKey || null,
+            webhookSecret: formData.webhookSecret || null,
+            merchantId: formData.merchantId || null,
+          };
+
+      const endpoint = isNew
+        ? `/api/v1/payment-settings/store/${storeId}`
+        : `/api/v1/payment-settings/store/${storeId}/${provider}`;
 
       const apiCall = isNew ? apiPost : apiPut;
-      const { error: saveError } = await apiCall(`/api/v1/payment-settings/store/${storeId}`, body);
+      const { error: saveError } = await apiCall(endpoint, body);
 
       if (!saveError) {
         setSaveMessages(prev => ({
@@ -279,87 +325,155 @@ export default function StorePaymentSettingsPage() {
               {/* Config form (expanded) */}
               {isExpanded && (
                 <div className="border-t bg-muted p-6 space-y-5">
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-1">
-                        API Key
-                      </label>
-                      <input
-                        type="password"
-                        value={form.apiKey || ''}
-                        onChange={e => updateForm(provider.id, 'apiKey', e.target.value)}
-                        placeholder="Enter API key"
-                        className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-1">
-                        Secret Key
-                      </label>
-                      <input
-                        type="password"
-                        value={form.secretKey || ''}
-                        onChange={e => updateForm(provider.id, 'secretKey', e.target.value)}
-                        placeholder="Enter secret key"
-                        className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-1">
-                        Webhook Secret
-                      </label>
-                      <input
-                        type="password"
-                        value={form.webhookSecret || ''}
-                        onChange={e => updateForm(provider.id, 'webhookSecret', e.target.value)}
-                        placeholder="Enter webhook secret"
-                        className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-1">
-                        Merchant ID
-                      </label>
-                      <input
-                        type="text"
-                        value={form.merchantId || ''}
-                        onChange={e => updateForm(provider.id, 'merchantId', e.target.value)}
-                        placeholder="Enter merchant ID (if applicable)"
-                        className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                      />
-                    </div>
-                  </div>
+                  {provider.kind === 'cod' ? (
+                    <>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div>
+                          <label className="block text-sm font-medium text-foreground mb-1">
+                            Display Name (English)
+                          </label>
+                          <input
+                            type="text"
+                            value={form.displayName || ''}
+                            onChange={e => updateForm(provider.id, 'displayName', e.target.value)}
+                            placeholder="Cash on Delivery"
+                            className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-foreground mb-1">
+                            Display Name (Arabic)
+                          </label>
+                          <input
+                            type="text"
+                            dir="rtl"
+                            value={form.displayNameAr || ''}
+                            onChange={e => updateForm(provider.id, 'displayNameAr', e.target.value)}
+                            placeholder="الدفع عند الاستلام"
+                            className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                          />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <label className="block text-sm font-medium text-foreground mb-1">
+                            Surcharge Fee (fils)
+                          </label>
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="number"
+                              min={0}
+                              step={1}
+                              value={form.fixedFee ?? 0}
+                              onChange={e =>
+                                updateForm(
+                                  provider.id,
+                                  'fixedFee',
+                                  Math.max(0, Math.floor(Number(e.target.value) || 0))
+                                )
+                              }
+                              placeholder="0"
+                              className="w-40 rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                            />
+                            <span className="text-sm text-muted-foreground">
+                              = {((Number(form.fixedFee) || 0) / 1000).toFixed(3)} KWD
+                            </span>
+                          </div>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Extra charge added to the order when the customer pays cash on delivery.
+                            Enter <strong>0</strong> for free COD. 1000 fils = 1 KWD.
+                          </p>
+                        </div>
+                      </div>
 
-                  {/* Test mode toggle */}
-                  <div className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
-                    <label className="relative inline-flex cursor-pointer items-center">
-                      <input
-                        type="checkbox"
-                        checked={form.testMode}
-                        onChange={e => updateForm(provider.id, 'testMode', e.target.checked)}
-                        className="sr-only peer"
-                      />
-                      <div className="peer h-5 w-9 rounded-full bg-muted after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-border after:bg-white after:transition-all after:content-[''] peer-checked:bg-amber-500 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
-                    </label>
-                    <div>
-                      <p className="text-sm font-medium text-amber-800">
-                        Test Mode {form.testMode ? 'On' : 'Off'}
-                      </p>
-                      <p className="text-xs text-amber-700">
-                        {form.testMode
-                          ? 'Using test credentials — no real payments processed'
-                          : 'Live mode — real payments will be processed'}
-                      </p>
-                    </div>
-                  </div>
+                      <div className="rounded-lg border border-border bg-background p-3 text-xs text-muted-foreground">
+                        COD orders bypass the payment gateway. The customer confirms the order, and
+                        you mark it as paid from the Orders page once cash is collected.
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div>
+                          <label className="block text-sm font-medium text-foreground mb-1">
+                            API Key
+                          </label>
+                          <input
+                            type="password"
+                            value={form.apiKey || ''}
+                            onChange={e => updateForm(provider.id, 'apiKey', e.target.value)}
+                            placeholder="Enter API key"
+                            className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-foreground mb-1">
+                            Secret Key
+                          </label>
+                          <input
+                            type="password"
+                            value={form.secretKey || ''}
+                            onChange={e => updateForm(provider.id, 'secretKey', e.target.value)}
+                            placeholder="Enter secret key"
+                            className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-foreground mb-1">
+                            Webhook Secret
+                          </label>
+                          <input
+                            type="password"
+                            value={form.webhookSecret || ''}
+                            onChange={e => updateForm(provider.id, 'webhookSecret', e.target.value)}
+                            placeholder="Enter webhook secret"
+                            className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-foreground mb-1">
+                            Merchant ID
+                          </label>
+                          <input
+                            type="text"
+                            value={form.merchantId || ''}
+                            onChange={e => updateForm(provider.id, 'merchantId', e.target.value)}
+                            placeholder="Enter merchant ID (if applicable)"
+                            className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Test mode toggle */}
+                      <div className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                        <label className="relative inline-flex cursor-pointer items-center">
+                          <input
+                            type="checkbox"
+                            checked={form.testMode}
+                            onChange={e => updateForm(provider.id, 'testMode', e.target.checked)}
+                            className="sr-only peer"
+                          />
+                          <div className="peer h-5 w-9 rounded-full bg-muted after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-border after:bg-white after:transition-all after:content-[''] peer-checked:bg-amber-500 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+                        </label>
+                        <div>
+                          <p className="text-sm font-medium text-amber-800">
+                            Test Mode {form.testMode ? 'On' : 'Off'}
+                          </p>
+                          <p className="text-xs text-amber-700">
+                            {form.testMode
+                              ? 'Using test credentials — no real payments processed'
+                              : 'Live mode — real payments will be processed'}
+                          </p>
+                        </div>
+                      </div>
+                    </>
+                  )}
 
                   {/* Save message */}
                   {message && (
                     <div
                       className={`rounded-lg p-3 text-sm ${
                         message.type === 'success'
-                          ? 'bg-emerald-50 text-emerald-700'
-                          : 'bg-red-50 text-red-700'
+                          ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300'
+                          : 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300'
                       }`}
                     >
                       {message.text}

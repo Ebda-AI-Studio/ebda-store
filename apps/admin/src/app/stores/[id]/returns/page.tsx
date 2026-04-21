@@ -71,13 +71,13 @@ function formatCurrency(amount: number) {
 }
 
 const statusColors: Record<string, string> = {
-  pending: 'bg-yellow-100 text-yellow-800',
-  approved: 'bg-blue-100 text-blue-800',
-  rejected: 'bg-red-100 text-red-800',
-  shipped: 'bg-purple-100 text-purple-800',
-  received: 'bg-indigo-100 text-indigo-800',
-  inspecting: 'bg-cyan-100 text-cyan-800',
-  completed: 'bg-green-100 text-green-800',
+  pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
+  approved: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+  rejected: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+  shipped: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
+  received: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300',
+  inspecting: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300',
+  completed: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
   cancelled: 'bg-muted text-foreground',
 };
 
@@ -490,7 +490,7 @@ export default function ReturnsPage() {
               {/* Refund Info */}
               <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
                 <span className="font-medium text-foreground">Refund Amount</span>
-                <span className="text-lg font-bold text-orange-600">
+                <span className="text-lg font-bold text-primary">
                   {formatCurrency(selectedReturn.refundAmount)}
                 </span>
               </div>

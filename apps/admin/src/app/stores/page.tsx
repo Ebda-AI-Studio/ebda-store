@@ -6,6 +6,7 @@ import { Button } from '@force/ui';
 import { AdminLayout } from '../../components/AdminLayout';
 import { ErrorState } from '../../components/ErrorState';
 import { apiGet } from '../../lib/api';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 
 interface Store {
   id: string;
@@ -81,6 +82,7 @@ export default function StoresPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search, 300);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
 
@@ -92,7 +94,7 @@ export default function StoresPage() {
         limit: pagination.limit.toString(),
       });
       if (statusFilter !== 'all') params.append('status', statusFilter);
-      if (search) params.append('search', search);
+      if (debouncedSearch) params.append('search', debouncedSearch);
 
       const { data, error: apiError } = await apiGet<{
         stores: Store[];
@@ -111,7 +113,7 @@ export default function StoresPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [pagination.page, pagination.limit, statusFilter, search]);
+  }, [pagination.page, pagination.limit, statusFilter, debouncedSearch]);
 
   useEffect(() => {
     fetchStores();
@@ -390,31 +392,55 @@ export default function StoresPage() {
           {/* Table View */}
           {viewMode === 'table' && (
             <div className="force-card p-0 overflow-hidden overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full" aria-label="Stores">
                 <thead className="bg-muted/50 border-b">
                   <tr>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    <th
+                      scope="col"
+                      className="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider"
+                    >
                       Store
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    <th
+                      scope="col"
+                      className="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider"
+                    >
                       Owner
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    <th
+                      scope="col"
+                      className="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider"
+                    >
                       Status
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    <th
+                      scope="col"
+                      className="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider"
+                    >
                       Plan
                     </th>
-                    <th className="px-6 py-4 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    <th
+                      scope="col"
+                      className="px-6 py-4 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider"
+                    >
                       Products
                     </th>
-                    <th className="px-6 py-4 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    <th
+                      scope="col"
+                      className="px-6 py-4 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider"
+                    >
                       Orders
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    <th
+                      scope="col"
+                      className="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider"
+                    >
                       Created
                     </th>
-                    <th className="px-6 py-4 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    <th
+                      scope="col"
+                      className="px-6 py-4 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider"
+                    >
                       Actions
                     </th>
                   </tr>

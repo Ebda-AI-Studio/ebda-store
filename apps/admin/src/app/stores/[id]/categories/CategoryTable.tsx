@@ -75,22 +75,37 @@ export function CategoryTable({
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full">
+      <table className="w-full" aria-label="Categories">
         <thead className="bg-muted border-b">
           <tr>
-            <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            <th
+              scope="col"
+              className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
+            >
               Category
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            <th
+              scope="col"
+              className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
+            >
               Slug
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            <th
+              scope="col"
+              className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
+            >
               Products
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider hidden md:table-cell">
+            <th
+              scope="col"
+              className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider hidden md:table-cell"
+            >
               Status
             </th>
-            <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            <th
+              scope="col"
+              className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider"
+            >
               Actions
             </th>
           </tr>
@@ -136,7 +151,7 @@ export function CategoryTable({
                 <span
                   className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${
                     cat.isActive
-                      ? 'bg-emerald-50 text-emerald-700'
+                      ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300'
                       : 'bg-muted text-muted-foreground'
                   }`}
                 >

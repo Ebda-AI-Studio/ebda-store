@@ -57,7 +57,7 @@ export function LoyaltySettingsPanel({
               onChange={e =>
                 onSettingsChange({ ...settings, pointsPerDinar: parseInt(e.target.value) || 1 })
               }
-              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
               disabled={!loyaltyEnabled}
             />
           </div>
@@ -72,7 +72,7 @@ export function LoyaltySettingsPanel({
               onChange={e =>
                 onSettingsChange({ ...settings, signupBonus: parseInt(e.target.value) || 0 })
               }
-              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
               disabled={!loyaltyEnabled}
             />
           </div>
@@ -87,7 +87,7 @@ export function LoyaltySettingsPanel({
               onChange={e =>
                 onSettingsChange({ ...settings, referralBonus: parseInt(e.target.value) || 0 })
               }
-              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
               disabled={!loyaltyEnabled}
             />
           </div>
@@ -102,7 +102,7 @@ export function LoyaltySettingsPanel({
               onChange={e =>
                 onSettingsChange({ ...settings, reviewBonus: parseInt(e.target.value) || 0 })
               }
-              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
               disabled={!loyaltyEnabled}
             />
           </div>
@@ -117,7 +117,7 @@ export function LoyaltySettingsPanel({
               onChange={e =>
                 onSettingsChange({ ...settings, birthdayBonus: parseInt(e.target.value) || 0 })
               }
-              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
               disabled={!loyaltyEnabled}
             />
           </div>
@@ -153,7 +153,7 @@ export function LoyaltySettingsPanel({
                         },
                       })
                     }
-                    className="w-full px-3 py-1.5 border border-border rounded text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                    className="w-full px-3 py-1.5 border border-border rounded text-sm focus:ring-2 focus:ring-primary focus:border-primary"
                     disabled={!loyaltyEnabled || tier === 'bronze'}
                   />
                 </div>
@@ -176,7 +176,7 @@ export function LoyaltySettingsPanel({
                         },
                       })
                     }
-                    className="w-full px-3 py-1.5 border border-border rounded text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                    className="w-full px-3 py-1.5 border border-border rounded text-sm focus:ring-2 focus:ring-primary focus:border-primary"
                     disabled={!loyaltyEnabled}
                   />
                 </div>
@@ -201,7 +201,7 @@ export function LoyaltySettingsPanel({
               onChange={e =>
                 onSettingsChange({ ...settings, pointsValue: parseInt(e.target.value) || 1 })
               }
-              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
               disabled={!loyaltyEnabled}
             />
             <p className="text-xs text-muted-foreground mt-1">
@@ -219,7 +219,7 @@ export function LoyaltySettingsPanel({
               onChange={e =>
                 onSettingsChange({ ...settings, minRedeemPoints: parseInt(e.target.value) || 0 })
               }
-              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
               disabled={!loyaltyEnabled}
             />
           </div>
@@ -238,7 +238,7 @@ export function LoyaltySettingsPanel({
                   maxRedeemPercentage: parseInt(e.target.value) || 0,
                 })
               }
-              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
               disabled={!loyaltyEnabled}
             />
           </div>
@@ -256,7 +256,7 @@ export function LoyaltySettingsPanel({
                   expirationMonths: parseInt(e.target.value) || 0,
                 })
               }
-              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
               disabled={!loyaltyEnabled}
             />
             <p className="text-xs text-muted-foreground mt-1">0 = never expires</p>
@@ -270,7 +270,7 @@ export function LoyaltySettingsPanel({
           <button
             onClick={onSave}
             disabled={saving}
-            className="px-6 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50 flex items-center gap-2"
+            className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-2"
           >
             {saving && (
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>

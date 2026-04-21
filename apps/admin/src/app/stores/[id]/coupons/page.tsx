@@ -201,15 +201,27 @@ export default function CouponsPage() {
 
     const now = new Date();
     if (coupon.startsAt && new Date(coupon.startsAt) > now) {
-      return { label: 'Scheduled', color: 'bg-blue-100 text-blue-800' };
+      return {
+        label: 'Scheduled',
+        color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+      };
     }
     if (coupon.expiresAt && new Date(coupon.expiresAt) < now) {
-      return { label: 'Expired', color: 'bg-red-100 text-red-800' };
+      return {
+        label: 'Expired',
+        color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+      };
     }
     if (coupon.usageLimit && coupon.usageCount >= coupon.usageLimit) {
-      return { label: 'Exhausted', color: 'bg-amber-100 text-amber-800' };
+      return {
+        label: 'Exhausted',
+        color: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
+      };
     }
-    return { label: 'Active', color: 'bg-green-100 text-green-800' };
+    return {
+      label: 'Active',
+      color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+    };
   }
 
   if (isLoading) {
@@ -299,28 +311,49 @@ export default function CouponsPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full" aria-label="Coupons">
                 <thead className="bg-muted border-b">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                    >
                       Code
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                    >
                       Name
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                    >
                       Type
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                    >
                       Value
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                    >
                       Usage
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                    >
                       Status
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                    >
                       Actions
                     </th>
                   </tr>

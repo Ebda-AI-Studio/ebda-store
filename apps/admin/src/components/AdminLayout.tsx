@@ -215,7 +215,7 @@ export function AdminLayout({
           ) : (
             // Force Media Branding (default)
             <>
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-orange-600 shadow-lg shadow-primary/25">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/90 shadow-lg shadow-primary/25">
                 <Image
                   src="/logo.svg"
                   alt="Force Media"
@@ -241,8 +241,8 @@ export function AdminLayout({
         {/* Super Admin Badge */}
         {mode === 'super_admin' && (
           <div className="border-b border-border/50 px-4 py-3">
-            <div className="flex items-center gap-2.5 rounded-xl bg-gradient-to-r from-primary/10 to-orange-500/10 px-3 py-2.5">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-orange-600 text-[10px] font-bold text-white shadow-sm">
+            <div className="flex items-center gap-2.5 rounded-xl bg-gradient-to-r from-primary/10 to-primary/10 px-3 py-2.5">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/90 text-[10px] font-bold text-white shadow-sm">
                 SA
               </div>
               <div>
@@ -410,7 +410,7 @@ export function AdminLayout({
           <div className="relative">
             <div className="h-12 w-12 motion-safe:animate-spin rounded-full border-4 border-muted border-t-primary" />
             <div className="absolute inset-0 flex items-center justify-center">
-              <div className="h-6 w-6 rounded-full bg-gradient-to-br from-primary to-orange-600 animate-pulse" />
+              <div className="h-6 w-6 rounded-full bg-gradient-to-br from-primary to-primary/90 animate-pulse" />
             </div>
           </div>
           <p className="text-sm font-medium text-muted-foreground">Loading dashboard...</p>
@@ -461,7 +461,7 @@ export function AdminLayout({
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 lg:ms-72">
+      <main id="admin-main-content" tabIndex={-1} className="flex-1 lg:ms-72">
         {/* Header */}
         <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-border/50 bg-card/80 px-4 backdrop-blur-md lg:px-6">
           <div className="flex items-center gap-4">

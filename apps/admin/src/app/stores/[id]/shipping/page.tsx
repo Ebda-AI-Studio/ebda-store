@@ -222,7 +222,7 @@ export default function ShippingSettingsPage() {
       actions={
         <button
           onClick={() => handleOpenModal()}
-          className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors flex items-center gap-2"
+          className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-2"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -240,7 +240,7 @@ export default function ShippingSettingsPage() {
               onClick={() => setFilter(f)}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                 filter === f
-                  ? 'bg-orange-500 text-white'
+                  ? 'bg-primary text-white'
                   : 'bg-muted text-foreground hover:bg-muted/80'
               }`}
             >
@@ -252,7 +252,7 @@ export default function ShippingSettingsPage() {
         {/* Zones List */}
         {loading ? (
           <div className="flex items-center justify-center h-64">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
         ) : zones.length === 0 ? (
           <div className="bg-card rounded-xl border border-border p-12 text-center">
@@ -277,35 +277,56 @@ export default function ShippingSettingsPage() {
             </p>
             <button
               onClick={() => handleOpenModal()}
-              className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+              className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
             >
               Create First Zone
             </button>
           </div>
         ) : (
           <div className="bg-card rounded-xl border border-border overflow-hidden">
-            <table className="w-full">
+            <table className="w-full" aria-label="Shipping zones">
               <thead>
                 <tr className="bg-muted border-b border-border">
-                  <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  <th
+                    scope="col"
+                    className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                  >
                     Zone
                   </th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  <th
+                    scope="col"
+                    className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                  >
                     Areas
                   </th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  <th
+                    scope="col"
+                    className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                  >
                     Delivery Fee
                   </th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  <th
+                    scope="col"
+                    className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                  >
                     Free Shipping
                   </th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  <th
+                    scope="col"
+                    className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                  >
                     Est. Delivery
                   </th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  <th
+                    scope="col"
+                    className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                  >
                     Status
                   </th>
-                  <th className="text-right px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  <th
+                    scope="col"
+                    className="text-right px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                  >
                     Actions
                   </th>
                 </tr>
@@ -362,7 +383,7 @@ export default function ShippingSettingsPage() {
                         onClick={() => handleToggle(zone)}
                         className={`px-2 py-1 rounded-full text-xs font-medium ${
                           zone.isActive
-                            ? 'bg-green-100 text-green-700'
+                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
                             : 'bg-muted text-muted-foreground'
                         }`}
                       >
@@ -373,7 +394,7 @@ export default function ShippingSettingsPage() {
                       <div className="flex items-center justify-end gap-2">
                         <button
                           onClick={() => handleOpenModal(zone)}
-                          className="p-2 text-muted-foreground hover:text-orange-500 transition-colors"
+                          className="p-2 text-muted-foreground hover:text-primary transition-colors"
                           title="Edit"
                         >
                           <svg
@@ -453,7 +474,7 @@ export default function ShippingSettingsPage() {
                       value={formData.name}
                       onChange={e => setFormData({ ...formData, name: e.target.value })}
                       placeholder="e.g., Capital Area"
-                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                       required
                     />
                   </div>
@@ -466,7 +487,7 @@ export default function ShippingSettingsPage() {
                       value={formData.nameAr}
                       onChange={e => setFormData({ ...formData, nameAr: e.target.value })}
                       placeholder="e.g., منطقة العاصمة"
-                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                       dir="rtl"
                     />
                   </div>
@@ -481,7 +502,7 @@ export default function ShippingSettingsPage() {
                     <button
                       type="button"
                       onClick={addGovernorateAreas}
-                      className="text-xs text-orange-500 hover:text-orange-600"
+                      className="text-xs text-primary hover:text-primary/90"
                     >
                       + Add All Kuwait Governorates
                     </button>
@@ -490,7 +511,7 @@ export default function ShippingSettingsPage() {
                     value={formData.areas}
                     onChange={e => setFormData({ ...formData, areas: e.target.value })}
                     placeholder="Separate areas with commas: Capital, Hawalli, Farwaniya"
-                    className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                    className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                     rows={2}
                     required
                   />
@@ -504,7 +525,7 @@ export default function ShippingSettingsPage() {
                     value={formData.areasAr}
                     onChange={e => setFormData({ ...formData, areasAr: e.target.value })}
                     placeholder="العاصمة، حولي، الفروانية"
-                    className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                    className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                     rows={2}
                     dir="rtl"
                   />
@@ -523,7 +544,7 @@ export default function ShippingSettingsPage() {
                       value={formData.deliveryFee}
                       onChange={e => setFormData({ ...formData, deliveryFee: e.target.value })}
                       placeholder="1.000"
-                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                       required
                     />
                   </div>
@@ -540,7 +561,7 @@ export default function ShippingSettingsPage() {
                         setFormData({ ...formData, freeShippingThreshold: e.target.value })
                       }
                       placeholder="25.000"
-                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                     />
                   </div>
                 </div>
@@ -557,7 +578,7 @@ export default function ShippingSettingsPage() {
                       value={formData.estimatedDaysMin}
                       onChange={e => setFormData({ ...formData, estimatedDaysMin: e.target.value })}
                       placeholder="Min days"
-                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                     />
                     <input
                       type="number"
@@ -565,7 +586,7 @@ export default function ShippingSettingsPage() {
                       value={formData.estimatedDaysMax}
                       onChange={e => setFormData({ ...formData, estimatedDaysMax: e.target.value })}
                       placeholder="Max days"
-                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                     />
                   </div>
                 </div>
@@ -579,7 +600,7 @@ export default function ShippingSettingsPage() {
                       onChange={e => setFormData({ ...formData, isActive: e.target.checked })}
                       className="sr-only peer"
                     />
-                    <div className="w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div>
+                    <div className="w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/30 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
                   </label>
                   <span className="text-sm text-foreground">Active</span>
                 </div>
@@ -596,7 +617,7 @@ export default function ShippingSettingsPage() {
                   <button
                     type="submit"
                     disabled={saving}
-                    className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                   >
                     {saving && (
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>

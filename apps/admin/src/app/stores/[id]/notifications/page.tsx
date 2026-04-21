@@ -675,24 +675,36 @@ export default function NotificationsPage() {
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full" aria-label="Notification event configuration">
                 <thead>
                   <tr className="bg-muted border-b border-border">
-                    <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    <th
+                      scope="col"
+                      className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                    >
                       Event
                     </th>
                     {whatsappEnabled && (
-                      <th className="px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider text-center">
+                      <th
+                        scope="col"
+                        className="px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider text-center"
+                      >
                         WhatsApp
                       </th>
                     )}
                     {smsEnabled && (
-                      <th className="px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider text-center">
+                      <th
+                        scope="col"
+                        className="px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider text-center"
+                      >
                         SMS
                       </th>
                     )}
                     {pushEnabled && (
-                      <th className="px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider text-center">
+                      <th
+                        scope="col"
+                        className="px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider text-center"
+                      >
                         Push
                       </th>
                     )}
@@ -812,22 +824,37 @@ export default function NotificationsPage() {
             ) : (
               <>
                 <div className="overflow-x-auto">
-                  <table className="w-full">
+                  <table className="w-full" aria-label="Notification log">
                     <thead>
                       <tr className="bg-muted border-b border-border">
-                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                        >
                           Timestamp
                         </th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                        >
                           Event
                         </th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                        >
                           Channel
                         </th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                        >
                           Recipient
                         </th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                        >
                           Status
                         </th>
                       </tr>

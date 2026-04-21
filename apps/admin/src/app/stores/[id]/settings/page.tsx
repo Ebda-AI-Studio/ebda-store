@@ -25,7 +25,7 @@ export default function StoreSettingsPage() {
       title: 'Branding',
       description: 'Logo, colors, fonts, contact info and social links',
       href: `/stores/${storeId}/branding`,
-      color: 'bg-pink-100 text-pink-600',
+      color: 'bg-pink-100 text-pink-600 dark:bg-pink-900/30 dark:text-pink-300',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
@@ -41,7 +41,7 @@ export default function StoreSettingsPage() {
       title: 'Hero Section',
       description: 'Customize the homepage hero — title, subtitle, CTA, and background image',
       href: `/stores/${storeId}/hero`,
-      color: 'bg-rose-100 text-rose-600',
+      color: 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-300',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
@@ -73,7 +73,7 @@ export default function StoreSettingsPage() {
       title: 'SEO',
       description: 'Meta titles, meta descriptions and search engine optimization',
       href: `/stores/${storeId}/seo`,
-      color: 'bg-blue-100 text-blue-600',
+      color: 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300',
       featureKey: 'seo',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -90,7 +90,7 @@ export default function StoreSettingsPage() {
       title: 'Announcement Bar',
       description: 'Show a banner across the top of your store with promotions or news',
       href: `/stores/${storeId}/announcement`,
-      color: 'bg-amber-100 text-amber-600',
+      color: 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-300',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
@@ -106,7 +106,7 @@ export default function StoreSettingsPage() {
       title: 'Domain',
       description: 'Connect a custom domain to your store',
       href: `/stores/${storeId}/domain`,
-      color: 'bg-indigo-100 text-indigo-600',
+      color: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-300',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
@@ -122,7 +122,7 @@ export default function StoreSettingsPage() {
       title: 'Payment Settings',
       description: 'Configure payment providers: Tap, MyFatoorah, Hesabe, UPayments',
       href: `/stores/${storeId}/payment-settings`,
-      color: 'bg-emerald-100 text-emerald-600',
+      color: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
@@ -138,7 +138,7 @@ export default function StoreSettingsPage() {
       title: 'Shipping',
       description: 'Delivery zones, shipping rates and carrier settings',
       href: `/stores/${storeId}/shipping`,
-      color: 'bg-cyan-100 text-cyan-600',
+      color: 'bg-cyan-100 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-300',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
@@ -154,7 +154,7 @@ export default function StoreSettingsPage() {
       title: 'Tax Settings',
       description: 'Tax rates, tax calculation rules and exemptions',
       href: `/stores/${storeId}/tax`,
-      color: 'bg-teal-100 text-teal-600',
+      color: 'bg-teal-100 text-teal-600 dark:bg-teal-900/30 dark:text-teal-300',
       featureKey: 'tax',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -188,7 +188,7 @@ export default function StoreSettingsPage() {
       title: 'Template',
       description: 'Choose and customize the storefront design template',
       href: `/stores/${storeId}/template`,
-      color: 'bg-orange-100 text-orange-600',
+      color: 'bg-orange-100 text-primary',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
@@ -220,7 +220,7 @@ export default function StoreSettingsPage() {
       title: 'Language',
       description: 'Set the default language for your storefront',
       href: `/stores/${storeId}/language`,
-      color: 'bg-sky-100 text-sky-600',
+      color: 'bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-300',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
@@ -236,7 +236,7 @@ export default function StoreSettingsPage() {
       title: 'Marketing Pixels',
       description: 'Facebook Pixel, Google Analytics, TikTok Pixel and other tracking codes',
       href: `/stores/${storeId}/marketing-pixels`,
-      color: 'bg-purple-100 text-purple-600',
+      color: 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-300',
       featureKey: 'marketing_pixels',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -253,7 +253,7 @@ export default function StoreSettingsPage() {
       title: 'Notifications',
       description: 'WhatsApp, SMS, and Push notification settings',
       href: `/stores/${storeId}/notifications`,
-      color: 'bg-teal-100 text-teal-600',
+      color: 'bg-teal-100 text-teal-600 dark:bg-teal-900/30 dark:text-teal-300',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
@@ -269,7 +269,7 @@ export default function StoreSettingsPage() {
       title: 'Affiliate Program',
       description: 'Influencer referral commissions and tracking',
       href: `/stores/${storeId}/affiliates`,
-      color: 'bg-emerald-100 text-emerald-600',
+      color: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300',
       featureKey: 'affiliate',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -286,7 +286,7 @@ export default function StoreSettingsPage() {
       title: 'Abandoned Cart Recovery',
       description: 'Recover lost sales with automated reminders',
       href: `/stores/${storeId}/abandoned-carts`,
-      color: 'bg-orange-100 text-orange-600',
+      color: 'bg-orange-100 text-primary',
       featureKey: 'abandoned_cart',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -303,7 +303,7 @@ export default function StoreSettingsPage() {
       title: 'Shipping Carriers',
       description: 'iCarry and Aramex delivery integration',
       href: `/stores/${storeId}/shipping-carriers`,
-      color: 'bg-cyan-100 text-cyan-600',
+      color: 'bg-cyan-100 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-300',
       featureKey: 'shipping_carriers',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">

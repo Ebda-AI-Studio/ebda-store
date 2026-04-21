@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button, Input, Select, useToast } from '@force/ui';
+import { Button, Input, Modal, Select, useToast } from '@force/ui';
 import { api } from '@/lib/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
@@ -48,6 +48,8 @@ export default function AddressesClient() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState(EMPTY_FORM);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -101,17 +103,22 @@ export default function AddressesClient() {
     }
   }
 
-  async function handleDelete(id: string) {
+  async function confirmDelete() {
+    if (!deleteTargetId) return;
+    setIsDeleting(true);
     try {
-      const result = await api.delete(`/addresses/${id}`);
+      const result = await api.delete(`/addresses/${deleteTargetId}`);
       if (result.success) {
-        setAddresses(prev => prev.filter(a => a.id !== id));
+        setAddresses(prev => prev.filter(a => a.id !== deleteTargetId));
         success('Address deleted', 'The address has been removed.');
       } else {
         toastError('Error', 'Failed to delete address');
       }
     } catch {
       toastError('Error', 'An unexpected error occurred.');
+    } finally {
+      setIsDeleting(false);
+      setDeleteTargetId(null);
     }
   }
 
@@ -382,7 +389,7 @@ export default function AddressesClient() {
                   </button>
                 )}
                 <button
-                  onClick={() => handleDelete(address.id)}
+                  onClick={() => setDeleteTargetId(address.id)}
                   className="text-sm text-destructive hover:underline"
                 >
                   {t('Delete', '\u062d\u0630\u0641')}
@@ -432,6 +439,28 @@ export default function AddressesClient() {
           </Button>
         </div>
       ) : null}
+
+      <Modal
+        isOpen={!!deleteTargetId}
+        onClose={() => (isDeleting ? undefined : setDeleteTargetId(null))}
+        title={t('Delete address', 'حذف العنوان')}
+        size="sm"
+      >
+        <p className="text-sm text-muted-foreground">
+          {t(
+            'This address will be removed permanently. You can add a new one anytime.',
+            'سيتم حذف هذا العنوان نهائيًا. يمكنك إضافة عنوان جديد في أي وقت.'
+          )}
+        </p>
+        <div className="mt-6 flex justify-end gap-3">
+          <Button variant="outline" onClick={() => setDeleteTargetId(null)} disabled={isDeleting}>
+            {t('Cancel', 'إلغاء')}
+          </Button>
+          <Button variant="destructive" onClick={confirmDelete} disabled={isDeleting}>
+            {isDeleting ? t('Deleting…', 'جاري الحذف…') : t('Delete', 'حذف')}
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 }

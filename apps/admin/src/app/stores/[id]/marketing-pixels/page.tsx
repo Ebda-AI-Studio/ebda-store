@@ -63,7 +63,7 @@ const PLATFORMS = [
         <path d="M7.22 20.9987C7.22 22.1033 6.32457 22.9987 5.22 22.9987C4.11543 22.9987 3.22 22.1033 3.22 20.9987C3.22 19.8941 4.11543 18.9987 5.22 18.9987C6.32457 18.9987 7.22 19.8941 7.22 20.9987Z" />
       </svg>
     ),
-    color: 'bg-orange-500',
+    color: 'bg-primary',
     idLabel: 'Measurement ID',
     idPlaceholder: 'G-XXXXXXXXXX',
     docsUrl: 'https://developers.google.com/analytics/devguides/collection/ga4',
@@ -357,7 +357,9 @@ export default function MarketingPixelsPage() {
                     {/* Status Badge */}
                     <span
                       className={`px-2 py-1 text-xs font-medium rounded-full ${
-                        isEnabled ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground'
+                        isEnabled
+                          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                          : 'bg-muted text-muted-foreground'
                       }`}
                     >
                       {isEnabled ? 'Active' : 'Inactive'}

@@ -45,7 +45,7 @@ export function LoyaltyMembersTable({
             onClick={() => onTierFilterChange(t)}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors capitalize ${
               tierFilter === t
-                ? 'bg-orange-500 text-white'
+                ? 'bg-primary text-white'
                 : 'bg-card text-foreground hover:bg-muted border border-border'
             }`}
           >
@@ -79,25 +79,43 @@ export function LoyaltyMembersTable({
         </div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full" aria-label="Loyalty members">
             <thead>
               <tr className="bg-muted border-b border-border">
-                <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <th
+                  scope="col"
+                  className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                >
                   Member
                 </th>
-                <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <th
+                  scope="col"
+                  className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                >
                   Tier
                 </th>
-                <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <th
+                  scope="col"
+                  className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                >
                   Points Balance
                 </th>
-                <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <th
+                  scope="col"
+                  className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                >
                   Total Earned
                 </th>
-                <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <th
+                  scope="col"
+                  className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                >
                   Total Redeemed
                 </th>
-                <th className="text-right px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <th
+                  scope="col"
+                  className="text-right px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                >
                   Actions
                 </th>
               </tr>
@@ -128,13 +146,13 @@ export function LoyaltyMembersTable({
                   <td className="px-6 py-4 text-green-600">
                     +{member.totalEarned.toLocaleString()}
                   </td>
-                  <td className="px-6 py-4 text-orange-600">
+                  <td className="px-6 py-4 text-primary">
                     -{member.totalRedeemed.toLocaleString()}
                   </td>
                   <td className="px-6 py-4 text-right">
                     <button
                       onClick={() => onAwardPoints(member)}
-                      className="text-orange-500 hover:text-orange-600 text-sm font-medium"
+                      className="text-primary hover:text-primary/90 text-sm font-medium"
                     >
                       Award Points
                     </button>

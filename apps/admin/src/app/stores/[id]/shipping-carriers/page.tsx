@@ -85,12 +85,12 @@ const DEFAULT_CONFIGS: CarrierConfigs = {
 function ShipmentStatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
     created: 'bg-muted text-foreground',
-    picked_up: 'bg-blue-100 text-blue-700',
-    in_transit: 'bg-yellow-100 text-yellow-700',
-    out_for_delivery: 'bg-orange-100 text-orange-700',
-    delivered: 'bg-green-100 text-green-700',
-    failed: 'bg-red-100 text-red-700',
-    returned: 'bg-purple-100 text-purple-700',
+    picked_up: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+    in_transit: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300',
+    out_for_delivery: 'bg-orange-100 text-primary',
+    delivered: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+    failed: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+    returned: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
     cancelled: 'bg-muted text-muted-foreground',
   };
   const labels: Record<string, string> = {
@@ -129,8 +129,8 @@ function Toggle({
       aria-checked={checked}
       onClick={() => !disabled && onChange(!checked)}
       disabled={disabled}
-      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 disabled:opacity-50 ${
-        checked ? 'bg-orange-500' : 'bg-muted'
+      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 ${
+        checked ? 'bg-primary' : 'bg-muted'
       }`}
     >
       <span
@@ -197,7 +197,7 @@ function PickupAddressForm({
             value={value.area}
             onChange={e => onChange({ area: e.target.value })}
             placeholder="e.g. Salmiya"
-            className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+            className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
           />
         </div>
         <div>
@@ -207,7 +207,7 @@ function PickupAddressForm({
             value={value.block}
             onChange={e => onChange({ block: e.target.value })}
             placeholder="e.g. 12"
-            className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+            className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
           />
         </div>
         <div>
@@ -217,7 +217,7 @@ function PickupAddressForm({
             value={value.street}
             onChange={e => onChange({ street: e.target.value })}
             placeholder="e.g. Gulf Road"
-            className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+            className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
           />
         </div>
         <div>
@@ -227,7 +227,7 @@ function PickupAddressForm({
             value={value.building}
             onChange={e => onChange({ building: e.target.value })}
             placeholder="e.g. Al Hamra"
-            className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+            className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
           />
         </div>
       </div>
@@ -485,7 +485,7 @@ export default function ShippingCarriersPage() {
     >
       {loading ? (
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500" />
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
         </div>
       ) : !featureEnabled ? (
         // ── Empty state ──────────────────────────────────────────────────────
@@ -550,7 +550,7 @@ export default function ShippingCarriersPage() {
                   <div className="flex items-center gap-2">
                     <h2 className="text-lg font-semibold text-foreground">iCarry</h2>
                     {configs.icarry.isDefault && (
-                      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700">
+                      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-primary">
                         Default
                       </span>
                     )}
@@ -580,7 +580,7 @@ export default function ShippingCarriersPage() {
                   value={configs.icarry.apiKey}
                   onChange={e => updateICarry({ apiKey: e.target.value })}
                   placeholder="iCarry API key"
-                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                 />
               </div>
               <div>
@@ -592,7 +592,7 @@ export default function ShippingCarriersPage() {
                   value={configs.icarry.merchantId}
                   onChange={e => updateICarry({ merchantId: e.target.value })}
                   placeholder="e.g. MERCH-001"
-                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                 />
               </div>
             </div>
@@ -603,7 +603,7 @@ export default function ShippingCarriersPage() {
               <button
                 onClick={() => handleSaveCarrier('icarry')}
                 disabled={savingCarrier === 'icarry'}
-                className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
+                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
               >
                 {savingCarrier === 'icarry' && (
                   <span className="animate-spin inline-block h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
@@ -656,7 +656,7 @@ export default function ShippingCarriersPage() {
                   <div className="flex items-center gap-2">
                     <h2 className="text-lg font-semibold text-foreground">Aramex</h2>
                     {configs.aramex.isDefault && (
-                      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700">
+                      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-primary">
                         Default
                       </span>
                     )}
@@ -686,7 +686,7 @@ export default function ShippingCarriersPage() {
                   value={configs.aramex.accountNumber}
                   onChange={e => updateAramex({ accountNumber: e.target.value })}
                   placeholder="Aramex account number"
-                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                 />
               </div>
               <div>
@@ -696,7 +696,7 @@ export default function ShippingCarriersPage() {
                   value={configs.aramex.accountPin}
                   onChange={e => updateAramex({ accountPin: e.target.value })}
                   placeholder="Account PIN"
-                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                 />
               </div>
               <div>
@@ -708,7 +708,7 @@ export default function ShippingCarriersPage() {
                   value={configs.aramex.accountEntity}
                   onChange={e => updateAramex({ accountEntity: e.target.value })}
                   placeholder="e.g. KWI"
-                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                 />
               </div>
               <div>
@@ -720,7 +720,7 @@ export default function ShippingCarriersPage() {
                   value={configs.aramex.accountCountryCode}
                   onChange={e => updateAramex({ accountCountryCode: e.target.value })}
                   placeholder="e.g. KW"
-                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                 />
               </div>
               <div>
@@ -732,7 +732,7 @@ export default function ShippingCarriersPage() {
                   value={configs.aramex.username}
                   onChange={e => updateAramex({ username: e.target.value })}
                   placeholder="Aramex account username"
-                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                 />
               </div>
               <div>
@@ -744,7 +744,7 @@ export default function ShippingCarriersPage() {
                   value={configs.aramex.password}
                   onChange={e => updateAramex({ password: e.target.value })}
                   placeholder="Aramex account password"
-                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                 />
               </div>
             </div>
@@ -755,7 +755,7 @@ export default function ShippingCarriersPage() {
               <button
                 onClick={() => handleSaveCarrier('aramex')}
                 disabled={savingCarrier === 'aramex'}
-                className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
+                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
               >
                 {savingCarrier === 'aramex' && (
                   <span className="animate-spin inline-block h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
@@ -802,7 +802,7 @@ export default function ShippingCarriersPage() {
                     setShipmentsPage(1);
                   }}
                   aria-label="Filter by carrier"
-                  className="px-3 py-1.5 text-sm border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="px-3 py-1.5 text-sm border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                 >
                   <option value="all">All carriers</option>
                   <option value="icarry">iCarry</option>
@@ -815,7 +815,7 @@ export default function ShippingCarriersPage() {
                     setShipmentsPage(1);
                   }}
                   aria-label="Filter by status"
-                  className="px-3 py-1.5 text-sm border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="px-3 py-1.5 text-sm border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                 >
                   <option value="all">All statuses</option>
                   <option value="created">Created</option>
@@ -858,22 +858,37 @@ export default function ShippingCarriersPage() {
             ) : (
               <>
                 <div className="overflow-x-auto">
-                  <table className="w-full">
+                  <table className="w-full" aria-label="Shipping carriers">
                     <thead>
                       <tr className="bg-muted border-b border-border">
-                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                        >
                           Order #
                         </th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                        >
                           Carrier
                         </th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                        >
                           Tracking #
                         </th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                        >
                           Status
                         </th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                        >
                           Created
                         </th>
                       </tr>

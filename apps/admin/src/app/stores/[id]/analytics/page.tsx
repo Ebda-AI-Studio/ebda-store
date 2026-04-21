@@ -105,7 +105,7 @@ function SimpleBarChart({
           return (
             <div key={i} className="flex-1 flex flex-col items-center gap-1 group">
               <div
-                className="w-full bg-orange-500 rounded-t transition-all group-hover:bg-orange-600"
+                className="w-full bg-primary rounded-t transition-all group-hover:bg-primary/90"
                 style={{ height: `${Math.max(height, 2)}%` }}
                 title={`${formatDate(item.date)}: ${dataKey === 'revenue' ? formatCurrency(item[dataKey]) : item[dataKey]}`}
               />
@@ -173,7 +173,9 @@ function StatCard({
             <div className="mt-2 flex items-center gap-1">
               <span
                 className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs font-semibold ${
-                  isPositive ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
+                  isPositive
+                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300'
+                    : 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300'
                 }`}
               >
                 <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -259,12 +261,12 @@ export default function AnalyticsPage() {
   }, [fetchAnalytics]);
 
   const statusColors: Record<string, string> = {
-    pending: 'bg-yellow-100 text-yellow-800',
-    confirmed: 'bg-blue-100 text-blue-800',
-    processing: 'bg-indigo-100 text-indigo-800',
-    shipped: 'bg-purple-100 text-purple-800',
-    delivered: 'bg-green-100 text-green-800',
-    cancelled: 'bg-red-100 text-red-800',
+    pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
+    confirmed: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+    processing: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300',
+    shipped: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
+    delivered: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+    cancelled: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
     refunded: 'bg-muted text-foreground',
   };
 
@@ -574,10 +576,10 @@ export default function AnalyticsPage() {
                       <span
                         className={`px-2 py-1 text-xs font-semibold rounded ${
                           product.inventory === 0
-                            ? 'bg-red-100 text-red-800'
+                            ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
                             : product.inventory <= 5
                               ? 'bg-orange-100 text-orange-800'
-                              : 'bg-yellow-100 text-yellow-800'
+                              : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
                         }`}
                       >
                         {product.inventory} left
