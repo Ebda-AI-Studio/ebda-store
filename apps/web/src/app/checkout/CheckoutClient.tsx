@@ -181,7 +181,11 @@ export default function CheckoutClient() {
           store?.id
             ? api.get<{ zones: ShippingZone[] }>(`/stores/public/${store.id}/shipping`)
             : Promise.resolve(null),
-          api.get<{ providers: PaymentProvider[]; defaultProvider?: string }>('/payments/config'),
+          api.get<{
+            providers: PaymentProvider[];
+            defaultProvider?: string;
+            cod?: { fixedFee: number; displayName: string; displayNameAr: string | null };
+          }>('/payments/config'),
         ]);
 
         if (shippingResult?.success && shippingResult.data) {
@@ -189,11 +193,26 @@ export default function CheckoutClient() {
         }
 
         if (paymentResult.success && paymentResult.data) {
-          if (paymentResult.data.providers) {
-            setPaymentProviders(paymentResult.data.providers);
-            if (paymentResult.data.defaultProvider) {
-              setSelectedProvider(paymentResult.data.defaultProvider);
-            }
+          const allProviders = [...(paymentResult.data.providers || [])];
+
+          // Add COD as a provider option if enabled
+          if (paymentResult.data.cod) {
+            const codFee = paymentResult.data.cod.fixedFee || 0;
+            const feeText = codFee > 0 ? ` (+${formatPrice(codFee)})` : '';
+            allProviders.push({
+              id: 'cod',
+              name: `${paymentResult.data.cod.displayName || 'Cash on Delivery'}${feeText}`,
+              nameAr: paymentResult.data.cod.displayNameAr
+                ? `${paymentResult.data.cod.displayNameAr}${feeText}`
+                : undefined,
+              description: 'Pay when your order is delivered',
+              descriptionAr: 'ادفع عند استلام طلبك',
+            });
+          }
+
+          setPaymentProviders(allProviders);
+          if (paymentResult.data.defaultProvider) {
+            setSelectedProvider(paymentResult.data.defaultProvider);
           }
         }
       } catch (error) {
@@ -388,19 +407,22 @@ export default function CheckoutClient() {
       const order = orderResult.data.order;
 
       // Create payment
-      const paymentResult = await api.post<{ paymentUrl?: string }>('/payments/create', {
-        orderId: order.id,
-        provider: selectedProvider,
-        successUrl: `${window.location.origin}/checkout/success?orderId=${order.id}`,
-        errorUrl: `${window.location.origin}/checkout/error?orderId=${order.id}`,
-      });
+      const paymentResult = await api.post<{ paymentUrl?: string; cod?: boolean }>(
+        '/payments/create',
+        {
+          orderId: order.id,
+          provider: selectedProvider,
+          successUrl: `${window.location.origin}/checkout/success?orderId=${order.id}`,
+          errorUrl: `${window.location.origin}/checkout/error?orderId=${order.id}`,
+        }
+      );
 
-      if (paymentResult.success && paymentResult.data?.paymentUrl) {
-        // Redirect to payment gateway
+      if (paymentResult.success && paymentResult.data?.cod) {
+        // Cash on delivery — go straight to success
+        router.push(storeUrl(`/checkout/success?orderId=${order.id}&cod=1`));
+      } else if (paymentResult.success && paymentResult.data?.paymentUrl) {
+        // Online payment — redirect to payment gateway
         window.location.href = paymentResult.data.paymentUrl;
-      } else if (selectedProvider === 'cod') {
-        // Cash on delivery - go straight to success
-        router.push(storeUrl(`/checkout/success?orderId=${order.id}`));
       } else {
         throw new Error(paymentResult.error?.message || 'Failed to initiate payment');
       }

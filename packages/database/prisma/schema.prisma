@@ -725,6 +725,7 @@ enum PaymentStatus {
   refunded
   partially_refunded
   disputed
+  cod_pending
 }
 
 // ==========================================
@@ -866,6 +867,7 @@ enum PaymentProvider {
   myfatoorah
   hesabe
   upayments
+  cod
 }
 
 enum ProviderHealthStatus {

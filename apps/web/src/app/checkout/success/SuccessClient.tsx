@@ -15,6 +15,7 @@ import { formatPrice } from '@/lib/format';
 function SuccessContent() {
   const searchParams = useSearchParams();
   const orderId = searchParams?.get('orderId');
+  const isCod = searchParams?.get('cod') === '1';
   const { store } = useStore();
   const storeUrl = useStoreUrl();
   const { clearCart } = useCart();
@@ -110,11 +111,27 @@ function SuccessContent() {
             )}
           </h1>
           <p className="mt-2 text-lg text-muted-foreground">
-            {t(
-              'Your order has been confirmed and will be shipped soon.',
-              '\u062a\u0645 \u062a\u0623\u0643\u064a\u062f \u0637\u0644\u0628\u0643 \u0648\u0633\u064a\u062a\u0645 \u0634\u062d\u0646\u0647 \u0642\u0631\u064a\u0628\u0627\u064b.'
-            )}
+            {isCod
+              ? t(
+                  'Your order has been placed. Please have the payment ready when your order is delivered.',
+                  '\u062a\u0645 \u062a\u0642\u062f\u064a\u0645 \u0637\u0644\u0628\u0643. \u064a\u0631\u062c\u0649 \u062a\u062c\u0647\u064a\u0632 \u0627\u0644\u0645\u0628\u0644\u063a \u0639\u0646\u062f \u0627\u0633\u062a\u0644\u0627\u0645 \u0627\u0644\u0637\u0644\u0628.'
+                )
+              : t(
+                  'Your order has been confirmed and will be shipped soon.',
+                  '\u062a\u0645 \u062a\u0623\u0643\u064a\u062f \u0637\u0644\u0628\u0643 \u0648\u0633\u064a\u062a\u0645 \u0634\u062d\u0646\u0647 \u0642\u0631\u064a\u0628\u0627\u064b.'
+                )}
           </p>
+
+          {isCod && (
+            <div className="mt-4 rounded-lg border border-[hsl(var(--warning))]/30 bg-[hsl(var(--warning))]/10 px-4 py-3">
+              <p className="text-sm font-medium text-[hsl(var(--warning))]">
+                {t(
+                  'Cash on Delivery — Pay when your order arrives',
+                  '\u0627\u0644\u062f\u0641\u0639 \u0639\u0646\u062f \u0627\u0644\u0627\u0633\u062a\u0644\u0627\u0645 — \u0627\u062f\u0641\u0639 \u0639\u0646\u062f \u0648\u0635\u0648\u0644 \u0637\u0644\u0628\u0643'
+                )}
+              </p>
+            </div>
+          )}
 
           <div className="mt-8 rounded-xl border bg-card p-6 shadow-sm text-left">
             <div className="flex items-center justify-between border-b pb-4">

@@ -1,11 +1,14 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { authenticate } from '../middleware/auth';
+import { authenticate, authorize } from '../middleware/auth';
+import { requireStoreAccess } from '../middleware/store-access';
 import { OrderService } from '../services/order.service';
 import { InvoiceService } from '../services/invoice.service';
 import { requirePermission, requireRole } from '../middleware/rbac';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { getAuthUser } from '../utils/store-helpers';
+import { prisma } from '@force/database';
+import logger from '../lib/logger';
 
 const router = Router({ mergeParams: true });
 
@@ -206,5 +209,168 @@ router.get('/my/list', authenticate, async (req: Request, res: Response, next: N
     next(error);
   }
 });
+
+// ==========================================
+// COD Mark as Paid
+// ==========================================
+
+/**
+ * POST /stores/:storeId/orders/:orderId/mark-paid
+ * Mark a COD order as paid (admin only)
+ */
+router.post(
+  '/:orderId/mark-paid',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, orderId } = req.params;
+      const user = getAuthUser(req);
+
+      const order = await prisma.order.findFirst({
+        where: { id: orderId, storeId },
+        include: { payments: true },
+      });
+
+      if (!order) {
+        res.status(404).json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'Order not found' },
+        });
+        return;
+      }
+
+      // Verify this is a COD order
+      const codPayment = order.payments.find(p => p.provider === 'cod');
+      if (!codPayment) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'NOT_COD', message: 'This order is not a Cash on Delivery order' },
+        });
+        return;
+      }
+
+      if (order.paymentStatus === 'paid') {
+        res.status(400).json({
+          success: false,
+          error: { code: 'ALREADY_PAID', message: 'Order is already marked as paid' },
+        });
+        return;
+      }
+
+      // Update payment and order status atomically
+      await prisma.$transaction([
+        prisma.payment.update({
+          where: { id: codPayment.id },
+          data: { status: 'completed', paidAt: new Date() },
+        }),
+        prisma.order.update({
+          where: { id: orderId },
+          data: { paymentStatus: 'paid', status: 'confirmed' },
+        }),
+      ]);
+
+      await auditLog({
+        action: 'order.cod_marked_paid',
+        userId: user.userId,
+        resourceType: 'order',
+        resourceId: orderId,
+        details: { orderNumber: order.orderNumber, amount: codPayment.amount },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+
+      logger.info({ orderId, orderNumber: order.orderNumber }, '[COD] Order marked as paid');
+
+      res.json({
+        success: true,
+        data: { message: 'Order marked as paid', orderNumber: order.orderNumber },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /stores/:storeId/orders/bulk-mark-paid
+ * Mark multiple COD orders as paid (admin only)
+ */
+router.post(
+  '/bulk-mark-paid',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const user = getAuthUser(req);
+      const { orderIds } = z
+        .object({ orderIds: z.array(z.string().uuid()).min(1).max(50) })
+        .parse(req.body);
+
+      // Fetch all orders with their COD payments
+      const orders = await prisma.order.findMany({
+        where: {
+          id: { in: orderIds },
+          storeId,
+          paymentStatus: { not: 'paid' },
+        },
+        include: { payments: { where: { provider: 'cod' } } },
+      });
+
+      // Filter to only COD orders with pending payments
+      const codOrders = orders.filter(o => o.payments.length > 0);
+
+      if (codOrders.length === 0) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'NO_COD_ORDERS', message: 'No eligible COD orders found' },
+        });
+        return;
+      }
+
+      // Build update operations
+      const updates = codOrders.flatMap(order => [
+        prisma.payment.update({
+          where: { id: order.payments[0].id },
+          data: { status: 'completed', paidAt: new Date() },
+        }),
+        prisma.order.update({
+          where: { id: order.id },
+          data: { paymentStatus: 'paid', status: 'confirmed' },
+        }),
+      ]);
+
+      await prisma.$transaction(updates);
+
+      await auditLog({
+        action: 'order.cod_bulk_marked_paid',
+        userId: user.userId,
+        resourceType: 'order',
+        details: {
+          count: codOrders.length,
+          orderNumbers: codOrders.map(o => o.orderNumber).join(', '),
+        },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+
+      logger.info({ count: codOrders.length, storeId }, '[COD] Bulk orders marked as paid');
+
+      res.json({
+        success: true,
+        data: {
+          message: `${codOrders.length} order(s) marked as paid`,
+          updated: codOrders.length,
+          skipped: orderIds.length - codOrders.length,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 export default router;

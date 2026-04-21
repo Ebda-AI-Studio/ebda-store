@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useToast } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
-import { apiGet, apiPut, getApiUrl } from '../../../../lib/api';
+import { apiGet, apiPut, apiPost, getApiUrl } from '../../../../lib/api';
 
 interface OrderCustomer {
   id: string;
@@ -80,6 +80,8 @@ export default function StoreOrdersPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
   const { success: toastSuccess, error: showError } = useToast();
 
   const fetchOrders = useCallback(async () => {
@@ -141,6 +143,51 @@ export default function StoreOrdersPage() {
 
   const openInvoice = (orderId: string) => {
     window.open(`${API_URL}/api/v1/stores/${storeId}/orders/${orderId}/invoice`, '_blank');
+  };
+
+  const handleMarkPaid = async (orderId: string) => {
+    if (!confirm('Confirm cash payment received for this order?')) return;
+    setUpdatingId(orderId);
+    try {
+      const { error: apiError } = await apiPost(
+        `/api/v1/stores/${storeId}/orders/${orderId}/mark-paid`,
+        {}
+      );
+      if (!apiError) {
+        toastSuccess('Marked as Paid', 'Order has been marked as paid.');
+        fetchOrders();
+      } else {
+        showError('Error', apiError.message || 'Failed to mark as paid');
+      }
+    } catch {
+      showError('Error', 'Unable to connect to the server');
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const handleBulkMarkPaid = async () => {
+    const ids = Array.from(selectedOrders);
+    if (ids.length === 0) return;
+    if (!confirm(`Mark ${ids.length} order(s) as paid?`)) return;
+    setIsBulkProcessing(true);
+    try {
+      const { data, error: apiError } = await apiPost<{ updated: number; skipped: number }>(
+        `/api/v1/stores/${storeId}/orders/bulk-mark-paid`,
+        { orderIds: ids }
+      );
+      if (!apiError && data) {
+        toastSuccess('Bulk Update', `${data.updated} order(s) marked as paid.`);
+        setSelectedOrders(new Set());
+        fetchOrders();
+      } else {
+        showError('Error', apiError?.message || 'Failed to bulk mark as paid');
+      }
+    } catch {
+      showError('Error', 'Unable to connect to the server');
+    } finally {
+      setIsBulkProcessing(false);
+    }
   };
 
   // Client-side search on already-fetched page
@@ -221,6 +268,28 @@ export default function StoreOrdersPage() {
           {error}
           <button className="ml-4 font-medium underline" onClick={fetchOrders}>
             Retry
+          </button>
+        </div>
+      )}
+
+      {/* Bulk Actions Bar */}
+      {selectedOrders.size > 0 && (
+        <div className="mb-4 flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3">
+          <span className="text-sm font-medium text-foreground">
+            {selectedOrders.size} order(s) selected
+          </span>
+          <button
+            onClick={handleBulkMarkPaid}
+            disabled={isBulkProcessing}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+          >
+            {isBulkProcessing ? 'Processing...' : 'Mark as Paid'}
+          </button>
+          <button
+            onClick={() => setSelectedOrders(new Set())}
+            className="text-xs text-muted-foreground hover:text-foreground"
+          >
+            Clear selection
           </button>
         </div>
       )}
@@ -395,26 +464,52 @@ export default function StoreOrdersPage() {
                         {formatDate(order.createdAt)}
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <button
-                          onClick={() => openInvoice(order.id)}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-foreground border border-border rounded-lg hover:bg-muted transition-colors"
-                          title="View Invoice"
-                        >
-                          <svg
-                            className="h-3.5 w-3.5"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
+                        <div className="flex items-center justify-end gap-2">
+                          {/* COD Mark as Paid button */}
+                          {order.paymentStatus === 'unpaid' && (
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                aria-label={`Select order ${order.orderNumber || order.id}`}
+                                checked={selectedOrders.has(order.id)}
+                                onChange={e => {
+                                  const next = new Set(selectedOrders);
+                                  e.target.checked ? next.add(order.id) : next.delete(order.id);
+                                  setSelectedOrders(next);
+                                }}
+                                className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                              />
+                              <button
+                                onClick={() => handleMarkPaid(order.id)}
+                                disabled={isUpdating}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-[hsl(var(--success))] border border-[hsl(var(--success))]/30 rounded-lg hover:bg-[hsl(var(--success))]/10 transition-colors disabled:opacity-50"
+                                title="Mark COD payment as received"
+                              >
+                                Mark Paid
+                              </button>
+                            </div>
+                          )}
+                          <button
+                            onClick={() => openInvoice(order.id)}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-foreground border border-border rounded-lg hover:bg-muted transition-colors"
+                            title="View Invoice"
                           >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
-                            />
-                          </svg>
-                          Invoice
-                        </button>
+                            <svg
+                              className="h-3.5 w-3.5"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
+                              />
+                            </svg>
+                            Invoice
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );

@@ -3,7 +3,7 @@
 // Common interfaces for all Kuwait payment gateways
 // ==========================================
 
-export type PaymentProvider = 'tap' | 'myfatoorah' | 'hesabe' | 'upayments';
+export type PaymentProvider = 'tap' | 'myfatoorah' | 'hesabe' | 'upayments' | 'cod';
 
 export type PaymentMethod =
   | 'knet'
@@ -23,7 +23,8 @@ export type PaymentStatus =
   | 'refunded'
   | 'partially_refunded'
   | 'cancelled'
-  | 'expired';
+  | 'expired'
+  | 'cod_pending';
 
 export type Currency = 'KWD' | 'USD' | 'EUR' | 'GBP' | 'AED' | 'SAR' | 'BHD' | 'OMR' | 'QAR';
 

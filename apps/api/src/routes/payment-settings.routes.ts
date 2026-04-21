@@ -15,7 +15,7 @@ const router = Router();
 // ==========================================
 
 const paymentConfigSchema = z.object({
-  provider: z.enum(['tap', 'myfatoorah', 'hesabe', 'upayments']),
+  provider: z.enum(['tap', 'myfatoorah', 'hesabe', 'upayments', 'cod']),
   isEnabled: z.boolean().default(false),
   isDefault: z.boolean().default(false),
   displayName: z.string().optional(),

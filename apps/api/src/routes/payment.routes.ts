@@ -36,7 +36,7 @@ function platformUrlOrRelative(url: string): boolean {
 
 const createPaymentSchema = z.object({
   orderId: z.string().uuid(),
-  provider: z.enum(['tap', 'myfatoorah', 'hesabe', 'upayments']).optional(),
+  provider: z.enum(['tap', 'myfatoorah', 'hesabe', 'upayments', 'cod']).optional(),
   successUrl: z
     .string()
     .url()
@@ -73,14 +73,36 @@ const refundSchema = z.object({
  * GET /payments/config
  * Get payment configuration for Kuwait providers
  */
-router.get('/config', async (_req: Request, res: Response, next: NextFunction) => {
+router.get('/config', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const providers = await PaymentService.getAvailableProviders();
+    const storeId = req.headers['x-store-id'] as string | undefined;
+
+    // Check if COD is enabled for this store (or globally)
+    let codConfig: { fixedFee: number; displayName: string; displayNameAr: string | null } | null =
+      null;
+    const codRecord = await prisma.paymentConfig.findFirst({
+      where: {
+        OR: [
+          ...(storeId ? [{ storeId, provider: 'cod' as const, isEnabled: true }] : []),
+          { storeId: null, provider: 'cod' as const, isEnabled: true },
+        ],
+      },
+      orderBy: { storeId: 'desc' },
+    });
+    if (codRecord) {
+      codConfig = {
+        fixedFee: codRecord.fixedFee ? Number(codRecord.fixedFee) : 0,
+        displayName: codRecord.displayName || 'Cash on Delivery',
+        displayNameAr: codRecord.displayNameAr,
+      };
+    }
 
     res.json({
       success: true,
       data: {
         providers,
+        cod: codConfig,
         defaultProvider: config.defaultPaymentProvider,
         defaultCurrency: config.defaultCurrency,
         supportedCurrencies: ['KWD', 'USD', 'EUR', 'GBP', 'AED', 'SAR', 'BHD'],
@@ -145,6 +167,86 @@ router.post(
         });
         return;
       }
+
+      // ==========================================
+      // COD (Cash on Delivery) — skip payment gateway
+      // ==========================================
+      if (data.provider === 'cod') {
+        // Look up COD config for fee
+        const codConfig = await prisma.paymentConfig.findFirst({
+          where: {
+            OR: [
+              { storeId: order.storeId, provider: 'cod', isEnabled: true },
+              { storeId: null, provider: 'cod', isEnabled: true },
+            ],
+          },
+          orderBy: { storeId: 'desc' }, // Store-specific first, then global
+        });
+
+        if (!codConfig) {
+          res.status(400).json({
+            success: false,
+            error: {
+              code: 'COD_NOT_AVAILABLE',
+              message: 'Cash on Delivery is not available for this store',
+            },
+          });
+          return;
+        }
+
+        const codFee = codConfig.fixedFee ? Number(codConfig.fixedFee) : 0;
+
+        // Add COD fee to order total if configured
+        if (codFee > 0) {
+          await prisma.order.update({
+            where: { id: order.id },
+            data: { total: order.total + codFee },
+          });
+        }
+
+        // Create payment record with cod_pending status
+        const payment = await prisma.payment.create({
+          data: {
+            orderId: order.id,
+            provider: 'cod',
+            method: 'cod',
+            status: 'cod_pending',
+            amount: order.total + codFee,
+            currency: order.currency,
+            metadata: { codFee, originalTotal: order.total },
+          },
+        });
+
+        await auditLog({
+          action: 'payment.created',
+          userId: user.userId,
+          resourceType: 'payment',
+          resourceId: payment.id,
+          details: {
+            orderId: order.id,
+            amount: order.total + codFee,
+            codFee,
+            provider: 'cod',
+          },
+          ip: req.ip,
+          userAgent: req.headers['user-agent'],
+        });
+
+        res.json({
+          success: true,
+          data: {
+            transactionId: payment.id,
+            provider: 'cod',
+            cod: true,
+            codFee,
+          },
+        });
+        return;
+      }
+
+      // ==========================================
+      // Online payment providers (Tap, MyFatoorah, etc.)
+      // ==========================================
 
       // Resolve the correct storefront URL for payment callbacks
       const storefrontBaseUrl = order.store?.domain
