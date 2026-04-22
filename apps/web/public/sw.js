@@ -1,27 +1,23 @@
-const CACHE_NAME = 'force-store-v4';
-const STATIC_ASSETS = ['/', '/favicon.svg'];
+// Service worker exists for web push notifications only. Earlier versions also
+// intercepted fetches to serve a "static asset cache," which kept returning
+// broken responses (undefined -> "Failed to convert value to 'Response'",
+// then the synthetic 503 fallback breaking /checkout navigations). The app
+// relies on live API data anyway, so there's nothing to gain from caching
+// pages. We now take over existing clients, purge all old caches, and leave
+// network requests to the browser.
 
-// A last-resort synthetic response — returning undefined from a fetch handler
-// makes the browser throw "Failed to convert value to 'Response'", which then
-// breaks the page navigation (seen on /checkout when the network was flaky).
-function offlineFallback() {
-  return new Response('', { status: 503, statusText: 'Service Unavailable' });
-}
-
-self.addEventListener('install', event => {
-  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(STATIC_ASSETS)));
+self.addEventListener('install', () => {
   self.skipWaiting();
 });
 
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches
-      .keys()
-      .then(keys =>
-        Promise.all(keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key)))
-      )
+    (async () => {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(key => caches.delete(key)));
+      await self.clients.claim();
+    })()
   );
-  self.clients.claim();
 });
 
 // Web Push: show notification when a push arrives
@@ -66,44 +62,4 @@ self.addEventListener('notificationclick', event => {
   );
 });
 
-self.addEventListener('fetch', event => {
-  const url = event.request.url;
-
-  // Only handle http/https requests (skip chrome-extension://, etc.)
-  if (!url.startsWith('http')) return;
-
-  // Don't intercept navigations — let the browser stream HTML directly.
-  // The SW was returning undefined from caches.match on first navigation to
-  // /checkout etc., which throws "Failed to convert value to 'Response'".
-  if (event.request.mode === 'navigate') return;
-
-  // Network-first for API calls and Next.js chunks, cache-first for other assets
-  if (url.includes('/api/') || url.includes('/_next/')) {
-    event.respondWith(
-      fetch(event.request)
-        .catch(() => caches.match(event.request))
-        .then(response => response || offlineFallback())
-    );
-  } else if (event.request.method === 'GET') {
-    event.respondWith(
-      caches.match(event.request).then(cached => {
-        const fetched = fetch(event.request)
-          .then(response => {
-            // Only cache successful responses
-            if (response.ok) {
-              const clone = response.clone();
-              caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
-            }
-            return response;
-          })
-          .catch(() => cached);
-        // Always resolve to a valid Response — fall back to the offline
-        // placeholder if nothing is cached and the network failed.
-        return (
-          cached ||
-          fetched.then(response => response || offlineFallback()).catch(() => offlineFallback())
-        );
-      })
-    );
-  }
-});
+// No fetch handler — all network requests go straight to the browser.
