@@ -157,8 +157,10 @@ router.get(
 // ==========================================
 
 // GET /public/:storeId/products/:productId/recommendations
+// Mounted under '/public' in routes/index.ts, so the leading '/public'
+// is NOT part of the route path here.
 router.get(
-  '/public/:storeId/products/:productId/recommendations',
+  '/:storeId/products/:productId/recommendations',
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, productId } = req.params;
@@ -181,8 +183,9 @@ router.get(
 );
 
 // GET /public/:storeId/cart/recommendations?products=id1,id2
+// Mounted under '/public' in routes/index.ts.
 router.get(
-  '/public/:storeId/cart/recommendations',
+  '/:storeId/cart/recommendations',
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;

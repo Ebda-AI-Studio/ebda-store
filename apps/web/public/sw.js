@@ -1,5 +1,12 @@
-const CACHE_NAME = 'force-store-v3';
+const CACHE_NAME = 'force-store-v4';
 const STATIC_ASSETS = ['/', '/favicon.svg'];
+
+// A last-resort synthetic response — returning undefined from a fetch handler
+// makes the browser throw "Failed to convert value to 'Response'", which then
+// breaks the page navigation (seen on /checkout when the network was flaky).
+function offlineFallback() {
+  return new Response('', { status: 503, statusText: 'Service Unavailable' });
+}
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(STATIC_ASSETS)));
@@ -65,9 +72,18 @@ self.addEventListener('fetch', event => {
   // Only handle http/https requests (skip chrome-extension://, etc.)
   if (!url.startsWith('http')) return;
 
+  // Don't intercept navigations — let the browser stream HTML directly.
+  // The SW was returning undefined from caches.match on first navigation to
+  // /checkout etc., which throws "Failed to convert value to 'Response'".
+  if (event.request.mode === 'navigate') return;
+
   // Network-first for API calls and Next.js chunks, cache-first for other assets
   if (url.includes('/api/') || url.includes('/_next/')) {
-    event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
+    event.respondWith(
+      fetch(event.request)
+        .catch(() => caches.match(event.request))
+        .then(response => response || offlineFallback())
+    );
   } else if (event.request.method === 'GET') {
     event.respondWith(
       caches.match(event.request).then(cached => {
@@ -81,7 +97,12 @@ self.addEventListener('fetch', event => {
             return response;
           })
           .catch(() => cached);
-        return cached || fetched;
+        // Always resolve to a valid Response — fall back to the offline
+        // placeholder if nothing is cached and the network failed.
+        return (
+          cached ||
+          fetched.then(response => response || offlineFallback()).catch(() => offlineFallback())
+        );
       })
     );
   }
