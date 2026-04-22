@@ -25,6 +25,13 @@ export default function BulkOperationsPage() {
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [updateExisting, setUpdateExisting] = useState(true);
   const [csvContent, setCsvContent] = useState('');
+  const [xlsxBase64, setXlsxBase64] = useState('');
+  const [selectedFileName, setSelectedFileName] = useState('');
+  const [fileKind, setFileKind] = useState<'csv' | 'xlsx' | null>(null);
+  const [skuPrefix, setSkuPrefix] = useState('');
+  const [defaultInventory, setDefaultInventory] = useState(100);
+  const [defaultStatus, setDefaultStatus] = useState<'draft' | 'active'>('active');
+  const [trackInventory, setTrackInventory] = useState(false);
   const [exportFilters, setExportFilters] = useState({
     status: '',
     search: '',
@@ -59,25 +66,58 @@ export default function BulkOperationsPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = event => {
-      const content = event.target?.result as string;
-      setCsvContent(content);
-    };
-    reader.readAsText(file);
+    setSelectedFileName(file.name);
+    const isXlsx = /\.xlsx$/i.test(file.name) || file.type.includes('sheet');
+
+    if (isXlsx) {
+      setFileKind('xlsx');
+      setCsvContent('');
+      const buf = await file.arrayBuffer();
+      // Chunked base64 encode so we don't blow the stack on large files.
+      const bytes = new Uint8Array(buf);
+      let binary = '';
+      const chunk = 0x8000;
+      for (let i = 0; i < bytes.length; i += chunk) {
+        binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+      }
+      setXlsxBase64(btoa(binary));
+    } else {
+      setFileKind('csv');
+      setXlsxBase64('');
+      const reader = new FileReader();
+      reader.onload = event => {
+        const content = event.target?.result as string;
+        setCsvContent(content);
+      };
+      reader.readAsText(file);
+    }
   }
 
   async function handleImport() {
-    if (!csvContent) return;
+    if (fileKind === 'xlsx' ? !xlsxBase64 : !csvContent) return;
 
     setIsImporting(true);
     setImportResult(null);
 
     try {
-      const { data, error } = await apiPost<{ result: ImportResult }>(
-        `/api/v1/stores/${storeId}/bulk/import`,
-        { csvData: csvContent, options: { updateExisting } }
-      );
+      const isXlsx = fileKind === 'xlsx';
+      const endpoint = isXlsx
+        ? `/api/v1/stores/${storeId}/bulk/import-xlsx`
+        : `/api/v1/stores/${storeId}/bulk/import`;
+      const body = isXlsx
+        ? {
+            xlsxBase64,
+            options: {
+              updateExisting,
+              skuPrefix: skuPrefix.trim() || undefined,
+              defaultInventory,
+              defaultStatus,
+              trackInventory,
+            },
+          }
+        : { csvData: csvContent, options: { updateExisting } };
+
+      const { data, error } = await apiPost<{ result: ImportResult }>(endpoint, body);
 
       if (data) {
         setImportResult(data.result);
@@ -90,7 +130,7 @@ export default function BulkOperationsPage() {
           errors: [{ row: 0, error: error?.message || 'Import failed' }],
         });
       }
-    } catch (error) {
+    } catch {
       setImportResult({
         total: 0,
         created: 0,
@@ -137,6 +177,9 @@ export default function BulkOperationsPage() {
 
   function clearImport() {
     setCsvContent('');
+    setXlsxBase64('');
+    setSelectedFileName('');
+    setFileKind(null);
     setImportResult(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -243,7 +286,7 @@ export default function BulkOperationsPage() {
 
           {/* File Upload */}
           <div className="rounded-xl border bg-card p-6 shadow-sm">
-            <h3 className="font-semibold text-foreground mb-4">Upload CSV File</h3>
+            <h3 className="font-semibold text-foreground mb-4">Upload CSV or XLSX File</h3>
 
             <div className="space-y-4">
               <div
@@ -253,7 +296,7 @@ export default function BulkOperationsPage() {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".csv"
+                  accept=".csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                   onChange={handleFileSelect}
                   className="hidden"
                 />
@@ -271,12 +314,19 @@ export default function BulkOperationsPage() {
                   />
                 </svg>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  {csvContent ? 'File loaded. Click to change.' : 'Click to upload CSV file'}
+                  {selectedFileName
+                    ? `${selectedFileName} loaded. Click to change.`
+                    : 'Click to upload a CSV or XLSX file'}
                 </p>
-                {csvContent && (
+                {fileKind === 'csv' && csvContent && (
                   <p className="mt-1 text-xs text-[hsl(var(--success))]">
                     ✓ {csvContent.split('\n').filter(l => l.trim()).length - 1} products ready for
                     import
+                  </p>
+                )}
+                {fileKind === 'xlsx' && xlsxBase64 && (
+                  <p className="mt-1 text-xs text-[hsl(var(--success))]">
+                    ✓ Workbook loaded — rows will be mapped + parsed on the server
                   </p>
                 )}
               </div>
@@ -295,11 +345,73 @@ export default function BulkOperationsPage() {
                 </Label>
               </div>
 
+              {fileKind === 'xlsx' && (
+                <div className="rounded-lg border border-border bg-muted/40 p-4 space-y-3">
+                  <p className="text-xs text-muted-foreground">
+                    XLSX options — applied to rows that don&apos;t specify these columns explicitly.
+                  </p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <Label htmlFor="skuPrefix" className="text-xs">
+                        SKU prefix (e.g. <code>WJ</code> → <code>WJ-001</code>)
+                      </Label>
+                      <Input
+                        id="skuPrefix"
+                        value={skuPrefix}
+                        onChange={e => setSkuPrefix(e.target.value)}
+                        placeholder="ITEM"
+                        maxLength={16}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="defaultInventory" className="text-xs">
+                        Default inventory per row
+                      </Label>
+                      <Input
+                        id="defaultInventory"
+                        type="number"
+                        min={0}
+                        value={defaultInventory}
+                        onChange={e =>
+                          setDefaultInventory(Math.max(0, parseInt(e.target.value, 10) || 0))
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="defaultStatus" className="text-xs">
+                        Default status
+                      </Label>
+                      <select
+                        id="defaultStatus"
+                        value={defaultStatus}
+                        onChange={e => setDefaultStatus(e.target.value as 'draft' | 'active')}
+                        className="mt-2 block h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                      >
+                        <option value="active">active</option>
+                        <option value="draft">draft</option>
+                      </select>
+                    </div>
+                    <div className="flex items-end gap-2">
+                      <input
+                        type="checkbox"
+                        id="trackInventory"
+                        checked={trackInventory}
+                        onChange={e => setTrackInventory(e.target.checked)}
+                        className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                      />
+                      <Label htmlFor="trackInventory" className="text-sm font-normal">
+                        Track inventory (decrement on sale)
+                      </Label>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Import Button */}
               <div className="flex gap-2">
                 <Button
                   onClick={handleImport}
-                  disabled={!csvContent || isImporting}
+                  disabled={isImporting || (fileKind === 'xlsx' ? !xlsxBase64 : !csvContent)}
                   className="flex-1"
                 >
                   {isImporting ? (

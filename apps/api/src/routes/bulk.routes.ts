@@ -4,6 +4,7 @@ import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { BulkService } from '../services/bulk.service';
+import { xlsxBufferToImportCsv } from '../services/xlsx-import';
 import { ProductStatus } from '@force/database';
 import { auditLog, writeLimiter } from '../middleware/security';
 
@@ -25,6 +26,22 @@ const bulkStatusSchema = z.object({
 const importOptionsSchema = z.object({
   updateExisting: z.boolean().optional().default(true),
 });
+
+const xlsxImportOptionsSchema = z.object({
+  updateExisting: z.boolean().optional().default(true),
+  skuPrefix: z
+    .string()
+    .trim()
+    .regex(/^[A-Za-z0-9_-]{1,16}$/)
+    .optional(),
+  defaultInventory: z.number().int().min(0).max(1_000_000).optional(),
+  defaultStatus: z.enum(['draft', 'active', 'archived']).optional(),
+  trackInventory: z.boolean().optional(),
+});
+
+// Base64-encoded xlsx payloads. 10MB is plenty for merchant catalogues and
+// keeps JSON body parsing honest.
+const MAX_XLSX_BYTES = 10 * 1024 * 1024;
 
 // GET /stores/:storeId/bulk/export - Export products to CSV
 router.get(
@@ -106,6 +123,90 @@ router.post(
       const userId = req.user!.userId;
 
       const result = await BulkService.importProducts(storeId, csvData, parsedOptions, userId);
+
+      // Audit log
+      await auditLog({
+        action: 'bulk.import',
+        userId,
+        resourceType: 'product',
+        resourceId: storeId,
+        details: {
+          total: result.total,
+          created: result.created,
+          updated: result.updated,
+          failed: result.failed,
+        },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+
+      res.json({
+        success: true,
+        data: { result },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// POST /stores/:storeId/bulk/import-xlsx - Import products from an XLSX file
+// (base64 encoded). Accepts the same option shape as /import plus optional
+// xlsx-specific defaults (skuPrefix, defaultInventory, defaultStatus,
+// trackInventory). The sheet is parsed server-side, mapped against common
+// English/Arabic header aliases, converted to the platform CSV format, and
+// handed to the regular CSV importer so there's one source of truth for
+// product creation.
+router.post(
+  '/:storeId/bulk/import-xlsx',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const { xlsxBase64, options } = req.body;
+
+      if (!xlsxBase64 || typeof xlsxBase64 !== 'string') {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'INVALID_DATA',
+            message: 'xlsxBase64 is required and must be a base64 string',
+          },
+        });
+        return;
+      }
+
+      const parsedOptions = xlsxImportOptionsSchema.parse(options || {});
+      const userId = req.user!.userId;
+
+      const buffer = Buffer.from(xlsxBase64, 'base64');
+      if (buffer.byteLength === 0 || buffer.byteLength > MAX_XLSX_BYTES) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'INVALID_DATA',
+            message: `xlsx file must be between 1 byte and ${MAX_XLSX_BYTES} bytes`,
+          },
+        });
+        return;
+      }
+
+      const csvData = await xlsxBufferToImportCsv(buffer, {
+        skuPrefix: parsedOptions.skuPrefix,
+        defaultInventory: parsedOptions.defaultInventory,
+        defaultStatus: parsedOptions.defaultStatus,
+        trackInventory: parsedOptions.trackInventory,
+      });
+
+      const result = await BulkService.importProducts(
+        storeId,
+        csvData,
+        { updateExisting: parsedOptions.updateExisting ?? true },
+        userId
+      );
 
       // Audit log
       await auditLog({
