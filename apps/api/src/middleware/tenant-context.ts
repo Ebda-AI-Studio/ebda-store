@@ -35,16 +35,24 @@ export function tenantContext(req: Request, res: Response, next: NextFunction): 
 
   runInTenantContext(storeId, () => {
     return new Promise<void>((resolve, reject) => {
-      // Resolve the promise (committing the transaction) when the response is sent
-      res.on('finish', resolve);
-      // Also resolve on premature close so the transaction doesn't hang
+      // When the response finishes, commit on 2xx/3xx/4xx and roll back on 5xx
+      // so failed handlers don't leave partial writes behind.
+      res.on('finish', () => {
+        if (res.statusCode >= 500) {
+          reject(new Error(`Handler returned ${res.statusCode}`));
+        } else {
+          resolve();
+        }
+      });
+      // Premature close (client disconnect) — don't roll back, just let the tx commit.
       res.on('close', resolve);
 
-      // Catch synchronous errors from downstream handlers
+      // Advance to the next middleware. Passing a function here is a bug:
+      // Express treats any truthy argument to next() as an error and skips
+      // straight to the error handler, which is why every store-scoped
+      // route was returning 500 before the handler ever ran.
       try {
-        next((err?: unknown) => {
-          if (err) reject(err);
-        });
+        next();
       } catch (err) {
         reject(err);
       }
