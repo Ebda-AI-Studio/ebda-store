@@ -8,7 +8,13 @@ import { InventoryChangeType } from '@force/database';
 
 const router = Router();
 
-router.use(requireFeature('inventory'));
+// Scope the feature gate to the inventory subtree only. The previous
+// `router.use(requireFeature('inventory'))` fired on every request routed
+// into this router — which, because both this router and reviewRoutes share
+// the same '/stores' mount prefix upstream, also caught unrelated URLs
+// (e.g. /stores/:id/reviews) and responded with a misleading
+// 'FEATURE_DISABLED: inventory' 403.
+router.use('/:storeId/inventory', requireFeature('inventory'));
 
 // Validation schemas
 const adjustInventorySchema = z.object({

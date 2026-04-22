@@ -10,7 +10,10 @@ import { auditLog, writeLimiter } from '../middleware/security';
 
 const router = Router();
 
-router.use(requireFeature('bulk_operations'));
+// Scope the feature gate to the bulk subtree only — see inventory.routes.ts
+// for why the previous `router.use(requireFeature('bulk_operations'))`
+// over-triggered on sibling mounts under '/stores'.
+router.use('/:storeId/bulk', requireFeature('bulk_operations'));
 
 // Validation schemas
 const bulkDeleteSchema = z.object({

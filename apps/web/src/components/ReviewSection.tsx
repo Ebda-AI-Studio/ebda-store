@@ -132,7 +132,7 @@ export default function ReviewSection({ storeId, productId }: Props) {
   const fetchReviews = useCallback(async () => {
     setIsLoading(true);
     try {
-      const res = await fetch(`${API_URL}/stores/${storeId}/reviews?productId=${productId}`, {
+      const res = await fetch(`${API_URL}/stores/${storeId}/reviews/product/${productId}`, {
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
       });
