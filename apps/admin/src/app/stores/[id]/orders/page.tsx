@@ -22,6 +22,7 @@ interface Order {
   status: string;
   paymentStatus: string;
   createdAt: string;
+  payments?: { provider: string; status: string }[];
 }
 
 interface Pagination {
@@ -483,30 +484,31 @@ export default function StoreOrdersPage() {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          {/* COD Mark as Paid button */}
-                          {order.paymentStatus === 'unpaid' && (
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="checkbox"
-                                aria-label={`Select order ${order.orderNumber || order.id}`}
-                                checked={selectedOrders.has(order.id)}
-                                onChange={e => {
-                                  const next = new Set(selectedOrders);
-                                  e.target.checked ? next.add(order.id) : next.delete(order.id);
-                                  setSelectedOrders(next);
-                                }}
-                                className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-                              />
-                              <button
-                                onClick={() => handleMarkPaid(order.id)}
-                                disabled={isUpdating}
-                                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-[hsl(var(--success))] border border-[hsl(var(--success))]/30 rounded-lg hover:bg-[hsl(var(--success))]/10 transition-colors disabled:opacity-50"
-                                title="Mark COD payment as received"
-                              >
-                                Mark Paid
-                              </button>
-                            </div>
-                          )}
+                          {/* COD Mark as Paid button — only for COD orders awaiting cash */}
+                          {order.paymentStatus === 'unpaid' &&
+                            order.payments?.some(p => p.provider === 'cod') && (
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  aria-label={`Select order ${order.orderNumber || order.id}`}
+                                  checked={selectedOrders.has(order.id)}
+                                  onChange={e => {
+                                    const next = new Set(selectedOrders);
+                                    e.target.checked ? next.add(order.id) : next.delete(order.id);
+                                    setSelectedOrders(next);
+                                  }}
+                                  className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                                />
+                                <button
+                                  onClick={() => handleMarkPaid(order.id)}
+                                  disabled={isUpdating}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-[hsl(var(--success))] border border-[hsl(var(--success))]/30 rounded-lg hover:bg-[hsl(var(--success))]/10 transition-colors disabled:opacity-50"
+                                  title="Mark COD payment as received"
+                                >
+                                  Mark Paid
+                                </button>
+                              </div>
+                            )}
                           <button
                             onClick={() => openInvoice(order.id)}
                             className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-foreground border border-border rounded-lg hover:bg-muted transition-colors"

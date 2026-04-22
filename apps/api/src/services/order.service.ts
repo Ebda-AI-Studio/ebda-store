@@ -70,6 +70,7 @@ export class OrderService {
             select: { id: true, email: true, firstName: true, lastName: true },
           },
           items: true,
+          payments: { select: { provider: true, status: true } },
           _count: { select: { items: true } },
         },
         orderBy: { createdAt: 'desc' },
