@@ -160,7 +160,10 @@ export default function StorePaymentSettingsPage() {
     const isCod = provider === 'cod';
 
     try {
-      const body = isCod
+      // The API schema validates credentials with z.string().optional() —
+      // null is rejected. Omit empty/missing credential fields entirely
+      // instead of sending null.
+      const body: Record<string, unknown> = isCod
         ? {
             provider,
             isEnabled: formData.isEnabled,
@@ -168,18 +171,15 @@ export default function StorePaymentSettingsPage() {
             displayNameAr: formData.displayNameAr || 'الدفع عند الاستلام',
             fixedFee: Math.max(0, Math.floor(Number(formData.fixedFee) || 0)),
             testMode: false,
-            apiKey: null,
-            secretKey: null,
-            webhookSecret: null,
-            merchantId: null,
           }
         : {
-            ...formData,
-            // Omit empty strings — treat as null
-            apiKey: formData.apiKey || null,
-            secretKey: formData.secretKey || null,
-            webhookSecret: formData.webhookSecret || null,
-            merchantId: formData.merchantId || null,
+            provider: formData.provider,
+            isEnabled: formData.isEnabled,
+            testMode: formData.testMode,
+            ...(formData.apiKey ? { apiKey: formData.apiKey } : {}),
+            ...(formData.secretKey ? { secretKey: formData.secretKey } : {}),
+            ...(formData.webhookSecret ? { webhookSecret: formData.webhookSecret } : {}),
+            ...(formData.merchantId ? { merchantId: formData.merchantId } : {}),
           };
 
       const endpoint = isNew
