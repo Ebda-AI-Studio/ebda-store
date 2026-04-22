@@ -14,9 +14,15 @@ export class AppError extends Error {
   }
 }
 
-export function errorHandler(err: Error, _req: Request, res: Response, _next: NextFunction): void {
+export function errorHandler(err: Error, req: Request, res: Response, _next: NextFunction): void {
   // Log error
   logger.error({ err }, 'Unhandled error');
+
+  // Gate detailed error exposure behind an explicit header.
+  // Used for field debugging when Railway logs aren't accessible.
+  // Safe: only surfaces error class name + message (no stack, no env).
+  const debugHeader = req.headers['x-debug-errors'];
+  const debugMode = typeof debugHeader === 'string' && debugHeader === '1';
 
   // Handle known errors
   if (err instanceof AppError) {
@@ -59,6 +65,13 @@ export function errorHandler(err: Error, _req: Request, res: Response, _next: Ne
     error: {
       code: 'INTERNAL_ERROR',
       message: 'Internal server error',
+      ...(debugMode
+        ? {
+            debugName: err.name,
+            debugMessage: err.message,
+            debugCode: (err as { code?: string }).code,
+          }
+        : {}),
     },
   });
 }
