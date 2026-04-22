@@ -36,6 +36,7 @@ export async function generateMetadata({
         next: { revalidate: 60 },
         headers: {
           'Content-Type': 'application/json',
+          'X-Store-ID': store.id,
           ...(store.domain ? { 'x-store-domain': store.domain } : {}),
         },
       });
@@ -114,6 +115,7 @@ async function fetchInitialProduct(slug: string, store: { id: string; domain?: s
         next: { revalidate: 60 },
         headers: {
           'Content-Type': 'application/json',
+          'X-Store-ID': store.id,
           ...(store.domain ? { 'x-store-domain': store.domain } : {}),
         },
       });

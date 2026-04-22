@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import { api } from '../lib/api';
 import {
   type StoreTheme,
   type StoreSocialLinks,
@@ -140,12 +141,13 @@ export function StoreProvider({ children, initialStore }: StoreProviderProps) {
   const [isLoading] = useState(!initialStore);
   const [error] = useState<Error | null>(null);
 
-  // Set store ID on API client so all requests include it
-  useEffect(() => {
-    if (store.id && store.id !== 'demo') {
-      import('../lib/api').then(({ api }) => api.setStoreId(store.id)).catch(() => {});
-    }
-  }, [store.id]);
+  // Push the store id into the api client BEFORE any child effects run so the
+  // first client-side request already carries X-Store-ID. Using an effect
+  // here races with children's useEffects on mount and was the reason the api
+  // fell back to the first-created store.
+  if (store.id && store.id !== 'demo') {
+    api.setStoreId(store.id);
+  }
 
   // Apply theme on mount and when theme changes
   useEffect(() => {

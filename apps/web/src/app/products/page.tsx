@@ -11,10 +11,18 @@ export const metadata: Metadata = {
 };
 
 async function fetchInitialData(store: { id: string; domain?: string }) {
+  // Always send X-Store-ID so the API doesn't fall back to some other store.
+  // x-store-domain is kept as a backup for logging/debugging.
   const storeHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
+    'X-Store-ID': store.id,
     ...(store.domain ? { 'x-store-domain': store.domain } : {}),
   };
+
+  // No valid store id — bail with empty data rather than 400-ing the SSR pass.
+  if (!store.id || store.id === 'demo') {
+    return { categories: [], products: [], meta: null };
+  }
 
   // Fetch categories and first page of products in parallel
   const [categoriesResult, productsResult] = await Promise.all([
