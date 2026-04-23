@@ -61,6 +61,12 @@ const KUWAIT_AREAS = [
 export default function CheckoutClient() {
   const router = useRouter();
   const { store } = useStore();
+  // Optional override for the minimal-chrome label on /checkout. Store
+  // owners can rename or clear the "Secure Checkout" text via
+  // store.settings.checkoutLabel / .checkoutLabelAr without code changes.
+  const checkoutLabelEn =
+    (store?.settings?.checkoutLabel as string | undefined) ?? 'Secure Checkout';
+  const checkoutLabelAr = (store?.settings?.checkoutLabelAr as string | undefined) ?? 'دفع آمن';
   const storeUrl = useStoreUrl();
   const { items: cartContextItems, total: cartContextTotal, isReady: cartIsReady } = useCart();
   const { language, t } = useLanguage();
@@ -530,7 +536,7 @@ export default function CheckoutClient() {
 
   if (isLoading || !cartIsReady) {
     return (
-      <MinimalChrome label="Secure Checkout" labelAr="دفع آمن">
+      <MinimalChrome label={checkoutLabelEn} labelAr={checkoutLabelAr}>
         <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center">
           <div className="flex flex-col items-center gap-3">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -545,7 +551,7 @@ export default function CheckoutClient() {
 
   if (!cart || cart.items.length === 0) {
     return (
-      <MinimalChrome label="Secure Checkout" labelAr="دفع آمن">
+      <MinimalChrome label={checkoutLabelEn} labelAr={checkoutLabelAr}>
         <div className="mx-auto max-w-7xl px-4 py-16 text-center">
           <h1 className="text-2xl font-bold text-foreground">
             {t('Your cart is empty', translations['Your cart is empty'])}
@@ -567,7 +573,7 @@ export default function CheckoutClient() {
   }
 
   return (
-    <MinimalChrome label="Secure Checkout" labelAr="دفع آمن">
+    <MinimalChrome label={checkoutLabelEn} labelAr={checkoutLabelAr}>
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {/* Progress Steps */}
         <div className="mb-8">
