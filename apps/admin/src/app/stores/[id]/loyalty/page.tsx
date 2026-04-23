@@ -3,84 +3,34 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { useToast } from '@force/ui';
+import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPut, apiPost } from '../../../../lib/api';
-
-interface LoyaltySettings {
-  pointsPerDinar: number;
-  signupBonus: number;
-  referralBonus: number;
-  reviewBonus: number;
-  birthdayBonus: number;
-  tiers: {
-    bronze: { minPoints: number; multiplier: number };
-    silver: { minPoints: number; multiplier: number };
-    gold: { minPoints: number; multiplier: number };
-    platinum: { minPoints: number; multiplier: number };
-  };
-  pointsValue: number;
-  minRedeemPoints: number;
-  maxRedeemPercentage: number;
-  expirationMonths: number;
-}
-
-interface LoyaltyMember {
-  id: string;
-  customerId: string;
-  points: number;
-  totalEarned: number;
-  totalRedeemed: number;
-  tier: string;
-  customer: {
-    id: string;
-    email: string;
-    firstName: string;
-    lastName: string;
-  };
-}
-
-interface Stats {
-  totalMembers: number;
-  tierBreakdown: { bronze: number; silver: number; gold: number; platinum: number };
-  totalPointsIssued: number;
-  totalPointsRedeemed: number;
-  outstandingPoints: number;
-}
-
-const TIER_COLORS: Record<string, { bg: string; text: string; icon: string }> = {
-  bronze: { bg: 'bg-amber-100', text: 'text-amber-700', icon: 'bg-amber-500' },
-  silver: { bg: 'bg-muted', text: 'text-foreground', icon: 'bg-muted-foreground' },
-  gold: { bg: 'bg-warning/10', text: 'text-warning', icon: 'bg-warning' },
-  platinum: { bg: 'bg-info/10', text: 'text-info', icon: 'bg-info' },
-};
-
-const DEFAULT_SETTINGS: LoyaltySettings = {
-  pointsPerDinar: 10,
-  signupBonus: 100,
-  referralBonus: 200,
-  reviewBonus: 50,
-  birthdayBonus: 500,
-  tiers: {
-    bronze: { minPoints: 0, multiplier: 1.0 },
-    silver: { minPoints: 1000, multiplier: 1.25 },
-    gold: { minPoints: 5000, multiplier: 1.5 },
-    platinum: { minPoints: 15000, multiplier: 2.0 },
-  },
-  pointsValue: 1,
-  minRedeemPoints: 500,
-  maxRedeemPercentage: 50,
-  expirationMonths: 12,
-};
+import { LoyaltyStatsCards } from './_components/LoyaltyStatsCards';
+import { PointEarningForm } from './_components/PointEarningForm';
+import { TierSettings } from './_components/TierSettings';
+import { RedemptionForm } from './_components/RedemptionForm';
+import { MembersTable } from './_components/MembersTable';
+import { AwardPointsModal } from './_components/AwardPointsModal';
+import { DisableConfirmDialog } from './_components/DisableConfirmDialog';
+import {
+  DEFAULT_SETTINGS,
+  type LoyaltyMember,
+  type LoyaltySettings,
+  type LoyaltyStats,
+} from './_components/types';
 
 export default function LoyaltySettingsPage() {
   const params = useParams();
   const storeId = params.id as string;
+  const tPage = useT('loyalty.page');
+  const tToast = useT('loyalty.toast');
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [loyaltyEnabled, setLoyaltyEnabled] = useState(false);
   const [settings, setSettings] = useState<LoyaltySettings>(DEFAULT_SETTINGS);
-  const [stats, setStats] = useState<Stats | null>(null);
+  const [stats, setStats] = useState<LoyaltyStats | null>(null);
   const [members, setMembers] = useState<LoyaltyMember[]>([]);
   const [activeTab, setActiveTab] = useState<'settings' | 'members'>('settings');
   const [tierFilter, setTierFilter] = useState<string>('all');
@@ -103,18 +53,20 @@ export default function LoyaltySettingsPage() {
   }, [storeId]);
 
   const fetchStats = useCallback(async () => {
-    const { data } = await apiGet<{ stats: Stats }>(`/api/v1/stores/${storeId}/loyalty/stats`);
+    const { data } = await apiGet<{ stats: LoyaltyStats }>(
+      `/api/v1/stores/${storeId}/loyalty/stats`
+    );
     if (data) {
       setStats(data.stats || null);
     }
   }, [storeId]);
 
   const fetchMembers = useCallback(async () => {
-    const params = new URLSearchParams();
-    if (tierFilter !== 'all') params.set('tier', tierFilter);
+    const qs = new URLSearchParams();
+    if (tierFilter !== 'all') qs.set('tier', tierFilter);
 
     const { data } = await apiGet<{ members: LoyaltyMember[] }>(
-      `/api/v1/stores/${storeId}/loyalty/members?${params}`
+      `/api/v1/stores/${storeId}/loyalty/members?${qs}`
     );
     if (data) {
       setMembers(data.members || []);
@@ -129,12 +81,14 @@ export default function LoyaltySettingsPage() {
 
   useEffect(() => {
     fetchAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storeId]);
 
   useEffect(() => {
     if (!loading) {
       fetchMembers();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tierFilter]);
 
   const handleToggleEnabled = async () => {
@@ -155,13 +109,16 @@ export default function LoyaltySettingsPage() {
       });
       if (!error) {
         setLoyaltyEnabled(!loyaltyEnabled);
-        toastSuccess('Updated', `Loyalty program ${loyaltyEnabled ? 'disabled' : 'enabled'}.`);
+        toastSuccess(
+          tToast('updatedTitle'),
+          loyaltyEnabled ? tToast('disabledDescription') : tToast('enabledDescription')
+        );
       } else {
-        showError('Error', 'Failed to update loyalty program status. Please try again.');
+        showError(tToast('errorTitle'), tToast('toggleFailed'));
       }
     } catch (err) {
       console.error('Failed to toggle loyalty:', err);
-      showError('Error', 'Failed to update loyalty program status. Please try again.');
+      showError(tToast('errorTitle'), tToast('toggleFailed'));
     } finally {
       setSaving(false);
     }
@@ -172,13 +129,13 @@ export default function LoyaltySettingsPage() {
     try {
       const { error } = await apiPut(`/api/v1/stores/${storeId}/loyalty/settings`, { settings });
       if (!error) {
-        toastSuccess('Settings Saved', 'Loyalty settings have been updated.');
+        toastSuccess(tToast('savedTitle'), tToast('savedDescription'));
       } else {
-        showError('Error', 'Failed to save loyalty settings. Please try again.');
+        showError(tToast('errorTitle'), tToast('saveFailed'));
       }
     } catch (err) {
       console.error('Failed to save settings:', err);
-      showError('Error', 'Failed to save loyalty settings. Please try again.');
+      showError(tToast('errorTitle'), tToast('saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -200,8 +157,8 @@ export default function LoyaltySettingsPage() {
       );
       if (!error) {
         toastSuccess(
-          'Points Awarded',
-          `Points have been awarded to ${selectedMember.customer.firstName}.`
+          tToast('awardedTitle'),
+          tToast('awardedDescription', { name: selectedMember.customer.firstName })
         );
         setShowAwardModal(false);
         setSelectedMember(null);
@@ -210,23 +167,26 @@ export default function LoyaltySettingsPage() {
         fetchMembers();
         fetchStats();
       } else {
-        showError('Error', 'Failed to award points. Please try again.');
+        showError(tToast('errorTitle'), tToast('awardFailed'));
       }
     } catch (err) {
       console.error('Failed to award points:', err);
-      showError('Error', 'Failed to award points. Please try again.');
+      showError(tToast('errorTitle'), tToast('awardFailed'));
     } finally {
       setSaving(false);
     }
   };
 
+  const updateSettings = (patch: Partial<LoyaltySettings>) =>
+    setSettings(prev => ({ ...prev, ...patch }));
+
   return (
     <AdminLayout
-      title="Loyalty Program"
-      subtitle="Reward your customers with points and exclusive benefits"
+      title={tPage('title')}
+      subtitle={tPage('subtitle')}
       actions={
         <div className="flex items-center gap-3">
-          <span className="text-sm text-muted-foreground">Program Status:</span>
+          <span className="text-sm text-muted-foreground">{tPage('programStatus')}</span>
           <button
             onClick={handleToggleEnabled}
             disabled={saving}
@@ -236,7 +196,7 @@ export default function LoyaltySettingsPage() {
                 : 'bg-muted text-muted-foreground hover:bg-muted/80'
             }`}
           >
-            {loyaltyEnabled ? 'Enabled' : 'Disabled'}
+            {loyaltyEnabled ? tPage('enabled') : tPage('disabled')}
           </button>
         </div>
       }
@@ -247,48 +207,8 @@ export default function LoyaltySettingsPage() {
         </div>
       ) : (
         <>
-          {/* Stats Cards */}
-          {loyaltyEnabled && stats && (
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-              <div className="bg-card rounded-xl border border-border p-4">
-                <p className="text-sm text-muted-foreground">Total Members</p>
-                <p className="text-2xl font-bold text-foreground">{stats.totalMembers}</p>
-              </div>
-              <div className="bg-card rounded-xl border border-border p-4">
-                <p className="text-sm text-muted-foreground">Points Issued</p>
-                <p className="text-2xl font-bold text-success">
-                  {stats.totalPointsIssued.toLocaleString()}
-                </p>
-              </div>
-              <div className="bg-card rounded-xl border border-border p-4">
-                <p className="text-sm text-muted-foreground">Points Redeemed</p>
-                <p className="text-2xl font-bold text-primary">
-                  {stats.totalPointsRedeemed.toLocaleString()}
-                </p>
-              </div>
-              <div className="bg-card rounded-xl border border-border p-4">
-                <p className="text-sm text-muted-foreground">Outstanding</p>
-                <p className="text-2xl font-bold text-info">
-                  {stats.outstandingPoints.toLocaleString()}
-                </p>
-              </div>
-              <div className="bg-card rounded-xl border border-border p-4">
-                <p className="text-sm text-muted-foreground mb-2">Tier Breakdown</p>
-                <div className="flex gap-1">
-                  {Object.entries(stats.tierBreakdown).map(([tier, count]) => (
-                    <div
-                      key={tier}
-                      className={`flex-1 h-2 rounded ${TIER_COLORS[tier]?.icon || 'bg-muted-foreground'}`}
-                      style={{ flex: count || 0.1 }}
-                      title={`${tier}: ${count}`}
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
+          {loyaltyEnabled && stats && <LoyaltyStatsCards stats={stats} />}
 
-          {/* Tabs */}
           <div className="flex gap-2 mb-6">
             <button
               onClick={() => setActiveTab('settings')}
@@ -298,7 +218,7 @@ export default function LoyaltySettingsPage() {
                   : 'bg-muted text-foreground hover:bg-muted/80'
               }`}
             >
-              Settings
+              {tPage('tabs.settings')}
             </button>
             <button
               onClick={() => setActiveTab('members')}
@@ -309,242 +229,28 @@ export default function LoyaltySettingsPage() {
               }`}
               disabled={!loyaltyEnabled}
             >
-              Members
+              {tPage('tabs.members')}
             </button>
           </div>
 
-          {/* Settings Tab */}
           {activeTab === 'settings' && (
             <div className="space-y-6">
-              {/* Earning Settings */}
-              <div className="bg-card rounded-xl border border-border p-6">
-                <h2 className="text-lg font-semibold text-foreground mb-4">Point Earning</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-muted-foreground mb-2">
-                      Points per 1 KWD Spent
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={settings.pointsPerDinar}
-                      onChange={e =>
-                        setSettings({ ...settings, pointsPerDinar: parseInt(e.target.value) || 1 })
-                      }
-                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                      disabled={!loyaltyEnabled}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-muted-foreground mb-2">
-                      Signup Bonus
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={settings.signupBonus}
-                      onChange={e =>
-                        setSettings({ ...settings, signupBonus: parseInt(e.target.value) || 0 })
-                      }
-                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                      disabled={!loyaltyEnabled}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-muted-foreground mb-2">
-                      Referral Bonus
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={settings.referralBonus}
-                      onChange={e =>
-                        setSettings({ ...settings, referralBonus: parseInt(e.target.value) || 0 })
-                      }
-                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                      disabled={!loyaltyEnabled}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-muted-foreground mb-2">
-                      Review Bonus
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={settings.reviewBonus}
-                      onChange={e =>
-                        setSettings({ ...settings, reviewBonus: parseInt(e.target.value) || 0 })
-                      }
-                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                      disabled={!loyaltyEnabled}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-muted-foreground mb-2">
-                      Birthday Bonus
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={settings.birthdayBonus}
-                      onChange={e =>
-                        setSettings({ ...settings, birthdayBonus: parseInt(e.target.value) || 0 })
-                      }
-                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                      disabled={!loyaltyEnabled}
-                    />
-                  </div>
-                </div>
-              </div>
+              <PointEarningForm
+                settings={settings}
+                disabled={!loyaltyEnabled}
+                onChange={updateSettings}
+              />
+              <TierSettings
+                settings={settings}
+                disabled={!loyaltyEnabled}
+                onChange={updateSettings}
+              />
+              <RedemptionForm
+                settings={settings}
+                disabled={!loyaltyEnabled}
+                onChange={updateSettings}
+              />
 
-              {/* Tier Settings */}
-              <div className="bg-card rounded-xl border border-border p-6">
-                <h2 className="text-lg font-semibold text-foreground mb-4">Membership Tiers</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {(['bronze', 'silver', 'gold', 'platinum'] as const).map(tier => (
-                    <div key={tier} className={`p-4 rounded-lg ${TIER_COLORS[tier].bg}`}>
-                      <div className="flex items-center gap-2 mb-3">
-                        <div className={`w-3 h-3 rounded-full ${TIER_COLORS[tier].icon}`}></div>
-                        <h3 className={`font-semibold capitalize ${TIER_COLORS[tier].text}`}>
-                          {tier}
-                        </h3>
-                      </div>
-                      <div className="space-y-3">
-                        <div>
-                          <label className="block text-xs text-muted-foreground mb-1">
-                            Min Points
-                          </label>
-                          <input
-                            type="number"
-                            min="0"
-                            value={settings.tiers[tier].minPoints}
-                            onChange={e =>
-                              setSettings({
-                                ...settings,
-                                tiers: {
-                                  ...settings.tiers,
-                                  [tier]: {
-                                    ...settings.tiers[tier],
-                                    minPoints: parseInt(e.target.value) || 0,
-                                  },
-                                },
-                              })
-                            }
-                            className="w-full px-3 py-1.5 border border-border rounded text-sm focus:ring-2 focus:ring-primary focus:border-primary"
-                            disabled={!loyaltyEnabled || tier === 'bronze'}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs text-muted-foreground mb-1">
-                            Multiplier
-                          </label>
-                          <input
-                            type="number"
-                            step="0.05"
-                            min="1"
-                            value={settings.tiers[tier].multiplier}
-                            onChange={e =>
-                              setSettings({
-                                ...settings,
-                                tiers: {
-                                  ...settings.tiers,
-                                  [tier]: {
-                                    ...settings.tiers[tier],
-                                    multiplier: parseFloat(e.target.value) || 1,
-                                  },
-                                },
-                              })
-                            }
-                            className="w-full px-3 py-1.5 border border-border rounded text-sm focus:ring-2 focus:ring-primary focus:border-primary"
-                            disabled={!loyaltyEnabled}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Redemption Settings */}
-              <div className="bg-card rounded-xl border border-border p-6">
-                <h2 className="text-lg font-semibold text-foreground mb-4">Redemption</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-muted-foreground mb-2">
-                      Point Value (fils)
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={settings.pointsValue}
-                      onChange={e =>
-                        setSettings({ ...settings, pointsValue: parseInt(e.target.value) || 1 })
-                      }
-                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                      disabled={!loyaltyEnabled}
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      1 point = {settings.pointsValue} fils
-                    </p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-muted-foreground mb-2">
-                      Min Points to Redeem
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={settings.minRedeemPoints}
-                      onChange={e =>
-                        setSettings({ ...settings, minRedeemPoints: parseInt(e.target.value) || 0 })
-                      }
-                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                      disabled={!loyaltyEnabled}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-muted-foreground mb-2">
-                      Max % of Order
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={settings.maxRedeemPercentage}
-                      onChange={e =>
-                        setSettings({
-                          ...settings,
-                          maxRedeemPercentage: parseInt(e.target.value) || 0,
-                        })
-                      }
-                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                      disabled={!loyaltyEnabled}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-muted-foreground mb-2">
-                      Expiration (months)
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={settings.expirationMonths}
-                      onChange={e =>
-                        setSettings({
-                          ...settings,
-                          expirationMonths: parseInt(e.target.value) || 0,
-                        })
-                      }
-                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                      disabled={!loyaltyEnabled}
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">0 = never expires</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Save Button */}
               {loyaltyEnabled && (
                 <div className="flex justify-end">
                   <button
@@ -555,266 +261,49 @@ export default function LoyaltySettingsPage() {
                     {saving && (
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                     )}
-                    Save Settings
+                    {tPage('saveSettings')}
                   </button>
                 </div>
               )}
             </div>
           )}
 
-          {/* Members Tab */}
           {activeTab === 'members' && loyaltyEnabled && (
-            <div className="bg-card rounded-xl border border-border overflow-hidden">
-              {/* Tier Filter */}
-              <div className="flex gap-2 p-4 bg-muted border-b border-border">
-                {['all', 'bronze', 'silver', 'gold', 'platinum'].map(t => (
-                  <button
-                    key={t}
-                    onClick={() => setTierFilter(t)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors capitalize ${
-                      tierFilter === t
-                        ? 'bg-primary text-white'
-                        : 'bg-card text-foreground hover:bg-muted border border-border'
-                    }`}
-                  >
-                    {t}
-                  </button>
-                ))}
-              </div>
-
-              {/* Members Table */}
-              {members.length === 0 ? (
-                <div className="p-12 text-center">
-                  <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-                    <svg
-                      className="w-8 h-8 text-muted-foreground"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={1.5}
-                        d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-                      />
-                    </svg>
-                  </div>
-                  <h3 className="text-lg font-semibold text-foreground mb-2">No Members Yet</h3>
-                  <p className="text-muted-foreground">
-                    Customers will appear here when they join your loyalty program
-                  </p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full" aria-label="Loyalty rewards">
-                    <thead>
-                      <tr className="bg-muted border-b border-border">
-                        <th
-                          scope="col"
-                          className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
-                        >
-                          Member
-                        </th>
-                        <th
-                          scope="col"
-                          className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
-                        >
-                          Tier
-                        </th>
-                        <th
-                          scope="col"
-                          className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
-                        >
-                          Points Balance
-                        </th>
-                        <th
-                          scope="col"
-                          className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
-                        >
-                          Total Earned
-                        </th>
-                        <th
-                          scope="col"
-                          className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
-                        >
-                          Total Redeemed
-                        </th>
-                        <th
-                          scope="col"
-                          className="text-right px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
-                        >
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {members.map(member => (
-                        <tr key={member.id} className="hover:bg-muted">
-                          <td className="px-6 py-4">
-                            <div>
-                              <div className="font-medium text-foreground">
-                                {member.customer.firstName} {member.customer.lastName}
-                              </div>
-                              <div className="text-sm text-muted-foreground">
-                                {member.customer.email}
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <span
-                              className={`px-2 py-1 rounded-full text-xs font-medium capitalize ${TIER_COLORS[member.tier]?.bg} ${TIER_COLORS[member.tier]?.text}`}
-                            >
-                              {member.tier}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4">
-                            <span className="font-medium text-foreground">
-                              {member.points.toLocaleString()}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 text-success">
-                            +{member.totalEarned.toLocaleString()}
-                          </td>
-                          <td className="px-6 py-4 text-primary">
-                            -{member.totalRedeemed.toLocaleString()}
-                          </td>
-                          <td className="px-6 py-4 text-right">
-                            <button
-                              onClick={() => {
-                                setSelectedMember(member);
-                                setShowAwardModal(true);
-                              }}
-                              className="text-primary hover:text-primary/90 text-sm font-medium"
-                            >
-                              Award Points
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
+            <MembersTable
+              members={members}
+              tierFilter={tierFilter}
+              onTierFilterChange={setTierFilter}
+              onAwardClick={member => {
+                setSelectedMember(member);
+                setShowAwardModal(true);
+              }}
+            />
           )}
         </>
       )}
 
-      {/* Disable Confirmation Dialog */}
       {showDisableConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-card rounded-xl shadow-xl w-full max-w-sm p-6">
-            <h2 className="text-lg font-semibold text-foreground mb-2">Disable Loyalty Program</h2>
-            <p className="text-sm text-muted-foreground mb-6">
-              Disable the loyalty program? Customers will no longer earn or redeem points until you
-              re-enable it.
-            </p>
-            <div className="flex items-center justify-end gap-3">
-              <button
-                onClick={() => setShowDisableConfirm(false)}
-                className="px-4 py-2 text-foreground border border-border rounded-lg hover:bg-muted"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={performToggle}
-                disabled={saving}
-                className="px-4 py-2 bg-destructive text-white rounded-lg hover:bg-destructive/90 disabled:opacity-50"
-              >
-                Disable
-              </button>
-            </div>
-          </div>
-        </div>
+        <DisableConfirmDialog
+          saving={saving}
+          onCancel={() => setShowDisableConfirm(false)}
+          onConfirm={performToggle}
+        />
       )}
 
-      {/* Award Modal */}
       {showAwardModal && selectedMember && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-card rounded-xl shadow-xl w-full max-w-md">
-            <div className="flex items-center justify-between p-6 border-b border-border">
-              <h2 className="text-xl font-semibold text-foreground">Award Points</h2>
-              <button
-                onClick={() => {
-                  setShowAwardModal(false);
-                  setSelectedMember(null);
-                }}
-                className="p-2 text-muted-foreground hover:text-foreground"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            </div>
-
-            <form onSubmit={handleAwardPoints} className="p-6 space-y-4">
-              <div>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Award points to{' '}
-                  <strong>
-                    {selectedMember.customer.firstName} {selectedMember.customer.lastName}
-                  </strong>
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-muted-foreground mb-2">
-                  Points <span className="text-destructive">*</span>
-                </label>
-                <input
-                  type="number"
-                  value={awardPoints}
-                  onChange={e => setAwardPoints(e.target.value)}
-                  placeholder="Enter points (negative to deduct)"
-                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-muted-foreground mb-2">
-                  Reason
-                </label>
-                <input
-                  type="text"
-                  value={awardReason}
-                  onChange={e => setAwardReason(e.target.value)}
-                  placeholder="Optional reason for adjustment"
-                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowAwardModal(false);
-                    setSelectedMember(null);
-                  }}
-                  className="px-4 py-2 text-foreground border border-border rounded-lg hover:bg-muted"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving || !awardPoints}
-                  className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 flex items-center gap-2"
-                >
-                  {saving && (
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  )}
-                  Award Points
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <AwardPointsModal
+          member={selectedMember}
+          points={awardPoints}
+          reason={awardReason}
+          saving={saving}
+          onPointsChange={setAwardPoints}
+          onReasonChange={setAwardReason}
+          onClose={() => {
+            setShowAwardModal(false);
+            setSelectedMember(null);
+          }}
+          onSubmit={handleAwardPoints}
+        />
       )}
     </AdminLayout>
   );

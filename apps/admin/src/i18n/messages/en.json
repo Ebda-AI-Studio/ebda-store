@@ -506,7 +506,98 @@
       "eventsSaveFailed": "Failed to save event configuration."
     }
   },
-  "loyalty": {},
+  "loyalty": {
+    "page": {
+      "title": "Loyalty Program",
+      "subtitle": "Reward your customers with points and exclusive benefits",
+      "programStatus": "Program Status:",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "saveSettings": "Save Settings",
+      "tabs": {
+        "settings": "Settings",
+        "members": "Members"
+      }
+    },
+    "stats": {
+      "totalMembers": "Total Members",
+      "pointsIssued": "Points Issued",
+      "pointsRedeemed": "Points Redeemed",
+      "outstanding": "Outstanding",
+      "tierBreakdown": "Tier Breakdown"
+    },
+    "earning": {
+      "title": "Point Earning",
+      "pointsPerDinar": "Points per 1 KWD Spent",
+      "signupBonus": "Signup Bonus",
+      "referralBonus": "Referral Bonus",
+      "reviewBonus": "Review Bonus",
+      "birthdayBonus": "Birthday Bonus"
+    },
+    "tiers": {
+      "title": "Membership Tiers",
+      "bronze": "Bronze",
+      "silver": "Silver",
+      "gold": "Gold",
+      "platinum": "Platinum",
+      "minPoints": "Min Points",
+      "multiplier": "Multiplier"
+    },
+    "redemption": {
+      "title": "Redemption",
+      "pointValue": "Point Value (fils)",
+      "pointValueHint": "1 point = {value} fils",
+      "minRedeem": "Min Points to Redeem",
+      "maxPercent": "Max % of Order",
+      "expirationMonths": "Expiration (months)",
+      "expirationHint": "0 = never expires"
+    },
+    "members": {
+      "all": "All",
+      "emptyTitle": "No Members Yet",
+      "emptyDescription": "Customers will appear here when they join your loyalty program",
+      "tableLabel": "Loyalty members",
+      "awardPoints": "Award Points",
+      "columns": {
+        "member": "Member",
+        "tier": "Tier",
+        "balance": "Points Balance",
+        "totalEarned": "Total Earned",
+        "totalRedeemed": "Total Redeemed",
+        "actions": "Actions"
+      }
+    },
+    "award": {
+      "title": "Award Points",
+      "close": "Close",
+      "description": "Award points to",
+      "pointsLabel": "Points",
+      "pointsPlaceholder": "Enter points (negative to deduct)",
+      "reasonLabel": "Reason",
+      "reasonPlaceholder": "Optional reason for adjustment",
+      "cancel": "Cancel",
+      "submit": "Award Points"
+    },
+    "disableConfirm": {
+      "title": "Disable Loyalty Program",
+      "description": "Disable the loyalty program? Customers will no longer earn or redeem points until you re-enable it.",
+      "cancel": "Cancel",
+      "confirm": "Disable"
+    },
+    "toast": {
+      "updatedTitle": "Updated",
+      "enabledDescription": "Loyalty program enabled.",
+      "disabledDescription": "Loyalty program disabled.",
+      "errorTitle": "Error",
+      "toggleFailed": "Failed to update loyalty program status. Please try again.",
+      "savedTitle": "Settings Saved",
+      "savedDescription": "Loyalty settings have been updated.",
+      "saveFailed": "Failed to save loyalty settings. Please try again.",
+      "awardedTitle": "Points Awarded",
+      "awardedDescription": "Points have been awarded to {name}.",
+      "awardFailed": "Failed to award points. Please try again."
+    }
+  },
   "paymentSettings": {},
   "hero": {},
   "announcement": {},
