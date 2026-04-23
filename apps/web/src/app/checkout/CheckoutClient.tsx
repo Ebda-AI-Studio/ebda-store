@@ -539,7 +539,7 @@ export default function CheckoutClient() {
       <MinimalChrome label={checkoutLabelEn} labelAr={checkoutLabelAr}>
         <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center">
           <div className="flex flex-col items-center gap-3">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
             <p className="text-sm text-muted-foreground">
               {t('Loading checkout...', 'جارٍ التحميل...')}
             </p>

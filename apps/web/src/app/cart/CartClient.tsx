@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Button, useToast } from '@force/ui';
 import { ShopChrome } from '../../components';
 import { useCart } from '../../contexts/CartContext';
@@ -310,10 +311,13 @@ export default function CartClient() {
                       {/* Product Image */}
                       <div className="h-28 w-28 flex-shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-primary/5 to-primary/10 sm:h-32 sm:w-32">
                         {item.image ? (
-                          <img
+                          <Image
                             src={item.image}
                             alt={item.name}
+                            width={128}
+                            height={128}
                             className="h-full w-full object-cover"
+                            sizes="(max-width: 640px) 112px, 128px"
                           />
                         ) : (
                           <div className="flex h-full items-center justify-center">

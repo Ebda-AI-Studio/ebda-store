@@ -305,7 +305,7 @@ export default function SuccessClient() {
       fallback={
         <MinimalChrome>
           <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
+            <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent" />
           </div>
         </MinimalChrome>
       }
