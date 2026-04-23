@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Status pill for rows in the notifications-log table. Distinct from
  * ShipmentStatusBadge because the status vocabulary is different
@@ -5,6 +7,8 @@
  * colors here intentionally treat "sent" and "delivered" as equivalent
  * success states.
  */
+import { useT } from '@/i18n/useT';
+
 const COLORS: Record<string, string> = {
   sent: 'bg-success/10 text-success',
   delivered: 'bg-success/10 text-success',
@@ -13,11 +17,17 @@ const COLORS: Record<string, string> = {
   queued: 'bg-primary/10 text-primary',
 };
 
+const KNOWN_STATUSES = new Set(['sent', 'delivered', 'failed', 'pending', 'queued']);
+
 export function NotificationStatusBadge({ status }: { status: string }) {
+  const t = useT('notifications.log.status');
   const cls = COLORS[status] ?? 'bg-muted text-foreground';
+  // Only translate known statuses; unknown values fall through as-is so ops
+  // can still see whatever label the server sent.
+  const label = KNOWN_STATUSES.has(status) ? t(status) : status;
   return (
     <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${cls}`}>
-      {status}
+      {label}
     </span>
   );
 }

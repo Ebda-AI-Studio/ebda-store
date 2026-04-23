@@ -390,7 +390,122 @@
   "marketingPixels": {},
   "pages": {},
   "navigation": {},
-  "notifications": {},
+  "notifications": {
+    "page": {
+      "title": "Notifications",
+      "subtitle": "Configure WhatsApp, SMS, and push notification channels"
+    },
+    "empty": {
+      "title": "No notification channels enabled",
+      "description": "Enable notification channels (WhatsApp, SMS, or Push Notifications) in your store features to configure them here."
+    },
+    "shared": {
+      "save": "Save",
+      "testConnection": "Test Connection",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "channelNames": {
+        "whatsapp": "WhatsApp",
+        "sms": "SMS",
+        "push": "Push Notifications",
+        "pushShort": "Push"
+      }
+    },
+    "whatsapp": {
+      "title": "WhatsApp",
+      "subtitle": "WhatsApp Business API via Meta",
+      "fields": {
+        "phoneNumberId": "Phone Number ID",
+        "wabaId": "WABA ID",
+        "accessToken": "Access Token"
+      },
+      "placeholders": {
+        "phoneNumberId": "e.g. 123456789012345",
+        "wabaId": "WhatsApp Business Account ID",
+        "accessToken": "Meta permanent access token"
+      }
+    },
+    "sms": {
+      "title": "SMS",
+      "subtitle": "SMS via Unifonic",
+      "fields": {
+        "appSid": "App SID",
+        "senderId": "Sender ID"
+      },
+      "placeholders": {
+        "appSid": "Unifonic App SID",
+        "senderId": "e.g. MyStore"
+      }
+    },
+    "push": {
+      "title": "Push Notifications",
+      "subtitle": "Standards-based Web Push (W3C Push API)",
+      "subscribers": "{count, number} subscribers",
+      "platformNote": "Push notifications use the platform VAPID configuration. No per-store setup needed — just toggle Enabled."
+    },
+    "events": {
+      "title": "Event Configuration",
+      "subtitle": "Choose which events trigger notifications on each channel",
+      "tableLabel": "Notification event configuration",
+      "save": "Save Event Config",
+      "columns": {
+        "event": "Event"
+      },
+      "labels": {
+        "order_confirmed": "Order Confirmed",
+        "payment_success": "Payment Success",
+        "payment_failed": "Payment Failed",
+        "order_shipped": "Order Shipped",
+        "order_delivered": "Order Delivered",
+        "order_cancelled": "Order Cancelled",
+        "order_refunded": "Order Refunded"
+      }
+    },
+    "log": {
+      "title": "Recent Notifications",
+      "subtitle": "Delivery history for the last {limit} notifications",
+      "tableLabel": "Notification log",
+      "empty": "No notifications sent yet",
+      "columns": {
+        "timestamp": "Timestamp",
+        "event": "Event",
+        "channel": "Channel",
+        "recipient": "Recipient",
+        "status": "Status"
+      },
+      "filters": {
+        "channelLabel": "Filter by channel",
+        "statusLabel": "Filter by status",
+        "allChannels": "All channels",
+        "allStatuses": "All statuses"
+      },
+      "status": {
+        "sent": "Sent",
+        "delivered": "Delivered",
+        "failed": "Failed",
+        "pending": "Pending",
+        "queued": "Queued"
+      },
+      "pagination": {
+        "summary": "Page {page} of {pages} ({total} total)",
+        "previous": "Previous",
+        "next": "Next"
+      }
+    },
+    "toast": {
+      "savedTitle": "Saved",
+      "errorTitle": "Error",
+      "channelSavedDescription": "{channel} settings saved.",
+      "saveFailed": "Failed to save settings.",
+      "saveFailedRetry": "Failed to save settings. Please try again.",
+      "connectionOkTitle": "Connection OK",
+      "connectionOkDescription": "{channel} connection test passed.",
+      "connectionFailedTitle": "Connection Failed",
+      "testFailed": "Test failed.",
+      "eventsSavedDescription": "Event configuration saved.",
+      "eventsSaveFailed": "Failed to save event configuration."
+    }
+  },
   "loyalty": {},
   "paymentSettings": {},
   "hero": {},
