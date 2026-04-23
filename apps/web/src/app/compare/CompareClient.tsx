@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useToast } from '@force/ui';
-import { Header, Footer } from '../../components';
+import { ShopChrome } from '../../components';
 import { useCart } from '../../contexts/CartContext';
 import { useStoreUrl } from '../../contexts/StoreContext';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -72,8 +72,7 @@ export default function CompareClient() {
 
   if (isLoading) {
     return (
-      <main className="flex min-h-screen flex-col bg-background">
-        <Header />
+      <ShopChrome>
         <div className="container mx-auto px-4 py-8 flex-1">
           <h1 className="text-3xl font-bold mb-8">
             {t(
@@ -83,15 +82,13 @@ export default function CompareClient() {
           </h1>
           <div className="animate-pulse bg-muted h-96 rounded-lg"></div>
         </div>
-        <Footer />
-      </main>
+      </ShopChrome>
     );
   }
 
   if (products.length === 0) {
     return (
-      <main className="flex min-h-screen flex-col bg-background">
-        <Header />
+      <ShopChrome>
         <div className="container mx-auto px-4 py-8 flex-1">
           <h1 className="text-3xl font-bold mb-8">
             {t(
@@ -136,8 +133,7 @@ export default function CompareClient() {
             </Link>
           </div>
         </div>
-        <Footer />
-      </main>
+      </ShopChrome>
     );
   }
 
@@ -150,8 +146,7 @@ export default function CompareClient() {
   });
 
   return (
-    <main className="flex min-h-screen flex-col bg-background">
-      <Header />
+    <ShopChrome>
       <div className="container mx-auto px-4 py-8 flex-1">
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-3xl font-bold">
@@ -295,7 +290,6 @@ export default function CompareClient() {
           </table>
         </div>
       </div>
-      <Footer />
-    </main>
+    </ShopChrome>
   );
 }

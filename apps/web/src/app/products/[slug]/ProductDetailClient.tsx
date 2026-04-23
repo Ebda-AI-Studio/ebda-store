@@ -10,7 +10,7 @@ import { api, type Product, type ProductVariant } from '@/lib/api';
 import { useCart } from '../../../contexts/CartContext';
 import { useStore, useStoreUrl } from '../../../contexts/StoreContext';
 import { useFeatures } from '../../../contexts/FeatureContext';
-import { Header, Footer } from '../../../components';
+import { ShopChrome } from '../../../components';
 import { useLanguage, translations } from '../../../contexts/LanguageContext';
 import { trackViewContent, trackAddToCart } from '../../../components/MarketingPixels';
 import { VariantSelector } from '../../../components/VariantSelector';
@@ -214,20 +214,17 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
 
   if (isLoading) {
     return (
-      <main className="min-h-screen bg-background flex flex-col">
-        <Header />
+      <ShopChrome>
         <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 flex-1">
           <ProductSkeleton />
         </div>
-        <Footer />
-      </main>
+      </ShopChrome>
     );
   }
 
   if (error || !product) {
     return (
-      <main className="min-h-screen bg-background flex flex-col">
-        <Header />
+      <ShopChrome>
         <div className="mx-auto max-w-7xl px-4 py-16 text-center flex-1">
           <h1 className="text-2xl font-bold text-foreground">
             {error || t('Product not found', 'المنتج غير موجود')}
@@ -242,8 +239,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
             <Button className="mt-6">{t('Browse Products', 'تصفح المنتجات')}</Button>
           </Link>
         </div>
-        <Footer />
-      </main>
+      </ShopChrome>
     );
   }
 
@@ -271,9 +267,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
   const outOfStock = effectiveInventory === 0;
 
   return (
-    <main className="min-h-screen bg-background flex flex-col">
-      <Header />
-
+    <ShopChrome>
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 flex-1">
         {/* Breadcrumb */}
         <nav className="mb-8 flex items-center gap-2 text-sm text-muted-foreground">
@@ -552,8 +546,6 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
           </div>
         )}
       </div>
-
-      <Footer />
-    </main>
+    </ShopChrome>
   );
 }

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
-import { Header, Footer } from '../../../../components';
+import { MinimalChrome } from '../../../../components';
 import { useStore, useStoreUrl } from '../../../../contexts/StoreContext';
 import { useLanguage } from '../../../../contexts/LanguageContext';
 
@@ -103,8 +103,7 @@ export default function SharedWishlistClient({ userId }: Props) {
 
   if (isLoading) {
     return (
-      <main className="flex min-h-screen flex-col bg-background">
-        <Header />
+      <MinimalChrome>
         <div className="container mx-auto px-4 py-8 flex-1">
           <h1 className="text-3xl font-bold mb-8">
             {t('Shared Wishlist', 'قائمة المفضلة المشتركة')}
@@ -115,15 +114,13 @@ export default function SharedWishlistClient({ userId }: Props) {
             ))}
           </div>
         </div>
-        <Footer />
-      </main>
+      </MinimalChrome>
     );
   }
 
   if (isPrivate) {
     return (
-      <main className="flex min-h-screen flex-col bg-background">
-        <Header />
+      <MinimalChrome>
         <div className="container mx-auto px-4 py-8 flex-1">
           <div className="text-center py-16 bg-muted rounded-xl">
             <svg
@@ -150,28 +147,24 @@ export default function SharedWishlistClient({ userId }: Props) {
             </p>
           </div>
         </div>
-        <Footer />
-      </main>
+      </MinimalChrome>
     );
   }
 
   if (error) {
     return (
-      <main className="flex min-h-screen flex-col bg-background">
-        <Header />
+      <MinimalChrome>
         <div className="container mx-auto px-4 py-8 flex-1">
           <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg">
             <p className="text-destructive">{error}</p>
           </div>
         </div>
-        <Footer />
-      </main>
+      </MinimalChrome>
     );
   }
 
   return (
-    <main className="flex min-h-screen flex-col bg-background">
-      <Header />
+    <MinimalChrome>
       <div className="container mx-auto px-4 py-8 flex-1">
         <h1 className="text-3xl font-bold mb-8">
           {t('Shared Wishlist', 'قائمة المفضلة المشتركة')}
@@ -310,7 +303,6 @@ export default function SharedWishlistClient({ userId }: Props) {
           </div>
         )}
       </div>
-      <Footer />
-    </main>
+    </MinimalChrome>
   );
 }

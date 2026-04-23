@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Button } from '@force/ui';
+import { MinimalChrome } from '../../../components';
 import { useStoreUrl } from '../../../contexts/StoreContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
 
@@ -38,72 +38,66 @@ export default function ErrorClient() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
-      <div className="w-full max-w-md text-center">
-        <Link href={storeUrl('/')} className="inline-flex items-center gap-2 mb-8">
-          <Image src="/logo.svg" alt="Force Media" width={48} height={36} />
-          <span className="text-2xl font-bold">
-            <span className="text-primary">Force</span>
-            <span className="text-foreground"> Store</span>
-          </span>
-        </Link>
+    <MinimalChrome>
+      <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center bg-background px-4 py-12">
+        <div className="w-full max-w-md text-center">
+          <div className="rounded-xl border bg-card p-8 shadow-sm">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-destructive/20">
+              <svg
+                className="h-8 w-8 text-destructive"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </div>
 
-        <div className="rounded-xl border bg-card p-8 shadow-sm">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-destructive/20">
-            <svg
-              className="h-8 w-8 text-destructive"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </div>
-
-          <h1 className="mt-6 text-2xl font-bold text-foreground">
-            {t(
-              'Payment could not be processed',
-              '\u062a\u0639\u0630\u0631\u062a \u0645\u0639\u0627\u0644\u062c\u0629 \u0627\u0644\u062f\u0641\u0639'
-            )}
-          </h1>
-          <p className="mt-2 text-muted-foreground">
-            {t(
-              'Something went wrong during checkout. Please try again or contact support if the problem persists.',
-              '\u062d\u062f\u062b \u062e\u0637\u0623 \u0623\u062b\u0646\u0627\u0621 \u0627\u0644\u062f\u0641\u0639. \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649 \u0623\u0648 \u0627\u0644\u062a\u0648\u0627\u0635\u0644 \u0645\u0639 \u0627\u0644\u062f\u0639\u0645 \u0625\u0630\u0627 \u0627\u0633\u062a\u0645\u0631\u062a \u0627\u0644\u0645\u0634\u0643\u0644\u0629.'
-            )}
-          </p>
-
-          <div className="mt-8 flex flex-col gap-3">
-            {/* Retry Payment -- redirects back to checkout with orderId/paymentId so the
-                checkout page can resume the same order rather than creating a duplicate. */}
-            <Button
-              className="w-full"
-              size="lg"
-              onClick={handleRetryPayment}
-              isLoading={isRetrying}
-            >
+            <h1 className="mt-6 text-2xl font-bold text-foreground">
               {t(
-                'Retry Payment',
-                '\u0625\u0639\u0627\u062f\u0629 \u0645\u062d\u0627\u0648\u0644\u0629 \u0627\u0644\u062f\u0641\u0639'
+                'Payment could not be processed',
+                '\u062a\u0639\u0630\u0631\u062a \u0645\u0639\u0627\u0644\u062c\u0629 \u0627\u0644\u062f\u0641\u0639'
               )}
-            </Button>
+            </h1>
+            <p className="mt-2 text-muted-foreground">
+              {t(
+                'Something went wrong during checkout. Please try again or contact support if the problem persists.',
+                '\u062d\u062f\u062b \u062e\u0637\u0623 \u0623\u062b\u0646\u0627\u0621 \u0627\u0644\u062f\u0641\u0639. \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649 \u0623\u0648 \u0627\u0644\u062a\u0648\u0627\u0635\u0644 \u0645\u0639 \u0627\u0644\u062f\u0639\u0645 \u0625\u0630\u0627 \u0627\u0633\u062a\u0645\u0631\u062a \u0627\u0644\u0645\u0634\u0643\u0644\u0629.'
+              )}
+            </p>
 
-            <Link href={storeUrl('/cart')}>
-              <Button className="w-full" size="lg" variant="outline">
+            <div className="mt-8 flex flex-col gap-3">
+              {/* Retry Payment -- redirects back to checkout with orderId/paymentId so the
+                checkout page can resume the same order rather than creating a duplicate. */}
+              <Button
+                className="w-full"
+                size="lg"
+                onClick={handleRetryPayment}
+                isLoading={isRetrying}
+              >
                 {t(
-                  'Return to Cart',
-                  '\u0627\u0644\u0639\u0648\u062f\u0629 \u0625\u0644\u0649 \u0627\u0644\u0633\u0644\u0629'
+                  'Retry Payment',
+                  '\u0625\u0639\u0627\u062f\u0629 \u0645\u062d\u0627\u0648\u0644\u0629 \u0627\u0644\u062f\u0641\u0639'
                 )}
               </Button>
-            </Link>
+
+              <Link href={storeUrl('/cart')}>
+                <Button className="w-full" size="lg" variant="outline">
+                  {t(
+                    'Return to Cart',
+                    '\u0627\u0644\u0639\u0648\u062f\u0629 \u0625\u0644\u0649 \u0627\u0644\u0633\u0644\u0629'
+                  )}
+                </Button>
+              </Link>
+            </div>
           </div>
         </div>
       </div>
-    </main>
+    </MinimalChrome>
   );
 }

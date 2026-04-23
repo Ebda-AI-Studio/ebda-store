@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import dynamic from 'next/dynamic';
-import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button, Input, Select } from '@force/ui';
+import { MinimalChrome } from '../../components';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useCart } from '../../contexts/CartContext';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
@@ -530,20 +530,22 @@ export default function CheckoutClient() {
 
   if (isLoading || !cartIsReady) {
     return (
-      <main className="min-h-screen bg-background flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-          <p className="text-sm text-muted-foreground">
-            {t('Loading checkout...', 'جارٍ التحميل...')}
-          </p>
+      <MinimalChrome label="Secure Checkout" labelAr="دفع آمن">
+        <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center">
+          <div className="flex flex-col items-center gap-3">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            <p className="text-sm text-muted-foreground">
+              {t('Loading checkout...', 'جارٍ التحميل...')}
+            </p>
+          </div>
         </div>
-      </main>
+      </MinimalChrome>
     );
   }
 
   if (!cart || cart.items.length === 0) {
     return (
-      <main className="min-h-screen bg-background">
+      <MinimalChrome label="Secure Checkout" labelAr="دفع آمن">
         <div className="mx-auto max-w-7xl px-4 py-16 text-center">
           <h1 className="text-2xl font-bold text-foreground">
             {t('Your cart is empty', translations['Your cart is empty'])}
@@ -560,42 +562,12 @@ export default function CheckoutClient() {
             </Button>
           </Link>
         </div>
-      </main>
+      </MinimalChrome>
     );
   }
 
   return (
-    <main className="min-h-screen bg-background">
-      {/* Navigation */}
-      <nav className="border-b bg-background" aria-label="Checkout">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <Link href={storeUrl('/')} className="flex items-center gap-2">
-            {store?.logo ? (
-              <Image
-                src={store.logo}
-                alt={store.name}
-                width={40}
-                height={30}
-                className="object-contain"
-              />
-            ) : (
-              <span className="text-xl font-bold text-primary">{store?.name || 'Store'}</span>
-            )}
-          </Link>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-              />
-            </svg>
-            {t('Secure Checkout', '\u062f\u0641\u0639 \u0622\u0645\u0646')}
-          </div>
-        </div>
-      </nav>
-
+    <MinimalChrome label="Secure Checkout" labelAr="دفع آمن">
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {/* Progress Steps */}
         <div className="mb-8">
@@ -914,6 +886,6 @@ export default function CheckoutClient() {
           />
         </div>
       </div>
-    </main>
+    </MinimalChrome>
   );
 }

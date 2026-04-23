@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { Button, useToast } from '@force/ui';
-import { Header, Footer } from '../../components';
+import { ShopChrome } from '../../components';
 import { useCart } from '../../contexts/CartContext';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useFeatures } from '../../contexts/FeatureContext';
@@ -198,10 +198,8 @@ export default function CartClient() {
   const cartCount = itemCount;
 
   return (
-    <main className="flex min-h-screen flex-col bg-background">
-      <Header cartCount={cartCount} />
-
-      <div className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8">
+    <ShopChrome>
+      <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {/* Breadcrumb */}
         <nav className="mb-6 flex items-center gap-2 text-sm text-muted-foreground">
           <Link href={storeUrl('/')} className="transition-colors hover:text-primary">
@@ -714,8 +712,6 @@ export default function CartClient() {
           </>
         )}
       </div>
-
-      <Footer />
-    </main>
+    </ShopChrome>
   );
 }

@@ -7,7 +7,7 @@ import { api, type Product, type Category, type PaginationMeta } from '@/lib/api
 import { useToast, Select } from '@force/ui';
 import { useCart } from '../../contexts/CartContext';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
-import { Header, Footer } from '../../components';
+import { ShopChrome } from '../../components';
 import { toggleCompare } from '@/lib/compare';
 import { ProductGridCard } from './ProductGridCard';
 import { ProductListItem } from './ProductListItem';
@@ -225,9 +225,7 @@ export default function ProductsClient({
   };
 
   return (
-    <main className="flex min-h-screen flex-col bg-background">
-      <Header />
-
+    <ShopChrome>
       <div className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8">
         {/* Breadcrumb */}
         <nav className="mb-6 flex items-center gap-2 text-sm text-muted-foreground">
@@ -480,8 +478,6 @@ export default function ProductsClient({
           </div>
         </div>
       </div>
-
-      <Footer />
-    </main>
+    </ShopChrome>
   );
 }

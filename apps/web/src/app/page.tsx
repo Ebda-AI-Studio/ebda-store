@@ -2,53 +2,19 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
-import { useRouter } from 'next/navigation';
 import { Button } from '@force/ui';
 import { api, type Product, type Category } from '@/lib/api';
-import { useStore, useStoreBranding, useStoreContact, useStoreUrl } from '../contexts/StoreContext';
+import { useStore, useStoreUrl } from '../contexts/StoreContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useCart } from '../contexts/CartContext';
 import { useTemplateComponents } from '../hooks/useTemplateComponents';
-import { Header, Footer } from '../components';
-import type { TemplateProduct, TemplateCategory, NavItem } from '../templates/types';
-import { formatPrice } from '@/lib/format';
-
-function toTemplateProduct(p: Product): TemplateProduct {
-  return {
-    id: p.id,
-    name: p.name,
-    slug: p.slug,
-    price: p.price,
-    compareAtPrice: p.compareAtPrice ?? undefined,
-    images: (p.images || []).map((img: { id?: string; url: string; alt?: string }) => ({
-      id: img.id || p.id,
-      url: img.url,
-      alt: img.alt,
-    })),
-    inStock: p.inventory === undefined || p.inventory === null || p.inventory > 0,
-    isFeatured: true,
-  };
-}
-
-function toTemplateCategory(c: Category): TemplateCategory {
-  return {
-    id: c.id,
-    name: c.name,
-    nameAr: c.nameAr,
-    slug: c.slug || c.name.toLowerCase().replace(/\s+/g, '-'),
-    image: c.image,
-    productCount: c.productCount,
-  };
-}
+import { ShopChrome } from '../components';
+import { toTemplateProduct, toTemplateCategory } from '../templates/adapters';
 
 export default function HomePage() {
-  const router = useRouter();
   const { store } = useStore();
-  const branding = useStoreBranding();
-  const contact = useStoreContact();
   const { language } = useLanguage();
-  const { itemCount, addItem } = useCart();
+  const { addItem } = useCart();
   const { components: T, isLoading: templateLoading } = useTemplateComponents();
   const storeUrl = useStoreUrl();
 
@@ -57,19 +23,6 @@ export default function HomePage() {
   const [isLoading, setIsLoading] = useState(true);
 
   const isRtl = language === 'ar';
-
-  // Compute URL prefix for template components — must use state to avoid
-  // hydration mismatch (window is undefined on the server).
-  const [urlPrefix, setUrlPrefix] = useState('');
-  useEffect(() => {
-    const isPlatform =
-      window.location.hostname.includes('vercel.app') ||
-      window.location.hostname.includes('localhost') ||
-      window.location.hostname.includes('127.0.0.1');
-    if (isPlatform && store.slug && store.id !== 'demo') {
-      setUrlPrefix(`/${store.slug}`);
-    }
-  }, [store.slug, store.id]);
 
   useEffect(() => {
     async function fetchData() {
@@ -103,10 +56,6 @@ export default function HomePage() {
     fetchData();
   }, []);
 
-  const handleSearch = (query: string) => {
-    router.push(`/search?q=${encodeURIComponent(query)}`);
-  };
-
   const handleAddToCart = async (productId: string) => {
     const product = featuredProducts.find(p => p.id === productId);
     if (!product) return;
@@ -122,13 +71,6 @@ export default function HomePage() {
     );
   };
 
-  const navigation: NavItem[] = [
-    { label: 'Products', labelAr: 'المنتجات', href: storeUrl('/products') },
-    { label: 'Categories', labelAr: 'الفئات', href: storeUrl('/categories') },
-    { label: 'About', labelAr: 'من نحن', href: storeUrl('/about') },
-    { label: 'Contact', labelAr: 'تواصل معنا', href: storeUrl('/contact') },
-  ];
-
   const templateProducts = featuredProducts.map(toTemplateProduct);
   const templateCategories = categories.map(toTemplateCategory);
 
@@ -143,396 +85,96 @@ export default function HomePage() {
   const heroCtaLink = store.heroCtaLink ? storeUrl(store.heroCtaLink) : storeUrl('/products');
   const heroImage = store.heroImage || undefined;
 
-  // If template components are loaded, use them
-  if (T && !templateLoading) {
-    return (
-      <main className="flex min-h-screen flex-col">
-        <T.Header
-          branding={branding}
-          navigation={navigation}
-          isRtl={isRtl}
-          cartItemCount={itemCount}
-          isLoggedIn={false}
-          onSearch={handleSearch}
-          urlPrefix={urlPrefix}
-        />
-
-        {store.announcementBar?.enabled && (
-          <T.AnnouncementBar
-            text={store.announcementBar.text || ''}
-            textAr={store.announcementBar.textAr}
-            link={store.announcementBar.link}
-            linkText={store.announcementBar.linkText}
-            linkTextAr={store.announcementBar.linkTextAr}
-            bgColor={store.announcementBar.bgColor}
-            textColor={store.announcementBar.textColor}
-            dismissible={store.announcementBar.dismissible}
+  // ShopChrome provides the template Header/Footer/AnnouncementBar. The body
+  // uses the template's Hero / CategoryGrid / ProductGrid once they load.
+  return (
+    <ShopChrome>
+      {T && !templateLoading && (
+        <>
+          <T.Hero
+            title={heroTitleEn}
+            titleAr={heroTitleArVal}
+            subtitle={heroSubtitleEn}
+            subtitleAr={heroSubtitleArVal}
+            image={heroImage}
+            ctaText={heroCtaEn}
+            ctaTextAr={heroCtaArVal}
+            ctaLink={heroCtaLink}
             isRtl={isRtl}
           />
-        )}
 
-        <T.Hero
-          title={heroTitleEn}
-          titleAr={heroTitleArVal}
-          subtitle={heroSubtitleEn}
-          subtitleAr={heroSubtitleArVal}
-          image={heroImage}
-          ctaText={heroCtaEn}
-          ctaTextAr={heroCtaArVal}
-          ctaLink={heroCtaLink}
-          isRtl={isRtl}
-        />
-
-        {/* Categories */}
-        {templateCategories.length > 0 && (
-          <section className="py-16 lg:py-20">
-            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-              <T.CategoryGrid
-                categories={templateCategories}
-                title="Shop by Category"
-                titleAr="تسوق حسب الفئة"
-                isRtl={isRtl}
-              />
-            </div>
-          </section>
-        )}
-
-        {/* Featured Products */}
-        {isLoading ? (
-          <section className="bg-muted/30 py-16 lg:py-20">
-            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-                {[0, 1, 2, 3].map(i => (
-                  <div key={i} className="animate-pulse rounded-xl border bg-card p-4">
-                    <div className="aspect-square rounded-lg bg-muted" />
-                    <div className="mt-4 space-y-2">
-                      <div className="h-4 w-3/4 rounded bg-muted" />
-                      <div className="h-5 w-1/2 rounded bg-muted" />
-                    </div>
-                  </div>
-                ))}
+          {templateCategories.length > 0 && (
+            <section className="py-16 lg:py-20">
+              <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                <T.CategoryGrid
+                  categories={templateCategories}
+                  title="Shop by Category"
+                  titleAr="تسوق حسب الفئة"
+                  isRtl={isRtl}
+                />
               </div>
-            </div>
-          </section>
-        ) : templateProducts.length > 0 ? (
-          <section className="bg-muted/30 py-16 lg:py-20">
-            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-              <T.ProductGrid
-                products={templateProducts}
-                title="Featured Products"
-                titleAr="منتجات مميزة"
-                isRtl={isRtl}
-                currency={store.currency}
-                columns={4}
-                onAddToCart={handleAddToCart}
-              />
-            </div>
-          </section>
-        ) : null}
-
-        {/* CTA Section */}
-        <section className="force-gradient-primary py-16 lg:py-20">
-          <div className="mx-auto max-w-7xl px-4 text-center sm:px-6 lg:px-8">
-            <div className="mx-auto max-w-2xl">
-              <h2 className="text-3xl font-bold text-white lg:text-4xl">
-                {isRtl ? 'جاهز للتسوق؟' : 'Ready to Start Shopping?'}
-              </h2>
-              <p className="mx-auto mt-4 max-w-xl text-lg text-primary-foreground/80">
-                {isRtl
-                  ? 'انضم إلى آلاف العملاء الراضين واكتشف منتجاتنا المميزة'
-                  : 'Join thousands of satisfied customers and discover our amazing products.'}
-              </p>
-              <div className="mt-8">
-                <Link href={storeUrl('/products')}>
-                  <Button
-                    size="lg"
-                    variant="secondary"
-                    className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 shadow-lg"
-                  >
-                    {isRtl ? 'تصفح المنتجات' : 'Browse Products'}
-                  </Button>
-                </Link>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <T.Footer
-          branding={branding}
-          contact={contact}
-          socials={store.socialLinks || {}}
-          navigation={navigation}
-          isRtl={isRtl}
-          urlPrefix={urlPrefix}
-        />
-      </main>
-    );
-  }
-
-  // Fallback while template loads — use the generic Header/Footer
-  return (
-    <main className="flex min-h-screen flex-col">
-      <Header />
-
-      {/* Hero Section */}
-      <section className="relative overflow-hidden hero-gradient hero-pattern">
-        <div className="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-primary/5 blur-3xl" />
-        <div className="absolute -left-20 bottom-0 h-72 w-72 rounded-full bg-primary/5 blur-3xl" />
-
-        <div className="relative mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
-          <div className="grid gap-12 lg:grid-cols-2 lg:gap-8 items-center">
-            <div className="text-center lg:text-left animate-slide-up">
-              <h1 className="text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl lg:text-6xl leading-[1.15]">
-                <span className="block">{isRtl ? heroTitleArVal : heroTitleEn}</span>
-              </h1>
-              <p className="mx-auto mt-6 max-w-xl text-lg text-muted-foreground lg:mx-0">
-                {isRtl ? heroSubtitleArVal : heroSubtitleEn}
-              </p>
-              <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:justify-center lg:justify-start">
-                <Link href={heroCtaLink}>
-                  <Button size="lg" className="w-full gap-2 shadow-lg shadow-primary/25 sm:w-auto">
-                    {isRtl ? heroCtaArVal : heroCtaEn}
-                  </Button>
-                </Link>
-                <Link href={storeUrl('/categories')}>
-                  <Button variant="outline" size="lg" className="w-full gap-2 sm:w-auto">
-                    {isRtl ? 'تصفح الفئات' : 'Browse Categories'}
-                  </Button>
-                </Link>
-              </div>
-            </div>
-
-            <div className="relative animate-slide-up" style={{ animationDelay: '0.2s' }}>
-              <div className="relative mx-auto w-full max-w-lg">
-                <div className="relative z-10 rounded-3xl bg-card p-6 shadow-2xl">
-                  <div className="aspect-square overflow-hidden rounded-2xl bg-gradient-to-br from-primary/5 to-primary/10">
-                    {heroImage ? (
-                      <Image
-                        src={heroImage}
-                        alt={isRtl ? heroTitleArVal : heroTitleEn}
-                        width={600}
-                        height={600}
-                        className="h-full w-full object-cover"
-                        priority
-                      />
-                    ) : (
-                      <div className="flex h-full items-center justify-center">
-                        <div className="text-center">
-                          <div className="mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-full bg-primary/20">
-                            <svg
-                              className="h-12 w-12 text-primary"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={1.5}
-                                d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                              />
-                            </svg>
-                          </div>
-                          <span className="text-lg font-medium text-muted-foreground">
-                            {isRtl ? 'المنتجات المميزة' : 'Featured Products'}
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className="absolute -bottom-6 -left-6 h-full w-full rounded-3xl bg-primary/10" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Categories from API */}
-      {categories.length > 0 && (
-        <section className="py-16 lg:py-20">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div className="mb-10 flex items-end justify-between">
-              <div>
-                <h2 className="text-2xl font-bold text-foreground lg:text-3xl">
-                  {isRtl ? 'تسوق حسب الفئة' : 'Shop by Category'}
-                </h2>
-                <p className="mt-2 text-muted-foreground">
-                  {isRtl ? 'ابحث عما تريد' : "Find what you're looking for"}
-                </p>
-              </div>
-              <Link
-                href={storeUrl('/categories')}
-                className="hidden text-sm font-medium text-primary hover:text-primary/80 sm:block"
-              >
-                {isRtl ? 'عرض جميع الفئات →' : 'View all categories →'}
-              </Link>
-            </div>
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-              {categories.slice(0, 4).map(category => (
-                <Link
-                  key={category.id}
-                  href={storeUrl(`/products?category=${category.slug}`)}
-                  className="group relative overflow-hidden rounded-xl border bg-card shadow-sm transition hover:shadow-lg"
-                >
-                  <div className="relative h-48 bg-gradient-to-br from-primary/10 to-primary/5">
-                    {category.image && (
-                      <Image
-                        src={category.image}
-                        alt={category.name}
-                        width={500}
-                        height={192}
-                        className="h-full w-full object-cover"
-                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-                      />
-                    )}
-                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-6">
-                      <h3 className="text-lg font-bold text-white">{category.name}</h3>
-                      {category.productCount !== undefined && (
-                        <p className="text-sm text-white/80">
-                          {category.productCount} {isRtl ? 'منتج' : 'products'}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* Featured Products from API */}
-      <section className="bg-muted/30 py-16 lg:py-20">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="mb-10 flex items-end justify-between">
-            <div>
-              <h2 className="text-2xl font-bold text-foreground lg:text-3xl">
-                {isRtl ? 'المنتجات المميزة' : 'Featured Products'}
-              </h2>
-              <p className="mt-2 text-muted-foreground">
-                {isRtl ? 'اطلع على أحدث وصولاتنا' : 'Check out our latest arrivals'}
-              </p>
-            </div>
-            <Link
-              href={storeUrl('/products')}
-              className="text-sm font-medium text-primary hover:text-primary/80"
-            >
-              {isRtl ? 'عرض جميع المنتجات →' : 'View all products →'}
-            </Link>
-          </div>
+            </section>
+          )}
 
           {isLoading ? (
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-              {[0, 1, 2, 3].map(i => (
-                <div key={i} className="animate-pulse rounded-xl border bg-card p-4">
-                  <div className="aspect-square rounded-lg bg-muted" />
-                  <div className="mt-4 space-y-2">
-                    <div className="h-4 w-3/4 rounded bg-muted" />
-                    <div className="h-5 w-1/2 rounded bg-muted" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : featuredProducts.length > 0 ? (
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-              {featuredProducts.slice(0, 8).map(product => (
-                <Link
-                  key={product.id}
-                  href={storeUrl(`/products/${product.slug}`)}
-                  className="group rounded-2xl border bg-card shadow-sm transition hover:shadow-lg overflow-hidden"
-                >
-                  <div className="aspect-square overflow-hidden bg-gradient-to-br from-primary/5 to-primary/10">
-                    {product.images?.[0]?.url ? (
-                      <Image
-                        src={product.images[0].url}
-                        alt={product.name}
-                        width={500}
-                        height={500}
-                        className="h-full w-full object-cover group-hover:scale-105 transition-transform"
-                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-                      />
-                    ) : (
-                      <div className="flex h-full items-center justify-center">
-                        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/20">
-                          <svg
-                            className="h-8 w-8 text-primary"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={1.5}
-                              d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                            />
-                          </svg>
-                        </div>
+            <section className="bg-muted/30 py-16 lg:py-20">
+              <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+                  {[0, 1, 2, 3].map(i => (
+                    <div key={i} className="animate-pulse rounded-xl border bg-card p-4">
+                      <div className="aspect-square rounded-lg bg-muted" />
+                      <div className="mt-4 space-y-2">
+                        <div className="h-4 w-3/4 rounded bg-muted" />
+                        <div className="h-5 w-1/2 rounded bg-muted" />
                       </div>
-                    )}
-                  </div>
-                  <div className="p-4">
-                    <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors line-clamp-1">
-                      {product.name}
-                    </h3>
-                    <div className="mt-2 flex items-center gap-2">
-                      <span className="text-lg font-bold text-primary">
-                        {formatPrice(product.price)}
-                      </span>
-                      {product.compareAtPrice && product.compareAtPrice > product.price && (
-                        <span className="text-sm text-muted-foreground line-through">
-                          {formatPrice(product.compareAtPrice)}
-                        </span>
-                      )}
                     </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-12">
-              <p className="text-muted-foreground">
-                {isRtl ? 'لا توجد منتجات متاحة بعد.' : 'No products available yet.'}
-              </p>
-              <Link href={storeUrl('/products')}>
-                <Button className="mt-4">
-                  {isRtl ? 'تصفح جميع المنتجات' : 'Browse All Products'}
-                </Button>
-              </Link>
-            </div>
-          )}
-        </div>
-      </section>
+                  ))}
+                </div>
+              </div>
+            </section>
+          ) : templateProducts.length > 0 ? (
+            <section className="bg-muted/30 py-16 lg:py-20">
+              <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                <T.ProductGrid
+                  products={templateProducts}
+                  title="Featured Products"
+                  titleAr="منتجات مميزة"
+                  isRtl={isRtl}
+                  currency={store.currency}
+                  columns={4}
+                  onAddToCart={handleAddToCart}
+                />
+              </div>
+            </section>
+          ) : null}
 
-      {/* CTA Section */}
-      <section className="force-gradient-primary py-16 lg:py-20">
-        <div className="mx-auto max-w-7xl px-4 text-center sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-2xl">
-            <h2 className="text-3xl font-bold text-white lg:text-4xl">
-              {isRtl ? 'جاهز للتسوق؟' : 'Ready to Start Shopping?'}
-            </h2>
-            <p className="mx-auto mt-4 max-w-xl text-lg text-primary-foreground/80">
-              {isRtl
-                ? 'انضم إلى آلاف العملاء الراضين واكتشف منتجاتنا المميزة'
-                : 'Join thousands of satisfied customers and discover our amazing products.'}
-            </p>
-            <div className="mt-8">
-              <Link href={storeUrl('/products')}>
-                <Button
-                  size="lg"
-                  variant="secondary"
-                  className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 shadow-lg"
-                >
-                  {isRtl ? 'تصفح المنتجات' : 'Browse Products'}
-                </Button>
-              </Link>
+          <section className="force-gradient-primary py-16 lg:py-20">
+            <div className="mx-auto max-w-7xl px-4 text-center sm:px-6 lg:px-8">
+              <div className="mx-auto max-w-2xl">
+                <h2 className="text-3xl font-bold text-white lg:text-4xl">
+                  {isRtl ? 'جاهز للتسوق؟' : 'Ready to Start Shopping?'}
+                </h2>
+                <p className="mx-auto mt-4 max-w-xl text-lg text-primary-foreground/80">
+                  {isRtl
+                    ? 'انضم إلى آلاف العملاء الراضين واكتشف منتجاتنا المميزة'
+                    : 'Join thousands of satisfied customers and discover our amazing products.'}
+                </p>
+                <div className="mt-8">
+                  <Link href={storeUrl('/products')}>
+                    <Button
+                      size="lg"
+                      variant="secondary"
+                      className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 shadow-lg"
+                    >
+                      {isRtl ? 'تصفح المنتجات' : 'Browse Products'}
+                    </Button>
+                  </Link>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      <Footer />
-    </main>
+          </section>
+        </>
+      )}
+    </ShopChrome>
   );
 }

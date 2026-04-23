@@ -6,7 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { api, type Category, type Product } from '@/lib/api';
 import { Select } from '@force/ui';
-import { Header, Footer } from '../../components';
+import { ShopChrome } from '../../components';
 import { useStoreUrl } from '../../contexts/StoreContext';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { trackSearch } from '../../components/MarketingPixels';
@@ -166,8 +166,7 @@ function SearchContent() {
   const displayQuery = committedQuery || searchTerm;
 
   return (
-    <main className="flex min-h-screen flex-col bg-background">
-      <Header />
+    <ShopChrome>
       <div className="container mx-auto px-4 py-8 flex-1">
         <h1 className="text-3xl font-bold mb-6">
           {t(
@@ -457,22 +456,19 @@ function SearchContent() {
           </div>
         )}
       </div>
-      <Footer />
-    </main>
+    </ShopChrome>
   );
 }
 
 function SearchFallback() {
   const { t } = useLanguage();
   return (
-    <main className="flex min-h-screen flex-col bg-background">
-      <Header />
+    <ShopChrome>
       <div className="container mx-auto px-4 py-8 flex-1">
         <h1 className="text-3xl font-bold mb-8">{t('Search', translations['Search'])}</h1>
         <div className="animate-pulse bg-muted h-12 max-w-2xl rounded-lg" />
       </div>
-      <Footer />
-    </main>
+    </ShopChrome>
   );
 }
 

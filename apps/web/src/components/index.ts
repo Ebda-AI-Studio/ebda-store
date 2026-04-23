@@ -1,6 +1,6 @@
-export { Header } from './Header';
+export { ShopChrome } from './ShopChrome';
+export { MinimalChrome } from './MinimalChrome';
 export { SearchAutocomplete } from './SearchAutocomplete';
-export { Footer } from './Footer';
 export { LanguageSwitcher } from './LanguageSwitcher';
 export { VariantSelector } from './VariantSelector';
 export { FrequentlyBoughtTogether } from './FrequentlyBoughtTogether';

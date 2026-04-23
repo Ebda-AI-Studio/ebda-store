@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Header, Footer } from '../../components';
+import { ShopChrome } from '../../components';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 
@@ -20,9 +20,8 @@ export default function AboutClient() {
     );
 
   return (
-    <main className="flex min-h-screen flex-col bg-background">
-      <Header />
-      <div className="container mx-auto px-4 py-8 flex-1">
+    <ShopChrome>
+      <div className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
           <h1 className="text-4xl font-bold mb-8">{headingText}</h1>
 
@@ -189,7 +188,6 @@ export default function AboutClient() {
           </div>
         </div>
       </div>
-      <Footer />
-    </main>
+    </ShopChrome>
   );
 }

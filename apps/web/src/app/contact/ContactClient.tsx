@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Button, Input, Textarea, useToast } from '@force/ui';
-import { Header, Footer } from '../../components';
+import { ShopChrome } from '../../components';
 import { useStore } from '../../contexts/StoreContext';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { api } from '@/lib/api';
@@ -40,9 +40,7 @@ export default function ContactClient() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col bg-background">
-      <Header />
-
+    <ShopChrome>
       <div className="mx-auto w-full max-w-3xl flex-1 px-4 py-12 sm:px-6 lg:px-8">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-foreground">
@@ -176,8 +174,6 @@ export default function ContactClient() {
           </div>
         </div>
       </div>
-
-      <Footer />
-    </main>
+    </ShopChrome>
   );
 }

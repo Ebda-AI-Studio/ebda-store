@@ -2,11 +2,11 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import Image from 'next/image';
 import Link from 'next/link';
 import { Button } from '@force/ui';
 import { api, type Order } from '@/lib/api';
-import { useStore, useStoreUrl } from '../../../contexts/StoreContext';
+import { MinimalChrome } from '../../../components';
+import { useStoreUrl } from '../../../contexts/StoreContext';
 import { useCart } from '../../../contexts/CartContext';
 import { trackPurchase } from '../../../components/MarketingPixels';
 import { useLanguage } from '../../../contexts/LanguageContext';
@@ -16,7 +16,6 @@ function SuccessContent() {
   const searchParams = useSearchParams();
   const orderId = searchParams?.get('orderId');
   const isCod = searchParams?.get('cod') === '1';
-  const { store } = useStore();
   const storeUrl = useStoreUrl();
   const { clearCart } = useCart();
   const { t } = useLanguage();
@@ -62,29 +61,7 @@ function SuccessContent() {
   }, [orderId]);
 
   return (
-    <main className="min-h-screen bg-background">
-      {/* Navigation */}
-      <nav className="border-b bg-card">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-center px-4 sm:px-6 lg:px-8">
-          <Link href={storeUrl('/')} className="flex items-center gap-2">
-            {store?.logo ? (
-              <Image
-                src={store.logo}
-                alt={store.name}
-                width={40}
-                height={30}
-                className="object-contain"
-              />
-            ) : (
-              <span className="text-xl font-bold">
-                <span className="text-primary">{store?.name || 'Force'}</span>
-                <span className="text-foreground"> Store</span>
-              </span>
-            )}
-          </Link>
-        </div>
-      </nav>
-
+    <MinimalChrome>
       <div className="mx-auto max-w-2xl px-4 py-16 sm:px-6 lg:px-8">
         <div className="text-center">
           {/* Success Icon */}
@@ -318,7 +295,7 @@ function SuccessContent() {
           </p>
         </div>
       </div>
-    </main>
+    </MinimalChrome>
   );
 }
 
@@ -326,9 +303,11 @@ export default function SuccessClient() {
   return (
     <Suspense
       fallback={
-        <main className="min-h-screen bg-background flex items-center justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500" />
-        </main>
+        <MinimalChrome>
+          <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
+          </div>
+        </MinimalChrome>
       }
     >
       <SuccessContent />

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
-import { Header, Footer } from '../../components';
+import { ShopChrome } from '../../components';
 import { useStoreUrl } from '../../contexts/StoreContext';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 
@@ -163,8 +163,7 @@ export default function WishlistClient() {
 
   if (isLoading) {
     return (
-      <main className="flex min-h-screen flex-col bg-background">
-        <Header />
+      <ShopChrome>
         <div className="container mx-auto px-4 py-8 flex-1">
           <h1 className="text-3xl font-bold mb-8">
             {t(
@@ -178,15 +177,13 @@ export default function WishlistClient() {
             ))}
           </div>
         </div>
-        <Footer />
-      </main>
+      </ShopChrome>
     );
   }
 
   if (!isLoggedIn) {
     return (
-      <main className="flex min-h-screen flex-col bg-background">
-        <Header />
+      <ShopChrome>
         <div className="container mx-auto px-4 py-8 flex-1">
           <h1 className="text-3xl font-bold mb-8">
             {t(
@@ -228,14 +225,12 @@ export default function WishlistClient() {
             </Link>
           </div>
         </div>
-        <Footer />
-      </main>
+      </ShopChrome>
     );
   }
 
   return (
-    <main className="flex min-h-screen flex-col bg-background">
-      <Header />
+    <ShopChrome>
       <div className="container mx-auto px-4 py-8 flex-1">
         <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
           <h1 className="text-3xl font-bold">
@@ -581,7 +576,6 @@ export default function WishlistClient() {
           </div>
         )}
       </div>
-      <Footer />
-    </main>
+    </ShopChrome>
   );
 }

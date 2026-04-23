@@ -1,6 +1,6 @@
 'use client';
 
-import { Header, Footer } from '../../components';
+import { ShopChrome } from '../../components';
 import { useStoreContact } from '../../contexts/StoreContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 
@@ -9,9 +9,7 @@ export default function TermsClient() {
   const { t } = useLanguage();
   const legalEmail = email || t('our support team', 'فريق الدعم');
   return (
-    <main className="flex min-h-screen flex-col bg-muted">
-      <Header />
-
+    <ShopChrome>
       <div className="mx-auto w-full max-w-3xl flex-1 px-4 py-12 sm:px-6 lg:px-8">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-foreground">
@@ -263,8 +261,6 @@ export default function TermsClient() {
           </div>
         </div>
       </div>
-
-      <Footer />
-    </main>
+    </ShopChrome>
   );
 }

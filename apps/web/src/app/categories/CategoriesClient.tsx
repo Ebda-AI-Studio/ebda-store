@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { type Category } from '@/lib/api';
 import { useStoreUrl } from '@/contexts/StoreContext';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { Header, Footer } from '../../components';
+import { ShopChrome } from '../../components';
 
 interface CategoriesClientProps {
   categories: Category[];
@@ -16,8 +16,7 @@ export default function CategoriesClient({ categories }: CategoriesClientProps) 
   const { language, t } = useLanguage();
 
   return (
-    <main className="flex min-h-screen flex-col bg-background">
-      <Header />
+    <ShopChrome>
       <div className="container mx-auto px-4 py-8 flex-1">
         <h1 className="text-3xl font-bold mb-8">
           {t(
@@ -97,7 +96,6 @@ export default function CategoriesClient({ categories }: CategoriesClientProps) 
           </div>
         )}
       </div>
-      <Footer />
-    </main>
+    </ShopChrome>
   );
 }

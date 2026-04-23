@@ -2,12 +2,11 @@
 
 import { useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
-import { Button } from '@force/ui';
 import { useAuth } from '../../contexts/AuthContext';
 import { useStoreUrl } from '../../contexts/StoreContext';
 import { useFeatures } from '../../contexts/FeatureContext';
+import { ShopChrome } from '../../components';
 
 const accountNav = [
   {
@@ -65,33 +64,7 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b bg-card">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <Link href={storeUrl('/')} className="flex items-center gap-2">
-            <Image src="/logo.svg" alt="Force Store" width={32} height={24} />
-            <span className="text-lg font-bold">
-              <span className="text-primary">Force</span>
-              <span className="text-foreground"> Store</span>
-            </span>
-          </Link>
-
-          <div className="flex items-center gap-4">
-            <Link href={storeUrl('/products')}>
-              <Button variant="ghost" size="sm">
-                Shop
-              </Button>
-            </Link>
-            <Link href={storeUrl('/cart')}>
-              <Button variant="ghost" size="sm">
-                Cart
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </header>
-
+    <ShopChrome>
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="lg:grid lg:grid-cols-12 lg:gap-8">
           {/* Sidebar */}
@@ -171,9 +144,9 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
           </aside>
 
           {/* Main Content */}
-          <main className="mt-8 lg:col-span-9 lg:mt-0">{children}</main>
+          <div className="mt-8 lg:col-span-9 lg:mt-0">{children}</div>
         </div>
       </div>
-    </div>
+    </ShopChrome>
   );
 }

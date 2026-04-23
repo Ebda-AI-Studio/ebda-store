@@ -1,11 +1,9 @@
 import { SkeletonProductCard } from '@force/ui';
-import { Header, Footer } from '../../components';
+import { ShopChrome } from '../../components';
 
 export default function ProductsLoading() {
   return (
-    <main className="min-h-screen bg-background">
-      <Header />
-
+    <ShopChrome>
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {/* Header Skeleton */}
         <div className="mb-8">
@@ -30,8 +28,6 @@ export default function ProductsLoading() {
           ))}
         </div>
       </div>
-
-      <Footer />
-    </main>
+    </ShopChrome>
   );
 }

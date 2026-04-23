@@ -1,11 +1,9 @@
 import { Skeleton } from '@force/ui';
-import { Header, Footer } from '../../components';
+import { ShopChrome } from '../../components';
 
 export default function CartLoading() {
   return (
-    <main className="flex min-h-screen flex-col bg-background">
-      <Header />
-
+    <ShopChrome>
       <div className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8">
         <div className="h-9 w-48 animate-pulse rounded bg-muted" />
 
@@ -52,8 +50,6 @@ export default function CartLoading() {
           </div>
         </div>
       </div>
-
-      <Footer />
-    </main>
+    </ShopChrome>
   );
 }

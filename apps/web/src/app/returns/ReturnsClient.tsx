@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Button, Select } from '@force/ui';
-import { Header, Footer } from '../../components';
+import { ShopChrome } from '../../components';
 import { useStoreContact, useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { API_URL, type Order } from '../../lib/api';
@@ -428,9 +428,7 @@ export default function ReturnsClient() {
   const returnsEmail =
     email || t('our support team', '\u0641\u0631\u064a\u0642 \u0627\u0644\u062f\u0639\u0645');
   return (
-    <main className="flex min-h-screen flex-col bg-background">
-      <Header />
-
+    <ShopChrome>
       <div className="mx-auto w-full max-w-3xl flex-1 px-4 py-12 sm:px-6 lg:px-8">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-foreground">
@@ -678,8 +676,6 @@ export default function ReturnsClient() {
           </p>
         </div>
       </div>
-
-      <Footer />
-    </main>
+    </ShopChrome>
   );
 }
