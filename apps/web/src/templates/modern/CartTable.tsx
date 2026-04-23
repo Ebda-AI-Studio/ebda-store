@@ -76,7 +76,7 @@ export default function ModernCartTable({
                   <button
                     type="button"
                     onClick={() => onUpdateQuantity?.(item.id, Math.max(1, item.quantity - 1))}
-                    className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40"
+                    className="flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
                     disabled={item.quantity <= 1}
                     aria-label={isRtl ? 'تقليل الكمية' : 'Decrease quantity'}
                   >
@@ -95,7 +95,7 @@ export default function ModernCartTable({
                   <button
                     type="button"
                     onClick={() => onUpdateQuantity?.(item.id, item.quantity + 1)}
-                    className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    className="flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
                     aria-label={isRtl ? 'زيادة الكمية' : 'Increase quantity'}
                   >
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -116,7 +116,7 @@ export default function ModernCartTable({
                   <button
                     type="button"
                     onClick={() => onRemove?.(item.id)}
-                    className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                    className="flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-1"
                     aria-label={isRtl ? 'إزالة' : 'Remove'}
                   >
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

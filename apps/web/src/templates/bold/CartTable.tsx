@@ -58,7 +58,7 @@ export default function BoldCartTable({
                 </div>
                 <button
                   onClick={() => onRemove?.(item.id)}
-                  className="h-8 w-8 flex-shrink-0 border-2 border-foreground bg-background font-black text-foreground hover:bg-destructive hover:text-destructive-foreground hover:border-destructive"
+                  className="h-11 w-11 flex-shrink-0 border-2 border-foreground bg-background font-black text-foreground hover:bg-destructive hover:text-destructive-foreground hover:border-destructive focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
                   aria-label={isRtl ? 'إزالة' : 'Remove'}
                 >
                   ×
@@ -69,7 +69,7 @@ export default function BoldCartTable({
                   <button
                     disabled={item.quantity <= 1}
                     onClick={() => onUpdateQuantity?.(item.id, Math.max(1, item.quantity - 1))}
-                    className="h-8 w-8 font-black text-foreground hover:bg-foreground hover:text-background disabled:opacity-30"
+                    className="h-11 w-11 font-black text-foreground hover:bg-foreground hover:text-background disabled:opacity-30 focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-1"
                     aria-label={isRtl ? 'تقليل' : 'Decrease'}
                   >
                     −
@@ -79,7 +79,7 @@ export default function BoldCartTable({
                   </span>
                   <button
                     onClick={() => onUpdateQuantity?.(item.id, item.quantity + 1)}
-                    className="h-8 w-8 font-black text-foreground hover:bg-foreground hover:text-background"
+                    className="h-11 w-11 font-black text-foreground hover:bg-foreground hover:text-background focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-1"
                     aria-label={isRtl ? 'زيادة' : 'Increase'}
                   >
                     +

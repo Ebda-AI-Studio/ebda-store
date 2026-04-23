@@ -74,7 +74,7 @@ export default function ClassicCartTable({
                   <button
                     disabled={item.quantity <= 1}
                     onClick={() => onUpdateQuantity?.(item.id, Math.max(1, item.quantity - 1))}
-                    className="h-8 w-8 text-muted-foreground hover:bg-muted disabled:opacity-40"
+                    className="h-11 w-11 text-muted-foreground hover:bg-muted disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-foreground"
                     aria-label={isRtl ? 'تقليل' : 'Decrease'}
                   >
                     −
@@ -82,7 +82,7 @@ export default function ClassicCartTable({
                   <span className="w-10 text-center text-sm font-medium">{item.quantity}</span>
                   <button
                     onClick={() => onUpdateQuantity?.(item.id, item.quantity + 1)}
-                    className="h-8 w-8 text-muted-foreground hover:bg-muted"
+                    className="h-11 w-11 text-muted-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-foreground"
                     aria-label={isRtl ? 'زيادة' : 'Increase'}
                   >
                     +
