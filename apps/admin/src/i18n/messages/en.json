@@ -479,7 +479,82 @@
       "snapchat": "Snapchat"
     }
   },
-  "coupons": {},
+  "coupons": {
+    "page": {
+      "title": "Discount Coupons",
+      "subtitle": "Manage promotional codes and discounts"
+    },
+    "actions": {
+      "create": "Create Coupon",
+      "update": "Update Coupon",
+      "cancel": "Cancel",
+      "edit": "Edit",
+      "delete": "Delete",
+      "activate": "Activate",
+      "deactivate": "Deactivate"
+    },
+    "filters": {
+      "searchPlaceholder": "Search coupons...",
+      "statusAriaLabel": "Filter by status",
+      "statusAll": "All Status",
+      "statusActive": "Active",
+      "statusInactive": "Inactive"
+    },
+    "table": {
+      "ariaLabel": "Coupons",
+      "code": "Code",
+      "name": "Name",
+      "type": "Type",
+      "value": "Value",
+      "usage": "Usage",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "status": {
+      "active": "Active",
+      "inactive": "Inactive",
+      "scheduled": "Scheduled",
+      "expired": "Expired",
+      "exhausted": "Exhausted"
+    },
+    "type": {
+      "percentage": "Percentage Off",
+      "fixed": "Fixed Amount",
+      "freeShipping": "Free Shipping"
+    },
+    "empty": {
+      "title": "No coupons found",
+      "createFirst": "Create your first coupon"
+    },
+    "modal": {
+      "createTitle": "Create Coupon",
+      "editTitle": "Edit Coupon"
+    },
+    "form": {
+      "codeLabel": "Coupon Code *",
+      "codePlaceholder": "SUMMER20",
+      "nameLabel": "Name *",
+      "namePlaceholder": "Summer Sale 20% Off",
+      "nameArLabel": "Name (Arabic)",
+      "nameArPlaceholder": "خصم الصيف ٢٠٪",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "Get 20% off on all summer items",
+      "typeLabel": "Discount Type *",
+      "valuePercentageLabel": "Percentage (%) *",
+      "valueAmountLabel": "Amount (KWD) *",
+      "minOrderLabel": "Minimum Order (KWD)",
+      "minOrderPlaceholder": "10.000",
+      "maxDiscountLabel": "Max Discount (KWD)",
+      "maxDiscountPlaceholder": "50.000",
+      "usageLimitLabel": "Total Usage Limit",
+      "usageLimitPlaceholder": "100",
+      "usageLimitPerUserLabel": "Limit Per Customer",
+      "usageLimitPerUserPlaceholder": "1",
+      "startsAt": "Start Date",
+      "expiresAt": "Expiry Date",
+      "isActiveLabel": "Coupon is active"
+    }
+  },
   "shipping": {
     "carriers": {
       "page": {
