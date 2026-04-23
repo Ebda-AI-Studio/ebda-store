@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { prisma, Prisma, OrderStatus } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import { CartService } from './cart.service';
+import { CouponService } from './coupon.service';
 import { EmailService, type OrderEmailData } from './email.service';
 import { socketService } from './socket.service';
 import { notificationDispatcher } from './notification-dispatcher.service';
@@ -39,6 +40,7 @@ interface CreateOrderData {
   };
   paymentMethod: string;
   notes?: string;
+  couponCode?: string;
 }
 
 export class OrderService {
@@ -160,7 +162,40 @@ export class OrderService {
     const taxRate = taxRates.length > 0 ? Number(taxRates[0].rate) / 100 : 0;
     const tax = Math.round(subtotal * taxRate);
     const shipping = 0; // Free shipping (simplified)
-    const total = subtotal + tax + shipping;
+
+    // Resolve coupon (if any) on the server -- we never trust a client-asserted
+    // discount, since the cart could have changed between /coupons/validate
+    // and order creation. CouponService.getByCode enforces active/starts/expires/
+    // usage-limit at read time; the atomic usage-count increment inside the
+    // transaction below closes the remaining concurrency gap.
+    let appliedCoupon: Awaited<ReturnType<typeof CouponService.getByCode>> | null = null;
+    let couponDiscount = 0;
+    if (data.couponCode) {
+      appliedCoupon = await CouponService.getByCode(storeId, data.couponCode);
+      if (appliedCoupon.minOrderAmount && subtotal < appliedCoupon.minOrderAmount) {
+        throw new AppError(
+          400,
+          'MIN_ORDER_NOT_MET',
+          `Minimum order amount of ${(appliedCoupon.minOrderAmount / 1000).toFixed(3)} KWD required for this coupon`
+        );
+      }
+      if (appliedCoupon.type !== 'free_shipping') {
+        couponDiscount = CouponService.calculateDiscount(
+          {
+            type: appliedCoupon.type,
+            value: appliedCoupon.value,
+            maxDiscount: appliedCoupon.maxDiscount,
+          },
+          subtotal
+        );
+      }
+      // free_shipping coupons zero the shipping line. Shipping is already 0
+      // in the current "simplified" pricing above; this is a no-op today but
+      // keeps the semantics correct for when shipping cost gets wired in.
+    }
+
+    const discount = couponDiscount;
+    const total = Math.max(0, subtotal + tax + shipping - discount);
 
     // Generate order number
     const orderNumber = `ORD-${Date.now()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
@@ -208,6 +243,25 @@ export class OrderService {
         }
       }
 
+      // Atomically reserve a coupon redemption before creating the order so
+      // that two concurrent checkouts can't both slip past a usage limit by
+      // reading the same stale count. updateMany with a usageCount < limit
+      // guard updates zero rows when the limit is reached, which we detect
+      // via `count === 0` and roll back by throwing.
+      if (appliedCoupon) {
+        const reserve = await tx.coupon.updateMany({
+          where: {
+            id: appliedCoupon.id,
+            isActive: true,
+            ...(appliedCoupon.usageLimit ? { usageCount: { lt: appliedCoupon.usageLimit } } : {}),
+          },
+          data: { usageCount: { increment: 1 } },
+        });
+        if (reserve.count === 0) {
+          throw new AppError(400, 'COUPON_LIMIT_REACHED', 'Coupon usage limit reached');
+        }
+      }
+
       // Create order
       const newOrder = await tx.order.create({
         data: {
@@ -218,6 +272,9 @@ export class OrderService {
           subtotal,
           tax,
           shipping,
+          discount,
+          couponCode: appliedCoupon?.code ?? null,
+          couponDiscount,
           total,
           shippingAddress: data.shippingAddress,
           billingAddress: data.billingAddress || data.shippingAddress,
@@ -335,6 +392,8 @@ export class OrderService {
         subtotal: order.subtotal,
         tax: order.tax,
         shipping: order.shipping,
+        discount: order.discount,
+        couponCode: order.couponCode ?? undefined,
         total: order.total,
         shippingAddress: data.shippingAddress,
       };

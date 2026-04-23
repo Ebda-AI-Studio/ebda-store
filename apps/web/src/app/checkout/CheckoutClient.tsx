@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -62,73 +62,51 @@ export default function CheckoutClient() {
   const router = useRouter();
   const { store } = useStore();
   const storeUrl = useStoreUrl();
-  const { items: cartContextItems, total: cartContextTotal } = useCart();
+  const { items: cartContextItems, total: cartContextTotal, isReady: cartIsReady } = useCart();
   const { language, t } = useLanguage();
   const [step, setStep] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Server-side cart state used to reconcile with local cart context
-  const [serverCart, setServerCart] = useState<Cart | null>(null);
-
-  // Fire InitiateCheckout pixel event once cart items are available
+  // Fire InitiateCheckout pixel event once the cart has hydrated from the
+  // server and we know it isn't empty. Firing on mount (before hydration)
+  // would miss the event because cartContextItems starts empty.
+  const pixelFiredRef = useRef(false);
   useEffect(() => {
-    if (cartContextItems.length > 0) {
-      trackInitiateCheckout({
-        contentIds: cartContextItems.map(item => item.id),
-        numItems: cartContextItems.reduce((sum, item) => sum + item.quantity, 0),
-        value: cartContextTotal / 1000,
-        currency: 'KWD',
-      });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Run once on mount
+    if (pixelFiredRef.current) return;
+    if (!cartIsReady || cartContextItems.length === 0) return;
+    pixelFiredRef.current = true;
+    trackInitiateCheckout({
+      contentIds: cartContextItems.map(item => item.productId),
+      numItems: cartContextItems.reduce((sum, item) => sum + item.quantity, 0),
+      value: cartContextTotal / 1000,
+      currency: 'KWD',
+    });
+  }, [cartIsReady, cartContextItems, cartContextTotal]);
 
-  // Re-fetch the server-side cart on mount to ensure the displayed totals match
-  // what the API will use when creating the order. If they differ, use the
-  // server cart as the source of truth so the charged amount matches display.
-  useEffect(() => {
-    let cancelled = false;
-    async function syncCart() {
-      try {
-        const result = await api.getCart();
-        if (!cancelled && result.success && result.data?.cart) {
-          setServerCart(result.data.cart);
-        }
-      } catch {
-        // Non-critical -- fall back to local cart context
-      }
-    }
-    syncCart();
-    return () => {
-      cancelled = true;
+  // CartContext is write-through to /public/cart, so the context is the
+  // single source of truth for both display and order creation. Memoized so
+  // hooks that depend on it don't re-run on unrelated re-renders.
+  const cart: Cart | null = useMemo(() => {
+    if (cartContextItems.length === 0) return null;
+    return {
+      id: 'cart',
+      items: cartContextItems.map(item => ({
+        id: item.id,
+        productId: item.productId,
+        quantity: item.quantity,
+        price: item.price,
+        product: {
+          id: item.productId,
+          name: item.name,
+          slug: item.slug,
+          images: item.image ? [{ id: '1', url: item.image, alt: item.name }] : [],
+        },
+      })),
+      subtotal: cartContextTotal,
+      total: cartContextTotal,
     };
-  }, []);
-
-  // Use server cart when available, otherwise fall back to local cart context.
-  // This ensures the totals displayed to the user match the server-side values
-  // that will be used to create the order and charge payment.
-  const cart: Cart | null = serverCart
-    ? serverCart
-    : cartContextItems.length > 0
-      ? {
-          id: 'local-cart',
-          items: cartContextItems.map(item => ({
-            id: item.id,
-            productId: item.id,
-            quantity: item.quantity,
-            price: item.price,
-            product: {
-              id: item.id,
-              name: item.name,
-              slug: item.slug,
-              images: item.image ? [{ id: '1', url: item.image, alt: item.name }] : [],
-            },
-          })),
-          subtotal: cartContextTotal,
-          total: cartContextTotal,
-        }
-      : null;
+  }, [cartContextItems, cartContextTotal]);
   const [, setShippingZones] = useState<ShippingZone[]>([]);
   const [paymentProviders, setPaymentProviders] = useState<PaymentProvider[]>([]);
 
@@ -159,10 +137,34 @@ export default function CheckoutClient() {
   });
 
   const checkoutStorageKey = store?.id ? `force-checkout-form-${store.id}` : null;
+  const promoStorageKey = store?.id ? `force-promo-${store.id}` : null;
 
-  // Hydrate form from sessionStorage once the store id is known.
+  // Hydrate form from sessionStorage once the store id is known. Also sweep
+  // any stale per-tenant keys left over from a previous store so a shared
+  // device can't surface one tenant's in-flight form/promo in another.
   useEffect(() => {
-    if (!checkoutStorageKey || typeof window === 'undefined') return;
+    if (!store?.id || typeof window === 'undefined') return;
+
+    // Sweep stale tenant keys.
+    try {
+      const toRemove: string[] = [];
+      for (let i = 0; i < window.sessionStorage.length; i++) {
+        const key = window.sessionStorage.key(i);
+        if (!key) continue;
+        const isCheckoutKey = key.startsWith('force-checkout-form-');
+        const isPromoKey = key.startsWith('force-promo-');
+        if (!isCheckoutKey && !isPromoKey) continue;
+        const keyStoreId = isCheckoutKey
+          ? key.slice('force-checkout-form-'.length)
+          : key.slice('force-promo-'.length);
+        if (keyStoreId !== store.id) toRemove.push(key);
+      }
+      for (const key of toRemove) window.sessionStorage.removeItem(key);
+    } catch {
+      // Non-fatal.
+    }
+
+    if (!checkoutStorageKey) return;
     try {
       const saved = window.sessionStorage.getItem(checkoutStorageKey);
       if (!saved) return;
@@ -177,7 +179,7 @@ export default function CheckoutClient() {
       // Corrupt JSON — drop it and start fresh.
       window.sessionStorage.removeItem(checkoutStorageKey);
     }
-  }, [checkoutStorageKey]);
+  }, [checkoutStorageKey, store?.id]);
 
   // Persist form to sessionStorage on every change (skip empty default state).
   useEffect(() => {
@@ -359,37 +361,82 @@ export default function CheckoutClient() {
     return Object.keys(errors).length === 0;
   };
 
-  // Apply coupon
-  const handleApplyCoupon = async () => {
-    if (!couponCode.trim() || !store?.id || !cart) return;
+  // Apply coupon. Accepts an optional code override so the auto-apply effect
+  // can pass a stored code directly without waiting for couponCode state.
+  const applyCouponCode = useCallback(
+    async (codeOverride?: string) => {
+      const code = (codeOverride ?? couponCode).trim();
+      if (!code || !store?.id || !cart) return;
 
-    setCouponError('');
-    try {
-      const result = await api.post<{ coupon: Coupon; discount: number }>(
-        `/stores/public/${store.id}/coupons/validate`,
-        { code: couponCode, orderTotal: cart.subtotal }
-      );
-      if (result.success && result.data) {
-        setAppliedCoupon(result.data.coupon);
-        setCouponDiscount(result.data.discount);
-        if (result.data.coupon.type === 'free_shipping') {
-          setFreeShipping(true);
-          setShippingCost(0);
+      setCouponError('');
+      try {
+        const result = await api.post<{ coupon: Coupon; discount: number }>(
+          `/stores/public/${store.id}/coupons/validate`,
+          { code, orderTotal: cart.subtotal }
+        );
+        if (result.success && result.data) {
+          setCouponCode(result.data.coupon.code);
+          setAppliedCoupon(result.data.coupon);
+          setCouponDiscount(result.data.discount);
+          if (result.data.coupon.type === 'free_shipping') {
+            setFreeShipping(true);
+            setShippingCost(0);
+          }
+          // Persist so a refresh or navigation back to /cart keeps the promo.
+          if (promoStorageKey && typeof window !== 'undefined') {
+            try {
+              window.sessionStorage.setItem(promoStorageKey, result.data.coupon.code);
+            } catch {
+              // Non-fatal.
+            }
+          }
+        } else {
+          setCouponError(result.error?.message || t('Invalid coupon', 'كوبون غير صالح'));
+          // Stored code is no longer valid -- drop it so we don't auto-apply again.
+          if (codeOverride && promoStorageKey && typeof window !== 'undefined') {
+            try {
+              window.sessionStorage.removeItem(promoStorageKey);
+            } catch {
+              // Non-fatal.
+            }
+          }
         }
-      } else {
-        setCouponError(result.error?.message || t('Invalid coupon', 'كوبون غير صالح'));
+      } catch {
+        setCouponError(t('Failed to apply coupon', 'فشل تطبيق الكوبون'));
       }
-    } catch {
-      setCouponError(t('Failed to apply coupon', 'فشل تطبيق الكوبون'));
-    }
-  };
+    },
+    [couponCode, store?.id, cart, promoStorageKey, t]
+  );
+
+  const handleApplyCoupon = () => applyCouponCode();
 
   const removeCoupon = () => {
     setAppliedCoupon(null);
     setCouponDiscount(0);
     setCouponCode('');
+    if (promoStorageKey && typeof window !== 'undefined') {
+      try {
+        window.sessionStorage.removeItem(promoStorageKey);
+      } catch {
+        // Non-fatal.
+      }
+    }
     calculateShipping();
   };
+
+  // Auto-apply a promo that the user entered on /cart. Runs once after the
+  // cart hydrates so the discount is re-validated server-side with the
+  // authoritative subtotal.
+  const autoAppliedPromoRef = useRef(false);
+  useEffect(() => {
+    if (autoAppliedPromoRef.current) return;
+    if (!cartIsReady || !promoStorageKey || !cart || cart.subtotal === 0) return;
+    if (typeof window === 'undefined') return;
+    const stored = window.sessionStorage.getItem(promoStorageKey);
+    if (!stored) return;
+    autoAppliedPromoRef.current = true;
+    applyCouponCode(stored);
+  }, [cartIsReady, cart, promoStorageKey, applyCouponCode]);
 
   // Calculate totals
   const subtotal = cart?.subtotal || 0;
@@ -432,6 +479,7 @@ export default function CheckoutClient() {
         },
         paymentMethod: selectedProvider,
         notes: formData.notes,
+        couponCode: appliedCoupon?.code,
       });
 
       if (!orderResult.success || !orderResult.data?.order) {
@@ -451,10 +499,12 @@ export default function CheckoutClient() {
         }
       );
 
-      // Order created — clear the saved checkout form before leaving the page.
-      if (checkoutStorageKey && typeof window !== 'undefined') {
+      // Order created -- clear the saved checkout form and promo code
+      // before leaving the page so they don't leak into the next order.
+      if (typeof window !== 'undefined') {
         try {
-          window.sessionStorage.removeItem(checkoutStorageKey);
+          if (checkoutStorageKey) window.sessionStorage.removeItem(checkoutStorageKey);
+          if (promoStorageKey) window.sessionStorage.removeItem(promoStorageKey);
         } catch {
           // Non-fatal
         }
@@ -478,7 +528,7 @@ export default function CheckoutClient() {
     }
   };
 
-  if (isLoading) {
+  if (isLoading || !cartIsReady) {
     return (
       <main className="min-h-screen bg-background flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">

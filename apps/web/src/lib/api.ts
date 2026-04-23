@@ -172,6 +172,7 @@ interface CreateOrderData {
   };
   paymentMethod: string;
   notes?: string;
+  couponCode?: string;
 }
 
 class ApiClient {

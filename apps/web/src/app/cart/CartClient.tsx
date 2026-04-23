@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { Button, useToast } from '@force/ui';
 import { Header, Footer } from '../../components';
@@ -19,6 +19,7 @@ export default function CartClient() {
     removeItem: removeCartItem,
     itemCount,
     total: cartTotal,
+    isReady: cartIsReady,
   } = useCart();
   const { store } = useStore();
   const storeUrl = useStoreUrl();
@@ -84,6 +85,16 @@ export default function CartClient() {
         setPromoName(result.data.coupon.name);
         setPromoType(result.data.coupon.type);
         setPromoValue(result.data.coupon.value);
+        // Persist so /checkout can pick it up and the server applies the
+        // discount to the order (not just the UI). Keyed by store to avoid
+        // leaking across tenants on shared devices.
+        if (store.id && typeof window !== 'undefined') {
+          try {
+            window.sessionStorage.setItem(`force-promo-${store.id}`, result.data.coupon.code);
+          } catch {
+            // Quota exceeded or storage disabled -- non-fatal.
+          }
+        }
         success(
           t('Promo applied', 'تم تطبيق الخصم'),
           t(
@@ -108,6 +119,42 @@ export default function CartClient() {
       setIsValidating(false);
     }
   }, [promoCode, isValidating, store.id, cartTotal, success, info, errorToast, t]);
+
+  // Re-apply a previously validated promo code once the cart has hydrated.
+  // The server is still the source of truth for the discount amount; if the
+  // stored code is no longer valid we silently drop it.
+  const autoAppliedRef = useRef(false);
+  useEffect(() => {
+    if (autoAppliedRef.current) return;
+    if (!cartIsReady || !store.id || cartTotal === 0) return;
+    if (typeof window === 'undefined') return;
+    const stored = window.sessionStorage.getItem(`force-promo-${store.id}`);
+    if (!stored) return;
+    autoAppliedRef.current = true;
+    (async () => {
+      try {
+        const result = await api.post<{
+          coupon: { id: string; code: string; name: string; type: string; value: number };
+          discount: number;
+        }>(`/stores/public/${store.id}/coupons/validate`, {
+          code: stored,
+          orderTotal: cartTotal,
+        });
+        if (result.success && result.data) {
+          setPromoCode(result.data.coupon.code);
+          setPromoApplied(true);
+          setPromoDiscount(result.data.discount);
+          setPromoName(result.data.coupon.name);
+          setPromoType(result.data.coupon.type);
+          setPromoValue(result.data.coupon.value);
+        } else {
+          window.sessionStorage.removeItem(`force-promo-${store.id}`);
+        }
+      } catch {
+        // Silent -- user can re-enter the code manually.
+      }
+    })();
+  }, [cartIsReady, cartTotal, store.id]);
 
   // Fetch shipping zones on mount
   useEffect(() => {

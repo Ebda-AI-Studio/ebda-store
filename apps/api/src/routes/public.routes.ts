@@ -119,6 +119,7 @@ const createOrderSchema = z.object({
   billingAddress: shippingAddressSchema.optional(),
   paymentMethod: z.string().min(1),
   notes: z.string().optional(),
+  couponCode: z.string().trim().min(1).max(50).optional(),
 });
 
 // GET /products - List all public products (cached 30s)

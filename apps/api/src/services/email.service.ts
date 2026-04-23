@@ -33,6 +33,8 @@ export interface OrderEmailData {
   subtotal: number;
   tax: number;
   shipping: number;
+  discount?: number;
+  couponCode?: string;
   total: number;
   shippingAddress: {
     firstName: string;
@@ -450,6 +452,14 @@ export class EmailService {
             <td colspan="2">Shipping</td>
             <td style="text-align: right;">${(d.shipping / 1000).toFixed(3)} KWD</td>
           </tr>
+          ${
+            d.discount && d.discount > 0
+              ? `<tr>
+            <td colspan="2">Discount${d.couponCode ? ` (${d.couponCode})` : ''}</td>
+            <td style="text-align: right;">-${(d.discount / 1000).toFixed(3)} KWD</td>
+          </tr>`
+              : ''
+          }
           <tr class="total-row">
             <td colspan="2">Total</td>
             <td style="text-align: right;">${(d.total / 1000).toFixed(3)} KWD</td>
