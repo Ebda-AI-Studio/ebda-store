@@ -1,480 +1,76 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useParams } from 'next/navigation';
-import Link from 'next/link';
-import { Button, Badge, Input, Label, Modal } from '@force/ui';
+import { Button } from '@force/ui';
 import { AdminLayout } from '../../../components/AdminLayout';
-import { formatPrice, formatDate } from '../../../lib/format';
-import { apiGet, apiPut, apiPatch } from '../../../lib/api';
 import { useAuth } from '../../../lib/auth';
-
-interface Store {
-  id: string;
-  name: string;
-  slug: string;
-  domain: string | null;
-  status: 'active' | 'inactive' | 'suspended';
-  plan: 'free' | 'starter' | 'professional' | 'enterprise';
-  createdAt: string;
-  updatedAt: string;
-  owner: {
-    id: string;
-    email: string;
-    firstName: string;
-    lastName: string;
-  };
-  _count?: {
-    products: number;
-    orders: number;
-    customers: number;
-  };
-  stats?: {
-    revenue: number;
-    ordersThisMonth: number;
-  };
-}
-
-const statusColors = {
-  active: 'default',
-  inactive: 'secondary',
-  suspended: 'destructive',
-} as const;
-
-function DomainSection({
-  storeId,
-  domain,
-  onDomainChange,
-}: {
-  storeId: string;
-  domain: string | null;
-  onDomainChange: () => void;
-}) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [newDomain, setNewDomain] = useState(domain || '');
-  const [isSaving, setIsSaving] = useState(false);
-  const [isChecking, setIsChecking] = useState(false);
-  const [domainStatus, setDomainStatus] = useState<{
-    domain: string;
-    verified: boolean;
-    misconfigured: boolean;
-    dnsRecords: Array<{ type: string; name: string; value: string }>;
-  } | null>(null);
-  const [domainError, setDomainError] = useState('');
-
-  const checkDns = useCallback(async () => {
-    if (!domain) return;
-    setIsChecking(true);
-    try {
-      const { data } = await apiGet<{
-        domain: string;
-        verified: boolean;
-        misconfigured: boolean;
-        dnsRecords: Array<{ type: string; name: string; value: string }>;
-      }>(`/api/v1/stores/${storeId}/domain`);
-      if (data) {
-        setDomainStatus(data);
-      }
-    } catch {
-      // non-critical
-    } finally {
-      setIsChecking(false);
-    }
-  }, [domain, storeId]);
-
-  useEffect(() => {
-    checkDns();
-  }, [checkDns]);
-
-  async function handleSaveDomain() {
-    const trimmed = newDomain.trim().toLowerCase();
-    if (
-      trimmed &&
-      !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(trimmed)
-    ) {
-      setDomainError('Please enter a valid domain (e.g., shop.example.com)');
-      return;
-    }
-
-    setIsSaving(true);
-    setDomainError('');
-    try {
-      const { error: apiError } = await apiPut(`/api/v1/stores/${storeId}/domain`, {
-        domain: trimmed || null,
-      });
-
-      if (!apiError) {
-        setIsEditing(false);
-        onDomainChange();
-        if (trimmed) {
-          // Refresh status
-          setTimeout(checkDns, 1000);
-        } else {
-          setDomainStatus(null);
-        }
-      } else {
-        setDomainError(apiError.message || 'Failed to update domain');
-      }
-    } catch {
-      setDomainError('Failed to update domain');
-    } finally {
-      setIsSaving(false);
-    }
-  }
-
-  async function handleRemoveDomain() {
-    setNewDomain('');
-    setIsSaving(true);
-    try {
-      const { error: apiError } = await apiPut(`/api/v1/stores/${storeId}/domain`, {
-        domain: null,
-      });
-      if (!apiError) {
-        setDomainStatus(null);
-        setIsEditing(false);
-        onDomainChange();
-      }
-    } catch {
-      // non-critical
-    } finally {
-      setIsSaving(false);
-    }
-  }
-
-  return (
-    <div className="mt-8">
-      <div className="rounded-xl border bg-card shadow-sm">
-        <div className="flex items-center justify-between border-b p-4">
-          <h2 className="font-semibold text-foreground">Custom Domain</h2>
-          <div className="flex gap-2">
-            {!isEditing && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setNewDomain(domain || '');
-                  setIsEditing(true);
-                  setDomainError('');
-                }}
-              >
-                {domain ? 'Change Domain' : 'Add Domain'}
-              </Button>
-            )}
-            {domain && !isEditing && (
-              <Button variant="outline" size="sm" onClick={handleRemoveDomain} disabled={isSaving}>
-                Remove
-              </Button>
-            )}
-          </div>
-        </div>
-        <div className="p-6">
-          {isEditing ? (
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="domain">Domain</Label>
-                <Input
-                  id="domain"
-                  value={newDomain}
-                  onChange={e => {
-                    setNewDomain(e.target.value.toLowerCase());
-                    setDomainError('');
-                  }}
-                  placeholder="shop.example.com"
-                  className={`mt-1 ${domainError ? 'border-destructive' : ''}`}
-                />
-                {domainError && <p className="mt-1 text-sm text-destructive">{domainError}</p>}
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Leave empty and save to remove the custom domain.
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <Button size="sm" onClick={handleSaveDomain} disabled={isSaving}>
-                  {isSaving ? 'Saving...' : 'Save'}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setIsEditing(false);
-                    setDomainError('');
-                  }}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          ) : domain ? (
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <p className="font-medium text-foreground">{domain}</p>
-                <Badge variant={domainStatus?.verified ? 'default' : 'secondary'}>
-                  {domainStatus?.verified ? 'Verified' : 'Pending Verification'}
-                </Badge>
-              </div>
-
-              {/* DNS Instructions (always visible while unverified) */}
-              {!domainStatus?.verified && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-                  <p className="text-sm font-medium text-amber-900">DNS Configuration Required</p>
-                  <p className="mt-1 text-sm text-amber-800">
-                    Add the following DNS record to your domain provider:
-                  </p>
-                  <div className="mt-3 overflow-hidden rounded-md border border-amber-200 bg-white">
-                    <table className="w-full text-sm" aria-label="Store overview">
-                      <thead>
-                        <tr className="border-b bg-amber-50">
-                          <th
-                            scope="col"
-                            className="px-3 py-2 text-left font-medium text-amber-900"
-                          >
-                            Type
-                          </th>
-                          <th
-                            scope="col"
-                            className="px-3 py-2 text-left font-medium text-amber-900"
-                          >
-                            Name
-                          </th>
-                          <th
-                            scope="col"
-                            className="px-3 py-2 text-left font-medium text-amber-900"
-                          >
-                            Value
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {domainStatus?.dnsRecords?.map((record, i) => (
-                          <tr key={i} className="border-b last:border-0">
-                            <td className="px-3 py-2 font-mono text-xs">{record.type}</td>
-                            <td className="px-3 py-2 font-mono text-xs">{record.name}</td>
-                            <td className="px-3 py-2 font-mono text-xs">{record.value}</td>
-                          </tr>
-                        )) || (
-                          <tr>
-                            <td className="px-3 py-2 font-mono text-xs">CNAME</td>
-                            <td className="px-3 py-2 font-mono text-xs">{domain}</td>
-                            <td className="px-3 py-2 font-mono text-xs">cname.vercel-dns.com</td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                  <div className="mt-3 flex items-center justify-between">
-                    <p className="text-xs text-amber-700">
-                      DNS changes can take up to 48 hours to propagate.
-                    </p>
-                    <Button variant="outline" size="sm" onClick={checkDns} disabled={isChecking}>
-                      {isChecking ? 'Checking...' : 'Check DNS'}
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {domainStatus?.verified && (
-                <p className="text-sm text-[hsl(var(--success))]">
-                  Domain is verified and SSL is active. Your store is accessible at https://{domain}
-                </p>
-              )}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              No custom domain configured. This store is accessible via its default subdomain.
-            </p>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
+import { useT } from '@/i18n/useT';
+import { useDashboardData } from './_hooks/useDashboardData';
+import { StatsGrid } from './_components/StatsGrid';
+import { StoreDetailsCard } from './_components/StoreDetailsCard';
+import { StoreOwnerCard } from './_components/StoreOwnerCard';
+import { DomainSection } from './_components/DomainSection';
+import { QuickActions } from './_components/QuickActions';
+import { SettingsLink } from './_components/SettingsLink';
+import { SuspendStoreModal } from './_components/SuspendStoreModal';
+import { StoreLoadingSkeleton } from './_components/StoreLoadingSkeleton';
+import { StoreErrorState } from './_components/StoreErrorState';
+import type { StoreFormErrors } from './_components/types';
 
 export default function StoreDetailPage() {
   const params = useParams();
   const storeId = params?.id as string;
   const { user } = useAuth();
   const isSuperAdmin = user?.role === 'super_admin';
-  const [store, setStore] = useState<Store | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [storeError, setStoreError] = useState<'not_found' | 'network' | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isChangingStatus, setIsChangingStatus] = useState(false);
+  const t = useT('stores.dashboard');
+  const tErrors = useT('stores.dashboard.details.errors');
+  const translateError = useCallback(
+    (key: string) => tErrors(key as Parameters<typeof tErrors>[0]),
+    [tErrors]
+  );
+
+  const {
+    store,
+    isLoading,
+    storeError,
+    isEditing,
+    isSaving,
+    isChangingStatus,
+    editForm,
+    formErrors,
+    setIsLoading,
+    setIsEditing,
+    setEditForm,
+    setFormErrors,
+    fetchStore,
+    handleSave,
+    handleStatusChange,
+    resetEditForm,
+  } = useDashboardData(storeId);
+
   const [showSuspendModal, setShowSuspendModal] = useState(false);
-  const [editForm, setEditForm] = useState({ name: '', slug: '', plan: '', status: '' });
-  const [formErrors, setFormErrors] = useState<{ name?: string; slug?: string }>({});
 
-  const fetchStore = useCallback(async () => {
-    if (!storeId) return;
-    try {
-      setStoreError(null);
-      const { data, error } = await apiGet<{ store: Store }>(`/api/v1/stores/${storeId}`);
-      if (error) {
-        setStoreError(error.status === 404 ? 'not_found' : 'network');
-        return;
-      }
-      if (data?.store) {
-        setStore(data.store);
-        setEditForm({
-          name: data.store.name,
-          slug: data.store.slug,
-          plan: data.store.plan,
-          status: data.store.status,
-        });
-      }
-    } catch (error) {
-      console.error('Failed to fetch store:', error);
-      setStoreError('network');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [storeId]);
-
-  useEffect(() => {
-    fetchStore();
-  }, [fetchStore]);
-
-  function validateForm(): boolean {
-    const errors: { name?: string; slug?: string } = {};
-
-    // Validate name
-    if (!editForm.name.trim()) {
-      errors.name = 'Store name is required';
-    } else if (editForm.name.trim().length < 2) {
-      errors.name = 'Store name must be at least 2 characters';
-    } else if (editForm.name.trim().length > 100) {
-      errors.name = 'Store name must be less than 100 characters';
-    }
-
-    // Validate slug
-    if (!editForm.slug.trim()) {
-      errors.slug = 'URL slug is required';
-    } else if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(editForm.slug)) {
-      errors.slug = 'Slug must be lowercase, alphanumeric, with hyphens only';
-    } else if (editForm.slug.length < 3) {
-      errors.slug = 'Slug must be at least 3 characters';
-    } else if (editForm.slug.length > 50) {
-      errors.slug = 'Slug must be less than 50 characters';
-    }
-
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
-  }
-
-  async function handleSave() {
-    if (!validateForm()) {
-      return;
-    }
-
-    setIsSaving(true);
-    try {
-      const { data, error: apiError } = await apiPut<{ store: Store }>(
-        `/api/v1/stores/${storeId}`,
-        {
-          name: editForm.name.trim(),
-          slug: editForm.slug.trim().toLowerCase(),
-          plan: editForm.plan,
-          status: editForm.status,
-        }
-      );
-      if (data?.store) {
-        setStore(data.store);
-        setIsEditing(false);
-        setFormErrors({});
-      } else if (apiError) {
-        if (apiError.message?.toLowerCase().includes('slug')) {
-          setFormErrors({ slug: 'This slug is already in use' });
-        }
-      }
-    } catch (error) {
-      console.error('Failed to update store:', error);
-    } finally {
-      setIsSaving(false);
-    }
-  }
-
-  async function handleStatusChange(newStatus: string) {
-    setIsChangingStatus(true);
-    try {
-      await apiPatch(`/api/v1/stores/${storeId}/status`, { status: newStatus });
-      await fetchStore();
-    } finally {
-      setIsChangingStatus(false);
-    }
-  }
+  const clearFieldError = useCallback(
+    (field: keyof StoreFormErrors) => {
+      setFormErrors(prev => ({ ...prev, [field]: undefined }));
+    },
+    [setFormErrors]
+  );
 
   if (isLoading) {
-    return (
-      <AdminLayout title="Store Details" subtitle="Loading...">
-        <div className="space-y-6">
-          {/* Skeleton stat cards */}
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="force-stat-card">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 space-y-3">
-                    <div className="h-3 w-20 force-skeleton" />
-                    <div className="h-8 w-28 force-skeleton" />
-                  </div>
-                  <div className="h-12 w-12 rounded-2xl force-skeleton" />
-                </div>
-              </div>
-            ))}
-          </div>
-          {/* Skeleton content */}
-          <div className="grid gap-6 lg:grid-cols-3">
-            <div className="lg:col-span-2 rounded-xl border bg-card p-6 shadow-sm space-y-4">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="space-y-2">
-                  <div className="h-3 w-24 force-skeleton" />
-                  <div className="h-5 w-48 force-skeleton" />
-                </div>
-              ))}
-            </div>
-            <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
-              <div className="flex items-center gap-4">
-                <div className="h-12 w-12 rounded-full force-skeleton" />
-                <div className="space-y-2">
-                  <div className="h-4 w-32 force-skeleton" />
-                  <div className="h-3 w-40 force-skeleton" />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </AdminLayout>
-    );
+    return <StoreLoadingSkeleton />;
   }
 
   if (!store) {
-    const isNotFound = storeError === 'not_found';
     return (
-      <AdminLayout
-        title={isNotFound ? 'Store Not Found' : 'Error Loading Store'}
-        subtitle={
-          isNotFound
-            ? 'The requested store could not be found'
-            : 'A network error occurred while loading this store'
-        }
-      >
-        <div className="text-center py-12 space-y-4">
-          {!isNotFound && (
-            <button
-              onClick={() => {
-                setIsLoading(true);
-                fetchStore();
-              }}
-              className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors cursor-pointer"
-            >
-              Retry
-            </button>
-          )}
-          <div>
-            <Link href="/stores" className="text-primary hover:underline text-sm">
-              Back to Stores
-            </Link>
-          </div>
-        </div>
-      </AdminLayout>
+      <StoreErrorState
+        storeError={storeError}
+        onRetry={() => {
+          setIsLoading(true);
+          fetchStore();
+        }}
+      />
     );
   }
 
@@ -486,486 +82,54 @@ export default function StoreDetailPage() {
         <div className="flex gap-2">
           {!isEditing && (
             <Button size="sm" onClick={() => setIsEditing(true)}>
-              Edit Store
+              {t('editStore')}
             </Button>
           )}
         </div>
       }
     >
-      {/* Store Stats */}
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 stagger-animation">
-        {[
-          {
-            label: 'Products',
-            value: store._count?.products || 0,
-            iconBg: 'bg-info',
-            icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4',
-          },
-          {
-            label: 'Orders',
-            value: store._count?.orders || 0,
-            iconBg: 'bg-violet-500',
-            icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2',
-          },
-          {
-            label: 'Customers',
-            value: store._count?.customers || 0,
-            iconBg: 'bg-emerald-500',
-            icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z',
-          },
-          {
-            label: 'Revenue',
-            value: formatPrice(store.stats?.revenue || 0),
-            iconBg: 'bg-primary',
-            icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
-            isRevenue: true,
-          },
-        ].map((stat, index) => (
-          <div
-            key={stat.label}
-            className="force-stat-card group"
-            style={{ animationDelay: `${index * 0.08}s` }}
-          >
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <p className="text-sm font-medium text-muted-foreground">{stat.label}</p>
-                <p className="mt-2 text-3xl font-bold tracking-tight text-foreground">
-                  {stat.isRevenue ? stat.value : stat.value}
-                </p>
-              </div>
-              <div
-                className={`flex h-12 w-12 items-center justify-center rounded-2xl ${stat.iconBg} text-white shadow-lg transition-transform duration-200 group-hover:scale-110`}
-              >
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.5}
-                    d={stat.icon}
-                  />
-                </svg>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+      <StatsGrid store={store} />
 
       <div className="mt-8 grid gap-6 lg:grid-cols-3">
-        {/* Store Details */}
-        <div className="lg:col-span-2 rounded-xl border bg-card shadow-sm">
-          <div className="flex items-center justify-between border-b p-4">
-            <h2 className="font-semibold text-foreground">Store Details</h2>
-            {isEditing && (
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setIsEditing(false);
-                    setFormErrors({});
-                    if (store) {
-                      setEditForm({
-                        name: store.name,
-                        slug: store.slug,
-                        plan: store.plan,
-                        status: store.status,
-                      });
-                    }
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button size="sm" onClick={handleSave} disabled={isSaving}>
-                  {isSaving ? 'Saving...' : 'Save Changes'}
-                </Button>
-              </div>
-            )}
-          </div>
-          <div className="p-6 space-y-4">
-            {isEditing ? (
-              <>
-                <div>
-                  <Label htmlFor="name">Store Name</Label>
-                  <Input
-                    id="name"
-                    value={editForm.name}
-                    onChange={e => {
-                      setEditForm(prev => ({ ...prev, name: e.target.value }));
-                      if (formErrors.name) setFormErrors(prev => ({ ...prev, name: undefined }));
-                    }}
-                    className={`mt-1 ${formErrors.name ? 'border-destructive focus:border-destructive focus:ring-destructive' : ''}`}
-                  />
-                  {formErrors.name && (
-                    <p className="mt-1 text-sm text-destructive">{formErrors.name}</p>
-                  )}
-                </div>
-                <div>
-                  <Label htmlFor="slug">URL Slug</Label>
-                  <Input
-                    id="slug"
-                    value={editForm.slug}
-                    onChange={e => {
-                      const value = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
-                      setEditForm(prev => ({ ...prev, slug: value }));
-                      if (formErrors.slug) setFormErrors(prev => ({ ...prev, slug: undefined }));
-                    }}
-                    className={`mt-1 ${formErrors.slug ? 'border-destructive focus:border-destructive focus:ring-destructive' : ''}`}
-                    placeholder="my-store-name"
-                  />
-                  {formErrors.slug && (
-                    <p className="mt-1 text-sm text-destructive">{formErrors.slug}</p>
-                  )}
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Your store will be at: {editForm.slug || 'your-slug'}.forcemediakw.com
-                  </p>
-                </div>
-                <div>
-                  <Label htmlFor="plan">Plan</Label>
-                  <select
-                    id="plan"
-                    value={editForm.plan}
-                    onChange={e => setEditForm(prev => ({ ...prev, plan: e.target.value }))}
-                    className="mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                  >
-                    <option value="free">Free</option>
-                    <option value="starter">Starter</option>
-                    <option value="professional">Professional</option>
-                    <option value="enterprise">Enterprise</option>
-                  </select>
-                </div>
-                <div>
-                  <Label htmlFor="status">Status</Label>
-                  <select
-                    id="status"
-                    value={editForm.status}
-                    onChange={e => setEditForm(prev => ({ ...prev, status: e.target.value }))}
-                    className="mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                  >
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                    <option value="suspended">Suspended</option>
-                  </select>
-                </div>
-              </>
-            ) : (
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <p className="text-sm text-muted-foreground">Store Name</p>
-                  <p className="font-medium text-foreground">{store.name}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">URL</p>
-                  <p className="font-medium text-foreground">
-                    {store.domain || `${store.slug}.forcemediakw.com`}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Status</p>
-                  <Badge variant={statusColors[store.status]} className="mt-1">
-                    {store.status}
-                  </Badge>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Plan</p>
-                  <p className="font-medium text-foreground capitalize">{store.plan}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Created</p>
-                  <p className="font-medium text-foreground">{formatDate(store.createdAt)}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Last Updated</p>
-                  <p className="font-medium text-foreground">{formatDate(store.updatedAt)}</p>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Owner Info */}
-        <div className="rounded-xl border bg-card shadow-sm">
-          <div className="border-b p-4">
-            <h2 className="font-semibold text-foreground">Store Owner</h2>
-          </div>
-          <div className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <span className="text-lg font-bold">
-                  {store.owner.firstName[0]}
-                  {store.owner.lastName[0]}
-                </span>
-              </div>
-              <div>
-                <p className="font-medium text-foreground">
-                  {store.owner.firstName} {store.owner.lastName}
-                </p>
-                <p className="text-sm text-muted-foreground">{store.owner.email}</p>
-              </div>
-            </div>
-            <div className="mt-6 space-y-2">
-              <Link href={`/users/${store.owner.id}`}>
-                <Button variant="outline" size="sm" className="w-full">
-                  View Profile
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </div>
+        <StoreDetailsCard
+          store={store}
+          isEditing={isEditing}
+          isSaving={isSaving}
+          editForm={editForm}
+          formErrors={formErrors}
+          onChangeForm={setEditForm}
+          onClearFieldError={clearFieldError}
+          onSave={() => handleSave(translateError)}
+          onCancel={() => {
+            setIsEditing(false);
+            resetEditForm();
+          }}
+        />
+        <StoreOwnerCard owner={store.owner} />
       </div>
 
-      {/* Domain Management */}
       <DomainSection storeId={store.id} domain={store.domain} onDomainChange={fetchStore} />
 
-      {/* Quick Actions */}
-      <div className="mt-8">
-        <h2 className="mb-4 font-semibold text-foreground">Quick Actions</h2>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {store.status === 'active' ? (
-            <button
-              disabled={isChangingStatus}
-              onClick={() => setShowSuspendModal(true)}
-              className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm transition-all duration-200 hover:border-destructive/40 hover:shadow-md cursor-pointer text-left disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-destructive/10">
-                {isChangingStatus ? (
-                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-destructive/40 border-t-red-600" />
-                ) : (
-                  <svg
-                    className="h-5 w-5 text-destructive"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
-                    />
-                  </svg>
-                )}
-              </div>
-              <div>
-                <p className="font-medium text-foreground">Suspend Store</p>
-                <p className="text-xs text-muted-foreground">Temporarily disable access</p>
-              </div>
-            </button>
-          ) : (
-            <button
-              disabled={isChangingStatus}
-              onClick={() => handleStatusChange('active')}
-              className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm transition-all duration-200 hover:border-success/40 hover:shadow-md cursor-pointer text-left disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success/10">
-                {isChangingStatus ? (
-                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-success/40 border-t-green-600" />
-                ) : (
-                  <svg
-                    className="h-5 w-5 text-success"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                )}
-              </div>
-              <div>
-                <p className="font-medium text-foreground">Activate Store</p>
-                <p className="text-xs text-muted-foreground">Enable store access</p>
-              </div>
-            </button>
-          )}
+      <QuickActions
+        store={store}
+        isSuperAdmin={isSuperAdmin}
+        isChangingStatus={isChangingStatus}
+        onRequestSuspend={() => setShowSuspendModal(true)}
+        onActivate={() => handleStatusChange('active')}
+      />
 
-          <Link
-            href={`/stores/${store.id}/products`}
-            className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm transition-all duration-200 hover:border-primary hover:shadow-md cursor-pointer"
-          >
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-info/10">
-              <svg
-                className="h-5 w-5 text-info"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                />
-              </svg>
-            </div>
-            <div>
-              <p className="font-medium text-foreground">View Products</p>
-              <p className="text-xs text-muted-foreground">
-                {store._count?.products || 0} products
-              </p>
-            </div>
-          </Link>
+      <SettingsLink storeId={store.id} />
 
-          <Link
-            href={`/stores/${store.id}/orders`}
-            className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm transition-all duration-200 hover:border-primary hover:shadow-md cursor-pointer"
-          >
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-info/10">
-              <svg
-                className="h-5 w-5 text-info"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                />
-              </svg>
-            </div>
-            <div>
-              <p className="font-medium text-foreground">View Orders</p>
-              <p className="text-xs text-muted-foreground">{store._count?.orders || 0} orders</p>
-            </div>
-          </Link>
-
-          <Link
-            href={`/stores/${store.id}/analytics`}
-            className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm transition-all duration-200 hover:border-primary hover:shadow-md cursor-pointer"
-          >
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success/10">
-              <svg
-                className="h-5 w-5 text-success"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                />
-              </svg>
-            </div>
-            <div>
-              <p className="font-medium text-foreground">Analytics</p>
-              <p className="text-xs text-muted-foreground">View store metrics</p>
-            </div>
-          </Link>
-
-          {isSuperAdmin && (
-            <Link
-              href={`/stores/${store.id}/features`}
-              className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm transition-all duration-200 hover:border-primary hover:shadow-md cursor-pointer"
-            >
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-100">
-                <svg
-                  className="h-5 w-5 text-indigo-600"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 6h16M4 10h16M4 14h16M4 18h16"
-                  />
-                </svg>
-              </div>
-              <div>
-                <p className="font-medium text-foreground">Manage Features</p>
-                <p className="text-xs text-muted-foreground">Toggle store capabilities</p>
-              </div>
-            </Link>
-          )}
-        </div>
-      </div>
-
-      {/* Settings - single link to settings hub */}
-      <div className="mt-8">
-        <Link
-          href={`/stores/${store.id}/settings`}
-          className="flex items-center justify-between rounded-xl border bg-card p-5 shadow-sm transition hover:border-primary hover:shadow-md group"
-        >
-          <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted transition-transform group-hover:scale-110">
-              <svg
-                className="h-6 w-6 text-muted-foreground"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                />
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                />
-              </svg>
-            </div>
-            <div>
-              <p className="font-semibold text-foreground group-hover:text-primary transition-colors">
-                Settings & Configuration
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Branding, SEO, shipping, tax, payments, PWA, and more
-              </p>
-            </div>
-          </div>
-          <svg
-            className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        </Link>
-      </div>
-
-      {/* Suspend Store Confirmation Modal */}
-      <Modal
+      <SuspendStoreModal
         isOpen={showSuspendModal}
+        storeName={store.name}
+        isChangingStatus={isChangingStatus}
         onClose={() => setShowSuspendModal(false)}
-        title="Suspend Store"
-      >
-        <p className="text-sm text-muted-foreground">
-          Are you sure you want to suspend <strong>{store.name}</strong>? This will disable customer
-          access to the store.
-        </p>
-        <div className="mt-6 flex justify-end gap-3">
-          <Button
-            variant="outline"
-            onClick={() => setShowSuspendModal(false)}
-            disabled={isChangingStatus}
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="destructive"
-            onClick={() => {
-              setShowSuspendModal(false);
-              handleStatusChange('suspended');
-            }}
-            disabled={isChangingStatus}
-          >
-            {isChangingStatus ? 'Suspending...' : 'Suspend Store'}
-          </Button>
-        </div>
-      </Modal>
+        onConfirm={() => {
+          setShowSuspendModal(false);
+          handleStatusChange('suspended');
+        }}
+      />
     </AdminLayout>
   );
 }
