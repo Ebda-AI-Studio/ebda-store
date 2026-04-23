@@ -617,7 +617,110 @@
       "standardDescription": "are calculated only on the original subtotal."
     }
   },
-  "inventory": {},
+  "inventory": {
+    "page": {
+      "title": "Inventory Management",
+      "subtitle": "Track and manage your product stock levels"
+    },
+    "stats": {
+      "totalProducts": "Total Products",
+      "totalStock": "Total Stock",
+      "lowStock": "Low Stock",
+      "outOfStock": "Out of Stock",
+      "stockValue": "Stock Value",
+      "kwdValue": "{value} KWD"
+    },
+    "alertBanner": {
+      "needAttention": "{count, plural, =1 {# product needs attention} other {# products need attention}}",
+      "breakdown": "{out} out of stock, {low} low stock",
+      "viewAlerts": "View Alerts"
+    },
+    "tabs": {
+      "products": "Products",
+      "history": "History",
+      "alerts": "Alerts"
+    },
+    "status": {
+      "in_stock": "In Stock",
+      "low_stock": "Low Stock",
+      "out_of_stock": "Out of Stock"
+    },
+    "levels": {
+      "searchPlaceholder": "Search products...",
+      "tableLabel": "Product inventory",
+      "empty": "No products found",
+      "adjustAction": "Adjust",
+      "kwdValue": "{value} KWD",
+      "filters": {
+        "all": "All"
+      },
+      "columns": {
+        "product": "Product",
+        "sku": "SKU",
+        "stock": "Stock",
+        "threshold": "Threshold",
+        "status": "Status",
+        "value": "Value",
+        "actions": "Actions"
+      }
+    },
+    "history": {
+      "tableLabel": "Inventory history",
+      "empty": "No inventory history yet",
+      "columns": {
+        "date": "Date",
+        "product": "Product",
+        "type": "Type",
+        "change": "Change",
+        "stock": "Stock",
+        "reason": "Reason"
+      }
+    },
+    "historyTypes": {
+      "manual_add": "Added",
+      "manual_remove": "Removed",
+      "sale": "Sale",
+      "return_stock": "Returned",
+      "adjustment": "Adjusted",
+      "damage": "Damaged",
+      "transfer_in": "Transfer In",
+      "transfer_out": "Transfer Out",
+      "initial": "Initial"
+    },
+    "alertsTab": {
+      "tableLabel": "Low stock and out of stock",
+      "emptyTitle": "All Good!",
+      "emptySubtitle": "No low stock or out of stock products",
+      "restockAction": "Restock",
+      "columns": {
+        "product": "Product",
+        "sku": "SKU",
+        "currentStock": "Current Stock",
+        "threshold": "Threshold",
+        "status": "Status",
+        "actions": "Actions"
+      }
+    },
+    "adjust": {
+      "title": "Adjust Inventory",
+      "close": "Close",
+      "currentStock": "Current stock: {count}",
+      "typeLabel": "Adjustment Type",
+      "quantityLabel": "Quantity",
+      "quantityPlaceholder": "Enter quantity",
+      "newStockPreview": "New stock will be:",
+      "reasonLabel": "Reason",
+      "reasonPlaceholder": "Optional reason for adjustment",
+      "cancel": "Cancel",
+      "apply": "Apply"
+    },
+    "adjustTypes": {
+      "manual_add": "Add Stock",
+      "manual_remove": "Remove Stock",
+      "damage": "Damaged",
+      "adjustment": "Adjustment"
+    }
+  },
   "pwa": {},
   "affiliates": {},
   "bulk": {},
