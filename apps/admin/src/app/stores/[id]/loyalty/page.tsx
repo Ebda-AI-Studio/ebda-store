@@ -76,7 +76,6 @@ export default function LoyaltySettingsPage() {
   const params = useParams();
   const storeId = params.id as string;
 
-  const [_storeName, setStoreName] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [loyaltyEnabled, setLoyaltyEnabled] = useState(false);
@@ -92,13 +91,6 @@ export default function LoyaltySettingsPage() {
   const [awardReason, setAwardReason] = useState('');
   const [showDisableConfirm, setShowDisableConfirm] = useState(false);
   const { success: toastSuccess, error: showError } = useToast();
-
-  const fetchStoreName = useCallback(async () => {
-    const { data } = await apiGet<{ store: { name: string } }>(`/api/v1/stores/${storeId}`);
-    if (data) {
-      setStoreName(data.store?.name || '');
-    }
-  }, [storeId]);
 
   const fetchSettings = useCallback(async () => {
     const { data } = await apiGet<{ loyaltyEnabled: boolean; settings: LoyaltySettings }>(
@@ -131,9 +123,9 @@ export default function LoyaltySettingsPage() {
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
-    await Promise.all([fetchStoreName(), fetchSettings(), fetchStats(), fetchMembers()]);
+    await Promise.all([fetchSettings(), fetchStats(), fetchMembers()]);
     setLoading(false);
-  }, [fetchStoreName, fetchSettings, fetchStats, fetchMembers]);
+  }, [fetchSettings, fetchStats, fetchMembers]);
 
   useEffect(() => {
     fetchAll();

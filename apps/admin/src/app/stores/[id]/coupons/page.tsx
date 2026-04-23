@@ -34,7 +34,6 @@ export default function CouponsPage() {
   const [editingCoupon, setEditingCoupon] = useState<Coupon | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterActive, setFilterActive] = useState<'all' | 'active' | 'inactive'>('all');
-  const [_storeName, setStoreName] = useState('');
 
   // Form state
   const [formData, setFormData] = useState({
@@ -55,15 +54,7 @@ export default function CouponsPage() {
 
   useEffect(() => {
     fetchCoupons();
-    fetchStoreName();
   }, [storeId]);
-
-  async function fetchStoreName() {
-    const { data } = await apiGet<{ store: { name: string } }>(`/api/v1/stores/${storeId}`);
-    if (data) {
-      setStoreName(data.store.name);
-    }
-  }
 
   async function fetchCoupons() {
     try {

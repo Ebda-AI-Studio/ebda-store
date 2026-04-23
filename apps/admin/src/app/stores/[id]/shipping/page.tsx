@@ -59,20 +59,12 @@ export default function ShippingSettingsPage() {
   const storeId = params.id as string;
 
   const [zones, setZones] = useState<ShippingZone[]>([]);
-  const [_storeName, setStoreName] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editingZone, setEditingZone] = useState<ShippingZone | null>(null);
   const [formData, setFormData] = useState<ZoneFormData>(DEFAULT_FORM);
   const [filter, setFilter] = useState<'all' | 'active' | 'inactive'>('all');
-
-  const fetchStoreName = useCallback(async () => {
-    const { data } = await apiGet<{ store: { name: string } }>(`/api/v1/stores/${storeId}`);
-    if (data) {
-      setStoreName(data.store?.name || '');
-    }
-  }, [storeId]);
 
   const fetchZones = useCallback(async () => {
     try {
@@ -95,7 +87,6 @@ export default function ShippingSettingsPage() {
   }, [storeId, filter]);
 
   useEffect(() => {
-    fetchStoreName();
     fetchZones();
   }, [storeId, filter]);
 

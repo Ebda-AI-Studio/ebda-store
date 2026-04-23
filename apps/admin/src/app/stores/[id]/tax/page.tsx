@@ -63,7 +63,6 @@ export default function TaxSettingsPage() {
     defaultTaxRate: null,
   });
   const [rates, setRates] = useState<TaxRate[]>([]);
-  const [_storeName, setStoreName] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
@@ -71,13 +70,6 @@ export default function TaxSettingsPage() {
   const [editingRate, setEditingRate] = useState<TaxRate | null>(null);
   const [formData, setFormData] = useState<RateFormData>(DEFAULT_FORM);
   const [filter, setFilter] = useState<'all' | 'active' | 'inactive'>('all');
-
-  const fetchStoreName = useCallback(async () => {
-    const { data } = await apiGet<{ store: { name: string } }>(`/api/v1/stores/${storeId}`);
-    if (data) {
-      setStoreName(data.store?.name || '');
-    }
-  }, [storeId]);
 
   const fetchSettings = useCallback(async () => {
     const { data } = await apiGet<{ settings: TaxSettings }>(
@@ -118,9 +110,9 @@ export default function TaxSettingsPage() {
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
-    await Promise.all([fetchStoreName(), fetchSettings(), fetchRates()]);
+    await Promise.all([fetchSettings(), fetchRates()]);
     setLoading(false);
-  }, [fetchStoreName, fetchSettings, fetchRates]);
+  }, [fetchSettings, fetchRates]);
 
   useEffect(() => {
     fetchAll();

@@ -5,22 +5,13 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button, Input, useToast } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
-import { apiGet, apiPut } from '../../../../lib/api';
+import { apiPut } from '../../../../lib/api';
+import { useCurrentStore } from '../../../../hooks/useCurrentStore';
 
 interface NavItem {
   label: string;
   labelAr?: string;
   href: string;
-}
-
-interface StoreSettingsResponse {
-  store: {
-    id: string;
-    settings?: {
-      navMenu?: unknown;
-      [key: string]: unknown;
-    } | null;
-  };
 }
 
 const DEFAULT_MENU: NavItem[] = [
@@ -56,27 +47,27 @@ export default function StoreNavigationPage() {
   const storeId = params?.id as string;
   const toast = useToast();
 
+  const { store, isLoading, error: fetchError } = useCurrentStore(storeId);
   const [items, setItems] = useState<NavItem[]>([]);
-  const [existingSettings, setExistingSettings] = useState<Record<string, unknown>>({});
-  const [isLoading, setIsLoading] = useState(true);
+  const [itemsHydrated, setItemsHydrated] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
+  const existingSettings = (store?.settings ?? {}) as Record<string, unknown>;
+
+  // Hydrate the editor's local list from the store's saved navMenu the first
+  // time the hook resolves. Subsequent refetches (e.g. after save) shouldn't
+  // blow away local edits, hence the one-shot guard.
   useEffect(() => {
-    async function load() {
-      const { data, error } = await apiGet<StoreSettingsResponse>(`/api/v1/stores/${storeId}`);
-      if (error) {
-        toast.error('Failed to load', error.message);
-        setIsLoading(false);
-        return;
-      }
-      const settings = (data?.store?.settings ?? {}) as Record<string, unknown>;
-      setExistingSettings(settings);
-      const current = sanitize(settings.navMenu);
-      setItems(current.length > 0 ? current : DEFAULT_MENU);
-      setIsLoading(false);
-    }
-    if (storeId) load();
-  }, [storeId, toast]);
+    if (itemsHydrated) return;
+    if (!store) return;
+    const current = sanitize(existingSettings.navMenu);
+    setItems(current.length > 0 ? current : DEFAULT_MENU);
+    setItemsHydrated(true);
+  }, [store, existingSettings, itemsHydrated]);
+
+  useEffect(() => {
+    if (fetchError) toast.error('Failed to load', fetchError.message);
+  }, [fetchError, toast]);
 
   function update(index: number, field: keyof NavItem, value: string) {
     setItems(prev => prev.map((it, i) => (i === index ? { ...it, [field]: value } : it)));

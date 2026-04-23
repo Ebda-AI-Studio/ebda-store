@@ -57,7 +57,6 @@ export default function InventoryPage() {
   const params = useParams();
   const storeId = params.id as string;
 
-  const [_storeName, setStoreName] = useState('');
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<InventoryStats | null>(null);
   const [products, setProducts] = useState<ProductInventory[]>([]);
@@ -77,13 +76,6 @@ export default function InventoryPage() {
   const [adjustQuantity, setAdjustQuantity] = useState('');
   const [adjustReason, setAdjustReason] = useState('');
   const [saving, setSaving] = useState(false);
-
-  const fetchStoreName = useCallback(async () => {
-    const { data } = await apiGet<{ store: { name: string } }>(`/api/v1/stores/${storeId}`);
-    if (data) {
-      setStoreName(data.store?.name || '');
-    }
-  }, [storeId]);
 
   const fetchStats = useCallback(async () => {
     const { data } = await apiGet<{ stats: InventoryStats }>(
@@ -129,15 +121,9 @@ export default function InventoryPage() {
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
-    await Promise.all([
-      fetchStoreName(),
-      fetchStats(),
-      fetchProducts(),
-      fetchHistory(),
-      fetchAlerts(),
-    ]);
+    await Promise.all([fetchStats(), fetchProducts(), fetchHistory(), fetchAlerts()]);
     setLoading(false);
-  }, [fetchStoreName, fetchStats, fetchProducts, fetchHistory, fetchAlerts]);
+  }, [fetchStats, fetchProducts, fetchHistory, fetchAlerts]);
 
   useEffect(() => {
     fetchAll();
