@@ -134,7 +134,74 @@
       }
     }
   },
-  "products": {},
+  "products": {
+    "list": {
+      "title": "Products - {storeName}",
+      "subtitle": "Manage products for {storeName}",
+      "loading": "Loading...",
+      "fallbackStore": "Store",
+      "fallbackThisStore": "this store",
+      "toolbar": {
+        "addProduct": "Add Product",
+        "bulkImport": "Bulk Import",
+        "backToStore": "Back to Store"
+      },
+      "filters": {
+        "searchPlaceholder": "Search products...",
+        "all": "All",
+        "active": "Active",
+        "draft": "Draft",
+        "archived": "Archived"
+      },
+      "status": {
+        "active": "Active",
+        "draft": "Draft",
+        "archived": "Archived"
+      },
+      "table": {
+        "label": "Products",
+        "loadingLabel": "Products (loading)",
+        "product": "Product",
+        "sku": "SKU",
+        "price": "Price",
+        "inventory": "Inventory",
+        "status": "Status",
+        "actions": "Actions",
+        "hasVariants": "Has variants"
+      },
+      "actions": {
+        "variants": "Variants",
+        "edit": "Edit",
+        "view": "View",
+        "delete": "Delete"
+      },
+      "empty": {
+        "title": "No products found",
+        "description": "Add your first product to get started.",
+        "descriptionFiltered": "Try adjusting your search or filters.",
+        "addProduct": "Add Product"
+      },
+      "pagination": {
+        "showing": "Showing {from} to {to} of {total} products",
+        "previous": "Previous",
+        "next": "Next"
+      },
+      "deleteModal": {
+        "title": "Delete Product",
+        "messageBefore": "Are you sure you want to delete",
+        "messageAfter": "? This action cannot be undone.",
+        "cancel": "Cancel",
+        "confirm": "Delete Product",
+        "deleting": "Deleting..."
+      },
+      "toast": {
+        "deletedTitle": "Product deleted",
+        "deletedDescription": "{name} has been deleted.",
+        "deleteFailedTitle": "Delete failed",
+        "deleteFailedDescription": "Failed to delete the product. Please try again."
+      }
+    }
+  },
   "orders": {},
   "customers": {},
   "analytics": {},
