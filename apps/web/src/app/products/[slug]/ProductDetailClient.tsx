@@ -14,6 +14,8 @@ import { ShopChrome } from '../../../components';
 import { useLanguage, translations } from '../../../contexts/LanguageContext';
 import { trackViewContent, trackAddToCart } from '../../../components/MarketingPixels';
 import { VariantSelector } from '../../../components/VariantSelector';
+import { useTemplateComponents } from '../../../hooks/useTemplateComponents';
+import { toTemplateProduct } from '../../../templates/adapters';
 import { formatPrice } from '@/lib/format';
 
 // Lazy-load heavy below-the-fold components to reduce initial bundle size
@@ -72,6 +74,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
   const { addItem } = useCart();
   const { store } = useStore();
   const storeUrl = useStoreUrl();
+  const { components: T, isLoading: templateLoading } = useTemplateComponents();
   const { isEnabled } = useFeatures();
   const { language, t } = useLanguage();
 
@@ -492,57 +495,18 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
         )}
 
         {/* Related Products */}
-        {relatedProducts.length > 0 && (
+        {relatedProducts.length > 0 && T && !templateLoading && (
           <div className="mt-16">
-            <h2 className="text-2xl font-bold text-foreground">
+            <h2 className="text-2xl font-bold text-foreground mb-6">
               {t('Related Products', 'منتجات ذات صلة')}
             </h2>
-            <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-3">
-              {relatedProducts.map(item => (
-                <Link
-                  key={item.id}
-                  href={storeUrl(`/products/${item.slug}`)}
-                  className="group rounded-2xl border border-border bg-card p-4 shadow-sm transition hover:shadow-lg"
-                >
-                  <div className="aspect-square overflow-hidden rounded-lg bg-gradient-to-br from-primary/5 to-primary/10">
-                    {item.images?.[0]?.url ? (
-                      <Image
-                        src={item.images[0].url}
-                        alt={item.name}
-                        width={500}
-                        height={500}
-                        className="h-full w-full object-cover group-hover:scale-105 transition-transform"
-                        sizes="(max-width: 640px) 100vw, 33vw"
-                      />
-                    ) : (
-                      <div className="flex h-full items-center justify-center">
-                        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/20">
-                          <svg
-                            className="h-8 w-8 text-primary"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={1.5}
-                              d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                            />
-                          </svg>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  <div className="mt-4">
-                    <h3 className="mt-1 font-medium text-foreground group-hover:text-primary">
-                      {item.name}
-                    </h3>
-                    <p className="mt-2 font-bold text-primary">{formatPrice(item.price)}</p>
-                  </div>
-                </Link>
-              ))}
-            </div>
+            <T.ProductGrid
+              products={relatedProducts.map(toTemplateProduct)}
+              isRtl={language === 'ar'}
+              currency={store.currency}
+              columns={3}
+              urlPrefix={storeUrl('')}
+            />
           </div>
         )}
       </div>

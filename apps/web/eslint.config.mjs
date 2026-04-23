@@ -36,11 +36,40 @@ export default [
       "react/no-unescaped-entities": "off",
       "@typescript-eslint/no-explicit-any": "warn",
       "@typescript-eslint/no-unused-vars": "warn",
+      // Block hardcoded Tailwind semantic colors inside page/component source
+      // so storefront pages honor the tenant's theme via design tokens
+      // (bg-primary / bg-destructive / bg-muted / text-foreground / etc.).
+      // Templates under src/templates may intentionally use gray-950 / etc.
+      // for their built-in aesthetic — see the overrides block below.
+      "no-restricted-syntax": [
+        "warn",
+        {
+          selector:
+            "Literal[value=/bg-(red|green|blue|yellow|orange|purple|pink|indigo)-[0-9]/]",
+          message:
+            "Use design tokens (bg-primary / bg-destructive / bg-success / etc.) instead of hardcoded Tailwind colors. Storefront pages must honor the tenant's theme.",
+        },
+        {
+          selector:
+            "Literal[value=/text-(red|green|blue|yellow|orange|purple|pink|indigo)-[0-9]/]",
+          message:
+            "Use design tokens (text-primary / text-destructive / etc.) instead of hardcoded Tailwind colors.",
+        },
+      ],
     },
     settings: {
       react: {
         version: "detect",
       },
+    },
+  },
+  {
+    // Templates intentionally use bespoke colors (bold = gray-950, modern
+    // header uses gray-900 backdrop, etc.) to express their own aesthetic;
+    // don't block hardcoded colors there.
+    files: ["src/templates/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-syntax": "off",
     },
   },
 ];

@@ -3,12 +3,14 @@
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import Image from 'next/image';
 import { api, type Category, type Product } from '@/lib/api';
 import { Select } from '@force/ui';
 import { ShopChrome } from '../../components';
-import { useStoreUrl } from '../../contexts/StoreContext';
+import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
+import { useCart } from '../../contexts/CartContext';
+import { useTemplateComponents } from '../../hooks/useTemplateComponents';
+import { toTemplateProduct } from '../../templates/adapters';
 import { trackSearch } from '../../components/MarketingPixels';
 
 const sortValues = ['newest', 'price-asc', 'price-desc', 'name-asc'] as const;
@@ -64,8 +66,33 @@ function sortProducts(products: Product[], sortBy: SortValue): Product[] {
 function SearchContent() {
   const router = useRouter();
   const storeUrl = useStoreUrl();
-  const { t } = useLanguage();
+  const { store } = useStore();
+  const { t, language } = useLanguage();
+  const { addItem, items: cartItems } = useCart();
+  const { components: T, isLoading: templateLoading } = useTemplateComponents();
   const searchParams = useSearchParams();
+  const isRtl = language === 'ar';
+  const urlPrefix = storeUrl('');
+
+  const cartQuantities: Record<string, number> = {};
+  for (const item of cartItems) {
+    cartQuantities[item.productId] = item.quantity;
+  }
+
+  const handleAddToCart = async (productId: string) => {
+    const product = allProducts.find(p => p.id === productId);
+    if (!product) return;
+    await addItem(
+      {
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        slug: product.slug,
+        image: product.images?.[0]?.url,
+      },
+      1
+    );
+  };
 
   // Derive initial values from URL params for shareability
   const committedQuery = searchParams?.get('q') || '';
@@ -312,70 +339,29 @@ function SearchContent() {
                 </>
               )}
             </p>
-            <div role="list" className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {products.map(product => (
-                <div key={product.id} role="listitem">
-                  <Link
-                    href={storeUrl(`/products/${product.slug}`)}
-                    className="group rounded-2xl border border-border bg-card overflow-hidden hover:shadow-lg transition-shadow block"
-                  >
-                    <div className="aspect-square bg-gradient-to-br from-primary/5 to-primary/10 relative overflow-hidden">
-                      {product.images?.[0]?.url ? (
-                        <Image
-                          src={product.images[0].url}
-                          alt={product.images[0].alt || product.name}
-                          width={500}
-                          height={500}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                          sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                          <svg
-                            className="w-12 h-12"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={1.5}
-                              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                            />
-                          </svg>
-                        </div>
-                      )}
-                      {product.compareAtPrice && product.compareAtPrice > product.price && (
-                        <span className="absolute top-2 left-2 rounded-full bg-destructive px-2 py-0.5 text-[10px] font-bold uppercase text-white">
-                          Sale
-                        </span>
-                      )}
+            {T && !templateLoading ? (
+              <T.ProductGrid
+                products={products.map(toTemplateProduct)}
+                isRtl={isRtl}
+                currency={store.currency}
+                columns={4}
+                cartQuantities={cartQuantities}
+                onAddToCart={handleAddToCart}
+                urlPrefix={urlPrefix}
+              />
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                {products.map(p => (
+                  <div key={p.id} className="animate-pulse rounded-xl border bg-card">
+                    <div className="aspect-square bg-muted rounded-t-xl" />
+                    <div className="p-4 space-y-2">
+                      <div className="h-4 w-3/4 bg-muted rounded" />
+                      <div className="h-5 w-1/2 bg-muted rounded" />
                     </div>
-                    <div className="p-4">
-                      {product.categories?.[0] && (
-                        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">
-                          {product.categories[0].category?.name}
-                        </p>
-                      )}
-                      <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors line-clamp-2">
-                        {product.name}
-                      </h3>
-                      <div className="mt-2 flex items-center gap-2">
-                        <span className="font-bold text-lg text-primary">
-                          {(product.price / 1000).toFixed(3)} KWD
-                        </span>
-                        {product.compareAtPrice && product.compareAtPrice > product.price && (
-                          <span className="text-muted-foreground line-through text-sm">
-                            {(product.compareAtPrice / 1000).toFixed(3)} KWD
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </Link>
-                </div>
-              ))}
-            </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </>
         )}
 

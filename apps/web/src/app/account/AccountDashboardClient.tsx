@@ -164,9 +164,9 @@ export default function AccountDashboardClient() {
 
         <div className="rounded-xl border bg-card p-6 shadow-sm">
           <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-purple-100">
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
               <svg
-                className="h-6 w-6 text-purple-600"
+                className="h-6 w-6 text-primary"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
