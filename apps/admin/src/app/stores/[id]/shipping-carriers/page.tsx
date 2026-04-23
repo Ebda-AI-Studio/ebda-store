@@ -6,9 +6,9 @@ import { useToast } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPut, apiPost } from '../../../../lib/api';
 import { useFeatures } from '../../../../hooks/useFeatures';
+import { Toggle } from '../../../../components/Toggle';
+import { ConnectionStatus } from '../../../../components/ConnectionStatus';
 import { ShipmentStatusBadge } from './components/ShipmentStatusBadge';
-import { Toggle } from './components/Toggle';
-import { ConnectionStatus } from './components/ConnectionStatus';
 import {
   PickupAddressForm,
   DEFAULT_PICKUP,

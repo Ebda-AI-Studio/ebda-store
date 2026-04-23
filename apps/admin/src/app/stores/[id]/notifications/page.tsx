@@ -4,8 +4,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { Button, useToast } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { Toggle } from '../../../../components/Toggle';
+import { ConnectionStatus } from '../../../../components/ConnectionStatus';
 import { apiGet, apiPut, apiPost } from '../../../../lib/api';
 import { useFeatures } from '../../../../hooks/useFeatures';
+import { NotificationStatusBadge } from './components/NotificationStatusBadge';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -110,90 +113,6 @@ const DEFAULT_EVENTS: EventConfig[] = [
     push_notifications: false,
   },
 ];
-
-// ─── Status Badge ─────────────────────────────────────────────────────────────
-
-function StatusBadge({ status }: { status: string }) {
-  const colors: Record<string, string> = {
-    sent: 'bg-[hsl(var(--success)/0.1)] text-[hsl(var(--success))]',
-    delivered: 'bg-[hsl(var(--success)/0.1)] text-[hsl(var(--success))]',
-    failed: 'bg-destructive/10 text-destructive',
-    pending: 'bg-muted text-muted-foreground',
-    queued: 'bg-primary/10 text-primary',
-  };
-  const cls = colors[status] || 'bg-muted text-foreground';
-  return (
-    <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${cls}`}>
-      {status}
-    </span>
-  );
-}
-
-// ─── Toggle ───────────────────────────────────────────────────────────────────
-
-function Toggle({
-  checked,
-  onChange,
-  disabled,
-}: {
-  checked: boolean;
-  onChange: (val: boolean) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      onClick={() => !disabled && onChange(!checked)}
-      disabled={disabled}
-      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 ${
-        checked ? 'bg-primary' : 'bg-muted'
-      }`}
-    >
-      <span
-        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
-          checked ? 'translate-x-6' : 'translate-x-1'
-        }`}
-      />
-    </button>
-  );
-}
-
-// ─── Connection Status ────────────────────────────────────────────────────────
-
-function ConnectionStatus({ status }: { status: 'idle' | 'testing' | 'success' | 'error' }) {
-  if (status === 'idle') return null;
-  if (status === 'testing')
-    return (
-      <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
-        <span className="animate-spin inline-block h-3 w-3 border-2 border-current border-t-transparent rounded-full" />
-        Testing…
-      </span>
-    );
-  if (status === 'success')
-    return (
-      <span className="flex items-center gap-1.5 text-sm text-[hsl(var(--success))]">
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-        </svg>
-        Connected
-      </span>
-    );
-  return (
-    <span className="flex items-center gap-1.5 text-sm text-destructive">
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M6 18L18 6M6 6l12 12"
-        />
-      </svg>
-      Failed
-    </span>
-  );
-}
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
@@ -875,7 +794,7 @@ export default function NotificationsPage() {
                             {log.recipient || '—'}
                           </td>
                           <td className="px-6 py-3">
-                            <StatusBadge status={log.status} />
+                            <NotificationStatusBadge status={log.status} />
                             {log.error && (
                               <p
                                 className="text-xs text-destructive mt-1 truncate max-w-[200px]"
