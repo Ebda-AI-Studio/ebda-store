@@ -6,15 +6,16 @@ import { useToast } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPut, apiPost } from '../../../../lib/api';
 import { useFeatures } from '../../../../hooks/useFeatures';
+import { ShipmentStatusBadge } from './components/ShipmentStatusBadge';
+import { Toggle } from './components/Toggle';
+import { ConnectionStatus } from './components/ConnectionStatus';
+import {
+  PickupAddressForm,
+  DEFAULT_PICKUP,
+  type PickupAddress,
+} from './components/PickupAddressForm';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-interface PickupAddress {
-  area: string;
-  block: string;
-  street: string;
-  building: string;
-}
 
 interface ICarryConfig {
   enabled: boolean;
@@ -57,8 +58,6 @@ interface ShipmentsData {
   limit: number;
 }
 
-const DEFAULT_PICKUP: PickupAddress = { area: '', block: '', street: '', building: '' };
-
 const DEFAULT_CONFIGS: CarrierConfigs = {
   icarry: {
     enabled: false,
@@ -79,161 +78,6 @@ const DEFAULT_CONFIGS: CarrierConfigs = {
     pickup: { ...DEFAULT_PICKUP },
   },
 };
-
-// ─── Status Badge ─────────────────────────────────────────────────────────────
-
-function ShipmentStatusBadge({ status }: { status: string }) {
-  const colors: Record<string, string> = {
-    created: 'bg-muted text-foreground',
-    picked_up: 'bg-info/10 text-info dark:bg-info/30 dark:text-info',
-    in_transit: 'bg-warning/10 text-warning dark:bg-warning/30 dark:text-warning',
-    out_for_delivery: 'bg-primary/10 text-primary',
-    delivered: 'bg-success/10 text-success dark:bg-success/30 dark:text-success',
-    failed: 'bg-destructive/10 text-destructive dark:bg-destructive/30/30 dark:text-destructive',
-    returned: 'bg-info/10 text-info dark:bg-info/30 dark:text-info',
-    cancelled: 'bg-muted text-muted-foreground',
-  };
-  const labels: Record<string, string> = {
-    created: 'Created',
-    picked_up: 'Picked Up',
-    in_transit: 'In Transit',
-    out_for_delivery: 'Out for Delivery',
-    delivered: 'Delivered',
-    failed: 'Failed',
-    returned: 'Returned',
-    cancelled: 'Cancelled',
-  };
-  const cls = colors[status] || 'bg-muted text-foreground';
-  return (
-    <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${cls}`}>
-      {labels[status] || status}
-    </span>
-  );
-}
-
-// ─── Toggle ───────────────────────────────────────────────────────────────────
-
-function Toggle({
-  checked,
-  onChange,
-  disabled,
-}: {
-  checked: boolean;
-  onChange: (val: boolean) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      onClick={() => !disabled && onChange(!checked)}
-      disabled={disabled}
-      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 ${
-        checked ? 'bg-primary' : 'bg-muted'
-      }`}
-    >
-      <span
-        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
-          checked ? 'translate-x-6' : 'translate-x-1'
-        }`}
-      />
-    </button>
-  );
-}
-
-// ─── Connection Status ────────────────────────────────────────────────────────
-
-function ConnectionStatus({ status }: { status: 'idle' | 'testing' | 'success' | 'error' }) {
-  if (status === 'idle') return null;
-  if (status === 'testing')
-    return (
-      <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
-        <span className="animate-spin inline-block h-3 w-3 border-2 border-current border-t-transparent rounded-full" />
-        Testing…
-      </span>
-    );
-  if (status === 'success')
-    return (
-      <span className="flex items-center gap-1.5 text-sm text-success">
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-        </svg>
-        Connected
-      </span>
-    );
-  return (
-    <span className="flex items-center gap-1.5 text-sm text-destructive">
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M6 18L18 6M6 6l12 12"
-        />
-      </svg>
-      Failed
-    </span>
-  );
-}
-
-// ─── Pickup Address Form ──────────────────────────────────────────────────────
-
-function PickupAddressForm({
-  value,
-  onChange,
-}: {
-  value: PickupAddress;
-  onChange: (patch: Partial<PickupAddress>) => void;
-}) {
-  return (
-    <div className="border border-border rounded-lg p-4 mt-4">
-      <h4 className="text-sm font-medium text-foreground mb-3">Pickup Address</h4>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div>
-          <label className="block text-xs text-muted-foreground mb-1">Area</label>
-          <input
-            type="text"
-            value={value.area}
-            onChange={e => onChange({ area: e.target.value })}
-            placeholder="e.g. Salmiya"
-            className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
-          />
-        </div>
-        <div>
-          <label className="block text-xs text-muted-foreground mb-1">Block</label>
-          <input
-            type="text"
-            value={value.block}
-            onChange={e => onChange({ block: e.target.value })}
-            placeholder="e.g. 12"
-            className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
-          />
-        </div>
-        <div>
-          <label className="block text-xs text-muted-foreground mb-1">Street</label>
-          <input
-            type="text"
-            value={value.street}
-            onChange={e => onChange({ street: e.target.value })}
-            placeholder="e.g. Gulf Road"
-            className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
-          />
-        </div>
-        <div>
-          <label className="block text-xs text-muted-foreground mb-1">Building</label>
-          <input
-            type="text"
-            value={value.building}
-            onChange={e => onChange({ building: e.target.value })}
-            placeholder="e.g. Al Hamra"
-            className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
