@@ -379,7 +379,132 @@
   },
   "branding": {},
   "coupons": {},
-  "shipping": {},
+  "shipping": {
+    "carriers": {
+      "page": {
+        "title": "Shipping Carriers",
+        "subtitle": "Configure iCarry and Aramex delivery integrations"
+      },
+      "empty": {
+        "title": "Shipping Carriers not enabled",
+        "description": "Enable the Shipping Carriers feature in your store features to configure iCarry and Aramex delivery integrations."
+      },
+      "shared": {
+        "enabled": "Enabled",
+        "disabled": "Disabled",
+        "save": "Save",
+        "testConnection": "Test Connection",
+        "setAsDefault": "Set as Default",
+        "defaultBadge": "Default"
+      },
+      "icarry": {
+        "title": "iCarry",
+        "subtitle": "Kuwait delivery via iCarry",
+        "fields": {
+          "apiKey": "API Key",
+          "merchantId": "Merchant ID"
+        },
+        "placeholders": {
+          "apiKey": "iCarry API key",
+          "merchantId": "e.g. MERCH-001"
+        }
+      },
+      "aramex": {
+        "title": "Aramex",
+        "subtitle": "International delivery via Aramex",
+        "fields": {
+          "accountNumber": "Account Number",
+          "accountPin": "PIN",
+          "accountEntity": "Entity",
+          "accountCountryCode": "Country Code",
+          "username": "Username",
+          "password": "Password"
+        },
+        "placeholders": {
+          "accountNumber": "Aramex account number",
+          "accountPin": "Account PIN",
+          "accountEntity": "e.g. KWI",
+          "accountCountryCode": "e.g. KW",
+          "username": "Aramex account username",
+          "password": "Aramex account password"
+        }
+      },
+      "pickup": {
+        "title": "Pickup Address",
+        "fields": {
+          "area": "Area",
+          "block": "Block",
+          "street": "Street",
+          "building": "Building"
+        },
+        "placeholders": {
+          "area": "e.g. Salmiya",
+          "block": "e.g. 12",
+          "street": "e.g. Gulf Road",
+          "building": "e.g. Al Hamra"
+        }
+      },
+      "shipments": {
+        "title": "Active Shipments",
+        "totalOne": "{total} total shipment",
+        "totalOther": "{total} total shipments",
+        "filters": {
+          "carrierLabel": "Filter by carrier",
+          "statusLabel": "Filter by status",
+          "allCarriers": "All carriers",
+          "allStatuses": "All statuses"
+        },
+        "carrierNames": {
+          "icarry": "iCarry",
+          "aramex": "Aramex"
+        },
+        "statuses": {
+          "created": "Created",
+          "picked_up": "Picked Up",
+          "in_transit": "In Transit",
+          "out_for_delivery": "Out for Delivery",
+          "delivered": "Delivered",
+          "failed": "Failed",
+          "returned": "Returned",
+          "cancelled": "Cancelled"
+        },
+        "columns": {
+          "orderNumber": "Order #",
+          "carrier": "Carrier",
+          "trackingNumber": "Tracking #",
+          "status": "Status",
+          "created": "Created"
+        },
+        "empty": "No shipments found",
+        "tableLabel": "Shipping carriers",
+        "pagination": {
+          "summary": "Page {page} of {pages} ({total} total)",
+          "previous": "Previous",
+          "next": "Next"
+        }
+      },
+      "connectionStatus": {
+        "testing": "Testing…",
+        "connected": "Connected",
+        "failed": "Failed"
+      },
+      "toast": {
+        "savedTitle": "Saved",
+        "savedDescription": "{carrier} settings saved.",
+        "errorTitle": "Error",
+        "saveFailed": "Failed to save settings.",
+        "saveFailedRetry": "Failed to save settings. Please try again.",
+        "connectionOkTitle": "Connection OK",
+        "connectionOkDescription": "{carrier} connection test passed.",
+        "connectionFailedTitle": "Connection Failed",
+        "testFailed": "Test failed.",
+        "testFailedRetry": "Test connection failed.",
+        "defaultSetTitle": "Default Set",
+        "defaultSetDescription": "{carrier} is now the default carrier.",
+        "defaultSetFailed": "Failed to set default carrier."
+      }
+    }
+  },
   "tax": {},
   "inventory": {},
   "pwa": {},

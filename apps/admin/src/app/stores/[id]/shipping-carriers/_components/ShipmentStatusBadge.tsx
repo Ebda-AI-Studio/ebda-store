@@ -1,3 +1,7 @@
+'use client';
+
+import { useT } from '@/i18n/useT';
+
 /**
  * Shipment status pill used in the shipments table on the shipping-carriers
  * admin page. Maps the carrier-agnostic status strings (created /
@@ -16,22 +20,17 @@ const STATUS_COLORS: Record<string, string> = {
   cancelled: 'bg-muted text-muted-foreground',
 };
 
-const STATUS_LABELS: Record<string, string> = {
-  created: 'Created',
-  picked_up: 'Picked Up',
-  in_transit: 'In Transit',
-  out_for_delivery: 'Out for Delivery',
-  delivered: 'Delivered',
-  failed: 'Failed',
-  returned: 'Returned',
-  cancelled: 'Cancelled',
-};
+const KNOWN_STATUSES = new Set(Object.keys(STATUS_COLORS));
 
 export function ShipmentStatusBadge({ status }: { status: string }) {
+  const t = useT('shipping.carriers.shipments.statuses');
   const cls = STATUS_COLORS[status] ?? 'bg-muted text-foreground';
+  // Only translate known statuses; fall back to the raw value otherwise to
+  // avoid next-intl throwing on unknown keys.
+  const label = KNOWN_STATUSES.has(status) ? t(status) : status;
   return (
     <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${cls}`}>
-      {STATUS_LABELS[status] ?? status}
+      {label}
     </span>
   );
 }

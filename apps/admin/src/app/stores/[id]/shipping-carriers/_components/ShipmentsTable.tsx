@@ -1,0 +1,199 @@
+'use client';
+
+import { useT } from '@/i18n/useT';
+import { ShipmentStatusBadge } from './ShipmentStatusBadge';
+import type { Shipment } from './types';
+
+interface ShipmentsTableProps {
+  shipments: Shipment[];
+  total: number;
+  page: number;
+  pages: number;
+  carrierFilter: string;
+  statusFilter: string;
+  onCarrierFilterChange: (value: string) => void;
+  onStatusFilterChange: (value: string) => void;
+  onPageChange: (updater: (prev: number) => number) => void;
+}
+
+const CARRIER_LABEL_KEYS: Record<string, string> = {
+  icarry: 'carrierNames.icarry',
+  aramex: 'carrierNames.aramex',
+};
+
+/**
+ * Active shipments table — filter bar (carrier/status) + table + pagination.
+ * Handles its own empty state when no rows match the current filters.
+ */
+export function ShipmentsTable({
+  shipments,
+  total,
+  page,
+  pages,
+  carrierFilter,
+  statusFilter,
+  onCarrierFilterChange,
+  onStatusFilterChange,
+  onPageChange,
+}: ShipmentsTableProps) {
+  const t = useT('shipping.carriers.shipments');
+
+  const carrierLabel = (carrier: string): string => {
+    const key = CARRIER_LABEL_KEYS[carrier];
+    return key ? t(key) : carrier;
+  };
+
+  return (
+    <div className="bg-card rounded-xl border border-border overflow-hidden">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+        <div>
+          <h2 className="text-lg font-semibold text-foreground">{t('title')}</h2>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {total === 1 ? t('totalOne', { total }) : t('totalOther', { total })}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <select
+            value={carrierFilter}
+            onChange={e => onCarrierFilterChange(e.target.value)}
+            aria-label={t('filters.carrierLabel')}
+            className="px-3 py-1.5 text-sm border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+          >
+            <option value="all">{t('filters.allCarriers')}</option>
+            <option value="icarry">{t('carrierNames.icarry')}</option>
+            <option value="aramex">{t('carrierNames.aramex')}</option>
+          </select>
+          <select
+            value={statusFilter}
+            onChange={e => onStatusFilterChange(e.target.value)}
+            aria-label={t('filters.statusLabel')}
+            className="px-3 py-1.5 text-sm border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+          >
+            <option value="all">{t('filters.allStatuses')}</option>
+            <option value="created">{t('statuses.created')}</option>
+            <option value="picked_up">{t('statuses.picked_up')}</option>
+            <option value="in_transit">{t('statuses.in_transit')}</option>
+            <option value="out_for_delivery">{t('statuses.out_for_delivery')}</option>
+            <option value="delivered">{t('statuses.delivered')}</option>
+            <option value="failed">{t('statuses.failed')}</option>
+            <option value="returned">{t('statuses.returned')}</option>
+            <option value="cancelled">{t('statuses.cancelled')}</option>
+          </select>
+        </div>
+      </div>
+
+      {shipments.length === 0 ? (
+        <div className="p-12 text-center">
+          <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center mx-auto mb-3">
+            <svg
+              className="w-6 h-6 text-muted-foreground"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"
+              />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"
+              />
+            </svg>
+          </div>
+          <p className="text-muted-foreground text-sm">{t('empty')}</p>
+        </div>
+      ) : (
+        <>
+          <div className="overflow-x-auto">
+            <table className="w-full" aria-label={t('tableLabel')}>
+              <thead>
+                <tr className="bg-muted border-b border-border">
+                  <th
+                    scope="col"
+                    className="text-start px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                  >
+                    {t('columns.orderNumber')}
+                  </th>
+                  <th
+                    scope="col"
+                    className="text-start px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                  >
+                    {t('columns.carrier')}
+                  </th>
+                  <th
+                    scope="col"
+                    className="text-start px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                  >
+                    {t('columns.trackingNumber')}
+                  </th>
+                  <th
+                    scope="col"
+                    className="text-start px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                  >
+                    {t('columns.status')}
+                  </th>
+                  <th
+                    scope="col"
+                    className="text-start px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                  >
+                    {t('columns.created')}
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {shipments.map(shipment => (
+                  <tr key={shipment.id} className="hover:bg-muted">
+                    <td className="px-6 py-3 text-sm font-medium text-foreground">
+                      {shipment.orderNumber}
+                    </td>
+                    <td className="px-6 py-3 text-sm text-foreground capitalize">
+                      {carrierLabel(shipment.carrierCode)}
+                    </td>
+                    <td className="px-6 py-3 text-sm text-muted-foreground font-mono">
+                      {shipment.trackingNumber || '—'}
+                    </td>
+                    <td className="px-6 py-3">
+                      <ShipmentStatusBadge status={shipment.status} />
+                    </td>
+                    <td className="px-6 py-3 text-sm text-muted-foreground whitespace-nowrap">
+                      {new Date(shipment.createdAt).toLocaleDateString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {pages > 1 && (
+            <div className="flex items-center justify-between px-6 py-4 border-t border-border">
+              <p className="text-sm text-muted-foreground">
+                {t('pagination.summary', { page, pages, total })}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => onPageChange(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="px-3 py-1.5 text-sm border border-border rounded-lg hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {t('pagination.previous')}
+                </button>
+                <button
+                  onClick={() => onPageChange(p => Math.min(pages, p + 1))}
+                  disabled={page === pages}
+                  className="px-3 py-1.5 text-sm border border-border rounded-lg hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {t('pagination.next')}
+                </button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}

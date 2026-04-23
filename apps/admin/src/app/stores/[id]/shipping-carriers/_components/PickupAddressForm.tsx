@@ -1,3 +1,7 @@
+'use client';
+
+import { useT } from '@/i18n/useT';
+
 export interface PickupAddress {
   area: string;
   block: string;
@@ -25,47 +29,49 @@ export function PickupAddressForm({
   value: PickupAddress;
   onChange: (patch: Partial<PickupAddress>) => void;
 }) {
+  const t = useT('shipping.carriers.pickup');
+
   return (
     <div className="border border-border rounded-lg p-4 mt-4">
-      <h4 className="text-sm font-medium text-foreground mb-3">Pickup Address</h4>
+      <h4 className="text-sm font-medium text-foreground mb-3">{t('title')}</h4>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div>
-          <label className="block text-xs text-muted-foreground mb-1">Area</label>
+          <label className="block text-xs text-muted-foreground mb-1">{t('fields.area')}</label>
           <input
             type="text"
             value={value.area}
             onChange={e => onChange({ area: e.target.value })}
-            placeholder="e.g. Salmiya"
+            placeholder={t('placeholders.area')}
             className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
           />
         </div>
         <div>
-          <label className="block text-xs text-muted-foreground mb-1">Block</label>
+          <label className="block text-xs text-muted-foreground mb-1">{t('fields.block')}</label>
           <input
             type="text"
             value={value.block}
             onChange={e => onChange({ block: e.target.value })}
-            placeholder="e.g. 12"
+            placeholder={t('placeholders.block')}
             className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
           />
         </div>
         <div>
-          <label className="block text-xs text-muted-foreground mb-1">Street</label>
+          <label className="block text-xs text-muted-foreground mb-1">{t('fields.street')}</label>
           <input
             type="text"
             value={value.street}
             onChange={e => onChange({ street: e.target.value })}
-            placeholder="e.g. Gulf Road"
+            placeholder={t('placeholders.street')}
             className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
           />
         </div>
         <div>
-          <label className="block text-xs text-muted-foreground mb-1">Building</label>
+          <label className="block text-xs text-muted-foreground mb-1">{t('fields.building')}</label>
           <input
             type="text"
             value={value.building}
             onChange={e => onChange({ building: e.target.value })}
-            placeholder="e.g. Al Hamra"
+            placeholder={t('placeholders.building')}
             className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
           />
         </div>

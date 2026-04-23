@@ -6,86 +6,37 @@ import { useToast } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPut, apiPost } from '../../../../lib/api';
 import { useFeatures } from '../../../../hooks/useFeatures';
-import { Toggle } from '../../../../components/Toggle';
-import { ConnectionStatus } from '../../../../components/ConnectionStatus';
-import { ShipmentStatusBadge } from './components/ShipmentStatusBadge';
+import { useT } from '@/i18n/useT';
+import { ShippingCarriersEmptyState } from './_components/ShippingCarriersEmptyState';
+import { ICarryCarrierCard } from './_components/ICarryCarrierCard';
+import { AramexCarrierCard } from './_components/AramexCarrierCard';
+import { ShipmentsTable } from './_components/ShipmentsTable';
+import { type PickupAddress } from './_components/PickupAddressForm';
 import {
-  PickupAddressForm,
-  DEFAULT_PICKUP,
-  type PickupAddress,
-} from './components/PickupAddressForm';
+  DEFAULT_CONFIGS,
+  type AramexConfig,
+  type CarrierConfigApiRow,
+  type CarrierConfigs,
+  type CarrierKey,
+  type ICarryConfig,
+  type Shipment,
+  type ShipmentsData,
+  type TestStatus,
+} from './_components/types';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface ICarryConfig {
-  enabled: boolean;
-  isDefault: boolean;
-  apiKey: string;
-  merchantId: string;
-  pickup: PickupAddress;
-}
-
-interface AramexConfig {
-  enabled: boolean;
-  isDefault: boolean;
-  accountNumber: string;
-  accountPin: string;
-  accountEntity: string;
-  accountCountryCode: string;
-  username: string;
-  password: string;
-  pickup: PickupAddress;
-}
-
-interface CarrierConfigs {
-  icarry: ICarryConfig;
-  aramex: AramexConfig;
-}
-
-interface Shipment {
-  id: string;
-  orderNumber: string;
-  carrierCode: string;
-  trackingNumber: string | null;
-  status: string;
-  createdAt: string;
-}
-
-interface ShipmentsData {
-  shipments: Shipment[];
-  total: number;
-  page: number;
-  limit: number;
-}
-
-const DEFAULT_CONFIGS: CarrierConfigs = {
-  icarry: {
-    enabled: false,
-    isDefault: false,
-    apiKey: '',
-    merchantId: '',
-    pickup: { ...DEFAULT_PICKUP },
-  },
-  aramex: {
-    enabled: false,
-    isDefault: false,
-    accountNumber: '',
-    accountPin: '',
-    accountEntity: '',
-    accountCountryCode: 'KW',
-    username: '',
-    password: '',
-    pickup: { ...DEFAULT_PICKUP },
-  },
+const CARRIER_NAME_KEYS: Record<CarrierKey, string> = {
+  icarry: 'carrierNames.icarry',
+  aramex: 'carrierNames.aramex',
 };
-
-// ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function ShippingCarriersPage() {
   const params = useParams();
   const storeId = params.id as string;
   const { isEnabled } = useFeatures();
   const { success: toastSuccess, error: showError } = useToast();
+  const tPage = useT('shipping.carriers.page');
+  const tShipments = useT('shipping.carriers.shipments');
+  const tToast = useT('shipping.carriers.toast');
 
   const featureEnabled = isEnabled('shipping_carriers');
 
@@ -94,12 +45,13 @@ export default function ShippingCarriersPage() {
   const [configs, setConfigs] = useState<CarrierConfigs>(DEFAULT_CONFIGS);
 
   // Save/test state
-  const [savingCarrier, setSavingCarrier] = useState<string | null>(null);
-  const [testingCarrier, setTestingCarrier] = useState<string | null>(null);
-  const [settingDefault, setSettingDefault] = useState<string | null>(null);
-  const [testStatus, setTestStatus] = useState<
-    Record<string, 'idle' | 'testing' | 'success' | 'error'>
-  >({ icarry: 'idle', aramex: 'idle' });
+  const [savingCarrier, setSavingCarrier] = useState<CarrierKey | null>(null);
+  const [testingCarrier, setTestingCarrier] = useState<CarrierKey | null>(null);
+  const [settingDefault, setSettingDefault] = useState<CarrierKey | null>(null);
+  const [testStatus, setTestStatus] = useState<Record<CarrierKey, TestStatus>>({
+    icarry: 'idle',
+    aramex: 'idle',
+  });
 
   // Shipments state
   const [shipments, setShipments] = useState<Shipment[]>([]);
@@ -112,13 +64,13 @@ export default function ShippingCarriersPage() {
   // ─── Data Fetching ──────────────────────────────────────────────────────────
 
   const fetchConfigs = useCallback(async () => {
-    const { data } = await apiGet<{ configs: any[] }>(
+    const { data } = await apiGet<{ configs: CarrierConfigApiRow[] }>(
       `/api/v1/stores/${storeId}/shipping-carriers/configs`
     );
     if (data?.configs) {
       const merged: CarrierConfigs = { ...DEFAULT_CONFIGS };
       for (const cfg of data.configs) {
-        const code = cfg.carrierCode as keyof CarrierConfigs;
+        const code = cfg.carrierCode as CarrierKey;
         if (code === 'icarry') {
           merged.icarry = {
             enabled: cfg.enabled ?? false,
@@ -184,9 +136,16 @@ export default function ShippingCarriersPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shipmentsPage, carrierFilter, statusFilter]);
 
+  // ─── Helpers ────────────────────────────────────────────────────────────────
+
+  const carrierLabel = useCallback(
+    (carrier: CarrierKey): string => tShipments(CARRIER_NAME_KEYS[carrier]),
+    [tShipments]
+  );
+
   // ─── Save Carrier Config ────────────────────────────────────────────────────
 
-  const handleSaveCarrier = async (carrier: 'icarry' | 'aramex') => {
+  const handleSaveCarrier = async (carrier: CarrierKey) => {
     setSavingCarrier(carrier);
     try {
       const cfg = configs[carrier];
@@ -228,13 +187,16 @@ export default function ShippingCarriersPage() {
         body
       );
       if (!error) {
-        toastSuccess('Saved', `${carrierLabel(carrier)} settings saved.`);
+        toastSuccess(
+          tToast('savedTitle'),
+          tToast('savedDescription', { carrier: carrierLabel(carrier) })
+        );
       } else {
-        showError('Error', error.message || 'Failed to save settings.');
+        showError(tToast('errorTitle'), error.message || tToast('saveFailed'));
       }
     } catch (err) {
       console.error('Failed to save carrier config:', err);
-      showError('Error', 'Failed to save settings. Please try again.');
+      showError(tToast('errorTitle'), tToast('saveFailedRetry'));
     } finally {
       setSavingCarrier(null);
     }
@@ -242,7 +204,7 @@ export default function ShippingCarriersPage() {
 
   // ─── Test Connection ────────────────────────────────────────────────────────
 
-  const handleTestConnection = async (carrier: 'icarry' | 'aramex') => {
+  const handleTestConnection = async (carrier: CarrierKey) => {
     setTestingCarrier(carrier);
     setTestStatus(prev => ({ ...prev, [carrier]: 'testing' }));
     try {
@@ -251,15 +213,18 @@ export default function ShippingCarriersPage() {
       );
       if (!error) {
         setTestStatus(prev => ({ ...prev, [carrier]: 'success' }));
-        toastSuccess('Connection OK', `${carrierLabel(carrier)} connection test passed.`);
+        toastSuccess(
+          tToast('connectionOkTitle'),
+          tToast('connectionOkDescription', { carrier: carrierLabel(carrier) })
+        );
       } else {
         setTestStatus(prev => ({ ...prev, [carrier]: 'error' }));
-        showError('Connection Failed', error.message || 'Test failed.');
+        showError(tToast('connectionFailedTitle'), error.message || tToast('testFailed'));
       }
     } catch (err) {
       console.error('Test connection error:', err);
       setTestStatus(prev => ({ ...prev, [carrier]: 'error' }));
-      showError('Error', 'Test connection failed.');
+      showError(tToast('errorTitle'), tToast('testFailedRetry'));
     } finally {
       setTestingCarrier(null);
     }
@@ -267,7 +232,7 @@ export default function ShippingCarriersPage() {
 
   // ─── Set Default ────────────────────────────────────────────────────────────
 
-  const handleSetDefault = async (carrier: 'icarry' | 'aramex') => {
+  const handleSetDefault = async (carrier: CarrierKey) => {
     setSettingDefault(carrier);
     try {
       const { error } = await apiPost(
@@ -278,23 +243,22 @@ export default function ShippingCarriersPage() {
           icarry: { ...prev.icarry, isDefault: carrier === 'icarry' },
           aramex: { ...prev.aramex, isDefault: carrier === 'aramex' },
         }));
-        toastSuccess('Default Set', `${carrierLabel(carrier)} is now the default carrier.`);
+        toastSuccess(
+          tToast('defaultSetTitle'),
+          tToast('defaultSetDescription', { carrier: carrierLabel(carrier) })
+        );
       } else {
-        showError('Error', error.message || 'Failed to set default carrier.');
+        showError(tToast('errorTitle'), error.message || tToast('defaultSetFailed'));
       }
     } catch (err) {
       console.error('Set default error:', err);
-      showError('Error', 'Failed to set default carrier.');
+      showError(tToast('errorTitle'), tToast('defaultSetFailed'));
     } finally {
       setSettingDefault(null);
     }
   };
 
-  // ─── Helpers ────────────────────────────────────────────────────────────────
-
-  function carrierLabel(carrier: string): string {
-    return carrier === 'icarry' ? 'iCarry' : 'Aramex';
-  }
+  // ─── Config Patchers ────────────────────────────────────────────────────────
 
   function updateICarry(patch: Partial<ICarryConfig>) {
     setConfigs(prev => ({ ...prev, icarry: { ...prev.icarry, ...patch } }));
@@ -323,471 +287,58 @@ export default function ShippingCarriersPage() {
   // ─── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <AdminLayout
-      title="Shipping Carriers"
-      subtitle="Configure iCarry and Aramex delivery integrations"
-    >
+    <AdminLayout title={tPage('title')} subtitle={tPage('subtitle')}>
       {loading ? (
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
         </div>
       ) : !featureEnabled ? (
-        // ── Empty state ──────────────────────────────────────────────────────
-        <div className="flex flex-col items-center justify-center py-24 text-center">
-          <div className="w-16 h-16 bg-cyan-100 rounded-full flex items-center justify-center mb-4">
-            <svg
-              className="w-8 h-8 text-cyan-600"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.5}
-                d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"
-              />
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.5}
-                d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"
-              />
-            </svg>
-          </div>
-          <h2 className="text-xl font-semibold text-foreground mb-2">
-            Shipping Carriers not enabled
-          </h2>
-          <p className="text-muted-foreground max-w-md">
-            Enable the Shipping Carriers feature in your store features to configure iCarry and
-            Aramex delivery integrations.
-          </p>
-        </div>
+        <ShippingCarriersEmptyState />
       ) : (
         <div className="space-y-6">
-          {/* ── iCarry ──────────────────────────────────────────────────────── */}
-          <div className="bg-card rounded-xl border border-border p-6">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-cyan-100 rounded-xl flex items-center justify-center">
-                  <svg
-                    className="w-5 h-5 text-cyan-600"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"
-                    />
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"
-                    />
-                  </svg>
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-lg font-semibold text-foreground">iCarry</h2>
-                    {configs.icarry.isDefault && (
-                      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                        Default
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-sm text-muted-foreground">Kuwait delivery via iCarry</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-sm text-muted-foreground">
-                  {configs.icarry.enabled ? 'Enabled' : 'Disabled'}
-                </span>
-                <Toggle
-                  checked={configs.icarry.enabled}
-                  onChange={val => updateICarry({ enabled: val })}
-                />
-              </div>
-            </div>
+          <ICarryCarrierCard
+            config={configs.icarry}
+            saving={savingCarrier === 'icarry'}
+            testing={testingCarrier === 'icarry'}
+            settingDefault={settingDefault === 'icarry'}
+            testStatus={testStatus.icarry}
+            onConfigChange={updateICarry}
+            onPickupChange={updateICarryPickup}
+            onSave={() => handleSaveCarrier('icarry')}
+            onTest={() => handleTestConnection('icarry')}
+            onSetDefault={() => handleSetDefault('icarry')}
+          />
 
-            {/* iCarry credentials */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-muted-foreground mb-2">
-                  API Key
-                </label>
-                <input
-                  type="password"
-                  value={configs.icarry.apiKey}
-                  onChange={e => updateICarry({ apiKey: e.target.value })}
-                  placeholder="iCarry API key"
-                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-muted-foreground mb-2">
-                  Merchant ID
-                </label>
-                <input
-                  type="text"
-                  value={configs.icarry.merchantId}
-                  onChange={e => updateICarry({ merchantId: e.target.value })}
-                  placeholder="e.g. MERCH-001"
-                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                />
-              </div>
-            </div>
+          <AramexCarrierCard
+            config={configs.aramex}
+            saving={savingCarrier === 'aramex'}
+            testing={testingCarrier === 'aramex'}
+            settingDefault={settingDefault === 'aramex'}
+            testStatus={testStatus.aramex}
+            onConfigChange={updateAramex}
+            onPickupChange={updateAramexPickup}
+            onSave={() => handleSaveCarrier('aramex')}
+            onTest={() => handleTestConnection('aramex')}
+            onSetDefault={() => handleSetDefault('aramex')}
+          />
 
-            <PickupAddressForm value={configs.icarry.pickup} onChange={updateICarryPickup} />
-
-            <div className="flex items-center gap-3 mt-4 flex-wrap">
-              <button
-                onClick={() => handleSaveCarrier('icarry')}
-                disabled={savingCarrier === 'icarry'}
-                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
-              >
-                {savingCarrier === 'icarry' && (
-                  <span className="animate-spin inline-block h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
-                )}
-                Save
-              </button>
-              <button
-                onClick={() => handleTestConnection('icarry')}
-                disabled={testingCarrier === 'icarry'}
-                className="px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-muted/80 transition-colors disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
-              >
-                Test Connection
-              </button>
-              {!configs.icarry.isDefault && (
-                <button
-                  onClick={() => handleSetDefault('icarry')}
-                  disabled={settingDefault === 'icarry'}
-                  className="px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-muted/80 transition-colors disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
-                >
-                  {settingDefault === 'icarry' && (
-                    <span className="animate-spin inline-block h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
-                  )}
-                  Set as Default
-                </button>
-              )}
-              <ConnectionStatus status={testStatus.icarry} />
-            </div>
-          </div>
-
-          {/* ── Aramex ──────────────────────────────────────────────────────── */}
-          <div className="bg-card rounded-xl border border-border p-6">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-destructive/10 rounded-xl flex items-center justify-center">
-                  <svg
-                    className="w-5 h-5 text-destructive"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                    />
-                  </svg>
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-lg font-semibold text-foreground">Aramex</h2>
-                    {configs.aramex.isDefault && (
-                      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                        Default
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-sm text-muted-foreground">International delivery via Aramex</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-sm text-muted-foreground">
-                  {configs.aramex.enabled ? 'Enabled' : 'Disabled'}
-                </span>
-                <Toggle
-                  checked={configs.aramex.enabled}
-                  onChange={val => updateAramex({ enabled: val })}
-                />
-              </div>
-            </div>
-
-            {/* Aramex credentials */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-muted-foreground mb-2">
-                  Account Number
-                </label>
-                <input
-                  type="text"
-                  value={configs.aramex.accountNumber}
-                  onChange={e => updateAramex({ accountNumber: e.target.value })}
-                  placeholder="Aramex account number"
-                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-muted-foreground mb-2">PIN</label>
-                <input
-                  type="password"
-                  value={configs.aramex.accountPin}
-                  onChange={e => updateAramex({ accountPin: e.target.value })}
-                  placeholder="Account PIN"
-                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-muted-foreground mb-2">
-                  Entity
-                </label>
-                <input
-                  type="text"
-                  value={configs.aramex.accountEntity}
-                  onChange={e => updateAramex({ accountEntity: e.target.value })}
-                  placeholder="e.g. KWI"
-                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-muted-foreground mb-2">
-                  Country Code
-                </label>
-                <input
-                  type="text"
-                  value={configs.aramex.accountCountryCode}
-                  onChange={e => updateAramex({ accountCountryCode: e.target.value })}
-                  placeholder="e.g. KW"
-                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-muted-foreground mb-2">
-                  Username
-                </label>
-                <input
-                  type="text"
-                  value={configs.aramex.username}
-                  onChange={e => updateAramex({ username: e.target.value })}
-                  placeholder="Aramex account username"
-                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-muted-foreground mb-2">
-                  Password
-                </label>
-                <input
-                  type="password"
-                  value={configs.aramex.password}
-                  onChange={e => updateAramex({ password: e.target.value })}
-                  placeholder="Aramex account password"
-                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                />
-              </div>
-            </div>
-
-            <PickupAddressForm value={configs.aramex.pickup} onChange={updateAramexPickup} />
-
-            <div className="flex items-center gap-3 mt-4 flex-wrap">
-              <button
-                onClick={() => handleSaveCarrier('aramex')}
-                disabled={savingCarrier === 'aramex'}
-                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
-              >
-                {savingCarrier === 'aramex' && (
-                  <span className="animate-spin inline-block h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
-                )}
-                Save
-              </button>
-              <button
-                onClick={() => handleTestConnection('aramex')}
-                disabled={testingCarrier === 'aramex'}
-                className="px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-muted/80 transition-colors disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
-              >
-                Test Connection
-              </button>
-              {!configs.aramex.isDefault && (
-                <button
-                  onClick={() => handleSetDefault('aramex')}
-                  disabled={settingDefault === 'aramex'}
-                  className="px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-muted/80 transition-colors disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
-                >
-                  {settingDefault === 'aramex' && (
-                    <span className="animate-spin inline-block h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
-                  )}
-                  Set as Default
-                </button>
-              )}
-              <ConnectionStatus status={testStatus.aramex} />
-            </div>
-          </div>
-
-          {/* ── Active Shipments ─────────────────────────────────────────────── */}
-          <div className="bg-card rounded-xl border border-border overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-              <div>
-                <h2 className="text-lg font-semibold text-foreground">Active Shipments</h2>
-                <p className="text-sm text-muted-foreground mt-0.5">
-                  {shipmentsTotal} total shipment{shipmentsTotal !== 1 ? 's' : ''}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <select
-                  value={carrierFilter}
-                  onChange={e => {
-                    setCarrierFilter(e.target.value);
-                    setShipmentsPage(1);
-                  }}
-                  aria-label="Filter by carrier"
-                  className="px-3 py-1.5 text-sm border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                >
-                  <option value="all">All carriers</option>
-                  <option value="icarry">iCarry</option>
-                  <option value="aramex">Aramex</option>
-                </select>
-                <select
-                  value={statusFilter}
-                  onChange={e => {
-                    setStatusFilter(e.target.value);
-                    setShipmentsPage(1);
-                  }}
-                  aria-label="Filter by status"
-                  className="px-3 py-1.5 text-sm border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                >
-                  <option value="all">All statuses</option>
-                  <option value="created">Created</option>
-                  <option value="picked_up">Picked Up</option>
-                  <option value="in_transit">In Transit</option>
-                  <option value="out_for_delivery">Out for Delivery</option>
-                  <option value="delivered">Delivered</option>
-                  <option value="failed">Failed</option>
-                  <option value="returned">Returned</option>
-                  <option value="cancelled">Cancelled</option>
-                </select>
-              </div>
-            </div>
-
-            {shipments.length === 0 ? (
-              <div className="p-12 text-center">
-                <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center mx-auto mb-3">
-                  <svg
-                    className="w-6 h-6 text-muted-foreground"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"
-                    />
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"
-                    />
-                  </svg>
-                </div>
-                <p className="text-muted-foreground text-sm">No shipments found</p>
-              </div>
-            ) : (
-              <>
-                <div className="overflow-x-auto">
-                  <table className="w-full" aria-label="Shipping carriers">
-                    <thead>
-                      <tr className="bg-muted border-b border-border">
-                        <th
-                          scope="col"
-                          className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
-                        >
-                          Order #
-                        </th>
-                        <th
-                          scope="col"
-                          className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
-                        >
-                          Carrier
-                        </th>
-                        <th
-                          scope="col"
-                          className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
-                        >
-                          Tracking #
-                        </th>
-                        <th
-                          scope="col"
-                          className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
-                        >
-                          Status
-                        </th>
-                        <th
-                          scope="col"
-                          className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
-                        >
-                          Created
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {shipments.map(shipment => (
-                        <tr key={shipment.id} className="hover:bg-muted">
-                          <td className="px-6 py-3 text-sm font-medium text-foreground">
-                            {shipment.orderNumber}
-                          </td>
-                          <td className="px-6 py-3 text-sm text-foreground capitalize">
-                            {carrierLabel(shipment.carrierCode)}
-                          </td>
-                          <td className="px-6 py-3 text-sm text-muted-foreground font-mono">
-                            {shipment.trackingNumber || '—'}
-                          </td>
-                          <td className="px-6 py-3">
-                            <ShipmentStatusBadge status={shipment.status} />
-                          </td>
-                          <td className="px-6 py-3 text-sm text-muted-foreground whitespace-nowrap">
-                            {new Date(shipment.createdAt).toLocaleDateString()}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Pagination */}
-                {shipmentsPages > 1 && (
-                  <div className="flex items-center justify-between px-6 py-4 border-t border-border">
-                    <p className="text-sm text-muted-foreground">
-                      Page {shipmentsPage} of {shipmentsPages} ({shipmentsTotal} total)
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setShipmentsPage(p => Math.max(1, p - 1))}
-                        disabled={shipmentsPage === 1}
-                        className="px-3 py-1.5 text-sm border border-border rounded-lg hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        Previous
-                      </button>
-                      <button
-                        onClick={() => setShipmentsPage(p => Math.min(shipmentsPages, p + 1))}
-                        disabled={shipmentsPage === shipmentsPages}
-                        className="px-3 py-1.5 text-sm border border-border rounded-lg hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        Next
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
+          <ShipmentsTable
+            shipments={shipments}
+            total={shipmentsTotal}
+            page={shipmentsPage}
+            pages={shipmentsPages}
+            carrierFilter={carrierFilter}
+            statusFilter={statusFilter}
+            onCarrierFilterChange={value => {
+              setCarrierFilter(value);
+              setShipmentsPage(1);
+            }}
+            onStatusFilterChange={value => {
+              setStatusFilter(value);
+              setShipmentsPage(1);
+            }}
+            onPageChange={updater => setShipmentsPage(prev => updater(prev))}
+          />
         </div>
       )}
     </AdminLayout>
