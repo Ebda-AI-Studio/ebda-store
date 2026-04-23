@@ -721,7 +721,118 @@
       "adjustment": "Adjustment"
     }
   },
-  "pwa": {},
+  "pwa": {
+    "page": {
+      "title": "Progressive Web App",
+      "subtitle": "Enable app-like experience for your customers"
+    },
+    "actions": {
+      "statusLabel": "PWA Status:",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "save": "Save Settings"
+    },
+    "messages": {
+      "populated": "Populated from store branding",
+      "toggleError": "Failed to update PWA status",
+      "saveSuccess": "PWA settings saved successfully",
+      "saveError": "Failed to save PWA settings"
+    },
+    "autoPopulate": {
+      "logoAlt": "Store logo",
+      "description": "Use store branding to fill PWA settings",
+      "button": "Populate from Store"
+    },
+    "benefits": {
+      "title": "Why Enable PWA?",
+      "install": {
+        "title": "Install on Device",
+        "description": "Customers can add to home screen"
+      },
+      "offline": {
+        "title": "Offline Support",
+        "description": "Works even without internet"
+      },
+      "fast": {
+        "title": "Fast Performance",
+        "description": "Cached assets load instantly"
+      }
+    },
+    "branding": {
+      "title": "App Identity",
+      "appName": "App Name",
+      "appNamePlaceholder": "My Store",
+      "appNameAr": "App Name (Arabic)",
+      "appNameArPlaceholder": "متجري",
+      "shortName": "Short Name (max 12 chars)",
+      "shortNamePlaceholder": "Store",
+      "shortNameHelp": "Shown under home screen icon",
+      "shortNameAr": "Short Name (Arabic)",
+      "shortNameArPlaceholder": "المتجر",
+      "description": "Description",
+      "descriptionPlaceholder": "Shop the latest products at amazing prices",
+      "descriptionAr": "Description (Arabic)",
+      "descriptionArPlaceholder": "تسوق أحدث المنتجات بأسعار مميزة"
+    },
+    "manifest": {
+      "title": "Theme & Appearance",
+      "themeColor": "Theme Color",
+      "themeColorHelp": "Browser address bar color",
+      "backgroundColor": "Background Color",
+      "backgroundColorHelp": "Splash screen background",
+      "display": "Display Mode",
+      "orientation": "Orientation",
+      "displayOptions": {
+        "standalone": "Standalone",
+        "fullscreen": "Fullscreen",
+        "minimalUi": "Minimal UI",
+        "browser": "Browser"
+      },
+      "orientationOptions": {
+        "any": "Any",
+        "portrait": "Portrait",
+        "landscape": "Landscape"
+      }
+    },
+    "icons": {
+      "title": "App Icons",
+      "urlPlaceholder": "https://...",
+      "icon192": "Icon 192x192",
+      "icon192Alt": "Icon 192",
+      "icon192Help": "Standard icon for app",
+      "icon512": "Icon 512x512",
+      "icon512Alt": "Icon 512",
+      "icon512Help": "High-res icon for splash screen",
+      "maskable": "Maskable Icon",
+      "maskableAlt": "Maskable",
+      "maskableHelp": "Adaptive icon with safe zone"
+    },
+    "features": {
+      "title": "Features",
+      "installPrompt": {
+        "title": "Install Prompt",
+        "description": "Show prompt to add app to home screen"
+      },
+      "offline": {
+        "title": "Offline Support",
+        "description": "Cache pages for offline access"
+      },
+      "push": {
+        "title": "Push Notifications",
+        "description": "Send notifications to customers (requires setup)"
+      }
+    },
+    "ios": {
+      "title": "iOS Settings",
+      "statusBarStyle": "Status Bar Style",
+      "splashScreenColor": "Splash Screen Color",
+      "statusBarOptions": {
+        "default": "Default (white)",
+        "black": "Black",
+        "blackTranslucent": "Black Translucent"
+      }
+    }
+  },
   "affiliates": {},
   "bulk": {},
   "abandonedCarts": {},
