@@ -232,72 +232,87 @@ export default function CartClient() {
         )}
 
         {cartItems.length === 0 ? (
-          <div className="mt-16 flex flex-col items-center justify-center py-12">
-            <div className="mb-6 flex h-32 w-32 items-center justify-center rounded-full bg-muted">
-              <svg
-                className="h-16 w-16 text-muted-foreground"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1}
-                  d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
-                />
-              </svg>
+          T?.EmptyState ? (
+            <div className="mt-16">
+              <T.EmptyState
+                title="Your cart is empty"
+                titleAr="سلة التسوق فارغة"
+                description="Looks like you haven't added any items yet."
+                descriptionAr="يبدو أنك لم تضف أي منتجات بعد."
+                ctaLabel="Start Shopping"
+                ctaLabelAr="ابدأ التسوق"
+                ctaHref={storeUrl('/products')}
+                isRtl={language === 'ar'}
+              />
             </div>
-            <h2 className="text-2xl font-bold text-foreground">
-              {t(
-                'Your cart is empty',
-                '\u0633\u0644\u0629 \u0627\u0644\u062a\u0633\u0648\u0642 \u0641\u0627\u0631\u063a\u0629'
-              )}
-            </h2>
-            <p className="mt-2 text-muted-foreground">
-              {t(
-                "Looks like you haven't added any items yet.",
-                '\u064a\u0628\u062f\u0648 \u0623\u0646\u0643 \u0644\u0645 \u062a\u0636\u0641 \u0623\u064a \u0645\u0646\u062a\u062c\u0627\u062a \u0628\u0639\u062f.'
-              )}
-            </p>
-            <Link href={storeUrl('/products')}>
-              <Button className="mt-8 gap-2 rounded-xl shadow-lg shadow-primary/25" size="lg">
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          ) : (
+            <div className="mt-16 flex flex-col items-center justify-center py-12">
+              <div className="mb-6 flex h-32 w-32 items-center justify-center rounded-full bg-muted">
+                <svg
+                  className="h-16 w-16 text-muted-foreground"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    strokeWidth={2}
+                    strokeWidth={1}
                     d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
                   />
                 </svg>
+              </div>
+              <h2 className="text-2xl font-bold text-foreground">
                 {t(
-                  'Start Shopping',
-                  '\u0627\u0628\u062f\u0623 \u0627\u0644\u062a\u0633\u0648\u0642'
+                  'Your cart is empty',
+                  '\u0633\u0644\u0629 \u0627\u0644\u062a\u0633\u0648\u0642 \u0641\u0627\u0631\u063a\u0629'
                 )}
-              </Button>
-            </Link>
-
-            {/* Browse Products */}
-            <div className="mt-12">
-              <Link
-                href={storeUrl('/products')}
-                className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M10 19l-7-7m0 0l7-7m-7 7h18"
-                  />
-                </svg>
+              </h2>
+              <p className="mt-2 text-muted-foreground">
                 {t(
-                  'Browse all products',
-                  '\u062a\u0635\u0641\u062d \u062c\u0645\u064a\u0639 \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a'
+                  "Looks like you haven't added any items yet.",
+                  '\u064a\u0628\u062f\u0648 \u0623\u0646\u0643 \u0644\u0645 \u062a\u0636\u0641 \u0623\u064a \u0645\u0646\u062a\u062c\u0627\u062a \u0628\u0639\u062f.'
                 )}
+              </p>
+              <Link href={storeUrl('/products')}>
+                <Button className="mt-8 gap-2 rounded-xl shadow-lg shadow-primary/25" size="lg">
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
+                    />
+                  </svg>
+                  {t(
+                    'Start Shopping',
+                    '\u0627\u0628\u062f\u0623 \u0627\u0644\u062a\u0633\u0648\u0642'
+                  )}
+                </Button>
               </Link>
+
+              {/* Browse Products */}
+              <div className="mt-12">
+                <Link
+                  href={storeUrl('/products')}
+                  className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                    />
+                  </svg>
+                  {t(
+                    'Browse all products',
+                    '\u062a\u0635\u0641\u062d \u062c\u0645\u064a\u0639 \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a'
+                  )}
+                </Link>
+              </div>
             </div>
-          </div>
+          )
         ) : (
           <>
             <div className="mt-8 lg:grid lg:grid-cols-12 lg:gap-8">

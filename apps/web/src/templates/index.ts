@@ -15,6 +15,8 @@ const templates: Record<TemplateId, () => Promise<TemplateComponents>> = {
       AnnouncementBar: m.AnnouncementBar,
       CartTable: m.CartTable,
       OrderSummary: m.OrderSummary,
+      EmptyState: m.EmptyState,
+      FormCard: m.FormCard,
     })),
   classic: () =>
     import('./classic').then(m => ({
@@ -28,6 +30,8 @@ const templates: Record<TemplateId, () => Promise<TemplateComponents>> = {
       AnnouncementBar: m.AnnouncementBar,
       CartTable: m.CartTable,
       OrderSummary: m.OrderSummary,
+      EmptyState: m.EmptyState,
+      FormCard: m.FormCard,
     })),
   minimal: () =>
     import('./minimal').then(m => ({
@@ -41,6 +45,8 @@ const templates: Record<TemplateId, () => Promise<TemplateComponents>> = {
       AnnouncementBar: m.AnnouncementBar,
       CartTable: m.CartTable,
       OrderSummary: m.OrderSummary,
+      EmptyState: m.EmptyState,
+      FormCard: m.FormCard,
     })),
   bold: () =>
     import('./bold').then(m => ({
@@ -54,6 +60,8 @@ const templates: Record<TemplateId, () => Promise<TemplateComponents>> = {
       AnnouncementBar: m.AnnouncementBar,
       CartTable: m.CartTable,
       OrderSummary: m.OrderSummary,
+      EmptyState: m.EmptyState,
+      FormCard: m.FormCard,
     })),
   elegant: () =>
     import('./elegant').then(m => ({
@@ -67,6 +75,8 @@ const templates: Record<TemplateId, () => Promise<TemplateComponents>> = {
       AnnouncementBar: m.AnnouncementBar,
       CartTable: m.CartTable,
       OrderSummary: m.OrderSummary,
+      EmptyState: m.EmptyState,
+      FormCard: m.FormCard,
     })),
 };
 
