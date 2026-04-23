@@ -1142,7 +1142,77 @@
       }
     }
   },
-  "bulk": {},
+  "bulk": {
+    "page": {
+      "title": "Bulk Operations",
+      "subtitle": "Import and export products in bulk",
+      "backToStore": "Back to Store"
+    },
+    "tabs": {
+      "import": "Import Products",
+      "export": "Export Products"
+    },
+    "import": {
+      "instructionsTitle": "How to Import Products",
+      "step1": "Download the CSV template using the button below",
+      "step2": "Fill in your product data following the template format",
+      "step3": "Prices are in fils (1 KWD = 1000 fils)",
+      "step4": "For multiple categories/tags/images, separate with commas within quotes",
+      "step5": "Upload the completed CSV file and click Import",
+      "downloadTemplate": "Download Template",
+      "uploadTitle": "Upload CSV or XLSX File",
+      "uploadPrompt": "Click to upload a CSV or XLSX file",
+      "fileLoaded": "{name} loaded. Click to change.",
+      "csvReady": "{count} products ready for import",
+      "xlsxReady": "Workbook loaded — rows will be mapped + parsed on the server",
+      "updateExisting": "Update existing products (match by SKU or slug)",
+      "xlsxOptionsHint": "XLSX options — applied to rows that don't specify these columns explicitly.",
+      "skuPrefixLabel": "SKU prefix (e.g. <code>WJ</code> → <code>WJ-001</code>)",
+      "skuPrefixPlaceholder": "ITEM",
+      "defaultInventoryLabel": "Default inventory per row",
+      "defaultStatusLabel": "Default status",
+      "statusActive": "active",
+      "statusDraft": "draft",
+      "trackInventory": "Track inventory (decrement on sale)",
+      "importing": "Importing...",
+      "importProducts": "Import Products",
+      "clear": "Clear"
+    },
+    "results": {
+      "title": "Import Results",
+      "totalRows": "Total Rows",
+      "created": "Created",
+      "updated": "Updated",
+      "failed": "Failed",
+      "errorsHeading": "Errors:",
+      "rowLabel": "Row {row}:",
+      "successMessage": "✓ Import completed successfully! <link>View products</link>"
+    },
+    "export": {
+      "optionsTitle": "Export Options",
+      "statusLabel": "Product Status",
+      "statusAll": "All Statuses",
+      "statusActive": "Active",
+      "statusDraft": "Draft",
+      "statusArchived": "Archived",
+      "searchLabel": "Search",
+      "searchPlaceholder": "Search by name or SKU",
+      "includeDeleted": "Include deleted products",
+      "exporting": "Exporting...",
+      "exportButton": "Export to CSV",
+      "infoTitle": "Export Information",
+      "info": {
+        "allFields": "All product fields are included in the export",
+        "commaSeparated": "Categories, tags, and images are comma-separated within their columns",
+        "reImport": "The exported file can be edited and re-imported to update products",
+        "pricesInFils": "Prices are in fils (1 KWD = 1000 fils)"
+      }
+    },
+    "errors": {
+      "network": "Network error. Please try again.",
+      "importFailed": "Import failed"
+    }
+  },
   "abandonedCarts": {},
   "returns": {},
   "marketingPixels": {},
