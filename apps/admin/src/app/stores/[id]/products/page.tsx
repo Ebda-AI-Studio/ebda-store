@@ -463,7 +463,7 @@ export default function StoreProductsPage() {
                       <div>
                         <p className="font-medium text-foreground">{product.name}</p>
                         {product.hasVariants && (
-                          <span className="text-xs text-blue-600">Has variants</span>
+                          <span className="text-xs text-info">Has variants</span>
                         )}
                       </div>
                     </div>
@@ -478,7 +478,7 @@ export default function StoreProductsPage() {
                         product.inventory === 0
                           ? 'text-destructive'
                           : product.inventory < 10
-                            ? 'text-yellow-600'
+                            ? 'text-warning'
                             : 'text-[hsl(var(--success))]'
                       }`}
                     >

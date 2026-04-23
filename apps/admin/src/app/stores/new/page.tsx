@@ -398,7 +398,7 @@ export default function CreateStorePage() {
                     value={formData.storeName}
                     onChange={e => handleNameChange(e.target.value)}
                     placeholder="My Awesome Store"
-                    className={`mt-1 ${validationErrors.storeName ? 'border-red-500' : ''}`}
+                    className={`mt-1 ${validationErrors.storeName ? 'border-destructive' : ''}`}
                   />
                   {validationErrors.storeName && (
                     <p className="mt-1 text-sm text-destructive">{validationErrors.storeName}</p>
@@ -410,7 +410,7 @@ export default function CreateStorePage() {
                     Store URL <span className="text-destructive">*</span>
                   </label>
                   <div
-                    className={`mt-1 flex rounded-lg border overflow-hidden ${validationErrors.storeSlug ? 'border-red-500' : ''}`}
+                    className={`mt-1 flex rounded-lg border overflow-hidden ${validationErrors.storeSlug ? 'border-destructive' : ''}`}
                   >
                     <span className="flex items-center bg-muted px-3 text-sm text-muted-foreground border-r">
                       https://
@@ -481,7 +481,7 @@ export default function CreateStorePage() {
                       setValidationErrors(prev => ({ ...prev, ownerName: '' }));
                     }}
                     placeholder="John Doe"
-                    className={`mt-1 ${validationErrors.ownerName ? 'border-red-500' : ''}`}
+                    className={`mt-1 ${validationErrors.ownerName ? 'border-destructive' : ''}`}
                   />
                   {validationErrors.ownerName && (
                     <p className="mt-1 text-sm text-destructive">{validationErrors.ownerName}</p>
@@ -501,7 +501,7 @@ export default function CreateStorePage() {
                       setValidationErrors(prev => ({ ...prev, ownerEmail: '' }));
                     }}
                     placeholder="john@example.com"
-                    className={`mt-1 ${validationErrors.ownerEmail ? 'border-red-500' : ''}`}
+                    className={`mt-1 ${validationErrors.ownerEmail ? 'border-destructive' : ''}`}
                   />
                   {validationErrors.ownerEmail && (
                     <p className="mt-1 text-sm text-destructive">{validationErrors.ownerEmail}</p>
@@ -524,7 +524,7 @@ export default function CreateStorePage() {
                       setValidationErrors(prev => ({ ...prev, ownerPassword: '' }));
                     }}
                     placeholder="Min 8 characters"
-                    className={`mt-1 ${validationErrors.ownerPassword ? 'border-red-500' : ''}`}
+                    className={`mt-1 ${validationErrors.ownerPassword ? 'border-destructive' : ''}`}
                   />
                   {validationErrors.ownerPassword && (
                     <p className="mt-1 text-sm text-destructive">

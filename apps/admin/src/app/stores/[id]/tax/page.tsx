@@ -484,8 +484,8 @@ export default function TaxSettingsPage() {
                             <span
                               className={`px-2 py-1 rounded text-xs font-medium ${
                                 rate.isCompound
-                                  ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
-                                  : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                                  ? 'bg-info/10 text-info dark:bg-info/30 dark:text-info'
+                                  : 'bg-info/10 text-info dark:bg-info/30 dark:text-info'
                               }`}
                             >
                               {rate.isCompound ? 'Compound' : 'Standard'}
@@ -554,10 +554,10 @@ export default function TaxSettingsPage() {
             </div>
 
             {/* Info Box */}
-            <div className="mt-6 bg-blue-50 border border-blue-200 rounded-xl p-4">
+            <div className="mt-6 bg-info/5 border border-info/30 rounded-xl p-4">
               <div className="flex gap-3">
                 <svg
-                  className="w-5 h-5 text-blue-500 mt-0.5"
+                  className="w-5 h-5 text-info mt-0.5"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -570,8 +570,8 @@ export default function TaxSettingsPage() {
                   />
                 </svg>
                 <div>
-                  <h3 className="text-sm font-medium text-blue-900">About Tax Calculation</h3>
-                  <p className="text-sm text-blue-700 mt-1">
+                  <h3 className="text-sm font-medium text-info">About Tax Calculation</h3>
+                  <p className="text-sm text-info mt-1">
                     Tax rates are applied based on priority (highest first).{' '}
                     <strong>Compound taxes</strong> are calculated on top of the subtotal plus any
                     previously calculated taxes. <strong>Standard taxes</strong> are calculated only
@@ -742,7 +742,7 @@ export default function TaxSettingsPage() {
                         onChange={e => setFormData({ ...formData, isCompound: e.target.checked })}
                         className="sr-only peer"
                       />
-                      <div className="w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/30 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-500"></div>
+                      <div className="w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/30 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-info"></div>
                     </label>
                     <div>
                       <span className="text-sm text-foreground font-medium">Compound Tax</span>

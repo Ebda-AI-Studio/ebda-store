@@ -12,9 +12,9 @@ export default function Error({
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center px-4">
       <div className="force-card max-w-lg w-full py-12 text-center">
-        <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-red-50">
+        <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-destructive/5">
           <svg
-            className="h-10 w-10 text-red-500"
+            className="h-10 w-10 text-destructive"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"

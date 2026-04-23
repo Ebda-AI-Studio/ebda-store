@@ -71,13 +71,13 @@ function formatCurrency(amount: number) {
 }
 
 const statusColors: Record<string, string> = {
-  pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
-  approved: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
-  rejected: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
-  shipped: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
+  pending: 'bg-warning/10 text-warning dark:bg-warning/30 dark:text-warning',
+  approved: 'bg-info/10 text-info dark:bg-info/30 dark:text-info',
+  rejected: 'bg-destructive/10 text-destructive dark:bg-destructive/30/30 dark:text-destructive',
+  shipped: 'bg-info/10 text-info dark:bg-info/30 dark:text-info',
   received: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300',
   inspecting: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300',
-  completed: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+  completed: 'bg-success/10 text-success dark:bg-success/30 dark:text-success',
   cancelled: 'bg-muted text-foreground',
 };
 
@@ -230,15 +230,15 @@ export default function ReturnsPage() {
           </div>
           <div className="bg-card rounded-xl border p-4 shadow-sm">
             <p className="text-sm text-muted-foreground">Pending</p>
-            <p className="text-2xl font-bold text-yellow-600">{stats.pending}</p>
+            <p className="text-2xl font-bold text-warning">{stats.pending}</p>
           </div>
           <div className="bg-card rounded-xl border p-4 shadow-sm">
             <p className="text-sm text-muted-foreground">Approved</p>
-            <p className="text-2xl font-bold text-blue-600">{stats.approved}</p>
+            <p className="text-2xl font-bold text-info">{stats.approved}</p>
           </div>
           <div className="bg-card rounded-xl border p-4 shadow-sm">
             <p className="text-sm text-muted-foreground">Completed</p>
-            <p className="text-2xl font-bold text-green-600">{stats.completed}</p>
+            <p className="text-2xl font-bold text-success">{stats.completed}</p>
           </div>
         </div>
       )}

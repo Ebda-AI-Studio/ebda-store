@@ -90,7 +90,7 @@ export default function StoreSettingsPage() {
       title: 'SEO',
       description: 'Meta titles, meta descriptions and search engine optimization',
       href: `/stores/${storeId}/seo`,
-      color: 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300',
+      color: 'bg-info/10 text-info dark:bg-info/30 dark:text-info',
       featureKey: 'seo',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -253,7 +253,7 @@ export default function StoreSettingsPage() {
       title: 'Marketing Pixels',
       description: 'Facebook Pixel, Google Analytics, TikTok Pixel and other tracking codes',
       href: `/stores/${storeId}/marketing-pixels`,
-      color: 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-300',
+      color: 'bg-info/10 text-info dark:bg-info/30 dark:text-info',
       featureKey: 'marketing_pixels',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">

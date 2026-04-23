@@ -14,12 +14,12 @@ const iconMap: Record<string, string> = {
 };
 
 const colorMap: Record<string, string> = {
-  new_order: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-  new_review: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
+  new_order: 'bg-success/10 text-success dark:bg-success/30 dark:text-success',
+  new_review: 'bg-warning/10 text-warning dark:bg-warning/30 dark:text-warning',
   new_return: 'bg-primary/10 text-primary dark:bg-primary/30 dark:text-primary',
-  low_stock: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
-  order_status: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-  return_status: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
+  low_stock: 'bg-destructive/10 text-destructive dark:bg-destructive/30/30 dark:text-destructive',
+  order_status: 'bg-info/10 text-info dark:bg-info/30 dark:text-info',
+  return_status: 'bg-info/10 text-info dark:bg-info/30 dark:text-info',
 };
 
 export function NotificationBell() {
@@ -64,7 +64,7 @@ export function NotificationBell() {
 
         {/* Unread Badge */}
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-red-500 rounded-full">
+          <span className="absolute -top-1 -right-1 flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-destructive rounded-full">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
@@ -72,7 +72,7 @@ export function NotificationBell() {
         {/* Connection Status Indicator */}
         <span
           className={`absolute bottom-1 right-1 w-2 h-2 rounded-full ${
-            isConnected ? 'bg-green-500' : 'bg-muted-foreground'
+            isConnected ? 'bg-success' : 'bg-muted-foreground'
           }`}
         />
       </button>
@@ -170,9 +170,9 @@ export function NotificationBell() {
 
           {/* Footer */}
           {!isConnected && (
-            <div className="px-4 py-2 bg-yellow-50 dark:bg-yellow-900/20 border-t border-yellow-200 dark:border-yellow-800">
-              <p className="text-xs text-yellow-700 dark:text-yellow-400 flex items-center gap-1">
-                <span className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
+            <div className="px-4 py-2 bg-warning/5 dark:bg-warning/30 border-t border-warning/30 dark:border-yellow-800">
+              <p className="text-xs text-warning dark:text-warning flex items-center gap-1">
+                <span className="w-2 h-2 bg-warning rounded-full animate-pulse" />
                 Reconnecting to notification server...
               </p>
             </div>

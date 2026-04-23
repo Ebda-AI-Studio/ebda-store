@@ -368,7 +368,7 @@ export default function ShippingSettingsPage() {
                     </td>
                     <td className="px-6 py-4">
                       {zone.freeShippingThreshold ? (
-                        <span className="text-green-600 text-sm">
+                        <span className="text-success text-sm">
                           Over {(zone.freeShippingThreshold / 1000).toFixed(3)} KWD
                         </span>
                       ) : (
@@ -383,7 +383,7 @@ export default function ShippingSettingsPage() {
                         onClick={() => handleToggle(zone)}
                         className={`px-2 py-1 rounded-full text-xs font-medium ${
                           zone.isActive
-                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                            ? 'bg-success/10 text-success dark:bg-success/30 dark:text-success'
                             : 'bg-muted text-muted-foreground'
                         }`}
                       >
@@ -467,7 +467,7 @@ export default function ShippingSettingsPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-muted-foreground mb-2">
-                      Zone Name <span className="text-red-500">*</span>
+                      Zone Name <span className="text-destructive">*</span>
                     </label>
                     <input
                       type="text"
@@ -497,7 +497,7 @@ export default function ShippingSettingsPage() {
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <label className="block text-sm font-medium text-muted-foreground">
-                      Areas <span className="text-red-500">*</span>
+                      Areas <span className="text-destructive">*</span>
                     </label>
                     <button
                       type="button"
@@ -535,7 +535,7 @@ export default function ShippingSettingsPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-muted-foreground mb-2">
-                      Delivery Fee (KWD) <span className="text-red-500">*</span>
+                      Delivery Fee (KWD) <span className="text-destructive">*</span>
                     </label>
                     <input
                       type="number"

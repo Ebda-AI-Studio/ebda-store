@@ -41,9 +41,9 @@ interface HistoryItem {
 }
 
 const STOCK_STATUS_STYLES = {
-  in_stock: { bg: 'bg-green-100', text: 'text-green-700', label: 'In Stock' },
-  low_stock: { bg: 'bg-yellow-100', text: 'text-yellow-700', label: 'Low Stock' },
-  out_of_stock: { bg: 'bg-red-100', text: 'text-red-700', label: 'Out of Stock' },
+  in_stock: { bg: 'bg-success/10', text: 'text-success', label: 'In Stock' },
+  low_stock: { bg: 'bg-warning/10', text: 'text-warning', label: 'Low Stock' },
+  out_of_stock: { bg: 'bg-destructive/10', text: 'text-destructive', label: 'Out of Stock' },
 };
 
 const ADJUSTMENT_TYPES = [
@@ -219,21 +219,19 @@ export default function InventoryPage() {
               </div>
               <div className="bg-card rounded-xl border border-border p-4">
                 <p className="text-sm text-muted-foreground">Total Stock</p>
-                <p className="text-2xl font-bold text-blue-600">
-                  {stats.totalStock.toLocaleString()}
-                </p>
+                <p className="text-2xl font-bold text-info">{stats.totalStock.toLocaleString()}</p>
               </div>
               <div className="bg-card rounded-xl border border-border p-4">
                 <p className="text-sm text-muted-foreground">Low Stock</p>
-                <p className="text-2xl font-bold text-yellow-600">{stats.lowStockCount}</p>
+                <p className="text-2xl font-bold text-warning">{stats.lowStockCount}</p>
               </div>
               <div className="bg-card rounded-xl border border-border p-4">
                 <p className="text-sm text-muted-foreground">Out of Stock</p>
-                <p className="text-2xl font-bold text-red-600">{stats.outOfStockCount}</p>
+                <p className="text-2xl font-bold text-destructive">{stats.outOfStockCount}</p>
               </div>
               <div className="bg-card rounded-xl border border-border p-4">
                 <p className="text-sm text-muted-foreground">Stock Value</p>
-                <p className="text-2xl font-bold text-green-600">
+                <p className="text-2xl font-bold text-success">
                   {(stats.totalValue / 1000).toFixed(3)} KWD
                 </p>
               </div>
@@ -242,11 +240,11 @@ export default function InventoryPage() {
 
           {/* Low Stock Alert Banner */}
           {alerts.length > 0 && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-6">
+            <div className="bg-warning/5 border border-warning/30 rounded-xl p-4 mb-6">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center">
+                <div className="w-10 h-10 bg-warning/10 rounded-full flex items-center justify-center">
                   <svg
-                    className="w-5 h-5 text-yellow-600"
+                    className="w-5 h-5 text-warning"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -260,17 +258,17 @@ export default function InventoryPage() {
                   </svg>
                 </div>
                 <div className="flex-1">
-                  <p className="font-medium text-yellow-800">
+                  <p className="font-medium text-warning">
                     {alerts.length} product{alerts.length > 1 ? 's' : ''} need attention
                   </p>
-                  <p className="text-sm text-yellow-700">
+                  <p className="text-sm text-warning">
                     {alerts.filter(a => a.stockStatus === 'out_of_stock').length} out of stock,{' '}
                     {alerts.filter(a => a.stockStatus === 'low_stock').length} low stock
                   </p>
                 </div>
                 <button
                   onClick={() => setActiveTab('alerts')}
-                  className="px-4 py-2 bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300 rounded-lg hover:bg-yellow-200 text-sm font-medium"
+                  className="px-4 py-2 bg-warning/10 text-warning dark:bg-warning/30 dark:text-warning rounded-lg hover:bg-warning/20 text-sm font-medium"
                 >
                   View Alerts
                 </button>
@@ -310,7 +308,7 @@ export default function InventoryPage() {
             >
               Alerts
               {alerts.length > 0 && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-white text-xs rounded-full flex items-center justify-center">
                   {alerts.length}
                 </span>
               )}
@@ -534,7 +532,7 @@ export default function InventoryPage() {
                           </td>
                           <td className="px-6 py-4">
                             <span
-                              className={`font-medium ${item.quantity >= 0 ? 'text-green-600' : 'text-red-600'}`}
+                              className={`font-medium ${item.quantity >= 0 ? 'text-success' : 'text-destructive'}`}
                             >
                               {item.quantity >= 0 ? '+' : ''}
                               {item.quantity}
@@ -560,9 +558,9 @@ export default function InventoryPage() {
             <div className="bg-card rounded-xl border border-border overflow-hidden">
               {alerts.length === 0 ? (
                 <div className="p-12 text-center">
-                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <div className="w-16 h-16 bg-success/10 rounded-full flex items-center justify-center mx-auto mb-4">
                     <svg
-                      className="w-8 h-8 text-green-600"
+                      className="w-8 h-8 text-success"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -637,7 +635,7 @@ export default function InventoryPage() {
                           </td>
                           <td className="px-6 py-4">
                             <span
-                              className={`font-semibold ${product.inventory <= 0 ? 'text-red-600' : 'text-yellow-600'}`}
+                              className={`font-semibold ${product.inventory <= 0 ? 'text-destructive' : 'text-warning'}`}
                             >
                               {product.inventory}
                             </span>
@@ -725,7 +723,7 @@ export default function InventoryPage() {
 
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
-                  Quantity <span className="text-red-500">*</span>
+                  Quantity <span className="text-destructive">*</span>
                 </label>
                 <input
                   type="number"

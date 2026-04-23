@@ -172,7 +172,7 @@ export function CategoryTable({
                   <button
                     onClick={() => onDelete({ id: cat.id, name: cat.name })}
                     disabled={deletingId === cat.id}
-                    className="px-3 py-1.5 text-xs font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
+                    className="px-3 py-1.5 text-xs font-medium text-destructive border border-destructive/30 rounded-lg hover:bg-destructive/5 transition-colors disabled:opacity-50"
                   >
                     {deletingId === cat.id ? 'Deleting...' : 'Delete'}
                   </button>

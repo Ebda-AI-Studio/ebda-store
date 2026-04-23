@@ -175,7 +175,7 @@ function StatCard({
                 className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs font-semibold ${
                   isPositive
                     ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300'
-                    : 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300'
+                    : 'bg-destructive/5 text-destructive dark:bg-destructive/30/20 dark:text-destructive'
                 }`}
               >
                 <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -261,12 +261,12 @@ export default function AnalyticsPage() {
   }, [fetchAnalytics]);
 
   const statusColors: Record<string, string> = {
-    pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
-    confirmed: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+    pending: 'bg-warning/10 text-warning dark:bg-warning/30 dark:text-warning',
+    confirmed: 'bg-info/10 text-info dark:bg-info/30 dark:text-info',
     processing: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300',
-    shipped: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
-    delivered: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
-    cancelled: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+    shipped: 'bg-info/10 text-info dark:bg-info/30 dark:text-info',
+    delivered: 'bg-success/10 text-success dark:bg-success/30 dark:text-success',
+    cancelled: 'bg-destructive/10 text-destructive dark:bg-destructive/30/30 dark:text-destructive',
     refunded: 'bg-muted text-foreground',
   };
 
@@ -378,7 +378,7 @@ export default function AnalyticsPage() {
               title="Avg Order Value"
               value={stats?.averageOrderValue || 0}
               format="currency"
-              iconBg="bg-blue-500"
+              iconBg="bg-info"
               icon={
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path
@@ -526,7 +526,7 @@ export default function AnalyticsPage() {
               {lowStockProducts.length === 0 ? (
                 <div className="text-center py-4">
                   <svg
-                    className="w-12 h-12 text-green-200 mx-auto mb-2"
+                    className="w-12 h-12 text-success/60 mx-auto mb-2"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -576,10 +576,10 @@ export default function AnalyticsPage() {
                       <span
                         className={`px-2 py-1 text-xs font-semibold rounded ${
                           product.inventory === 0
-                            ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+                            ? 'bg-destructive/10 text-destructive dark:bg-destructive/30/30 dark:text-destructive'
                             : product.inventory <= 5
                               ? 'bg-primary/10 text-primary'
-                              : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
+                              : 'bg-warning/10 text-warning dark:bg-warning/30 dark:text-warning'
                         }`}
                       >
                         {product.inventory} left

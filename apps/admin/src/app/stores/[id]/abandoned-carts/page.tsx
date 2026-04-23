@@ -69,11 +69,11 @@ const DEFAULT_CONFIG: AbandonedCartConfig = {
 
 function StatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
-    pending: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300',
-    step1_sent: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-    step2_sent: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-    step3_sent: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-    recovered: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+    pending: 'bg-warning/10 text-warning dark:bg-warning/30 dark:text-warning',
+    step1_sent: 'bg-info/10 text-info dark:bg-info/30 dark:text-info',
+    step2_sent: 'bg-info/10 text-info dark:bg-info/30 dark:text-info',
+    step3_sent: 'bg-info/10 text-info dark:bg-info/30 dark:text-info',
+    recovered: 'bg-success/10 text-success dark:bg-success/30 dark:text-success',
     expired: 'bg-muted text-muted-foreground',
   };
   const labels: Record<string, string> = {

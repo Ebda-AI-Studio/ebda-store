@@ -46,10 +46,10 @@ const validTransitions: Record<string, string[]> = {
 const statusStyles: Record<string, { bg: string; text: string; dot: string }> = {
   pending: { bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-500' },
   confirmed: { bg: 'bg-cyan-50', text: 'text-cyan-700', dot: 'bg-cyan-500' },
-  processing: { bg: 'bg-blue-50', text: 'text-blue-700', dot: 'bg-blue-500' },
+  processing: { bg: 'bg-info/5', text: 'text-info', dot: 'bg-info' },
   shipped: { bg: 'bg-violet-50', text: 'text-violet-700', dot: 'bg-violet-500' },
   delivered: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
-  cancelled: { bg: 'bg-red-50', text: 'text-red-700', dot: 'bg-red-500' },
+  cancelled: { bg: 'bg-destructive/5', text: 'text-destructive', dot: 'bg-destructive' },
   refunded: { bg: 'bg-muted', text: 'text-muted-foreground', dot: 'bg-muted-foreground' },
 };
 
@@ -265,7 +265,7 @@ export default function StoreOrdersPage() {
 
       {/* Error */}
       {error && (
-        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <div className="mb-6 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
           {error}
           <button className="ml-4 font-medium underline" onClick={fetchOrders}>
             Retry

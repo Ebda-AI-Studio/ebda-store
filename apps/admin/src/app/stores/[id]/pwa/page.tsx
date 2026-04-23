@@ -229,7 +229,7 @@ export default function PWASettingsPage() {
             disabled={saving}
             className={`px-4 py-2 rounded-lg font-medium transition-colors ${
               pwaEnabled
-                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 hover:bg-green-200'
+                ? 'bg-success/10 text-success dark:bg-success/30 dark:text-success hover:bg-success/20'
                 : 'bg-muted text-muted-foreground hover:bg-muted/80'
             }`}
           >
@@ -246,7 +246,7 @@ export default function PWASettingsPage() {
         <div className="space-y-6">
           {/* Auto-populate banner */}
           {storeInfo && (
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-center justify-between">
+            <div className="bg-info/5 border border-info/30 rounded-xl p-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 {storeInfo.logo && (
                   <img
@@ -268,7 +268,7 @@ export default function PWASettingsPage() {
               </div>
               <button
                 onClick={handlePopulateFromStore}
-                className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap"
+                className="px-4 py-2 bg-info text-white text-sm rounded-lg hover:bg-info/90 transition-colors whitespace-nowrap"
               >
                 Populate from Store
               </button>
@@ -727,7 +727,7 @@ export default function PWASettingsPage() {
               className={`rounded-xl p-4 text-sm ${
                 message.type === 'success'
                   ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
-                  : 'bg-red-50 border border-red-200 text-red-700'
+                  : 'bg-destructive/5 border border-destructive/30 text-destructive'
               }`}
             >
               {message.text}

@@ -79,9 +79,11 @@ export function StoreDetailsForm({
                     onEditFormChange({ ...editForm, name: e.target.value });
                     if (formErrors.name) onFormErrorsClear('name');
                   }}
-                  className={`mt-1 ${formErrors.name ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
+                  className={`mt-1 ${formErrors.name ? 'border-destructive focus:border-destructive focus:ring-red-500' : ''}`}
                 />
-                {formErrors.name && <p className="mt-1 text-sm text-red-500">{formErrors.name}</p>}
+                {formErrors.name && (
+                  <p className="mt-1 text-sm text-destructive">{formErrors.name}</p>
+                )}
               </div>
               <div>
                 <Label htmlFor="slug">URL Slug</Label>
@@ -93,10 +95,12 @@ export function StoreDetailsForm({
                     onEditFormChange({ ...editForm, slug: value });
                     if (formErrors.slug) onFormErrorsClear('slug');
                   }}
-                  className={`mt-1 ${formErrors.slug ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
+                  className={`mt-1 ${formErrors.slug ? 'border-destructive focus:border-destructive focus:ring-red-500' : ''}`}
                   placeholder="my-store-name"
                 />
-                {formErrors.slug && <p className="mt-1 text-sm text-red-500">{formErrors.slug}</p>}
+                {formErrors.slug && (
+                  <p className="mt-1 text-sm text-destructive">{formErrors.slug}</p>
+                )}
                 <p className="mt-1 text-xs text-muted-foreground">
                   Your store will be at: {editForm.slug || 'your-slug'}.forcemediakw.com
                 </p>

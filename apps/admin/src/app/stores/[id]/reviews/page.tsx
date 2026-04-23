@@ -42,7 +42,7 @@ function StarRating({ rating }: { rating: number }) {
       {Array.from({ length: 5 }).map((_, i) => (
         <svg
           key={i}
-          className={`h-4 w-4 ${i < rating ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground/60'}`}
+          className={`h-4 w-4 ${i < rating ? 'text-warning fill-yellow-400' : 'text-muted-foreground/60'}`}
           viewBox="0 0 20 20"
           fill="currentColor"
         >
@@ -180,7 +180,7 @@ export default function ReviewsPage() {
                         {review.isApproved ? 'Approved' : 'Pending'}
                       </Badge>
                       {review.isVerified && (
-                        <Badge variant="outline" className="text-green-600 border-green-300">
+                        <Badge variant="outline" className="text-success border-success/40">
                           Verified Purchase
                         </Badge>
                       )}
@@ -226,7 +226,7 @@ export default function ReviewsPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="text-red-600 hover:bg-red-50"
+                      className="text-destructive hover:bg-destructive/5"
                       onClick={() => setDeleteTarget(review.id)}
                     >
                       Delete

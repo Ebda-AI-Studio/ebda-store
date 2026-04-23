@@ -24,11 +24,11 @@ export function QuickActionsGrid({
         {storeStatus === 'active' ? (
           <button
             onClick={() => onStatusChange('suspended')}
-            className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm transition hover:border-red-300 hover:shadow-md text-left"
+            className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm transition hover:border-destructive/40 hover:shadow-md text-left"
           >
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-100">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-destructive/10">
               <svg
-                className="h-5 w-5 text-red-600"
+                className="h-5 w-5 text-destructive"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -49,11 +49,11 @@ export function QuickActionsGrid({
         ) : (
           <button
             onClick={() => onStatusChange('active')}
-            className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm transition hover:border-green-300 hover:shadow-md text-left"
+            className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm transition hover:border-success/40 hover:shadow-md text-left"
           >
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success/10">
               <svg
-                className="h-5 w-5 text-green-600"
+                className="h-5 w-5 text-success"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -77,9 +77,9 @@ export function QuickActionsGrid({
           href={`/stores/${storeId}/products`}
           className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm transition hover:border-primary hover:shadow-md"
         >
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-info/10">
             <svg
-              className="h-5 w-5 text-blue-600"
+              className="h-5 w-5 text-info"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -102,9 +102,9 @@ export function QuickActionsGrid({
           href={`/stores/${storeId}/orders`}
           className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm transition hover:border-primary hover:shadow-md"
         >
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-100">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-info/10">
             <svg
-              className="h-5 w-5 text-purple-600"
+              className="h-5 w-5 text-info"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -127,9 +127,9 @@ export function QuickActionsGrid({
           href={`/stores/${storeId}/analytics`}
           className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm transition hover:border-primary hover:shadow-md"
         >
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success/10">
             <svg
-              className="h-5 w-5 text-green-600"
+              className="h-5 w-5 text-success"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"

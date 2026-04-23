@@ -50,8 +50,8 @@ interface Stats {
 const TIER_COLORS: Record<string, { bg: string; text: string; icon: string }> = {
   bronze: { bg: 'bg-amber-100', text: 'text-amber-700', icon: 'bg-amber-500' },
   silver: { bg: 'bg-muted', text: 'text-foreground', icon: 'bg-muted-foreground' },
-  gold: { bg: 'bg-yellow-100', text: 'text-yellow-700', icon: 'bg-yellow-500' },
-  platinum: { bg: 'bg-purple-100', text: 'text-purple-700', icon: 'bg-purple-500' },
+  gold: { bg: 'bg-warning/10', text: 'text-warning', icon: 'bg-warning' },
+  platinum: { bg: 'bg-info/10', text: 'text-info', icon: 'bg-info' },
 };
 
 const DEFAULT_SETTINGS: LoyaltySettings = {
@@ -240,7 +240,7 @@ export default function LoyaltySettingsPage() {
             disabled={saving}
             className={`px-4 py-2 rounded-lg font-medium transition-colors ${
               loyaltyEnabled
-                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 hover:bg-green-200'
+                ? 'bg-success/10 text-success dark:bg-success/30 dark:text-success hover:bg-success/20'
                 : 'bg-muted text-muted-foreground hover:bg-muted/80'
             }`}
           >
@@ -264,7 +264,7 @@ export default function LoyaltySettingsPage() {
               </div>
               <div className="bg-card rounded-xl border border-border p-4">
                 <p className="text-sm text-muted-foreground">Points Issued</p>
-                <p className="text-2xl font-bold text-green-600">
+                <p className="text-2xl font-bold text-success">
                   {stats.totalPointsIssued.toLocaleString()}
                 </p>
               </div>
@@ -276,7 +276,7 @@ export default function LoyaltySettingsPage() {
               </div>
               <div className="bg-card rounded-xl border border-border p-4">
                 <p className="text-sm text-muted-foreground">Outstanding</p>
-                <p className="text-2xl font-bold text-blue-600">
+                <p className="text-2xl font-bold text-info">
                   {stats.outstandingPoints.toLocaleString()}
                 </p>
               </div>
@@ -681,7 +681,7 @@ export default function LoyaltySettingsPage() {
                               {member.points.toLocaleString()}
                             </span>
                           </td>
-                          <td className="px-6 py-4 text-green-600">
+                          <td className="px-6 py-4 text-success">
                             +{member.totalEarned.toLocaleString()}
                           </td>
                           <td className="px-6 py-4 text-primary">
@@ -728,7 +728,7 @@ export default function LoyaltySettingsPage() {
               <button
                 onClick={performToggle}
                 disabled={saving}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+                className="px-4 py-2 bg-destructive text-white rounded-lg hover:bg-destructive/90 disabled:opacity-50"
               >
                 Disable
               </button>
@@ -773,7 +773,7 @@ export default function LoyaltySettingsPage() {
 
               <div>
                 <label className="block text-sm font-medium text-muted-foreground mb-2">
-                  Points <span className="text-red-500">*</span>
+                  Points <span className="text-destructive">*</span>
                 </label>
                 <input
                   type="number"

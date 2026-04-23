@@ -306,7 +306,7 @@ export default function StoreCustomersPage() {
                     </td>
                     <td className="px-6 py-4 text-sm text-muted-foreground">{customer.email}</td>
                     <td className="px-6 py-4">
-                      <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">
+                      <span className="inline-flex items-center rounded-full bg-info/5 px-2.5 py-1 text-xs font-medium text-info">
                         {customer.totalOrders} order{customer.totalOrders !== 1 ? 's' : ''}
                       </span>
                     </td>

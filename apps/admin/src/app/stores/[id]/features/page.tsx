@@ -35,10 +35,10 @@ const CATEGORY_LABELS: Record<FeatureCategory, string> = {
 };
 
 const CATEGORY_COLORS: Record<FeatureCategory, { icon: string; bg: string; text: string }> = {
-  commerce: { icon: 'bg-blue-100', bg: 'bg-blue-500', text: 'text-blue-600' },
-  marketing: { icon: 'bg-purple-100', bg: 'bg-purple-500', text: 'text-purple-600' },
+  commerce: { icon: 'bg-info/10', bg: 'bg-info', text: 'text-info' },
+  marketing: { icon: 'bg-info/10', bg: 'bg-info', text: 'text-info' },
   operations: { icon: 'bg-primary/10', bg: 'bg-primary', text: 'text-primary' },
-  storefront: { icon: 'bg-green-100', bg: 'bg-green-500', text: 'text-green-600' },
+  storefront: { icon: 'bg-success/10', bg: 'bg-success', text: 'text-success' },
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

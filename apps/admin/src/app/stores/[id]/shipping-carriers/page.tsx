@@ -85,12 +85,12 @@ const DEFAULT_CONFIGS: CarrierConfigs = {
 function ShipmentStatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
     created: 'bg-muted text-foreground',
-    picked_up: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-    in_transit: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300',
+    picked_up: 'bg-info/10 text-info dark:bg-info/30 dark:text-info',
+    in_transit: 'bg-warning/10 text-warning dark:bg-warning/30 dark:text-warning',
     out_for_delivery: 'bg-primary/10 text-primary',
-    delivered: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
-    failed: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
-    returned: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+    delivered: 'bg-success/10 text-success dark:bg-success/30 dark:text-success',
+    failed: 'bg-destructive/10 text-destructive dark:bg-destructive/30/30 dark:text-destructive',
+    returned: 'bg-info/10 text-info dark:bg-info/30 dark:text-info',
     cancelled: 'bg-muted text-muted-foreground',
   };
   const labels: Record<string, string> = {
@@ -155,7 +155,7 @@ function ConnectionStatus({ status }: { status: 'idle' | 'testing' | 'success' |
     );
   if (status === 'success')
     return (
-      <span className="flex items-center gap-1.5 text-sm text-green-600">
+      <span className="flex items-center gap-1.5 text-sm text-success">
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
         </svg>
@@ -163,7 +163,7 @@ function ConnectionStatus({ status }: { status: 'idle' | 'testing' | 'success' |
       </span>
     );
   return (
-    <span className="flex items-center gap-1.5 text-sm text-red-600">
+    <span className="flex items-center gap-1.5 text-sm text-destructive">
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path
           strokeLinecap="round"
@@ -637,9 +637,9 @@ export default function ShippingCarriersPage() {
           <div className="bg-card rounded-xl border border-border p-6">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center">
+                <div className="w-10 h-10 bg-destructive/10 rounded-xl flex items-center justify-center">
                   <svg
-                    className="w-5 h-5 text-red-600"
+                    className="w-5 h-5 text-destructive"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"

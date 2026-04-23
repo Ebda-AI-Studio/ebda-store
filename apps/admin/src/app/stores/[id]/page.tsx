@@ -498,7 +498,7 @@ export default function StoreDetailPage() {
           {
             label: 'Products',
             value: store._count?.products || 0,
-            iconBg: 'bg-blue-500',
+            iconBg: 'bg-info',
             icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4',
           },
           {
@@ -724,14 +724,14 @@ export default function StoreDetailPage() {
             <button
               disabled={isChangingStatus}
               onClick={() => setShowSuspendModal(true)}
-              className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm transition-all duration-200 hover:border-red-300 hover:shadow-md cursor-pointer text-left disabled:opacity-60 disabled:cursor-not-allowed"
+              className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm transition-all duration-200 hover:border-destructive/40 hover:shadow-md cursor-pointer text-left disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-100">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-destructive/10">
                 {isChangingStatus ? (
-                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-red-300 border-t-red-600" />
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-destructive/40 border-t-red-600" />
                 ) : (
                   <svg
-                    className="h-5 w-5 text-red-600"
+                    className="h-5 w-5 text-destructive"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -754,14 +754,14 @@ export default function StoreDetailPage() {
             <button
               disabled={isChangingStatus}
               onClick={() => handleStatusChange('active')}
-              className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm transition-all duration-200 hover:border-green-300 hover:shadow-md cursor-pointer text-left disabled:opacity-60 disabled:cursor-not-allowed"
+              className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm transition-all duration-200 hover:border-success/40 hover:shadow-md cursor-pointer text-left disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success/10">
                 {isChangingStatus ? (
-                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-green-300 border-t-green-600" />
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-success/40 border-t-green-600" />
                 ) : (
                   <svg
-                    className="h-5 w-5 text-green-600"
+                    className="h-5 w-5 text-success"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -786,9 +786,9 @@ export default function StoreDetailPage() {
             href={`/stores/${store.id}/products`}
             className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm transition-all duration-200 hover:border-primary hover:shadow-md cursor-pointer"
           >
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-info/10">
               <svg
-                className="h-5 w-5 text-blue-600"
+                className="h-5 w-5 text-info"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -813,9 +813,9 @@ export default function StoreDetailPage() {
             href={`/stores/${store.id}/orders`}
             className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm transition-all duration-200 hover:border-primary hover:shadow-md cursor-pointer"
           >
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-100">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-info/10">
               <svg
-                className="h-5 w-5 text-purple-600"
+                className="h-5 w-5 text-info"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -838,9 +838,9 @@ export default function StoreDetailPage() {
             href={`/stores/${store.id}/analytics`}
             className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm transition-all duration-200 hover:border-primary hover:shadow-md cursor-pointer"
           >
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success/10">
               <svg
-                className="h-5 w-5 text-green-600"
+                className="h-5 w-5 text-success"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"

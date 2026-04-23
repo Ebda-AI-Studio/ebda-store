@@ -203,13 +203,13 @@ export default function CouponsPage() {
     if (coupon.startsAt && new Date(coupon.startsAt) > now) {
       return {
         label: 'Scheduled',
-        color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+        color: 'bg-info/10 text-info dark:bg-info/30 dark:text-info',
       };
     }
     if (coupon.expiresAt && new Date(coupon.expiresAt) < now) {
       return {
         label: 'Expired',
-        color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+        color: 'bg-destructive/10 text-destructive dark:bg-destructive/30/30 dark:text-destructive',
       };
     }
     if (coupon.usageLimit && coupon.usageCount >= coupon.usageLimit) {
@@ -220,7 +220,7 @@ export default function CouponsPage() {
     }
     return {
       label: 'Active',
-      color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+      color: 'bg-success/10 text-success dark:bg-success/30 dark:text-success',
     };
   }
 
@@ -406,7 +406,7 @@ export default function CouponsPage() {
                               className={`p-2 rounded-lg transition-colors ${
                                 coupon.isActive
                                   ? 'text-amber-600 hover:bg-amber-50'
-                                  : 'text-green-600 hover:bg-green-50'
+                                  : 'text-success hover:bg-success/5'
                               }`}
                               title={coupon.isActive ? 'Deactivate' : 'Activate'}
                             >
@@ -461,7 +461,7 @@ export default function CouponsPage() {
                             </button>
                             <button
                               onClick={() => handleDelete(coupon.id)}
-                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                              className="p-2 text-destructive hover:bg-destructive/5 rounded-lg"
                               title="Delete"
                             >
                               <svg

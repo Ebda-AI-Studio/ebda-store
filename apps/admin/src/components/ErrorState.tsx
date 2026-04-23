@@ -18,9 +18,9 @@ export function ErrorState({
   return (
     <div className="force-card py-16">
       <div className="flex flex-col items-center text-center">
-        <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-red-50">
+        <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-destructive/5">
           <svg
-            className="h-10 w-10 text-red-500"
+            className="h-10 w-10 text-destructive"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"

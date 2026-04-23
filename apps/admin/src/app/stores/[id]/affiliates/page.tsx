@@ -56,9 +56,9 @@ interface Meta {
 // ==========================================
 
 const STATUS_COLORS: Record<string, string> = {
-  pending: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300',
-  approved: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
-  rejected: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+  pending: 'bg-warning/10 text-warning dark:bg-warning/30 dark:text-warning',
+  approved: 'bg-success/10 text-success dark:bg-success/30 dark:text-success',
+  rejected: 'bg-destructive/10 text-destructive dark:bg-destructive/30/30 dark:text-destructive',
   suspended: 'bg-muted text-foreground',
 };
 
@@ -253,11 +253,11 @@ export default function AffiliatesPage() {
               </div>
               <div className="bg-card rounded-xl border border-border p-4">
                 <p className="text-sm text-muted-foreground">Active Referrals</p>
-                <p className="text-2xl font-bold text-green-600">{stats.totalReferrals}</p>
+                <p className="text-2xl font-bold text-success">{stats.totalReferrals}</p>
               </div>
               <div className="bg-card rounded-xl border border-border p-4">
                 <p className="text-sm text-muted-foreground">Conversion Rate</p>
-                <p className="text-2xl font-bold text-blue-600">{stats.conversionRate}%</p>
+                <p className="text-2xl font-bold text-info">{stats.conversionRate}%</p>
               </div>
               <div className="bg-card rounded-xl border border-border p-4">
                 <p className="text-sm text-muted-foreground">Total Paid</p>
@@ -267,7 +267,7 @@ export default function AffiliatesPage() {
               </div>
               <div className="bg-card rounded-xl border border-border p-4">
                 <p className="text-sm text-muted-foreground">Conversions</p>
-                <p className="text-2xl font-bold text-purple-600">{stats.conversions}</p>
+                <p className="text-2xl font-bold text-info">{stats.conversions}</p>
               </div>
             </div>
           )}
@@ -404,7 +404,7 @@ export default function AffiliatesPage() {
                                 {affiliate.status}
                               </span>
                             </td>
-                            <td className="px-6 py-4 text-green-600 font-medium">
+                            <td className="px-6 py-4 text-success font-medium">
                               {formatFils(Number(affiliate.totalEarned))}
                             </td>
                             <td className="px-6 py-4 text-primary font-medium">
@@ -417,14 +417,14 @@ export default function AffiliatesPage() {
                                     <button
                                       onClick={() => handleStatusAction(affiliate, 'approve')}
                                       disabled={saving}
-                                      className="text-green-600 hover:text-green-700 text-sm font-medium disabled:opacity-50"
+                                      className="text-success hover:text-success text-sm font-medium disabled:opacity-50"
                                     >
                                       Approve
                                     </button>
                                     <button
                                       onClick={() => handleStatusAction(affiliate, 'reject')}
                                       disabled={saving}
-                                      className="text-red-600 hover:text-red-700 text-sm font-medium disabled:opacity-50"
+                                      className="text-destructive hover:text-destructive text-sm font-medium disabled:opacity-50"
                                     >
                                       Reject
                                     </button>
@@ -644,7 +644,7 @@ export default function AffiliatesPage() {
 
               <div>
                 <label className="block text-sm font-medium text-muted-foreground mb-2">
-                  Amount (KWD) <span className="text-red-500">*</span>
+                  Amount (KWD) <span className="text-destructive">*</span>
                 </label>
                 <input
                   type="number"

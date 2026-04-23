@@ -252,10 +252,10 @@ export default function StoreTemplatePage() {
         </div>
 
         {/* Help Text */}
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+        <div className="bg-info/5 border border-info/30 rounded-xl p-4">
           <div className="flex gap-3">
             <svg
-              className="w-5 h-5 text-blue-500 shrink-0 mt-0.5"
+              className="w-5 h-5 text-info shrink-0 mt-0.5"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -268,8 +268,8 @@ export default function StoreTemplatePage() {
               />
             </svg>
             <div>
-              <p className="text-blue-800 font-medium">About Templates</p>
-              <p className="text-blue-600 text-sm mt-1">
+              <p className="text-info font-medium">About Templates</p>
+              <p className="text-info text-sm mt-1">
                 Templates define the overall look and feel of your storefront. You can change
                 templates at any time, and your content will automatically adapt to the new design.
                 Customize colors and fonts in the

@@ -87,8 +87,8 @@ export default function DashboardPage() {
         </svg>
       ),
       color: 'from-blue-500 to-blue-600',
-      bgColor: 'bg-blue-50',
-      iconBg: 'bg-blue-500',
+      bgColor: 'bg-info/5',
+      iconBg: 'bg-info',
     },
     {
       name: 'Total Users',
@@ -154,7 +154,7 @@ export default function DashboardPage() {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
         </svg>
       ),
-      iconBg: 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300',
+      iconBg: 'bg-info/10 text-info dark:bg-info/30 dark:text-info',
     },
     {
       title: 'Manage Users',

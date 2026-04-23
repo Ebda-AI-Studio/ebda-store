@@ -141,7 +141,7 @@ export default function OrderDetailClient() {
     pending: 'bg-[hsl(var(--warning))]/20 text-[hsl(var(--warning))]',
     confirmed: 'bg-[hsl(var(--info))]/20 text-[hsl(var(--info))]',
     processing: 'bg-[hsl(var(--info))]/20 text-[hsl(var(--info))]',
-    shipped: 'bg-purple-100 text-purple-800',
+    shipped: 'bg-info/10 text-info',
     delivered: 'bg-[hsl(var(--success))]/20 text-[hsl(var(--success))]',
     cancelled: 'bg-destructive/20 text-destructive',
     refunded: 'bg-muted text-foreground',

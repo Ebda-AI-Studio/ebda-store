@@ -243,7 +243,7 @@ export default function StorePaymentSettingsPage() {
       }
     >
       {error && (
-        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <div className="mb-6 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
           {error}
           <button className="ml-4 font-medium underline" onClick={fetchConfigs}>
             Retry
@@ -473,7 +473,7 @@ export default function StorePaymentSettingsPage() {
                       className={`rounded-lg p-3 text-sm ${
                         message.type === 'success'
                           ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300'
-                          : 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300'
+                          : 'bg-destructive/5 text-destructive dark:bg-destructive/30/20 dark:text-destructive'
                       }`}
                     >
                       {message.text}

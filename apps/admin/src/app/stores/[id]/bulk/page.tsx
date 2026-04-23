@@ -260,9 +260,9 @@ export default function BulkOperationsPage() {
       {activeTab === 'import' && (
         <div className="space-y-6">
           {/* Instructions */}
-          <div className="rounded-xl border bg-blue-50 p-6">
-            <h3 className="font-semibold text-blue-900">How to Import Products</h3>
-            <ol className="mt-3 list-decimal list-inside space-y-2 text-sm text-blue-800">
+          <div className="rounded-xl border bg-info/5 p-6">
+            <h3 className="font-semibold text-info">How to Import Products</h3>
+            <ol className="mt-3 list-decimal list-inside space-y-2 text-sm text-info">
               <li>Download the CSV template using the button below</li>
               <li>Fill in your product data following the template format</li>
               <li>Prices are in fils (1 KWD = 1000 fils)</li>
@@ -477,8 +477,8 @@ export default function BulkOperationsPage() {
                   </p>
                   <p className="text-xs text-muted-foreground">Created</p>
                 </div>
-                <div className="text-center p-4 bg-blue-50 rounded-lg">
-                  <p className="text-2xl font-bold text-blue-600">{importResult.updated}</p>
+                <div className="text-center p-4 bg-info/5 rounded-lg">
+                  <p className="text-2xl font-bold text-info">{importResult.updated}</p>
                   <p className="text-xs text-muted-foreground">Updated</p>
                 </div>
                 <div className="text-center p-4 bg-destructive/10 rounded-lg">
@@ -494,7 +494,7 @@ export default function BulkOperationsPage() {
                     {importResult.errors.map((error, i) => (
                       <div
                         key={i}
-                        className="px-4 py-2 border-b border-red-100 last:border-0 text-sm"
+                        className="px-4 py-2 border-b border-destructive/20 last:border-0 text-sm"
                       >
                         <span className="font-medium text-destructive">Row {error.row}:</span>{' '}
                         <span className="text-destructive">{error.error}</span>

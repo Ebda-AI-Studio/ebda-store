@@ -18,8 +18,8 @@ interface LoyaltyMember {
 const TIER_COLORS: Record<string, { bg: string; text: string; icon: string }> = {
   bronze: { bg: 'bg-amber-100', text: 'text-amber-700', icon: 'bg-amber-500' },
   silver: { bg: 'bg-muted', text: 'text-foreground', icon: 'bg-muted-foreground' },
-  gold: { bg: 'bg-yellow-100', text: 'text-yellow-700', icon: 'bg-yellow-500' },
-  platinum: { bg: 'bg-purple-100', text: 'text-purple-700', icon: 'bg-purple-500' },
+  gold: { bg: 'bg-warning/10', text: 'text-warning', icon: 'bg-warning' },
+  platinum: { bg: 'bg-info/10', text: 'text-info', icon: 'bg-info' },
 };
 
 interface LoyaltyMembersTableProps {
@@ -143,9 +143,7 @@ export function LoyaltyMembersTable({
                       {member.points.toLocaleString()}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-green-600">
-                    +{member.totalEarned.toLocaleString()}
-                  </td>
+                  <td className="px-6 py-4 text-success">+{member.totalEarned.toLocaleString()}</td>
                   <td className="px-6 py-4 text-primary">
                     -{member.totalRedeemed.toLocaleString()}
                   </td>

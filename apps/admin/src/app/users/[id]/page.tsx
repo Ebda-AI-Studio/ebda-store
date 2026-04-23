@@ -28,7 +28,7 @@ const ROLE_LABELS: Record<string, string> = {
 const STATUS_STYLES: Record<string, { bg: string; text: string; dot: string }> = {
   active: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
   inactive: { bg: 'bg-muted', text: 'text-muted-foreground', dot: 'bg-muted-foreground' },
-  suspended: { bg: 'bg-red-50', text: 'text-red-700', dot: 'bg-red-500' },
+  suspended: { bg: 'bg-destructive/5', text: 'text-destructive', dot: 'bg-destructive' },
 };
 
 function formatDate(dateString: string | null) {
@@ -132,8 +132,8 @@ export default function UserDetailPage() {
   if (error || !user) {
     return (
       <AdminLayout title="User Not Found" subtitle="The requested user could not be found">
-        <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
-          <p className="text-red-700">{error || 'User not found'}</p>
+        <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6 text-center">
+          <p className="text-destructive">{error || 'User not found'}</p>
           <Link href="/users" className="mt-4 inline-block text-primary hover:underline">
             Back to Users
           </Link>
@@ -348,7 +348,7 @@ export default function UserDetailPage() {
                   className={`rounded-lg p-4 text-sm ${
                     saveMessage.type === 'success'
                       ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300'
-                      : 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300'
+                      : 'bg-destructive/5 text-destructive dark:bg-destructive/30/20 dark:text-destructive'
                   }`}
                 >
                   {saveMessage.text}

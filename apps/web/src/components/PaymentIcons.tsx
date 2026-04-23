@@ -6,7 +6,7 @@ interface PaymentIconProps {
 
 export function KNETIcon({ className = 'h-5 w-5' }: PaymentIconProps) {
   return (
-    <div className="flex h-8 w-12 items-center justify-center rounded bg-blue-600">
+    <div className="flex h-8 w-12 items-center justify-center rounded bg-info">
       <svg
         className={`${className} text-white`}
         fill="none"
@@ -88,7 +88,7 @@ export function GooglePayIcon({ className = 'h-5 w-5' }: PaymentIconProps) {
 
 export function CashOnDeliveryIcon({ className = 'h-5 w-5' }: PaymentIconProps) {
   return (
-    <div className="flex h-8 w-12 items-center justify-center rounded bg-green-600">
+    <div className="flex h-8 w-12 items-center justify-center rounded bg-success">
       <svg
         className={`${className} text-white`}
         fill="none"
@@ -108,7 +108,7 @@ export function CashOnDeliveryIcon({ className = 'h-5 w-5' }: PaymentIconProps) 
 
 export function BankTransferIcon({ className = 'h-5 w-5' }: PaymentIconProps) {
   return (
-    <div className="flex h-8 w-12 items-center justify-center rounded bg-purple-600">
+    <div className="flex h-8 w-12 items-center justify-center rounded bg-info">
       <svg
         className={`${className} text-white`}
         fill="none"

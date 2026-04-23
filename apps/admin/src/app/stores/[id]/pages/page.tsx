@@ -213,7 +213,7 @@ export default function StorePagesPage() {
                 />
                 <button
                   onClick={() => removeLink(section, index)}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-red-50 hover:text-red-500 transition-colors"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-destructive/5 hover:text-destructive transition-colors"
                   title="Remove link"
                 >
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -268,11 +268,11 @@ export default function StorePagesPage() {
       }
     >
       <div className="space-y-6">
-        <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
-          <p className="text-sm text-blue-800">
+        <div className="rounded-xl border border-info/30 bg-info/5 p-4">
+          <p className="text-sm text-info">
             Configure which links appear in your store&apos;s footer. Disable links to hide them, or
             add new ones. Links use relative paths (e.g.,{' '}
-            <code className="bg-blue-100 px-1 rounded">/faq</code>).
+            <code className="bg-info/10 px-1 rounded">/faq</code>).
           </p>
         </div>
 

@@ -17,7 +17,7 @@ const PLATFORMS = [
         <path d="M12 2C6.477 2 2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.879V14.89h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.989C18.343 21.129 22 16.99 22 12c0-5.523-4.477-10-10-10z" />
       </svg>
     ),
-    color: 'bg-blue-600',
+    color: 'bg-info',
     idLabel: 'Pixel ID',
     idPlaceholder: '123456789012345',
     hasAccessToken: true,
@@ -47,7 +47,7 @@ const PLATFORMS = [
         <path d="M12.206.793c.99 0 4.347.276 5.93 3.821.529 1.193.403 3.219.299 4.847l-.003.06c-.012.18-.022.345-.03.51.075.045.203.09.401.09.3-.016.659-.12 1.033-.301.165-.088.344-.104.464-.104.182 0 .359.029.509.09.45.149.734.479.734.838.015.449-.39.839-1.213 1.168-.089.029-.209.075-.344.119-.45.135-1.139.36-1.333.81-.09.224-.061.524.12.868l.015.015c.06.136 1.526 3.475 4.791 4.014.255.044.435.27.42.509 0 .075-.015.149-.045.225-.24.569-1.273.988-3.146 1.271-.059.091-.12.375-.164.57-.029.179-.074.36-.134.553-.076.271-.27.405-.555.405h-.03c-.135 0-.313-.031-.538-.074-.36-.075-.765-.135-1.273-.135-.3 0-.599.015-.913.074-.6.104-1.123.464-1.723.884-.853.599-1.826 1.288-3.294 1.288-.06 0-.119-.015-.18-.015h-.149c-1.468 0-2.427-.675-3.279-1.288-.599-.42-1.107-.779-1.707-.884-.314-.045-.629-.074-.928-.074-.54 0-.958.089-1.272.149-.211.043-.391.074-.54.074-.374 0-.523-.224-.583-.42-.061-.192-.09-.389-.135-.567-.046-.181-.105-.494-.166-.57-1.918-.222-2.95-.642-3.189-1.226-.031-.063-.052-.15-.055-.225-.015-.243.165-.465.42-.509 3.264-.54 4.73-3.879 4.791-4.02l.016-.029c.18-.345.224-.645.119-.869-.195-.434-.884-.658-1.332-.809-.121-.029-.24-.074-.346-.119-.809-.33-1.227-.719-1.212-1.168 0-.359.285-.69.735-.838.165-.045.359-.074.523-.074.12 0 .285.015.465.074.36.18.735.301 1.032.301.196 0 .33-.045.406-.089-.009-.18-.024-.359-.03-.539 0-.015-.003-.044-.003-.059-.104-1.627-.225-3.653.299-4.847C7.859 1.07 11.216.793 12.206.793z" />
       </svg>
     ),
-    color: 'bg-yellow-400',
+    color: 'bg-warning',
     idLabel: 'Pixel ID',
     idPlaceholder: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
     docsUrl: 'https://businesshelp.snapchat.com/s/article/snap-pixel-about',
@@ -77,7 +77,7 @@ const PLATFORMS = [
         <path d="M12 0L1.608 6v12L12 24l10.392-6V6zm-1.068 17.4l-4.788-4.788 1.932-1.932 2.856 2.856 5.94-5.94 1.932 1.932z" />
       </svg>
     ),
-    color: 'bg-blue-500',
+    color: 'bg-info',
     idLabel: 'Container ID',
     idPlaceholder: 'GTM-XXXXXXX',
     docsUrl: 'https://developers.google.com/tag-manager',
@@ -92,7 +92,7 @@ const PLATFORMS = [
         <path d="M12 21.75C13.2426 21.75 14.25 20.7426 14.25 19.5C14.25 18.2574 13.2426 17.25 12 17.25C10.7574 17.25 9.75 18.2574 9.75 19.5C9.75 20.7426 10.7574 21.75 12 21.75Z" />
       </svg>
     ),
-    color: 'bg-green-500',
+    color: 'bg-success',
     idLabel: 'Conversion ID',
     idPlaceholder: 'AW-XXXXXXXXX',
     hasConversionLabel: true,
@@ -122,7 +122,7 @@ const PLATFORMS = [
         <path d="M12 0C5.373 0 0 5.372 0 12c0 5.084 3.163 9.426 7.627 11.174-.105-.949-.2-2.405.042-3.441.218-.937 1.407-5.965 1.407-5.965s-.359-.719-.359-1.782c0-1.668.967-2.914 2.171-2.914 1.023 0 1.518.769 1.518 1.69 0 1.029-.655 2.568-.994 3.995-.283 1.194.599 2.169 1.777 2.169 2.133 0 3.772-2.249 3.772-5.495 0-2.873-2.064-4.882-5.012-4.882-3.414 0-5.418 2.561-5.418 5.207 0 1.031.397 2.138.893 2.738.098.119.112.224.083.345l-.333 1.36c-.053.22-.174.267-.402.161-1.499-.698-2.436-2.889-2.436-4.649 0-3.785 2.75-7.262 7.929-7.262 4.163 0 7.398 2.967 7.398 6.931 0 4.136-2.607 7.464-6.227 7.464-1.216 0-2.359-.631-2.75-1.378l-.748 2.853c-.271 1.043-1.002 2.35-1.492 3.146C9.57 23.812 10.763 24 12 24c6.627 0 12-5.373 12-12 0-6.628-5.373-12-12-12z" />
       </svg>
     ),
-    color: 'bg-red-600',
+    color: 'bg-destructive',
     idLabel: 'Tag ID',
     idPlaceholder: '1234567890123',
     docsUrl: 'https://help.pinterest.com/en/business/article/install-the-pinterest-tag',
@@ -250,7 +250,7 @@ export default function MarketingPixelsPage() {
         <div className="flex items-center gap-3">
           {saveMessage && (
             <span
-              className={`text-sm ${saveMessage.includes('Failed') ? 'text-red-600' : 'text-green-600'}`}
+              className={`text-sm ${saveMessage.includes('Failed') ? 'text-destructive' : 'text-success'}`}
             >
               {saveMessage}
             </span>
@@ -267,10 +267,10 @@ export default function MarketingPixelsPage() {
     >
       <div className="space-y-6">
         {/* Info Banner */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="bg-info/5 border border-info/30 rounded-lg p-4">
           <div className="flex items-start gap-3">
             <svg
-              className="w-5 h-5 text-blue-600 mt-0.5"
+              className="w-5 h-5 text-info mt-0.5"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -282,7 +282,7 @@ export default function MarketingPixelsPage() {
                 d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
               />
             </svg>
-            <div className="text-sm text-blue-800">
+            <div className="text-sm text-info">
               <p className="font-medium mb-1">About Marketing Pixels</p>
               <p>
                 Marketing pixels are small code snippets that track visitor behavior on your store.
@@ -358,7 +358,7 @@ export default function MarketingPixelsPage() {
                     <span
                       className={`px-2 py-1 text-xs font-medium rounded-full ${
                         isEnabled
-                          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                          ? 'bg-success/10 text-success dark:bg-success/30 dark:text-success'
                           : 'bg-muted text-muted-foreground'
                       }`}
                     >

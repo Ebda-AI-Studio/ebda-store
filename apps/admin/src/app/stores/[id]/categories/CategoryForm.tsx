@@ -63,7 +63,7 @@ export function CategoryForm({
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">
-              Name (English) <span className="text-red-500">*</span>
+              Name (English) <span className="text-destructive">*</span>
             </label>
             <input
               type="text"
@@ -79,9 +79,9 @@ export function CategoryForm({
                 if (formErrors.name) onFormErrorChange(prev => ({ ...prev, name: '' }));
               }}
               placeholder="Electronics"
-              className={`w-full rounded-lg border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary ${formErrors.name ? 'border-red-500' : 'border-border'}`}
+              className={`w-full rounded-lg border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary ${formErrors.name ? 'border-destructive' : 'border-border'}`}
             />
-            {formErrors.name && <p className="mt-1 text-xs text-red-500">{formErrors.name}</p>}
+            {formErrors.name && <p className="mt-1 text-xs text-destructive">{formErrors.name}</p>}
           </div>
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">Name (Arabic)</label>
@@ -98,7 +98,7 @@ export function CategoryForm({
 
         <div>
           <label className="block text-sm font-medium text-foreground mb-1">
-            URL Slug <span className="text-red-500">*</span>
+            URL Slug <span className="text-destructive">*</span>
           </label>
           <input
             type="text"
@@ -108,9 +108,9 @@ export function CategoryForm({
               if (formErrors.slug) onFormErrorChange(prev => ({ ...prev, slug: '' }));
             }}
             placeholder="electronics"
-            className={`w-full rounded-lg border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary ${formErrors.slug ? 'border-red-500' : 'border-border'}`}
+            className={`w-full rounded-lg border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary ${formErrors.slug ? 'border-destructive' : 'border-border'}`}
           />
-          {formErrors.slug && <p className="mt-1 text-xs text-red-500">{formErrors.slug}</p>}
+          {formErrors.slug && <p className="mt-1 text-xs text-destructive">{formErrors.slug}</p>}
           <p className="mt-1 text-xs text-muted-foreground">
             Used in URLs: lowercase, hyphens only
           </p>
@@ -156,7 +156,7 @@ export function CategoryForm({
         {saveMessage && (
           <p
             className={`text-sm ${
-              saveMessage.includes('success') ? 'text-emerald-600' : 'text-red-600'
+              saveMessage.includes('success') ? 'text-emerald-600' : 'text-destructive'
             }`}
           >
             {saveMessage}

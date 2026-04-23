@@ -269,7 +269,7 @@ export default function ProductDetailPage() {
                     product.inventory === 0
                       ? 'text-destructive'
                       : product.inventory <= product.lowStockThreshold
-                        ? 'text-yellow-600'
+                        ? 'text-warning'
                         : 'text-[hsl(var(--success))]'
                   }`}
                 >

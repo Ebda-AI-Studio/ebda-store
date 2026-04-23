@@ -207,7 +207,7 @@ export default function StoreCategoriesPage() {
     >
       {/* Error */}
       {error && (
-        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <div className="mb-6 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
           {error}
           <button className="ml-4 font-medium underline" onClick={fetchCategories}>
             Retry
@@ -261,7 +261,7 @@ export default function StoreCategoriesPage() {
               <button
                 onClick={confirmDelete}
                 disabled={deletingId === deleteTarget.id}
-                className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+                className="px-4 py-2 text-sm bg-destructive text-white rounded-lg hover:bg-destructive/90 disabled:opacity-50"
               >
                 {deletingId === deleteTarget.id ? 'Deleting...' : 'Delete'}
               </button>

@@ -113,7 +113,7 @@ export default function LoyaltyClient() {
       case 'silver':
         return 'bg-muted text-foreground';
       case 'platinum':
-        return 'bg-purple-100 text-purple-800';
+        return 'bg-info/10 text-info';
       default:
         return 'bg-[hsl(var(--info))]/20 text-[hsl(var(--info))]';
     }

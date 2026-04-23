@@ -58,15 +58,15 @@ const statusConfig = {
   },
   suspended: {
     variant: 'destructive' as const,
-    bg: 'bg-red-50',
-    text: 'text-red-700',
-    dot: 'bg-red-500',
+    bg: 'bg-destructive/5',
+    text: 'text-destructive',
+    dot: 'bg-destructive',
   },
 };
 
 const planConfig = {
   free: { bg: 'bg-muted', text: 'text-foreground', icon: '🆓' },
-  starter: { bg: 'bg-blue-50', text: 'text-blue-700', icon: '🚀' },
+  starter: { bg: 'bg-info/5', text: 'text-info', icon: '🚀' },
   professional: { bg: 'bg-violet-50', text: 'text-violet-700', icon: '💼' },
   enterprise: { bg: 'bg-amber-50', text: 'text-amber-700', icon: '👑' },
 };

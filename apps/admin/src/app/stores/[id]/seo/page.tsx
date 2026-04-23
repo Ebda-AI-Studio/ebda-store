@@ -37,7 +37,11 @@ function CharCount({ value, max }: { value: string; max: number }) {
   return (
     <span
       className={`text-xs ${
-        isOver ? 'text-red-500 font-medium' : isClose ? 'text-amber-500' : 'text-muted-foreground'
+        isOver
+          ? 'text-destructive font-medium'
+          : isClose
+            ? 'text-amber-500'
+            : 'text-muted-foreground'
       }`}
     >
       {len}/{max}
@@ -145,7 +149,7 @@ export default function StoreSeoPage() {
           <h2 className="mb-4 text-sm font-medium text-foreground">Search Result Preview</h2>
           <div className="rounded-lg border border-border p-4 max-w-xl">
             <p className="text-xs text-muted-foreground mb-1">example.com</p>
-            <p className="text-lg font-medium text-blue-700 leading-tight line-clamp-1">
+            <p className="text-lg font-medium text-info leading-tight line-clamp-1">
               {settings.metaTitle}
             </p>
             {settings.metaDescription && (
@@ -161,8 +165,8 @@ export default function StoreSeoPage() {
         {/* English SEO */}
         <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
           <div className="flex items-center gap-2">
-            <div className="flex h-6 w-6 items-center justify-center rounded bg-blue-100">
-              <span className="text-xs font-bold text-blue-600">EN</span>
+            <div className="flex h-6 w-6 items-center justify-center rounded bg-info/10">
+              <span className="text-xs font-bold text-info">EN</span>
             </div>
             <h2 className="font-semibold text-foreground">English SEO</h2>
           </div>
@@ -179,7 +183,7 @@ export default function StoreSeoPage() {
               placeholder="My Store — Best Products in Kuwait"
               maxLength={TITLE_MAX + 20}
               className={`w-full rounded-lg border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary ${
-                settings.metaTitle.length > TITLE_MAX ? 'border-red-300' : 'border-border'
+                settings.metaTitle.length > TITLE_MAX ? 'border-destructive/40' : 'border-border'
               }`}
             />
             <p className="mt-1 text-xs text-muted-foreground">
@@ -200,7 +204,9 @@ export default function StoreSeoPage() {
               rows={3}
               maxLength={DESC_MAX + 50}
               className={`w-full rounded-lg border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none ${
-                settings.metaDescription.length > DESC_MAX ? 'border-red-300' : 'border-border'
+                settings.metaDescription.length > DESC_MAX
+                  ? 'border-destructive/40'
+                  : 'border-border'
               }`}
             />
             <p className="mt-1 text-xs text-muted-foreground">
@@ -212,8 +218,8 @@ export default function StoreSeoPage() {
         {/* Arabic SEO */}
         <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
           <div className="flex items-center gap-2">
-            <div className="flex h-6 w-6 items-center justify-center rounded bg-green-100">
-              <span className="text-xs font-bold text-green-600">AR</span>
+            <div className="flex h-6 w-6 items-center justify-center rounded bg-success/10">
+              <span className="text-xs font-bold text-success">AR</span>
             </div>
             <h2 className="font-semibold text-foreground">Arabic SEO</h2>
           </div>
@@ -231,7 +237,7 @@ export default function StoreSeoPage() {
               placeholder="متجري — أفضل المنتجات في الكويت"
               maxLength={TITLE_MAX + 20}
               className={`w-full rounded-lg border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary ${
-                settings.metaTitleAr.length > TITLE_MAX ? 'border-red-300' : 'border-border'
+                settings.metaTitleAr.length > TITLE_MAX ? 'border-destructive/40' : 'border-border'
               }`}
             />
           </div>
@@ -251,7 +257,9 @@ export default function StoreSeoPage() {
               rows={3}
               maxLength={DESC_MAX + 50}
               className={`w-full rounded-lg border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none ${
-                settings.metaDescriptionAr.length > DESC_MAX ? 'border-red-300' : 'border-border'
+                settings.metaDescriptionAr.length > DESC_MAX
+                  ? 'border-destructive/40'
+                  : 'border-border'
               }`}
             />
           </div>
@@ -325,7 +333,7 @@ export default function StoreSeoPage() {
             className={`rounded-xl p-4 text-sm ${
               message.type === 'success'
                 ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
-                : 'bg-red-50 border border-red-200 text-red-700'
+                : 'bg-destructive/5 border border-destructive/30 text-destructive'
             }`}
           >
             {message.text}

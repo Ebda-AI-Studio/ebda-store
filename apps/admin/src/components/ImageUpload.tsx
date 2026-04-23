@@ -157,7 +157,7 @@ export function ImageUpload({
           <button
             type="button"
             onClick={onRemove}
-            className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+            className="absolute top-1 right-1 p-1 bg-destructive text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
@@ -227,7 +227,7 @@ export function ImageUpload({
         )}
       </div>
 
-      {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
+      {error && <p className="mt-1 text-xs text-destructive">{error}</p>}
     </div>
   );
 }
@@ -421,7 +421,7 @@ export function MultiImageUpload({
                 <button
                   type="button"
                   onClick={() => removeImage(i)}
-                  className="p-1 bg-red-500 text-white rounded-full shadow"
+                  className="p-1 bg-destructive text-white rounded-full shadow"
                   title="Remove"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -497,7 +497,7 @@ export function MultiImageUpload({
         </div>
       )}
 
-      {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
+      {error && <p className="mt-1 text-xs text-destructive">{error}</p>}
     </div>
   );
 }
