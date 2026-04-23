@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import type { ProductCardProps } from '../types';
+import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions';
 import { Price, ProductBadge, AddToCartButton, cn } from '@force/ui';
 import { PlaceholderImageIcon } from '../shared/icons';
 
@@ -20,6 +21,12 @@ export default function ClassicProductCard({
   quantityInCart = 0,
   onAddToCart,
   urlPrefix = '',
+
+  isInCompare = false,
+
+  onToggleCompare,
+
+  onRemoveFromWishlist,
 }: ProductCardProps) {
   const handleAddToCart = async (productId: string) => {
     await onAddToCart?.(productId);
@@ -29,6 +36,21 @@ export default function ClassicProductCard({
     <Link href={`${urlPrefix}/products/${product.slug}`} className="group block cursor-pointer">
       {/* Image container — aspect-square, clean border */}
       <div className="relative aspect-square overflow-hidden bg-muted border border-border group-hover:border-foreground/30 group-hover:shadow-md transition-all duration-300 mb-4">
+        {onToggleCompare && (
+          <CompareButton
+            productId={product.id}
+            isInCompare={isInCompare}
+            onToggle={onToggleCompare}
+            isRtl={isRtl}
+          />
+        )}
+        {onRemoveFromWishlist && (
+          <RemoveFromWishlistButton
+            productId={product.id}
+            onRemove={onRemoveFromWishlist}
+            isRtl={isRtl}
+          />
+        )}
         {product.images?.[0]?.url ? (
           <Image
             src={product.images[0].url}

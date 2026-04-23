@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import type { ProductCardProps } from '../types';
+import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions';
 import { Price, ProductBadge, ProductBadgeGroup, AddToCartButton, cn } from '@force/ui';
 import { calculateDiscount } from '../shared/display-helpers';
 import { PlaceholderImageIcon } from '../shared/icons';
@@ -21,6 +22,12 @@ export default function BoldProductCard({
   quantityInCart = 0,
   onAddToCart,
   urlPrefix = '',
+
+  isInCompare = false,
+
+  onToggleCompare,
+
+  onRemoveFromWishlist,
 }: ProductCardProps) {
   const [isHovered, setIsHovered] = useState(false);
 
@@ -39,6 +46,21 @@ export default function BoldProductCard({
     >
       {/* Image */}
       <div className="relative aspect-square overflow-hidden bg-muted">
+        {onToggleCompare && (
+          <CompareButton
+            productId={product.id}
+            isInCompare={isInCompare}
+            onToggle={onToggleCompare}
+            isRtl={isRtl}
+          />
+        )}
+        {onRemoveFromWishlist && (
+          <RemoveFromWishlistButton
+            productId={product.id}
+            onRemove={onRemoveFromWishlist}
+            isRtl={isRtl}
+          />
+        )}
         {product.images?.[0]?.url ? (
           <Image
             src={product.images[0].url}

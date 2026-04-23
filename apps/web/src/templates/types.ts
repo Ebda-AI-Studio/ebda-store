@@ -131,6 +131,19 @@ export interface ProductCardProps {
   quantityInCart?: number;
   onAddToCart?: (productId: string) => Promise<void> | void;
   onAddToWishlist?: (productId: string) => void;
+  /** True if this product is currently in the compare list. */
+  isInCompare?: boolean;
+  /**
+   * When provided, the template renders a compare-toggle button on the
+   * card. Omit to hide. Used by the /products listing and /compare pages.
+   */
+  onToggleCompare?: (productId: string) => void;
+  /**
+   * When provided, the template renders a "remove" button on the card (an
+   * X icon, replacing the add-to-wishlist heart when present). Used by the
+   * /wishlist page so a user can drop an item without opening it.
+   */
+  onRemoveFromWishlist?: (productId: string) => void;
   urlPrefix?: string;
 }
 
@@ -151,6 +164,10 @@ export interface ProductGridProps {
   cartQuantities?: Record<string, number>;
   onAddToCart?: (productId: string) => Promise<void> | void;
   onAddToWishlist?: (productId: string) => void;
+  /** Set of product IDs currently in the compare list. Forwarded per-card. */
+  compareIds?: Set<string>;
+  onToggleCompare?: (productId: string) => void;
+  onRemoveFromWishlist?: (productId: string) => void;
   urlPrefix?: string;
 }
 

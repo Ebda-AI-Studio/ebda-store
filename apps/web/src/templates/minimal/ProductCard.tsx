@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import type { ProductCardProps } from '../types';
+import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions';
 import { Price } from '@force/ui';
 
 /**
@@ -17,11 +18,32 @@ export default function MinimalProductCard({
   isRtl = false,
   currency = 'KWD',
   urlPrefix = '',
+
+  isInCompare = false,
+
+  onToggleCompare,
+
+  onRemoveFromWishlist,
 }: ProductCardProps) {
   return (
     <Link href={`${urlPrefix}/products/${product.slug}`} className="group block cursor-pointer">
       {/* Image — no border, no shadow, subtle opacity on hover */}
       <div className="relative aspect-[3/4] overflow-hidden bg-muted/30 mb-5">
+        {onToggleCompare && (
+          <CompareButton
+            productId={product.id}
+            isInCompare={isInCompare}
+            onToggle={onToggleCompare}
+            isRtl={isRtl}
+          />
+        )}
+        {onRemoveFromWishlist && (
+          <RemoveFromWishlistButton
+            productId={product.id}
+            onRemove={onRemoveFromWishlist}
+            isRtl={isRtl}
+          />
+        )}
         {product.images?.[0]?.url ? (
           <Image
             src={product.images[0].url}

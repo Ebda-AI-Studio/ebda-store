@@ -2,12 +2,14 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { ShopChrome } from '../../components';
-import { useStoreUrl } from '../../contexts/StoreContext';
+import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
+import { useCart } from '../../contexts/CartContext';
+import { useTemplateComponents } from '../../hooks/useTemplateComponents';
+import type { TemplateProduct } from '../../templates/types';
 
 interface WishlistItem {
   id: string;
@@ -25,7 +27,10 @@ interface WishlistItem {
 export default function WishlistClient() {
   const router = useRouter();
   const storeUrl = useStoreUrl();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const { store } = useStore();
+  const { components: T, isLoading: templateLoading } = useTemplateComponents();
+  useCart(); // ensure the cart context is mounted so addToCart writes through
   const [items, setItems] = useState<WishlistItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -228,6 +233,25 @@ export default function WishlistClient() {
       </ShopChrome>
     );
   }
+
+  const wishlistTemplateProducts: TemplateProduct[] = items.map(item => ({
+    id: item.product.id,
+    name: item.product.name,
+    slug: item.product.slug,
+    price: item.product.price,
+    compareAtPrice: item.product.compareAtPrice,
+    images: item.product.images.map((url, i) => ({ id: `${item.id}-${i}`, url })),
+    inStock: item.product.status === 'active',
+  }));
+
+  const handleAddFromWishlist = async (productId: string) => {
+    await addToCart(productId);
+  };
+
+  const handleRemoveByProductId = async (productId: string) => {
+    const item = items.find(i => i.product.id === productId);
+    if (item) await removeFromWishlist(item.id);
+  };
 
   return (
     <ShopChrome>
@@ -456,125 +480,17 @@ export default function WishlistClient() {
               )}
             </Link>
           </div>
-        ) : (
-          <div className="space-y-4">
-            {items.map(item => (
-              <div
-                key={item.id}
-                className="bg-card rounded-2xl shadow-md p-4 flex items-center gap-4"
-              >
-                <Link href={storeUrl(`/products/${item.product.slug}`)} className="flex-shrink-0">
-                  <div className="w-24 h-24 bg-muted rounded-lg overflow-hidden">
-                    {item.product.images?.[0] ? (
-                      <Image
-                        src={item.product.images[0]}
-                        alt={item.product.name}
-                        width={96}
-                        height={96}
-                        className="w-full h-full object-cover"
-                        sizes="96px"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-muted-foreground/70">
-                        <svg
-                          className="w-8 h-8"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={1.5}
-                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                          />
-                        </svg>
-                      </div>
-                    )}
-                  </div>
-                </Link>
-
-                <div className="flex-1 min-w-0">
-                  <Link href={storeUrl(`/products/${item.product.slug}`)}>
-                    <h3 className="font-semibold text-foreground hover:text-primary truncate">
-                      {item.product.name}
-                    </h3>
-                  </Link>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="font-bold">
-                      {new Intl.NumberFormat('en-KW', {
-                        style: 'currency',
-                        currency: 'KWD',
-                        minimumFractionDigits: 3,
-                      }).format(item.product.price / 1000)}
-                    </span>
-                    {item.product.compareAtPrice &&
-                      item.product.compareAtPrice > item.product.price && (
-                        <span className="text-muted-foreground/70 line-through text-sm">
-                          {new Intl.NumberFormat('en-KW', {
-                            style: 'currency',
-                            currency: 'KWD',
-                            minimumFractionDigits: 3,
-                          }).format(item.product.compareAtPrice / 1000)}
-                        </span>
-                      )}
-                  </div>
-                  {item.product.status !== 'active' && (
-                    <span className="text-destructive text-sm">
-                      {t(
-                        'Currently unavailable',
-                        '\u063a\u064a\u0631 \u0645\u062a\u0648\u0641\u0631 \u062d\u0627\u0644\u064a\u0627\u064b'
-                      )}
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => addToCart(item.product.id)}
-                    disabled={item.product.status !== 'active'}
-                    className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {t('Add to Cart', translations['Add to Cart'])}
-                  </button>
-                  <button
-                    onClick={() => removeFromWishlist(item.id)}
-                    className="p-2 text-muted-foreground/70 hover:text-destructive"
-                    title={t(
-                      'Remove from wishlist',
-                      '\u0625\u0632\u0627\u0644\u0629 \u0645\u0646 \u0627\u0644\u0645\u0641\u0636\u0644\u0629'
-                    )}
-                    aria-label={t(
-                      'Remove from wishlist',
-                      '\u0625\u0632\u0627\u0644\u0629 \u0645\u0646 \u0627\u0644\u0645\u0641\u0636\u0644\u0629'
-                    )}
-                  >
-                    <svg
-                      className="w-5 h-5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                      aria-hidden="true"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                      />
-                    </svg>
-                    <span className="sr-only">
-                      {t(
-                        'Remove from wishlist',
-                        '\u0625\u0632\u0627\u0644\u0629 \u0645\u0646 \u0627\u0644\u0645\u0641\u0636\u0644\u0629'
-                      )}
-                    </span>
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        ) : T && !templateLoading ? (
+          <T.ProductGrid
+            products={wishlistTemplateProducts}
+            isRtl={language === 'ar'}
+            currency={store.currency}
+            columns={3}
+            onAddToCart={handleAddFromWishlist}
+            onRemoveFromWishlist={handleRemoveByProductId}
+            urlPrefix={storeUrl('')}
+          />
+        ) : null}
       </div>
     </ShopChrome>
   );

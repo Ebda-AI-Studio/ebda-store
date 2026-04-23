@@ -24,6 +24,12 @@ export default function ModernProductGrid({
   onAddToCart,
   onAddToWishlist,
   urlPrefix = '',
+
+  compareIds,
+
+  onToggleCompare,
+
+  onRemoveFromWishlist,
 }: ProductGridProps) {
   const [visibleCount, setVisibleCount] = useState(0);
 
@@ -92,6 +98,9 @@ export default function ModernProductGrid({
             onAddToCart={onAddToCart}
             onAddToWishlist={onAddToWishlist}
             urlPrefix={urlPrefix}
+            isInCompare={compareIds?.has(product.id) ?? false}
+            onToggleCompare={onToggleCompare}
+            onRemoveFromWishlist={onRemoveFromWishlist}
           />
         </div>
       ))}

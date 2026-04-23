@@ -7,6 +7,7 @@ import type { ProductCardProps } from '../types';
 import { Price, ProductBadge, ProductBadgeGroup, Rating, AddToCartButton, cn } from '@force/ui';
 import { calculateDiscount } from '../shared/display-helpers';
 import { PlaceholderImageIcon } from '../shared/icons';
+import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions';
 
 /**
  * Modern Template - Product Card
@@ -24,6 +25,9 @@ export default function ModernProductCard({
   onAddToCart,
   onAddToWishlist,
   quantityInCart = 0,
+  isInCompare = false,
+  onToggleCompare,
+  onRemoveFromWishlist,
   urlPrefix = '',
 }: ProductCardProps) {
   const [isHovered, setIsHovered] = useState(false);
@@ -96,41 +100,59 @@ export default function ModernProductCard({
           {product.inStock === false && <ProductBadge variant="soldOut" isRtl={isRtl} size="sm" />}
         </ProductBadgeGroup>
 
-        {/* Wishlist Button */}
-        <div
-          className={cn(
-            'absolute top-3 flex flex-col gap-2 transition-all duration-300',
-            isRtl ? 'left-3' : 'right-3',
-            isHovered ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-3'
-          )}
-        >
-          <button
-            onClick={handleWishlist}
+        {/* Per-card actions (compare / wishlist). When a card lives on the
+            /wishlist page, `onRemoveFromWishlist` is provided; the "add to
+            wishlist" heart is hidden to avoid a conflicting second action. */}
+        {onToggleCompare && (
+          <CompareButton
+            productId={product.id}
+            isInCompare={isInCompare}
+            onToggle={onToggleCompare}
+            isRtl={isRtl}
+          />
+        )}
+        {onRemoveFromWishlist ? (
+          <RemoveFromWishlistButton
+            productId={product.id}
+            onRemove={onRemoveFromWishlist}
+            isRtl={isRtl}
+          />
+        ) : (
+          <div
             className={cn(
-              'w-9 h-9 rounded-full flex items-center justify-center shadow-md transition-all duration-200 cursor-pointer',
-              isWishlisted
-                ? 'bg-red-500 text-white scale-110'
-                : 'bg-white/95 text-foreground hover:bg-white hover:scale-110'
+              'absolute top-3 flex flex-col gap-2 transition-all duration-300',
+              isRtl ? 'left-3' : 'right-3',
+              isHovered ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-3'
             )}
-            aria-label={isRtl ? 'إضافة للمفضلة' : 'Add to wishlist'}
-            aria-pressed={isWishlisted}
           >
-            <svg
-              className="w-4 h-4"
-              fill={isWishlisted ? 'currentColor' : 'none'}
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
+            <button
+              onClick={handleWishlist}
+              className={cn(
+                'w-9 h-9 rounded-full flex items-center justify-center shadow-md transition-all duration-200 cursor-pointer',
+                isWishlisted
+                  ? 'bg-destructive text-destructive-foreground scale-110'
+                  : 'bg-background/95 text-foreground hover:bg-background hover:scale-110'
+              )}
+              aria-label={isRtl ? 'إضافة للمفضلة' : 'Add to wishlist'}
+              aria-pressed={isWishlisted}
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-              />
-            </svg>
-          </button>
-        </div>
+              <svg
+                className="w-4 h-4"
+                fill={isWishlisted ? 'currentColor' : 'none'}
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                />
+              </svg>
+            </button>
+          </div>
+        )}
 
         {/* Quick Add Button — slides up from bottom */}
         <div

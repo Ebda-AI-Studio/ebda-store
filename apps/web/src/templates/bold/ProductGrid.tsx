@@ -13,6 +13,12 @@ export default function BoldProductGrid({
   onAddToCart,
   cartQuantities = {},
   urlPrefix = '',
+
+  compareIds,
+
+  onToggleCompare,
+
+  onRemoveFromWishlist,
 }: ProductGridProps) {
   const displayTitle = getDisplayTitle(isRtl, title, titleAr);
   const gridCols = getGridColsClass(columns);
@@ -46,6 +52,9 @@ export default function BoldProductGrid({
               onAddToCart={onAddToCart}
               quantityInCart={cartQuantities[product.id]}
               urlPrefix={urlPrefix}
+              isInCompare={compareIds?.has(product.id) ?? false}
+              onToggleCompare={onToggleCompare}
+              onRemoveFromWishlist={onRemoveFromWishlist}
             />
           ))}
         </div>

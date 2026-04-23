@@ -9,7 +9,9 @@ import { useCart } from '../../contexts/CartContext';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { ShopChrome } from '../../components';
 import { toggleCompare } from '@/lib/compare';
-import { ProductGridCard } from './ProductGridCard';
+import { useStore, useStoreUrl } from '../../contexts/StoreContext';
+import { useTemplateComponents } from '../../hooks/useTemplateComponents';
+import { toTemplateProduct } from '../../templates/adapters';
 import { ProductListItem } from './ProductListItem';
 import { ProductsFilterSidebar } from './ProductsFilterSidebar';
 import { ProductsPagination } from './ProductsPagination';
@@ -75,10 +77,16 @@ export default function ProductsClient({
   const [error, setError] = useState<string | null>(null);
   // Track which product ids are in the compare list so buttons re-render on change
   const [compareIds, setCompareIds] = useState<Set<string>>(new Set());
-  const { addItem } = useCart();
+  const { addItem, items: cartItems } = useCart();
   const { language, t } = useLanguage();
   const { warning } = useToast();
+  const { store } = useStore();
+  const storeUrl = useStoreUrl();
+  const { components: T, isLoading: templateLoading } = useTemplateComponents();
   const sortOptions = getSortOptions(t);
+
+  const cartQuantities: Record<string, number> = {};
+  for (const item of cartItems) cartQuantities[item.productId] = item.quantity;
 
   // Sync compare state from localStorage on mount (client-only)
   useEffect(() => {
@@ -398,19 +406,36 @@ export default function ProductsClient({
             )}
 
             {/* Grid View */}
-            {!isLoading && !error && viewMode === 'grid' && (
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
-                {products.map((product, index) => (
-                  <ProductGridCard
-                    key={product.id}
-                    product={product}
-                    index={index}
-                    isInCompare={compareIds.has(product.id)}
-                    onToggleCompare={handleToggleCompare}
-                    onAddToCart={handleAddToCart}
-                  />
-                ))}
-              </div>
+            {!isLoading && !error && viewMode === 'grid' && T && !templateLoading && (
+              <T.ProductGrid
+                products={products.map(toTemplateProduct)}
+                isRtl={language === 'ar'}
+                currency={store.currency}
+                columns={3}
+                cartQuantities={cartQuantities}
+                onAddToCart={productId => {
+                  const p = products.find(x => x.id === productId);
+                  if (p)
+                    addItem({
+                      id: p.id,
+                      name: p.name,
+                      price: p.price,
+                      slug: p.slug,
+                      image: p.images?.[0]?.url,
+                      category: p.categories?.[0]?.category?.name,
+                    });
+                }}
+                compareIds={compareIds}
+                onToggleCompare={productId => {
+                  const p = products.find(x => x.id === productId);
+                  if (!p) return;
+                  handleToggleCompare(p, {
+                    preventDefault() {},
+                    stopPropagation() {},
+                  } as React.MouseEvent);
+                }}
+                urlPrefix={storeUrl('')}
+              />
             )}
 
             {/* List View */}
