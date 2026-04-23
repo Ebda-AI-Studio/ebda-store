@@ -613,9 +613,10 @@ export default function CartClient() {
                                 className="h-10 flex-1 rounded-lg border border-border bg-background px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
                               />
                               <button
+                                type="button"
                                 onClick={applyPromoCode}
                                 disabled={promoApplied || !promoCode || isValidating}
-                                className="h-10 rounded-lg bg-muted px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+                                className="h-10 min-w-[88px] rounded-lg bg-muted px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-50"
                               >
                                 {promoApplied
                                   ? t(
@@ -631,7 +632,10 @@ export default function CartClient() {
                               </button>
                             </div>
                             {promoApplied && (
-                              <p className="mt-2 flex items-center gap-1 text-xs text-[hsl(var(--success))]">
+                              <p
+                                role="status"
+                                className="mt-2 flex items-center gap-1 text-xs text-success"
+                              >
                                 <svg
                                   className="h-3.5 w-3.5"
                                   fill="none"

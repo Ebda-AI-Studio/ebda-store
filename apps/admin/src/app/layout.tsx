@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 import { Plus_Jakarta_Sans, IBM_Plex_Sans_Arabic } from 'next/font/google';
+import { NextIntlClientProvider } from 'next-intl';
+import { getLocale, getMessages } from 'next-intl/server';
 import { Providers } from './providers';
 import '../styles/globals.css';
 
@@ -28,9 +30,13 @@ export const metadata: Metadata = {
   creator: 'Force Media Kuwait',
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const locale = await getLocale();
+  const messages = await getMessages();
+  const dir = locale === 'ar' ? 'rtl' : 'ltr';
+
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang={locale} dir={dir} suppressHydrationWarning>
       <head>
         {/* Inline script to prevent flash of wrong theme on page load.
             Only reads from localStorage — no user input, safe static content. */}
@@ -43,11 +49,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={`${plusJakarta.variable} ${ibmPlexArabic.variable} font-sans antialiased`}>
         <a
           href="#admin-main-content"
-          className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[9999] focus:rounded-lg focus:bg-background focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-foreground focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary"
+          className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:start-4 focus:z-[9999] focus:rounded-lg focus:bg-background focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-foreground focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary"
         >
           Skip to main content
         </a>
-        <Providers>{children}</Providers>
+        <NextIntlClientProvider locale={locale} messages={messages}>
+          <Providers>{children}</Providers>
+        </NextIntlClientProvider>
       </body>
     </html>
   );

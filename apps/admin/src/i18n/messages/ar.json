@@ -1,0 +1,27 @@
+{
+  "common": {
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "delete": "حذف",
+    "edit": "تعديل",
+    "close": "إغلاق",
+    "confirm": "تأكيد",
+    "back": "رجوع",
+    "next": "التالي",
+    "search": "بحث",
+    "loading": "جارٍ التحميل…",
+    "saving": "جارٍ الحفظ…",
+    "deleting": "جارٍ الحذف…",
+    "noResults": "لا توجد نتائج"
+  },
+  "nav": {
+    "dashboard": "لوحة التحكم",
+    "stores": "المتاجر",
+    "users": "المستخدمون",
+    "auditLogs": "سجلات التدقيق",
+    "signOut": "تسجيل الخروج",
+    "language": "اللغة",
+    "english": "English",
+    "arabic": "العربية"
+  }
+}

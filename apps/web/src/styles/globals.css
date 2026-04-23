@@ -158,6 +158,15 @@
   ::selection {
     @apply bg-primary/20 text-foreground;
   }
+
+  /* Clickable affordance — :where() keeps specificity zero so utilities win */
+  :where(button, [role='button'], a, summary, [type='submit'], [type='button']):not(:disabled):not([aria-disabled='true']) {
+    cursor: pointer;
+  }
+  :where(button, [type='submit'], [type='button']):disabled,
+  :where(button, [role='button'], a)[aria-disabled='true'] {
+    cursor: not-allowed;
+  }
 }
 
 @layer components {

@@ -62,8 +62,9 @@ export default function ClassicCartTable({
                   <p className="mt-1 text-sm text-muted-foreground">{format(item.price)}</p>
                 </div>
                 <button
+                  type="button"
                   onClick={() => onRemove?.(item.id)}
-                  className="text-sm uppercase tracking-widest text-muted-foreground hover:text-destructive"
+                  className="inline-flex min-h-[44px] items-center text-sm uppercase tracking-widest text-muted-foreground hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive cursor-pointer"
                   aria-label={isRtl ? 'إزالة' : 'Remove'}
                 >
                   {isRtl ? 'إزالة' : 'Remove'}
@@ -72,17 +73,19 @@ export default function ClassicCartTable({
               <div className="mt-4 flex items-center justify-between">
                 <div className="flex items-center border border-border">
                   <button
+                    type="button"
                     disabled={item.quantity <= 1}
                     onClick={() => onUpdateQuantity?.(item.id, Math.max(1, item.quantity - 1))}
-                    className="h-11 w-11 text-muted-foreground hover:bg-muted disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-foreground"
+                    className="h-11 w-11 text-muted-foreground hover:bg-muted disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground cursor-pointer"
                     aria-label={isRtl ? 'تقليل' : 'Decrease'}
                   >
                     −
                   </button>
                   <span className="w-10 text-center text-sm font-medium">{item.quantity}</span>
                   <button
+                    type="button"
                     onClick={() => onUpdateQuantity?.(item.id, item.quantity + 1)}
-                    className="h-11 w-11 text-muted-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-foreground"
+                    className="h-11 w-11 text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground cursor-pointer"
                     aria-label={isRtl ? 'زيادة' : 'Increase'}
                   >
                     +

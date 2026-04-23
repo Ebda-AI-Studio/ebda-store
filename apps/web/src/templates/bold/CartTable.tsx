@@ -57,8 +57,9 @@ export default function BoldCartTable({
                   </p>
                 </div>
                 <button
+                  type="button"
                   onClick={() => onRemove?.(item.id)}
-                  className="h-11 w-11 flex-shrink-0 border-2 border-foreground bg-background font-black text-foreground hover:bg-destructive hover:text-destructive-foreground hover:border-destructive focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
+                  className="h-11 w-11 flex-shrink-0 border-2 border-foreground bg-background font-black text-foreground hover:bg-destructive hover:text-destructive-foreground hover:border-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 cursor-pointer"
                   aria-label={isRtl ? 'إزالة' : 'Remove'}
                 >
                   ×
@@ -67,9 +68,10 @@ export default function BoldCartTable({
               <div className="flex items-center justify-between">
                 <div className="flex items-center border-2 border-foreground">
                   <button
+                    type="button"
                     disabled={item.quantity <= 1}
                     onClick={() => onUpdateQuantity?.(item.id, Math.max(1, item.quantity - 1))}
-                    className="h-11 w-11 font-black text-foreground hover:bg-foreground hover:text-background disabled:opacity-30 focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-1"
+                    className="h-11 w-11 font-black text-foreground hover:bg-foreground hover:text-background disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-1 cursor-pointer"
                     aria-label={isRtl ? 'تقليل' : 'Decrease'}
                   >
                     −
@@ -78,8 +80,9 @@ export default function BoldCartTable({
                     {item.quantity}
                   </span>
                   <button
+                    type="button"
                     onClick={() => onUpdateQuantity?.(item.id, item.quantity + 1)}
-                    className="h-11 w-11 font-black text-foreground hover:bg-foreground hover:text-background focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-1"
+                    className="h-11 w-11 font-black text-foreground hover:bg-foreground hover:text-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-1 cursor-pointer"
                     aria-label={isRtl ? 'زيادة' : 'Increase'}
                   >
                     +

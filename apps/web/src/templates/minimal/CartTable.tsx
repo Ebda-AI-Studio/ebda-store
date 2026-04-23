@@ -56,24 +56,27 @@ export default function MinimalCartTable({
               <div className="flex items-center justify-between text-sm">
                 <div className="flex items-center gap-3 text-muted-foreground">
                   <button
+                    type="button"
                     disabled={item.quantity <= 1}
                     onClick={() => onUpdateQuantity?.(item.id, Math.max(1, item.quantity - 1))}
-                    className="hover:text-foreground disabled:opacity-30"
+                    className="inline-flex h-11 w-11 items-center justify-center hover:text-foreground disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary cursor-pointer"
                     aria-label={isRtl ? 'تقليل' : 'Decrease'}
                   >
                     −
                   </button>
                   <span className="min-w-[1.5ch] text-center text-foreground">{item.quantity}</span>
                   <button
+                    type="button"
                     onClick={() => onUpdateQuantity?.(item.id, item.quantity + 1)}
-                    className="hover:text-foreground"
+                    className="inline-flex h-11 w-11 items-center justify-center hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary cursor-pointer"
                     aria-label={isRtl ? 'زيادة' : 'Increase'}
                   >
                     +
                   </button>
                   <button
+                    type="button"
                     onClick={() => onRemove?.(item.id)}
-                    className="ms-4 text-xs hover:text-destructive"
+                    className="ms-4 inline-flex min-h-[44px] items-center text-xs hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive cursor-pointer"
                     aria-label={isRtl ? 'إزالة' : 'Remove'}
                   >
                     {isRtl ? 'إزالة' : 'Remove'}

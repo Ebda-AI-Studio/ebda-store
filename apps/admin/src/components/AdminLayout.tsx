@@ -8,6 +8,7 @@ import { Button } from '@force/ui';
 import { useAuth } from '../lib/auth';
 import { apiGet } from '../lib/api';
 import { NotificationBell } from './NotificationBell';
+import AdminLanguageSwitcher from './AdminLanguageSwitcher';
 import { useStore } from '../contexts/StoreContext';
 import { useFeatures } from '../hooks/useFeatures';
 
@@ -327,15 +328,22 @@ export function AdminLayout({
           </ul>
         </nav>
 
-        {/* Theme Toggle */}
-        <div className="px-4 pb-2">
+        {/* Language + Theme Toggles */}
+        <div className="flex items-center justify-between gap-2 px-4 pb-2">
+          <AdminLanguageSwitcher />
           <button
             onClick={toggleTheme}
-            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="flex h-11 w-11 items-center justify-center rounded-lg border border-border/60 bg-muted/40 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary cursor-pointer"
             aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
           >
             {isDark ? (
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg
+                className="h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                aria-hidden="true"
+              >
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -344,7 +352,13 @@ export function AdminLayout({
                 />
               </svg>
             ) : (
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg
+                className="h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                aria-hidden="true"
+              >
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -353,7 +367,6 @@ export function AdminLayout({
                 />
               </svg>
             )}
-            {isDark ? 'Light Mode' : 'Dark Mode'}
           </button>
         </div>
 

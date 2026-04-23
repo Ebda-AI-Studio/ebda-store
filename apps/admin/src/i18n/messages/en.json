@@ -1,0 +1,27 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "close": "Close",
+    "confirm": "Confirm",
+    "back": "Back",
+    "next": "Next",
+    "search": "Search",
+    "loading": "Loading…",
+    "saving": "Saving…",
+    "deleting": "Deleting…",
+    "noResults": "No results"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "stores": "Stores",
+    "users": "Users",
+    "auditLogs": "Audit logs",
+    "signOut": "Sign out",
+    "language": "Language",
+    "english": "English",
+    "arabic": "العربية"
+  }
+}
