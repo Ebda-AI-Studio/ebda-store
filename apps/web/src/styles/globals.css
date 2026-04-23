@@ -185,11 +185,11 @@
   }
 
   .product-badge-new {
-    @apply bg-emerald-500 text-white;
+    @apply bg-success text-success-foreground;
   }
 
   .product-badge-sale {
-    @apply bg-red-500 text-white;
+    @apply bg-destructive text-destructive-foreground;
   }
 
   .product-badge-bestseller {
@@ -258,7 +258,7 @@
   }
 
   .price-discount {
-    @apply inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-600;
+    @apply inline-flex items-center rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-bold text-destructive;
   }
 
   /* Rating Stars */
@@ -267,7 +267,7 @@
   }
 
   .rating-star-filled {
-    @apply text-amber-400;
+    @apply text-warning;
   }
 
   .rating-star-empty {
@@ -303,7 +303,7 @@
   }
 
   .checkout-step-completed .checkout-step-number {
-    @apply bg-emerald-500 text-white;
+    @apply bg-success text-success-foreground;
   }
 
   .checkout-step-pending .checkout-step-number {
