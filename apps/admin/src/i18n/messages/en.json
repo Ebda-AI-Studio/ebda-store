@@ -1009,7 +1009,139 @@
       }
     }
   },
-  "affiliates": {},
+  "affiliates": {
+    "page": {
+      "title": "Affiliate Program",
+      "subtitle": "Manage influencer referrals and commissions"
+    },
+    "tabs": {
+      "affiliates": "Affiliates",
+      "config": "Configuration"
+    },
+    "stats": {
+      "totalAffiliates": "Total Affiliates",
+      "activeReferrals": "Active Referrals",
+      "conversionRate": "Conversion Rate",
+      "totalPaid": "Total Paid",
+      "conversions": "Conversions"
+    },
+    "list": {
+      "tableLabel": "Affiliates",
+      "filters": {
+        "all": "All",
+        "pending": "Pending",
+        "approved": "Approved",
+        "rejected": "Rejected",
+        "suspended": "Suspended"
+      },
+      "columns": {
+        "nameEmail": "Name / Email",
+        "referralCode": "Referral Code",
+        "status": "Status",
+        "totalEarned": "Total Earned",
+        "pendingBalance": "Pending Balance",
+        "actions": "Actions"
+      },
+      "status": {
+        "pending": "Pending",
+        "approved": "Approved",
+        "rejected": "Rejected",
+        "suspended": "Suspended"
+      },
+      "actions": {
+        "approve": "Approve",
+        "reject": "Reject",
+        "suspend": "Suspend",
+        "payout": "Payout"
+      },
+      "empty": {
+        "title": "No Affiliates Yet",
+        "description": "Affiliates will appear here when they sign up or are invited."
+      },
+      "pagination": {
+        "summary": "Page {page} of {totalPages} ({total} total)",
+        "previous": "Previous",
+        "next": "Next"
+      }
+    },
+    "config": {
+      "commissionSection": "Commission & Payouts",
+      "optionsSection": "Program Options",
+      "save": "Save Configuration",
+      "fields": {
+        "defaultCommissionRate": "Default Commission Rate (%)",
+        "cookieDurationDays": "Cookie Duration (days)",
+        "minPayoutAmount": "Min Payout Amount (fils)",
+        "minPayoutEquivalent": "{amount} KWD equivalent"
+      },
+      "toggles": {
+        "autoApprove": {
+          "title": "Auto-approve Applications",
+          "description": "Automatically approve new affiliate applications without manual review"
+        },
+        "publicSignup": {
+          "title": "Public Signup",
+          "description": "Allow influencers to sign up as affiliates through the public page"
+        }
+      }
+    },
+    "payout": {
+      "title": "Create Payout",
+      "close": "Close",
+      "cancel": "Cancel",
+      "confirm": "Confirm Payout",
+      "summary": {
+        "label": "Paying out to",
+        "available": "Available balance:"
+      },
+      "fields": {
+        "amount": "Amount (KWD)",
+        "method": "Method",
+        "notes": "Notes",
+        "notesPlaceholder": "Optional notes for this payout"
+      },
+      "methods": {
+        "bank_transfer": "Bank Transfer",
+        "knet": "KNET",
+        "cash": "Cash",
+        "manual": "Manual"
+      }
+    },
+    "toasts": {
+      "error": {
+        "title": "Error"
+      },
+      "configSaved": {
+        "title": "Config Saved",
+        "message": "Affiliate program settings updated."
+      },
+      "configError": {
+        "message": "Failed to save config."
+      },
+      "statusUpdated": {
+        "title": "Updated",
+        "approve": "Affiliate approved successfully.",
+        "reject": "Affiliate rejected successfully.",
+        "suspend": "Affiliate suspended successfully."
+      },
+      "statusError": {
+        "approve": "Failed to approve affiliate.",
+        "reject": "Failed to reject affiliate.",
+        "suspend": "Failed to suspend affiliate."
+      },
+      "payoutCreated": {
+        "title": "Payout Created",
+        "message": "Payout recorded for {name}."
+      },
+      "payoutError": {
+        "message": "Failed to create payout."
+      },
+      "invalidAmount": {
+        "title": "Invalid Amount",
+        "message": "Enter a valid payout amount."
+      }
+    }
+  },
   "bulk": {},
   "abandonedCarts": {},
   "returns": {},

@@ -1,0 +1,136 @@
+'use client';
+
+import { useT } from '@/i18n/useT';
+import { formatFils, type Affiliate } from './types';
+
+interface PayoutsHistoryProps {
+  affiliate: Affiliate;
+  amount: string;
+  method: string;
+  notes: string;
+  saving: boolean;
+  onAmountChange: (value: string) => void;
+  onMethodChange: (value: string) => void;
+  onNotesChange: (value: string) => void;
+  onClose: () => void;
+  onSubmit: (e: React.FormEvent) => void;
+}
+
+const PAYOUT_METHODS = ['bank_transfer', 'knet', 'cash', 'manual'] as const;
+
+/**
+ * Payout creation modal. Collects amount (KWD), method, and optional notes
+ * for a specific approved affiliate with a positive pending balance.
+ */
+export function PayoutsHistory({
+  affiliate,
+  amount,
+  method,
+  notes,
+  saving,
+  onAmountChange,
+  onMethodChange,
+  onNotesChange,
+  onClose,
+  onSubmit,
+}: PayoutsHistoryProps) {
+  const t = useT('affiliates.payout');
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-card rounded-xl shadow-xl w-full max-w-md">
+        <div className="flex items-center justify-between p-6 border-b border-border">
+          <h2 className="text-xl font-semibold text-foreground">{t('title')}</h2>
+          <button
+            onClick={onClose}
+            className="p-2 text-muted-foreground hover:text-foreground"
+            aria-label={t('close')}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+        </div>
+
+        <form onSubmit={onSubmit} className="p-6 space-y-4">
+          <p className="text-sm text-muted-foreground">
+            {t('summary.label')} <strong>{affiliate.name}</strong>. {t('summary.available')}{' '}
+            <strong className="text-primary">{formatFils(Number(affiliate.pendingBalance))}</strong>
+          </p>
+
+          <div>
+            <label className="block text-sm font-medium text-muted-foreground mb-2">
+              {t('fields.amount')} <span className="text-destructive">*</span>
+            </label>
+            <input
+              type="number"
+              step="0.001"
+              min="0.001"
+              max={(Number(affiliate.pendingBalance) / 1000).toFixed(3)}
+              value={amount}
+              onChange={e => onAmountChange(e.target.value)}
+              placeholder="0.000"
+              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-muted-foreground mb-2">
+              {t('fields.method')}
+            </label>
+            <select
+              value={method}
+              onChange={e => onMethodChange(e.target.value)}
+              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+            >
+              {PAYOUT_METHODS.map(m => (
+                <option key={m} value={m}>
+                  {t(`methods.${m}`)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-muted-foreground mb-2">
+              {t('fields.notes')}
+            </label>
+            <textarea
+              value={notes}
+              onChange={e => onNotesChange(e.target.value)}
+              placeholder={t('fields.notesPlaceholder')}
+              rows={3}
+              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary resize-none"
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-foreground border border-border rounded-lg hover:bg-muted"
+            >
+              {t('cancel')}
+            </button>
+            <button
+              type="submit"
+              disabled={saving || !amount}
+              className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 flex items-center gap-2"
+            >
+              {saving && (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+              )}
+              {t('confirm')}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
