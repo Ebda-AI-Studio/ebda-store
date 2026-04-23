@@ -14,6 +14,7 @@ const templates: Record<TemplateId, () => Promise<TemplateComponents>> = {
       CategoryGrid: m.CategoryGrid,
       AnnouncementBar: m.AnnouncementBar,
       CartTable: m.CartTable,
+      OrderSummary: m.OrderSummary,
     })),
   classic: () =>
     import('./classic').then(m => ({
@@ -26,6 +27,7 @@ const templates: Record<TemplateId, () => Promise<TemplateComponents>> = {
       CategoryGrid: m.CategoryGrid,
       AnnouncementBar: m.AnnouncementBar,
       CartTable: m.CartTable,
+      OrderSummary: m.OrderSummary,
     })),
   minimal: () =>
     import('./minimal').then(m => ({
@@ -38,6 +40,7 @@ const templates: Record<TemplateId, () => Promise<TemplateComponents>> = {
       CategoryGrid: m.CategoryGrid,
       AnnouncementBar: m.AnnouncementBar,
       CartTable: m.CartTable,
+      OrderSummary: m.OrderSummary,
     })),
   bold: () =>
     import('./bold').then(m => ({
@@ -50,6 +53,7 @@ const templates: Record<TemplateId, () => Promise<TemplateComponents>> = {
       CategoryGrid: m.CategoryGrid,
       AnnouncementBar: m.AnnouncementBar,
       CartTable: m.CartTable,
+      OrderSummary: m.OrderSummary,
     })),
   elegant: () =>
     import('./elegant').then(m => ({
@@ -62,6 +66,7 @@ const templates: Record<TemplateId, () => Promise<TemplateComponents>> = {
       CategoryGrid: m.CategoryGrid,
       AnnouncementBar: m.AnnouncementBar,
       CartTable: m.CartTable,
+      OrderSummary: m.OrderSummary,
     })),
 };
 

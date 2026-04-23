@@ -224,6 +224,71 @@ export interface CartTableProps {
 }
 
 /**
+ * Totals panel rendered beside the cart or checkout. Each template can
+ * present the breakdown (subtotal / discount / shipping / tax / total) in
+ * its own aesthetic. The parent owns the math; the template is purely
+ * presentational + provides a slot for consumer UI (coupon input on cart).
+ */
+export interface OrderSummaryProps {
+  /** All amounts are in the smallest currency unit (fils for KWD). */
+  subtotal: number;
+  discount?: number;
+  discountLabel?: string;
+  shipping?: number;
+  /** If true, render shipping row as "Free" regardless of the shipping value. */
+  freeShipping?: boolean;
+  tax?: number;
+  total: number;
+  currency?: string;
+  isRtl?: boolean;
+  /** Optional slot below totals — cart uses it for the coupon input. */
+  children?: ReactNode;
+  /** Primary CTA (e.g. "Proceed to Checkout"). Omit on pages where the CTA lives elsewhere. */
+  ctaLabel?: string;
+  ctaLabelAr?: string;
+  ctaHref?: string;
+  onCtaClick?: () => void;
+  ctaDisabled?: boolean;
+  ctaLoading?: boolean;
+}
+
+/**
+ * Blank-state shown when a collection is empty (empty cart, wishlist, search
+ * no-results, etc.). The template chooses icon, typography, and action-button
+ * treatment; the consumer provides the copy and link.
+ */
+export interface EmptyStateProps {
+  title: string;
+  titleAr?: string;
+  description?: string;
+  descriptionAr?: string;
+  ctaLabel?: string;
+  ctaLabelAr?: string;
+  ctaHref?: string;
+  onCtaClick?: () => void;
+  /** Optional render-prop for a custom icon. Default: each template's own empty icon. */
+  icon?: ReactNode;
+  isRtl?: boolean;
+}
+
+/**
+ * Auth/profile form wrapper — replaces the bespoke card wrappers around
+ * login/register/reset/verify forms with a template-appropriate shell.
+ * Receives a `title` + optional `subtitle` + children (the form itself).
+ */
+export interface FormCardProps {
+  title: string;
+  titleAr?: string;
+  subtitle?: string;
+  subtitleAr?: string;
+  /** Form body. */
+  children: ReactNode;
+  /** Optional footer row (e.g. "Don't have an account? Sign up"). */
+  footer?: ReactNode;
+  isRtl?: boolean;
+}
+
+/**
  * Announcement bar props
  */
 export interface AnnouncementBarProps {
@@ -257,6 +322,12 @@ export interface TemplateComponents {
    * `?` once all 5 templates ship it.
    */
   CartTable?: React.ComponentType<CartTableProps>;
+  /** Totals panel (cart + checkout). Optional during rollout. */
+  OrderSummary?: React.ComponentType<OrderSummaryProps>;
+  /** Blank-state for empty collections. Optional during rollout. */
+  EmptyState?: React.ComponentType<EmptyStateProps>;
+  /** Auth/profile form shell. Optional during rollout. */
+  FormCard?: React.ComponentType<FormCardProps>;
 }
 
 /**

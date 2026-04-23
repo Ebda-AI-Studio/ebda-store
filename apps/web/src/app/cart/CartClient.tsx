@@ -489,60 +489,226 @@ export default function CartClient() {
               {/* Order Summary */}
               <div className="mt-8 lg:col-span-4 lg:mt-0">
                 <div className="sticky top-24 space-y-6">
-                  {/* Summary Card */}
-                  <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-                    <h2 className="text-lg font-bold text-foreground">
-                      {t(
-                        'Order Summary',
-                        '\u0645\u0644\u062e\u0635 \u0627\u0644\u0637\u0644\u0628'
-                      )}
-                    </h2>
-
-                    {/* Promo Code */}
-                    {isEnabled('coupons') && (
-                      <div className="mt-6">
-                        <label
-                          htmlFor="cart-promo-code"
-                          className="text-sm font-medium text-foreground"
-                        >
-                          {t('Promo Code', '\u0643\u0648\u062f \u0627\u0644\u062e\u0635\u0645')}
-                        </label>
-                        <div className="mt-2 flex gap-2">
-                          <input
-                            id="cart-promo-code"
-                            type="text"
-                            autoComplete="off"
-                            value={promoCode}
-                            onChange={e => setPromoCode(e.target.value)}
-                            placeholder={t(
-                              'Enter code',
-                              '\u0623\u062f\u062e\u0644 \u0627\u0644\u0643\u0648\u062f'
-                            )}
-                            disabled={promoApplied}
-                            className="h-10 flex-1 rounded-lg border border-border bg-background px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
-                          />
-                          <button
-                            onClick={applyPromoCode}
-                            disabled={promoApplied || !promoCode || isValidating}
-                            className="h-10 rounded-lg bg-muted px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+                  {T?.OrderSummary ? (
+                    <T.OrderSummary
+                      subtotal={subtotal}
+                      discount={discount}
+                      discountLabel={
+                        promoApplied
+                          ? `${t('Discount', 'الخصم')}${promoType === 'percentage' ? ` (${promoValue}%)` : promoName ? ` — ${promoName}` : ''}`
+                          : undefined
+                      }
+                      shipping={shipping}
+                      freeShipping={shipping === 0}
+                      total={total}
+                      currency={store.currency}
+                      isRtl={language === 'ar'}
+                      ctaLabel="Proceed to Checkout"
+                      ctaLabelAr="المتابعة للدفع"
+                      ctaHref={storeUrl('/checkout')}
+                    >
+                      {isEnabled('coupons') && (
+                        <div>
+                          <label
+                            htmlFor="cart-promo-code-t"
+                            className="text-sm font-medium text-foreground"
                           >
-                            {promoApplied
-                              ? t(
-                                  'Applied',
-                                  '\u062a\u0645 \u0627\u0644\u062a\u0637\u0628\u064a\u0642'
-                                )
-                              : isValidating
-                                ? t(
-                                    'Validating...',
-                                    '\u062c\u0627\u0631\u064a \u0627\u0644\u062a\u062d\u0642\u0642...'
-                                  )
-                                : t('Apply', '\u062a\u0637\u0628\u064a\u0642')}
-                          </button>
+                            {t('Promo Code', 'كود الخصم')}
+                          </label>
+                          <div className="mt-2 flex gap-2">
+                            <input
+                              id="cart-promo-code-t"
+                              type="text"
+                              autoComplete="off"
+                              value={promoCode}
+                              onChange={e => setPromoCode(e.target.value)}
+                              placeholder={t('Enter code', 'أدخل الكود')}
+                              disabled={promoApplied}
+                              className="h-11 flex-1 rounded-lg border border-border bg-background px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
+                            />
+                            <button
+                              onClick={applyPromoCode}
+                              disabled={promoApplied || !promoCode || isValidating}
+                              className="h-11 rounded-lg bg-muted px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+                            >
+                              {promoApplied
+                                ? t('Applied', 'تم')
+                                : isValidating
+                                  ? '…'
+                                  : t('Apply', 'تطبيق')}
+                            </button>
+                          </div>
+                          {promoApplied && (
+                            <p
+                              role="status"
+                              className="mt-2 flex items-center gap-1 text-xs text-success"
+                            >
+                              <svg
+                                className="h-3.5 w-3.5"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                aria-hidden
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M5 13l4 4L19 7"
+                                />
+                              </svg>
+                              {promoCode.toUpperCase()} — {formatPrice(discount)} {t('off', 'خصم')}
+                            </p>
+                          )}
                         </div>
-                        {promoApplied && (
-                          <p className="mt-2 flex items-center gap-1 text-xs text-[hsl(var(--success))]">
+                      )}
+                    </T.OrderSummary>
+                  ) : (
+                    <>
+                      {/* Summary Card */}
+                      <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+                        <h2 className="text-lg font-bold text-foreground">
+                          {t(
+                            'Order Summary',
+                            '\u0645\u0644\u062e\u0635 \u0627\u0644\u0637\u0644\u0628'
+                          )}
+                        </h2>
+
+                        {/* Promo Code */}
+                        {isEnabled('coupons') && (
+                          <div className="mt-6">
+                            <label
+                              htmlFor="cart-promo-code"
+                              className="text-sm font-medium text-foreground"
+                            >
+                              {t('Promo Code', '\u0643\u0648\u062f \u0627\u0644\u062e\u0635\u0645')}
+                            </label>
+                            <div className="mt-2 flex gap-2">
+                              <input
+                                id="cart-promo-code"
+                                type="text"
+                                autoComplete="off"
+                                value={promoCode}
+                                onChange={e => setPromoCode(e.target.value)}
+                                placeholder={t(
+                                  'Enter code',
+                                  '\u0623\u062f\u062e\u0644 \u0627\u0644\u0643\u0648\u062f'
+                                )}
+                                disabled={promoApplied}
+                                className="h-10 flex-1 rounded-lg border border-border bg-background px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
+                              />
+                              <button
+                                onClick={applyPromoCode}
+                                disabled={promoApplied || !promoCode || isValidating}
+                                className="h-10 rounded-lg bg-muted px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+                              >
+                                {promoApplied
+                                  ? t(
+                                      'Applied',
+                                      '\u062a\u0645 \u0627\u0644\u062a\u0637\u0628\u064a\u0642'
+                                    )
+                                  : isValidating
+                                    ? t(
+                                        'Validating...',
+                                        '\u062c\u0627\u0631\u064a \u0627\u0644\u062a\u062d\u0642\u0642...'
+                                      )
+                                    : t('Apply', '\u062a\u0637\u0628\u064a\u0642')}
+                              </button>
+                            </div>
+                            {promoApplied && (
+                              <p className="mt-2 flex items-center gap-1 text-xs text-[hsl(var(--success))]">
+                                <svg
+                                  className="h-3.5 w-3.5"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M5 13l4 4L19 7"
+                                  />
+                                </svg>
+                                {promoCode.toUpperCase()} - {promoName} ({formatPrice(discount)}{' '}
+                                off)
+                              </p>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Price Breakdown */}
+                        <div className="mt-6 space-y-3">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">
+                              {t(
+                                'Subtotal',
+                                '\u0627\u0644\u0645\u062c\u0645\u0648\u0639 \u0627\u0644\u0641\u0631\u0639\u064a'
+                              )}{' '}
+                              ({cartCount} {t('items', '\u0645\u0646\u062a\u062c\u0627\u062a')})
+                            </span>
+                            <span className="font-medium text-foreground">
+                              {formatPrice(subtotal)}
+                            </span>
+                          </div>
+                          {promoApplied && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-[hsl(var(--success))]">
+                                {t('Discount', '\u0627\u0644\u062e\u0635\u0645')} (
+                                {promoType === 'percentage' ? `${promoValue}%` : promoName})
+                              </span>
+                              <span className="font-medium text-[hsl(var(--success))]">
+                                -{formatPrice(discount)}
+                              </span>
+                            </div>
+                          )}
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">
+                              {t('Shipping', '\u0627\u0644\u0634\u062d\u0646')}
+                            </span>
+                            {shipping === 0 ? (
+                              <span className="font-medium text-[hsl(var(--success))]">
+                                {t('Free', '\u0645\u062c\u0627\u0646\u064a')}
+                              </span>
+                            ) : (
+                              <span className="font-medium text-foreground">
+                                {formatPrice(shipping)}
+                              </span>
+                            )}
+                          </div>
+                          {shipping === 0 && (
+                            <p className="text-xs text-muted-foreground">
+                              {t(
+                                'Free shipping on orders over',
+                                '\u0634\u062d\u0646 \u0645\u062c\u0627\u0646\u064a \u0644\u0644\u0637\u0644\u0628\u0627\u062a \u0641\u0648\u0642'
+                              )}{' '}
+                              {formatPrice(freeShippingThreshold)}
+                            </p>
+                          )}
+                          <div className="border-t border-border pt-3">
+                            <div className="flex justify-between">
+                              <span className="text-lg font-bold text-foreground">
+                                {t('Total', '\u0627\u0644\u0625\u062c\u0645\u0627\u0644\u064a')}
+                              </span>
+                              <span className="text-xl font-bold text-primary">
+                                {formatPrice(total)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Checkout Button */}
+                        <Link href={storeUrl('/checkout')} className="mt-6 block">
+                          <Button
+                            className="w-full gap-2 rounded-xl shadow-lg shadow-primary/25"
+                            size="lg"
+                          >
+                            {t(
+                              'Proceed to Checkout',
+                              '\u0627\u0644\u0645\u062a\u0627\u0628\u0639\u0629 \u0644\u0644\u062f\u0641\u0639'
+                            )}
                             <svg
-                              className="h-3.5 w-3.5"
+                              className="h-5 w-5"
                               fill="none"
                               viewBox="0 0 24 24"
                               stroke="currentColor"
@@ -551,120 +717,35 @@ export default function CartClient() {
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
                                 strokeWidth={2}
-                                d="M5 13l4 4L19 7"
+                                d="M14 5l7 7m0 0l-7 7m7-7H3"
                               />
                             </svg>
-                            {promoCode.toUpperCase()} - {promoName} ({formatPrice(discount)} off)
-                          </p>
-                        )}
-                      </div>
-                    )}
+                          </Button>
+                        </Link>
 
-                    {/* Price Breakdown */}
-                    <div className="mt-6 space-y-3">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">
+                        {/* Security Badge */}
+                        <div className="mt-6 flex items-center justify-center gap-2 rounded-lg bg-muted/50 py-3 text-xs text-muted-foreground">
+                          <svg
+                            className="h-4 w-4"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                            />
+                          </svg>
                           {t(
-                            'Subtotal',
-                            '\u0627\u0644\u0645\u062c\u0645\u0648\u0639 \u0627\u0644\u0641\u0631\u0639\u064a'
-                          )}{' '}
-                          ({cartCount} {t('items', '\u0645\u0646\u062a\u062c\u0627\u062a')})
-                        </span>
-                        <span className="font-medium text-foreground">{formatPrice(subtotal)}</span>
-                      </div>
-                      {promoApplied && (
-                        <div className="flex justify-between text-sm">
-                          <span className="text-[hsl(var(--success))]">
-                            {t('Discount', '\u0627\u0644\u062e\u0635\u0645')} (
-                            {promoType === 'percentage' ? `${promoValue}%` : promoName})
-                          </span>
-                          <span className="font-medium text-[hsl(var(--success))]">
-                            -{formatPrice(discount)}
-                          </span>
-                        </div>
-                      )}
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">
-                          {t('Shipping', '\u0627\u0644\u0634\u062d\u0646')}
-                        </span>
-                        {shipping === 0 ? (
-                          <span className="font-medium text-[hsl(var(--success))]">
-                            {t('Free', '\u0645\u062c\u0627\u0646\u064a')}
-                          </span>
-                        ) : (
-                          <span className="font-medium text-foreground">
-                            {formatPrice(shipping)}
-                          </span>
-                        )}
-                      </div>
-                      {shipping === 0 && (
-                        <p className="text-xs text-muted-foreground">
-                          {t(
-                            'Free shipping on orders over',
-                            '\u0634\u062d\u0646 \u0645\u062c\u0627\u0646\u064a \u0644\u0644\u0637\u0644\u0628\u0627\u062a \u0641\u0648\u0642'
-                          )}{' '}
-                          {formatPrice(freeShippingThreshold)}
-                        </p>
-                      )}
-                      <div className="border-t border-border pt-3">
-                        <div className="flex justify-between">
-                          <span className="text-lg font-bold text-foreground">
-                            {t('Total', '\u0627\u0644\u0625\u062c\u0645\u0627\u0644\u064a')}
-                          </span>
-                          <span className="text-xl font-bold text-primary">
-                            {formatPrice(total)}
-                          </span>
+                            'Secure checkout with SSL encryption',
+                            '\u062f\u0641\u0639 \u0622\u0645\u0646 \u0628\u062a\u0634\u0641\u064a\u0631 SSL'
+                          )}
                         </div>
                       </div>
-                    </div>
-
-                    {/* Checkout Button */}
-                    <Link href={storeUrl('/checkout')} className="mt-6 block">
-                      <Button
-                        className="w-full gap-2 rounded-xl shadow-lg shadow-primary/25"
-                        size="lg"
-                      >
-                        {t(
-                          'Proceed to Checkout',
-                          '\u0627\u0644\u0645\u062a\u0627\u0628\u0639\u0629 \u0644\u0644\u062f\u0641\u0639'
-                        )}
-                        <svg
-                          className="h-5 w-5"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M14 5l7 7m0 0l-7 7m7-7H3"
-                          />
-                        </svg>
-                      </Button>
-                    </Link>
-
-                    {/* Security Badge */}
-                    <div className="mt-6 flex items-center justify-center gap-2 rounded-lg bg-muted/50 py-3 text-xs text-muted-foreground">
-                      <svg
-                        className="h-4 w-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-                        />
-                      </svg>
-                      {t(
-                        'Secure checkout with SSL encryption',
-                        '\u062f\u0641\u0639 \u0622\u0645\u0646 \u0628\u062a\u0634\u0641\u064a\u0631 SSL'
-                      )}
-                    </div>
-                  </div>
+                    </>
+                  )}
 
                   {/* Payment Methods */}
                   <div className="rounded-2xl border border-border bg-card p-4">
