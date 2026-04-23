@@ -202,7 +202,94 @@
       }
     }
   },
-  "orders": {},
+  "orders": {
+    "list": {
+      "title": "Store Orders",
+      "subtitle": "View and manage orders for this store",
+      "backToStore": "Back to Store",
+      "search": {
+        "placeholder": "Search orders..."
+      },
+      "filters": {
+        "all": "All Orders",
+        "pending": "Pending",
+        "confirmed": "Confirmed",
+        "processing": "Processing",
+        "shipped": "Shipped",
+        "delivered": "Delivered",
+        "cancelled": "Cancelled"
+      },
+      "bulk": {
+        "selected": "{count} order(s) selected",
+        "markPaid": "Mark as Paid",
+        "processing": "Processing...",
+        "clearSelection": "Clear selection"
+      },
+      "table": {
+        "label": "Orders",
+        "loadingLabel": "Orders (loading)",
+        "order": "Order",
+        "customer": "Customer",
+        "total": "Total",
+        "status": "Status",
+        "date": "Date",
+        "actions": "Actions",
+        "totalValue": "{amount} KWD"
+      },
+      "actions": {
+        "updateStatusLabel": "Update order status",
+        "updatePlaceholder": "Update...",
+        "selectOrderLabel": "Select order {order}",
+        "markPaid": "Mark Paid",
+        "markPaidTitle": "Mark COD payment as received",
+        "invoice": "Invoice",
+        "invoiceTitle": "View Invoice"
+      },
+      "empty": {
+        "title": "No orders yet",
+        "description": "Orders will appear here when customers make purchases",
+        "filteredTitle": "No matching orders",
+        "filteredDescription": "Try adjusting your search or filters"
+      },
+      "pagination": {
+        "showing": "Showing {from} to {to} of {total} orders",
+        "previous": "Previous",
+        "next": "Next"
+      },
+      "confirm": {
+        "markPaid": "Confirm cash payment received for this order?",
+        "bulkMarkPaid": "Mark {count} order(s) as paid?"
+      },
+      "toast": {
+        "errorTitle": "Error",
+        "statusUpdatedTitle": "Status Updated",
+        "statusUpdatedDescription": "Order status changed to {status}.",
+        "markedPaidTitle": "Marked as Paid",
+        "markedPaidDescription": "Order has been marked as paid.",
+        "bulkUpdateTitle": "Bulk Update",
+        "bulkUpdateDescription": "{count} order(s) marked as paid."
+      },
+      "errors": {
+        "fetchFailed": "Failed to fetch orders",
+        "connection": "Unable to connect to the server. Please check your connection and try again.",
+        "statusUpdate": "Failed to update status",
+        "markPaid": "Failed to mark as paid",
+        "bulkMarkPaid": "Failed to bulk mark as paid",
+        "retry": "Retry"
+      }
+    },
+    "status": {
+      "pending": "Pending",
+      "confirmed": "Confirmed",
+      "processing": "Processing",
+      "shipped": "Shipped",
+      "delivered": "Delivered",
+      "cancelled": "Cancelled",
+      "refunded": "Refunded",
+      "paid": "Paid",
+      "unpaid": "Unpaid"
+    }
+  },
   "customers": {},
   "analytics": {},
   "settings": {
