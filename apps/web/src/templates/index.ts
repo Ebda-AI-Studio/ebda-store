@@ -25,6 +25,7 @@ const templates: Record<TemplateId, () => Promise<TemplateComponents>> = {
       CategoryCard: m.CategoryCard,
       CategoryGrid: m.CategoryGrid,
       AnnouncementBar: m.AnnouncementBar,
+      CartTable: m.CartTable,
     })),
   minimal: () =>
     import('./minimal').then(m => ({
@@ -36,6 +37,7 @@ const templates: Record<TemplateId, () => Promise<TemplateComponents>> = {
       CategoryCard: m.CategoryCard,
       CategoryGrid: m.CategoryGrid,
       AnnouncementBar: m.AnnouncementBar,
+      CartTable: m.CartTable,
     })),
   bold: () =>
     import('./bold').then(m => ({
@@ -47,6 +49,7 @@ const templates: Record<TemplateId, () => Promise<TemplateComponents>> = {
       CategoryCard: m.CategoryCard,
       CategoryGrid: m.CategoryGrid,
       AnnouncementBar: m.AnnouncementBar,
+      CartTable: m.CartTable,
     })),
   elegant: () =>
     import('./elegant').then(m => ({
@@ -58,6 +61,7 @@ const templates: Record<TemplateId, () => Promise<TemplateComponents>> = {
       CategoryCard: m.CategoryCard,
       CategoryGrid: m.CategoryGrid,
       AnnouncementBar: m.AnnouncementBar,
+      CartTable: m.CartTable,
     })),
 };
 

@@ -7,3 +7,4 @@ export { default as ProductGrid } from './ProductGrid';
 export { default as CategoryCard } from './CategoryCard';
 export { default as CategoryGrid } from './CategoryGrid';
 export { default as AnnouncementBar } from './AnnouncementBar';
+export { default as CartTable } from './CartTable';
