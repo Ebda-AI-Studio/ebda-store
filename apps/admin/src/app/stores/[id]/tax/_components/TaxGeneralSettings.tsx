@@ -1,0 +1,100 @@
+'use client';
+
+import { useT } from '@/i18n/useT';
+import type { TaxSettings } from './types';
+
+interface TaxGeneralSettingsProps {
+  settings: TaxSettings;
+  savingSettings: boolean;
+  onSettingsChange: (settings: TaxSettings) => void;
+  onSaveSettings: (patch: Partial<TaxSettings>) => void;
+}
+
+/**
+ * Top card: toggles for enabling tax, tax-inclusive pricing, and the default rate input.
+ * Each control auto-saves via `onSaveSettings` on change/blur.
+ */
+export function TaxGeneralSettings({
+  settings,
+  savingSettings,
+  onSettingsChange,
+  onSaveSettings,
+}: TaxGeneralSettingsProps) {
+  const t = useT('tax.settings');
+
+  return (
+    <div className="bg-card rounded-xl border border-border p-6 mb-6">
+      <h2 className="text-lg font-semibold text-foreground mb-4">{t('title')}</h2>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-medium text-foreground">{t('enable.title')}</h3>
+            <p className="text-sm text-muted-foreground">{t('enable.description')}</p>
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={settings.taxEnabled}
+              onChange={e => {
+                const newSettings = { ...settings, taxEnabled: e.target.checked };
+                onSettingsChange(newSettings);
+                onSaveSettings({ taxEnabled: e.target.checked });
+              }}
+              className="sr-only peer"
+              disabled={savingSettings}
+            />
+            <div className="w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/30 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+          </label>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-medium text-foreground">{t('included.title')}</h3>
+            <p className="text-sm text-muted-foreground">{t('included.description')}</p>
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={settings.taxIncludedInPrice}
+              onChange={e => {
+                const newSettings = { ...settings, taxIncludedInPrice: e.target.checked };
+                onSettingsChange(newSettings);
+                onSaveSettings({ taxIncludedInPrice: e.target.checked });
+              }}
+              className="sr-only peer"
+              disabled={savingSettings || !settings.taxEnabled}
+            />
+            <div
+              className={`w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/30 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary ${!settings.taxEnabled ? 'opacity-50' : ''}`}
+            ></div>
+          </label>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1">
+            {t('defaultRate.label')}
+          </label>
+          <p className="text-sm text-muted-foreground mb-2">{t('defaultRate.description')}</p>
+          <div className="flex items-center gap-3">
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              max="100"
+              value={settings.defaultTaxRate ?? ''}
+              onChange={e => {
+                const value = e.target.value ? parseFloat(e.target.value) : null;
+                onSettingsChange({ ...settings, defaultTaxRate: value });
+              }}
+              onBlur={() => onSaveSettings({ defaultTaxRate: settings.defaultTaxRate })}
+              placeholder={t('defaultRate.placeholder')}
+              className="w-32 px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              disabled={!settings.taxEnabled}
+            />
+            <span className="text-muted-foreground">%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

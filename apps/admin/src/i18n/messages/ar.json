@@ -505,7 +505,118 @@
       }
     }
   },
-  "tax": {},
+  "tax": {
+    "page": {
+      "title": "Tax Configuration",
+      "subtitle": "Configure tax rates and settings for your store"
+    },
+    "settings": {
+      "title": "General Settings",
+      "enable": {
+        "title": "Enable Tax Collection",
+        "description": "When enabled, taxes will be calculated and added to orders"
+      },
+      "included": {
+        "title": "Prices Include Tax",
+        "description": "Product prices already include tax (tax will be calculated backwards)"
+      },
+      "defaultRate": {
+        "label": "Default Tax Rate (%)",
+        "description": "Used when no specific tax rate rules apply",
+        "placeholder": "e.g., 5.00"
+      }
+    },
+    "rates": {
+      "title": "Tax Rates",
+      "subtitle": "Create specific tax rates for different regions or categories",
+      "addButton": "Add Rate",
+      "tableLabel": "Tax rules",
+      "allRegions": "All regions",
+      "filters": {
+        "all": "All",
+        "active": "Active",
+        "inactive": "Inactive"
+      },
+      "empty": {
+        "title": "No Tax Rates",
+        "enabled": "Create tax rates for specific regions or product categories",
+        "disabled": "Enable tax collection to start adding tax rates",
+        "createFirst": "Create First Rate"
+      },
+      "columns": {
+        "name": "Name",
+        "rate": "Rate",
+        "region": "Region",
+        "priority": "Priority",
+        "type": "Type",
+        "status": "Status",
+        "actions": "Actions"
+      },
+      "types": {
+        "compound": "Compound",
+        "standard": "Standard"
+      },
+      "status": {
+        "active": "Active",
+        "inactive": "Inactive"
+      },
+      "actions": {
+        "edit": "Edit",
+        "delete": "Delete"
+      }
+    },
+    "form": {
+      "newTitle": "New Tax Rate",
+      "editTitle": "Edit Tax Rate",
+      "templates": {
+        "label": "Quick Templates"
+      },
+      "name": {
+        "label": "Tax Name",
+        "placeholder": "e.g., VAT"
+      },
+      "nameAr": {
+        "label": "Tax Name (Arabic)",
+        "placeholder": "e.g., ضريبة القيمة المضافة"
+      },
+      "rate": {
+        "label": "Tax Rate (%)",
+        "placeholder": "5.00"
+      },
+      "country": {
+        "label": "Country Code",
+        "placeholder": "e.g., KW",
+        "hint": "Leave empty for all countries"
+      },
+      "state": {
+        "label": "State/Region",
+        "placeholder": "e.g., Capital",
+        "hint": "Leave empty for all states"
+      },
+      "priority": {
+        "label": "Priority",
+        "hint": "Higher priority rates are applied first"
+      },
+      "compound": {
+        "label": "Compound Tax",
+        "hint": "Calculate on subtotal + previous taxes"
+      },
+      "active": {
+        "label": "Active"
+      },
+      "cancel": "Cancel",
+      "create": "Create Rate",
+      "update": "Update Rate"
+    },
+    "info": {
+      "title": "About Tax Calculation",
+      "priority": "Tax rates are applied based on priority (highest first).",
+      "compoundLabel": "Compound taxes",
+      "compoundDescription": "are calculated on top of the subtotal plus any previously calculated taxes.",
+      "standardLabel": "Standard taxes",
+      "standardDescription": "are calculated only on the original subtotal."
+    }
+  },
   "inventory": {},
   "pwa": {},
   "affiliates": {},
