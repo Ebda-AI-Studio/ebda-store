@@ -38,6 +38,23 @@ export default function StoreSettingsPage() {
       ),
     },
     {
+      title: 'Navigation',
+      description:
+        'Choose which links appear in the storefront header menu. Add, remove, reorder, or link to external URLs.',
+      href: `/stores/${storeId}/navigation`,
+      color: 'bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-300',
+      icon: (
+        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M4 6h16M4 12h16M4 18h16"
+          />
+        </svg>
+      ),
+    },
+    {
       title: 'Hero Section',
       description: 'Customize the homepage hero — title, subtitle, CTA, and background image',
       href: `/stores/${storeId}/hero`,

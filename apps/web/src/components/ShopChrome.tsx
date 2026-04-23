@@ -26,12 +26,33 @@ export function ShopChrome({ children }: { children: ReactNode }) {
 
   const isRtl = language === 'ar';
 
-  const navigation: NavItem[] = [
+  // Store owners can override the navigation menu via store.settings.navMenu
+  // (an array of { label, labelAr?, href }). href may be relative ("/about")
+  // or absolute ("https://..."); relative hrefs are run through storeUrl() so
+  // multi-tenant platform URLs get the right slug prefix. Falls back to the
+  // default 4-item menu when the setting is missing or malformed.
+  const defaultNav: NavItem[] = [
     { label: 'Products', labelAr: 'المنتجات', href: storeUrl('/products') },
     { label: 'Categories', labelAr: 'الفئات', href: storeUrl('/categories') },
     { label: 'About', labelAr: 'من نحن', href: storeUrl('/about') },
     { label: 'Contact', labelAr: 'تواصل معنا', href: storeUrl('/contact') },
   ];
+  const customNav = store.settings?.navMenu;
+  const navigation: NavItem[] = Array.isArray(customNav)
+    ? customNav
+        .filter(
+          (item): item is { label: string; labelAr?: string; href: string } =>
+            !!item &&
+            typeof item === 'object' &&
+            typeof (item as { label?: unknown }).label === 'string' &&
+            typeof (item as { href?: unknown }).href === 'string'
+        )
+        .map(item => ({
+          label: item.label,
+          labelAr: item.labelAr,
+          href: item.href.startsWith('http') ? item.href : storeUrl(item.href),
+        }))
+    : defaultNav;
 
   const handleSearch = (query: string) => {
     router.push(storeUrl(`/search?q=${encodeURIComponent(query)}`));
