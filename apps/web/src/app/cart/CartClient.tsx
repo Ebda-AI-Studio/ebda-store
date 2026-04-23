@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Button, useToast } from '@force/ui';
 import { ShopChrome } from '../../components';
+import { useTemplateComponents } from '../../hooks/useTemplateComponents';
 import { useCart } from '../../contexts/CartContext';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useFeatures } from '../../contexts/FeatureContext';
@@ -197,6 +198,7 @@ export default function CartClient() {
       : 2500;
   const total = subtotal - discount + shipping;
   const cartCount = itemCount;
+  const { components: T } = useTemplateComponents();
 
   return (
     <ShopChrome>
@@ -301,29 +303,86 @@ export default function CartClient() {
             <div className="mt-8 lg:grid lg:grid-cols-12 lg:gap-8">
               {/* Cart Items */}
               <div className="lg:col-span-8">
-                <div className="space-y-4">
-                  {cartItems.map((item, index) => (
-                    <div
-                      key={item.id}
-                      className="cart-item animate-fade-in"
-                      style={{ animationDelay: `${index * 100}ms` }}
-                    >
-                      {/* Product Image */}
-                      <div className="h-28 w-28 flex-shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-primary/5 to-primary/10 sm:h-32 sm:w-32">
-                        {item.image ? (
-                          <Image
-                            src={item.image}
-                            alt={item.name}
-                            width={128}
-                            height={128}
-                            className="h-full w-full object-cover"
-                            sizes="(max-width: 640px) 112px, 128px"
-                          />
-                        ) : (
-                          <div className="flex h-full items-center justify-center">
-                            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+                {T?.CartTable ? (
+                  <T.CartTable
+                    items={cartItems.map(item => ({
+                      id: item.id,
+                      productId: item.productId,
+                      name: item.name,
+                      nameAr: item.nameAr,
+                      slug: item.slug,
+                      price: item.price,
+                      quantity: item.quantity,
+                      image: item.image,
+                    }))}
+                    isRtl={language === 'ar'}
+                    currency={store.currency}
+                    urlPrefix={storeUrl('')}
+                    onUpdateQuantity={handleUpdateQuantity}
+                    onRemove={handleRemoveItem}
+                  />
+                ) : (
+                  <div className="space-y-4">
+                    {cartItems.map((item, index) => (
+                      <div
+                        key={item.id}
+                        className="cart-item animate-fade-in"
+                        style={{ animationDelay: `${index * 100}ms` }}
+                      >
+                        {/* Product Image */}
+                        <div className="h-28 w-28 flex-shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-primary/5 to-primary/10 sm:h-32 sm:w-32">
+                          {item.image ? (
+                            <Image
+                              src={item.image}
+                              alt={item.name}
+                              width={128}
+                              height={128}
+                              className="h-full w-full object-cover"
+                              sizes="(max-width: 640px) 112px, 128px"
+                            />
+                          ) : (
+                            <div className="flex h-full items-center justify-center">
+                              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+                                <svg
+                                  className="h-8 w-8 text-primary"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={1}
+                                    d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                                  />
+                                </svg>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Product Details */}
+                        <div className="flex flex-1 flex-col gap-2 sm:gap-0">
+                          <div className="flex items-start justify-between gap-4">
+                            <div>
+                              {item.category && (
+                                <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                                  {item.category}
+                                </span>
+                              )}
+                              <h3 className="mt-0.5 font-semibold text-foreground">{item.name}</h3>
+                              <p className="mt-1 text-sm text-muted-foreground">
+                                {formatPrice(item.price)}{' '}
+                                {t('each', '\u0644\u0644\u0648\u0627\u062d\u062f')}
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => handleRemoveItem(item.id)}
+                              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                              aria-label="Remove item"
+                            >
                               <svg
-                                className="h-8 w-8 text-primary"
+                                className="h-5 w-5"
                                 fill="none"
                                 viewBox="0 0 24 24"
                                 stroke="currentColor"
@@ -331,116 +390,79 @@ export default function CartClient() {
                                 <path
                                   strokeLinecap="round"
                                   strokeLinejoin="round"
-                                  strokeWidth={1}
-                                  d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                                  strokeWidth={1.5}
+                                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                                 />
                               </svg>
-                            </div>
+                            </button>
                           </div>
-                        )}
-                      </div>
 
-                      {/* Product Details */}
-                      <div className="flex flex-1 flex-col gap-2 sm:gap-0">
-                        <div className="flex items-start justify-between gap-4">
-                          <div>
-                            {item.category && (
-                              <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                                {item.category}
+                          <div className="mt-auto flex items-center justify-between pt-2">
+                            {/* Quantity Selector */}
+                            <div className="flex items-center rounded-xl border border-border bg-background">
+                              <button
+                                onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}
+                                disabled={item.quantity <= 1}
+                                className={`flex h-11 w-11 items-center justify-center transition-colors ${
+                                  item.quantity <= 1
+                                    ? 'text-muted-foreground/40 cursor-not-allowed'
+                                    : 'text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer'
+                                }`}
+                                aria-label="Decrease quantity"
+                              >
+                                <svg
+                                  className="h-4 w-4"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M20 12H4"
+                                  />
+                                </svg>
+                              </button>
+                              <span className="w-10 text-center text-sm font-semibold text-foreground">
+                                {item.quantity}
                               </span>
-                            )}
-                            <h3 className="mt-0.5 font-semibold text-foreground">{item.name}</h3>
-                            <p className="mt-1 text-sm text-muted-foreground">
-                              {formatPrice(item.price)}{' '}
-                              {t('each', '\u0644\u0644\u0648\u0627\u062d\u062f')}
+                              <button
+                                onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
+                                disabled={item.quantity >= 10}
+                                className={`flex h-11 w-11 items-center justify-center transition-colors ${
+                                  item.quantity >= 10
+                                    ? 'text-muted-foreground/40 cursor-not-allowed'
+                                    : 'text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer'
+                                }`}
+                                aria-label="Increase quantity"
+                              >
+                                <svg
+                                  className="h-4 w-4"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M12 4v16m8-8H4"
+                                  />
+                                </svg>
+                              </button>
+                            </div>
+
+                            {/* Item Total */}
+                            <p className="text-lg font-bold text-primary">
+                              {formatPrice(item.price * item.quantity)}
                             </p>
                           </div>
-                          <button
-                            onClick={() => handleRemoveItem(item.id)}
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                            aria-label="Remove item"
-                          >
-                            <svg
-                              className="h-5 w-5"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={1.5}
-                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                              />
-                            </svg>
-                          </button>
-                        </div>
-
-                        <div className="mt-auto flex items-center justify-between pt-2">
-                          {/* Quantity Selector */}
-                          <div className="flex items-center rounded-xl border border-border bg-background">
-                            <button
-                              onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}
-                              disabled={item.quantity <= 1}
-                              className={`flex h-11 w-11 items-center justify-center transition-colors ${
-                                item.quantity <= 1
-                                  ? 'text-muted-foreground/40 cursor-not-allowed'
-                                  : 'text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer'
-                              }`}
-                              aria-label="Decrease quantity"
-                            >
-                              <svg
-                                className="h-4 w-4"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M20 12H4"
-                                />
-                              </svg>
-                            </button>
-                            <span className="w-10 text-center text-sm font-semibold text-foreground">
-                              {item.quantity}
-                            </span>
-                            <button
-                              onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
-                              disabled={item.quantity >= 10}
-                              className={`flex h-11 w-11 items-center justify-center transition-colors ${
-                                item.quantity >= 10
-                                  ? 'text-muted-foreground/40 cursor-not-allowed'
-                                  : 'text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer'
-                              }`}
-                              aria-label="Increase quantity"
-                            >
-                              <svg
-                                className="h-4 w-4"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M12 4v16m8-8H4"
-                                />
-                              </svg>
-                            </button>
-                          </div>
-
-                          {/* Item Total */}
-                          <p className="text-lg font-bold text-primary">
-                            {formatPrice(item.price * item.quantity)}
-                          </p>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
 
                 {/* Continue Shopping */}
                 <div className="mt-8">

@@ -193,6 +193,37 @@ export interface CategoryGridProps {
 }
 
 /**
+ * Cart line item as rendered inside a template CartTable.
+ */
+export interface CartTableItem {
+  id: string;
+  productId: string;
+  name: string;
+  nameAr?: string;
+  slug: string;
+  price: number;
+  quantity: number;
+  image?: string;
+}
+
+/**
+ * CartTable is the line-item list the storefront shows on /cart. Each
+ * template can present the same cart with its own aesthetic — one pack
+ * might favor a clean table grid, another a card-per-row layout. The
+ * parent (CartClient) still owns state + handlers; the template is
+ * purely presentational.
+ */
+export interface CartTableProps {
+  items: CartTableItem[];
+  isRtl?: boolean;
+  currency?: string;
+  urlPrefix?: string;
+  /** Called with the *new* quantity (clamped by the template to >= 1). */
+  onUpdateQuantity?: (itemId: string, quantity: number) => void;
+  onRemove?: (itemId: string) => void;
+}
+
+/**
  * Announcement bar props
  */
 export interface AnnouncementBarProps {
@@ -220,6 +251,12 @@ export interface TemplateComponents {
   CategoryCard: React.ComponentType<CategoryCardProps>;
   CategoryGrid: React.ComponentType<CategoryGridProps>;
   AnnouncementBar: React.ComponentType<AnnouncementBarProps>;
+  /**
+   * Optional — templates that haven't implemented CartTable yet fall back
+   * to the generic inline cart-row layout in CartClient.tsx. Remove the
+   * `?` once all 5 templates ship it.
+   */
+  CartTable?: React.ComponentType<CartTableProps>;
 }
 
 /**

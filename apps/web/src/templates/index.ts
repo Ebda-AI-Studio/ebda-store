@@ -13,6 +13,7 @@ const templates: Record<TemplateId, () => Promise<TemplateComponents>> = {
       CategoryCard: m.CategoryCard,
       CategoryGrid: m.CategoryGrid,
       AnnouncementBar: m.AnnouncementBar,
+      CartTable: m.CartTable,
     })),
   classic: () =>
     import('./classic').then(m => ({
