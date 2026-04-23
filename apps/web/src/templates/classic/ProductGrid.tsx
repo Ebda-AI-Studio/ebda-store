@@ -1,13 +1,14 @@
 'use client';
 
 import type { ProductGridProps } from '../types';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { getGridColsClass, getDisplayTitle } from '../shared';
 import ProductCard from './ProductCard';
 import { NoProductsIcon } from '../shared/icons';
 
 export default function ClassicProductGrid({
   products,
-  isRtl = false,
+  isRtl: isRtlProp,
   title,
   titleAr,
   showFilters: _showFilters = false,
@@ -22,6 +23,8 @@ export default function ClassicProductGrid({
 
   onRemoveFromWishlist,
 }: ProductGridProps) {
+  const { isRtl: ctxIsRtl } = useLanguage();
+  const isRtl = isRtlProp ?? ctxIsRtl;
   const displayTitle = getDisplayTitle(isRtl, title, titleAr);
   const gridCols = getGridColsClass(columns);
 

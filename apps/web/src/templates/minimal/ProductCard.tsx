@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import type { ProductCardProps } from '../types';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions';
 import { Price } from '@force/ui';
 
@@ -15,7 +16,7 @@ import { Price } from '@force/ui';
  */
 export default function MinimalProductCard({
   product,
-  isRtl = false,
+  isRtl: isRtlProp,
   currency = 'KWD',
   urlPrefix = '',
 
@@ -25,6 +26,8 @@ export default function MinimalProductCard({
 
   onRemoveFromWishlist,
 }: ProductCardProps) {
+  const { isRtl: ctxIsRtl } = useLanguage();
+  const isRtl = isRtlProp ?? ctxIsRtl;
   return (
     <Link href={`${urlPrefix}/products/${product.slug}`} className="group block cursor-pointer">
       {/* Image — no border, no shadow, subtle opacity on hover */}

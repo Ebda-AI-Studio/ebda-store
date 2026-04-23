@@ -2,15 +2,18 @@
 
 import Link from 'next/link';
 import type { FooterProps } from '../types';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 export default function MinimalFooter({
   branding,
   contact,
   socials,
   navigation = [],
-  isRtl = false,
+  isRtl: isRtlProp,
   urlPrefix = '',
 }: FooterProps) {
+  const { isRtl: ctxIsRtl } = useLanguage();
+  const isRtl = isRtlProp ?? ctxIsRtl;
   const displayName = isRtl && branding.nameAr ? branding.nameAr : branding.name;
   const displayLogo = isRtl && branding.logoAr ? branding.logoAr : branding.logo;
 

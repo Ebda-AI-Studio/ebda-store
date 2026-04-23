@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import type { ProductCardProps } from '../types';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { Price, ProductBadge, ProductBadgeGroup, Rating, AddToCartButton, cn } from '@force/ui';
 import { calculateDiscount } from '../shared/display-helpers';
 import { PlaceholderImageIcon } from '../shared/icons';
@@ -20,7 +21,7 @@ import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions'
  */
 export default function ModernProductCard({
   product,
-  isRtl = false,
+  isRtl: isRtlProp,
   currency = 'KWD',
   onAddToCart,
   onAddToWishlist,
@@ -30,6 +31,8 @@ export default function ModernProductCard({
   onRemoveFromWishlist,
   urlPrefix = '',
 }: ProductCardProps) {
+  const { isRtl: ctxIsRtl } = useLanguage();
+  const isRtl = isRtlProp ?? ctxIsRtl;
   const [isHovered, setIsHovered] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
 

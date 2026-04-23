@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import type { AnnouncementBarProps } from '../types';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 export default function ModernAnnouncementBar({
   text,
@@ -13,9 +14,11 @@ export default function ModernAnnouncementBar({
   bgColor,
   textColor,
   dismissible = true,
-  isRtl = false,
+  isRtl: isRtlProp,
   onDismiss,
 }: AnnouncementBarProps) {
+  const { isRtl: ctxIsRtl } = useLanguage();
+  const isRtl = isRtlProp ?? ctxIsRtl;
   const [isDismissed, setIsDismissed] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const [shouldMarquee, setShouldMarquee] = useState(false);

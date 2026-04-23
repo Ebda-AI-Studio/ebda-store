@@ -2,12 +2,15 @@
 
 import CategoryCard from './CategoryCard';
 import type { CategoryGridProps } from '../types';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 export default function ModernCategoryGrid({
   categories,
-  isRtl = false,
+  isRtl: isRtlProp,
   urlPrefix = '',
 }: CategoryGridProps) {
+  const { isRtl: ctxIsRtl } = useLanguage();
+  const isRtl = isRtlProp ?? ctxIsRtl;
   if (categories.length === 0) {
     return null;
   }

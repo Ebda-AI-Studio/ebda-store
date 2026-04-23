@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import type { ProductCardProps } from '../types';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions';
 import { Price, ProductBadge, AddToCartButton, cn } from '@force/ui';
 import { PlaceholderImageIcon } from '../shared/icons';
@@ -16,7 +17,7 @@ import { PlaceholderImageIcon } from '../shared/icons';
  */
 export default function ClassicProductCard({
   product,
-  isRtl = false,
+  isRtl: isRtlProp,
   currency = 'KWD',
   quantityInCart = 0,
   onAddToCart,
@@ -28,6 +29,8 @@ export default function ClassicProductCard({
 
   onRemoveFromWishlist,
 }: ProductCardProps) {
+  const { isRtl: ctxIsRtl } = useLanguage();
+  const isRtl = isRtlProp ?? ctxIsRtl;
   const handleAddToCart = async (productId: string) => {
     await onAddToCart?.(productId);
   };

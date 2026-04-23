@@ -1,16 +1,19 @@
 'use client';
 
 import type { CategoryGridProps } from '../types';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { getDisplayTitle } from '../shared';
 import CategoryCard from './CategoryCard';
 
 export default function ClassicCategoryGrid({
   categories,
-  isRtl = false,
+  isRtl: isRtlProp,
   title,
   titleAr,
   urlPrefix = '',
 }: CategoryGridProps) {
+  const { isRtl: ctxIsRtl } = useLanguage();
+  const isRtl = isRtlProp ?? ctxIsRtl;
   const displayTitle = getDisplayTitle(isRtl, title, titleAr);
 
   return (

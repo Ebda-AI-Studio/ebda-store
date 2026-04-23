@@ -3,16 +3,19 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import type { HeaderProps } from '../types';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 export default function BoldHeader({
   branding,
   navigation = [],
-  isRtl = false,
+  isRtl: isRtlProp,
   cartItemCount = 0,
   isLoggedIn = false,
   onSearch,
   urlPrefix = '',
 }: HeaderProps) {
+  const { isRtl: ctxIsRtl } = useLanguage();
+  const isRtl = isRtlProp ?? ctxIsRtl;
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);

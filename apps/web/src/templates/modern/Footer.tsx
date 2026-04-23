@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import type { FooterProps } from '../types';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { getDisplayBranding, getDisplayText } from '../shared/display-helpers';
 import { getSocialLinks } from '../shared/icons';
 
@@ -11,9 +12,11 @@ export default function ModernFooter({
   contact,
   socials,
   navigation = [],
-  isRtl = false,
+  isRtl: isRtlProp,
   urlPrefix = '',
 }: FooterProps) {
+  const { isRtl: ctxIsRtl } = useLanguage();
+  const isRtl = isRtlProp ?? ctxIsRtl;
   const [email, setEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
 

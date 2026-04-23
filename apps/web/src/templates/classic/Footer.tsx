@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import type { FooterProps } from '../types';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { getDisplayBranding, getDisplayText } from '../shared/display-helpers';
 import { getSocialLinks } from '../shared/icons';
 
@@ -10,9 +11,11 @@ export default function ClassicFooter({
   contact,
   socials,
   navigation = [],
-  isRtl = false,
+  isRtl: isRtlProp,
   urlPrefix = '',
 }: FooterProps) {
+  const { isRtl: ctxIsRtl } = useLanguage();
+  const isRtl = isRtlProp ?? ctxIsRtl;
   const {
     name: displayName,
     logo: displayLogo,

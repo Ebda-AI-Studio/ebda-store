@@ -1,12 +1,13 @@
 'use client';
 
 import type { ProductGridProps } from '../types';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { getGridColsClass, getDisplayTitle } from '../shared';
 import ProductCard from './ProductCard';
 
 export default function BoldProductGrid({
   products,
-  isRtl = false,
+  isRtl: isRtlProp,
   title,
   titleAr,
   columns = 4,
@@ -20,6 +21,8 @@ export default function BoldProductGrid({
 
   onRemoveFromWishlist,
 }: ProductGridProps) {
+  const { isRtl: ctxIsRtl } = useLanguage();
+  const isRtl = isRtlProp ?? ctxIsRtl;
   const displayTitle = getDisplayTitle(isRtl, title, titleAr);
   const gridCols = getGridColsClass(columns);
 

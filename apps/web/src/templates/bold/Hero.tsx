@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import type { HeroProps } from '../types';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 export default function BoldHero({
   title,
@@ -13,9 +14,11 @@ export default function BoldHero({
   ctaText,
   ctaTextAr,
   ctaLink = '/products',
-  isRtl = false,
+  isRtl: isRtlProp,
   urlPrefix = '',
 }: HeroProps) {
+  const { isRtl: ctxIsRtl } = useLanguage();
+  const isRtl = isRtlProp ?? ctxIsRtl;
   const displayTitle = isRtl && titleAr ? titleAr : title || (isRtl ? 'اكتشف الجديد' : 'GO BOLD');
   const displaySubtitle =
     isRtl && subtitleAr

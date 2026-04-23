@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import type { ProductCardProps } from '../types';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions';
 import { Price, ProductBadge, ProductBadgeGroup, AddToCartButton, cn } from '@force/ui';
 import { calculateDiscount } from '../shared/display-helpers';
@@ -17,7 +18,7 @@ import { PlaceholderImageIcon } from '../shared/icons';
  */
 export default function BoldProductCard({
   product,
-  isRtl = false,
+  isRtl: isRtlProp,
   currency = 'KWD',
   quantityInCart = 0,
   onAddToCart,
@@ -29,6 +30,8 @@ export default function BoldProductCard({
 
   onRemoveFromWishlist,
 }: ProductCardProps) {
+  const { isRtl: ctxIsRtl } = useLanguage();
+  const isRtl = isRtlProp ?? ctxIsRtl;
   const [isHovered, setIsHovered] = useState(false);
 
   const discount = calculateDiscount(product.price, product.compareAtPrice);

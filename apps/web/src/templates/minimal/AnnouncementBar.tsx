@@ -2,13 +2,16 @@
 
 import Link from 'next/link';
 import type { AnnouncementBarProps } from '../types';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 export default function MinimalAnnouncementBar({
   text,
   textAr,
   link,
-  isRtl = false,
+  isRtl: isRtlProp,
 }: AnnouncementBarProps) {
+  const { isRtl: ctxIsRtl } = useLanguage();
+  const isRtl = isRtlProp ?? ctxIsRtl;
   const displayText = isRtl && textAr ? textAr : text;
 
   if (!displayText) return null;

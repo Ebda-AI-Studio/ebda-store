@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import ProductCard from './ProductCard';
 import type { ProductGridProps } from '../types';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { cn } from '@force/ui';
 import { NoProductsIcon } from '../shared/icons';
 
@@ -17,7 +18,7 @@ import { NoProductsIcon } from '../shared/icons';
  */
 export default function ModernProductGrid({
   products,
-  isRtl = false,
+  isRtl: isRtlProp,
   currency = 'KWD',
   columns = 4,
   cartQuantities = {},
@@ -31,6 +32,8 @@ export default function ModernProductGrid({
 
   onRemoveFromWishlist,
 }: ProductGridProps) {
+  const { isRtl: ctxIsRtl } = useLanguage();
+  const isRtl = isRtlProp ?? ctxIsRtl;
   const [visibleCount, setVisibleCount] = useState(0);
 
   useEffect(() => {

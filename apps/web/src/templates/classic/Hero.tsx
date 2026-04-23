@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import type { HeroProps } from '../types';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 export default function ClassicHero({
   title,
@@ -13,8 +14,10 @@ export default function ClassicHero({
   ctaText,
   ctaTextAr,
   ctaLink = '/products',
-  isRtl = false,
+  isRtl: isRtlProp,
 }: HeroProps) {
+  const { isRtl: ctxIsRtl } = useLanguage();
+  const isRtl = isRtlProp ?? ctxIsRtl;
   const displayTitle =
     isRtl && titleAr ? titleAr : title || (isRtl ? 'تشكيلة فاخرة' : 'Exquisite Collection');
   const displaySubtitle =

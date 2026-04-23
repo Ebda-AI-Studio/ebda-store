@@ -2,12 +2,15 @@
 
 import Link from 'next/link';
 import type { CategoryCardProps } from '../types';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 export default function BoldCategoryCard({
   category,
-  isRtl = false,
+  isRtl: isRtlProp,
   urlPrefix = '',
 }: CategoryCardProps) {
+  const { isRtl: ctxIsRtl } = useLanguage();
+  const isRtl = isRtlProp ?? ctxIsRtl;
   const displayName = isRtl && category.nameAr ? category.nameAr : category.name;
 
   return (
