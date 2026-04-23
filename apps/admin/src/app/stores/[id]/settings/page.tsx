@@ -205,7 +205,7 @@ export default function StoreSettingsPage() {
       title: 'Template',
       description: 'Choose and customize the storefront design template',
       href: `/stores/${storeId}/template`,
-      color: 'bg-orange-100 text-primary',
+      color: 'bg-primary/10 text-primary',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
@@ -303,7 +303,7 @@ export default function StoreSettingsPage() {
       title: 'Abandoned Cart Recovery',
       description: 'Recover lost sales with automated reminders',
       href: `/stores/${storeId}/abandoned-carts`,
-      color: 'bg-orange-100 text-primary',
+      color: 'bg-primary/10 text-primary',
       featureKey: 'abandoned_cart',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">

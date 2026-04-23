@@ -578,7 +578,7 @@ export default function AnalyticsPage() {
                           product.inventory === 0
                             ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
                             : product.inventory <= 5
-                              ? 'bg-orange-100 text-orange-800'
+                              ? 'bg-primary/10 text-primary'
                               : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
                         }`}
                       >

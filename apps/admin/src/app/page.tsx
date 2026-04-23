@@ -138,7 +138,7 @@ export default function DashboardPage() {
         </svg>
       ),
       color: 'from-primary to-primary/90',
-      bgColor: 'bg-orange-50',
+      bgColor: 'bg-primary/5',
       iconBg: 'bg-primary',
       isRevenue: true,
     },

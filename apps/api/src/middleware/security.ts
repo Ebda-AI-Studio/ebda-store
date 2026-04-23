@@ -3,15 +3,20 @@ import rateLimit from 'express-rate-limit';
 import { v4 as uuidv4 } from 'uuid';
 import { prisma } from '@force/database';
 import { redis } from '../services/redis.service';
+import { BoundedMap } from '../lib/bounded-map';
 import logger from '../lib/logger';
 
 // ==========================================
 // CSRF Protection with Redis + In-Memory Fallback
 // ==========================================
 
-// In-memory fallback when Redis is unavailable
+// In-memory fallback when Redis is unavailable. BoundedMap caps the entry
+// count so the process can never exhaust heap through CSRF token churn
+// during a long Redis outage; old sessions are evicted and will re-mint.
 const MAX_CSRF_TOKENS = 10000;
-const csrfTokensMemory = new Map<string, { token: string; expiresAt: Date }>();
+const csrfTokensMemory = new BoundedMap<string, { token: string; expiresAt: Date }>(
+  MAX_CSRF_TOKENS
+);
 
 // Periodic cleanup of expired CSRF tokens
 setInterval(

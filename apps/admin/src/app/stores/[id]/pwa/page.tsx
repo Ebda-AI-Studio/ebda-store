@@ -276,11 +276,11 @@ export default function PWASettingsPage() {
           )}
 
           {/* PWA Benefits Info */}
-          <div className="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-6">
+          <div className="bg-gradient-to-r from-primary/5 to-amber-50 border border-primary/30 rounded-xl p-6">
             <h3 className="font-semibold text-foreground mb-3">Why Enable PWA?</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="flex items-start gap-3">
-                <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
                   <svg
                     className="w-4 h-4 text-primary"
                     fill="none"
@@ -301,7 +301,7 @@ export default function PWASettingsPage() {
                 </div>
               </div>
               <div className="flex items-start gap-3">
-                <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
                   <svg
                     className="w-4 h-4 text-primary"
                     fill="none"
@@ -322,7 +322,7 @@ export default function PWASettingsPage() {
                 </div>
               </div>
               <div className="flex items-start gap-3">
-                <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
                   <svg
                     className="w-4 h-4 text-primary"
                     fill="none"

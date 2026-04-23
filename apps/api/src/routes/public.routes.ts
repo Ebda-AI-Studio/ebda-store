@@ -15,6 +15,7 @@ import {
 } from '../middleware/security';
 import { getStoreIdFromRequest } from '../utils/store-helpers';
 import { redis } from '../services/redis.service';
+import { BoundedMap } from '../lib/bounded-map';
 import logger from '../lib/logger';
 import { featureService } from '../services/feature.service';
 
@@ -24,7 +25,10 @@ const router = Router();
 // Cache-aside helper (uses Redis with in-memory fallback)
 // ==========================================
 
-const memoryCache = new Map<string, { data: unknown; expiresAt: number }>();
+// Bounded to 1000 keys so a long-running process never grows the Map
+// without limit when Redis is unavailable. The cache is a best-effort
+// fallback for Redis, so random eviction is acceptable.
+const memoryCache = new BoundedMap<string, { data: unknown; expiresAt: number }>(1000);
 
 async function getCached<T>(key: string, ttl: number, fetchFn: () => Promise<T>): Promise<T> {
   // Try Redis first

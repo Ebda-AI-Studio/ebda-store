@@ -37,7 +37,7 @@ const CATEGORY_LABELS: Record<FeatureCategory, string> = {
 const CATEGORY_COLORS: Record<FeatureCategory, { icon: string; bg: string; text: string }> = {
   commerce: { icon: 'bg-blue-100', bg: 'bg-blue-500', text: 'text-blue-600' },
   marketing: { icon: 'bg-purple-100', bg: 'bg-purple-500', text: 'text-purple-600' },
-  operations: { icon: 'bg-orange-100', bg: 'bg-primary', text: 'text-primary' },
+  operations: { icon: 'bg-primary/10', bg: 'bg-primary', text: 'text-primary' },
   storefront: { icon: 'bg-green-100', bg: 'bg-green-500', text: 'text-green-600' },
 };
 
@@ -381,14 +381,14 @@ export default function StoreFeaturesPage() {
                     <div
                       key={def.key}
                       className={`flex items-start justify-between px-6 py-4 transition-colors ${
-                        isDirty ? 'bg-orange-50/50' : 'hover:bg-muted/30'
+                        isDirty ? 'bg-primary/5/50' : 'hover:bg-muted/30'
                       }`}
                     >
                       <div className="flex-1 min-w-0 mr-4">
                         <div className="flex items-center gap-2 mb-0.5">
                           <p className="font-medium text-foreground">{def.name}</p>
                           {isDirty && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-100 text-primary">
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-primary/10 text-primary">
                               unsaved
                             </span>
                           )}
