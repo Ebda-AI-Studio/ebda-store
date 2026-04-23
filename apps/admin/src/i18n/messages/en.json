@@ -377,7 +377,108 @@
       }
     }
   },
-  "branding": {},
+  "branding": {
+    "page": {
+      "title": "Store Branding",
+      "subtitle": "Customize {name}'s visual identity"
+    },
+    "actions": {
+      "save": "Save Changes",
+      "saving": "Saving...",
+      "backToStores": "Back to stores"
+    },
+    "messages": {
+      "notFound": "Store not found",
+      "loadFailedTitle": "Failed to load branding",
+      "connectionErrorTitle": "Connection error",
+      "connectionErrorBody": "Failed to connect to the server",
+      "connectionErrorSaveBody": "Failed to connect to the server. Please try again.",
+      "serverErrorPrefix": "Server error: ",
+      "accessDeniedTitle": "Access denied",
+      "accessDeniedBody": "You do not have permission to update this store",
+      "sessionExpiredTitle": "Session expired",
+      "sessionExpiredBody": "Please log in again",
+      "saveFailedPrefix": "Failed to save ",
+      "serverError": "Server error",
+      "saveSuccessTitle": "Branding saved",
+      "saveSuccessBody": "All changes have been saved successfully"
+    },
+    "tabs": {
+      "branding": "Branding",
+      "theme": "Theme & Colors",
+      "contact": "Contact Info",
+      "social": "Social Links"
+    },
+    "identity": {
+      "storeName": "Store Name",
+      "storeNameAr": "Store Name (Arabic)",
+      "logo": "Logo",
+      "logoAr": "Logo (Arabic)",
+      "favicon": "Favicon",
+      "logoUpload": "Upload Logo",
+      "logoArUpload": "Upload Arabic Logo",
+      "faviconUpload": "Upload Favicon",
+      "description": "Description",
+      "descriptionAr": "Description (Arabic)"
+    },
+    "theme": {
+      "primaryColor": "Primary Color",
+      "secondaryColor": "Secondary Color",
+      "fontFamily": "Font Family",
+      "borderRadius": "Border Radius",
+      "hex": "HEX",
+      "presets": {
+        "orange": "Orange",
+        "blue": "Blue",
+        "green": "Green",
+        "purple": "Purple",
+        "rose": "Rose",
+        "teal": "Teal",
+        "amber": "Amber",
+        "black": "Black"
+      },
+      "fonts": {
+        "default": "Default (Sans-serif)",
+        "serif": "Serif (Elegant)",
+        "modern": "Modern (Geometric)",
+        "rounded": "Rounded (Friendly)"
+      },
+      "radius": {
+        "none": "None (Sharp)",
+        "sm": "Small",
+        "md": "Medium",
+        "lg": "Large",
+        "xl": "Extra Large"
+      }
+    },
+    "preview": {
+      "title": "Preview",
+      "primaryButton": "Primary Button",
+      "secondaryButton": "Secondary Button",
+      "sampleText": "This is how your primary color looks as text."
+    },
+    "contact": {
+      "email": "Email",
+      "emailPlaceholder": "store@example.com",
+      "whatsapp": "WhatsApp Number",
+      "phone": "Phone",
+      "phoneAr": "Phone (Arabic Display)",
+      "phonePlaceholder": "+965 XXXX XXXX",
+      "phoneArPlaceholder": "٩٦٥ XXXX XXXX+",
+      "address": "Address",
+      "addressAr": "Address (Arabic)",
+      "addressPlaceholder": "123 Street, City, Kuwait",
+      "addressArPlaceholder": "١٢٣ شارع، المدينة، الكويت"
+    },
+    "social": {
+      "instagram": "Instagram",
+      "facebook": "Facebook",
+      "twitter": "Twitter / X",
+      "tiktok": "TikTok",
+      "youtube": "YouTube",
+      "snapchat": "Snapchat"
+    }
+  },
   "coupons": {},
   "shipping": {
     "carriers": {
