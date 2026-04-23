@@ -4,10 +4,11 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { useFeatures } from '../../../../hooks/useFeatures';
+import { useT } from '@/i18n/useT';
 
 interface SettingsCard {
-  title: string;
-  description: string;
+  /** Translation key under `settings.cards` (e.g. `branding`). */
+  key: string;
   href: string;
   icon: React.ReactNode;
   color: string;
@@ -19,11 +20,12 @@ export default function StoreSettingsPage() {
   const params = useParams();
   const storeId = params?.id as string;
   const { isEnabled, isLoading } = useFeatures();
+  const t = useT('settings');
+  const tCards = useT('settings.cards');
 
   const cards: SettingsCard[] = [
     {
-      title: 'Branding',
-      description: 'Logo, colors, fonts, contact info and social links',
+      key: 'branding',
       href: `/stores/${storeId}/branding`,
       color: 'bg-pink-100 text-pink-600 dark:bg-pink-900/30 dark:text-pink-300',
       icon: (
@@ -38,9 +40,7 @@ export default function StoreSettingsPage() {
       ),
     },
     {
-      title: 'Navigation',
-      description:
-        'Choose which links appear in the storefront header menu. Add, remove, reorder, or link to external URLs.',
+      key: 'navigation',
       href: `/stores/${storeId}/navigation`,
       color: 'bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-300',
       icon: (
@@ -55,8 +55,7 @@ export default function StoreSettingsPage() {
       ),
     },
     {
-      title: 'Hero Section',
-      description: 'Customize the homepage hero — title, subtitle, CTA, and background image',
+      key: 'hero',
       href: `/stores/${storeId}/hero`,
       color: 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-300',
       icon: (
@@ -71,8 +70,7 @@ export default function StoreSettingsPage() {
       ),
     },
     {
-      title: 'Categories',
-      description: 'Manage product categories, images and display order',
+      key: 'categories',
       href: `/stores/${storeId}/categories`,
       color: 'bg-lime-100 text-lime-600',
       icon: (
@@ -87,8 +85,7 @@ export default function StoreSettingsPage() {
       ),
     },
     {
-      title: 'SEO',
-      description: 'Meta titles, meta descriptions and search engine optimization',
+      key: 'seo',
       href: `/stores/${storeId}/seo`,
       color: 'bg-info/10 text-info dark:bg-info/30 dark:text-info',
       featureKey: 'seo',
@@ -104,8 +101,7 @@ export default function StoreSettingsPage() {
       ),
     },
     {
-      title: 'Announcement Bar',
-      description: 'Show a banner across the top of your store with promotions or news',
+      key: 'announcement',
       href: `/stores/${storeId}/announcement`,
       color: 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-300',
       icon: (
@@ -120,8 +116,7 @@ export default function StoreSettingsPage() {
       ),
     },
     {
-      title: 'Domain',
-      description: 'Connect a custom domain to your store',
+      key: 'domain',
       href: `/stores/${storeId}/domain`,
       color: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-300',
       icon: (
@@ -136,8 +131,7 @@ export default function StoreSettingsPage() {
       ),
     },
     {
-      title: 'Payment Settings',
-      description: 'Configure payment providers: Tap, MyFatoorah, Hesabe, UPayments',
+      key: 'paymentSettings',
       href: `/stores/${storeId}/payment-settings`,
       color: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300',
       icon: (
@@ -152,8 +146,7 @@ export default function StoreSettingsPage() {
       ),
     },
     {
-      title: 'Shipping',
-      description: 'Delivery zones, shipping rates and carrier settings',
+      key: 'shipping',
       href: `/stores/${storeId}/shipping`,
       color: 'bg-cyan-100 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-300',
       icon: (
@@ -168,8 +161,7 @@ export default function StoreSettingsPage() {
       ),
     },
     {
-      title: 'Tax Settings',
-      description: 'Tax rates, tax calculation rules and exemptions',
+      key: 'taxSettings',
       href: `/stores/${storeId}/tax`,
       color: 'bg-teal-100 text-teal-600 dark:bg-teal-900/30 dark:text-teal-300',
       featureKey: 'tax',
@@ -185,8 +177,7 @@ export default function StoreSettingsPage() {
       ),
     },
     {
-      title: 'PWA Settings',
-      description: 'Progressive Web App configuration for mobile users',
+      key: 'pwaSettings',
       href: `/stores/${storeId}/pwa`,
       color: 'bg-violet-100 text-violet-600',
       featureKey: 'pwa',
@@ -202,8 +193,7 @@ export default function StoreSettingsPage() {
       ),
     },
     {
-      title: 'Template',
-      description: 'Choose and customize the storefront design template',
+      key: 'template',
       href: `/stores/${storeId}/template`,
       color: 'bg-primary/10 text-primary',
       icon: (
@@ -218,8 +208,7 @@ export default function StoreSettingsPage() {
       ),
     },
     {
-      title: 'Footer & Pages',
-      description: 'Manage footer links, support pages and company pages',
+      key: 'pages',
       href: `/stores/${storeId}/pages`,
       color: 'bg-slate-100 text-slate-600',
       icon: (
@@ -234,8 +223,7 @@ export default function StoreSettingsPage() {
       ),
     },
     {
-      title: 'Language',
-      description: 'Set the default language for your storefront',
+      key: 'language',
       href: `/stores/${storeId}/language`,
       color: 'bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-300',
       icon: (
@@ -250,8 +238,7 @@ export default function StoreSettingsPage() {
       ),
     },
     {
-      title: 'Marketing Pixels',
-      description: 'Facebook Pixel, Google Analytics, TikTok Pixel and other tracking codes',
+      key: 'marketingPixels',
       href: `/stores/${storeId}/marketing-pixels`,
       color: 'bg-info/10 text-info dark:bg-info/30 dark:text-info',
       featureKey: 'marketing_pixels',
@@ -267,8 +254,7 @@ export default function StoreSettingsPage() {
       ),
     },
     {
-      title: 'Notifications',
-      description: 'WhatsApp, SMS, and Push notification settings',
+      key: 'notifications',
       href: `/stores/${storeId}/notifications`,
       color: 'bg-teal-100 text-teal-600 dark:bg-teal-900/30 dark:text-teal-300',
       icon: (
@@ -283,8 +269,7 @@ export default function StoreSettingsPage() {
       ),
     },
     {
-      title: 'Affiliate Program',
-      description: 'Influencer referral commissions and tracking',
+      key: 'affiliates',
       href: `/stores/${storeId}/affiliates`,
       color: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300',
       featureKey: 'affiliate',
@@ -300,8 +285,7 @@ export default function StoreSettingsPage() {
       ),
     },
     {
-      title: 'Abandoned Cart Recovery',
-      description: 'Recover lost sales with automated reminders',
+      key: 'abandonedCarts',
       href: `/stores/${storeId}/abandoned-carts`,
       color: 'bg-primary/10 text-primary',
       featureKey: 'abandoned_cart',
@@ -317,8 +301,7 @@ export default function StoreSettingsPage() {
       ),
     },
     {
-      title: 'Shipping Carriers',
-      description: 'iCarry and Aramex delivery integration',
+      key: 'shippingCarriers',
       href: `/stores/${storeId}/shipping-carriers`,
       color: 'bg-cyan-100 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-300',
       featureKey: 'shipping_carriers',
@@ -343,12 +326,12 @@ export default function StoreSettingsPage() {
 
   return (
     <AdminLayout
-      title="Store Settings"
-      subtitle="Configure all aspects of this store"
+      title={t('page.title')}
+      subtitle={t('page.subtitle')}
       actions={
         <Link href={`/stores/${storeId}`}>
           <button className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted font-medium">
-            Back to Store
+            {t('page.backToStore')}
           </button>
         </Link>
       }
@@ -382,10 +365,10 @@ export default function StoreSettingsPage() {
                   </div>
                   <div className="min-w-0">
                     <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">
-                      {card.title}
+                      {tCards(`${card.key}.title`)}
                     </h3>
                     <p className="mt-1 text-sm text-muted-foreground leading-snug">
-                      {card.description}
+                      {tCards(`${card.key}.description`)}
                     </p>
                   </div>
                 </Link>

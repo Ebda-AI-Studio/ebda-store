@@ -138,7 +138,91 @@
   "orders": {},
   "customers": {},
   "analytics": {},
-  "settings": {},
+  "settings": {
+    "page": {
+      "title": "Store Settings",
+      "subtitle": "Configure all aspects of this store",
+      "backToStore": "Back to Store"
+    },
+    "cards": {
+      "branding": {
+        "title": "Branding",
+        "description": "Logo, colors, fonts, contact info and social links"
+      },
+      "navigation": {
+        "title": "Navigation",
+        "description": "Choose which links appear in the storefront header menu. Add, remove, reorder, or link to external URLs."
+      },
+      "hero": {
+        "title": "Hero Section",
+        "description": "Customize the homepage hero — title, subtitle, CTA, and background image"
+      },
+      "categories": {
+        "title": "Categories",
+        "description": "Manage product categories, images and display order"
+      },
+      "seo": {
+        "title": "SEO",
+        "description": "Meta titles, meta descriptions and search engine optimization"
+      },
+      "announcement": {
+        "title": "Announcement Bar",
+        "description": "Show a banner across the top of your store with promotions or news"
+      },
+      "domain": {
+        "title": "Domain",
+        "description": "Connect a custom domain to your store"
+      },
+      "paymentSettings": {
+        "title": "Payment Settings",
+        "description": "Configure payment providers: Tap, MyFatoorah, Hesabe, UPayments"
+      },
+      "shipping": {
+        "title": "Shipping",
+        "description": "Delivery zones, shipping rates and carrier settings"
+      },
+      "taxSettings": {
+        "title": "Tax Settings",
+        "description": "Tax rates, tax calculation rules and exemptions"
+      },
+      "pwaSettings": {
+        "title": "PWA Settings",
+        "description": "Progressive Web App configuration for mobile users"
+      },
+      "template": {
+        "title": "Template",
+        "description": "Choose and customize the storefront design template"
+      },
+      "pages": {
+        "title": "Footer & Pages",
+        "description": "Manage footer links, support pages and company pages"
+      },
+      "language": {
+        "title": "Language",
+        "description": "Set the default language for your storefront"
+      },
+      "marketingPixels": {
+        "title": "Marketing Pixels",
+        "description": "Facebook Pixel, Google Analytics, TikTok Pixel and other tracking codes"
+      },
+      "notifications": {
+        "title": "Notifications",
+        "description": "WhatsApp, SMS, and Push notification settings"
+      },
+      "affiliates": {
+        "title": "Affiliate Program",
+        "description": "Influencer referral commissions and tracking"
+      },
+      "abandonedCarts": {
+        "title": "Abandoned Cart Recovery",
+        "description": "Recover lost sales with automated reminders"
+      },
+      "shippingCarriers": {
+        "title": "Shipping Carriers",
+        "description": "iCarry and Aramex delivery integration"
+      }
+    }
+  },
   "branding": {},
   "coupons": {},
   "shipping": {},
