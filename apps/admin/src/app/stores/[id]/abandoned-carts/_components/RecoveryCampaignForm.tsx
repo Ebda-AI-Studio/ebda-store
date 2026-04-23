@@ -1,0 +1,215 @@
+'use client';
+
+import { useT } from '@/i18n/useT';
+import type { AbandonedCartConfig } from './types';
+
+interface ToggleProps {
+  checked: boolean;
+  onChange: (val: boolean) => void;
+  disabled?: boolean;
+}
+
+function Toggle({ checked, onChange, disabled }: ToggleProps) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={() => !disabled && onChange(!checked)}
+      disabled={disabled}
+      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 ${
+        checked ? 'bg-primary' : 'bg-muted'
+      }`}
+    >
+      <span
+        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+          checked ? 'translate-x-6 rtl:-translate-x-6' : 'translate-x-1 rtl:-translate-x-1'
+        }`}
+      />
+    </button>
+  );
+}
+
+interface StepRowProps {
+  title: string;
+  sendAfterLabel: string;
+  minutesLabel: string;
+  enabled: boolean;
+  delay: number;
+  onEnabledChange: (val: boolean) => void;
+  onDelayChange: (val: number) => void;
+  children?: React.ReactNode;
+}
+
+function StepRow({
+  title,
+  sendAfterLabel,
+  minutesLabel,
+  enabled,
+  delay,
+  onEnabledChange,
+  onDelayChange,
+  children,
+}: StepRowProps) {
+  return (
+    <div className="border border-border rounded-lg p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-medium text-foreground">{title}</h3>
+        <Toggle checked={enabled} onChange={onEnabledChange} />
+      </div>
+      <div className="flex items-center gap-2">
+        <label className="text-sm text-muted-foreground">{sendAfterLabel}</label>
+        <input
+          type="number"
+          min={1}
+          value={delay}
+          onChange={e => onDelayChange(Number(e.target.value))}
+          disabled={!enabled}
+          className="w-20 px-3 py-1.5 border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-50"
+        />
+        <label className="text-sm text-muted-foreground">{minutesLabel}</label>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+interface RecoveryCampaignFormProps {
+  config: AbandonedCartConfig;
+  saving: boolean;
+  onPatch: (patch: Partial<AbandonedCartConfig>) => void;
+  onSave: () => void;
+}
+
+/**
+ * Recovery campaign configuration: three reminder steps (with enable toggle
+ * and delay input) plus the optional auto-coupon block attached to step 3.
+ * All labels come from the `abandonedCarts.campaign.*` namespace.
+ */
+export function RecoveryCampaignForm({
+  config,
+  saving,
+  onPatch,
+  onSave,
+}: RecoveryCampaignFormProps) {
+  const t = useT('abandonedCarts.campaign');
+
+  return (
+    <div className="bg-card rounded-xl border border-border p-6">
+      <h2 className="text-lg font-semibold text-foreground mb-5">{t('title')}</h2>
+
+      <div className="space-y-6">
+        <StepRow
+          title={t('step1.title')}
+          sendAfterLabel={t('sendAfter')}
+          minutesLabel={t('minutes')}
+          enabled={config.step1Enabled}
+          delay={config.step1DelayMinutes}
+          onEnabledChange={val => onPatch({ step1Enabled: val })}
+          onDelayChange={val => onPatch({ step1DelayMinutes: val })}
+        />
+
+        <StepRow
+          title={t('step2.title')}
+          sendAfterLabel={t('sendAfter')}
+          minutesLabel={t('minutes')}
+          enabled={config.step2Enabled}
+          delay={config.step2DelayMinutes}
+          onEnabledChange={val => onPatch({ step2Enabled: val })}
+          onDelayChange={val => onPatch({ step2DelayMinutes: val })}
+        />
+
+        <StepRow
+          title={t('step3.title')}
+          sendAfterLabel={t('sendAfter')}
+          minutesLabel={t('minutes')}
+          enabled={config.step3Enabled}
+          delay={config.step3DelayMinutes}
+          onEnabledChange={val => onPatch({ step3Enabled: val })}
+          onDelayChange={val => onPatch({ step3DelayMinutes: val })}
+        >
+          <div className="pt-4 mt-4 border-t border-border space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-foreground">{t('autoCoupon.title')}</span>
+              <Toggle
+                checked={config.autoCouponEnabled}
+                onChange={val => onPatch({ autoCouponEnabled: val })}
+                disabled={!config.step3Enabled}
+              />
+            </div>
+            {config.autoCouponEnabled && config.step3Enabled && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                <div>
+                  <label className="block text-xs text-muted-foreground mb-1">
+                    {t('autoCoupon.discount')}
+                  </label>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={config.couponDiscountPercent}
+                      onChange={e => onPatch({ couponDiscountPercent: Number(e.target.value) })}
+                      className="w-full px-3 py-1.5 border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
+                    />
+                    <span className="text-sm text-muted-foreground">%</span>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs text-muted-foreground mb-1">
+                    {t('autoCoupon.maxDiscount')}
+                  </label>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min={0}
+                      step={0.001}
+                      value={config.couponMaxDiscount ?? ''}
+                      onChange={e =>
+                        onPatch({
+                          couponMaxDiscount: e.target.value ? Number(e.target.value) : null,
+                        })
+                      }
+                      placeholder={t('autoCoupon.noLimit')}
+                      className="w-full px-3 py-1.5 border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
+                    />
+                    <span className="text-sm text-muted-foreground">{t('autoCoupon.kwd')}</span>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs text-muted-foreground mb-1">
+                    {t('autoCoupon.expiry')}
+                  </label>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min={1}
+                      value={config.couponExpiryHours}
+                      onChange={e => onPatch({ couponExpiryHours: Number(e.target.value) })}
+                      className="w-full px-3 py-1.5 border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
+                    />
+                    <span className="text-sm text-muted-foreground">{t('autoCoupon.hours')}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </StepRow>
+      </div>
+
+      <div className="mt-5 flex justify-end">
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={saving}
+          className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
+        >
+          {saving && (
+            <span className="animate-spin inline-block h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+          )}
+          {t('save')}
+        </button>
+      </div>
+    </div>
+  );
+}

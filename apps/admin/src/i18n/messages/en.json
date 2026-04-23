@@ -1213,7 +1213,79 @@
       "importFailed": "Import failed"
     }
   },
-  "abandonedCarts": {},
+  "abandonedCarts": {
+    "page": {
+      "title": "Abandoned Cart Recovery",
+      "subtitle": "Recover lost sales with automated reminders"
+    },
+    "featureDisabled": {
+      "title": "Abandoned Cart Recovery not enabled",
+      "description": "Enable the Abandoned Cart feature in your store features to start recovering lost sales."
+    },
+    "stats": {
+      "totalAbandoned": "Total Abandoned",
+      "recovered": "Recovered",
+      "recoveryRate": "Recovery Rate",
+      "recoveredRevenue": "Revenue Recovered",
+      "kwdValue": "{amount} KWD"
+    },
+    "status": {
+      "pending": "Pending",
+      "step1_sent": "Step 1 Sent",
+      "step2_sent": "Step 2 Sent",
+      "step3_sent": "Step 3 Sent",
+      "recovered": "Recovered",
+      "expired": "Expired"
+    },
+    "campaign": {
+      "title": "Recovery Settings",
+      "sendAfter": "Send after",
+      "minutes": "min",
+      "save": "Save Settings",
+      "step1": {
+        "title": "Step 1 — First Reminder"
+      },
+      "step2": {
+        "title": "Step 2 — Follow-up Reminder"
+      },
+      "step3": {
+        "title": "Step 3 — Final Reminder"
+      },
+      "autoCoupon": {
+        "title": "Auto-coupon",
+        "discount": "Discount",
+        "maxDiscount": "Max Discount",
+        "expiry": "Expiry",
+        "noLimit": "No limit",
+        "kwd": "KWD",
+        "hours": "hours"
+      }
+    },
+    "list": {
+      "title": "Abandoned Carts",
+      "ariaLabel": "Abandoned carts",
+      "filterAriaLabel": "Filter by status",
+      "allStatuses": "All statuses",
+      "totalRecords": "{count, plural, =0 {No records} one {# total record} other {# total records}}",
+      "empty": "No abandoned carts found",
+      "previous": "Previous",
+      "next": "Next",
+      "pagination": "Page {page} of {totalPages} ({total} total)",
+      "columns": {
+        "customer": "Customer",
+        "total": "Total",
+        "items": "Items",
+        "status": "Status",
+        "date": "Date"
+      }
+    },
+    "messages": {
+      "saveSuccessTitle": "Saved",
+      "saveSuccessBody": "Abandoned cart settings saved.",
+      "saveErrorTitle": "Error",
+      "saveErrorBody": "Failed to save settings. Please try again."
+    }
+  },
   "returns": {},
   "marketingPixels": {},
   "pages": {},
