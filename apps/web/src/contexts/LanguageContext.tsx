@@ -10,6 +10,10 @@ type Direction = 'ltr' | 'rtl';
 interface LanguageContextType {
   language: Language;
   direction: Direction;
+  /** Shorthand for `language === 'ar'`. Every template/component that used
+   *  to accept an `isRtl?: boolean` prop should read this instead so the
+   *  prop can eventually disappear from the template contract. */
+  isRtl: boolean;
   setLanguage: (lang: Language) => void;
   t: (en: string, ar: string) => string;
 }
@@ -58,7 +62,9 @@ export function LanguageProvider({ children, defaultLanguage }: LanguageProvider
   };
 
   return (
-    <LanguageContext.Provider value={{ language, direction, setLanguage, t }}>
+    <LanguageContext.Provider
+      value={{ language, direction, isRtl: language === 'ar', setLanguage, t }}
+    >
       {children}
     </LanguageContext.Provider>
   );
