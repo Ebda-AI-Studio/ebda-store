@@ -112,6 +112,7 @@ export function LowStockAlerts({ alerts, onAdjust }: LowStockAlertsProps) {
                   </td>
                   <td className="px-6 py-4 text-end">
                     <button
+                      type="button"
                       onClick={() => onAdjust(product)}
                       className="px-3 py-1 bg-primary text-white rounded-lg hover:bg-primary/90 text-sm font-medium"
                     >

@@ -95,6 +95,7 @@ export function VariantsTable({ variants, onEdit, onDelete }: VariantsTableProps
                   <td className="px-4 py-3">
                     <div className="flex gap-2 justify-end">
                       <button
+                        type="button"
                         onClick={() => onEdit(variant)}
                         className="text-muted-foreground hover:text-primary"
                         title={t('edit')}
@@ -114,6 +115,7 @@ export function VariantsTable({ variants, onEdit, onDelete }: VariantsTableProps
                         </svg>
                       </button>
                       <button
+                        type="button"
                         onClick={() => onDelete(variant.id)}
                         className="text-muted-foreground hover:text-destructive"
                         title={t('delete')}

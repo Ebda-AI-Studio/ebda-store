@@ -22,6 +22,7 @@ export function ReviewStep({ formData, error, onJumpTo }: ReviewStepProps) {
           <h3 className="flex items-center justify-between font-medium text-foreground">
             {t('storeDetails')}
             <button
+              type="button"
               onClick={() => onJumpTo('store')}
               className="text-sm text-primary hover:underline"
             >
@@ -50,6 +51,7 @@ export function ReviewStep({ formData, error, onJumpTo }: ReviewStepProps) {
           <h3 className="flex items-center justify-between font-medium text-foreground">
             {t('stepOwnerName')}
             <button
+              type="button"
               onClick={() => onJumpTo('owner')}
               className="text-sm text-primary hover:underline"
             >

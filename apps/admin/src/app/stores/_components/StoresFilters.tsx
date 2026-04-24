@@ -69,6 +69,7 @@ export function StoresFilters({
         <div className="hidden sm:flex items-center gap-1 rounded-xl bg-muted/50 p-1">
           {STATUS_KEYS.map(({ value, labelKey }) => (
             <button
+              type="button"
               key={value}
               onClick={() => setStatusFilter(value)}
               className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
@@ -98,6 +99,7 @@ export function StoresFilters({
         {/* View Toggle */}
         <div className="flex items-center gap-1 rounded-xl bg-muted/50 p-1">
           <button
+            type="button"
             onClick={() => setViewMode('grid')}
             className={`rounded-lg p-2 transition-all ${
               viewMode === 'grid'
@@ -117,6 +119,7 @@ export function StoresFilters({
             </svg>
           </button>
           <button
+            type="button"
             onClick={() => setViewMode('table')}
             className={`rounded-lg p-2 transition-all ${
               viewMode === 'table'

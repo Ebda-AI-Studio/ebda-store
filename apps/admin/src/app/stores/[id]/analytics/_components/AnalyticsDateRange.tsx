@@ -21,6 +21,7 @@ export function AnalyticsDateRange({ period, onPeriodChange }: AnalyticsDateRang
     <div className="mb-6 flex items-center gap-1 rounded-xl bg-muted p-1 w-fit">
       {PERIODS.map(p => (
         <button
+          type="button"
           key={p}
           onClick={() => onPeriodChange(p)}
           className={`cursor-pointer rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 ${

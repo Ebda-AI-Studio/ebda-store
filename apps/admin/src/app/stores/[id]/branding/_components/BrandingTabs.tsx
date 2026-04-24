@@ -22,6 +22,7 @@ export function BrandingTabs({ activeTab, onTabChange }: BrandingTabsProps) {
     <div className="flex gap-2 border-b border-border">
       {TABS.map(tab => (
         <button
+          type="button"
           key={tab.id}
           onClick={() => onTabChange(tab.id)}
           className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${

@@ -180,6 +180,7 @@ export function AdminLayout({
       >
         <div className="flex h-full flex-col">
           <button
+            type="button"
             onClick={() => setIsSidebarOpen(false)}
             className="absolute end-3 top-4 flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:hidden"
             aria-label={t('closeSidebar')}

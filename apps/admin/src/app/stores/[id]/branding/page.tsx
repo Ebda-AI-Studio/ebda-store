@@ -78,6 +78,7 @@ export default function StoreBrandingPage() {
       subtitle={tPage('subtitle', { name: branding.name })}
       actions={
         <button
+          type="button"
           onClick={saveBranding}
           disabled={isSaving}
           className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 font-medium"

@@ -54,6 +54,7 @@ export function ProductFilters({
       <div className="flex items-center gap-1 rounded-xl bg-muted p-1">
         {STATUS_VALUES.map(s => (
           <button
+            type="button"
             key={s}
             onClick={() => onStatusFilterChange(s)}
             className={`cursor-pointer rounded-lg px-3 py-1.5 text-xs font-medium capitalize transition-all duration-200 ${

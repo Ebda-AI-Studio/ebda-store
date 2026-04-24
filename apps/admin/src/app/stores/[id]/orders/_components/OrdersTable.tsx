@@ -212,6 +212,7 @@ export function OrdersTable({
                           className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
                         />
                         <button
+                          type="button"
                           onClick={() => onMarkPaid(order.id)}
                           disabled={isUpdating}
                           className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-[hsl(var(--success))] border border-[hsl(var(--success))]/30 rounded-lg hover:bg-[hsl(var(--success))]/10 transition-colors disabled:opacity-50"
@@ -222,6 +223,7 @@ export function OrdersTable({
                       </div>
                     )}
                     <button
+                      type="button"
                       onClick={() => onOpenInvoice(order.id)}
                       className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-foreground border border-border rounded-lg hover:bg-muted transition-colors"
                       title={t('actions.invoiceTitle')}

@@ -176,6 +176,7 @@ export function ShipmentsTable({
               </p>
               <div className="flex items-center gap-2">
                 <button
+                  type="button"
                   onClick={() => onPageChange(p => Math.max(1, p - 1))}
                   disabled={page === 1}
                   className="px-3 py-1.5 text-sm border border-border rounded-lg hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
@@ -183,6 +184,7 @@ export function ShipmentsTable({
                   {t('pagination.previous')}
                 </button>
                 <button
+                  type="button"
                   onClick={() => onPageChange(p => Math.min(pages, p + 1))}
                   disabled={page === pages}
                   className="px-3 py-1.5 text-sm border border-border rounded-lg hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"

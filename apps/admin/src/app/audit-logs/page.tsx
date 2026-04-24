@@ -246,6 +246,7 @@ export default function AuditLogsPage() {
                     {/* Expandable Details */}
                     {Object.keys(log.details || {}).length > 0 && (
                       <button
+                        type="button"
                         onClick={() => setExpandedLog(expandedLog === log.id ? null : log.id)}
                         className="mt-2 text-xs text-primary hover:underline"
                       >

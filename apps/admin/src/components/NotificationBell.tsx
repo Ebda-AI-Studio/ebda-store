@@ -46,6 +46,7 @@ export function NotificationBell() {
     <div className="relative" ref={dropdownRef}>
       {/* Bell Button */}
       <button
+        type="button"
         onClick={() => setIsOpen(!isOpen)}
         className="relative p-2 rounded-lg hover:bg-muted dark:hover:bg-foreground transition-colors"
         aria-label={t('ariaLabel')}
@@ -88,6 +89,7 @@ export function NotificationBell() {
             <div className="flex gap-2">
               {unreadCount > 0 && (
                 <button
+                  type="button"
                   onClick={markAllAsRead}
                   className="text-xs text-primary hover:text-primary/80 font-medium"
                 >
@@ -96,6 +98,7 @@ export function NotificationBell() {
               )}
               {notifications.length > 0 && (
                 <button
+                  type="button"
                   onClick={clearNotifications}
                   className="text-xs text-muted-foreground hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground"
                 >

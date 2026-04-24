@@ -64,6 +64,7 @@ export function PixelPlatformCard({
             {isEnabled ? t('status.active') : t('status.inactive')}
           </span>
           <button
+            type="button"
             onClick={e => {
               e.stopPropagation();
               onToggle();

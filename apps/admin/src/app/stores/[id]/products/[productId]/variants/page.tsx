@@ -222,6 +222,7 @@ export default function ProductVariantsPage() {
       <AdminLayout title={t('notFoundTitle')} subtitle={t('notFoundSubtitle')}>
         <div className="text-center py-12">
           <button
+            type="button"
             onClick={() => router.push(`/stores/${storeId}/products`)}
             className="text-primary hover:underline"
           >

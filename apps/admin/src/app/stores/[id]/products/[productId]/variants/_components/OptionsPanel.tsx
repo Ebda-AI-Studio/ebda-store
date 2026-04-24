@@ -54,6 +54,7 @@ export function OptionsPanel({
                     )}
                   </div>
                   <button
+                    type="button"
                     onClick={() => onDeleteOption(option.id)}
                     className="text-muted-foreground hover:text-destructive"
                   >
@@ -75,6 +76,7 @@ export function OptionsPanel({
                     >
                       {value.value}
                       <button
+                        type="button"
                         onClick={() => onDeleteValue(value.id)}
                         className="text-muted-foreground hover:text-destructive"
                       >
@@ -95,6 +97,7 @@ export function OptionsPanel({
                     </span>
                   ))}
                   <button
+                    type="button"
                     onClick={() => onAddValue(option.id)}
                     className="inline-flex items-center rounded-full bg-primary/10 px-2 py-1 text-xs text-primary hover:bg-primary/20"
                   >

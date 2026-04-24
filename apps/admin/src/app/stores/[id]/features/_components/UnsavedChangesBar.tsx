@@ -28,6 +28,7 @@ export function UnsavedChangesBar({
         </p>
         <div className="flex items-center gap-3">
           <button
+            type="button"
             onClick={onDiscard}
             disabled={saving}
             className="px-4 py-2 text-sm font-medium text-foreground border border-border rounded-lg hover:bg-muted transition-colors disabled:opacity-50"
@@ -35,6 +36,7 @@ export function UnsavedChangesBar({
             {t('actions.discard')}
           </button>
           <button
+            type="button"
             onClick={onSave}
             disabled={saving}
             className="px-6 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-2"

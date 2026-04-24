@@ -22,6 +22,7 @@ export function InventoryTabs({ activeTab, alertsCount, onTabChange }: Inventory
     <div className="flex gap-2 mb-6">
       {TABS.map(tab => (
         <button
+          type="button"
           key={tab}
           onClick={() => onTabChange(tab)}
           className={`px-4 py-2 rounded-lg font-medium transition-colors relative ${

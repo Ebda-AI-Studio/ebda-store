@@ -25,12 +25,16 @@ export function BrandPreview({ theme }: BrandPreviewProps) {
       >
         <div className="flex items-center gap-4 mb-4">
           <button
+            type="button"
             className="px-4 py-2 text-white rounded-lg"
             style={{ backgroundColor: `hsl(${theme.primaryColor})` }}
           >
             {t('primaryButton')}
           </button>
-          <button className="px-4 py-2 border border-border rounded-lg hover:bg-muted">
+          <button
+            type="button"
+            className="px-4 py-2 border border-border rounded-lg hover:bg-muted"
+          >
             {t('secondaryButton')}
           </button>
         </div>

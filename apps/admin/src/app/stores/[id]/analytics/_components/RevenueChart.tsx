@@ -80,6 +80,7 @@ export function RevenueChart({
         </div>
         <div className="flex items-center gap-1 rounded-lg bg-muted p-1">
           <button
+            type="button"
             onClick={() => onChartTypeChange('revenue')}
             className={`cursor-pointer rounded-md px-3 py-1 text-xs font-medium transition-all duration-200 ${
               chartType === 'revenue'
@@ -90,6 +91,7 @@ export function RevenueChart({
             {t('revenue')}
           </button>
           <button
+            type="button"
             onClick={() => onChartTypeChange('orders')}
             className={`cursor-pointer rounded-md px-3 py-1 text-xs font-medium transition-all duration-200 ${
               chartType === 'orders'

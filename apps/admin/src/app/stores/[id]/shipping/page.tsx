@@ -187,6 +187,7 @@ export default function ShippingSettingsPage() {
       subtitle={tPage('subtitle')}
       actions={
         <button
+          type="button"
           onClick={() => handleOpenModal()}
           className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-2"
         >
@@ -201,6 +202,7 @@ export default function ShippingSettingsPage() {
         <div className="flex gap-2 mb-6">
           {(['all', 'active', 'inactive'] as const).map(f => (
             <button
+              type="button"
               key={f}
               onClick={() => setFilter(f)}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${

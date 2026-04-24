@@ -167,6 +167,7 @@ export default function StorePagesPage() {
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-foreground">{title}</h2>
           <button
+            type="button"
             onClick={() => addLink(section)}
             className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
           >
@@ -219,6 +220,7 @@ export default function StorePagesPage() {
                   className="w-40 rounded-lg border border-border px-3 py-2 text-sm font-mono focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 />
                 <button
+                  type="button"
                   onClick={() => removeLink(section, index)}
                   className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-destructive/5 hover:text-destructive transition-colors"
                   title={t('removeLink')}
@@ -257,11 +259,15 @@ export default function StorePagesPage() {
       actions={
         <div className="flex gap-3">
           <Link href={`/stores/${storeId}/settings`}>
-            <button className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted font-medium">
+            <button
+              type="button"
+              className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted font-medium"
+            >
               {t('backToSettings')}
             </button>
           </Link>
           <button
+            type="button"
             onClick={handleSave}
             disabled={isSaving}
             className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 disabled:opacity-50 transition-colors"

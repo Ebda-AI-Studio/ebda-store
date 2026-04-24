@@ -45,6 +45,7 @@ export function ColorPalettePicker({
             const isSelected = currentHexUpper === preset.hex.toUpperCase();
             return (
               <button
+                type="button"
                 key={preset.key}
                 onClick={() => setHex(preset.hex)}
                 className={`w-10 h-10 rounded-full border-2 transition-all ${

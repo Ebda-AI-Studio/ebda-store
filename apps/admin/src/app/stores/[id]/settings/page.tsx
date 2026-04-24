@@ -330,7 +330,10 @@ export default function StoreSettingsPage() {
       subtitle={t('page.subtitle')}
       actions={
         <Link href={`/stores/${storeId}`}>
-          <button className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted font-medium">
+          <button
+            type="button"
+            className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted font-medium"
+          >
             {t('page.backToStore')}
           </button>
         </Link>

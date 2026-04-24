@@ -25,6 +25,7 @@ export function SidebarFooter({ isDark, onToggleTheme, user, onLogout }: Sidebar
       <div className="flex items-center justify-between gap-2 px-4 pb-2">
         <AdminLanguageSwitcher />
         <button
+          type="button"
           onClick={onToggleTheme}
           className="flex h-11 w-11 items-center justify-center rounded-lg border border-border/60 bg-muted/40 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary cursor-pointer"
           aria-label={isDark ? t('switchToLight') : t('switchToDark')}
@@ -77,6 +78,7 @@ export function SidebarFooter({ isDark, onToggleTheme, user, onLogout }: Sidebar
             <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
           </div>
           <button
+            type="button"
             onClick={onLogout}
             className="flex h-10 w-10 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
             aria-label={t('logout')}

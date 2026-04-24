@@ -61,6 +61,7 @@ export default function GlobalError({
           </p>
           <div className="flex gap-3">
             <button
+              type="button"
               onClick={reset}
               className="cursor-pointer rounded-lg border-none bg-primary px-6 py-2.5 text-sm font-medium text-white hover:bg-primary/90"
             >

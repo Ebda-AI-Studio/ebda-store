@@ -48,6 +48,7 @@ export function AdjustStockModal({
         <div className="flex items-center justify-between p-6 border-b border-border">
           <h2 className="text-xl font-semibold text-foreground">{t('title')}</h2>
           <button
+            type="button"
             onClick={onClose}
             className="p-2 text-muted-foreground hover:text-foreground"
             aria-label={t('close')}

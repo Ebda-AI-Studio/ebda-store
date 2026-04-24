@@ -23,6 +23,7 @@ export function OrdersFilters({
       <div className="flex items-center gap-1 rounded-xl bg-muted p-1 overflow-x-auto">
         {STATUS_FILTERS.map(status => (
           <button
+            type="button"
             key={status}
             onClick={() => onStatusFilterChange(status)}
             className={`whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium transition-all ${

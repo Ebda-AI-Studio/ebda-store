@@ -181,7 +181,10 @@ export default function StoreOrdersPage() {
       subtitle={t('subtitle')}
       actions={
         <Link href={`/stores/${storeId}`}>
-          <button className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted font-medium">
+          <button
+            type="button"
+            className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted font-medium"
+          >
             {t('backToStore')}
           </button>
         </Link>
@@ -200,7 +203,7 @@ export default function StoreOrdersPage() {
       {error && (
         <div className="mb-6 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
           {error}
-          <button className="ms-4 font-medium underline" onClick={fetchOrders}>
+          <button type="button" className="ms-4 font-medium underline" onClick={fetchOrders}>
             {t('errors.retry')}
           </button>
         </div>

@@ -95,6 +95,7 @@ export function ProviderCard({
           </div>
 
           <button
+            type="button"
             onClick={onToggleExpanded}
             className="flex items-center gap-1 px-3 py-1.5 text-sm text-muted-foreground border border-border rounded-lg hover:bg-muted transition-colors"
           >
@@ -138,6 +139,7 @@ export function ProviderCard({
 
           <div className="flex justify-end">
             <button
+              type="button"
               onClick={onSave}
               disabled={saving}
               className="px-6 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 font-medium"

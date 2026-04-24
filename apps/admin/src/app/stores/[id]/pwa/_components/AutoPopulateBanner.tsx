@@ -35,6 +35,7 @@ export function AutoPopulateBanner({ storeInfo, onPopulate }: AutoPopulateBanner
         </div>
       </div>
       <button
+        type="button"
         onClick={onPopulate}
         className="px-4 py-2 bg-info text-white text-sm rounded-lg hover:bg-info/90 transition-colors whitespace-nowrap"
       >

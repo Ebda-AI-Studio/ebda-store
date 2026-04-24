@@ -47,6 +47,7 @@ export function CategoryForm({
           {editingId ? t('editTitle') : t('addTitle')}
         </h2>
         <button
+          type="button"
           onClick={onClose}
           className="p-1 text-muted-foreground hover:text-muted-foreground"
           aria-label={t('close')}

@@ -212,7 +212,10 @@ export default function StorePaymentSettingsPage() {
       subtitle={t('page.subtitle')}
       actions={
         <Link href={`/stores/${storeId}/settings`}>
-          <button className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted font-medium">
+          <button
+            type="button"
+            className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted font-medium"
+          >
             {t('actions.backToSettings')}
           </button>
         </Link>
@@ -221,7 +224,7 @@ export default function StorePaymentSettingsPage() {
       {error && (
         <div className="mb-6 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
           {error}
-          <button className="ms-4 font-medium underline" onClick={fetchConfigs}>
+          <button type="button" className="ms-4 font-medium underline" onClick={fetchConfigs}>
             {t('errors.retry')}
           </button>
         </div>

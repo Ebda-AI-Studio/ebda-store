@@ -188,6 +188,7 @@ export default function LoyaltySettingsPage() {
         <div className="flex items-center gap-3">
           <span className="text-sm text-muted-foreground">{tPage('programStatus')}</span>
           <button
+            type="button"
             onClick={handleToggleEnabled}
             disabled={saving}
             className={`px-4 py-2 rounded-lg font-medium transition-colors ${
@@ -211,6 +212,7 @@ export default function LoyaltySettingsPage() {
 
           <div className="flex gap-2 mb-6">
             <button
+              type="button"
               onClick={() => setActiveTab('settings')}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                 activeTab === 'settings'
@@ -221,6 +223,7 @@ export default function LoyaltySettingsPage() {
               {tPage('tabs.settings')}
             </button>
             <button
+              type="button"
               onClick={() => setActiveTab('members')}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                 activeTab === 'members'
@@ -254,6 +257,7 @@ export default function LoyaltySettingsPage() {
               {loyaltyEnabled && (
                 <div className="flex justify-end">
                   <button
+                    type="button"
                     onClick={handleSaveSettings}
                     disabled={saving}
                     className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-2"

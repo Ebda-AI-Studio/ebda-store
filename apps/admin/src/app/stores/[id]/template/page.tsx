@@ -169,6 +169,7 @@ export default function StoreTemplatePage() {
             {t('cancel')}
           </Link>
           <button
+            type="button"
             onClick={handleSave}
             disabled={isSaving || selectedTemplate === store.template}
             className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 font-medium"
@@ -187,6 +188,7 @@ export default function StoreTemplatePage() {
 
             return (
               <button
+                type="button"
                 key={template.id}
                 onClick={() => setSelectedTemplate(template.id)}
                 className={`relative text-start bg-card rounded-2xl border-2 overflow-hidden transition-all hover:shadow-lg ${

@@ -35,6 +35,7 @@ export function MembersTable({
       <div className="flex gap-2 p-4 bg-muted border-b border-border">
         {FILTER_TIERS.map(tier => (
           <button
+            type="button"
             key={tier}
             onClick={() => onTierFilterChange(tier)}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -140,6 +141,7 @@ export function MembersTable({
                   </td>
                   <td className="px-6 py-4 text-end">
                     <button
+                      type="button"
                       onClick={() => onAwardClick(member)}
                       className="text-primary hover:text-primary/90 text-sm font-medium"
                     >

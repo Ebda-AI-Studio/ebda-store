@@ -27,6 +27,7 @@ export function QuickActions({
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {store.status === 'active' ? (
           <button
+            type="button"
             disabled={isChangingStatus}
             onClick={onRequestSuspend}
             className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm transition-all duration-200 hover:border-destructive/40 hover:shadow-md cursor-pointer text-start disabled:opacity-60 disabled:cursor-not-allowed"
@@ -57,6 +58,7 @@ export function QuickActions({
           </button>
         ) : (
           <button
+            type="button"
             disabled={isChangingStatus}
             onClick={onActivate}
             className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm transition-all duration-200 hover:border-success/40 hover:shadow-md cursor-pointer text-start disabled:opacity-60 disabled:cursor-not-allowed"

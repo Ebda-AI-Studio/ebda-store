@@ -134,6 +134,7 @@ export default function StoreHeroPage() {
       storeId={storeId}
       actions={
         <button
+          type="button"
           onClick={handleSave}
           disabled={isSaving}
           className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 font-medium"

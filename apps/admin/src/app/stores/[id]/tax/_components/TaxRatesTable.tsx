@@ -40,6 +40,7 @@ export function TaxRatesTable({
           <p className="text-sm text-muted-foreground">{t('subtitle')}</p>
         </div>
         <button
+          type="button"
           onClick={onAdd}
           className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-2"
           disabled={!taxEnabled}
@@ -54,6 +55,7 @@ export function TaxRatesTable({
       <div className="flex gap-2 p-4 bg-muted border-b border-border">
         {FILTERS.map(f => (
           <button
+            type="button"
             key={f}
             onClick={() => onFilterChange(f)}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -90,6 +92,7 @@ export function TaxRatesTable({
           </p>
           {taxEnabled && (
             <button
+              type="button"
               onClick={onAdd}
               className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
             >
@@ -183,6 +186,7 @@ export function TaxRatesTable({
                   </td>
                   <td className="px-6 py-4">
                     <button
+                      type="button"
                       onClick={() => onToggle(rate)}
                       className={`px-2 py-1 rounded-full text-xs font-medium ${
                         rate.isActive
@@ -196,6 +200,7 @@ export function TaxRatesTable({
                   <td className="px-6 py-4 text-end">
                     <div className="flex items-center justify-end gap-2">
                       <button
+                        type="button"
                         onClick={() => onEdit(rate)}
                         className="p-2 text-muted-foreground hover:text-primary transition-colors"
                         title={t('actions.edit')}
@@ -215,6 +220,7 @@ export function TaxRatesTable({
                         </svg>
                       </button>
                       <button
+                        type="button"
                         onClick={() => onDelete(rate)}
                         className="p-2 text-muted-foreground hover:text-destructive transition-colors"
                         title={t('actions.delete')}

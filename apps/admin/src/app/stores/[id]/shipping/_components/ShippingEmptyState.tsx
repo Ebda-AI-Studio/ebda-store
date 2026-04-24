@@ -29,6 +29,7 @@ export function ShippingEmptyState({ onCreate }: ShippingEmptyStateProps) {
       <h3 className="text-lg font-semibold text-foreground mb-2">{t('title')}</h3>
       <p className="text-muted-foreground mb-6">{t('description')}</p>
       <button
+        type="button"
         onClick={onCreate}
         className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
       >

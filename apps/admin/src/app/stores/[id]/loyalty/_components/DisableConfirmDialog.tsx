@@ -23,12 +23,14 @@ export function DisableConfirmDialog({ saving, onCancel, onConfirm }: DisableCon
         <p className="text-sm text-muted-foreground mb-6">{t('description')}</p>
         <div className="flex items-center justify-end gap-3">
           <button
+            type="button"
             onClick={onCancel}
             className="px-4 py-2 text-foreground border border-border rounded-lg hover:bg-muted"
           >
             {t('cancel')}
           </button>
           <button
+            type="button"
             onClick={onConfirm}
             disabled={saving}
             className="px-4 py-2 bg-destructive text-white rounded-lg hover:bg-destructive/90 disabled:opacity-50"

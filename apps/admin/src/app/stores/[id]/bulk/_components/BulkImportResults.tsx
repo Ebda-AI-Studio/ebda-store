@@ -63,7 +63,11 @@ export function BulkImportResults({ result, onViewProducts }: BulkImportResultsP
           <p className="text-sm text-[hsl(var(--success))]">
             {t.rich('successMessage', {
               link: chunks => (
-                <button onClick={onViewProducts} className="underline hover:no-underline">
+                <button
+                  type="button"
+                  onClick={onViewProducts}
+                  className="underline hover:no-underline"
+                >
                   {chunks}
                 </button>
               ),

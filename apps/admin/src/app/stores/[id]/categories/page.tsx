@@ -191,11 +191,15 @@ export default function StoreCategoriesPage() {
       actions={
         <div className="flex gap-2">
           <Link href={`/stores/${storeId}`}>
-            <button className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted font-medium">
+            <button
+              type="button"
+              className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted font-medium"
+            >
               {t('backToStore')}
             </button>
           </Link>
           <button
+            type="button"
             onClick={openAddForm}
             className="px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 font-medium"
           >
@@ -208,7 +212,7 @@ export default function StoreCategoriesPage() {
       {error && (
         <div className="mb-6 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
           {error}
-          <button className="ms-4 font-medium underline" onClick={fetchCategories}>
+          <button type="button" className="ms-4 font-medium underline" onClick={fetchCategories}>
             {t('retry')}
           </button>
         </div>
@@ -252,12 +256,14 @@ export default function StoreCategoriesPage() {
             </p>
             <div className="flex items-center justify-end gap-3">
               <button
+                type="button"
                 onClick={() => setDeleteTarget(null)}
                 className="px-4 py-2 text-sm text-foreground border border-border rounded-lg hover:bg-muted"
               >
                 {t('cancel')}
               </button>
               <button
+                type="button"
                 onClick={confirmDelete}
                 disabled={deletingId === deleteTarget.id}
                 className="px-4 py-2 text-sm bg-destructive text-white rounded-lg hover:bg-destructive/90 disabled:opacity-50"

@@ -89,7 +89,11 @@ export function CouponsTable({
             </svg>
           </div>
           <p className="text-muted-foreground">{tEmpty('title')}</p>
-          <button onClick={onCreateFirst} className="mt-4 text-primary hover:underline">
+          <button
+            type="button"
+            onClick={onCreateFirst}
+            className="mt-4 text-primary hover:underline"
+          >
             {tEmpty('createFirst')}
           </button>
         </div>
@@ -195,6 +199,7 @@ export function CouponsTable({
                   <td className="px-6 py-4 text-end">
                     <div className="flex items-center justify-end gap-2">
                       <button
+                        type="button"
                         onClick={() => onToggleActive(coupon.id)}
                         className={`p-2 rounded-lg transition-colors ${
                           coupon.isActive
@@ -234,6 +239,7 @@ export function CouponsTable({
                         )}
                       </button>
                       <button
+                        type="button"
                         onClick={() => onEdit(coupon)}
                         className="p-2 text-muted-foreground hover:bg-muted rounded-lg"
                         title={tActions('edit')}
@@ -253,6 +259,7 @@ export function CouponsTable({
                         </svg>
                       </button>
                       <button
+                        type="button"
                         onClick={() => onDelete(coupon.id)}
                         className="p-2 text-destructive hover:bg-destructive/5 rounded-lg"
                         title={tActions('delete')}

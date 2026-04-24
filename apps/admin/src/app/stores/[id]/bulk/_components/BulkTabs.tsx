@@ -19,6 +19,7 @@ export function BulkTabs({ activeTab, onTabChange }: BulkTabsProps) {
     <div className="mb-6 border-b">
       <nav className="flex gap-4">
         <button
+          type="button"
           onClick={() => onTabChange('import')}
           className={`pb-3 text-sm font-medium transition ${
             activeTab === 'import'
@@ -39,6 +40,7 @@ export function BulkTabs({ activeTab, onTabChange }: BulkTabsProps) {
           </span>
         </button>
         <button
+          type="button"
           onClick={() => onTabChange('export')}
           className={`pb-3 text-sm font-medium transition ${
             activeTab === 'export'

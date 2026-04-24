@@ -101,11 +101,15 @@ export default function AnnouncementPage() {
       actions={
         <div className="flex gap-2">
           <Link href={`/stores/${storeId}/settings`}>
-            <button className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted font-medium">
+            <button
+              type="button"
+              className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted font-medium"
+            >
               {t('backToSettings')}
             </button>
           </Link>
           <button
+            type="button"
             onClick={handleSave}
             disabled={isSaving}
             className="px-6 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 font-medium"
@@ -261,6 +265,7 @@ export default function AnnouncementPage() {
               <div className="mt-2 flex gap-2">
                 {['#000000', '#1f2937', '#dc2626', '#2563eb', '#16a34a', '#ea580c'].map(color => (
                   <button
+                    type="button"
                     key={color}
                     onClick={() => setSettings(prev => ({ ...prev, backgroundColor: color }))}
                     className={`h-6 w-6 rounded-full border-2 transition-transform hover:scale-110 ${
@@ -298,6 +303,7 @@ export default function AnnouncementPage() {
               <div className="mt-2 flex gap-2">
                 {['#ffffff', '#f3f4f6', '#fef08a', '#fbbf24', '#000000'].map(color => (
                   <button
+                    type="button"
                     key={color}
                     onClick={() => setSettings(prev => ({ ...prev, textColor: color }))}
                     className={`h-6 w-6 rounded-full border-2 transition-transform hover:scale-110 ${

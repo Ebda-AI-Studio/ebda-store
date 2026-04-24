@@ -41,6 +41,7 @@ export function LowStockAlertBanner({ alerts, onViewAlerts }: LowStockAlertBanne
           <p className="text-sm text-warning">{t('breakdown', { out: outCount, low: lowCount })}</p>
         </div>
         <button
+          type="button"
           onClick={onViewAlerts}
           className="px-4 py-2 bg-warning/10 text-warning dark:bg-warning/30 dark:text-warning rounded-lg hover:bg-warning/20 text-sm font-medium"
         >

@@ -209,6 +209,7 @@ export default function AffiliatesPage() {
 
           <div className="flex gap-2 mb-6">
             <button
+              type="button"
               onClick={() => setActiveTab('affiliates')}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                 activeTab === 'affiliates'
@@ -219,6 +220,7 @@ export default function AffiliatesPage() {
               {tTabs('affiliates')}
             </button>
             <button
+              type="button"
               onClick={() => setActiveTab('config')}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                 activeTab === 'config'

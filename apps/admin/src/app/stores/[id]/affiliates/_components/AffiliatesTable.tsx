@@ -44,6 +44,7 @@ export function AffiliatesTable({
       <div className="flex flex-wrap gap-2 p-4 bg-muted border-b border-border">
         {STATUS_FILTERS.map(s => (
           <button
+            type="button"
             key={s}
             onClick={() => onStatusFilterChange(s)}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -153,6 +154,7 @@ export function AffiliatesTable({
                         {affiliate.status === 'pending' && (
                           <>
                             <button
+                              type="button"
                               onClick={() => onStatusAction(affiliate, 'approve')}
                               disabled={saving}
                               className="text-success hover:text-success text-sm font-medium disabled:opacity-50"
@@ -160,6 +162,7 @@ export function AffiliatesTable({
                               {t('actions.approve')}
                             </button>
                             <button
+                              type="button"
                               onClick={() => onStatusAction(affiliate, 'reject')}
                               disabled={saving}
                               className="text-destructive hover:text-destructive text-sm font-medium disabled:opacity-50"
@@ -171,6 +174,7 @@ export function AffiliatesTable({
                         {affiliate.status === 'approved' && (
                           <>
                             <button
+                              type="button"
                               onClick={() => onOpenPayout(affiliate)}
                               disabled={saving || Number(affiliate.pendingBalance) <= 0}
                               className="text-primary hover:text-primary/90 text-sm font-medium disabled:opacity-30"
@@ -178,6 +182,7 @@ export function AffiliatesTable({
                               {t('actions.payout')}
                             </button>
                             <button
+                              type="button"
                               onClick={() => onStatusAction(affiliate, 'suspend')}
                               disabled={saving}
                               className="text-muted-foreground hover:text-foreground text-sm font-medium disabled:opacity-50"
@@ -205,6 +210,7 @@ export function AffiliatesTable({
               </p>
               <div className="flex gap-2">
                 <button
+                  type="button"
                   onClick={() => onPageChange(p => Math.max(1, p - 1))}
                   disabled={page <= 1}
                   className="px-3 py-1 border border-border rounded text-sm disabled:opacity-50 hover:bg-card"
@@ -212,6 +218,7 @@ export function AffiliatesTable({
                   {t('pagination.previous')}
                 </button>
                 <button
+                  type="button"
                   onClick={() => onPageChange(p => Math.min(meta.totalPages, p + 1))}
                   disabled={page >= meta.totalPages}
                   className="px-3 py-1 border border-border rounded text-sm disabled:opacity-50 hover:bg-card"

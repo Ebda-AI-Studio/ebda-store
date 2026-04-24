@@ -36,6 +36,7 @@ export function TaxRateFormModal({
             {editingRate ? t('editTitle') : t('newTitle')}
           </h2>
           <button
+            type="button"
             onClick={onClose}
             className="p-2 text-muted-foreground hover:text-foreground transition-colors"
           >

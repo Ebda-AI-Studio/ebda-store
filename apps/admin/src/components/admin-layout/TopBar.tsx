@@ -31,6 +31,7 @@ export function TopBar({
       <div className="flex items-center gap-4">
         {/* Mobile menu button */}
         <button
+          type="button"
           onClick={onOpenSidebar}
           className="flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:hidden"
           aria-label={t('openSidebar')}
@@ -46,6 +47,7 @@ export function TopBar({
         </button>
         {showBackButton && (
           <button
+            type="button"
             onClick={onBack}
             className="flex h-10 w-10 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             aria-label={t('goBack')}

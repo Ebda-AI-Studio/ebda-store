@@ -25,6 +25,7 @@ export function OrdersBulkBar({
         {t('selected', { count: selectedCount })}
       </span>
       <button
+        type="button"
         onClick={onMarkPaid}
         disabled={isProcessing}
         className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
@@ -32,6 +33,7 @@ export function OrdersBulkBar({
         {isProcessing ? t('processing') : t('markPaid')}
       </button>
       <button
+        type="button"
         onClick={onClearSelection}
         className="text-xs text-muted-foreground hover:text-foreground"
       >

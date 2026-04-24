@@ -53,6 +53,7 @@ export default function PWASettingsPage() {
         <div className="flex items-center gap-3">
           <span className="text-sm text-muted-foreground">{tActions('statusLabel')}</span>
           <button
+            type="button"
             onClick={handleToggleEnabled}
             disabled={saving}
             className={`px-4 py-2 rounded-lg font-medium transition-colors ${
@@ -91,6 +92,7 @@ export default function PWASettingsPage() {
           {pwaEnabled && (
             <div className="flex justify-end">
               <button
+                type="button"
                 onClick={handleSaveSettings}
                 disabled={saving}
                 className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-2"

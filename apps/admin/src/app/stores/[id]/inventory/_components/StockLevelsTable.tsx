@@ -44,6 +44,7 @@ export function StockLevelsTable({
         <div className="flex gap-2">
           {FILTERS.map(filter => (
             <button
+              type="button"
               key={filter}
               onClick={() => onFilterChange(filter)}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -145,6 +146,7 @@ export function StockLevelsTable({
                   </td>
                   <td className="px-6 py-4 text-end">
                     <button
+                      type="button"
                       onClick={() => onAdjust(product)}
                       className="text-primary hover:text-primary/90 text-sm font-medium"
                     >

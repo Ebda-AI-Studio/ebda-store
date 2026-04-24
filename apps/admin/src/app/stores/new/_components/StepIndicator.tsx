@@ -32,6 +32,7 @@ export function StepIndicator({ currentStep, onJumpTo }: StepIndicatorProps) {
             className={`flex items-center ${index < STEPS.length - 1 ? 'flex-1' : ''}`}
           >
             <button
+              type="button"
               onClick={() => index < currentIndex && onJumpTo(step.id)}
               disabled={index > currentIndex}
               className={`flex items-center ${index <= currentIndex ? 'cursor-pointer' : 'cursor-not-allowed'}`}

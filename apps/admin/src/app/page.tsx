@@ -58,6 +58,7 @@ export default function DashboardPage() {
         <div className="flex flex-col items-center justify-center py-24 text-center">
           <p className="text-muted-foreground mb-4">{t('loadFailed')}</p>
           <button
+            type="button"
             onClick={() => {
               setHasError(false);
               setIsLoading(true);

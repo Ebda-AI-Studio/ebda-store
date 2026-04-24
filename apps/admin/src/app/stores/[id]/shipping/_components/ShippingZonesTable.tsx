@@ -133,6 +133,7 @@ export function ShippingZonesTable({ zones, onEdit, onToggle, onDelete }: Shippi
               </td>
               <td className="px-6 py-4">
                 <button
+                  type="button"
                   onClick={() => onToggle(zone)}
                   className={`px-2 py-1 rounded-full text-xs font-medium ${
                     zone.isActive
@@ -146,6 +147,7 @@ export function ShippingZonesTable({ zones, onEdit, onToggle, onDelete }: Shippi
               <td className="px-6 py-4 text-end">
                 <div className="flex items-center justify-end gap-2">
                   <button
+                    type="button"
                     onClick={() => onEdit(zone)}
                     className="p-2 text-muted-foreground hover:text-primary transition-colors"
                     title={t('edit')}
@@ -160,6 +162,7 @@ export function ShippingZonesTable({ zones, onEdit, onToggle, onDelete }: Shippi
                     </svg>
                   </button>
                   <button
+                    type="button"
                     onClick={() => onDelete(zone)}
                     className="p-2 text-muted-foreground hover:text-destructive transition-colors"
                     title={t('delete')}

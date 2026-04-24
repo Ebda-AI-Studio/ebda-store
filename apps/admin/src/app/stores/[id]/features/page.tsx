@@ -146,6 +146,7 @@ export default function StoreFeaturesPage() {
           </div>
           <p className="text-muted-foreground">{error || t('errors.loadFailed')}</p>
           <button
+            type="button"
             onClick={fetchFeatures}
             className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
           >
@@ -177,6 +178,7 @@ export default function StoreFeaturesPage() {
               {t('actions.unsavedChanges', { count: dirtyKeys.length })}
             </span>
             <button
+              type="button"
               onClick={() => setLocalState({})}
               disabled={saving}
               className="px-4 py-2 text-sm font-medium text-foreground border border-border rounded-lg hover:bg-muted transition-colors disabled:opacity-50"
@@ -184,6 +186,7 @@ export default function StoreFeaturesPage() {
               {t('actions.discard')}
             </button>
             <button
+              type="button"
               onClick={handleSave}
               disabled={saving}
               className="px-4 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-2"

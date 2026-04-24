@@ -148,7 +148,10 @@ export default function UserDetailPage() {
       subtitle={user.email}
       actions={
         <Link href="/users">
-          <button className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted font-medium">
+          <button
+            type="button"
+            className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted font-medium"
+          >
             {t('backToUsers')}
           </button>
         </Link>
@@ -348,6 +351,7 @@ export default function UserDetailPage() {
                   {t('userIdLabel')} <span className="font-mono">{user.id}</span>
                 </p>
                 <button
+                  type="button"
                   onClick={handleSave}
                   disabled={isSaving || !hasChanges}
                   className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed font-medium text-sm"

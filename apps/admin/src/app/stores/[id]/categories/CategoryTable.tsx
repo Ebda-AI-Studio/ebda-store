@@ -69,7 +69,11 @@ export function CategoryTable({
           />
         </svg>
         <p className="mt-4 text-muted-foreground">{t('empty')}</p>
-        <button onClick={onAddFirst} className="mt-4 text-sm text-primary hover:underline">
+        <button
+          type="button"
+          onClick={onAddFirst}
+          className="mt-4 text-sm text-primary hover:underline"
+        >
           {t('addFirst')}
         </button>
       </div>
@@ -167,12 +171,14 @@ export function CategoryTable({
               <td className="px-6 py-4 text-end">
                 <div className="flex items-center justify-end gap-2">
                   <button
+                    type="button"
                     onClick={() => onEdit(cat)}
                     className="px-3 py-1.5 text-xs font-medium text-foreground border border-border rounded-lg hover:bg-muted transition-colors"
                   >
                     {t('edit')}
                   </button>
                   <button
+                    type="button"
                     onClick={() => onDelete({ id: cat.id, name: cat.name })}
                     disabled={deletingId === cat.id}
                     className="px-3 py-1.5 text-xs font-medium text-destructive border border-destructive/30 rounded-lg hover:bg-destructive/5 transition-colors disabled:opacity-50"
