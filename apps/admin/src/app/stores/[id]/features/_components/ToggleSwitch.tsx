@@ -20,7 +20,7 @@ export function ToggleSwitch({ enabled, onChange, disabled }: ToggleSwitchProps)
     >
       <span
         className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-          enabled ? 'translate-x-5' : 'translate-x-0'
+          enabled ? 'translate-x-5 rtl:-translate-x-5' : 'translate-x-0'
         }`}
       />
     </button>

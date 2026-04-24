@@ -107,7 +107,9 @@ export function AffiliateCommissionForm({
             >
               <span
                 className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  config.autoApprove ? 'translate-x-6' : 'translate-x-1'
+                  config.autoApprove
+                    ? 'translate-x-6 rtl:-translate-x-6'
+                    : 'translate-x-1 rtl:-translate-x-1'
                 }`}
               />
             </button>
@@ -131,7 +133,9 @@ export function AffiliateCommissionForm({
             >
               <span
                 className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  config.publicSignupEnabled ? 'translate-x-6' : 'translate-x-1'
+                  config.publicSignupEnabled
+                    ? 'translate-x-6 rtl:-translate-x-6'
+                    : 'translate-x-1 rtl:-translate-x-1'
                 }`}
               />
             </button>

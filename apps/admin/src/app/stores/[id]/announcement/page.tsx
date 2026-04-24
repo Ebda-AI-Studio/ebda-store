@@ -134,7 +134,7 @@ export default function AnnouncementPage() {
           >
             <span>{settings.text}</span>
             {settings.linkUrl && settings.linkText && (
-              <span className="underline cursor-pointer">{settings.linkText}</span>
+              <span className="underline">{settings.linkText}</span>
             )}
           </div>
         </div>
@@ -155,7 +155,7 @@ export default function AnnouncementPage() {
                 onChange={e => setSettings(prev => ({ ...prev, enabled: e.target.checked }))}
                 className="sr-only peer"
               />
-              <div className="peer h-6 w-11 rounded-full bg-muted after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-border after:bg-card after:transition-all after:content-[''] peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/20" />
+              <div className="peer h-6 w-11 rounded-full bg-muted after:absolute after:start-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-border after:bg-card after:transition-all after:content-[''] peer-checked:bg-primary peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/20" />
             </label>
           </div>
         </div>

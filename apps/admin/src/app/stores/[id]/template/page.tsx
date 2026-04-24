@@ -241,7 +241,7 @@ export default function StoreTemplatePage() {
 
                 {/* Selection Indicator */}
                 {isSelected && (
-                  <div className="absolute top-4 right-4 w-6 h-6 bg-white rounded-full flex items-center justify-center shadow">
+                  <div className="absolute top-4 end-4 w-6 h-6 bg-white rounded-full flex items-center justify-center shadow">
                     <svg
                       className="w-4 h-4 text-primary"
                       fill="none"
