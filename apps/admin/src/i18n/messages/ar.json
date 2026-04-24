@@ -13,39 +13,39 @@
     "saving": "جارٍ الحفظ…",
     "deleting": "جارٍ الحذف…",
     "noResults": "لا توجد نتائج",
-    "loadingDashboard": "Loading dashboard…",
-    "dashboard": "Dashboard",
+    "loadingDashboard": "جارٍ تحميل لوحة التحكم…",
+    "dashboard": "لوحة التحكم",
     "errors": {
       "notFound": {
         "code": "404",
-        "title": "Page not found",
-        "message": "The admin page you are looking for does not exist or has been moved.",
-        "goHome": "Go to Dashboard"
+        "title": "الصفحة غير موجودة",
+        "message": "صفحة الإدارة التي تبحث عنها غير موجودة أو تم نقلها.",
+        "goHome": "الانتقال إلى لوحة التحكم"
       },
       "boundary": {
-        "title": "Something went wrong",
-        "message": "An unexpected error occurred in the admin panel.",
-        "errorId": "Error ID: {id}",
-        "unknown": "Unknown error",
-        "generic": "An unexpected error occurred.",
-        "retry": "Try Again",
-        "goHome": "Go to Dashboard"
+        "title": "حدث خطأ ما",
+        "message": "حدث خطأ غير متوقع في لوحة الإدارة.",
+        "errorId": "معرّف الخطأ: {id}",
+        "unknown": "خطأ غير معروف",
+        "generic": "حدث خطأ غير متوقع.",
+        "retry": "حاول مرة أخرى",
+        "goHome": "الانتقال إلى لوحة التحكم"
       },
       "global": {
-        "title": "Admin Error",
-        "message": "A critical error occurred in the admin application."
+        "title": "خطأ في لوحة الإدارة",
+        "message": "حدث خطأ جوهري في تطبيق الإدارة."
       },
-      "somethingWrong": "Something went wrong"
+      "somethingWrong": "حدث خطأ ما"
     },
-    "tryAgain": "Try Again",
-    "storeNotFound": "Store not found",
-    "backToStores": "Back to stores",
-    "retry": "Retry",
-    "connectionError": "Unable to connect to the server. Please check your connection and try again.",
-    "backToStore": "Back to Store",
-    "backToSettings": "Back to Settings",
-    "saveChanges": "Save Changes",
-    "loadingEllipsis": "Loading..."
+    "tryAgain": "حاول مرة أخرى",
+    "storeNotFound": "المتجر غير موجود",
+    "backToStores": "العودة إلى المتاجر",
+    "retry": "إعادة المحاولة",
+    "connectionError": "تعذّر الاتصال بالخادم. يرجى التحقق من الاتصال والمحاولة مرة أخرى.",
+    "backToStore": "العودة إلى المتجر",
+    "backToSettings": "العودة إلى الإعدادات",
+    "saveChanges": "حفظ التغييرات",
+    "loadingEllipsis": "جارٍ التحميل..."
   },
   "nav": {
     "dashboard": "لوحة التحكم",
@@ -59,957 +59,957 @@
   },
   "dashboard": {
     "super": {
-      "title": "Platform Dashboard",
-      "subtitleAll": "Overview of all stores and platform metrics",
-      "subtitleStore": "Overview for {store}",
-      "newStore": "New Store",
-      "retry": "Retry",
-      "loadFailed": "Failed to load dashboard data.",
-      "statTotalStores": "Total Stores",
-      "statTotalUsers": "Total Users",
-      "statTotalOrders": "Total Orders",
-      "statTotalRevenue": "Total Revenue",
-      "recentStoresTitle": "Recent Stores",
-      "recentStoresSubtitle": "Latest store registrations",
-      "recentOrdersTitle": "Recent Orders",
-      "recentOrdersAll": "Across all stores",
-      "viewAll": "View all →",
-      "noStoresTitle": "No stores yet",
-      "noStoresSubtitle": "Create your first store to get started",
-      "createStore": "Create Store",
-      "noOrdersTitle": "No orders yet",
-      "noOrdersSubtitle": "Orders will appear here when customers make purchases",
-      "quickActionsTitle": "Quick Actions",
-      "quickActionsSubtitle": "Common platform management tasks",
-      "qaCreateStoreTitle": "Create Store",
-      "qaCreateStoreDesc": "Provision a new store",
-      "qaManageUsersTitle": "Manage Users",
-      "qaManageUsersDesc": "View all platform users",
-      "qaAuditLogsTitle": "Audit Logs",
-      "qaAuditLogsDesc": "View system activity",
-      "qaAllStoresTitle": "All Stores",
-      "qaAllStoresDesc": "Manage all stores"
+      "title": "لوحة تحكم المنصة",
+      "subtitleAll": "نظرة عامة على جميع المتاجر ومؤشرات المنصة",
+      "subtitleStore": "نظرة عامة على {store}",
+      "newStore": "متجر جديد",
+      "retry": "إعادة المحاولة",
+      "loadFailed": "تعذّر تحميل بيانات لوحة التحكم.",
+      "statTotalStores": "إجمالي المتاجر",
+      "statTotalUsers": "إجمالي المستخدمين",
+      "statTotalOrders": "إجمالي الطلبات",
+      "statTotalRevenue": "إجمالي الإيرادات",
+      "recentStoresTitle": "أحدث المتاجر",
+      "recentStoresSubtitle": "أحدث تسجيلات المتاجر",
+      "recentOrdersTitle": "أحدث الطلبات",
+      "recentOrdersAll": "من جميع المتاجر",
+      "viewAll": "عرض الكل ←",
+      "noStoresTitle": "لا توجد متاجر بعد",
+      "noStoresSubtitle": "أنشئ متجرك الأول للبدء",
+      "createStore": "إنشاء متجر",
+      "noOrdersTitle": "لا توجد طلبات بعد",
+      "noOrdersSubtitle": "ستظهر الطلبات هنا عند قيام العملاء بالشراء",
+      "quickActionsTitle": "إجراءات سريعة",
+      "quickActionsSubtitle": "مهام إدارة المنصة الشائعة",
+      "qaCreateStoreTitle": "إنشاء متجر",
+      "qaCreateStoreDesc": "تجهيز متجر جديد",
+      "qaManageUsersTitle": "إدارة المستخدمين",
+      "qaManageUsersDesc": "عرض جميع مستخدمي المنصة",
+      "qaAuditLogsTitle": "سجلات التدقيق",
+      "qaAuditLogsDesc": "عرض نشاط النظام",
+      "qaAllStoresTitle": "جميع المتاجر",
+      "qaAllStoresDesc": "إدارة جميع المتاجر"
     }
   },
   "stores": {
     "dashboard": {
-      "editStore": "Edit Store",
-      "loadingTitle": "Store Details",
-      "loadingSubtitle": "Loading...",
-      "notFoundTitle": "Store Not Found",
-      "notFoundSubtitle": "The requested store could not be found",
-      "errorTitle": "Error Loading Store",
-      "errorSubtitle": "A network error occurred while loading this store",
-      "retry": "Retry",
-      "backToStores": "Back to Stores",
+      "editStore": "تعديل المتجر",
+      "loadingTitle": "تفاصيل المتجر",
+      "loadingSubtitle": "جارٍ التحميل...",
+      "notFoundTitle": "المتجر غير موجود",
+      "notFoundSubtitle": "تعذّر العثور على المتجر المطلوب",
+      "errorTitle": "خطأ في تحميل المتجر",
+      "errorSubtitle": "حدث خطأ في الشبكة أثناء تحميل هذا المتجر",
+      "retry": "إعادة المحاولة",
+      "backToStores": "العودة إلى المتاجر",
       "stats": {
-        "products": "Products",
-        "orders": "Orders",
-        "customers": "Customers",
-        "revenue": "Revenue"
+        "products": "المنتجات",
+        "orders": "الطلبات",
+        "customers": "العملاء",
+        "revenue": "الإيرادات"
       },
       "details": {
-        "title": "Store Details",
-        "cancel": "Cancel",
-        "save": "Save Changes",
-        "saving": "Saving...",
-        "storeName": "Store Name",
-        "urlSlug": "URL Slug",
+        "title": "تفاصيل المتجر",
+        "cancel": "إلغاء",
+        "save": "حفظ التغييرات",
+        "saving": "جارٍ الحفظ...",
+        "storeName": "اسم المتجر",
+        "urlSlug": "معرّف الرابط",
         "slugPlaceholder": "my-store-name",
-        "slugHint": "Your store will be at: {slug}.forcemediakw.com",
+        "slugHint": "سيكون متجرك على: {slug}.forcemediakw.com",
         "slugHintPlaceholder": "your-slug",
-        "plan": "Plan",
-        "status": "Status",
-        "planFree": "Free",
-        "planStarter": "Starter",
-        "planProfessional": "Professional",
-        "planEnterprise": "Enterprise",
-        "statusActive": "Active",
-        "statusInactive": "Inactive",
-        "statusSuspended": "Suspended",
-        "url": "URL",
-        "created": "Created",
-        "lastUpdated": "Last Updated",
+        "plan": "الخطة",
+        "status": "الحالة",
+        "planFree": "مجاني",
+        "planStarter": "مبتدئ",
+        "planProfessional": "احترافي",
+        "planEnterprise": "مؤسسي",
+        "statusActive": "نشط",
+        "statusInactive": "غير نشط",
+        "statusSuspended": "معلّق",
+        "url": "الرابط",
+        "created": "تاريخ الإنشاء",
+        "lastUpdated": "آخر تحديث",
         "errors": {
-          "nameRequired": "Store name is required",
-          "nameTooShort": "Store name must be at least 2 characters",
-          "nameTooLong": "Store name must be less than 100 characters",
-          "slugRequired": "URL slug is required",
-          "slugInvalid": "Slug must be lowercase, alphanumeric, with hyphens only",
-          "slugTooShort": "Slug must be at least 3 characters",
-          "slugTooLong": "Slug must be less than 50 characters",
-          "slugTaken": "This slug is already in use"
+          "nameRequired": "اسم المتجر مطلوب",
+          "nameTooShort": "يجب ألا يقل اسم المتجر عن حرفين",
+          "nameTooLong": "يجب أن يكون اسم المتجر أقل من 100 حرف",
+          "slugRequired": "معرّف الرابط مطلوب",
+          "slugInvalid": "يجب أن يكون المعرّف بأحرف صغيرة وأرقام وشرطات فقط",
+          "slugTooShort": "يجب ألا يقل المعرّف عن 3 أحرف",
+          "slugTooLong": "يجب أن يكون المعرّف أقل من 50 حرفًا",
+          "slugTaken": "هذا المعرّف مستخدم بالفعل"
         }
       },
       "owner": {
-        "title": "Store Owner",
-        "viewProfile": "View Profile"
+        "title": "مالك المتجر",
+        "viewProfile": "عرض الملف الشخصي"
       },
       "domain": {
-        "title": "Custom Domain",
-        "add": "Add Domain",
-        "change": "Change Domain",
-        "remove": "Remove",
-        "label": "Domain",
+        "title": "نطاق مخصّص",
+        "add": "إضافة نطاق",
+        "change": "تغيير النطاق",
+        "remove": "إزالة",
+        "label": "النطاق",
         "placeholder": "shop.example.com",
-        "save": "Save",
-        "saving": "Saving...",
-        "cancel": "Cancel",
-        "removeHint": "Leave empty and save to remove the custom domain.",
-        "invalid": "Please enter a valid domain (e.g., shop.example.com)",
-        "updateFailed": "Failed to update domain",
-        "verified": "Verified",
-        "pending": "Pending Verification",
-        "dnsRequired": "DNS Configuration Required",
-        "dnsInstructions": "Add the following DNS record to your domain provider:",
-        "dnsPropagation": "DNS changes can take up to 48 hours to propagate.",
-        "checkDns": "Check DNS",
-        "checkingDns": "Checking...",
-        "verifiedMessage": "Domain is verified and SSL is active. Your store is accessible at https://{domain}",
-        "empty": "No custom domain configured. This store is accessible via its default subdomain.",
-        "tableLabel": "Store overview",
-        "columnType": "Type",
-        "columnName": "Name",
-        "columnValue": "Value"
+        "save": "حفظ",
+        "saving": "جارٍ الحفظ...",
+        "cancel": "إلغاء",
+        "removeHint": "اترك الحقل فارغًا واحفظ لإزالة النطاق المخصّص.",
+        "invalid": "يرجى إدخال نطاق صالح (مثل shop.example.com)",
+        "updateFailed": "تعذّر تحديث النطاق",
+        "verified": "تم التحقق",
+        "pending": "بانتظار التحقق",
+        "dnsRequired": "مطلوب إعداد DNS",
+        "dnsInstructions": "أضف سجل DNS التالي لدى مزوّد النطاق:",
+        "dnsPropagation": "قد تستغرق تغييرات DNS حتى 48 ساعة للانتشار.",
+        "checkDns": "فحص DNS",
+        "checkingDns": "جارٍ الفحص...",
+        "verifiedMessage": "تم التحقق من النطاق وتفعيل SSL. يمكن الوصول إلى متجرك عبر https://{domain}",
+        "empty": "لم يتم إعداد نطاق مخصّص. يمكن الوصول إلى هذا المتجر عبر النطاق الفرعي الافتراضي.",
+        "tableLabel": "نظرة عامة على المتجر",
+        "columnType": "النوع",
+        "columnName": "الاسم",
+        "columnValue": "القيمة"
       },
       "quickActions": {
-        "title": "Quick Actions",
-        "suspend": "Suspend Store",
-        "suspendDescription": "Temporarily disable access",
-        "activate": "Activate Store",
-        "activateDescription": "Enable store access",
-        "viewProducts": "View Products",
-        "viewProductsCount": "{count} products",
-        "viewOrders": "View Orders",
-        "viewOrdersCount": "{count} orders",
-        "analytics": "Analytics",
-        "analyticsDescription": "View store metrics",
-        "manageFeatures": "Manage Features",
-        "manageFeaturesDescription": "Toggle store capabilities"
+        "title": "إجراءات سريعة",
+        "suspend": "تعليق المتجر",
+        "suspendDescription": "تعطيل الوصول مؤقتًا",
+        "activate": "تفعيل المتجر",
+        "activateDescription": "تمكين الوصول إلى المتجر",
+        "viewProducts": "عرض المنتجات",
+        "viewProductsCount": "{count} منتج",
+        "viewOrders": "عرض الطلبات",
+        "viewOrdersCount": "{count} طلب",
+        "analytics": "التحليلات",
+        "analyticsDescription": "عرض مؤشرات المتجر",
+        "manageFeatures": "إدارة الميزات",
+        "manageFeaturesDescription": "تفعيل أو تعطيل إمكانيات المتجر"
       },
       "settings": {
-        "title": "Settings & Configuration",
-        "description": "Branding, SEO, shipping, tax, payments, PWA, and more"
+        "title": "الإعدادات والتكوين",
+        "description": "الهوية البصرية، SEO، الشحن، الضرائب، الدفع، PWA والمزيد"
       },
       "suspendModal": {
-        "title": "Suspend Store",
-        "message": "Are you sure you want to suspend {name}? This will disable customer access to the store.",
-        "cancel": "Cancel",
-        "confirm": "Suspend Store",
-        "confirming": "Suspending..."
+        "title": "تعليق المتجر",
+        "message": "هل أنت متأكد من تعليق {name}؟ سيؤدي ذلك إلى تعطيل وصول العملاء إلى المتجر.",
+        "cancel": "إلغاء",
+        "confirm": "تعليق المتجر",
+        "confirming": "جارٍ التعليق..."
       }
     },
     "list": {
-      "title": "Stores",
-      "subtitleCount": "{count} stores on the platform",
-      "createStore": "Create Store",
-      "searchPlaceholder": "Search by name, slug, or owner…",
-      "search": "Search",
-      "filterStatusLabel": "Filter by status",
-      "filterAll": "All",
-      "filterActive": "Active",
-      "filterInactive": "Inactive",
-      "filterSuspended": "Suspended",
-      "filterAllStatus": "All Status",
-      "gridView": "Grid view",
-      "tableView": "Table view",
-      "errorTitle": "Failed to load stores",
-      "errorDefault": "Failed to fetch stores",
-      "errorNetwork": "Unable to connect to the server. Please check your connection and try again.",
+      "title": "المتاجر",
+      "subtitleCount": "{count} متجر على المنصة",
+      "createStore": "إنشاء متجر",
+      "searchPlaceholder": "البحث بالاسم أو المعرّف أو المالك…",
+      "search": "بحث",
+      "filterStatusLabel": "تصفية حسب الحالة",
+      "filterAll": "الكل",
+      "filterActive": "نشط",
+      "filterInactive": "غير نشط",
+      "filterSuspended": "معلّق",
+      "filterAllStatus": "جميع الحالات",
+      "gridView": "عرض الشبكة",
+      "tableView": "عرض الجدول",
+      "errorTitle": "تعذّر تحميل المتاجر",
+      "errorDefault": "تعذّر جلب المتاجر",
+      "errorNetwork": "تعذّر الاتصال بالخادم. يرجى التحقق من الاتصال والمحاولة مرة أخرى.",
       "status": {
-        "active": "active",
-        "inactive": "inactive",
-        "suspended": "suspended"
+        "active": "نشط",
+        "inactive": "غير نشط",
+        "suspended": "معلّق"
       },
-      "products": "Products",
-      "orders": "Orders",
-      "plan": "Plan",
-      "createdPrefix": "Created {date}",
-      "viewDetails": "View Details →",
-      "tableLabel": "Stores",
-      "colStore": "Store",
-      "colOwner": "Owner",
-      "colStatus": "Status",
-      "colPlan": "Plan",
-      "colProducts": "Products",
-      "colOrders": "Orders",
-      "colCreated": "Created",
-      "colActions": "Actions",
-      "view": "View",
-      "paginationShowing": "Showing {from} to {to} of {total} stores",
-      "previous": "← Previous",
-      "next": "Next →",
-      "emptyTitle": "No stores found",
-      "emptyHintSearch": "Try adjusting your search or filter criteria",
-      "emptyHintDefault": "Get started by creating your first store on the platform",
-      "emptyCta": "Create Your First Store"
+      "products": "المنتجات",
+      "orders": "الطلبات",
+      "plan": "الخطة",
+      "createdPrefix": "تاريخ الإنشاء {date}",
+      "viewDetails": "عرض التفاصيل ←",
+      "tableLabel": "المتاجر",
+      "colStore": "المتجر",
+      "colOwner": "المالك",
+      "colStatus": "الحالة",
+      "colPlan": "الخطة",
+      "colProducts": "المنتجات",
+      "colOrders": "الطلبات",
+      "colCreated": "تاريخ الإنشاء",
+      "colActions": "الإجراءات",
+      "view": "عرض",
+      "paginationShowing": "عرض {from} إلى {to} من {total} متجر",
+      "previous": "← السابق",
+      "next": "التالي →",
+      "emptyTitle": "لا توجد متاجر",
+      "emptyHintSearch": "حاول تعديل معايير البحث أو التصفية",
+      "emptyHintDefault": "ابدأ بإنشاء أول متجر على المنصة",
+      "emptyCta": "أنشئ أول متجر لك"
     },
     "new": {
-      "title": "Create New Store",
-      "subtitle": "Set up a new store on the platform",
-      "cancel": "Cancel",
-      "successTitle": "Store Created!",
-      "successSubtitle": "Your new store is ready",
-      "successHeading": "Store Created Successfully!",
-      "successMessage": "{name} is now live and ready for products.",
-      "storeDetails": "Store Details",
-      "storeUrl": "Store URL:",
-      "defaultUrl": "Default URL:",
-      "ownerEmail": "Owner Email:",
-      "tempPassword": "Temporary Password:",
-      "dnsRequired": "DNS Configuration Required",
-      "dnsVerified": "Verified",
-      "dnsPending": "Pending",
-      "dnsInstructions": "Add the following DNS record to your domain provider to complete setup:",
-      "dnsTableLabel": "DNS records required",
-      "colType": "Type",
-      "colName": "Name",
-      "colValue": "Value",
-      "dnsPropagation": "DNS changes can take up to 48 hours to propagate.",
-      "checkDns": "Check DNS",
-      "checkingDns": "Checking…",
-      "viewStore": "View Store",
-      "backToStores": "Back to Stores",
-      "stepStoreName": "Store Details",
-      "stepStoreDesc": "Basic store information",
-      "stepOwnerName": "Store Owner",
-      "stepOwnerDesc": "Owner account setup",
-      "stepReviewName": "Review & Create",
-      "stepReviewDesc": "Confirm and create store",
-      "step1Heading": "Store Details",
-      "step1Subtitle": "Enter the basic information for the new store",
-      "storeNameLabel": "Store Name",
-      "storeNamePlaceholder": "My Awesome Store",
+      "title": "إنشاء متجر جديد",
+      "subtitle": "إعداد متجر جديد على المنصة",
+      "cancel": "إلغاء",
+      "successTitle": "تم إنشاء المتجر!",
+      "successSubtitle": "متجرك الجديد جاهز",
+      "successHeading": "تم إنشاء المتجر بنجاح!",
+      "successMessage": "{name} أصبح جاهزًا لإضافة المنتجات.",
+      "storeDetails": "تفاصيل المتجر",
+      "storeUrl": "رابط المتجر:",
+      "defaultUrl": "الرابط الافتراضي:",
+      "ownerEmail": "البريد الإلكتروني للمالك:",
+      "tempPassword": "كلمة مرور مؤقتة:",
+      "dnsRequired": "مطلوب إعداد DNS",
+      "dnsVerified": "تم التحقق",
+      "dnsPending": "قيد الانتظار",
+      "dnsInstructions": "أضف سجل DNS التالي لدى مزوّد النطاق لإكمال الإعداد:",
+      "dnsTableLabel": "سجلات DNS المطلوبة",
+      "colType": "النوع",
+      "colName": "الاسم",
+      "colValue": "القيمة",
+      "dnsPropagation": "قد تستغرق تغييرات DNS حتى 48 ساعة للانتشار.",
+      "checkDns": "فحص DNS",
+      "checkingDns": "جارٍ الفحص…",
+      "viewStore": "عرض المتجر",
+      "backToStores": "العودة إلى المتاجر",
+      "stepStoreName": "تفاصيل المتجر",
+      "stepStoreDesc": "المعلومات الأساسية للمتجر",
+      "stepOwnerName": "مالك المتجر",
+      "stepOwnerDesc": "إعداد حساب المالك",
+      "stepReviewName": "المراجعة والإنشاء",
+      "stepReviewDesc": "تأكيد وإنشاء المتجر",
+      "step1Heading": "تفاصيل المتجر",
+      "step1Subtitle": "أدخل المعلومات الأساسية للمتجر الجديد",
+      "storeNameLabel": "اسم المتجر",
+      "storeNamePlaceholder": "متجري الرائع",
       "required": "*",
-      "storeSlugLabel": "Store URL",
+      "storeSlugLabel": "رابط المتجر",
       "storeSlugPlaceholder": "my-awesome-store",
-      "customDomainLabel": "Custom Domain",
-      "customDomainOptional": "(optional)",
+      "customDomainLabel": "نطاق مخصّص",
+      "customDomainOptional": "(اختياري)",
       "customDomainPlaceholder": "store.example.com",
-      "customDomainHint": "Leave empty to use the default subdomain. Custom domains require DNS configuration.",
-      "step2Heading": "Store Owner",
-      "step2Subtitle": "Set up the owner account for this store",
-      "ownerNameLabel": "Owner Name",
-      "ownerNamePlaceholder": "John Doe",
-      "emailLabel": "Email Address",
-      "emailPlaceholder": "john@example.com",
-      "tempPasswordLabel": "Temporary Password",
-      "tempPasswordPlaceholder": "Min 8 characters",
-      "tempPasswordHint": "The owner will be prompted to change this on first login",
-      "step3Heading": "Review & Create",
-      "step3Subtitle": "Please review the details before creating the store",
-      "reviewStoreName": "Name:",
-      "reviewStoreUrl": "Default URL:",
-      "reviewCustomDomain": "Custom Domain:",
-      "reviewOwnerName": "Name:",
-      "reviewOwnerEmail": "Email:",
-      "edit": "Edit",
-      "back": "Back",
-      "continueBtn": "Continue",
-      "createBtn": "Create Store",
-      "creating": "Creating Store…",
+      "customDomainHint": "اترك الحقل فارغًا لاستخدام النطاق الفرعي الافتراضي. النطاقات المخصّصة تتطلب إعداد DNS.",
+      "step2Heading": "مالك المتجر",
+      "step2Subtitle": "إعداد حساب المالك لهذا المتجر",
+      "ownerNameLabel": "اسم المالك",
+      "ownerNamePlaceholder": "أحمد محمد",
+      "emailLabel": "عنوان البريد الإلكتروني",
+      "emailPlaceholder": "owner@example.com",
+      "tempPasswordLabel": "كلمة مرور مؤقتة",
+      "tempPasswordPlaceholder": "8 أحرف على الأقل",
+      "tempPasswordHint": "سيُطلب من المالك تغييرها عند أول تسجيل دخول",
+      "step3Heading": "المراجعة والإنشاء",
+      "step3Subtitle": "يرجى مراجعة التفاصيل قبل إنشاء المتجر",
+      "reviewStoreName": "الاسم:",
+      "reviewStoreUrl": "الرابط الافتراضي:",
+      "reviewCustomDomain": "النطاق المخصّص:",
+      "reviewOwnerName": "الاسم:",
+      "reviewOwnerEmail": "البريد الإلكتروني:",
+      "edit": "تعديل",
+      "back": "رجوع",
+      "continueBtn": "متابعة",
+      "createBtn": "إنشاء المتجر",
+      "creating": "جارٍ إنشاء المتجر…",
       "errors": {
-        "storeNameRequired": "Store name is required",
-        "storeUrlRequired": "Store URL is required",
-        "storeUrlInvalid": "URL can only contain lowercase letters, numbers, and hyphens",
-        "emailRequired": "Email is required",
-        "emailInvalid": "Please enter a valid email address",
-        "ownerNameRequired": "Owner name is required",
-        "passwordRequired": "Password is required",
-        "passwordTooShort": "Password must be at least 8 characters",
-        "createFailed": "Failed to create store",
-        "generic": "Something went wrong"
+        "storeNameRequired": "اسم المتجر مطلوب",
+        "storeUrlRequired": "رابط المتجر مطلوب",
+        "storeUrlInvalid": "يمكن أن يحتوي الرابط على أحرف إنجليزية صغيرة وأرقام وشرطات فقط",
+        "emailRequired": "البريد الإلكتروني مطلوب",
+        "emailInvalid": "يرجى إدخال عنوان بريد إلكتروني صالح",
+        "ownerNameRequired": "اسم المالك مطلوب",
+        "passwordRequired": "كلمة المرور مطلوبة",
+        "passwordTooShort": "يجب ألا تقل كلمة المرور عن 8 أحرف",
+        "createFailed": "تعذّر إنشاء المتجر",
+        "generic": "حدث خطأ ما"
       }
     }
   },
   "products": {
     "list": {
-      "title": "Products - {storeName}",
-      "subtitle": "Manage products for {storeName}",
-      "loading": "Loading...",
-      "fallbackStore": "Store",
-      "fallbackThisStore": "this store",
+      "title": "المنتجات - {storeName}",
+      "subtitle": "إدارة منتجات {storeName}",
+      "loading": "جارٍ التحميل...",
+      "fallbackStore": "المتجر",
+      "fallbackThisStore": "هذا المتجر",
       "toolbar": {
-        "addProduct": "Add Product",
-        "bulkImport": "Bulk Import",
-        "backToStore": "Back to Store"
+        "addProduct": "إضافة منتج",
+        "bulkImport": "استيراد جماعي",
+        "backToStore": "العودة إلى المتجر"
       },
       "filters": {
-        "searchPlaceholder": "Search products...",
-        "all": "All",
-        "active": "Active",
-        "draft": "Draft",
-        "archived": "Archived"
+        "searchPlaceholder": "البحث عن منتجات...",
+        "all": "الكل",
+        "active": "نشط",
+        "draft": "مسودة",
+        "archived": "مؤرشف"
       },
       "status": {
-        "active": "Active",
-        "draft": "Draft",
-        "archived": "Archived"
+        "active": "نشط",
+        "draft": "مسودة",
+        "archived": "مؤرشف"
       },
       "table": {
-        "label": "Products",
-        "loadingLabel": "Products (loading)",
-        "product": "Product",
+        "label": "المنتجات",
+        "loadingLabel": "المنتجات (جارٍ التحميل)",
+        "product": "المنتج",
         "sku": "SKU",
-        "price": "Price",
-        "inventory": "Inventory",
-        "status": "Status",
-        "actions": "Actions",
-        "hasVariants": "Has variants"
+        "price": "السعر",
+        "inventory": "المخزون",
+        "status": "الحالة",
+        "actions": "الإجراءات",
+        "hasVariants": "يحتوي على متغيرات"
       },
       "actions": {
-        "variants": "Variants",
-        "edit": "Edit",
-        "view": "View",
-        "delete": "Delete"
+        "variants": "المتغيرات",
+        "edit": "تعديل",
+        "view": "عرض",
+        "delete": "حذف"
       },
       "empty": {
-        "title": "No products found",
-        "description": "Add your first product to get started.",
-        "descriptionFiltered": "Try adjusting your search or filters.",
-        "addProduct": "Add Product"
+        "title": "لا توجد منتجات",
+        "description": "أضف منتجك الأول للبدء.",
+        "descriptionFiltered": "حاول تعديل البحث أو عوامل التصفية.",
+        "addProduct": "إضافة منتج"
       },
       "pagination": {
-        "showing": "Showing {from} to {to} of {total} products",
-        "previous": "Previous",
-        "next": "Next"
+        "showing": "عرض {from} إلى {to} من {total} منتج",
+        "previous": "السابق",
+        "next": "التالي"
       },
       "deleteModal": {
-        "title": "Delete Product",
-        "messageBefore": "Are you sure you want to delete",
-        "messageAfter": "? This action cannot be undone.",
-        "cancel": "Cancel",
-        "confirm": "Delete Product",
-        "deleting": "Deleting..."
+        "title": "حذف المنتج",
+        "messageBefore": "هل أنت متأكد من حذف",
+        "messageAfter": "؟ لا يمكن التراجع عن هذا الإجراء.",
+        "cancel": "إلغاء",
+        "confirm": "حذف المنتج",
+        "deleting": "جارٍ الحذف..."
       },
       "toast": {
-        "deletedTitle": "Product deleted",
-        "deletedDescription": "{name} has been deleted.",
-        "deleteFailedTitle": "Delete failed",
-        "deleteFailedDescription": "Failed to delete the product. Please try again."
+        "deletedTitle": "تم حذف المنتج",
+        "deletedDescription": "تم حذف {name}.",
+        "deleteFailedTitle": "فشل الحذف",
+        "deleteFailedDescription": "تعذّر حذف المنتج. يرجى المحاولة مرة أخرى."
       }
     },
     "detail": {
-      "loading": "Loading...",
-      "notFoundTitle": "Product Not Found",
-      "notFound": "Product not found",
-      "loadFailed": "Failed to load product",
-      "notFoundBody": "The product you're looking for doesn't exist or has been removed.",
-      "subtitle": "SKU: {sku} • Store: {storeName}",
-      "fallbackSku": "N/A",
-      "fallbackStore": "Unknown",
+      "loading": "جارٍ التحميل...",
+      "notFoundTitle": "المنتج غير موجود",
+      "notFound": "المنتج غير موجود",
+      "loadFailed": "تعذّر تحميل المنتج",
+      "notFoundBody": "المنتج الذي تبحث عنه غير موجود أو تمت إزالته.",
+      "subtitle": "SKU: {sku} • المتجر: {storeName}",
+      "fallbackSku": "غير متوفر",
+      "fallbackStore": "غير معروف",
       "actions": {
-        "edit": "Edit",
-        "manageVariants": "Manage Variants",
-        "recommendations": "Recommendations",
-        "delete": "Delete",
-        "backToProducts": "Back to Products"
+        "edit": "تعديل",
+        "manageVariants": "إدارة المتغيرات",
+        "recommendations": "التوصيات",
+        "delete": "حذف",
+        "backToProducts": "العودة إلى المنتجات"
       },
       "status": {
-        "active": "Active",
-        "draft": "Draft",
-        "archived": "Archived"
+        "active": "نشط",
+        "draft": "مسودة",
+        "archived": "مؤرشف"
       },
       "sections": {
-        "productDetails": "Product Details",
-        "pricing": "Pricing",
-        "inventory": "Inventory",
-        "images": "Images",
-        "categories": "Categories",
-        "tags": "Tags",
-        "flags": "Product Flags",
-        "timestamps": "Timestamps"
+        "productDetails": "تفاصيل المنتج",
+        "pricing": "التسعير",
+        "inventory": "المخزون",
+        "images": "الصور",
+        "categories": "الفئات",
+        "tags": "الوسوم",
+        "flags": "خيارات المنتج",
+        "timestamps": "الطوابع الزمنية"
       },
       "fields": {
-        "name": "Name",
-        "nameAr": "Name (Arabic)",
-        "slug": "Slug",
-        "status": "Status",
-        "description": "Description",
-        "descriptionAr": "Description (Arabic)",
-        "price": "Price",
-        "compareAtPrice": "Compare at Price",
-        "costPrice": "Cost Price",
+        "name": "الاسم",
+        "nameAr": "الاسم (بالعربية)",
+        "slug": "المعرّف",
+        "status": "الحالة",
+        "description": "الوصف",
+        "descriptionAr": "الوصف (بالعربية)",
+        "price": "السعر",
+        "compareAtPrice": "السعر قبل الخصم",
+        "costPrice": "سعر التكلفة",
         "sku": "SKU",
-        "barcode": "Barcode",
-        "stock": "Stock",
-        "stockInStock": "{count} in stock",
-        "featured": "Featured",
-        "newArrival": "New Arrival",
-        "trackInventory": "Track Inventory",
-        "yes": "Yes",
-        "no": "No",
-        "created": "Created",
-        "updated": "Updated"
+        "barcode": "الباركود",
+        "stock": "المخزون",
+        "stockInStock": "{count} متوفر في المخزون",
+        "featured": "مميّز",
+        "newArrival": "وصل حديثًا",
+        "trackInventory": "تتبع المخزون",
+        "yes": "نعم",
+        "no": "لا",
+        "created": "تاريخ الإنشاء",
+        "updated": "آخر تحديث"
       },
       "deleteModal": {
-        "title": "Delete Product",
-        "messageBefore": "Are you sure you want to delete",
-        "messageAfter": "? This action cannot be undone.",
-        "cancel": "Cancel",
-        "confirm": "Delete Product",
-        "deleting": "Deleting..."
+        "title": "حذف المنتج",
+        "messageBefore": "هل أنت متأكد من حذف",
+        "messageAfter": "؟ لا يمكن التراجع عن هذا الإجراء.",
+        "cancel": "إلغاء",
+        "confirm": "حذف المنتج",
+        "deleting": "جارٍ الحذف..."
       },
       "toasts": {
-        "deletedTitle": "Product deleted",
-        "deletedDescription": "{name} has been deleted.",
-        "deleteFailedTitle": "Delete failed",
-        "deleteFailedDescription": "Failed to delete the product. Please try again."
+        "deletedTitle": "تم حذف المنتج",
+        "deletedDescription": "تم حذف {name}.",
+        "deleteFailedTitle": "فشل الحذف",
+        "deleteFailedDescription": "تعذّر حذف المنتج. يرجى المحاولة مرة أخرى."
       }
     },
     "edit": {
-      "loading": "Loading...",
-      "notFoundTitle": "Product Not Found",
-      "notFound": "Product not found",
-      "loadFailed": "Failed to load product",
-      "updateFailed": "Failed to update product. Please try again.",
-      "title": "Edit: {name}",
-      "fallbackTitle": "Product",
-      "subtitle": "Store: {storeName}",
-      "fallbackStore": "Unknown",
-      "backToProducts": "Back to Products",
+      "loading": "جارٍ التحميل...",
+      "notFoundTitle": "المنتج غير موجود",
+      "notFound": "المنتج غير موجود",
+      "loadFailed": "تعذّر تحميل المنتج",
+      "updateFailed": "تعذّر تحديث المنتج. يرجى المحاولة مرة أخرى.",
+      "title": "تعديل: {name}",
+      "fallbackTitle": "المنتج",
+      "subtitle": "المتجر: {storeName}",
+      "fallbackStore": "غير معروف",
+      "backToProducts": "العودة إلى المنتجات",
       "sections": {
-        "basicInformation": "Basic Information",
-        "media": "Media",
-        "pricing": "Pricing",
-        "inventory": "Inventory",
-        "status": "Status",
-        "organization": "Organization",
-        "flags": "Product Flags"
+        "basicInformation": "المعلومات الأساسية",
+        "media": "الوسائط",
+        "pricing": "التسعير",
+        "inventory": "المخزون",
+        "status": "الحالة",
+        "organization": "التنظيم",
+        "flags": "خيارات المنتج"
       },
       "fields": {
-        "name": "Product Name",
-        "namePlaceholder": "Enter product name",
-        "nameAr": "Product Name (Arabic)",
+        "name": "اسم المنتج",
+        "namePlaceholder": "أدخل اسم المنتج",
+        "nameAr": "اسم المنتج (بالعربية)",
         "nameArPlaceholder": "ادخل اسم المنتج",
-        "description": "Description",
-        "descriptionPlaceholder": "Describe your product...",
-        "descriptionAr": "Description (Arabic)",
+        "description": "الوصف",
+        "descriptionPlaceholder": "صف منتجك...",
+        "descriptionAr": "الوصف (بالعربية)",
         "descriptionArPlaceholder": "وصف المنتج...",
-        "mediaHint": "Drag and drop images here, or click to select",
-        "price": "Price (KWD)",
-        "compareAtPrice": "Compare at Price (KWD)",
+        "mediaHint": "اسحب وأفلت الصور هنا، أو انقر للاختيار",
+        "price": "السعر (د.ك)",
+        "compareAtPrice": "السعر قبل الخصم (د.ك)",
         "pricePlaceholder": "0.000",
         "sku": "SKU",
         "skuPlaceholder": "PROD-001",
-        "quantity": "Quantity",
+        "quantity": "الكمية",
         "quantityPlaceholder": "0",
-        "productStatus": "Product Status",
-        "category": "Category",
-        "noCategory": "No category",
-        "featured": "Featured Product",
-        "newArrival": "New Arrival"
+        "productStatus": "حالة المنتج",
+        "category": "الفئة",
+        "noCategory": "بدون فئة",
+        "featured": "منتج مميّز",
+        "newArrival": "وصل حديثًا"
       },
       "statusOptions": {
-        "draft": "Draft",
-        "active": "Active",
-        "archived": "Archived"
+        "draft": "مسودة",
+        "active": "نشط",
+        "archived": "مؤرشف"
       },
       "actions": {
-        "saveChanges": "Save Changes",
-        "cancel": "Cancel"
+        "saveChanges": "حفظ التغييرات",
+        "cancel": "إلغاء"
       }
     },
     "recommendations": {
-      "loading": "Loading...",
-      "title": "Recommendations: {productName}",
-      "fallbackProductName": "Product",
-      "subtitle": "Manage cross-sell and upsell product relationships",
+      "loading": "جارٍ التحميل...",
+      "title": "التوصيات: {productName}",
+      "fallbackProductName": "المنتج",
+      "subtitle": "إدارة علاقات البيع المتقاطع والبيع المطوّر",
       "actions": {
-        "save": "Save Recommendations",
-        "backToEdit": "Back to Edit",
-        "cancel": "Cancel"
+        "save": "حفظ التوصيات",
+        "backToEdit": "العودة إلى التعديل",
+        "cancel": "إلغاء"
       },
       "crossSell": {
-        "title": "Frequently Bought Together",
-        "description": "Products that customers commonly buy alongside this one.",
-        "maxReached": "Maximum of {max} cross-sell products reached.",
-        "empty": "No cross-sell products added yet. Search above to add some."
+        "title": "يُشترى معًا عادةً",
+        "description": "منتجات يشتريها العملاء عادةً مع هذا المنتج.",
+        "maxReached": "تم الوصول إلى الحد الأقصى {max} من منتجات البيع المتقاطع.",
+        "empty": "لم تتم إضافة منتجات بيع متقاطع بعد. ابحث أعلاه لإضافة بعضها."
       },
       "upsell": {
-        "title": "Upsell Alternatives",
-        "description": "Higher-value products to suggest as alternatives or upgrades.",
-        "maxReached": "Maximum of {max} upsell products reached.",
-        "empty": "No upsell products added yet. Search above to add some."
+        "title": "بدائل بيع مطوّر",
+        "description": "منتجات ذات قيمة أعلى لاقتراحها كبدائل أو ترقيات.",
+        "maxReached": "تم الوصول إلى الحد الأقصى {max} من منتجات البيع المطوّر.",
+        "empty": "لم تتم إضافة منتجات بيع مطوّر بعد. ابحث أعلاه لإضافة بعضها."
       },
       "search": {
-        "label": "Search products",
-        "placeholder": "Type to search products...",
-        "noResults": "No products found"
+        "label": "بحث عن المنتجات",
+        "placeholder": "اكتب للبحث عن المنتجات...",
+        "noResults": "لم يتم العثور على منتجات"
       },
       "errors": {
-        "loadFailed": "Failed to load existing recommendations."
+        "loadFailed": "تعذّر تحميل التوصيات الحالية."
       },
       "toasts": {
-        "saveFailedTitle": "Save failed",
-        "savedTitle": "Saved",
-        "savedDescription": "Recommendations saved successfully."
+        "saveFailedTitle": "فشل الحفظ",
+        "savedTitle": "تم الحفظ",
+        "savedDescription": "تم حفظ التوصيات بنجاح."
       },
       "counts": "{count} / {max}",
-      "removeAria": "Remove {name}"
+      "removeAria": "إزالة {name}"
     },
     "variants": {
-      "loading": "Loading...",
-      "loadingSubtitle": "Please wait",
-      "notFoundTitle": "Product Not Found",
-      "notFoundSubtitle": "The requested product could not be found",
-      "backToProducts": "Back to Products",
-      "title": "Variants: {productName}",
-      "subtitle": "Manage product options and variants",
+      "loading": "جارٍ التحميل...",
+      "loadingSubtitle": "يرجى الانتظار",
+      "notFoundTitle": "المنتج غير موجود",
+      "notFoundSubtitle": "تعذّر العثور على المنتج المطلوب",
+      "backToProducts": "العودة إلى المنتجات",
+      "title": "المتغيرات: {productName}",
+      "subtitle": "إدارة خيارات المنتج والمتغيرات",
       "summary": {
-        "basePrice": "Base Price: {price}",
-        "totalVariantStock": "Total Variant Stock"
+        "basePrice": "السعر الأساسي: {price}",
+        "totalVariantStock": "إجمالي مخزون المتغيرات"
       },
       "options": {
-        "title": "Options",
-        "addOption": "Add Option",
-        "empty": "No options defined yet.",
-        "emptyHint": "Add options like \"Size\" or \"Color\"",
-        "addValue": "+ Add",
-        "generateAll": "Generate All Variants"
+        "title": "الخيارات",
+        "addOption": "إضافة خيار",
+        "empty": "لم يتم تحديد خيارات بعد.",
+        "emptyHint": "أضف خيارات مثل \"المقاس\" أو \"اللون\"",
+        "addValue": "+ إضافة",
+        "generateAll": "إنشاء كل المتغيرات"
       },
       "table": {
-        "label": "Product variants",
-        "variants": "Variants ({count})",
-        "variant": "Variant",
+        "label": "متغيرات المنتج",
+        "variants": "المتغيرات ({count})",
+        "variant": "المتغير",
         "sku": "SKU",
-        "price": "Price",
-        "stock": "Stock",
-        "status": "Status",
-        "actions": "Actions",
+        "price": "السعر",
+        "stock": "المخزون",
+        "status": "الحالة",
+        "actions": "الإجراءات",
         "dash": "-",
-        "base": "Base",
-        "active": "Active",
-        "inactive": "Inactive",
-        "edit": "Edit",
-        "delete": "Delete",
-        "empty": "No variants created yet.",
-        "emptyHint": "Add options and click \"Generate All Variants\""
+        "base": "الأساسي",
+        "active": "نشط",
+        "inactive": "غير نشط",
+        "edit": "تعديل",
+        "delete": "حذف",
+        "empty": "لم يتم إنشاء متغيرات بعد.",
+        "emptyHint": "أضف خيارات ثم انقر على \"إنشاء كل المتغيرات\""
       },
       "optionModal": {
-        "title": "Add Option",
-        "nameLabel": "Option Name",
-        "namePlaceholder": "e.g., Size, Color",
-        "nameArLabel": "Option Name (Arabic)",
-        "nameArPlaceholder": "e.g., المقاس، اللون",
-        "valuesLabel": "Values (comma-separated)",
-        "valuesPlaceholder": "e.g., Small, Medium, Large",
-        "cancel": "Cancel",
-        "submit": "Add Option"
+        "title": "إضافة خيار",
+        "nameLabel": "اسم الخيار",
+        "namePlaceholder": "مثال: المقاس، اللون",
+        "nameArLabel": "اسم الخيار (بالعربية)",
+        "nameArPlaceholder": "مثال: المقاس، اللون",
+        "valuesLabel": "القيم (مفصولة بفواصل)",
+        "valuesPlaceholder": "مثال: Small, Medium, Large",
+        "cancel": "إلغاء",
+        "submit": "إضافة خيار"
       },
       "valueModal": {
-        "title": "Add Value",
-        "valueLabel": "Value",
-        "valuePlaceholder": "e.g., XL",
-        "valueArLabel": "Value (Arabic)",
-        "cancel": "Cancel",
-        "submit": "Add Value"
+        "title": "إضافة قيمة",
+        "valueLabel": "القيمة",
+        "valuePlaceholder": "مثال: XL",
+        "valueArLabel": "القيمة (بالعربية)",
+        "cancel": "إلغاء",
+        "submit": "إضافة قيمة"
       },
       "variantModal": {
-        "title": "Edit Variant: {title}",
+        "title": "تعديل المتغير: {title}",
         "skuLabel": "SKU",
-        "barcodeLabel": "Barcode",
-        "priceLabel": "Price (fils)",
-        "pricePlaceholder": "Base price",
-        "compareAtLabel": "Compare At",
-        "costLabel": "Cost",
-        "inventoryLabel": "Inventory",
-        "weightLabel": "Weight (kg)",
-        "cancel": "Cancel",
-        "submit": "Save Changes"
+        "barcodeLabel": "الباركود",
+        "priceLabel": "السعر (فلس)",
+        "pricePlaceholder": "السعر الأساسي",
+        "compareAtLabel": "السعر قبل الخصم",
+        "costLabel": "التكلفة",
+        "inventoryLabel": "المخزون",
+        "weightLabel": "الوزن (كجم)",
+        "cancel": "إلغاء",
+        "submit": "حفظ التغييرات"
       }
     },
     "new": {
-      "title": "Add New Product",
-      "subtitle": "Create a new product for your store",
+      "title": "إضافة منتج جديد",
+      "subtitle": "إنشاء منتج جديد لمتجرك",
       "sections": {
-        "basicInformation": "Basic Information",
-        "media": "Media",
-        "pricing": "Pricing",
-        "inventory": "Inventory",
-        "status": "Status",
-        "organization": "Organization"
+        "basicInformation": "المعلومات الأساسية",
+        "media": "الوسائط",
+        "pricing": "التسعير",
+        "inventory": "المخزون",
+        "status": "الحالة",
+        "organization": "التنظيم"
       },
       "fields": {
-        "name": "Product Name",
-        "namePlaceholder": "Enter product name",
-        "nameAr": "Product Name (Arabic)",
+        "name": "اسم المنتج",
+        "namePlaceholder": "أدخل اسم المنتج",
+        "nameAr": "اسم المنتج (بالعربية)",
         "nameArPlaceholder": "ادخل اسم المنتج",
-        "description": "Description",
-        "descriptionPlaceholder": "Describe your product...",
-        "descriptionAr": "Description (Arabic)",
+        "description": "الوصف",
+        "descriptionPlaceholder": "صف منتجك...",
+        "descriptionAr": "الوصف (بالعربية)",
         "descriptionArPlaceholder": "وصف المنتج...",
-        "mediaHint": "Drag and drop images here, or click to select",
-        "price": "Price (KWD)",
+        "mediaHint": "اسحب وأفلت الصور هنا، أو انقر للاختيار",
+        "price": "السعر (د.ك)",
         "pricePlaceholder": "0.000",
-        "compareAtPrice": "Compare at Price (KWD)",
-        "pricingHint": "Enter prices in KWD. Compare at price is used to show a crossed-out price.",
+        "compareAtPrice": "السعر قبل الخصم (د.ك)",
+        "pricingHint": "أدخل الأسعار بالدينار الكويتي. يُستخدم السعر قبل الخصم لإظهار السعر مشطوبًا.",
         "sku": "SKU",
         "skuPlaceholder": "PROD-001",
-        "quantity": "Quantity",
+        "quantity": "الكمية",
         "quantityPlaceholder": "0",
-        "productStatus": "Product Status",
-        "category": "Category",
-        "noCategory": "No category"
+        "productStatus": "حالة المنتج",
+        "category": "الفئة",
+        "noCategory": "بدون فئة"
       },
       "statusOptions": {
-        "draft": "Draft",
-        "active": "Active",
-        "archived": "Archived"
+        "draft": "مسودة",
+        "active": "نشط",
+        "archived": "مؤرشف"
       },
       "actions": {
-        "create": "Create Product",
-        "cancel": "Cancel"
+        "create": "إنشاء المنتج",
+        "cancel": "إلغاء"
       },
       "errors": {
-        "createFailed": "Failed to create product. Please try again."
+        "createFailed": "تعذّر إنشاء المنتج. يرجى المحاولة مرة أخرى."
       }
     }
   },
   "orders": {
     "list": {
-      "title": "Store Orders",
-      "subtitle": "View and manage orders for this store",
-      "backToStore": "Back to Store",
+      "title": "طلبات المتجر",
+      "subtitle": "عرض وإدارة طلبات هذا المتجر",
+      "backToStore": "العودة إلى المتجر",
       "search": {
-        "placeholder": "Search orders..."
+        "placeholder": "البحث عن طلبات..."
       },
       "filters": {
-        "all": "All Orders",
-        "pending": "Pending",
-        "confirmed": "Confirmed",
-        "processing": "Processing",
-        "shipped": "Shipped",
-        "delivered": "Delivered",
-        "cancelled": "Cancelled"
+        "all": "جميع الطلبات",
+        "pending": "قيد الانتظار",
+        "confirmed": "مؤكد",
+        "processing": "قيد المعالجة",
+        "shipped": "تم الشحن",
+        "delivered": "تم التسليم",
+        "cancelled": "ملغى"
       },
       "bulk": {
-        "selected": "{count} order(s) selected",
-        "markPaid": "Mark as Paid",
-        "processing": "Processing...",
-        "clearSelection": "Clear selection"
+        "selected": "تم تحديد {count} طلب",
+        "markPaid": "تعليم كمدفوع",
+        "processing": "جارٍ المعالجة...",
+        "clearSelection": "إلغاء التحديد"
       },
       "table": {
-        "label": "Orders",
-        "loadingLabel": "Orders (loading)",
-        "order": "Order",
-        "customer": "Customer",
-        "total": "Total",
-        "status": "Status",
-        "date": "Date",
-        "actions": "Actions",
-        "totalValue": "{amount} KWD"
+        "label": "الطلبات",
+        "loadingLabel": "الطلبات (جارٍ التحميل)",
+        "order": "الطلب",
+        "customer": "العميل",
+        "total": "الإجمالي",
+        "status": "الحالة",
+        "date": "التاريخ",
+        "actions": "الإجراءات",
+        "totalValue": "{amount} د.ك"
       },
       "actions": {
-        "updateStatusLabel": "Update order status",
-        "updatePlaceholder": "Update...",
-        "selectOrderLabel": "Select order {order}",
-        "markPaid": "Mark Paid",
-        "markPaidTitle": "Mark COD payment as received",
-        "invoice": "Invoice",
-        "invoiceTitle": "View Invoice"
+        "updateStatusLabel": "تحديث حالة الطلب",
+        "updatePlaceholder": "تحديث...",
+        "selectOrderLabel": "تحديد الطلب {order}",
+        "markPaid": "تعليم كمدفوع",
+        "markPaidTitle": "تعليم استلام الدفع عند الاستلام",
+        "invoice": "الفاتورة",
+        "invoiceTitle": "عرض الفاتورة"
       },
       "empty": {
-        "title": "No orders yet",
-        "description": "Orders will appear here when customers make purchases",
-        "filteredTitle": "No matching orders",
-        "filteredDescription": "Try adjusting your search or filters"
+        "title": "لا توجد طلبات بعد",
+        "description": "ستظهر الطلبات هنا عند قيام العملاء بالشراء",
+        "filteredTitle": "لا توجد طلبات مطابقة",
+        "filteredDescription": "حاول تعديل البحث أو عوامل التصفية"
       },
       "pagination": {
-        "showing": "Showing {from} to {to} of {total} orders",
-        "previous": "Previous",
-        "next": "Next"
+        "showing": "عرض {from} إلى {to} من {total} طلب",
+        "previous": "السابق",
+        "next": "التالي"
       },
       "confirm": {
-        "markPaid": "Confirm cash payment received for this order?",
-        "bulkMarkPaid": "Mark {count} order(s) as paid?"
+        "markPaid": "هل تؤكد استلام الدفع النقدي لهذا الطلب؟",
+        "bulkMarkPaid": "تعليم {count} طلب كمدفوع؟"
       },
       "toast": {
-        "errorTitle": "Error",
-        "statusUpdatedTitle": "Status Updated",
-        "statusUpdatedDescription": "Order status changed to {status}.",
-        "markedPaidTitle": "Marked as Paid",
-        "markedPaidDescription": "Order has been marked as paid.",
-        "bulkUpdateTitle": "Bulk Update",
-        "bulkUpdateDescription": "{count} order(s) marked as paid."
+        "errorTitle": "خطأ",
+        "statusUpdatedTitle": "تم تحديث الحالة",
+        "statusUpdatedDescription": "تم تغيير حالة الطلب إلى {status}.",
+        "markedPaidTitle": "تم التعليم كمدفوع",
+        "markedPaidDescription": "تم تعليم الطلب كمدفوع.",
+        "bulkUpdateTitle": "تحديث جماعي",
+        "bulkUpdateDescription": "تم تعليم {count} طلب كمدفوع."
       },
       "errors": {
-        "fetchFailed": "Failed to fetch orders",
-        "connection": "Unable to connect to the server. Please check your connection and try again.",
-        "statusUpdate": "Failed to update status",
-        "markPaid": "Failed to mark as paid",
-        "bulkMarkPaid": "Failed to bulk mark as paid",
-        "retry": "Retry"
+        "fetchFailed": "تعذّر جلب الطلبات",
+        "connection": "تعذّر الاتصال بالخادم. يرجى التحقق من الاتصال والمحاولة مرة أخرى.",
+        "statusUpdate": "تعذّر تحديث الحالة",
+        "markPaid": "تعذّر التعليم كمدفوع",
+        "bulkMarkPaid": "تعذّر التعليم الجماعي كمدفوع",
+        "retry": "إعادة المحاولة"
       }
     },
     "status": {
-      "pending": "Pending",
-      "confirmed": "Confirmed",
-      "processing": "Processing",
-      "shipped": "Shipped",
-      "delivered": "Delivered",
-      "cancelled": "Cancelled",
-      "refunded": "Refunded",
-      "paid": "Paid",
-      "unpaid": "Unpaid"
+      "pending": "قيد الانتظار",
+      "confirmed": "مؤكد",
+      "processing": "قيد المعالجة",
+      "shipped": "تم الشحن",
+      "delivered": "تم التسليم",
+      "cancelled": "ملغى",
+      "refunded": "مُسترد",
+      "paid": "مدفوع",
+      "unpaid": "غير مدفوع"
     }
   },
   "customers": {
     "page": {
-      "title": "Customers",
-      "subtitle": "Customers who have placed orders in this store",
-      "backToStore": "Back to Store",
-      "loading": "Loading customers...",
-      "searchPlaceholder": "Search by name or email...",
-      "noMatch": "No customers match your search",
-      "empty": "No customers yet for this store",
-      "retry": "Retry",
-      "fetchFailed": "Failed to fetch customers",
-      "connectionError": "Unable to connect to the server. Please check your connection and try again.",
-      "tableLabel": "Customers",
-      "colCustomer": "Customer",
-      "colEmail": "Email",
-      "colOrders": "Total Orders",
-      "colSpent": "Total Spent",
-      "colLastOrder": "Last Order",
-      "colActions": "Actions",
-      "ordersCount": "{count} orders",
-      "orderCount": "{count} order",
-      "viewOrdersTitle": "View orders for this customer",
-      "viewOrders": "Orders",
-      "countSingular": "{count} customer",
-      "countPlural": "{count} customers"
+      "title": "العملاء",
+      "subtitle": "العملاء الذين قاموا بطلبات في هذا المتجر",
+      "backToStore": "العودة إلى المتجر",
+      "loading": "جارٍ تحميل العملاء...",
+      "searchPlaceholder": "البحث بالاسم أو البريد الإلكتروني...",
+      "noMatch": "لا يوجد عملاء يطابقون بحثك",
+      "empty": "لا يوجد عملاء لهذا المتجر بعد",
+      "retry": "إعادة المحاولة",
+      "fetchFailed": "تعذّر جلب العملاء",
+      "connectionError": "تعذّر الاتصال بالخادم. يرجى التحقق من الاتصال والمحاولة مرة أخرى.",
+      "tableLabel": "العملاء",
+      "colCustomer": "العميل",
+      "colEmail": "البريد الإلكتروني",
+      "colOrders": "إجمالي الطلبات",
+      "colSpent": "إجمالي الإنفاق",
+      "colLastOrder": "آخر طلب",
+      "colActions": "الإجراءات",
+      "ordersCount": "{count} طلب",
+      "orderCount": "{count} طلب",
+      "viewOrdersTitle": "عرض طلبات هذا العميل",
+      "viewOrders": "الطلبات",
+      "countSingular": "{count} عميل",
+      "countPlural": "{count} عميل"
     }
   },
   "analytics": {
     "page": {
-      "title": "Analytics",
-      "subtitle": "Store performance and insights"
+      "title": "التحليلات",
+      "subtitle": "أداء المتجر والرؤى"
     },
     "periods": {
-      "week": "Last 7 Days",
-      "month": "This Month",
-      "year": "This Year"
+      "week": "آخر 7 أيام",
+      "month": "هذا الشهر",
+      "year": "هذه السنة"
     },
     "periodsSubtitle": {
-      "week": "Last 7 days",
-      "month": "This month",
-      "year": "This year"
+      "week": "آخر 7 أيام",
+      "month": "هذا الشهر",
+      "year": "هذه السنة"
     },
     "stats": {
-      "totalRevenue": "Total Revenue",
-      "totalOrders": "Total Orders",
-      "totalCustomers": "Total Customers",
-      "avgOrderValue": "Avg Order Value",
-      "vsLastPeriod": "vs last period"
+      "totalRevenue": "إجمالي الإيرادات",
+      "totalOrders": "إجمالي الطلبات",
+      "totalCustomers": "إجمالي العملاء",
+      "avgOrderValue": "متوسط قيمة الطلب",
+      "vsLastPeriod": "مقارنة بالفترة السابقة"
     },
     "chart": {
-      "title": "Sales Overview",
-      "revenue": "Revenue",
-      "orders": "Orders",
-      "numberOfOrders": "Number of Orders",
-      "max": "Max"
+      "title": "نظرة عامة على المبيعات",
+      "revenue": "الإيرادات",
+      "orders": "الطلبات",
+      "numberOfOrders": "عدد الطلبات",
+      "max": "الأقصى"
     },
     "topProducts": {
-      "title": "Top Products",
-      "empty": "No sales data yet",
-      "soldCount": "{count} sold"
+      "title": "أفضل المنتجات",
+      "empty": "لا توجد بيانات مبيعات بعد",
+      "soldCount": "تم بيع {count}"
     },
     "recentOrders": {
-      "title": "Recent Orders",
-      "empty": "No orders yet",
-      "guest": "Guest"
+      "title": "أحدث الطلبات",
+      "empty": "لا توجد طلبات بعد",
+      "guest": "زائر"
     },
     "orderStatus": {
-      "pending": "Pending",
-      "confirmed": "Confirmed",
-      "processing": "Processing",
-      "shipped": "Shipped",
-      "delivered": "Delivered",
-      "cancelled": "Cancelled",
-      "refunded": "Refunded"
+      "pending": "قيد الانتظار",
+      "confirmed": "مؤكد",
+      "processing": "قيد المعالجة",
+      "shipped": "تم الشحن",
+      "delivered": "تم التسليم",
+      "cancelled": "ملغى",
+      "refunded": "مُسترد"
     },
     "lowStock": {
-      "title": "Low Stock Alerts",
-      "allStocked": "All products are well stocked",
-      "unitsLeft": "{count} left"
+      "title": "تنبيهات المخزون المنخفض",
+      "allStocked": "جميع المنتجات متوفرة بشكل جيد",
+      "unitsLeft": "{count} متبقٍّ"
     }
   },
   "settings": {
     "page": {
-      "title": "Store Settings",
-      "subtitle": "Configure all aspects of this store",
-      "backToStore": "Back to Store"
+      "title": "إعدادات المتجر",
+      "subtitle": "إعداد جميع جوانب هذا المتجر",
+      "backToStore": "العودة إلى المتجر"
     },
     "cards": {
       "branding": {
-        "title": "Branding",
-        "description": "Logo, colors, fonts, contact info and social links"
+        "title": "الهوية البصرية",
+        "description": "الشعار، الألوان، الخطوط، معلومات التواصل وروابط التواصل الاجتماعي"
       },
       "navigation": {
-        "title": "Navigation",
-        "description": "Choose which links appear in the storefront header menu. Add, remove, reorder, or link to external URLs."
+        "title": "التنقل",
+        "description": "اختر الروابط التي تظهر في شريط قائمة واجهة المتجر. أضف، أزل، أعد الترتيب، أو اربط بروابط خارجية."
       },
       "hero": {
-        "title": "Hero Section",
-        "description": "Customize the homepage hero — title, subtitle, CTA, and background image"
+        "title": "القسم الرئيسي",
+        "description": "تخصيص القسم الرئيسي للصفحة الرئيسية — العنوان، النص التعريفي، زر الإجراء وصورة الخلفية"
       },
       "categories": {
-        "title": "Categories",
-        "description": "Manage product categories, images and display order"
+        "title": "الفئات",
+        "description": "إدارة فئات المنتجات، الصور وترتيب العرض"
       },
       "seo": {
         "title": "SEO",
-        "description": "Meta titles, meta descriptions and search engine optimization"
+        "description": "عناوين الميتا، أوصاف الميتا وتحسين محركات البحث"
       },
       "announcement": {
-        "title": "Announcement Bar",
-        "description": "Show a banner across the top of your store with promotions or news"
+        "title": "شريط الإعلانات",
+        "description": "عرض شريط أعلى متجرك للترويجات أو الأخبار"
       },
       "domain": {
-        "title": "Domain",
-        "description": "Connect a custom domain to your store"
+        "title": "النطاق",
+        "description": "ربط نطاق مخصّص بمتجرك"
       },
       "paymentSettings": {
-        "title": "Payment Settings",
-        "description": "Configure payment providers: Tap, MyFatoorah, Hesabe, UPayments"
+        "title": "إعدادات الدفع",
+        "description": "تكوين مزوّدي الدفع: Tap، MyFatoorah، Hesabe، UPayments"
       },
       "shipping": {
-        "title": "Shipping",
-        "description": "Delivery zones, shipping rates and carrier settings"
+        "title": "الشحن",
+        "description": "مناطق التوصيل، أسعار الشحن وإعدادات شركات الشحن"
       },
       "taxSettings": {
-        "title": "Tax Settings",
-        "description": "Tax rates, tax calculation rules and exemptions"
+        "title": "إعدادات الضرائب",
+        "description": "معدلات الضريبة، قواعد احتساب الضريبة والإعفاءات"
       },
       "pwaSettings": {
-        "title": "PWA Settings",
-        "description": "Progressive Web App configuration for mobile users"
+        "title": "إعدادات PWA",
+        "description": "تكوين تطبيق الويب التقدمي لمستخدمي الأجهزة المحمولة"
       },
       "template": {
-        "title": "Template",
-        "description": "Choose and customize the storefront design template"
+        "title": "القالب",
+        "description": "اختر وخصّص قالب تصميم واجهة المتجر"
       },
       "pages": {
-        "title": "Footer & Pages",
-        "description": "Manage footer links, support pages and company pages"
+        "title": "التذييل والصفحات",
+        "description": "إدارة روابط التذييل، صفحات الدعم وصفحات الشركة"
       },
       "language": {
-        "title": "Language",
-        "description": "Set the default language for your storefront"
+        "title": "اللغة",
+        "description": "حدّد اللغة الافتراضية لواجهة متجرك"
       },
       "marketingPixels": {
-        "title": "Marketing Pixels",
-        "description": "Facebook Pixel, Google Analytics, TikTok Pixel and other tracking codes"
+        "title": "بكسلات التسويق",
+        "description": "Facebook Pixel، Google Analytics، TikTok Pixel وأكواد التتبع الأخرى"
       },
       "notifications": {
-        "title": "Notifications",
-        "description": "WhatsApp, SMS, and Push notification settings"
+        "title": "الإشعارات",
+        "description": "إعدادات WhatsApp والرسائل النصية والإشعارات الفورية"
       },
       "affiliates": {
-        "title": "Affiliate Program",
-        "description": "Influencer referral commissions and tracking"
+        "title": "برنامج التسويق بالعمولة",
+        "description": "عمولات إحالات المسوّقين والتتبع"
       },
       "abandonedCarts": {
-        "title": "Abandoned Cart Recovery",
-        "description": "Recover lost sales with automated reminders"
+        "title": "استعادة العربات المتروكة",
+        "description": "استعادة المبيعات المفقودة عبر تذكيرات تلقائية"
       },
       "shippingCarriers": {
-        "title": "Shipping Carriers",
-        "description": "iCarry and Aramex delivery integration"
+        "title": "شركات الشحن",
+        "description": "تكامل التوصيل مع iCarry و Aramex"
       }
     }
   },
   "branding": {
     "page": {
-      "title": "Store Branding",
-      "subtitle": "Customize {name}'s visual identity"
+      "title": "هوية المتجر",
+      "subtitle": "تخصيص الهوية البصرية لـ {name}"
     },
     "actions": {
-      "save": "Save Changes",
-      "saving": "Saving...",
-      "backToStores": "Back to stores"
+      "save": "حفظ التغييرات",
+      "saving": "جارٍ الحفظ...",
+      "backToStores": "العودة إلى المتاجر"
     },
     "messages": {
-      "notFound": "Store not found",
-      "loadFailedTitle": "Failed to load branding",
-      "connectionErrorTitle": "Connection error",
-      "connectionErrorBody": "Failed to connect to the server",
-      "connectionErrorSaveBody": "Failed to connect to the server. Please try again.",
-      "serverErrorPrefix": "Server error: ",
-      "accessDeniedTitle": "Access denied",
-      "accessDeniedBody": "You do not have permission to update this store",
-      "sessionExpiredTitle": "Session expired",
-      "sessionExpiredBody": "Please log in again",
-      "saveFailedPrefix": "Failed to save ",
-      "serverError": "Server error",
-      "saveSuccessTitle": "Branding saved",
-      "saveSuccessBody": "All changes have been saved successfully"
+      "notFound": "المتجر غير موجود",
+      "loadFailedTitle": "تعذّر تحميل الهوية البصرية",
+      "connectionErrorTitle": "خطأ في الاتصال",
+      "connectionErrorBody": "تعذّر الاتصال بالخادم",
+      "connectionErrorSaveBody": "تعذّر الاتصال بالخادم. يرجى المحاولة مرة أخرى.",
+      "serverErrorPrefix": "خطأ في الخادم: ",
+      "accessDeniedTitle": "الوصول مرفوض",
+      "accessDeniedBody": "ليس لديك صلاحية لتحديث هذا المتجر",
+      "sessionExpiredTitle": "انتهت الجلسة",
+      "sessionExpiredBody": "يرجى تسجيل الدخول مرة أخرى",
+      "saveFailedPrefix": "تعذّر حفظ ",
+      "serverError": "خطأ في الخادم",
+      "saveSuccessTitle": "تم حفظ الهوية البصرية",
+      "saveSuccessBody": "تم حفظ جميع التغييرات بنجاح"
     },
     "tabs": {
-      "branding": "Branding",
-      "theme": "Theme & Colors",
-      "contact": "Contact Info",
-      "social": "Social Links"
+      "branding": "الهوية البصرية",
+      "theme": "السمة والألوان",
+      "contact": "معلومات التواصل",
+      "social": "روابط التواصل"
     },
     "identity": {
-      "storeName": "Store Name",
-      "storeNameAr": "Store Name (Arabic)",
-      "logo": "Logo",
-      "logoAr": "Logo (Arabic)",
-      "favicon": "Favicon",
-      "logoUpload": "Upload Logo",
-      "logoArUpload": "Upload Arabic Logo",
-      "faviconUpload": "Upload Favicon",
-      "description": "Description",
-      "descriptionAr": "Description (Arabic)"
+      "storeName": "اسم المتجر",
+      "storeNameAr": "اسم المتجر (بالعربية)",
+      "logo": "الشعار",
+      "logoAr": "الشعار (بالعربية)",
+      "favicon": "أيقونة الموقع",
+      "logoUpload": "رفع الشعار",
+      "logoArUpload": "رفع الشعار العربي",
+      "faviconUpload": "رفع أيقونة الموقع",
+      "description": "الوصف",
+      "descriptionAr": "الوصف (بالعربية)"
     },
     "theme": {
-      "primaryColor": "Primary Color",
-      "secondaryColor": "Secondary Color",
-      "fontFamily": "Font Family",
-      "borderRadius": "Border Radius",
+      "primaryColor": "اللون الأساسي",
+      "secondaryColor": "اللون الثانوي",
+      "fontFamily": "نوع الخط",
+      "borderRadius": "انحناء الحواف",
       "hex": "HEX",
       "presets": {
-        "orange": "Orange",
-        "blue": "Blue",
-        "green": "Green",
-        "purple": "Purple",
-        "rose": "Rose",
-        "teal": "Teal",
-        "amber": "Amber",
-        "black": "Black"
+        "orange": "برتقالي",
+        "blue": "أزرق",
+        "green": "أخضر",
+        "purple": "بنفسجي",
+        "rose": "وردي",
+        "teal": "فيروزي",
+        "amber": "عنبري",
+        "black": "أسود"
       },
       "fonts": {
-        "default": "Default (Sans-serif)",
-        "serif": "Serif (Elegant)",
-        "modern": "Modern (Geometric)",
-        "rounded": "Rounded (Friendly)"
+        "default": "افتراضي (Sans-serif)",
+        "serif": "مُذيّل (أنيق)",
+        "modern": "حديث (هندسي)",
+        "rounded": "مستدير (ودود)"
       },
       "radius": {
-        "none": "None (Sharp)",
-        "sm": "Small",
-        "md": "Medium",
-        "lg": "Large",
-        "xl": "Extra Large"
+        "none": "بدون (حاد)",
+        "sm": "صغير",
+        "md": "متوسط",
+        "lg": "كبير",
+        "xl": "كبير جدًا"
       }
     },
     "preview": {
-      "title": "Preview",
-      "primaryButton": "Primary Button",
-      "secondaryButton": "Secondary Button",
-      "sampleText": "This is how your primary color looks as text."
+      "title": "معاينة",
+      "primaryButton": "زر أساسي",
+      "secondaryButton": "زر ثانوي",
+      "sampleText": "هكذا يبدو لونك الأساسي كنص."
     },
     "contact": {
-      "email": "Email",
+      "email": "البريد الإلكتروني",
       "emailPlaceholder": "store@example.com",
-      "whatsapp": "WhatsApp Number",
-      "phone": "Phone",
-      "phoneAr": "Phone (Arabic Display)",
+      "whatsapp": "رقم WhatsApp",
+      "phone": "الهاتف",
+      "phoneAr": "الهاتف (عرض عربي)",
       "phonePlaceholder": "+965 XXXX XXXX",
       "phoneArPlaceholder": "٩٦٥ XXXX XXXX+",
-      "address": "Address",
-      "addressAr": "Address (Arabic)",
+      "address": "العنوان",
+      "addressAr": "العنوان (بالعربية)",
       "addressPlaceholder": "123 Street, City, Kuwait",
       "addressArPlaceholder": "١٢٣ شارع، المدينة، الكويت"
     },
@@ -1024,1354 +1024,1354 @@
   },
   "coupons": {
     "page": {
-      "title": "Discount Coupons",
-      "subtitle": "Manage promotional codes and discounts"
+      "title": "كوبونات الخصم",
+      "subtitle": "إدارة أكواد الخصم والترويج"
     },
     "actions": {
-      "create": "Create Coupon",
-      "update": "Update Coupon",
-      "cancel": "Cancel",
-      "edit": "Edit",
-      "delete": "Delete",
-      "activate": "Activate",
-      "deactivate": "Deactivate"
+      "create": "إنشاء كوبون",
+      "update": "تحديث الكوبون",
+      "cancel": "إلغاء",
+      "edit": "تعديل",
+      "delete": "حذف",
+      "activate": "تفعيل",
+      "deactivate": "تعطيل"
     },
     "filters": {
-      "searchPlaceholder": "Search coupons...",
-      "statusAriaLabel": "Filter by status",
-      "statusAll": "All Status",
-      "statusActive": "Active",
-      "statusInactive": "Inactive"
+      "searchPlaceholder": "البحث عن كوبونات...",
+      "statusAriaLabel": "تصفية حسب الحالة",
+      "statusAll": "جميع الحالات",
+      "statusActive": "نشط",
+      "statusInactive": "غير نشط"
     },
     "table": {
-      "ariaLabel": "Coupons",
-      "code": "Code",
-      "name": "Name",
-      "type": "Type",
-      "value": "Value",
-      "usage": "Usage",
-      "status": "Status",
-      "actions": "Actions"
+      "ariaLabel": "الكوبونات",
+      "code": "الكود",
+      "name": "الاسم",
+      "type": "النوع",
+      "value": "القيمة",
+      "usage": "الاستخدام",
+      "status": "الحالة",
+      "actions": "الإجراءات"
     },
     "status": {
-      "active": "Active",
-      "inactive": "Inactive",
-      "scheduled": "Scheduled",
-      "expired": "Expired",
-      "exhausted": "Exhausted"
+      "active": "نشط",
+      "inactive": "غير نشط",
+      "scheduled": "مجدول",
+      "expired": "منتهٍ",
+      "exhausted": "مستنفد"
     },
     "type": {
-      "percentage": "Percentage Off",
-      "fixed": "Fixed Amount",
-      "freeShipping": "Free Shipping"
+      "percentage": "نسبة خصم",
+      "fixed": "مبلغ ثابت",
+      "freeShipping": "شحن مجاني"
     },
     "empty": {
-      "title": "No coupons found",
-      "createFirst": "Create your first coupon"
+      "title": "لا توجد كوبونات",
+      "createFirst": "أنشئ أول كوبون لك"
     },
     "modal": {
-      "createTitle": "Create Coupon",
-      "editTitle": "Edit Coupon"
+      "createTitle": "إنشاء كوبون",
+      "editTitle": "تعديل الكوبون"
     },
     "form": {
-      "codeLabel": "Coupon Code *",
+      "codeLabel": "كود الكوبون *",
       "codePlaceholder": "SUMMER20",
-      "nameLabel": "Name *",
-      "namePlaceholder": "Summer Sale 20% Off",
-      "nameArLabel": "Name (Arabic)",
+      "nameLabel": "الاسم *",
+      "namePlaceholder": "خصم الصيف 20٪",
+      "nameArLabel": "الاسم (بالعربية)",
       "nameArPlaceholder": "خصم الصيف ٢٠٪",
-      "descriptionLabel": "Description",
-      "descriptionPlaceholder": "Get 20% off on all summer items",
-      "typeLabel": "Discount Type *",
-      "valuePercentageLabel": "Percentage (%) *",
-      "valueAmountLabel": "Amount (KWD) *",
-      "minOrderLabel": "Minimum Order (KWD)",
+      "descriptionLabel": "الوصف",
+      "descriptionPlaceholder": "احصل على خصم 20٪ على جميع منتجات الصيف",
+      "typeLabel": "نوع الخصم *",
+      "valuePercentageLabel": "النسبة (%) *",
+      "valueAmountLabel": "المبلغ (د.ك) *",
+      "minOrderLabel": "الحد الأدنى للطلب (د.ك)",
       "minOrderPlaceholder": "10.000",
-      "maxDiscountLabel": "Max Discount (KWD)",
+      "maxDiscountLabel": "الحد الأقصى للخصم (د.ك)",
       "maxDiscountPlaceholder": "50.000",
-      "usageLimitLabel": "Total Usage Limit",
+      "usageLimitLabel": "إجمالي حد الاستخدام",
       "usageLimitPlaceholder": "100",
-      "usageLimitPerUserLabel": "Limit Per Customer",
+      "usageLimitPerUserLabel": "حد الاستخدام لكل عميل",
       "usageLimitPerUserPlaceholder": "1",
-      "startsAt": "Start Date",
-      "expiresAt": "Expiry Date",
-      "isActiveLabel": "Coupon is active"
+      "startsAt": "تاريخ البدء",
+      "expiresAt": "تاريخ الانتهاء",
+      "isActiveLabel": "الكوبون مفعّل"
     }
   },
   "shipping": {
     "carriers": {
       "page": {
-        "title": "Shipping Carriers",
-        "subtitle": "Configure iCarry and Aramex delivery integrations"
+        "title": "شركات الشحن",
+        "subtitle": "إعداد تكاملات التوصيل مع iCarry و Aramex"
       },
       "empty": {
-        "title": "Shipping Carriers not enabled",
-        "description": "Enable the Shipping Carriers feature in your store features to configure iCarry and Aramex delivery integrations."
+        "title": "شركات الشحن غير مفعّلة",
+        "description": "فعّل ميزة شركات الشحن في ميزات المتجر لإعداد تكاملات التوصيل مع iCarry و Aramex."
       },
       "shared": {
-        "enabled": "Enabled",
-        "disabled": "Disabled",
-        "save": "Save",
-        "testConnection": "Test Connection",
-        "setAsDefault": "Set as Default",
-        "defaultBadge": "Default"
+        "enabled": "مفعّل",
+        "disabled": "معطّل",
+        "save": "حفظ",
+        "testConnection": "اختبار الاتصال",
+        "setAsDefault": "تعيين كافتراضي",
+        "defaultBadge": "افتراضي"
       },
       "icarry": {
         "title": "iCarry",
-        "subtitle": "Kuwait delivery via iCarry",
+        "subtitle": "توصيل داخل الكويت عبر iCarry",
         "fields": {
-          "apiKey": "API Key",
-          "merchantId": "Merchant ID"
+          "apiKey": "مفتاح API",
+          "merchantId": "معرّف التاجر"
         },
         "placeholders": {
-          "apiKey": "iCarry API key",
-          "merchantId": "e.g. MERCH-001"
+          "apiKey": "مفتاح iCarry API",
+          "merchantId": "مثال: MERCH-001"
         }
       },
       "aramex": {
         "title": "Aramex",
-        "subtitle": "International delivery via Aramex",
+        "subtitle": "توصيل دولي عبر Aramex",
         "fields": {
-          "accountNumber": "Account Number",
-          "accountPin": "PIN",
-          "accountEntity": "Entity",
-          "accountCountryCode": "Country Code",
-          "username": "Username",
-          "password": "Password"
+          "accountNumber": "رقم الحساب",
+          "accountPin": "الرقم السري",
+          "accountEntity": "الكيان",
+          "accountCountryCode": "رمز الدولة",
+          "username": "اسم المستخدم",
+          "password": "كلمة المرور"
         },
         "placeholders": {
-          "accountNumber": "Aramex account number",
-          "accountPin": "Account PIN",
-          "accountEntity": "e.g. KWI",
-          "accountCountryCode": "e.g. KW",
-          "username": "Aramex account username",
-          "password": "Aramex account password"
+          "accountNumber": "رقم حساب Aramex",
+          "accountPin": "الرقم السري للحساب",
+          "accountEntity": "مثال: KWI",
+          "accountCountryCode": "مثال: KW",
+          "username": "اسم مستخدم حساب Aramex",
+          "password": "كلمة مرور حساب Aramex"
         }
       },
       "pickup": {
-        "title": "Pickup Address",
+        "title": "عنوان الاستلام",
         "fields": {
-          "area": "Area",
-          "block": "Block",
-          "street": "Street",
-          "building": "Building"
+          "area": "المنطقة",
+          "block": "القطعة",
+          "street": "الشارع",
+          "building": "المبنى"
         },
         "placeholders": {
-          "area": "e.g. Salmiya",
-          "block": "e.g. 12",
-          "street": "e.g. Gulf Road",
-          "building": "e.g. Al Hamra"
+          "area": "مثال: السالمية",
+          "block": "مثال: 12",
+          "street": "مثال: شارع الخليج",
+          "building": "مثال: الحمراء"
         }
       },
       "shipments": {
-        "title": "Active Shipments",
-        "totalOne": "{total} total shipment",
-        "totalOther": "{total} total shipments",
+        "title": "الشحنات النشطة",
+        "totalOne": "{total} شحنة إجمالًا",
+        "totalOther": "{total} شحنة إجمالًا",
         "filters": {
-          "carrierLabel": "Filter by carrier",
-          "statusLabel": "Filter by status",
-          "allCarriers": "All carriers",
-          "allStatuses": "All statuses"
+          "carrierLabel": "تصفية حسب شركة الشحن",
+          "statusLabel": "تصفية حسب الحالة",
+          "allCarriers": "جميع الشركات",
+          "allStatuses": "جميع الحالات"
         },
         "carrierNames": {
           "icarry": "iCarry",
           "aramex": "Aramex"
         },
         "statuses": {
-          "created": "Created",
-          "picked_up": "Picked Up",
-          "in_transit": "In Transit",
-          "out_for_delivery": "Out for Delivery",
-          "delivered": "Delivered",
-          "failed": "Failed",
-          "returned": "Returned",
-          "cancelled": "Cancelled"
+          "created": "تم الإنشاء",
+          "picked_up": "تم الاستلام",
+          "in_transit": "في الطريق",
+          "out_for_delivery": "خارج للتسليم",
+          "delivered": "تم التسليم",
+          "failed": "فشل",
+          "returned": "مُرجع",
+          "cancelled": "ملغى"
         },
         "columns": {
-          "orderNumber": "Order #",
-          "carrier": "Carrier",
-          "trackingNumber": "Tracking #",
-          "status": "Status",
-          "created": "Created"
+          "orderNumber": "رقم الطلب",
+          "carrier": "شركة الشحن",
+          "trackingNumber": "رقم التتبع",
+          "status": "الحالة",
+          "created": "تاريخ الإنشاء"
         },
-        "empty": "No shipments found",
-        "tableLabel": "Shipping carriers",
+        "empty": "لا توجد شحنات",
+        "tableLabel": "شركات الشحن",
         "pagination": {
-          "summary": "Page {page} of {pages} ({total} total)",
-          "previous": "Previous",
-          "next": "Next"
+          "summary": "الصفحة {page} من {pages} ({total} إجمالًا)",
+          "previous": "السابق",
+          "next": "التالي"
         }
       },
       "connectionStatus": {
-        "testing": "Testing…",
-        "connected": "Connected",
-        "failed": "Failed"
+        "testing": "جارٍ الاختبار…",
+        "connected": "متصل",
+        "failed": "فشل"
       },
       "toast": {
-        "savedTitle": "Saved",
-        "savedDescription": "{carrier} settings saved.",
-        "errorTitle": "Error",
-        "saveFailed": "Failed to save settings.",
-        "saveFailedRetry": "Failed to save settings. Please try again.",
-        "connectionOkTitle": "Connection OK",
-        "connectionOkDescription": "{carrier} connection test passed.",
-        "connectionFailedTitle": "Connection Failed",
-        "testFailed": "Test failed.",
-        "testFailedRetry": "Test connection failed.",
-        "defaultSetTitle": "Default Set",
-        "defaultSetDescription": "{carrier} is now the default carrier.",
-        "defaultSetFailed": "Failed to set default carrier."
+        "savedTitle": "تم الحفظ",
+        "savedDescription": "تم حفظ إعدادات {carrier}.",
+        "errorTitle": "خطأ",
+        "saveFailed": "تعذّر حفظ الإعدادات.",
+        "saveFailedRetry": "تعذّر حفظ الإعدادات. يرجى المحاولة مرة أخرى.",
+        "connectionOkTitle": "الاتصال ناجح",
+        "connectionOkDescription": "نجح اختبار اتصال {carrier}.",
+        "connectionFailedTitle": "فشل الاتصال",
+        "testFailed": "فشل الاختبار.",
+        "testFailedRetry": "فشل اختبار الاتصال.",
+        "defaultSetTitle": "تم تعيين الافتراضي",
+        "defaultSetDescription": "{carrier} أصبحت شركة الشحن الافتراضية.",
+        "defaultSetFailed": "تعذّر تعيين شركة الشحن الافتراضية."
       }
     },
     "page": {
-      "title": "Shipping Zones",
-      "subtitle": "Configure delivery areas and shipping rates"
+      "title": "مناطق الشحن",
+      "subtitle": "إعداد مناطق التوصيل وأسعار الشحن"
     },
     "toolbar": {
-      "addZone": "Add Zone"
+      "addZone": "إضافة منطقة"
     },
     "filters": {
-      "all": "All",
-      "active": "Active",
-      "inactive": "Inactive"
+      "all": "الكل",
+      "active": "نشط",
+      "inactive": "غير نشط"
     },
     "empty": {
-      "title": "No Shipping Zones",
-      "description": "Create shipping zones to configure delivery rates for different areas",
-      "createFirst": "Create First Zone"
+      "title": "لا توجد مناطق شحن",
+      "description": "أنشئ مناطق الشحن لتحديد أسعار التوصيل لمختلف المناطق",
+      "createFirst": "أنشئ أول منطقة"
     },
     "table": {
-      "label": "Shipping zones",
-      "zone": "Zone",
-      "areas": "Areas",
-      "deliveryFee": "Delivery Fee",
-      "freeShipping": "Free Shipping",
-      "estimatedDelivery": "Est. Delivery",
-      "status": "Status",
-      "actions": "Actions",
-      "moreAreas": "+{count} more",
-      "freeShippingOver": "Over {amount} KWD",
+      "label": "مناطق الشحن",
+      "zone": "المنطقة",
+      "areas": "المناطق الفرعية",
+      "deliveryFee": "رسوم التوصيل",
+      "freeShipping": "شحن مجاني",
+      "estimatedDelivery": "التسليم المتوقع",
+      "status": "الحالة",
+      "actions": "الإجراءات",
+      "moreAreas": "+{count} أخرى",
+      "freeShippingOver": "فوق {amount} د.ك",
       "dashPlaceholder": "-",
-      "daysRange": "{min}-{max} days",
-      "daysSingle": "{days} days",
-      "active": "Active",
-      "inactive": "Inactive",
-      "edit": "Edit",
-      "delete": "Delete",
-      "priceWithCurrency": "{amount} KWD"
+      "daysRange": "{min}-{max} يوم",
+      "daysSingle": "{days} يوم",
+      "active": "نشط",
+      "inactive": "غير نشط",
+      "edit": "تعديل",
+      "delete": "حذف",
+      "priceWithCurrency": "{amount} د.ك"
     },
     "modal": {
-      "editTitle": "Edit Shipping Zone",
-      "newTitle": "New Shipping Zone",
-      "close": "Close",
-      "zoneNameLabel": "Zone Name",
-      "zoneNamePlaceholder": "e.g., Capital Area",
-      "zoneNameArLabel": "Zone Name (Arabic)",
-      "zoneNameArPlaceholder": "e.g., منطقة العاصمة",
-      "areasLabel": "Areas",
-      "areasPlaceholder": "Separate areas with commas: Capital, Hawalli, Farwaniya",
-      "addAllKuwaitGovernorates": "+ Add All Kuwait Governorates",
-      "areasArLabel": "Areas (Arabic)",
+      "editTitle": "تعديل منطقة الشحن",
+      "newTitle": "منطقة شحن جديدة",
+      "close": "إغلاق",
+      "zoneNameLabel": "اسم المنطقة",
+      "zoneNamePlaceholder": "مثال: منطقة العاصمة",
+      "zoneNameArLabel": "اسم المنطقة (بالعربية)",
+      "zoneNameArPlaceholder": "مثال: منطقة العاصمة",
+      "areasLabel": "المناطق",
+      "areasPlaceholder": "افصل بين المناطق بفواصل: العاصمة، حولي، الفروانية",
+      "addAllKuwaitGovernorates": "+ إضافة جميع محافظات الكويت",
+      "areasArLabel": "المناطق (بالعربية)",
       "areasArPlaceholder": "العاصمة، حولي، الفروانية",
-      "deliveryFeeLabel": "Delivery Fee (KWD)",
+      "deliveryFeeLabel": "رسوم التوصيل (د.ك)",
       "deliveryFeePlaceholder": "1.000",
-      "freeShippingLabel": "Free Shipping Over (KWD)",
+      "freeShippingLabel": "شحن مجاني فوق (د.ك)",
       "freeShippingPlaceholder": "25.000",
-      "estimatedDaysLabel": "Estimated Delivery Time (Days)",
-      "estimatedDaysMinPlaceholder": "Min days",
-      "estimatedDaysMaxPlaceholder": "Max days",
-      "activeLabel": "Active",
-      "required": "required",
-      "cancel": "Cancel",
-      "createZone": "Create Zone",
-      "updateZone": "Update Zone"
+      "estimatedDaysLabel": "مدة التسليم المتوقعة (أيام)",
+      "estimatedDaysMinPlaceholder": "الحد الأدنى",
+      "estimatedDaysMaxPlaceholder": "الحد الأقصى",
+      "activeLabel": "نشط",
+      "required": "مطلوب",
+      "cancel": "إلغاء",
+      "createZone": "إنشاء المنطقة",
+      "updateZone": "تحديث المنطقة"
     }
   },
   "tax": {
     "page": {
-      "title": "Tax Configuration",
-      "subtitle": "Configure tax rates and settings for your store"
+      "title": "إعدادات الضرائب",
+      "subtitle": "إعداد معدلات الضريبة والإعدادات لمتجرك"
     },
     "settings": {
-      "title": "General Settings",
+      "title": "الإعدادات العامة",
       "enable": {
-        "title": "Enable Tax Collection",
-        "description": "When enabled, taxes will be calculated and added to orders"
+        "title": "تفعيل تحصيل الضريبة",
+        "description": "عند التفعيل، سيتم احتساب الضرائب وإضافتها إلى الطلبات"
       },
       "included": {
-        "title": "Prices Include Tax",
-        "description": "Product prices already include tax (tax will be calculated backwards)"
+        "title": "الأسعار تشمل الضريبة",
+        "description": "أسعار المنتجات تتضمن الضريبة بالفعل (سيتم احتساب الضريبة بشكل عكسي)"
       },
       "defaultRate": {
-        "label": "Default Tax Rate (%)",
-        "description": "Used when no specific tax rate rules apply",
-        "placeholder": "e.g., 5.00"
+        "label": "معدل الضريبة الافتراضي (%)",
+        "description": "يُستخدم عندما لا تنطبق قواعد معدل ضريبي محدد",
+        "placeholder": "مثال: 5.00"
       }
     },
     "rates": {
-      "title": "Tax Rates",
-      "subtitle": "Create specific tax rates for different regions or categories",
-      "addButton": "Add Rate",
-      "tableLabel": "Tax rules",
-      "allRegions": "All regions",
+      "title": "معدلات الضريبة",
+      "subtitle": "أنشئ معدلات ضريبية محددة لمناطق أو فئات مختلفة",
+      "addButton": "إضافة معدل",
+      "tableLabel": "قواعد الضريبة",
+      "allRegions": "جميع المناطق",
       "filters": {
-        "all": "All",
-        "active": "Active",
-        "inactive": "Inactive"
+        "all": "الكل",
+        "active": "نشط",
+        "inactive": "غير نشط"
       },
       "empty": {
-        "title": "No Tax Rates",
-        "enabled": "Create tax rates for specific regions or product categories",
-        "disabled": "Enable tax collection to start adding tax rates",
-        "createFirst": "Create First Rate"
+        "title": "لا توجد معدلات ضريبة",
+        "enabled": "أنشئ معدلات ضريبية لمناطق أو فئات منتجات محددة",
+        "disabled": "فعّل تحصيل الضريبة لبدء إضافة معدلات الضريبة",
+        "createFirst": "أنشئ أول معدل"
       },
       "columns": {
-        "name": "Name",
-        "rate": "Rate",
-        "region": "Region",
-        "priority": "Priority",
-        "type": "Type",
-        "status": "Status",
-        "actions": "Actions"
+        "name": "الاسم",
+        "rate": "المعدل",
+        "region": "المنطقة",
+        "priority": "الأولوية",
+        "type": "النوع",
+        "status": "الحالة",
+        "actions": "الإجراءات"
       },
       "types": {
-        "compound": "Compound",
-        "standard": "Standard"
+        "compound": "مركّبة",
+        "standard": "قياسية"
       },
       "status": {
-        "active": "Active",
-        "inactive": "Inactive"
+        "active": "نشط",
+        "inactive": "غير نشط"
       },
       "actions": {
-        "edit": "Edit",
-        "delete": "Delete"
+        "edit": "تعديل",
+        "delete": "حذف"
       }
     },
     "form": {
-      "newTitle": "New Tax Rate",
-      "editTitle": "Edit Tax Rate",
+      "newTitle": "معدل ضريبة جديد",
+      "editTitle": "تعديل معدل الضريبة",
       "templates": {
-        "label": "Quick Templates"
+        "label": "قوالب سريعة"
       },
       "name": {
-        "label": "Tax Name",
-        "placeholder": "e.g., VAT"
+        "label": "اسم الضريبة",
+        "placeholder": "مثال: ضريبة القيمة المضافة"
       },
       "nameAr": {
-        "label": "Tax Name (Arabic)",
-        "placeholder": "e.g., ضريبة القيمة المضافة"
+        "label": "اسم الضريبة (بالعربية)",
+        "placeholder": "مثال: ضريبة القيمة المضافة"
       },
       "rate": {
-        "label": "Tax Rate (%)",
+        "label": "معدل الضريبة (%)",
         "placeholder": "5.00"
       },
       "country": {
-        "label": "Country Code",
-        "placeholder": "e.g., KW",
-        "hint": "Leave empty for all countries"
+        "label": "رمز الدولة",
+        "placeholder": "مثال: KW",
+        "hint": "اترك الحقل فارغًا لجميع الدول"
       },
       "state": {
-        "label": "State/Region",
-        "placeholder": "e.g., Capital",
-        "hint": "Leave empty for all states"
+        "label": "المنطقة/المحافظة",
+        "placeholder": "مثال: العاصمة",
+        "hint": "اترك الحقل فارغًا لجميع المناطق"
       },
       "priority": {
-        "label": "Priority",
-        "hint": "Higher priority rates are applied first"
+        "label": "الأولوية",
+        "hint": "يتم تطبيق معدلات الضريبة ذات الأولوية الأعلى أولًا"
       },
       "compound": {
-        "label": "Compound Tax",
-        "hint": "Calculate on subtotal + previous taxes"
+        "label": "ضريبة مركّبة",
+        "hint": "تُحتسب على الإجمالي الفرعي + الضرائب السابقة"
       },
       "active": {
-        "label": "Active"
+        "label": "نشط"
       },
-      "cancel": "Cancel",
-      "create": "Create Rate",
-      "update": "Update Rate"
+      "cancel": "إلغاء",
+      "create": "إنشاء المعدل",
+      "update": "تحديث المعدل"
     },
     "info": {
-      "title": "About Tax Calculation",
-      "priority": "Tax rates are applied based on priority (highest first).",
-      "compoundLabel": "Compound taxes",
-      "compoundDescription": "are calculated on top of the subtotal plus any previously calculated taxes.",
-      "standardLabel": "Standard taxes",
-      "standardDescription": "are calculated only on the original subtotal."
+      "title": "عن احتساب الضريبة",
+      "priority": "تُطبّق معدلات الضريبة بناءً على الأولوية (الأعلى أولًا).",
+      "compoundLabel": "الضرائب المركّبة",
+      "compoundDescription": "تُحتسب فوق الإجمالي الفرعي بالإضافة إلى أي ضرائب محتسبة سابقًا.",
+      "standardLabel": "الضرائب القياسية",
+      "standardDescription": "تُحتسب فقط على الإجمالي الفرعي الأصلي."
     }
   },
   "inventory": {
     "page": {
-      "title": "Inventory Management",
-      "subtitle": "Track and manage your product stock levels"
+      "title": "إدارة المخزون",
+      "subtitle": "تتبع وإدارة مستويات مخزون منتجاتك"
     },
     "stats": {
-      "totalProducts": "Total Products",
-      "totalStock": "Total Stock",
-      "lowStock": "Low Stock",
-      "outOfStock": "Out of Stock",
-      "stockValue": "Stock Value",
-      "kwdValue": "{value} KWD"
+      "totalProducts": "إجمالي المنتجات",
+      "totalStock": "إجمالي المخزون",
+      "lowStock": "مخزون منخفض",
+      "outOfStock": "نفد من المخزون",
+      "stockValue": "قيمة المخزون",
+      "kwdValue": "{value} د.ك"
     },
     "alertBanner": {
-      "needAttention": "{count, plural, =1 {# product needs attention} other {# products need attention}}",
-      "breakdown": "{out} out of stock, {low} low stock",
-      "viewAlerts": "View Alerts"
+      "needAttention": "{count, plural, =1 {# منتج يحتاج إلى انتباه} other {# منتج يحتاجون إلى انتباه}}",
+      "breakdown": "{out} نفدت من المخزون، {low} مخزون منخفض",
+      "viewAlerts": "عرض التنبيهات"
     },
     "tabs": {
-      "products": "Products",
-      "history": "History",
-      "alerts": "Alerts"
+      "products": "المنتجات",
+      "history": "السجل",
+      "alerts": "التنبيهات"
     },
     "status": {
-      "in_stock": "In Stock",
-      "low_stock": "Low Stock",
-      "out_of_stock": "Out of Stock"
+      "in_stock": "متوفر",
+      "low_stock": "مخزون منخفض",
+      "out_of_stock": "نفد من المخزون"
     },
     "levels": {
-      "searchPlaceholder": "Search products...",
-      "tableLabel": "Product inventory",
-      "empty": "No products found",
-      "adjustAction": "Adjust",
-      "kwdValue": "{value} KWD",
+      "searchPlaceholder": "البحث عن منتجات...",
+      "tableLabel": "مخزون المنتجات",
+      "empty": "لم يتم العثور على منتجات",
+      "adjustAction": "تعديل",
+      "kwdValue": "{value} د.ك",
       "filters": {
-        "all": "All"
+        "all": "الكل"
       },
       "columns": {
-        "product": "Product",
+        "product": "المنتج",
         "sku": "SKU",
-        "stock": "Stock",
-        "threshold": "Threshold",
-        "status": "Status",
-        "value": "Value",
-        "actions": "Actions"
+        "stock": "المخزون",
+        "threshold": "حد التنبيه",
+        "status": "الحالة",
+        "value": "القيمة",
+        "actions": "الإجراءات"
       }
     },
     "history": {
-      "tableLabel": "Inventory history",
-      "empty": "No inventory history yet",
+      "tableLabel": "سجل المخزون",
+      "empty": "لا يوجد سجل مخزون بعد",
       "columns": {
-        "date": "Date",
-        "product": "Product",
-        "type": "Type",
-        "change": "Change",
-        "stock": "Stock",
-        "reason": "Reason"
+        "date": "التاريخ",
+        "product": "المنتج",
+        "type": "النوع",
+        "change": "التغيير",
+        "stock": "المخزون",
+        "reason": "السبب"
       }
     },
     "historyTypes": {
-      "manual_add": "Added",
-      "manual_remove": "Removed",
-      "sale": "Sale",
-      "return_stock": "Returned",
-      "adjustment": "Adjusted",
-      "damage": "Damaged",
-      "transfer_in": "Transfer In",
-      "transfer_out": "Transfer Out",
-      "initial": "Initial"
+      "manual_add": "تمت الإضافة",
+      "manual_remove": "تمت الإزالة",
+      "sale": "بيع",
+      "return_stock": "إرجاع",
+      "adjustment": "تعديل",
+      "damage": "تالف",
+      "transfer_in": "تحويل وارد",
+      "transfer_out": "تحويل صادر",
+      "initial": "أولي"
     },
     "alertsTab": {
-      "tableLabel": "Low stock and out of stock",
-      "emptyTitle": "All Good!",
-      "emptySubtitle": "No low stock or out of stock products",
-      "restockAction": "Restock",
+      "tableLabel": "مخزون منخفض ونفد من المخزون",
+      "emptyTitle": "كل شيء على ما يرام!",
+      "emptySubtitle": "لا توجد منتجات ذات مخزون منخفض أو نافدة",
+      "restockAction": "إعادة التزويد",
       "columns": {
-        "product": "Product",
+        "product": "المنتج",
         "sku": "SKU",
-        "currentStock": "Current Stock",
-        "threshold": "Threshold",
-        "status": "Status",
-        "actions": "Actions"
+        "currentStock": "المخزون الحالي",
+        "threshold": "حد التنبيه",
+        "status": "الحالة",
+        "actions": "الإجراءات"
       }
     },
     "adjust": {
-      "title": "Adjust Inventory",
-      "close": "Close",
-      "currentStock": "Current stock: {count}",
-      "typeLabel": "Adjustment Type",
-      "quantityLabel": "Quantity",
-      "quantityPlaceholder": "Enter quantity",
-      "newStockPreview": "New stock will be:",
-      "reasonLabel": "Reason",
-      "reasonPlaceholder": "Optional reason for adjustment",
-      "cancel": "Cancel",
-      "apply": "Apply"
+      "title": "تعديل المخزون",
+      "close": "إغلاق",
+      "currentStock": "المخزون الحالي: {count}",
+      "typeLabel": "نوع التعديل",
+      "quantityLabel": "الكمية",
+      "quantityPlaceholder": "أدخل الكمية",
+      "newStockPreview": "سيصبح المخزون الجديد:",
+      "reasonLabel": "السبب",
+      "reasonPlaceholder": "سبب اختياري للتعديل",
+      "cancel": "إلغاء",
+      "apply": "تطبيق"
     },
     "adjustTypes": {
-      "manual_add": "Add Stock",
-      "manual_remove": "Remove Stock",
-      "damage": "Damaged",
-      "adjustment": "Adjustment"
+      "manual_add": "إضافة مخزون",
+      "manual_remove": "إزالة مخزون",
+      "damage": "تالف",
+      "adjustment": "تعديل"
     }
   },
   "pwa": {
     "page": {
-      "title": "Progressive Web App",
-      "subtitle": "Enable app-like experience for your customers"
+      "title": "تطبيق ويب تقدمي",
+      "subtitle": "تمكين تجربة شبيهة بالتطبيق لعملائك"
     },
     "actions": {
-      "statusLabel": "PWA Status:",
-      "enabled": "Enabled",
-      "disabled": "Disabled",
-      "save": "Save Settings"
+      "statusLabel": "حالة PWA:",
+      "enabled": "مفعّل",
+      "disabled": "معطّل",
+      "save": "حفظ الإعدادات"
     },
     "messages": {
-      "populated": "Populated from store branding",
-      "toggleError": "Failed to update PWA status",
-      "saveSuccess": "PWA settings saved successfully",
-      "saveError": "Failed to save PWA settings"
+      "populated": "تم التعبئة من هوية المتجر",
+      "toggleError": "تعذّر تحديث حالة PWA",
+      "saveSuccess": "تم حفظ إعدادات PWA بنجاح",
+      "saveError": "تعذّر حفظ إعدادات PWA"
     },
     "autoPopulate": {
-      "logoAlt": "Store logo",
-      "description": "Use store branding to fill PWA settings",
-      "button": "Populate from Store"
+      "logoAlt": "شعار المتجر",
+      "description": "استخدام هوية المتجر لتعبئة إعدادات PWA",
+      "button": "تعبئة من المتجر"
     },
     "benefits": {
-      "title": "Why Enable PWA?",
+      "title": "لماذا تفعّل PWA؟",
       "install": {
-        "title": "Install on Device",
-        "description": "Customers can add to home screen"
+        "title": "التثبيت على الجهاز",
+        "description": "يمكن للعملاء الإضافة إلى الشاشة الرئيسية"
       },
       "offline": {
-        "title": "Offline Support",
-        "description": "Works even without internet"
+        "title": "دعم بدون اتصال",
+        "description": "يعمل حتى بدون إنترنت"
       },
       "fast": {
-        "title": "Fast Performance",
-        "description": "Cached assets load instantly"
+        "title": "أداء سريع",
+        "description": "تُحمّل الأصول المخزّنة فورًا"
       }
     },
     "branding": {
-      "title": "App Identity",
-      "appName": "App Name",
+      "title": "هوية التطبيق",
+      "appName": "اسم التطبيق",
       "appNamePlaceholder": "My Store",
-      "appNameAr": "App Name (Arabic)",
+      "appNameAr": "اسم التطبيق (بالعربية)",
       "appNameArPlaceholder": "متجري",
-      "shortName": "Short Name (max 12 chars)",
+      "shortName": "الاسم المختصر (12 حرفًا كحد أقصى)",
       "shortNamePlaceholder": "Store",
-      "shortNameHelp": "Shown under home screen icon",
-      "shortNameAr": "Short Name (Arabic)",
+      "shortNameHelp": "يظهر تحت أيقونة الشاشة الرئيسية",
+      "shortNameAr": "الاسم المختصر (بالعربية)",
       "shortNameArPlaceholder": "المتجر",
-      "description": "Description",
-      "descriptionPlaceholder": "Shop the latest products at amazing prices",
-      "descriptionAr": "Description (Arabic)",
+      "description": "الوصف",
+      "descriptionPlaceholder": "تسوّق أحدث المنتجات بأسعار مميزة",
+      "descriptionAr": "الوصف (بالعربية)",
       "descriptionArPlaceholder": "تسوق أحدث المنتجات بأسعار مميزة"
     },
     "manifest": {
-      "title": "Theme & Appearance",
-      "themeColor": "Theme Color",
-      "themeColorHelp": "Browser address bar color",
-      "backgroundColor": "Background Color",
-      "backgroundColorHelp": "Splash screen background",
-      "display": "Display Mode",
-      "orientation": "Orientation",
+      "title": "السمة والمظهر",
+      "themeColor": "لون السمة",
+      "themeColorHelp": "لون شريط عنوان المتصفح",
+      "backgroundColor": "لون الخلفية",
+      "backgroundColorHelp": "خلفية شاشة البدء",
+      "display": "وضع العرض",
+      "orientation": "الاتجاه",
       "displayOptions": {
-        "standalone": "Standalone",
-        "fullscreen": "Fullscreen",
-        "minimalUi": "Minimal UI",
-        "browser": "Browser"
+        "standalone": "مستقل",
+        "fullscreen": "ملء الشاشة",
+        "minimalUi": "واجهة بسيطة",
+        "browser": "المتصفح"
       },
       "orientationOptions": {
-        "any": "Any",
-        "portrait": "Portrait",
-        "landscape": "Landscape"
+        "any": "أي اتجاه",
+        "portrait": "طولي",
+        "landscape": "عرضي"
       }
     },
     "icons": {
-      "title": "App Icons",
+      "title": "أيقونات التطبيق",
       "urlPlaceholder": "https://...",
-      "icon192": "Icon 192x192",
-      "icon192Alt": "Icon 192",
-      "icon192Help": "Standard icon for app",
-      "icon512": "Icon 512x512",
-      "icon512Alt": "Icon 512",
-      "icon512Help": "High-res icon for splash screen",
-      "maskable": "Maskable Icon",
-      "maskableAlt": "Maskable",
-      "maskableHelp": "Adaptive icon with safe zone"
+      "icon192": "أيقونة 192x192",
+      "icon192Alt": "أيقونة 192",
+      "icon192Help": "أيقونة قياسية للتطبيق",
+      "icon512": "أيقونة 512x512",
+      "icon512Alt": "أيقونة 512",
+      "icon512Help": "أيقونة عالية الدقة لشاشة البدء",
+      "maskable": "أيقونة قابلة للقناع",
+      "maskableAlt": "قابلة للقناع",
+      "maskableHelp": "أيقونة قابلة للتكيّف مع منطقة آمنة"
     },
     "features": {
-      "title": "Features",
+      "title": "الميزات",
       "installPrompt": {
-        "title": "Install Prompt",
-        "description": "Show prompt to add app to home screen"
+        "title": "طلب التثبيت",
+        "description": "إظهار طلب لإضافة التطبيق إلى الشاشة الرئيسية"
       },
       "offline": {
-        "title": "Offline Support",
-        "description": "Cache pages for offline access"
+        "title": "دعم بدون اتصال",
+        "description": "تخزين الصفحات للوصول دون اتصال"
       },
       "push": {
-        "title": "Push Notifications",
-        "description": "Send notifications to customers (requires setup)"
+        "title": "الإشعارات الفورية",
+        "description": "إرسال إشعارات للعملاء (يتطلب إعدادًا)"
       }
     },
     "ios": {
-      "title": "iOS Settings",
-      "statusBarStyle": "Status Bar Style",
-      "splashScreenColor": "Splash Screen Color",
+      "title": "إعدادات iOS",
+      "statusBarStyle": "نمط شريط الحالة",
+      "splashScreenColor": "لون شاشة البدء",
       "statusBarOptions": {
-        "default": "Default (white)",
-        "black": "Black",
-        "blackTranslucent": "Black Translucent"
+        "default": "افتراضي (أبيض)",
+        "black": "أسود",
+        "blackTranslucent": "أسود شفاف"
       }
     }
   },
   "affiliates": {
     "page": {
-      "title": "Affiliate Program",
-      "subtitle": "Manage influencer referrals and commissions"
+      "title": "برنامج التسويق بالعمولة",
+      "subtitle": "إدارة إحالات المسوّقين والعمولات"
     },
     "tabs": {
-      "affiliates": "Affiliates",
-      "config": "Configuration"
+      "affiliates": "المسوّقون",
+      "config": "الإعدادات"
     },
     "stats": {
-      "totalAffiliates": "Total Affiliates",
-      "activeReferrals": "Active Referrals",
-      "conversionRate": "Conversion Rate",
-      "totalPaid": "Total Paid",
-      "conversions": "Conversions"
+      "totalAffiliates": "إجمالي المسوّقين",
+      "activeReferrals": "الإحالات النشطة",
+      "conversionRate": "معدل التحويل",
+      "totalPaid": "إجمالي المدفوع",
+      "conversions": "التحويلات"
     },
     "list": {
-      "tableLabel": "Affiliates",
+      "tableLabel": "المسوّقون",
       "filters": {
-        "all": "All",
-        "pending": "Pending",
-        "approved": "Approved",
-        "rejected": "Rejected",
-        "suspended": "Suspended"
+        "all": "الكل",
+        "pending": "قيد الانتظار",
+        "approved": "معتمد",
+        "rejected": "مرفوض",
+        "suspended": "معلّق"
       },
       "columns": {
-        "nameEmail": "Name / Email",
-        "referralCode": "Referral Code",
-        "status": "Status",
-        "totalEarned": "Total Earned",
-        "pendingBalance": "Pending Balance",
-        "actions": "Actions"
+        "nameEmail": "الاسم / البريد الإلكتروني",
+        "referralCode": "كود الإحالة",
+        "status": "الحالة",
+        "totalEarned": "إجمالي المكسوب",
+        "pendingBalance": "الرصيد المعلّق",
+        "actions": "الإجراءات"
       },
       "status": {
-        "pending": "Pending",
-        "approved": "Approved",
-        "rejected": "Rejected",
-        "suspended": "Suspended"
+        "pending": "قيد الانتظار",
+        "approved": "معتمد",
+        "rejected": "مرفوض",
+        "suspended": "معلّق"
       },
       "actions": {
-        "approve": "Approve",
-        "reject": "Reject",
-        "suspend": "Suspend",
-        "payout": "Payout"
+        "approve": "اعتماد",
+        "reject": "رفض",
+        "suspend": "تعليق",
+        "payout": "دفعة"
       },
       "empty": {
-        "title": "No Affiliates Yet",
-        "description": "Affiliates will appear here when they sign up or are invited."
+        "title": "لا يوجد مسوّقون بعد",
+        "description": "سيظهر المسوّقون هنا عند تسجيلهم أو دعوتهم."
       },
       "pagination": {
-        "summary": "Page {page} of {totalPages} ({total} total)",
-        "previous": "Previous",
-        "next": "Next"
+        "summary": "الصفحة {page} من {totalPages} ({total} إجمالًا)",
+        "previous": "السابق",
+        "next": "التالي"
       }
     },
     "config": {
-      "commissionSection": "Commission & Payouts",
-      "optionsSection": "Program Options",
-      "save": "Save Configuration",
+      "commissionSection": "العمولات والدفعات",
+      "optionsSection": "خيارات البرنامج",
+      "save": "حفظ الإعدادات",
       "fields": {
-        "defaultCommissionRate": "Default Commission Rate (%)",
-        "cookieDurationDays": "Cookie Duration (days)",
-        "minPayoutAmount": "Min Payout Amount (fils)",
-        "minPayoutEquivalent": "{amount} KWD equivalent"
+        "defaultCommissionRate": "معدل العمولة الافتراضي (%)",
+        "cookieDurationDays": "مدة ملف تعريف الارتباط (أيام)",
+        "minPayoutAmount": "الحد الأدنى لمبلغ الدفع (فلس)",
+        "minPayoutEquivalent": "ما يعادل {amount} د.ك"
       },
       "toggles": {
         "autoApprove": {
-          "title": "Auto-approve Applications",
-          "description": "Automatically approve new affiliate applications without manual review"
+          "title": "اعتماد تلقائي للطلبات",
+          "description": "اعتماد طلبات المسوّقين الجدد تلقائيًا بدون مراجعة يدوية"
         },
         "publicSignup": {
-          "title": "Public Signup",
-          "description": "Allow influencers to sign up as affiliates through the public page"
+          "title": "التسجيل العام",
+          "description": "السماح للمسوّقين بالتسجيل كمسوّقين عبر الصفحة العامة"
         }
       }
     },
     "payout": {
-      "title": "Create Payout",
-      "close": "Close",
-      "cancel": "Cancel",
-      "confirm": "Confirm Payout",
+      "title": "إنشاء دفعة",
+      "close": "إغلاق",
+      "cancel": "إلغاء",
+      "confirm": "تأكيد الدفعة",
       "summary": {
-        "label": "Paying out to",
-        "available": "Available balance:"
+        "label": "دفع إلى",
+        "available": "الرصيد المتاح:"
       },
       "fields": {
-        "amount": "Amount (KWD)",
-        "method": "Method",
-        "notes": "Notes",
-        "notesPlaceholder": "Optional notes for this payout"
+        "amount": "المبلغ (د.ك)",
+        "method": "الطريقة",
+        "notes": "ملاحظات",
+        "notesPlaceholder": "ملاحظات اختيارية لهذه الدفعة"
       },
       "methods": {
-        "bank_transfer": "Bank Transfer",
+        "bank_transfer": "تحويل بنكي",
         "knet": "KNET",
-        "cash": "Cash",
-        "manual": "Manual"
+        "cash": "نقدًا",
+        "manual": "يدوي"
       }
     },
     "toasts": {
       "error": {
-        "title": "Error"
+        "title": "خطأ"
       },
       "configSaved": {
-        "title": "Config Saved",
-        "message": "Affiliate program settings updated."
+        "title": "تم حفظ الإعدادات",
+        "message": "تم تحديث إعدادات برنامج التسويق بالعمولة."
       },
       "configError": {
-        "message": "Failed to save config."
+        "message": "تعذّر حفظ الإعدادات."
       },
       "statusUpdated": {
-        "title": "Updated",
-        "approve": "Affiliate approved successfully.",
-        "reject": "Affiliate rejected successfully.",
-        "suspend": "Affiliate suspended successfully."
+        "title": "تم التحديث",
+        "approve": "تم اعتماد المسوّق بنجاح.",
+        "reject": "تم رفض المسوّق بنجاح.",
+        "suspend": "تم تعليق المسوّق بنجاح."
       },
       "statusError": {
-        "approve": "Failed to approve affiliate.",
-        "reject": "Failed to reject affiliate.",
-        "suspend": "Failed to suspend affiliate."
+        "approve": "تعذّر اعتماد المسوّق.",
+        "reject": "تعذّر رفض المسوّق.",
+        "suspend": "تعذّر تعليق المسوّق."
       },
       "payoutCreated": {
-        "title": "Payout Created",
-        "message": "Payout recorded for {name}."
+        "title": "تم إنشاء الدفعة",
+        "message": "تم تسجيل الدفعة لـ {name}."
       },
       "payoutError": {
-        "message": "Failed to create payout."
+        "message": "تعذّر إنشاء الدفعة."
       },
       "invalidAmount": {
-        "title": "Invalid Amount",
-        "message": "Enter a valid payout amount."
+        "title": "مبلغ غير صالح",
+        "message": "أدخل مبلغ دفعة صالح."
       }
     }
   },
   "bulk": {
     "page": {
-      "title": "Bulk Operations",
-      "subtitle": "Import and export products in bulk",
-      "backToStore": "Back to Store"
+      "title": "العمليات الجماعية",
+      "subtitle": "استيراد وتصدير المنتجات بشكل جماعي",
+      "backToStore": "العودة إلى المتجر"
     },
     "tabs": {
-      "import": "Import Products",
-      "export": "Export Products"
+      "import": "استيراد منتجات",
+      "export": "تصدير منتجات"
     },
     "import": {
-      "instructionsTitle": "How to Import Products",
-      "step1": "Download the CSV template using the button below",
-      "step2": "Fill in your product data following the template format",
-      "step3": "Prices are in fils (1 KWD = 1000 fils)",
-      "step4": "For multiple categories/tags/images, separate with commas within quotes",
-      "step5": "Upload the completed CSV file and click Import",
-      "downloadTemplate": "Download Template",
-      "uploadTitle": "Upload CSV or XLSX File",
-      "uploadPrompt": "Click to upload a CSV or XLSX file",
-      "fileLoaded": "{name} loaded. Click to change.",
-      "csvReady": "{count} products ready for import",
-      "xlsxReady": "Workbook loaded — rows will be mapped + parsed on the server",
-      "updateExisting": "Update existing products (match by SKU or slug)",
-      "xlsxOptionsHint": "XLSX options — applied to rows that don't specify these columns explicitly.",
-      "skuPrefixLabel": "SKU prefix (e.g. <code>WJ</code> → <code>WJ-001</code>)",
+      "instructionsTitle": "كيفية استيراد المنتجات",
+      "step1": "نزّل قالب CSV باستخدام الزر أدناه",
+      "step2": "املأ بيانات منتجاتك متبعًا تنسيق القالب",
+      "step3": "الأسعار بالفلس (1 د.ك = 1000 فلس)",
+      "step4": "لتعدد الفئات/الوسوم/الصور، افصل بفواصل داخل علامات الاقتباس",
+      "step5": "ارفع ملف CSV المكتمل وانقر على استيراد",
+      "downloadTemplate": "تنزيل القالب",
+      "uploadTitle": "رفع ملف CSV أو XLSX",
+      "uploadPrompt": "انقر لرفع ملف CSV أو XLSX",
+      "fileLoaded": "تم تحميل {name}. انقر للتغيير.",
+      "csvReady": "{count} منتج جاهز للاستيراد",
+      "xlsxReady": "تم تحميل المصنّف — سيتم ربط وتحليل الصفوف على الخادم",
+      "updateExisting": "تحديث المنتجات الموجودة (المطابقة بواسطة SKU أو المعرّف)",
+      "xlsxOptionsHint": "خيارات XLSX — تُطبّق على الصفوف التي لا تحدّد هذه الأعمدة صراحةً.",
+      "skuPrefixLabel": "بادئة SKU (مثال: <code>WJ</code> ← <code>WJ-001</code>)",
       "skuPrefixPlaceholder": "ITEM",
-      "defaultInventoryLabel": "Default inventory per row",
-      "defaultStatusLabel": "Default status",
-      "statusActive": "active",
-      "statusDraft": "draft",
-      "trackInventory": "Track inventory (decrement on sale)",
-      "importing": "Importing...",
-      "importProducts": "Import Products",
-      "clear": "Clear"
+      "defaultInventoryLabel": "المخزون الافتراضي لكل صف",
+      "defaultStatusLabel": "الحالة الافتراضية",
+      "statusActive": "نشط",
+      "statusDraft": "مسودة",
+      "trackInventory": "تتبع المخزون (الإنقاص عند البيع)",
+      "importing": "جارٍ الاستيراد...",
+      "importProducts": "استيراد المنتجات",
+      "clear": "مسح"
     },
     "results": {
-      "title": "Import Results",
-      "totalRows": "Total Rows",
-      "created": "Created",
-      "updated": "Updated",
-      "failed": "Failed",
-      "errorsHeading": "Errors:",
-      "rowLabel": "Row {row}:",
-      "successMessage": "✓ Import completed successfully! <link>View products</link>"
+      "title": "نتائج الاستيراد",
+      "totalRows": "إجمالي الصفوف",
+      "created": "تم الإنشاء",
+      "updated": "تم التحديث",
+      "failed": "فشل",
+      "errorsHeading": "الأخطاء:",
+      "rowLabel": "الصف {row}:",
+      "successMessage": "✓ اكتمل الاستيراد بنجاح! <link>عرض المنتجات</link>"
     },
     "export": {
-      "optionsTitle": "Export Options",
-      "statusLabel": "Product Status",
-      "statusAll": "All Statuses",
-      "statusActive": "Active",
-      "statusDraft": "Draft",
-      "statusArchived": "Archived",
-      "searchLabel": "Search",
-      "searchPlaceholder": "Search by name or SKU",
-      "includeDeleted": "Include deleted products",
-      "exporting": "Exporting...",
-      "exportButton": "Export to CSV",
-      "infoTitle": "Export Information",
+      "optionsTitle": "خيارات التصدير",
+      "statusLabel": "حالة المنتج",
+      "statusAll": "جميع الحالات",
+      "statusActive": "نشط",
+      "statusDraft": "مسودة",
+      "statusArchived": "مؤرشف",
+      "searchLabel": "بحث",
+      "searchPlaceholder": "البحث بالاسم أو SKU",
+      "includeDeleted": "تضمين المنتجات المحذوفة",
+      "exporting": "جارٍ التصدير...",
+      "exportButton": "تصدير إلى CSV",
+      "infoTitle": "معلومات التصدير",
       "info": {
-        "allFields": "All product fields are included in the export",
-        "commaSeparated": "Categories, tags, and images are comma-separated within their columns",
-        "reImport": "The exported file can be edited and re-imported to update products",
-        "pricesInFils": "Prices are in fils (1 KWD = 1000 fils)"
+        "allFields": "جميع حقول المنتج مضمنة في التصدير",
+        "commaSeparated": "الفئات والوسوم والصور مفصولة بفواصل داخل أعمدتها",
+        "reImport": "يمكن تعديل الملف المصدّر وإعادة استيراده لتحديث المنتجات",
+        "pricesInFils": "الأسعار بالفلس (1 د.ك = 1000 فلس)"
       }
     },
     "errors": {
-      "network": "Network error. Please try again.",
-      "importFailed": "Import failed"
+      "network": "خطأ في الشبكة. يرجى المحاولة مرة أخرى.",
+      "importFailed": "فشل الاستيراد"
     }
   },
   "abandonedCarts": {
     "page": {
-      "title": "Abandoned Cart Recovery",
-      "subtitle": "Recover lost sales with automated reminders"
+      "title": "استعادة العربات المتروكة",
+      "subtitle": "استعادة المبيعات المفقودة عبر تذكيرات تلقائية"
     },
     "featureDisabled": {
-      "title": "Abandoned Cart Recovery not enabled",
-      "description": "Enable the Abandoned Cart feature in your store features to start recovering lost sales."
+      "title": "استعادة العربات المتروكة غير مفعّلة",
+      "description": "فعّل ميزة العربة المتروكة في ميزات المتجر لبدء استعادة المبيعات المفقودة."
     },
     "stats": {
-      "totalAbandoned": "Total Abandoned",
-      "recovered": "Recovered",
-      "recoveryRate": "Recovery Rate",
-      "recoveredRevenue": "Revenue Recovered",
-      "kwdValue": "{amount} KWD"
+      "totalAbandoned": "إجمالي المتروكة",
+      "recovered": "تم الاستعادة",
+      "recoveryRate": "معدل الاستعادة",
+      "recoveredRevenue": "الإيرادات المستعادة",
+      "kwdValue": "{amount} د.ك"
     },
     "status": {
-      "pending": "Pending",
-      "step1_sent": "Step 1 Sent",
-      "step2_sent": "Step 2 Sent",
-      "step3_sent": "Step 3 Sent",
-      "recovered": "Recovered",
-      "expired": "Expired"
+      "pending": "قيد الانتظار",
+      "step1_sent": "تم إرسال الخطوة 1",
+      "step2_sent": "تم إرسال الخطوة 2",
+      "step3_sent": "تم إرسال الخطوة 3",
+      "recovered": "تم الاستعادة",
+      "expired": "منتهٍ"
     },
     "campaign": {
-      "title": "Recovery Settings",
-      "sendAfter": "Send after",
-      "minutes": "min",
-      "save": "Save Settings",
+      "title": "إعدادات الاستعادة",
+      "sendAfter": "الإرسال بعد",
+      "minutes": "دقيقة",
+      "save": "حفظ الإعدادات",
       "step1": {
-        "title": "Step 1 — First Reminder"
+        "title": "الخطوة 1 — التذكير الأول"
       },
       "step2": {
-        "title": "Step 2 — Follow-up Reminder"
+        "title": "الخطوة 2 — تذكير المتابعة"
       },
       "step3": {
-        "title": "Step 3 — Final Reminder"
+        "title": "الخطوة 3 — التذكير الأخير"
       },
       "autoCoupon": {
-        "title": "Auto-coupon",
-        "discount": "Discount",
-        "maxDiscount": "Max Discount",
-        "expiry": "Expiry",
-        "noLimit": "No limit",
-        "kwd": "KWD",
-        "hours": "hours"
+        "title": "كوبون تلقائي",
+        "discount": "الخصم",
+        "maxDiscount": "الحد الأقصى للخصم",
+        "expiry": "الانتهاء",
+        "noLimit": "بلا حد",
+        "kwd": "د.ك",
+        "hours": "ساعة"
       }
     },
     "list": {
-      "title": "Abandoned Carts",
-      "ariaLabel": "Abandoned carts",
-      "filterAriaLabel": "Filter by status",
-      "allStatuses": "All statuses",
-      "totalRecords": "{count, plural, =0 {No records} one {# total record} other {# total records}}",
-      "empty": "No abandoned carts found",
-      "previous": "Previous",
-      "next": "Next",
-      "pagination": "Page {page} of {totalPages} ({total} total)",
+      "title": "العربات المتروكة",
+      "ariaLabel": "العربات المتروكة",
+      "filterAriaLabel": "تصفية حسب الحالة",
+      "allStatuses": "جميع الحالات",
+      "totalRecords": "{count, plural, =0 {لا توجد سجلات} one {# سجل إجمالًا} other {# سجل إجمالًا}}",
+      "empty": "لا توجد عربات متروكة",
+      "previous": "السابق",
+      "next": "التالي",
+      "pagination": "الصفحة {page} من {totalPages} ({total} إجمالًا)",
       "columns": {
-        "customer": "Customer",
-        "total": "Total",
-        "items": "Items",
-        "status": "Status",
-        "date": "Date"
+        "customer": "العميل",
+        "total": "الإجمالي",
+        "items": "العناصر",
+        "status": "الحالة",
+        "date": "التاريخ"
       }
     },
     "messages": {
-      "saveSuccessTitle": "Saved",
-      "saveSuccessBody": "Abandoned cart settings saved.",
-      "saveErrorTitle": "Error",
-      "saveErrorBody": "Failed to save settings. Please try again."
+      "saveSuccessTitle": "تم الحفظ",
+      "saveSuccessBody": "تم حفظ إعدادات العربة المتروكة.",
+      "saveErrorTitle": "خطأ",
+      "saveErrorBody": "تعذّر حفظ الإعدادات. يرجى المحاولة مرة أخرى."
     }
   },
   "returns": {
     "page": {
-      "title": "Returns & Exchanges",
-      "subtitle": "Manage return requests and refunds"
+      "title": "الإرجاع والاستبدال",
+      "subtitle": "إدارة طلبات الإرجاع والاسترداد"
     },
     "stats": {
-      "total": "Total Returns",
-      "pending": "Pending",
-      "approved": "Approved",
-      "completed": "Completed"
+      "total": "إجمالي الإرجاعات",
+      "pending": "قيد الانتظار",
+      "approved": "معتمد",
+      "completed": "مكتمل"
     },
     "filters": {
-      "all": "All",
-      "pending": "Pending",
-      "approved": "Approved",
-      "completed": "Completed"
+      "all": "الكل",
+      "pending": "قيد الانتظار",
+      "approved": "معتمد",
+      "completed": "مكتمل"
     },
     "status": {
-      "pending": "Pending",
-      "approved": "Approved",
-      "rejected": "Rejected",
-      "shipped": "Shipped",
-      "received": "Received",
-      "inspecting": "Inspecting",
-      "completed": "Completed",
-      "cancelled": "Cancelled"
+      "pending": "قيد الانتظار",
+      "approved": "معتمد",
+      "rejected": "مرفوض",
+      "shipped": "تم الشحن",
+      "received": "تم الاستلام",
+      "inspecting": "قيد الفحص",
+      "completed": "مكتمل",
+      "cancelled": "ملغى"
     },
     "type": {
-      "return": "Return",
-      "exchange": "Exchange",
-      "refund": "Refund"
+      "return": "إرجاع",
+      "exchange": "استبدال",
+      "refund": "استرداد"
     },
     "list": {
-      "loading": "Loading returns...",
-      "empty": "No returns found",
-      "orderLabel": "Order",
-      "customerLabel": "Customer",
-      "reasonLabel": "Reason",
-      "itemCount": "{count, plural, =0 {No items} one {# item} other {# items}}",
-      "pagination": "Showing {from} to {to} of {total} returns",
-      "previous": "Previous",
-      "next": "Next",
+      "loading": "جارٍ تحميل الإرجاعات...",
+      "empty": "لا توجد إرجاعات",
+      "orderLabel": "الطلب",
+      "customerLabel": "العميل",
+      "reasonLabel": "السبب",
+      "itemCount": "{count, plural, =0 {لا توجد عناصر} one {# عنصر} other {# عنصر}}",
+      "pagination": "عرض {from} إلى {to} من {total} إرجاع",
+      "previous": "السابق",
+      "next": "التالي",
       "actions": {
-        "approve": "Approve",
-        "reject": "Reject",
-        "markReceived": "Mark Received",
-        "completeRefund": "Complete & Refund"
+        "approve": "اعتماد",
+        "reject": "رفض",
+        "markReceived": "تعليم كمستلم",
+        "completeRefund": "الإكمال والاسترداد"
       }
     },
     "details": {
-      "heading": "Return #{number}",
-      "orderReference": "Order #{number}",
-      "close": "Close",
-      "customer": "Customer",
-      "reason": "Reason",
-      "items": "Items",
-      "itemMeta": "Qty: {qty} | Condition: {condition}",
-      "notAvailable": "N/A",
-      "refundAmount": "Refund Amount",
+      "heading": "إرجاع رقم {number}",
+      "orderReference": "الطلب رقم {number}",
+      "close": "إغلاق",
+      "customer": "العميل",
+      "reason": "السبب",
+      "items": "العناصر",
+      "itemMeta": "الكمية: {qty} | الحالة: {condition}",
+      "notAvailable": "غير متوفر",
+      "refundAmount": "مبلغ الاسترداد",
       "actions": {
-        "approveReturn": "Approve Return",
-        "reject": "Reject",
-        "markReceived": "Mark as Received",
-        "completeRefund": "Complete & Process Refund",
-        "close": "Close"
+        "approveReturn": "اعتماد الإرجاع",
+        "reject": "رفض",
+        "markReceived": "تعليم كمستلم",
+        "completeRefund": "الإكمال ومعالجة الاسترداد",
+        "close": "إغلاق"
       }
     },
     "messages": {
-      "approveSuccessTitle": "Return Approved",
-      "approveSuccessBody": "The return has been approved.",
-      "approveErrorTitle": "Error",
-      "approveErrorBody": "Failed to approve return. Please try again.",
-      "rejectPrompt": "Enter rejection reason:",
-      "rejectSuccessTitle": "Return Rejected",
-      "rejectSuccessBody": "The return has been rejected.",
-      "rejectErrorTitle": "Error",
-      "rejectErrorBody": "Failed to reject return. Please try again.",
-      "receivedSuccessTitle": "Return Received",
-      "receivedSuccessBody": "The return has been marked as received.",
-      "receivedErrorTitle": "Error",
-      "receivedErrorBody": "Failed to mark return as received. Please try again.",
-      "completePrompt": "Enter refund method (original, store_credit, bank_transfer):",
-      "completeSuccessTitle": "Return Completed",
-      "completeSuccessBody": "The return has been completed and refund processed.",
-      "completeErrorTitle": "Error",
-      "completeErrorBody": "Failed to complete return. Please try again."
+      "approveSuccessTitle": "تم اعتماد الإرجاع",
+      "approveSuccessBody": "تم اعتماد الإرجاع.",
+      "approveErrorTitle": "خطأ",
+      "approveErrorBody": "تعذّر اعتماد الإرجاع. يرجى المحاولة مرة أخرى.",
+      "rejectPrompt": "أدخل سبب الرفض:",
+      "rejectSuccessTitle": "تم رفض الإرجاع",
+      "rejectSuccessBody": "تم رفض الإرجاع.",
+      "rejectErrorTitle": "خطأ",
+      "rejectErrorBody": "تعذّر رفض الإرجاع. يرجى المحاولة مرة أخرى.",
+      "receivedSuccessTitle": "تم استلام الإرجاع",
+      "receivedSuccessBody": "تم تعليم الإرجاع كمستلم.",
+      "receivedErrorTitle": "خطأ",
+      "receivedErrorBody": "تعذّر تعليم الإرجاع كمستلم. يرجى المحاولة مرة أخرى.",
+      "completePrompt": "أدخل طريقة الاسترداد (original, store_credit, bank_transfer):",
+      "completeSuccessTitle": "تم إكمال الإرجاع",
+      "completeSuccessBody": "تم إكمال الإرجاع ومعالجة الاسترداد.",
+      "completeErrorTitle": "خطأ",
+      "completeErrorBody": "تعذّر إكمال الإرجاع. يرجى المحاولة مرة أخرى."
     }
   },
   "marketingPixels": {
     "page": {
-      "title": "Marketing Pixels",
-      "subtitle": "Configure tracking pixels to measure ad performance and conversions"
+      "title": "بكسلات التسويق",
+      "subtitle": "إعداد بكسلات التتبع لقياس أداء الإعلانات والتحويلات"
     },
     "info": {
-      "title": "About Marketing Pixels",
-      "body": "Marketing pixels are small code snippets that track visitor behavior on your store. They help you measure the effectiveness of your advertising campaigns and optimize for conversions."
+      "title": "عن بكسلات التسويق",
+      "body": "بكسلات التسويق هي مقاطع برمجية صغيرة تتتبع سلوك الزائرين في متجرك. تساعدك على قياس فعالية حملاتك الإعلانية وتحسين التحويلات."
     },
     "status": {
-      "active": "Active",
-      "inactive": "Inactive"
+      "active": "نشط",
+      "inactive": "غير نشط"
     },
-    "toggleAriaLabel": "Toggle platform",
-    "viewDocumentation": "View documentation",
+    "toggleAriaLabel": "تبديل المنصة",
+    "viewDocumentation": "عرض الوثائق",
     "save": {
-      "button": "Save Changes",
-      "saving": "Saving...",
-      "successMessage": "Marketing pixels saved successfully.",
-      "errorMessage": "Failed to save marketing pixels. Please try again."
+      "button": "حفظ التغييرات",
+      "saving": "جارٍ الحفظ...",
+      "successMessage": "تم حفظ بكسلات التسويق بنجاح.",
+      "errorMessage": "تعذّر حفظ بكسلات التسويق. يرجى المحاولة مرة أخرى."
     },
     "notFound": {
-      "title": "Store not found",
-      "backToStores": "Back to stores"
+      "title": "المتجر غير موجود",
+      "backToStores": "العودة إلى المتاجر"
     },
     "fields": {
-      "accessTokenLabel": "Access Token (Optional - for Conversions API)",
-      "accessTokenPlaceholder": "Enter access token for server-side tracking",
-      "accessTokenHelp": "Access tokens enable server-side event tracking for better accuracy",
-      "conversionLabelLabel": "Conversion Label (Optional)",
-      "conversionLabelPlaceholder": "e.g., AbC123def456"
+      "accessTokenLabel": "رمز الوصول (اختياري - لـ Conversions API)",
+      "accessTokenPlaceholder": "أدخل رمز الوصول لتتبع الأحداث على الخادم",
+      "accessTokenHelp": "رموز الوصول تُمكّن تتبع الأحداث على جانب الخادم لدقة أفضل",
+      "conversionLabelLabel": "تسمية التحويل (اختياري)",
+      "conversionLabelPlaceholder": "مثال: AbC123def456"
     },
     "platforms": {
       "meta": {
         "name": "Meta Pixel",
-        "description": "Track conversions from Facebook and Instagram ads",
-        "idLabel": "Pixel ID"
+        "description": "تتبع التحويلات من إعلانات Facebook و Instagram",
+        "idLabel": "معرّف البكسل"
       },
       "tiktok": {
         "name": "TikTok Pixel",
-        "description": "Track conversions from TikTok ads",
-        "idLabel": "Pixel ID"
+        "description": "تتبع التحويلات من إعلانات TikTok",
+        "idLabel": "معرّف البكسل"
       },
       "snapchat": {
         "name": "Snapchat Pixel",
-        "description": "Track conversions from Snapchat ads",
-        "idLabel": "Pixel ID"
+        "description": "تتبع التحويلات من إعلانات Snapchat",
+        "idLabel": "معرّف البكسل"
       },
       "googleAnalytics": {
         "name": "Google Analytics 4",
-        "description": "Track website traffic and user behavior",
-        "idLabel": "Measurement ID"
+        "description": "تتبع حركة الموقع وسلوك المستخدمين",
+        "idLabel": "معرّف القياس"
       },
       "googleTagManager": {
         "name": "Google Tag Manager",
-        "description": "Manage all your marketing tags in one place",
-        "idLabel": "Container ID"
+        "description": "إدارة جميع وسوم التسويق في مكان واحد",
+        "idLabel": "معرّف الحاوية"
       },
       "googleAds": {
         "name": "Google Ads",
-        "description": "Track conversions from Google Ads campaigns",
-        "idLabel": "Conversion ID"
+        "description": "تتبع التحويلات من حملات Google Ads",
+        "idLabel": "معرّف التحويل"
       },
       "twitter": {
         "name": "Twitter/X Pixel",
-        "description": "Track conversions from Twitter/X ads",
-        "idLabel": "Pixel ID"
+        "description": "تتبع التحويلات من إعلانات Twitter/X",
+        "idLabel": "معرّف البكسل"
       },
       "pinterest": {
         "name": "Pinterest Tag",
-        "description": "Track conversions from Pinterest ads",
-        "idLabel": "Tag ID"
+        "description": "تتبع التحويلات من إعلانات Pinterest",
+        "idLabel": "معرّف الوسم"
       }
     },
     "events": {
-      "title": "Tracked Events",
-      "description": "When pixels are enabled, the following e-commerce events are automatically tracked:",
+      "title": "الأحداث المتتبعة",
+      "description": "عند تفعيل البكسلات، يتم تتبع أحداث التجارة الإلكترونية التالية تلقائيًا:",
       "pageView": {
-        "name": "Page View",
-        "description": "Every page visit"
+        "name": "عرض الصفحة",
+        "description": "كل زيارة للصفحة"
       },
       "viewContent": {
-        "name": "View Content",
-        "description": "Product page views"
+        "name": "عرض المحتوى",
+        "description": "زيارات صفحة المنتج"
       },
       "addToCart": {
-        "name": "Add to Cart",
-        "description": "Items added to cart"
+        "name": "إضافة إلى السلة",
+        "description": "العناصر المضافة إلى السلة"
       },
       "initiateCheckout": {
-        "name": "Initiate Checkout",
-        "description": "Checkout started"
+        "name": "بدء إتمام الشراء",
+        "description": "بدء عملية الشراء"
       },
       "purchase": {
-        "name": "Purchase",
-        "description": "Completed orders"
+        "name": "شراء",
+        "description": "الطلبات المكتملة"
       },
       "search": {
-        "name": "Search",
-        "description": "Product searches"
+        "name": "بحث",
+        "description": "عمليات البحث عن المنتجات"
       },
       "addToWishlist": {
-        "name": "Add to Wishlist",
-        "description": "Wishlist additions"
+        "name": "إضافة إلى المفضلة",
+        "description": "الإضافات إلى قائمة المفضلة"
       },
       "lead": {
-        "name": "Lead",
-        "description": "Contact form submissions"
+        "name": "عميل محتمل",
+        "description": "إرسال نماذج التواصل"
       }
     }
   },
   "pages": {
     "page": {
-      "title": "Footer & Pages",
-      "subtitle": "Manage the links shown in your store's footer",
-      "loadingSubtitle": "Manage footer links and store pages",
-      "backToSettings": "Back to Settings",
-      "saveChanges": "Save Changes",
-      "saving": "Saving...",
-      "help": "Configure which links appear in your store's footer. Disable links to hide them, or add new ones. Links use relative paths (e.g.,",
+      "title": "التذييل والصفحات",
+      "subtitle": "إدارة الروابط الظاهرة في تذييل متجرك",
+      "loadingSubtitle": "إدارة روابط التذييل وصفحات المتجر",
+      "backToSettings": "العودة إلى الإعدادات",
+      "saveChanges": "حفظ التغييرات",
+      "saving": "جارٍ الحفظ...",
+      "help": "حدّد الروابط التي تظهر في تذييل متجرك. عطّل الروابط لإخفائها، أو أضف روابط جديدة. تستخدم الروابط مسارات نسبية (مثل",
       "helpCode": "/faq",
       "helpClose": ").",
-      "shopLinks": "Shop Links",
-      "supportLinks": "Support Links",
-      "companyLinks": "Company Links",
-      "newsletter": "Newsletter Section",
-      "newsletterHint": "Show or hide the newsletter signup form in the footer.",
-      "addLink": "Add Link",
-      "emptyLinks": "No links configured. Click \"Add Link\" to add one.",
-      "linkNamePlaceholder": "Link name",
-      "linkNameArPlaceholder": "Arabic name (optional)",
+      "shopLinks": "روابط التسوق",
+      "supportLinks": "روابط الدعم",
+      "companyLinks": "روابط الشركة",
+      "newsletter": "قسم النشرة البريدية",
+      "newsletterHint": "إظهار أو إخفاء نموذج التسجيل في النشرة البريدية في التذييل.",
+      "addLink": "إضافة رابط",
+      "emptyLinks": "لا توجد روابط مُعدّة. انقر على \"إضافة رابط\" لإضافة واحد.",
+      "linkNamePlaceholder": "اسم الرابط",
+      "linkNameArPlaceholder": "الاسم بالعربية (اختياري)",
       "linkPathPlaceholder": "/page-path",
-      "removeLink": "Remove link",
-      "toastSavedTitle": "Saved",
-      "toastSavedBody": "Footer links updated successfully.",
-      "toastErrorTitle": "Error",
-      "toastFailedSave": "Failed to save.",
-      "toastFailedSaveLinks": "Failed to save footer links."
+      "removeLink": "إزالة الرابط",
+      "toastSavedTitle": "تم الحفظ",
+      "toastSavedBody": "تم تحديث روابط التذييل بنجاح.",
+      "toastErrorTitle": "خطأ",
+      "toastFailedSave": "تعذّر الحفظ.",
+      "toastFailedSaveLinks": "تعذّر حفظ روابط التذييل."
     }
   },
   "navigation": {
     "page": {
-      "title": "Navigation",
-      "heading": "Storefront Navigation",
-      "loading": "Loading…",
-      "helpBefore": "Control the header menu on every storefront page. Use relative paths (",
+      "title": "التنقل",
+      "heading": "تنقّل واجهة المتجر",
+      "loading": "جارٍ التحميل…",
+      "helpBefore": "تحكّم بقائمة الشريط العلوي في كل صفحات واجهة المتجر. استخدم مسارات نسبية (",
       "helpCode": "/products",
-      "helpAfter": ") for store pages, or full URLs for external links.",
-      "breadcrumbStore": "Store",
-      "breadcrumbSettings": "Settings",
-      "breadcrumbNav": "Navigation",
-      "itemNumber": "Item {number}",
-      "moveUp": "Move up",
-      "moveDown": "Move down",
-      "removeItem": "Remove item",
-      "labelEnglish": "Label (English)",
+      "helpAfter": ") لصفحات المتجر، أو روابط كاملة للروابط الخارجية.",
+      "breadcrumbStore": "المتجر",
+      "breadcrumbSettings": "الإعدادات",
+      "breadcrumbNav": "التنقل",
+      "itemNumber": "العنصر {number}",
+      "moveUp": "تحريك لأعلى",
+      "moveDown": "تحريك لأسفل",
+      "removeItem": "إزالة العنصر",
+      "labelEnglish": "التسمية (الإنجليزية)",
       "labelEnglishPlaceholder": "Products",
-      "labelArabic": "Label (Arabic)",
+      "labelArabic": "التسمية (العربية)",
       "labelArabicPlaceholder": "المنتجات",
-      "pathOrUrl": "Path or URL",
+      "pathOrUrl": "المسار أو الرابط",
       "pathPlaceholder": "/products",
-      "addItem": "+ Add item",
-      "resetDefault": "Reset to defaults",
-      "saveNav": "Save navigation",
-      "toastFailedLoad": "Failed to load",
-      "toastAtLeastOne": "At least one menu item required",
-      "toastAtLeastOneBody": "Add a label and href.",
-      "toastFailedSave": "Failed to save",
-      "toastSaved": "Navigation saved",
-      "toastSavedBody": "Storefront will use the new menu on next page load."
+      "addItem": "+ إضافة عنصر",
+      "resetDefault": "إعادة إلى الافتراضي",
+      "saveNav": "حفظ التنقل",
+      "toastFailedLoad": "تعذّر التحميل",
+      "toastAtLeastOne": "يجب إضافة عنصر قائمة واحد على الأقل",
+      "toastAtLeastOneBody": "أضف تسمية ورابطًا.",
+      "toastFailedSave": "تعذّر الحفظ",
+      "toastSaved": "تم حفظ التنقل",
+      "toastSavedBody": "ستستخدم واجهة المتجر القائمة الجديدة عند تحميل الصفحة التالية."
     }
   },
   "notifications": {
     "page": {
-      "title": "Notifications",
-      "subtitle": "Configure WhatsApp, SMS, and push notification channels"
+      "title": "الإشعارات",
+      "subtitle": "إعداد قنوات WhatsApp والرسائل النصية والإشعارات الفورية"
     },
     "empty": {
-      "title": "No notification channels enabled",
-      "description": "Enable notification channels (WhatsApp, SMS, or Push Notifications) in your store features to configure them here."
+      "title": "لا توجد قنوات إشعارات مفعّلة",
+      "description": "فعّل قنوات الإشعارات (WhatsApp أو الرسائل النصية أو الإشعارات الفورية) في ميزات المتجر لإعدادها هنا."
     },
     "shared": {
-      "save": "Save",
-      "testConnection": "Test Connection",
-      "enabled": "Enabled",
-      "disabled": "Disabled",
+      "save": "حفظ",
+      "testConnection": "اختبار الاتصال",
+      "enabled": "مفعّل",
+      "disabled": "معطّل",
       "channelNames": {
         "whatsapp": "WhatsApp",
-        "sms": "SMS",
-        "push": "Push Notifications",
-        "pushShort": "Push"
+        "sms": "رسائل نصية",
+        "push": "إشعارات فورية",
+        "pushShort": "فوري"
       }
     },
     "whatsapp": {
       "title": "WhatsApp",
-      "subtitle": "WhatsApp Business API via Meta",
+      "subtitle": "WhatsApp Business API عبر Meta",
       "fields": {
-        "phoneNumberId": "Phone Number ID",
-        "wabaId": "WABA ID",
-        "accessToken": "Access Token"
+        "phoneNumberId": "معرّف رقم الهاتف",
+        "wabaId": "معرّف WABA",
+        "accessToken": "رمز الوصول"
       },
       "placeholders": {
-        "phoneNumberId": "e.g. 123456789012345",
-        "wabaId": "WhatsApp Business Account ID",
-        "accessToken": "Meta permanent access token"
+        "phoneNumberId": "مثال: 123456789012345",
+        "wabaId": "معرّف حساب WhatsApp Business",
+        "accessToken": "رمز الوصول الدائم من Meta"
       }
     },
     "sms": {
-      "title": "SMS",
-      "subtitle": "SMS via Unifonic",
+      "title": "الرسائل النصية",
+      "subtitle": "رسائل نصية عبر Unifonic",
       "fields": {
         "appSid": "App SID",
-        "senderId": "Sender ID"
+        "senderId": "معرّف المرسل"
       },
       "placeholders": {
         "appSid": "Unifonic App SID",
-        "senderId": "e.g. MyStore"
+        "senderId": "مثال: MyStore"
       }
     },
     "push": {
-      "title": "Push Notifications",
-      "subtitle": "Standards-based Web Push (W3C Push API)",
-      "subscribers": "{count, number} subscribers",
-      "platformNote": "Push notifications use the platform VAPID configuration. No per-store setup needed — just toggle Enabled."
+      "title": "الإشعارات الفورية",
+      "subtitle": "Web Push قياسي (W3C Push API)",
+      "subscribers": "{count, number} مشترك",
+      "platformNote": "تستخدم الإشعارات الفورية إعداد VAPID الخاص بالمنصة. لا يلزم إعداد لكل متجر — فقط فعّل الخيار."
     },
     "events": {
-      "title": "Event Configuration",
-      "subtitle": "Choose which events trigger notifications on each channel",
-      "tableLabel": "Notification event configuration",
-      "save": "Save Event Config",
+      "title": "إعدادات الأحداث",
+      "subtitle": "اختر الأحداث التي تُشغّل الإشعارات على كل قناة",
+      "tableLabel": "إعدادات أحداث الإشعارات",
+      "save": "حفظ إعدادات الأحداث",
       "columns": {
-        "event": "Event"
+        "event": "الحدث"
       },
       "labels": {
-        "order_confirmed": "Order Confirmed",
-        "payment_success": "Payment Success",
-        "payment_failed": "Payment Failed",
-        "order_shipped": "Order Shipped",
-        "order_delivered": "Order Delivered",
-        "order_cancelled": "Order Cancelled",
-        "order_refunded": "Order Refunded"
+        "order_confirmed": "تأكيد الطلب",
+        "payment_success": "نجاح الدفع",
+        "payment_failed": "فشل الدفع",
+        "order_shipped": "شحن الطلب",
+        "order_delivered": "تسليم الطلب",
+        "order_cancelled": "إلغاء الطلب",
+        "order_refunded": "استرداد الطلب"
       }
     },
     "log": {
-      "title": "Recent Notifications",
-      "subtitle": "Delivery history for the last {limit} notifications",
-      "tableLabel": "Notification log",
-      "empty": "No notifications sent yet",
+      "title": "أحدث الإشعارات",
+      "subtitle": "سجل التسليم لآخر {limit} إشعار",
+      "tableLabel": "سجل الإشعارات",
+      "empty": "لم يتم إرسال إشعارات بعد",
       "columns": {
-        "timestamp": "Timestamp",
-        "event": "Event",
-        "channel": "Channel",
-        "recipient": "Recipient",
-        "status": "Status"
+        "timestamp": "الطابع الزمني",
+        "event": "الحدث",
+        "channel": "القناة",
+        "recipient": "المستلم",
+        "status": "الحالة"
       },
       "filters": {
-        "channelLabel": "Filter by channel",
-        "statusLabel": "Filter by status",
-        "allChannels": "All channels",
-        "allStatuses": "All statuses"
+        "channelLabel": "تصفية حسب القناة",
+        "statusLabel": "تصفية حسب الحالة",
+        "allChannels": "جميع القنوات",
+        "allStatuses": "جميع الحالات"
       },
       "status": {
-        "sent": "Sent",
-        "delivered": "Delivered",
-        "failed": "Failed",
-        "pending": "Pending",
-        "queued": "Queued"
+        "sent": "مُرسل",
+        "delivered": "تم التسليم",
+        "failed": "فشل",
+        "pending": "قيد الانتظار",
+        "queued": "في الطابور"
       },
       "pagination": {
-        "summary": "Page {page} of {pages} ({total} total)",
-        "previous": "Previous",
-        "next": "Next"
+        "summary": "الصفحة {page} من {pages} ({total} إجمالًا)",
+        "previous": "السابق",
+        "next": "التالي"
       }
     },
     "toast": {
-      "savedTitle": "Saved",
-      "errorTitle": "Error",
-      "channelSavedDescription": "{channel} settings saved.",
-      "saveFailed": "Failed to save settings.",
-      "saveFailedRetry": "Failed to save settings. Please try again.",
-      "connectionOkTitle": "Connection OK",
-      "connectionOkDescription": "{channel} connection test passed.",
-      "connectionFailedTitle": "Connection Failed",
-      "testFailed": "Test failed.",
-      "eventsSavedDescription": "Event configuration saved.",
-      "eventsSaveFailed": "Failed to save event configuration."
+      "savedTitle": "تم الحفظ",
+      "errorTitle": "خطأ",
+      "channelSavedDescription": "تم حفظ إعدادات {channel}.",
+      "saveFailed": "تعذّر حفظ الإعدادات.",
+      "saveFailedRetry": "تعذّر حفظ الإعدادات. يرجى المحاولة مرة أخرى.",
+      "connectionOkTitle": "الاتصال ناجح",
+      "connectionOkDescription": "نجح اختبار اتصال {channel}.",
+      "connectionFailedTitle": "فشل الاتصال",
+      "testFailed": "فشل الاختبار.",
+      "eventsSavedDescription": "تم حفظ إعدادات الأحداث.",
+      "eventsSaveFailed": "تعذّر حفظ إعدادات الأحداث."
     }
   },
   "loyalty": {
     "page": {
-      "title": "Loyalty Program",
-      "subtitle": "Reward your customers with points and exclusive benefits",
-      "programStatus": "Program Status:",
-      "enabled": "Enabled",
-      "disabled": "Disabled",
-      "saveSettings": "Save Settings",
+      "title": "برنامج الولاء",
+      "subtitle": "كافئ عملاءك بالنقاط والمزايا الحصرية",
+      "programStatus": "حالة البرنامج:",
+      "enabled": "مفعّل",
+      "disabled": "معطّل",
+      "saveSettings": "حفظ الإعدادات",
       "tabs": {
-        "settings": "Settings",
-        "members": "Members"
+        "settings": "الإعدادات",
+        "members": "الأعضاء"
       }
     },
     "stats": {
-      "totalMembers": "Total Members",
-      "pointsIssued": "Points Issued",
-      "pointsRedeemed": "Points Redeemed",
-      "outstanding": "Outstanding",
-      "tierBreakdown": "Tier Breakdown"
+      "totalMembers": "إجمالي الأعضاء",
+      "pointsIssued": "النقاط الممنوحة",
+      "pointsRedeemed": "النقاط المستبدلة",
+      "outstanding": "النقاط المستحقة",
+      "tierBreakdown": "توزيع المستويات"
     },
     "earning": {
-      "title": "Point Earning",
-      "pointsPerDinar": "Points per 1 KWD Spent",
-      "signupBonus": "Signup Bonus",
-      "referralBonus": "Referral Bonus",
-      "reviewBonus": "Review Bonus",
-      "birthdayBonus": "Birthday Bonus"
+      "title": "كسب النقاط",
+      "pointsPerDinar": "النقاط لكل 1 د.ك يُنفق",
+      "signupBonus": "مكافأة التسجيل",
+      "referralBonus": "مكافأة الإحالة",
+      "reviewBonus": "مكافأة التقييم",
+      "birthdayBonus": "مكافأة عيد الميلاد"
     },
     "tiers": {
-      "title": "Membership Tiers",
-      "bronze": "Bronze",
-      "silver": "Silver",
-      "gold": "Gold",
-      "platinum": "Platinum",
-      "minPoints": "Min Points",
-      "multiplier": "Multiplier"
+      "title": "مستويات العضوية",
+      "bronze": "برونزي",
+      "silver": "فضي",
+      "gold": "ذهبي",
+      "platinum": "بلاتيني",
+      "minPoints": "الحد الأدنى للنقاط",
+      "multiplier": "المُضاعِف"
     },
     "redemption": {
-      "title": "Redemption",
-      "pointValue": "Point Value (fils)",
-      "pointValueHint": "1 point = {value} fils",
-      "minRedeem": "Min Points to Redeem",
-      "maxPercent": "Max % of Order",
-      "expirationMonths": "Expiration (months)",
-      "expirationHint": "0 = never expires"
+      "title": "الاستبدال",
+      "pointValue": "قيمة النقطة (فلس)",
+      "pointValueHint": "1 نقطة = {value} فلس",
+      "minRedeem": "الحد الأدنى من النقاط للاستبدال",
+      "maxPercent": "الحد الأقصى % من الطلب",
+      "expirationMonths": "الانتهاء (أشهر)",
+      "expirationHint": "0 = لا تنتهي أبدًا"
     },
     "members": {
-      "all": "All",
-      "emptyTitle": "No Members Yet",
-      "emptyDescription": "Customers will appear here when they join your loyalty program",
-      "tableLabel": "Loyalty members",
-      "awardPoints": "Award Points",
+      "all": "الكل",
+      "emptyTitle": "لا يوجد أعضاء بعد",
+      "emptyDescription": "سيظهر العملاء هنا عند انضمامهم إلى برنامج الولاء",
+      "tableLabel": "أعضاء برنامج الولاء",
+      "awardPoints": "منح نقاط",
       "columns": {
-        "member": "Member",
-        "tier": "Tier",
-        "balance": "Points Balance",
-        "totalEarned": "Total Earned",
-        "totalRedeemed": "Total Redeemed",
-        "actions": "Actions"
+        "member": "العضو",
+        "tier": "المستوى",
+        "balance": "رصيد النقاط",
+        "totalEarned": "إجمالي المكسوب",
+        "totalRedeemed": "إجمالي المستبدل",
+        "actions": "الإجراءات"
       }
     },
     "award": {
-      "title": "Award Points",
-      "close": "Close",
-      "description": "Award points to",
-      "pointsLabel": "Points",
-      "pointsPlaceholder": "Enter points (negative to deduct)",
-      "reasonLabel": "Reason",
-      "reasonPlaceholder": "Optional reason for adjustment",
-      "cancel": "Cancel",
-      "submit": "Award Points"
+      "title": "منح نقاط",
+      "close": "إغلاق",
+      "description": "منح نقاط إلى",
+      "pointsLabel": "النقاط",
+      "pointsPlaceholder": "أدخل النقاط (قيمة سالبة للخصم)",
+      "reasonLabel": "السبب",
+      "reasonPlaceholder": "سبب اختياري للتعديل",
+      "cancel": "إلغاء",
+      "submit": "منح النقاط"
     },
     "disableConfirm": {
-      "title": "Disable Loyalty Program",
-      "description": "Disable the loyalty program? Customers will no longer earn or redeem points until you re-enable it.",
-      "cancel": "Cancel",
-      "confirm": "Disable"
+      "title": "تعطيل برنامج الولاء",
+      "description": "تعطيل برنامج الولاء؟ لن يتمكن العملاء من كسب أو استبدال النقاط حتى إعادة التفعيل.",
+      "cancel": "إلغاء",
+      "confirm": "تعطيل"
     },
     "toast": {
-      "updatedTitle": "Updated",
-      "enabledDescription": "Loyalty program enabled.",
-      "disabledDescription": "Loyalty program disabled.",
-      "errorTitle": "Error",
-      "toggleFailed": "Failed to update loyalty program status. Please try again.",
-      "savedTitle": "Settings Saved",
-      "savedDescription": "Loyalty settings have been updated.",
-      "saveFailed": "Failed to save loyalty settings. Please try again.",
-      "awardedTitle": "Points Awarded",
-      "awardedDescription": "Points have been awarded to {name}.",
-      "awardFailed": "Failed to award points. Please try again."
+      "updatedTitle": "تم التحديث",
+      "enabledDescription": "تم تفعيل برنامج الولاء.",
+      "disabledDescription": "تم تعطيل برنامج الولاء.",
+      "errorTitle": "خطأ",
+      "toggleFailed": "تعذّر تحديث حالة برنامج الولاء. يرجى المحاولة مرة أخرى.",
+      "savedTitle": "تم حفظ الإعدادات",
+      "savedDescription": "تم تحديث إعدادات برنامج الولاء.",
+      "saveFailed": "تعذّر حفظ إعدادات برنامج الولاء. يرجى المحاولة مرة أخرى.",
+      "awardedTitle": "تم منح النقاط",
+      "awardedDescription": "تم منح النقاط إلى {name}.",
+      "awardFailed": "تعذّر منح النقاط. يرجى المحاولة مرة أخرى."
     }
   },
   "paymentSettings": {
     "page": {
-      "title": "Payment Settings",
-      "subtitle": "Configure payment providers for this store"
+      "title": "إعدادات الدفع",
+      "subtitle": "إعداد مزوّدي الدفع لهذا المتجر"
     },
     "actions": {
-      "backToSettings": "Back to Settings"
+      "backToSettings": "العودة إلى الإعدادات"
     },
     "errors": {
-      "loadFailed": "Failed to load payment settings",
-      "connectionError": "Unable to connect to the server. Please check your connection and try again.",
-      "retry": "Retry"
+      "loadFailed": "تعذّر تحميل إعدادات الدفع",
+      "connectionError": "تعذّر الاتصال بالخادم. يرجى التحقق من الاتصال والمحاولة مرة أخرى.",
+      "retry": "إعادة المحاولة"
     },
     "providers": {
       "tapName": "Tap Payments",
@@ -2382,568 +2382,568 @@
       "hesabeNameAr": "حسابي",
       "upaymentsName": "UPayments",
       "upaymentsNameAr": "يو بيمنتس",
-      "codName": "Cash on Delivery",
+      "codName": "الدفع عند الاستلام",
       "codNameAr": "الدفع عند الاستلام"
     },
     "toggle": {
-      "enabled": "Enabled",
-      "disabled": "Disabled"
+      "enabled": "مفعّل",
+      "disabled": "معطّل"
     },
-    "configure": "Configure",
+    "configure": "إعداد",
     "cod": {
-      "displayNameLabel": "Display Name (English)",
+      "displayNameLabel": "الاسم المعروض (الإنجليزية)",
       "displayNamePlaceholder": "Cash on Delivery",
-      "displayNameArLabel": "Display Name (Arabic)",
+      "displayNameArLabel": "الاسم المعروض (العربية)",
       "displayNameArPlaceholder": "الدفع عند الاستلام",
-      "fixedFeeLabel": "Surcharge Fee (fils)",
+      "fixedFeeLabel": "رسوم إضافية (فلس)",
       "fixedFeePlaceholder": "0",
-      "fixedFeeEquals": "= {amount} KWD",
-      "fixedFeeHelpPrefix": "Extra charge added to the order when the customer pays cash on delivery. Enter",
+      "fixedFeeEquals": "= {amount} د.ك",
+      "fixedFeeHelpPrefix": "رسوم إضافية تُضاف إلى الطلب عند دفع العميل نقدًا عند الاستلام. أدخل",
       "fixedFeeHelpZero": "0",
-      "fixedFeeHelpSuffix": "for free COD. 1000 fils = 1 KWD.",
-      "infoBanner": "COD orders bypass the payment gateway. The customer confirms the order, and you mark it as paid from the Orders page once cash is collected."
+      "fixedFeeHelpSuffix": "لإلغاء الرسوم. 1000 فلس = 1 د.ك.",
+      "infoBanner": "تتجاوز طلبات الدفع عند الاستلام بوابة الدفع. يؤكد العميل الطلب، وتقوم أنت بتعليمه كمدفوع من صفحة الطلبات عند استلام المبلغ."
     },
     "gateway": {
-      "apiKeyLabel": "API Key",
-      "apiKeyPlaceholder": "Enter API key",
-      "secretKeyLabel": "Secret Key",
-      "secretKeyPlaceholder": "Enter secret key",
-      "webhookSecretLabel": "Webhook Secret",
-      "webhookSecretPlaceholder": "Enter webhook secret",
-      "merchantIdLabel": "Merchant ID",
-      "merchantIdPlaceholder": "Enter merchant ID (if applicable)",
-      "testModeOn": "Test Mode On",
-      "testModeOff": "Test Mode Off",
-      "testModeDescriptionOn": "Using test credentials — no real payments processed",
-      "testModeDescriptionOff": "Live mode — real payments will be processed"
+      "apiKeyLabel": "مفتاح API",
+      "apiKeyPlaceholder": "أدخل مفتاح API",
+      "secretKeyLabel": "المفتاح السري",
+      "secretKeyPlaceholder": "أدخل المفتاح السري",
+      "webhookSecretLabel": "سر webhook",
+      "webhookSecretPlaceholder": "أدخل سر webhook",
+      "merchantIdLabel": "معرّف التاجر",
+      "merchantIdPlaceholder": "أدخل معرّف التاجر (إن وُجد)",
+      "testModeOn": "وضع الاختبار مفعّل",
+      "testModeOff": "وضع الاختبار معطّل",
+      "testModeDescriptionOn": "يستخدم بيانات اختبار — لا تُعالَج مدفوعات حقيقية",
+      "testModeDescriptionOff": "الوضع المباشر — ستُعالَج مدفوعات حقيقية"
     },
     "messages": {
-      "savedSuccess": "Saved successfully",
-      "failedToSave": "Failed to save",
-      "unableToConnect": "Unable to connect to the server"
+      "savedSuccess": "تم الحفظ بنجاح",
+      "failedToSave": "تعذّر الحفظ",
+      "unableToConnect": "تعذّر الاتصال بالخادم"
     },
-    "save": "Save",
-    "saving": "Saving..."
+    "save": "حفظ",
+    "saving": "جارٍ الحفظ..."
   },
   "hero": {
     "page": {
-      "title": "Hero Section",
-      "subtitle": "Customize your storefront homepage hero",
-      "storeNotFound": "Store not found",
-      "backToStores": "Back to stores",
-      "saving": "Saving...",
-      "saveChanges": "Save Changes",
-      "titleEnglish": "Title (English)",
+      "title": "القسم الرئيسي",
+      "subtitle": "تخصيص القسم الرئيسي للصفحة الرئيسية لواجهة متجرك",
+      "storeNotFound": "المتجر غير موجود",
+      "backToStores": "العودة إلى المتاجر",
+      "saving": "جارٍ الحفظ...",
+      "saveChanges": "حفظ التغييرات",
+      "titleEnglish": "العنوان (الإنجليزية)",
       "titleEnglishPlaceholder": "Shop the Future of E-Commerce",
-      "titleArabic": "Title (Arabic)",
+      "titleArabic": "العنوان (العربية)",
       "titleArabicPlaceholder": "اكتشف مجموعتنا",
-      "subtitleEnglish": "Subtitle (English)",
+      "subtitleEnglish": "النص التعريفي (الإنجليزية)",
       "subtitleEnglishPlaceholder": "Premium products, fast delivery, and secure payments",
-      "subtitleArabic": "Subtitle (Arabic)",
+      "subtitleArabic": "النص التعريفي (العربية)",
       "subtitleArabicPlaceholder": "أفضل المنتجات بأفضل الأسعار",
-      "ctaEnglish": "CTA Button Text (English)",
+      "ctaEnglish": "نص زر الإجراء (الإنجليزية)",
       "ctaEnglishPlaceholder": "Shop Now",
-      "ctaArabic": "CTA Button Text (Arabic)",
+      "ctaArabic": "نص زر الإجراء (العربية)",
       "ctaArabicPlaceholder": "تسوق الآن",
-      "ctaLink": "CTA Link",
+      "ctaLink": "رابط زر الإجراء",
       "ctaLinkPlaceholder": "/products",
-      "heroImage": "Hero Image",
-      "uploadHeroImage": "Upload Hero Image",
-      "heroImageHint": "Recommended: 1200x900px, JPG or PNG. Leave empty to use the default visual.",
-      "toastLoadFailedTitle": "Failed to load hero",
-      "toastConnectionTitle": "Connection error",
-      "toastConnectionBody": "Failed to connect to the server",
-      "toastAccessDeniedTitle": "Access denied",
-      "toastAccessDeniedBody": "You do not have permission to update this store",
-      "toastSessionExpiredTitle": "Session expired",
-      "toastSessionExpiredBody": "Please log in again",
-      "toastSaveFailedTitle": "Failed to save hero",
-      "toastSavedTitle": "Hero saved",
-      "toastSavedBody": "Your homepage hero has been updated",
-      "toastSaveConnectionBody": "Failed to connect to the server. Please try again."
+      "heroImage": "صورة القسم الرئيسي",
+      "uploadHeroImage": "رفع صورة القسم الرئيسي",
+      "heroImageHint": "مستحسن: 1200x900 بكسل، JPG أو PNG. اترك الحقل فارغًا لاستخدام الصورة الافتراضية.",
+      "toastLoadFailedTitle": "تعذّر تحميل القسم الرئيسي",
+      "toastConnectionTitle": "خطأ في الاتصال",
+      "toastConnectionBody": "تعذّر الاتصال بالخادم",
+      "toastAccessDeniedTitle": "الوصول مرفوض",
+      "toastAccessDeniedBody": "ليس لديك صلاحية لتحديث هذا المتجر",
+      "toastSessionExpiredTitle": "انتهت الجلسة",
+      "toastSessionExpiredBody": "يرجى تسجيل الدخول مرة أخرى",
+      "toastSaveFailedTitle": "تعذّر حفظ القسم الرئيسي",
+      "toastSavedTitle": "تم حفظ القسم الرئيسي",
+      "toastSavedBody": "تم تحديث القسم الرئيسي لصفحتك الرئيسية",
+      "toastSaveConnectionBody": "تعذّر الاتصال بالخادم. يرجى المحاولة مرة أخرى."
     }
   },
   "announcement": {
     "page": {
-      "title": "Announcement Bar",
-      "subtitle": "Display a banner across the top of your store",
-      "loading": "Loading...",
-      "backToSettings": "Back to Settings",
-      "saveChanges": "Save Changes",
-      "saving": "Saving...",
-      "preview": "Preview",
-      "sectionTitle": "Announcement Bar",
-      "sectionHint": "Show a banner at the top of your store for promotions, announcements or news",
-      "content": "Content",
-      "textEnglish": "Announcement Text (English)",
+      "title": "شريط الإعلانات",
+      "subtitle": "عرض شريط أعلى متجرك",
+      "loading": "جارٍ التحميل...",
+      "backToSettings": "العودة إلى الإعدادات",
+      "saveChanges": "حفظ التغييرات",
+      "saving": "جارٍ الحفظ...",
+      "preview": "معاينة",
+      "sectionTitle": "شريط الإعلانات",
+      "sectionHint": "إظهار شريط أعلى متجرك للترويجات والإعلانات والأخبار",
+      "content": "المحتوى",
+      "textEnglish": "نص الإعلان (الإنجليزية)",
       "textEnglishPlaceholder": "Free shipping on orders over 10 KWD!",
-      "textArabic": "Announcement Text (Arabic)",
+      "textArabic": "نص الإعلان (العربية)",
       "textArabicPlaceholder": "شحن مجاني للطلبات فوق ١٠ د.ك!",
-      "linkUrl": "Link URL (optional)",
+      "linkUrl": "رابط URL (اختياري)",
       "linkUrlPlaceholder": "https://example.com/sale",
-      "linkUrlHint": "The entire bar will link to this URL when clicked",
-      "linkTextEnglish": "Link Text (English)",
+      "linkUrlHint": "سيرتبط الشريط بالكامل بهذا الرابط عند النقر",
+      "linkTextEnglish": "نص الرابط (الإنجليزية)",
       "linkTextEnglishPlaceholder": "Shop Now",
-      "linkTextArabic": "Link Text (Arabic)",
+      "linkTextArabic": "نص الرابط (العربية)",
       "linkTextArabicPlaceholder": "تسوق الآن",
-      "colors": "Colors",
-      "backgroundColor": "Background Color",
-      "textColor": "Text Color",
-      "successMessage": "Announcement settings saved successfully",
-      "failedMessage": "Failed to save announcement settings",
-      "connectionError": "Unable to connect to the server"
+      "colors": "الألوان",
+      "backgroundColor": "لون الخلفية",
+      "textColor": "لون النص",
+      "successMessage": "تم حفظ إعدادات الإعلان بنجاح",
+      "failedMessage": "تعذّر حفظ إعدادات الإعلان",
+      "connectionError": "تعذّر الاتصال بالخادم"
     }
   },
   "features": {
     "page": {
-      "title": "Store Features",
-      "subtitleLoading": "Manage feature toggles for this store",
-      "subtitle": "Enable or disable features for this store"
+      "title": "ميزات المتجر",
+      "subtitleLoading": "إدارة تبديل الميزات لهذا المتجر",
+      "subtitle": "تفعيل أو تعطيل ميزات هذا المتجر"
     },
     "categories": {
-      "commerce": "Commerce",
-      "marketing": "Marketing",
-      "operations": "Operations",
-      "storefront": "Storefront"
+      "commerce": "التجارة",
+      "marketing": "التسويق",
+      "operations": "العمليات",
+      "storefront": "واجهة المتجر"
     },
     "category": {
-      "enabledOfTotal": "{enabled} of {total} enabled"
+      "enabledOfTotal": "{enabled} من {total} مفعّل"
     },
     "errors": {
-      "loadFailed": "Failed to load features. Please try again.",
-      "saveFailed": "Failed to save features. Please try again.",
-      "retry": "Retry"
+      "loadFailed": "تعذّر تحميل الميزات. يرجى المحاولة مرة أخرى.",
+      "saveFailed": "تعذّر حفظ الميزات. يرجى المحاولة مرة أخرى.",
+      "retry": "إعادة المحاولة"
     },
     "toasts": {
-      "errorTitle": "Error",
-      "savedTitle": "Features Saved",
-      "savedDescription": "{count} features updated successfully."
+      "errorTitle": "خطأ",
+      "savedTitle": "تم حفظ الميزات",
+      "savedDescription": "تم تحديث {count} ميزة بنجاح."
     },
     "actions": {
-      "discard": "Discard",
-      "saveChanges": "Save Changes",
-      "unsaved": "unsaved",
-      "unsavedChanges": "{count} unsaved changes",
-      "unsavedChangesBanner": "You have"
+      "discard": "تجاهل",
+      "saveChanges": "حفظ التغييرات",
+      "unsaved": "لم يُحفظ",
+      "unsavedChanges": "{count} تغيير غير محفوظ",
+      "unsavedChangesBanner": "لديك"
     },
     "row": {
-      "enabledBy": "Enabled by",
-      "enabledOn": "on"
+      "enabledBy": "فُعّل بواسطة",
+      "enabledOn": "في"
     }
   },
   "template": {
     "page": {
-      "title": "Choose Template",
-      "subtitleWithStore": "Select a template for {storeName}",
-      "storeNotFound": "Store not found",
-      "backToStores": "Back to stores",
-      "cancel": "Cancel",
-      "apply": "Apply Template",
-      "saving": "Saving...",
-      "current": "Current",
-      "aboutTitle": "About Templates",
-      "aboutBody": "Templates define the overall look and feel of your storefront. You can change templates at any time, and your content will automatically adapt to the new design. Customize colors and fonts in the",
-      "brandingSettings": "Branding settings"
+      "title": "اختيار القالب",
+      "subtitleWithStore": "اختر قالبًا لـ {storeName}",
+      "storeNotFound": "المتجر غير موجود",
+      "backToStores": "العودة إلى المتاجر",
+      "cancel": "إلغاء",
+      "apply": "تطبيق القالب",
+      "saving": "جارٍ الحفظ...",
+      "current": "الحالي",
+      "aboutTitle": "عن القوالب",
+      "aboutBody": "تحدّد القوالب الشكل العام لواجهة متجرك. يمكنك تغيير القوالب في أي وقت، وسيتكيّف المحتوى تلقائيًا مع التصميم الجديد. خصّص الألوان والخطوط في",
+      "brandingSettings": "إعدادات الهوية البصرية"
     }
   },
   "seo": {
     "page": {
-      "title": "SEO Settings",
-      "subtitle": "Optimize your store for search engines",
-      "loading": "Loading...",
-      "backToSettings": "Back to Settings",
-      "saveChanges": "Save Changes",
-      "saving": "Saving...",
-      "searchPreview": "Search Result Preview",
+      "title": "إعدادات SEO",
+      "subtitle": "تحسين متجرك لمحركات البحث",
+      "loading": "جارٍ التحميل...",
+      "backToSettings": "العودة إلى الإعدادات",
+      "saveChanges": "حفظ التغييرات",
+      "saving": "جارٍ الحفظ...",
+      "searchPreview": "معاينة نتيجة البحث",
       "previewDomain": "example.com",
-      "englishSeo": "English SEO",
-      "arabicSeo": "Arabic SEO",
+      "englishSeo": "SEO بالإنجليزية",
+      "arabicSeo": "SEO بالعربية",
       "enBadge": "EN",
       "arBadge": "AR",
-      "advanced": "Advanced",
-      "metaTitle": "Meta Title",
+      "advanced": "متقدّم",
+      "metaTitle": "عنوان الميتا",
       "metaTitlePlaceholder": "My Store — Best Products in Kuwait",
-      "metaTitleHint": "Appears in browser tabs and search results. Keep under {max} characters for best results.",
-      "metaDescription": "Meta Description",
+      "metaTitleHint": "يظهر في تبويبات المتصفح ونتائج البحث. ابقَ تحت {max} حرف لأفضل النتائج.",
+      "metaDescription": "وصف الميتا",
       "metaDescriptionPlaceholder": "Discover our wide range of products with fast delivery across Kuwait...",
-      "metaDescriptionHint": "Shown in search result snippets. Keep under {max} characters for best results.",
-      "metaTitleAr": "Meta Title (Arabic)",
+      "metaDescriptionHint": "يظهر في مقتطفات نتائج البحث. ابقَ تحت {max} حرف لأفضل النتائج.",
+      "metaTitleAr": "عنوان الميتا (العربية)",
       "metaTitleArPlaceholder": "متجري — أفضل المنتجات في الكويت",
-      "metaDescriptionAr": "Meta Description (Arabic)",
+      "metaDescriptionAr": "وصف الميتا (العربية)",
       "metaDescriptionArPlaceholder": "اكتشف مجموعتنا الواسعة من المنتجات مع توصيل سريع في الكويت...",
-      "ogImage": "OG Image URL",
+      "ogImage": "رابط صورة OG",
       "ogImagePlaceholder": "https://example.com/og-image.jpg",
-      "ogImageHint": "Image shown when your store is shared on social media. Recommended: 1200×630px.",
-      "twitterHandle": "Twitter / X Handle",
+      "ogImageHint": "الصورة التي تظهر عند مشاركة متجرك على وسائل التواصل. مستحسن: 1200×630 بكسل.",
+      "twitterHandle": "معرّف Twitter / X",
       "twitterPlaceholder": "yourstorehandle",
-      "googleSiteVerification": "Google Site Verification",
-      "googleSiteVerificationPlaceholder": "Verification meta tag content",
-      "googleSiteVerificationHint": "From Google Search Console verification",
-      "successMessage": "SEO settings saved successfully",
-      "failedMessage": "Failed to save SEO settings",
-      "connectionError": "Unable to connect to the server"
+      "googleSiteVerification": "التحقق من موقع Google",
+      "googleSiteVerificationPlaceholder": "محتوى علامة meta للتحقق",
+      "googleSiteVerificationHint": "من التحقق في Google Search Console",
+      "successMessage": "تم حفظ إعدادات SEO بنجاح",
+      "failedMessage": "تعذّر حفظ إعدادات SEO",
+      "connectionError": "تعذّر الاتصال بالخادم"
     }
   },
   "language": {
     "page": {
-      "title": "Language Settings",
-      "subtitle": "Set the default language for your storefront",
-      "loading": "Loading...",
-      "backToSettings": "Back to Settings",
-      "save": "Save Changes",
-      "saving": "Saving...",
-      "defaultTitle": "Default Storefront Language",
-      "defaultHint": "New visitors will see the storefront in this language. They can still switch languages manually.",
+      "title": "إعدادات اللغة",
+      "subtitle": "حدّد اللغة الافتراضية لواجهة متجرك",
+      "loading": "جارٍ التحميل...",
+      "backToSettings": "العودة إلى الإعدادات",
+      "save": "حفظ التغييرات",
+      "saving": "جارٍ الحفظ...",
+      "defaultTitle": "اللغة الافتراضية لواجهة المتجر",
+      "defaultHint": "سيرى الزوار الجدد واجهة المتجر بهذه اللغة. يمكنهم التبديل يدويًا.",
       "englishName": "English",
-      "englishLayout": "Left-to-right layout",
+      "englishLayout": "من اليسار إلى اليمين",
       "arabicName": "العربية",
-      "arabicLayout": "Right-to-left layout",
-      "successMessage": "Language settings saved successfully",
-      "failedMessage": "Failed to save language settings",
-      "connectionError": "Unable to connect to the server"
+      "arabicLayout": "من اليمين إلى اليسار",
+      "successMessage": "تم حفظ إعدادات اللغة بنجاح",
+      "failedMessage": "تعذّر حفظ إعدادات اللغة",
+      "connectionError": "تعذّر الاتصال بالخادم"
     }
   },
   "domain": {
     "page": {
-      "title": "Custom Domain",
-      "subtitle": "Connect a custom domain to your store",
-      "heading": "Custom Domain",
-      "storeDomainSuffix": "Domain",
-      "storeNotFound": "Store not found.",
-      "addDomain": "Add Domain",
-      "changeDomain": "Change Domain",
-      "remove": "Remove",
-      "domain": "Domain",
+      "title": "نطاق مخصّص",
+      "subtitle": "ربط نطاق مخصّص بمتجرك",
+      "heading": "نطاق مخصّص",
+      "storeDomainSuffix": "النطاق",
+      "storeNotFound": "المتجر غير موجود.",
+      "addDomain": "إضافة نطاق",
+      "changeDomain": "تغيير النطاق",
+      "remove": "إزالة",
+      "domain": "النطاق",
       "domainPlaceholder": "shop.example.com",
-      "domainRemoveHint": "Leave empty and save to remove the custom domain.",
-      "save": "Save",
-      "saving": "Saving...",
-      "cancel": "Cancel",
-      "verified": "Verified",
-      "pending": "Pending Verification",
-      "dnsRequired": "DNS Configuration Required",
-      "dnsInstructions": "Add the following DNS record to your domain provider:",
-      "dnsPropagation": "DNS changes can take up to 48 hours to propagate.",
-      "checkDns": "Check DNS",
-      "checkingDns": "Checking...",
-      "verifiedMessage": "Domain is verified and SSL is active. Your store is accessible at https://{domain}",
-      "noDomain": "No custom domain configured. This store is accessible via its default subdomain.",
-      "dnsTableLabel": "DNS records",
-      "colType": "Type",
-      "colName": "Name",
-      "colValue": "Value",
-      "invalidDomain": "Please enter a valid domain (e.g., shop.example.com)",
-      "updateFailed": "Failed to update domain"
+      "domainRemoveHint": "اترك الحقل فارغًا واحفظ لإزالة النطاق المخصّص.",
+      "save": "حفظ",
+      "saving": "جارٍ الحفظ...",
+      "cancel": "إلغاء",
+      "verified": "تم التحقق",
+      "pending": "بانتظار التحقق",
+      "dnsRequired": "مطلوب إعداد DNS",
+      "dnsInstructions": "أضف سجل DNS التالي لدى مزوّد النطاق:",
+      "dnsPropagation": "قد تستغرق تغييرات DNS حتى 48 ساعة للانتشار.",
+      "checkDns": "فحص DNS",
+      "checkingDns": "جارٍ الفحص...",
+      "verifiedMessage": "تم التحقق من النطاق وتفعيل SSL. يمكن الوصول إلى متجرك عبر https://{domain}",
+      "noDomain": "لم يتم إعداد نطاق مخصّص. يمكن الوصول إلى هذا المتجر عبر النطاق الفرعي الافتراضي.",
+      "dnsTableLabel": "سجلات DNS",
+      "colType": "النوع",
+      "colName": "الاسم",
+      "colValue": "القيمة",
+      "invalidDomain": "يرجى إدخال نطاق صالح (مثل shop.example.com)",
+      "updateFailed": "تعذّر تحديث النطاق"
     }
   },
   "categories": {
     "page": {
-      "title": "Product Categories",
-      "subtitle": "Manage categories for this store",
-      "backToStore": "Back to Store",
-      "addCategory": "Add Category",
-      "retry": "Retry",
-      "connectionError": "Unable to connect to the server. Please check your connection and try again.",
-      "fetchFailed": "Failed to fetch categories",
-      "deleteTitle": "Delete Category",
-      "deleteConfirm": "Delete category \"{name}\"? This cannot be undone.",
-      "cancel": "Cancel",
-      "delete": "Delete",
-      "deleting": "Deleting...",
-      "toastDeletedTitle": "Category Deleted",
-      "toastDeletedBody": "\"{name}\" has been removed.",
-      "errorTitle": "Error",
-      "deleteFailed": "Failed to delete category"
+      "title": "فئات المنتجات",
+      "subtitle": "إدارة فئات هذا المتجر",
+      "backToStore": "العودة إلى المتجر",
+      "addCategory": "إضافة فئة",
+      "retry": "إعادة المحاولة",
+      "connectionError": "تعذّر الاتصال بالخادم. يرجى التحقق من الاتصال والمحاولة مرة أخرى.",
+      "fetchFailed": "تعذّر جلب الفئات",
+      "deleteTitle": "حذف الفئة",
+      "deleteConfirm": "حذف الفئة \"{name}\"؟ لا يمكن التراجع عن هذا الإجراء.",
+      "cancel": "إلغاء",
+      "delete": "حذف",
+      "deleting": "جارٍ الحذف...",
+      "toastDeletedTitle": "تم حذف الفئة",
+      "toastDeletedBody": "تمت إزالة \"{name}\".",
+      "errorTitle": "خطأ",
+      "deleteFailed": "تعذّر حذف الفئة"
     },
     "form": {
-      "editTitle": "Edit Category",
-      "addTitle": "Add Category",
-      "close": "Close",
-      "nameEnglish": "Name (English)",
+      "editTitle": "تعديل الفئة",
+      "addTitle": "إضافة فئة",
+      "close": "إغلاق",
+      "nameEnglish": "الاسم (الإنجليزية)",
       "nameEnglishPlaceholder": "Electronics",
-      "nameArabic": "Name (Arabic)",
+      "nameArabic": "الاسم (العربية)",
       "nameArabicPlaceholder": "إلكترونيات",
-      "urlSlug": "URL Slug",
+      "urlSlug": "معرّف الرابط",
       "urlSlugPlaceholder": "electronics",
-      "urlSlugHint": "Used in URLs: lowercase, hyphens only",
-      "description": "Description",
-      "descriptionPlaceholder": "Category description...",
-      "descriptionArabic": "Description (Arabic)",
+      "urlSlugHint": "يُستخدم في الروابط: أحرف إنجليزية صغيرة وشرطات فقط",
+      "description": "الوصف",
+      "descriptionPlaceholder": "وصف الفئة...",
+      "descriptionArabic": "الوصف (العربية)",
       "descriptionArabicPlaceholder": "وصف التصنيف...",
-      "categoryImage": "Category Image",
-      "uploadCategoryImage": "Upload Category Image",
+      "categoryImage": "صورة الفئة",
+      "uploadCategoryImage": "رفع صورة الفئة",
       "required": "*",
-      "cancel": "Cancel",
-      "saving": "Saving...",
-      "updateCategory": "Update Category",
-      "createCategory": "Create Category",
-      "errorNameRequired": "Name is required",
-      "errorSlugRequired": "Slug is required",
-      "errorSlugInvalid": "Slug must be lowercase letters, numbers, Arabic characters and hyphens only",
-      "updatedSuccess": "Category updated successfully",
-      "createdSuccess": "Category created successfully",
-      "updateFailed": "Failed to update category",
-      "createFailed": "Failed to create category",
-      "slugInUse": "This slug is already in use",
-      "connectionError": "Unable to connect to the server"
+      "cancel": "إلغاء",
+      "saving": "جارٍ الحفظ...",
+      "updateCategory": "تحديث الفئة",
+      "createCategory": "إنشاء الفئة",
+      "errorNameRequired": "الاسم مطلوب",
+      "errorSlugRequired": "المعرّف مطلوب",
+      "errorSlugInvalid": "يجب أن يكون المعرّف بأحرف إنجليزية صغيرة وأرقام وحروف عربية وشرطات فقط",
+      "updatedSuccess": "تم تحديث الفئة بنجاح",
+      "createdSuccess": "تم إنشاء الفئة بنجاح",
+      "updateFailed": "تعذّر تحديث الفئة",
+      "createFailed": "تعذّر إنشاء الفئة",
+      "slugInUse": "هذا المعرّف مستخدم بالفعل",
+      "connectionError": "تعذّر الاتصال بالخادم"
     },
     "table": {
-      "label": "Categories",
-      "empty": "No categories yet",
-      "addFirst": "Add your first category",
-      "category": "Category",
-      "slug": "Slug",
-      "products": "Products",
-      "status": "Status",
-      "actions": "Actions",
-      "active": "Active",
-      "inactive": "Inactive",
-      "edit": "Edit",
-      "delete": "Delete",
-      "deleting": "Deleting..."
+      "label": "الفئات",
+      "empty": "لا توجد فئات بعد",
+      "addFirst": "أضف فئتك الأولى",
+      "category": "الفئة",
+      "slug": "المعرّف",
+      "products": "المنتجات",
+      "status": "الحالة",
+      "actions": "الإجراءات",
+      "active": "نشط",
+      "inactive": "غير نشط",
+      "edit": "تعديل",
+      "delete": "حذف",
+      "deleting": "جارٍ الحذف..."
     }
   },
   "reviews": {
     "page": {
-      "title": "Reviews",
-      "subtitle": "Manage product reviews and ratings",
-      "filterAll": "All Reviews",
-      "filterPending": "Pending Approval",
-      "filterApproved": "Approved",
-      "loading": "Loading reviews...",
-      "empty": "No reviews found",
-      "approved": "Approved",
-      "pending": "Pending",
-      "verifiedPurchase": "Verified Purchase",
-      "productLabel": "Product: ",
-      "byLabel": "By: ",
-      "anonymous": "Anonymous",
-      "helpfulSuffix": " helpful",
-      "approve": "Approve",
-      "unapprove": "Unapprove",
-      "delete": "Delete",
-      "paginationShowing": "Showing {from} to {to} of {total} reviews",
-      "previous": "Previous",
-      "next": "Next",
-      "deleteModalTitle": "Delete Review",
-      "deleteModalBody": "Are you sure you want to delete this review? This action cannot be undone.",
-      "cancel": "Cancel",
-      "toastApproveFailed": "Failed to approve review. Please try again.",
-      "toastUnapproveFailed": "Failed to unapprove review. Please try again.",
-      "toastDeleteFailed": "Failed to delete review. Please try again.",
-      "toastApproveTitle": "Review Approved",
-      "toastApproveBody": "The review is now visible to customers.",
-      "toastUnapproveTitle": "Review Unapproved",
-      "toastUnapproveBody": "The review has been unapproved.",
-      "toastDeleteTitle": "Review Deleted",
-      "toastDeleteBody": "The review has been permanently removed.",
-      "errorTitle": "Error"
+      "title": "التقييمات",
+      "subtitle": "إدارة تقييمات وآراء المنتجات",
+      "filterAll": "جميع التقييمات",
+      "filterPending": "بانتظار الاعتماد",
+      "filterApproved": "معتمد",
+      "loading": "جارٍ تحميل التقييمات...",
+      "empty": "لا توجد تقييمات",
+      "approved": "معتمد",
+      "pending": "قيد الانتظار",
+      "verifiedPurchase": "شراء موثّق",
+      "productLabel": "المنتج: ",
+      "byLabel": "بواسطة: ",
+      "anonymous": "مجهول",
+      "helpfulSuffix": " مفيد",
+      "approve": "اعتماد",
+      "unapprove": "إلغاء الاعتماد",
+      "delete": "حذف",
+      "paginationShowing": "عرض {from} إلى {to} من {total} تقييم",
+      "previous": "السابق",
+      "next": "التالي",
+      "deleteModalTitle": "حذف التقييم",
+      "deleteModalBody": "هل أنت متأكد من حذف هذا التقييم؟ لا يمكن التراجع عن هذا الإجراء.",
+      "cancel": "إلغاء",
+      "toastApproveFailed": "تعذّر اعتماد التقييم. يرجى المحاولة مرة أخرى.",
+      "toastUnapproveFailed": "تعذّر إلغاء اعتماد التقييم. يرجى المحاولة مرة أخرى.",
+      "toastDeleteFailed": "تعذّر حذف التقييم. يرجى المحاولة مرة أخرى.",
+      "toastApproveTitle": "تم اعتماد التقييم",
+      "toastApproveBody": "أصبح التقييم ظاهرًا للعملاء.",
+      "toastUnapproveTitle": "تم إلغاء اعتماد التقييم",
+      "toastUnapproveBody": "تم إلغاء اعتماد التقييم.",
+      "toastDeleteTitle": "تم حذف التقييم",
+      "toastDeleteBody": "تمت إزالة التقييم نهائيًا.",
+      "errorTitle": "خطأ"
     }
   },
   "audit": {
-    "title": "Audit Logs",
-    "subtitle": "Track all platform activity and changes",
-    "refresh": "Refresh",
-    "filterEntityLabel": "Filter by entity",
-    "filterActionLabel": "Filter by action",
-    "allEntities": "All Entities",
-    "entityStore": "Stores",
-    "entityUser": "Users",
-    "entityProduct": "Products",
-    "entityOrder": "Orders",
-    "entitySetting": "Settings",
-    "allActions": "All Actions",
-    "actionCreate": "Create",
-    "actionUpdate": "Update",
-    "actionDelete": "Delete",
-    "actionLogin": "Login",
-    "actionLogout": "Logout",
-    "hideDetails": "Hide details",
-    "showDetails": "Show details",
-    "empty": "No audit logs found",
-    "system": "System",
-    "idPrefix": "ID:",
-    "paginationShowing": "Showing {from} to {to} of {total} logs",
-    "previous": "Previous",
-    "next": "Next"
+    "title": "سجلات التدقيق",
+    "subtitle": "تتبع جميع أنشطة المنصة والتغييرات",
+    "refresh": "تحديث",
+    "filterEntityLabel": "تصفية حسب الكيان",
+    "filterActionLabel": "تصفية حسب الإجراء",
+    "allEntities": "جميع الكيانات",
+    "entityStore": "المتاجر",
+    "entityUser": "المستخدمون",
+    "entityProduct": "المنتجات",
+    "entityOrder": "الطلبات",
+    "entitySetting": "الإعدادات",
+    "allActions": "جميع الإجراءات",
+    "actionCreate": "إنشاء",
+    "actionUpdate": "تحديث",
+    "actionDelete": "حذف",
+    "actionLogin": "تسجيل دخول",
+    "actionLogout": "تسجيل خروج",
+    "hideDetails": "إخفاء التفاصيل",
+    "showDetails": "عرض التفاصيل",
+    "empty": "لا توجد سجلات تدقيق",
+    "system": "النظام",
+    "idPrefix": "المعرّف:",
+    "paginationShowing": "عرض {from} إلى {to} من {total} سجل",
+    "previous": "السابق",
+    "next": "التالي"
   },
   "auth": {
     "login": {
-      "title": "Admin Login",
-      "subtitle": "Sign in to access the Force Platform",
-      "email": "Email address",
+      "title": "تسجيل دخول المسؤول",
+      "subtitle": "سجّل الدخول للوصول إلى منصة Force",
+      "email": "عنوان البريد الإلكتروني",
       "emailPlaceholder": "you@example.com",
-      "password": "Password",
-      "passwordPlaceholder": "Enter your password",
-      "signIn": "Sign in",
-      "signingIn": "Signing in…",
-      "loginFailed": "Login failed",
-      "footer": "Force Platform Admin Panel",
-      "brandTitle": "Force Platform",
-      "brandSubtitle": "Manage your e-commerce stores, users, and platform settings from one powerful dashboard.",
-      "statActiveStores": "Active Stores",
-      "statProducts": "Products",
-      "statOrders": "Orders"
+      "password": "كلمة المرور",
+      "passwordPlaceholder": "أدخل كلمة المرور",
+      "signIn": "تسجيل الدخول",
+      "signingIn": "جارٍ تسجيل الدخول…",
+      "loginFailed": "فشل تسجيل الدخول",
+      "footer": "لوحة إدارة منصة Force",
+      "brandTitle": "منصة Force",
+      "brandSubtitle": "أدر متاجرك الإلكترونية ومستخدميك وإعدادات المنصة من لوحة تحكم واحدة قوية.",
+      "statActiveStores": "المتاجر النشطة",
+      "statProducts": "المنتجات",
+      "statOrders": "الطلبات"
     }
   },
   "users": {
-    "title": "Users",
-    "subtitle": "Manage all users on the platform",
-    "inviteUser": "Invite User",
-    "searchPlaceholder": "Search by name or email…",
-    "filterRoleLabel": "Filter by role",
-    "allRoles": "All Roles",
-    "roleSuperAdmins": "Super Admins",
-    "roleStoreAdmins": "Store Admins",
-    "roleCustomers": "Customers",
-    "tableLabel": "Users",
-    "colUser": "User",
-    "colRole": "Role",
-    "colStatus": "Status",
-    "colStores": "Stores",
-    "colJoined": "Joined",
-    "colLastLogin": "Last Login",
-    "colActions": "Actions",
-    "view": "View",
-    "moreCount": "+{count} more",
-    "neverLoggedIn": "Never",
-    "empty": "No users found",
-    "errorTitle": "Failed to load users",
-    "errorDefault": "Failed to fetch users",
-    "errorNetwork": "Unable to connect to the server. Please check your connection and try again.",
-    "paginationShowing": "Showing {from} to {to} of {total} users",
-    "previous": "Previous",
-    "next": "Next",
+    "title": "المستخدمون",
+    "subtitle": "إدارة جميع المستخدمين على المنصة",
+    "inviteUser": "دعوة مستخدم",
+    "searchPlaceholder": "البحث بالاسم أو البريد الإلكتروني…",
+    "filterRoleLabel": "تصفية حسب الدور",
+    "allRoles": "جميع الأدوار",
+    "roleSuperAdmins": "المديرون العامون",
+    "roleStoreAdmins": "مديرو المتاجر",
+    "roleCustomers": "العملاء",
+    "tableLabel": "المستخدمون",
+    "colUser": "المستخدم",
+    "colRole": "الدور",
+    "colStatus": "الحالة",
+    "colStores": "المتاجر",
+    "colJoined": "تاريخ الانضمام",
+    "colLastLogin": "آخر تسجيل دخول",
+    "colActions": "الإجراءات",
+    "view": "عرض",
+    "moreCount": "+{count} آخرون",
+    "neverLoggedIn": "أبدًا",
+    "empty": "لا يوجد مستخدمون",
+    "errorTitle": "تعذّر تحميل المستخدمين",
+    "errorDefault": "تعذّر جلب المستخدمين",
+    "errorNetwork": "تعذّر الاتصال بالخادم. يرجى التحقق من الاتصال والمحاولة مرة أخرى.",
+    "paginationShowing": "عرض {from} إلى {to} من {total} مستخدم",
+    "previous": "السابق",
+    "next": "التالي",
     "role": {
-      "super_admin": "super admin",
-      "store_admin": "store admin",
-      "customer": "customer"
+      "super_admin": "مدير عام",
+      "store_admin": "مدير متجر",
+      "customer": "عميل"
     },
     "status": {
-      "active": "active",
-      "inactive": "inactive",
-      "suspended": "suspended"
+      "active": "نشط",
+      "inactive": "غير نشط",
+      "suspended": "معلّق"
     },
     "detail": {
-      "loadingTitle": "Loading…",
-      "loadingSubtitle": "Please wait",
-      "notFoundTitle": "User Not Found",
-      "notFoundSubtitle": "The requested user could not be found",
-      "notFoundMessage": "User not found",
-      "backToUsers": "Back to Users",
-      "profile": "Profile",
-      "role": "Role",
-      "memberSince": "Member Since",
-      "lastLogin": "Last Login",
-      "neverLoggedIn": "Never",
-      "storesCount": "Stores ({count})",
-      "viewStore": "View",
-      "editUser": "Edit User",
-      "firstName": "First Name",
-      "lastName": "Last Name",
-      "emailAddress": "Email Address",
-      "emailHint": "Email cannot be changed from admin panel",
-      "roleLabel": "Role",
-      "roleHint": "Changing to super_admin grants full platform access.",
-      "accountStatus": "Account Status",
-      "statusActiveOption": "Active — User can log in and use the platform",
-      "statusInactiveOption": "Inactive — Account disabled, cannot log in",
-      "statusSuspendedOption": "Suspended — Account suspended for policy violation",
-      "activeStatus": "Active Status",
-      "activeStatusHint": "Toggle to quickly enable or disable this account",
-      "userIdLabel": "User ID:",
-      "save": "Save Changes",
-      "saving": "Saving…",
-      "updateSuccess": "User updated successfully",
-      "updateFailed": "Failed to update user",
-      "updateNetworkError": "Unable to connect to the server",
+      "loadingTitle": "جارٍ التحميل…",
+      "loadingSubtitle": "يرجى الانتظار",
+      "notFoundTitle": "المستخدم غير موجود",
+      "notFoundSubtitle": "تعذّر العثور على المستخدم المطلوب",
+      "notFoundMessage": "المستخدم غير موجود",
+      "backToUsers": "العودة إلى المستخدمين",
+      "profile": "الملف الشخصي",
+      "role": "الدور",
+      "memberSince": "عضو منذ",
+      "lastLogin": "آخر تسجيل دخول",
+      "neverLoggedIn": "أبدًا",
+      "storesCount": "المتاجر ({count})",
+      "viewStore": "عرض",
+      "editUser": "تعديل المستخدم",
+      "firstName": "الاسم الأول",
+      "lastName": "اسم العائلة",
+      "emailAddress": "عنوان البريد الإلكتروني",
+      "emailHint": "لا يمكن تغيير البريد الإلكتروني من لوحة الإدارة",
+      "roleLabel": "الدور",
+      "roleHint": "تغيير الدور إلى super_admin يمنح صلاحية كاملة على المنصة.",
+      "accountStatus": "حالة الحساب",
+      "statusActiveOption": "نشط — يمكن للمستخدم تسجيل الدخول واستخدام المنصة",
+      "statusInactiveOption": "غير نشط — الحساب معطّل، لا يمكن تسجيل الدخول",
+      "statusSuspendedOption": "معلّق — الحساب معلّق بسبب مخالفة السياسة",
+      "activeStatus": "الحالة النشطة",
+      "activeStatusHint": "بدّل لتفعيل أو تعطيل هذا الحساب سريعًا",
+      "userIdLabel": "معرّف المستخدم:",
+      "save": "حفظ التغييرات",
+      "saving": "جارٍ الحفظ…",
+      "updateSuccess": "تم تحديث المستخدم بنجاح",
+      "updateFailed": "تعذّر تحديث المستخدم",
+      "updateNetworkError": "تعذّر الاتصال بالخادم",
       "roleLabels": {
-        "super_admin": "Super Admin",
-        "store_admin": "Store Admin",
-        "customer": "Customer"
+        "super_admin": "مدير عام",
+        "store_admin": "مدير متجر",
+        "customer": "عميل"
       },
       "statusLabels": {
-        "active": "Active",
-        "inactive": "Inactive",
-        "suspended": "Suspended"
+        "active": "نشط",
+        "inactive": "غير نشط",
+        "suspended": "معلّق"
       },
       "roleOptions": {
-        "customer": "Customer",
-        "store_admin": "Store Admin",
-        "super_admin": "Super Admin"
+        "customer": "عميل",
+        "store_admin": "مدير متجر",
+        "super_admin": "مدير عام"
       }
     }
   },
   "components": {
     "notificationBell": {
-      "ariaLabel": "Notifications",
-      "title": "Notifications",
-      "markAllRead": "Mark all read",
-      "clear": "Clear",
-      "empty": "No notifications yet",
-      "reconnecting": "Reconnecting to notification server…"
+      "ariaLabel": "الإشعارات",
+      "title": "الإشعارات",
+      "markAllRead": "تعليم الكل كمقروء",
+      "clear": "مسح",
+      "empty": "لا توجد إشعارات بعد",
+      "reconnecting": "جارٍ إعادة الاتصال بخادم الإشعارات…"
     },
     "connectionStatus": {
-      "testing": "Testing…",
-      "connected": "Connected",
-      "failed": "Failed"
+      "testing": "جارٍ الاختبار…",
+      "connected": "متصل",
+      "failed": "فشل"
     },
     "imageUpload": {
-      "label": "Upload Image",
-      "multiLabel": "Upload Images",
-      "browse": "Drag & drop or click to browse",
-      "browseMulti": "Drag & drop or click to browse ({count}/{max})",
+      "label": "رفع صورة",
+      "multiLabel": "رفع صور",
+      "browse": "اسحب وأفلت أو انقر للتصفح",
+      "browseMulti": "اسحب وأفلت أو انقر للتصفح ({count}/{max})",
       "uploadingPercent": "{progress}%",
-      "uploadingMulti": "Uploading… {progress}%",
-      "main": "Main",
-      "moveLeft": "Move left",
-      "moveRight": "Move right",
-      "remove": "Remove",
+      "uploadingMulti": "جارٍ الرفع… {progress}%",
+      "main": "الرئيسية",
+      "moveLeft": "تحريك لليسار",
+      "moveRight": "تحريك لليمين",
+      "remove": "إزالة",
       "errors": {
-        "typeNotAccepted": "File type {type} not accepted",
-        "tooLarge": "File must be under 10MB",
-        "uploadFailed": "Upload failed",
-        "networkError": "Network error",
-        "cancelled": "Upload cancelled",
-        "invalidResponse": "Invalid server response",
-        "uploadFailedWithCode": "Upload failed ({code})",
-        "maxReached": "Maximum {max} images allowed",
-        "noValidFiles": "No valid image files selected"
+        "typeNotAccepted": "نوع الملف {type} غير مقبول",
+        "tooLarge": "يجب أن يكون حجم الملف أقل من 10 ميجابايت",
+        "uploadFailed": "فشل الرفع",
+        "networkError": "خطأ في الشبكة",
+        "cancelled": "تم إلغاء الرفع",
+        "invalidResponse": "استجابة غير صالحة من الخادم",
+        "uploadFailedWithCode": "فشل الرفع ({code})",
+        "maxReached": "الحد الأقصى المسموح به {max} صورة",
+        "noValidFiles": "لم يتم تحديد ملفات صور صالحة"
       },
-      "imageAlt": "Image {index}"
+      "imageAlt": "صورة {index}"
     },
     "adminLayout": {
-      "navDashboard": "Dashboard",
-      "navStores": "Stores",
-      "navUsers": "Users",
-      "navAuditLogs": "Audit Logs",
-      "navProducts": "Products",
-      "navOrders": "Orders",
-      "navCustomers": "Customers",
-      "navAnalytics": "Analytics",
-      "navSettings": "Settings",
-      "superAdmin": "Super Admin",
-      "superAdminHint": "Full platform access",
-      "storeAdmin": "Store Admin",
-      "storeAdminHint": "Managing your store",
-      "switchToDark": "Switch to dark mode",
-      "switchToLight": "Switch to light mode",
-      "logout": "Log out",
-      "openSidebar": "Open sidebar",
-      "closeSidebar": "Close sidebar",
-      "goBack": "Go back",
-      "viewStore": "View Store",
+      "navDashboard": "لوحة التحكم",
+      "navStores": "المتاجر",
+      "navUsers": "المستخدمون",
+      "navAuditLogs": "سجلات التدقيق",
+      "navProducts": "المنتجات",
+      "navOrders": "الطلبات",
+      "navCustomers": "العملاء",
+      "navAnalytics": "التحليلات",
+      "navSettings": "الإعدادات",
+      "superAdmin": "مدير عام",
+      "superAdminHint": "صلاحية كاملة على المنصة",
+      "storeAdmin": "مدير متجر",
+      "storeAdminHint": "إدارة متجرك",
+      "switchToDark": "التبديل إلى الوضع الداكن",
+      "switchToLight": "التبديل إلى الوضع الفاتح",
+      "logout": "تسجيل الخروج",
+      "openSidebar": "فتح الشريط الجانبي",
+      "closeSidebar": "إغلاق الشريط الجانبي",
+      "goBack": "رجوع",
+      "viewStore": "عرض المتجر",
       "forcePlatformBrand": "Platform",
       "forceAdminBrand": "Admin",
       "forceBrandPrefix": "Force",
-      "languageLabel": "Language"
+      "languageLabel": "اللغة"
     },
     "errorState": {
-      "defaultTitle": "Something went wrong",
-      "defaultRetry": "Try Again"
+      "defaultTitle": "حدث خطأ ما",
+      "defaultRetry": "حاول مرة أخرى"
     },
     "languageSwitcher": {
-      "ariaLabel": "Language"
+      "ariaLabel": "اللغة"
     },
     "brand": {
       "forceMediaAlt": "Force Media"
