@@ -1,8 +1,7 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { useToast } from '@force/ui';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { RefundMethodModal } from './_components/RefundMethodModal';
@@ -19,10 +18,8 @@ type StringResolver = (value: string | null) => void;
 export default function ReturnsPage() {
   const params = useParams();
   const storeId = params?.id as string;
-  const { success: toastSuccess, error: showError } = useToast();
 
   const tPage = useT('returns.page');
-  const tMessages = useT('returns.messages');
 
   const [selectedReturn, setSelectedReturn] = useState<ReturnRecord | null>(null);
   const [showDetails, setShowDetails] = useState(false);
@@ -34,31 +31,6 @@ export default function ReturnsPage() {
   // the pending promise; the hook then proceeds with (or aborts) the API call.
   const rejectResolverRef = useRef<StringResolver | null>(null);
   const refundResolverRef = useRef<StringResolver | null>(null);
-
-  // Memo so the hook's dependency-array-based effects don't re-run when the
-  // parent re-renders (toast helpers are stable, but the messages object is
-  // a plain literal).
-  const messages = useMemo(
-    () => ({
-      approveSuccessTitle: tMessages('approveSuccessTitle'),
-      approveSuccessBody: tMessages('approveSuccessBody'),
-      approveErrorTitle: tMessages('approveErrorTitle'),
-      approveErrorBody: tMessages('approveErrorBody'),
-      rejectSuccessTitle: tMessages('rejectSuccessTitle'),
-      rejectSuccessBody: tMessages('rejectSuccessBody'),
-      rejectErrorTitle: tMessages('rejectErrorTitle'),
-      rejectErrorBody: tMessages('rejectErrorBody'),
-      receivedSuccessTitle: tMessages('receivedSuccessTitle'),
-      receivedSuccessBody: tMessages('receivedSuccessBody'),
-      receivedErrorTitle: tMessages('receivedErrorTitle'),
-      receivedErrorBody: tMessages('receivedErrorBody'),
-      completeSuccessTitle: tMessages('completeSuccessTitle'),
-      completeSuccessBody: tMessages('completeSuccessBody'),
-      completeErrorTitle: tMessages('completeErrorTitle'),
-      completeErrorBody: tMessages('completeErrorBody'),
-    }),
-    [tMessages]
-  );
 
   const requestRejectReason = useCallback(() => {
     setRejectOpen(true);
@@ -112,9 +84,6 @@ export default function ReturnsPage() {
     setPage,
   } = useReturns({
     storeId,
-    messages,
-    onSuccess: toastSuccess,
-    onError: showError,
     requestRejectReason,
     requestRefundMethod,
   });

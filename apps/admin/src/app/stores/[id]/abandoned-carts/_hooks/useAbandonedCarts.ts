@@ -1,6 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useToast } from '@force/ui';
+import { useT } from '@/i18n/useT';
 import { apiGet, apiPut } from '../../../../../lib/api';
 import { DEFAULT_CONFIG } from '../_components/types';
 import type {
@@ -13,30 +15,18 @@ import type {
 interface UseAbandonedCartsArgs {
   storeId: string;
   enabled: boolean;
-  saveSuccessTitle: string;
-  saveSuccessBody: string;
-  saveErrorTitle: string;
-  saveErrorBody: string;
-  onSaveSuccess: (title: string, body: string) => void;
-  onSaveError: (title: string, body: string) => void;
 }
 
 /**
  * Encapsulates the three fetches (stats, config, carts list) plus the config
  * save mutation, and keeps the page state machine out of the render tree.
  * `enabled` gates all fetches — the hook stays quiet when the feature flag is
- * off so we don't hit the API for every mount.
+ * off so we don't hit the API for every mount. Owns its save toasts via
+ * useToast + useT so the page doesn't need to pass a messages object.
  */
-export function useAbandonedCarts({
-  storeId,
-  enabled,
-  saveSuccessTitle,
-  saveSuccessBody,
-  saveErrorTitle,
-  saveErrorBody,
-  onSaveSuccess,
-  onSaveError,
-}: UseAbandonedCartsArgs) {
+export function useAbandonedCarts({ storeId, enabled }: UseAbandonedCartsArgs) {
+  const toast = useToast();
+  const tMessages = useT('abandonedCarts.messages');
   const [stats, setStats] = useState<AbandonedCartStats | null>(null);
   const [config, setConfig] = useState<AbandonedCartConfig>(DEFAULT_CONFIG);
   const [records, setRecords] = useState<AbandonedCartRecord[]>([]);
@@ -105,26 +95,17 @@ export function useAbandonedCarts({
     try {
       const { error } = await apiPut(`/api/v1/stores/${storeId}/abandoned-carts/config`, config);
       if (!error) {
-        onSaveSuccess(saveSuccessTitle, saveSuccessBody);
+        toast.success(tMessages('saveSuccessTitle'), tMessages('saveSuccessBody'));
       } else {
-        onSaveError(saveErrorTitle, error.message || saveErrorBody);
+        toast.error(tMessages('saveErrorTitle'), error.message || tMessages('saveErrorBody'));
       }
     } catch (err) {
       console.error('Failed to save config:', err);
-      onSaveError(saveErrorTitle, saveErrorBody);
+      toast.error(tMessages('saveErrorTitle'), tMessages('saveErrorBody'));
     } finally {
       setSavingConfig(false);
     }
-  }, [
-    storeId,
-    config,
-    onSaveSuccess,
-    onSaveError,
-    saveSuccessTitle,
-    saveSuccessBody,
-    saveErrorTitle,
-    saveErrorBody,
-  ]);
+  }, [storeId, config, toast, tMessages]);
 
   const changeStatusFilter = useCallback((value: string) => {
     setStatusFilter(value);

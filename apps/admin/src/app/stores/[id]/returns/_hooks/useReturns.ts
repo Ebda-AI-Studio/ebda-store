@@ -1,33 +1,13 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useToast } from '@force/ui';
+import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '../../../../../lib/api';
 import type { ListMeta, ReturnFilter, ReturnRecord, ReturnsStats } from '../_components/types';
 
-interface ReturnsActionMessages {
-  approveSuccessTitle: string;
-  approveSuccessBody: string;
-  approveErrorTitle: string;
-  approveErrorBody: string;
-  rejectSuccessTitle: string;
-  rejectSuccessBody: string;
-  rejectErrorTitle: string;
-  rejectErrorBody: string;
-  receivedSuccessTitle: string;
-  receivedSuccessBody: string;
-  receivedErrorTitle: string;
-  receivedErrorBody: string;
-  completeSuccessTitle: string;
-  completeSuccessBody: string;
-  completeErrorTitle: string;
-  completeErrorBody: string;
-}
-
 interface UseReturnsArgs {
   storeId: string;
-  messages: ReturnsActionMessages;
-  onSuccess: (title: string, body: string) => void;
-  onError: (title: string, body: string) => void;
   /**
    * Called when the user invokes Reject. Should resolve with the rejection
    * reason entered in a styled modal, or null if the user cancelled.
@@ -42,17 +22,13 @@ interface UseReturnsArgs {
 
 /**
  * Encapsulates the returns list + stats fetches and the four lifecycle
- * mutations (approve, reject, mark received, complete). Keeps the page
- * component free of state plumbing and toast wiring.
+ * mutations (approve, reject, mark received, complete). Owns its toasts via
+ * useToast + useT so callers no longer need to plumb an 18-key messages
+ * object + onSuccess/onError callbacks through the page.
  */
-export function useReturns({
-  storeId,
-  messages,
-  onSuccess,
-  onError,
-  requestRejectReason,
-  requestRefundMethod,
-}: UseReturnsArgs) {
+export function useReturns({ storeId, requestRejectReason, requestRefundMethod }: UseReturnsArgs) {
+  const toast = useToast();
+  const tMessages = useT('returns.messages');
   const [returns, setReturns] = useState<ReturnRecord[]>([]);
   const [stats, setStats] = useState<ReturnsStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -109,19 +85,19 @@ export function useReturns({
           `/api/v1/stores/${storeId}/returns/admin/${returnId}/approve`
         );
         if (error) {
-          onError(messages.approveErrorTitle, messages.approveErrorBody);
+          toast.error(tMessages('approveErrorTitle'), tMessages('approveErrorBody'));
           return false;
         }
-        onSuccess(messages.approveSuccessTitle, messages.approveSuccessBody);
+        toast.success(tMessages('approveSuccessTitle'), tMessages('approveSuccessBody'));
         refreshAll();
         return true;
       } catch (error) {
         console.error('Failed to approve return:', error);
-        onError(messages.approveErrorTitle, messages.approveErrorBody);
+        toast.error(tMessages('approveErrorTitle'), tMessages('approveErrorBody'));
         return false;
       }
     },
-    [storeId, onError, onSuccess, messages, refreshAll]
+    [storeId, toast, tMessages, refreshAll]
   );
 
   const reject = useCallback(
@@ -134,19 +110,19 @@ export function useReturns({
           { reason }
         );
         if (error) {
-          onError(messages.rejectErrorTitle, messages.rejectErrorBody);
+          toast.error(tMessages('rejectErrorTitle'), tMessages('rejectErrorBody'));
           return false;
         }
-        onSuccess(messages.rejectSuccessTitle, messages.rejectSuccessBody);
+        toast.success(tMessages('rejectSuccessTitle'), tMessages('rejectSuccessBody'));
         refreshAll();
         return true;
       } catch (error) {
         console.error('Failed to reject return:', error);
-        onError(messages.rejectErrorTitle, messages.rejectErrorBody);
+        toast.error(tMessages('rejectErrorTitle'), tMessages('rejectErrorBody'));
         return false;
       }
     },
-    [storeId, onError, onSuccess, messages, refreshAll, requestRejectReason]
+    [storeId, toast, tMessages, refreshAll, requestRejectReason]
   );
 
   const markReceived = useCallback(
@@ -156,19 +132,19 @@ export function useReturns({
           `/api/v1/stores/${storeId}/returns/admin/${returnId}/received`
         );
         if (error) {
-          onError(messages.receivedErrorTitle, messages.receivedErrorBody);
+          toast.error(tMessages('receivedErrorTitle'), tMessages('receivedErrorBody'));
           return false;
         }
-        onSuccess(messages.receivedSuccessTitle, messages.receivedSuccessBody);
+        toast.success(tMessages('receivedSuccessTitle'), tMessages('receivedSuccessBody'));
         refreshAll();
         return true;
       } catch (error) {
         console.error('Failed to mark as received:', error);
-        onError(messages.receivedErrorTitle, messages.receivedErrorBody);
+        toast.error(tMessages('receivedErrorTitle'), tMessages('receivedErrorBody'));
         return false;
       }
     },
-    [storeId, onError, onSuccess, messages, refreshAll]
+    [storeId, toast, tMessages, refreshAll]
   );
 
   const complete = useCallback(
@@ -181,19 +157,19 @@ export function useReturns({
           { refundMethod }
         );
         if (error) {
-          onError(messages.completeErrorTitle, messages.completeErrorBody);
+          toast.error(tMessages('completeErrorTitle'), tMessages('completeErrorBody'));
           return false;
         }
-        onSuccess(messages.completeSuccessTitle, messages.completeSuccessBody);
+        toast.success(tMessages('completeSuccessTitle'), tMessages('completeSuccessBody'));
         refreshAll();
         return true;
       } catch (error) {
         console.error('Failed to complete return:', error);
-        onError(messages.completeErrorTitle, messages.completeErrorBody);
+        toast.error(tMessages('completeErrorTitle'), tMessages('completeErrorBody'));
         return false;
       }
     },
-    [storeId, onError, onSuccess, messages, refreshAll, requestRefundMethod]
+    [storeId, toast, tMessages, refreshAll, requestRefundMethod]
   );
 
   const changeFilter = useCallback((value: ReturnFilter) => {

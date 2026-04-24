@@ -1,7 +1,6 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import { useToast } from '@force/ui';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { useFeatures } from '../../../../hooks/useFeatures';
@@ -14,10 +13,8 @@ export default function AbandonedCartsPage() {
   const params = useParams();
   const storeId = params?.id as string;
   const { isEnabled } = useFeatures();
-  const { success: toastSuccess, error: showError } = useToast();
 
   const tPage = useT('abandonedCarts.page');
-  const tMessages = useT('abandonedCarts.messages');
   const tEmpty = useT('abandonedCarts.featureDisabled');
 
   const featureEnabled = isEnabled('abandoned_cart');
@@ -38,12 +35,6 @@ export default function AbandonedCartsPage() {
   } = useAbandonedCarts({
     storeId,
     enabled: featureEnabled,
-    saveSuccessTitle: tMessages('saveSuccessTitle'),
-    saveSuccessBody: tMessages('saveSuccessBody'),
-    saveErrorTitle: tMessages('saveErrorTitle'),
-    saveErrorBody: tMessages('saveErrorBody'),
-    onSaveSuccess: toastSuccess,
-    onSaveError: showError,
   });
 
   return (
