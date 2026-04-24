@@ -1,5 +1,6 @@
 'use client';
 
+import { useId } from 'react';
 import { useT } from '@/i18n/useT';
 import { getIdField } from './platformsConfig';
 import type { PixelConfigRow, Platform } from './types';
@@ -29,6 +30,7 @@ export function PixelPlatformCard({
   const t = useT('marketingPixels');
   const tPlatform = useT(`marketingPixels.platforms.${platform.i18nKey}`);
   const isEnabled = config.enabled || false;
+  const contentId = useId();
 
   const getIdValue = (): string => {
     if (platform.id === 'googleAnalytics') return config.measurementId || '';
@@ -45,7 +47,13 @@ export function PixelPlatformCard({
       }`}
     >
       {/* Header */}
-      <div className="flex items-center justify-between p-4 cursor-pointer" onClick={onExpand}>
+      <button
+        type="button"
+        onClick={onExpand}
+        aria-expanded={isExpanded}
+        aria-controls={contentId}
+        className="flex w-full items-center justify-between p-4 bg-transparent border-0 text-start cursor-pointer hover:bg-muted/30 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+      >
         <div className="flex items-center gap-4">
           <div className={`p-2 rounded-lg text-white ${platform.color}`}>{platform.icon}</div>
           <div>
@@ -63,24 +71,37 @@ export function PixelPlatformCard({
           >
             {isEnabled ? t('status.active') : t('status.inactive')}
           </span>
-          <button
-            type="button"
+          {/* Toggle is rendered as a span styled like a switch because nested
+              buttons are invalid HTML; clicks here stop propagation so the
+              outer expand button does not fire. */}
+          <span
+            role="switch"
+            tabIndex={0}
+            aria-checked={isEnabled}
+            aria-label={t('toggleAriaLabel')}
             onClick={e => {
               e.stopPropagation();
               onToggle();
             }}
-            className={`relative w-11 h-6 rounded-full transition-colors ${
+            onKeyDown={e => {
+              if (e.key === ' ' || e.key === 'Enter') {
+                e.preventDefault();
+                e.stopPropagation();
+                onToggle();
+              }
+            }}
+            className={`relative w-11 h-6 rounded-full transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
               isEnabled ? 'bg-primary' : 'bg-border'
             }`}
-            aria-label={t('toggleAriaLabel')}
           >
             <span
               className={`absolute top-0.5 w-5 h-5 bg-card rounded-full shadow transition-transform ${
                 isEnabled ? 'start-5' : 'start-0.5'
               }`}
             />
-          </button>
+          </span>
           <svg
+            aria-hidden="true"
             className={`w-5 h-5 text-muted-foreground transition-transform ${
               isExpanded ? 'rotate-180' : ''
             }`}
@@ -91,11 +112,11 @@ export function PixelPlatformCard({
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
         </div>
-      </div>
+      </button>
 
       {/* Expanded config */}
       {isExpanded && (
-        <div className="border-t border-border p-4 space-y-4 bg-muted/50">
+        <div id={contentId} className="border-t border-border p-4 space-y-4 bg-muted/50">
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">
               {tPlatform('idLabel')}
