@@ -1,9 +1,13 @@
+'use client';
+
 import { SkeletonDashboardStats, SkeletonTable } from '@force/ui';
 import { AdminLayout } from '../components/AdminLayout';
+import { useT } from '@/i18n/useT';
 
 export default function DashboardLoading() {
+  const t = useT('common');
   return (
-    <AdminLayout title="Dashboard" subtitle="Loading...">
+    <AdminLayout title={t('dashboard')} subtitle={t('loading')}>
       {/* Stats Grid Skeleton */}
       <SkeletonDashboardStats count={4} className="mb-8" />
 

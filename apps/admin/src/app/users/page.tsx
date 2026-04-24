@@ -7,6 +7,7 @@ import { AdminLayout } from '../../components/AdminLayout';
 import { ErrorState } from '../../components/ErrorState';
 import { apiGet } from '../../lib/api';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
+import { useT } from '@/i18n/useT';
 
 interface User {
   id: string;
@@ -27,15 +28,6 @@ interface Pagination {
   totalPages: number;
 }
 
-function formatDate(date: string | null) {
-  if (!date) return 'Never';
-  return new Date(date).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-}
-
 const roleColors = {
   super_admin: 'destructive',
   store_admin: 'default',
@@ -49,6 +41,8 @@ const statusColors = {
 } as const;
 
 export default function UsersPage() {
+  const t = useT('users');
+  const tc = useT('common');
   const [users, setUsers] = useState<User[]>([]);
   const [pagination, setPagination] = useState<Pagination>({
     page: 1,
@@ -61,6 +55,15 @@ export default function UsersPage() {
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search, 300);
   const [roleFilter, setRoleFilter] = useState<string>('all');
+
+  function formatDate(date: string | null) {
+    if (!date) return t('neverLoggedIn');
+    return new Date(date).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  }
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -80,15 +83,15 @@ export default function UsersPage() {
         setUsers(data.users || []);
         setPagination(prev => ({ ...prev, ...data.pagination }));
       } else if (apiError) {
-        setError(apiError.message || 'Failed to fetch users');
+        setError(apiError.message || t('errorDefault'));
       }
     } catch (error) {
       console.error('Failed to fetch users:', error);
-      setError('Unable to connect to the server. Please check your connection and try again.');
+      setError(t('errorNetwork'));
     } finally {
       setIsLoading(false);
     }
-  }, [pagination.page, pagination.limit, roleFilter, debouncedSearch]);
+  }, [pagination.page, pagination.limit, roleFilter, debouncedSearch, t]);
 
   useEffect(() => {
     fetchUsers();
@@ -101,14 +104,14 @@ export default function UsersPage() {
 
   return (
     <AdminLayout
-      title="Users"
-      subtitle="Manage all users on the platform"
+      title={t('title')}
+      subtitle={t('subtitle')}
       actions={
         <Button size="sm">
-          <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="me-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
-          Invite User
+          {t('inviteUser')}
         </Button>
       }
     >
@@ -117,7 +120,7 @@ export default function UsersPage() {
         <form onSubmit={handleSearch} className="flex flex-1 gap-2">
           <div className="relative flex-1 max-w-md">
             <svg
-              className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+              className="absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -131,14 +134,14 @@ export default function UsersPage() {
             </svg>
             <input
               type="text"
-              placeholder="Search by name or email..."
+              placeholder={t('searchPlaceholder')}
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="w-full rounded-lg border py-2 pl-10 pr-4 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              className="w-full rounded-lg border py-2 ps-10 pe-4 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             />
           </div>
           <Button type="submit" variant="outline" size="sm">
-            Search
+            {tc('search')}
           </Button>
         </form>
 
@@ -146,69 +149,69 @@ export default function UsersPage() {
           <select
             value={roleFilter}
             onChange={e => setRoleFilter(e.target.value)}
-            aria-label="Filter by role"
+            aria-label={t('filterRoleLabel')}
             className="rounded-lg border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           >
-            <option value="all">All Roles</option>
-            <option value="super_admin">Super Admins</option>
-            <option value="store_admin">Store Admins</option>
-            <option value="customer">Customers</option>
+            <option value="all">{t('allRoles')}</option>
+            <option value="super_admin">{t('roleSuperAdmins')}</option>
+            <option value="store_admin">{t('roleStoreAdmins')}</option>
+            <option value="customer">{t('roleCustomers')}</option>
           </select>
         </div>
       </div>
 
       {/* Error State */}
       {error && !isLoading && (
-        <ErrorState title="Failed to load users" message={error} onRetry={fetchUsers} />
+        <ErrorState title={t('errorTitle')} message={error} onRetry={fetchUsers} />
       )}
 
       {/* Users Table */}
       {!error && (
         <div className="rounded-xl border bg-card shadow-sm overflow-hidden overflow-x-auto">
-          <table className="w-full" aria-label="Users">
+          <table className="w-full" aria-label={t('tableLabel')}>
             <thead className="bg-muted border-b">
               <tr>
                 <th
                   scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                  className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider"
                 >
-                  User
+                  {t('colUser')}
                 </th>
                 <th
                   scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                  className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider"
                 >
-                  Role
+                  {t('colRole')}
                 </th>
                 <th
                   scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                  className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider"
                 >
-                  Status
+                  {t('colStatus')}
                 </th>
                 <th
                   scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                  className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider"
                 >
-                  Stores
+                  {t('colStores')}
                 </th>
                 <th
                   scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                  className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider"
                 >
-                  Joined
+                  {t('colJoined')}
                 </th>
                 <th
                   scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                  className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider"
                 >
-                  Last Login
+                  {t('colLastLogin')}
                 </th>
                 <th
                   scope="col"
-                  className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                  className="px-6 py-3 text-end text-xs font-medium text-muted-foreground uppercase tracking-wider"
                 >
-                  Actions
+                  {t('colActions')}
                 </th>
               </tr>
             </thead>
@@ -241,7 +244,7 @@ export default function UsersPage() {
                       <div className="h-4 w-24 bg-muted rounded animate-pulse" />
                     </td>
                     <td className="px-6 py-4">
-                      <div className="h-8 w-16 bg-muted rounded animate-pulse ml-auto" />
+                      <div className="h-8 w-16 bg-muted rounded animate-pulse ms-auto" />
                     </td>
                   </tr>
                 ))
@@ -265,10 +268,12 @@ export default function UsersPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <Badge variant={roleColors[user.role]}>{user.role.replace('_', ' ')}</Badge>
+                      <Badge variant={roleColors[user.role]}>{t(`role.${user.role}`)}</Badge>
                     </td>
                     <td className="px-6 py-4">
-                      <Badge variant={statusColors[user.status]}>{user.status}</Badge>
+                      <Badge variant={statusColors[user.status]}>
+                        {t(`status.${user.status}`)}
+                      </Badge>
                     </td>
                     <td className="px-6 py-4 text-sm text-muted-foreground">
                       {user.stores && user.stores.length > 0 ? (
@@ -284,7 +289,7 @@ export default function UsersPage() {
                           ))}
                           {user.stores.length > 2 && (
                             <span className="text-muted-foreground">
-                              +{user.stores.length - 2} more
+                              {t('moreCount', { count: user.stores.length - 2 })}
                             </span>
                           )}
                         </div>
@@ -298,10 +303,10 @@ export default function UsersPage() {
                     <td className="px-6 py-4 text-sm text-muted-foreground">
                       {formatDate(user.lastLoginAt)}
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-4 text-end">
                       <Link href={`/users/${user.id}`}>
                         <Button variant="outline" size="sm">
-                          View
+                          {t('view')}
                         </Button>
                       </Link>
                     </td>
@@ -324,7 +329,7 @@ export default function UsersPage() {
                           d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
                         />
                       </svg>
-                      <p className="mt-4 text-muted-foreground">No users found</p>
+                      <p className="mt-4 text-muted-foreground">{t('empty')}</p>
                     </div>
                   </td>
                 </tr>
@@ -336,9 +341,11 @@ export default function UsersPage() {
           {pagination.totalPages > 1 && (
             <div className="flex items-center justify-between border-t px-6 py-3">
               <p className="text-sm text-muted-foreground">
-                Showing {(pagination.page - 1) * pagination.limit + 1} to{' '}
-                {Math.min(pagination.page * pagination.limit, pagination.total)} of{' '}
-                {pagination.total} users
+                {t('paginationShowing', {
+                  from: (pagination.page - 1) * pagination.limit + 1,
+                  to: Math.min(pagination.page * pagination.limit, pagination.total),
+                  total: pagination.total,
+                })}
               </p>
               <div className="flex gap-2">
                 <Button
@@ -347,7 +354,7 @@ export default function UsersPage() {
                   disabled={pagination.page === 1}
                   onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
                 >
-                  Previous
+                  {t('previous')}
                 </Button>
                 <Button
                   variant="outline"
@@ -355,7 +362,7 @@ export default function UsersPage() {
                   disabled={pagination.page === pagination.totalPages}
                   onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
                 >
-                  Next
+                  {t('next')}
                 </Button>
               </div>
             </div>

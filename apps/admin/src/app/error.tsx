@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useT } from '@/i18n/useT';
 
 export default function Error({
   error,
@@ -9,6 +10,7 @@ export default function Error({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const t = useT('common.errors.boundary');
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center px-4">
       <div className="force-card max-w-lg w-full py-12 text-center">
@@ -27,32 +29,28 @@ export default function Error({
             />
           </svg>
         </div>
-        <h2 className="mb-2 text-xl font-semibold text-foreground">Something went wrong</h2>
-        <p className="mb-4 text-muted-foreground">
-          An unexpected error occurred in the admin panel.
-        </p>
+        <h2 className="mb-2 text-xl font-semibold text-foreground">{t('title')}</h2>
+        <p className="mb-4 text-muted-foreground">{t('message')}</p>
         {error.digest && (
           <p className="mb-4 rounded-lg bg-muted px-3 py-2 font-mono text-xs text-muted-foreground">
-            Error ID: {error.digest}
+            {t('errorId', { id: error.digest })}
           </p>
         )}
-        <p className="mb-6 rounded-lg bg-muted px-3 py-2 text-left font-mono text-xs text-muted-foreground break-all">
-          {process.env.NODE_ENV === 'development'
-            ? error.message || 'Unknown error'
-            : 'An unexpected error occurred.'}
+        <p className="mb-6 rounded-lg bg-muted px-3 py-2 text-start font-mono text-xs text-muted-foreground break-all">
+          {process.env.NODE_ENV === 'development' ? error.message || t('unknown') : t('generic')}
         </p>
         <div className="flex justify-center gap-3">
           <button
             onClick={reset}
             className="rounded-lg bg-primary px-5 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
-            Try Again
+            {t('retry')}
           </button>
           <Link
             href="/"
             className="rounded-lg border border-border px-5 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
           >
-            Go to Dashboard
+            {t('goHome')}
           </Link>
         </div>
       </div>

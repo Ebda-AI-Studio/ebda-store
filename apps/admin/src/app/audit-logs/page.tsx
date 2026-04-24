@@ -6,6 +6,7 @@ import { Button, Badge } from '@force/ui';
 import { AdminLayout } from '../../components/AdminLayout';
 import { apiGet } from '../../lib/api';
 import { useStore } from '../../contexts/StoreContext';
+import { useT } from '@/i18n/useT';
 
 interface AuditLog {
   id: string;
@@ -68,6 +69,7 @@ const entityIcons: Record<string, string> = {
 };
 
 export default function AuditLogsPage() {
+  const t = useT('audit');
   const { selectedStoreId } = useStore();
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [pagination, setPagination] = useState<Pagination>({
@@ -120,11 +122,11 @@ export default function AuditLogsPage() {
 
   return (
     <AdminLayout
-      title="Audit Logs"
-      subtitle="Track all platform activity and changes"
+      title={t('title')}
+      subtitle={t('subtitle')}
       actions={
         <Button variant="outline" size="sm" onClick={() => fetchLogs()}>
-          <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="me-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -132,7 +134,7 @@ export default function AuditLogsPage() {
               d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
             />
           </svg>
-          Refresh
+          {t('refresh')}
         </Button>
       }
     >
@@ -141,29 +143,29 @@ export default function AuditLogsPage() {
         <select
           value={entityFilter}
           onChange={e => setEntityFilter(e.target.value)}
-          aria-label="Filter by entity"
+          aria-label={t('filterEntityLabel')}
           className="rounded-lg border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
         >
-          <option value="all">All Entities</option>
-          <option value="store">Stores</option>
-          <option value="user">Users</option>
-          <option value="product">Products</option>
-          <option value="order">Orders</option>
-          <option value="setting">Settings</option>
+          <option value="all">{t('allEntities')}</option>
+          <option value="store">{t('entityStore')}</option>
+          <option value="user">{t('entityUser')}</option>
+          <option value="product">{t('entityProduct')}</option>
+          <option value="order">{t('entityOrder')}</option>
+          <option value="setting">{t('entitySetting')}</option>
         </select>
 
         <select
           value={actionFilter}
           onChange={e => setActionFilter(e.target.value)}
-          aria-label="Filter by action"
+          aria-label={t('filterActionLabel')}
           className="rounded-lg border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
         >
-          <option value="all">All Actions</option>
-          <option value="create">Create</option>
-          <option value="update">Update</option>
-          <option value="delete">Delete</option>
-          <option value="login">Login</option>
-          <option value="logout">Logout</option>
+          <option value="all">{t('allActions')}</option>
+          <option value="create">{t('actionCreate')}</option>
+          <option value="update">{t('actionUpdate')}</option>
+          <option value="delete">{t('actionDelete')}</option>
+          <option value="login">{t('actionLogin')}</option>
+          <option value="logout">{t('actionLogout')}</option>
         </select>
       </div>
 
@@ -227,13 +229,13 @@ export default function AuditLogsPage() {
                           {log.user.firstName} {log.user.lastName}
                         </Link>
                       ) : (
-                        <span className="font-medium text-muted-foreground">System</span>
+                        <span className="font-medium text-muted-foreground">{t('system')}</span>
                       )}{' '}
                       {log.action.toLowerCase()} {log.entityType}
                       {log.entityId && (
                         <span className="text-muted-foreground">
                           {' '}
-                          (ID: {log.entityId.slice(0, 8)}...)
+                          ({t('idPrefix')} {log.entityId.slice(0, 8)}...)
                         </span>
                       )}
                     </p>
@@ -247,7 +249,7 @@ export default function AuditLogsPage() {
                         onClick={() => setExpandedLog(expandedLog === log.id ? null : log.id)}
                         className="mt-2 text-xs text-primary hover:underline"
                       >
-                        {expandedLog === log.id ? 'Hide details' : 'Show details'}
+                        {expandedLog === log.id ? t('hideDetails') : t('showDetails')}
                       </button>
                     )}
                     {expandedLog === log.id && (
@@ -258,7 +260,7 @@ export default function AuditLogsPage() {
                   </div>
 
                   {/* Timestamp */}
-                  <div className="text-right flex-shrink-0">
+                  <div className="text-end flex-shrink-0">
                     <p className="text-sm text-muted-foreground">{formatDateTime(log.createdAt)}</p>
                   </div>
                 </div>
@@ -279,7 +281,7 @@ export default function AuditLogsPage() {
                   d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                 />
               </svg>
-              <p className="mt-4 text-muted-foreground">No audit logs found</p>
+              <p className="mt-4 text-muted-foreground">{t('empty')}</p>
             </div>
           )}
         </div>
@@ -288,9 +290,11 @@ export default function AuditLogsPage() {
         {pagination.totalPages > 1 && (
           <div className="flex items-center justify-between border-t px-6 py-3">
             <p className="text-sm text-muted-foreground">
-              Showing {(pagination.page - 1) * pagination.limit + 1} to{' '}
-              {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total}{' '}
-              logs
+              {t('paginationShowing', {
+                from: (pagination.page - 1) * pagination.limit + 1,
+                to: Math.min(pagination.page * pagination.limit, pagination.total),
+                total: pagination.total,
+              })}
             </p>
             <div className="flex gap-2">
               <Button
@@ -299,7 +303,7 @@ export default function AuditLogsPage() {
                 disabled={pagination.page === 1}
                 onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
               >
-                Previous
+                {t('previous')}
               </Button>
               <Button
                 variant="outline"
@@ -307,7 +311,7 @@ export default function AuditLogsPage() {
                 disabled={pagination.page === pagination.totalPages}
                 onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
               >
-                Next
+                {t('next')}
               </Button>
             </div>
           </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from '@force/ui';
+import { useT } from '@/i18n/useT';
 
 interface ErrorStateProps {
   title?: string;
@@ -9,12 +10,10 @@ interface ErrorStateProps {
   retryText?: string;
 }
 
-export function ErrorState({
-  title = 'Something went wrong',
-  message,
-  onRetry,
-  retryText = 'Try Again',
-}: ErrorStateProps) {
+export function ErrorState({ title, message, onRetry, retryText }: ErrorStateProps) {
+  const t = useT('components.errorState');
+  const resolvedTitle = title ?? t('defaultTitle');
+  const resolvedRetryText = retryText ?? t('defaultRetry');
   return (
     <div className="force-card py-16">
       <div className="flex flex-col items-center text-center">
@@ -33,7 +32,7 @@ export function ErrorState({
             />
           </svg>
         </div>
-        <h3 className="text-xl font-semibold text-foreground mb-2">{title}</h3>
+        <h3 className="text-xl font-semibold text-foreground mb-2">{resolvedTitle}</h3>
         <p className="text-muted-foreground mb-6 max-w-sm">{message}</p>
         {onRetry && (
           <Button onClick={onRetry} className="gap-2">
@@ -45,7 +44,7 @@ export function ErrorState({
                 d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
               />
             </svg>
-            {retryText}
+            {resolvedRetryText}
           </Button>
         )}
       </div>
