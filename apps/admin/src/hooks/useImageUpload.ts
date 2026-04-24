@@ -1,0 +1,151 @@
+'use client';
+
+import { useCallback, useState } from 'react';
+import { getApiUrl } from '../lib/api';
+import { useT } from '@/i18n/useT';
+
+type Translator = ReturnType<typeof useT>;
+
+/**
+ * Shared upload helpers for the ImageUpload widgets. Extracted so the
+ * single- and multi-image variants don't duplicate XHR/progress logic.
+ */
+export function useImageUpload() {
+  const t = useT('components.imageUpload');
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+
+  const uploadSingle = useCallback(
+    async (file: File, folder: string): Promise<string | null> => {
+      setError(null);
+      setUploading(true);
+      setProgress(0);
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        const url = await runXhr<string>({
+          t,
+          url: `${getApiUrl()}/api/v1/uploads/image?folder=${encodeURIComponent(folder)}`,
+          formData,
+          onProgress: setProgress,
+          parse: data => {
+            if (data.success && data.data?.url) return data.data.url as string;
+            throw new Error(data.error?.message || t('errors.uploadFailed'));
+          },
+        });
+        return url;
+      } catch (err) {
+        setError(err instanceof Error ? err.message : t('errors.uploadFailed'));
+        return null;
+      } finally {
+        setUploading(false);
+        setProgress(0);
+      }
+    },
+    [t]
+  );
+
+  const uploadMulti = useCallback(
+    async (files: File[], folder: string): Promise<string[] | null> => {
+      setError(null);
+      setUploading(true);
+      setProgress(0);
+
+      const formData = new FormData();
+      files.forEach(f => formData.append('files', f));
+
+      try {
+        const urls = await runXhr<string[]>({
+          t,
+          url: `${getApiUrl()}/api/v1/uploads/images?folder=${encodeURIComponent(folder)}`,
+          formData,
+          onProgress: setProgress,
+          parse: data => {
+            if (data.success && data.data?.files) {
+              return (data.data.files as Array<{ url: string }>).map(f => f.url);
+            }
+            throw new Error(data.error?.message || t('errors.uploadFailed'));
+          },
+        });
+        return urls;
+      } catch (err) {
+        setError(err instanceof Error ? err.message : t('errors.uploadFailed'));
+        return null;
+      } finally {
+        setUploading(false);
+        setProgress(0);
+      }
+    },
+    [t]
+  );
+
+  return {
+    uploading,
+    progress,
+    error,
+    setError,
+    uploadSingle,
+    uploadMulti,
+  };
+}
+
+interface UploadResponse {
+  success?: boolean;
+  data?: {
+    url?: string;
+    files?: Array<{ url: string }>;
+  };
+  error?: { message?: string };
+}
+
+interface RunXhrOptions<T> {
+  t: Translator;
+  url: string;
+  formData: FormData;
+  onProgress: (pct: number) => void;
+  parse: (data: UploadResponse) => T;
+}
+
+function runXhr<T>({ t, url, formData, onProgress, parse }: RunXhrOptions<T>): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+
+    xhr.upload.addEventListener('progress', e => {
+      if (e.lengthComputable) {
+        onProgress(Math.round((e.loaded / e.total) * 100));
+      }
+    });
+
+    xhr.addEventListener('load', () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const data: UploadResponse = JSON.parse(xhr.responseText);
+          resolve(parse(data));
+        } catch (err) {
+          if (err instanceof Error && err.message) reject(err);
+          else reject(new Error(t('errors.invalidResponse')));
+        }
+      } else {
+        try {
+          const data: UploadResponse = JSON.parse(xhr.responseText);
+          reject(
+            new Error(data.error?.message || t('errors.uploadFailedWithCode', { code: xhr.status }))
+          );
+        } catch {
+          reject(new Error(t('errors.uploadFailedWithCode', { code: xhr.status })));
+        }
+      }
+    });
+
+    xhr.addEventListener('error', () => reject(new Error(t('errors.networkError'))));
+    xhr.addEventListener('abort', () => reject(new Error(t('errors.cancelled'))));
+
+    xhr.open('POST', url);
+    xhr.withCredentials = true;
+    xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+    xhr.send(formData);
+  });
+}
