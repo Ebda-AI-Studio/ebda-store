@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import Image from 'next/image';
 import { Input } from '@force/ui';
 import { useT } from '@/i18n/useT';
 import { apiGet } from '../../../../../../../lib/api';
@@ -107,9 +108,11 @@ export function ProductSearch({ storeId, onSelect, excludeIds, disabled }: Produ
             >
               <div className="h-8 w-8 rounded-md bg-muted overflow-hidden flex-shrink-0">
                 {product.images?.[0] ? (
-                  <img
+                  <Image
                     src={product.images[0].url}
                     alt={product.name}
+                    width={32}
+                    height={32}
                     className="h-full w-full object-cover"
                   />
                 ) : (

@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useT } from '@/i18n/useT';
 import { formatCurrency, type TopProduct } from './types';
 
@@ -25,9 +26,11 @@ export function TopProductsTable({ products }: TopProductsTableProps) {
             <div key={product.id} className="flex items-center gap-3">
               <span className="text-sm font-medium text-muted-foreground w-4">{i + 1}</span>
               {product.image ? (
-                <img
+                <Image
                   src={product.image}
                   alt={product.name}
+                  width={40}
+                  height={40}
                   className="w-10 h-10 rounded object-cover"
                 />
               ) : (

@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useT } from '@/i18n/useT';
 import type { LowStockProduct } from './types';
 
@@ -40,9 +41,11 @@ export function LowStockAlertsCard({ products }: LowStockAlertsCardProps) {
           {products.slice(0, 5).map(product => (
             <div key={product.id} className="flex items-center gap-3">
               {product.images?.[0]?.url ? (
-                <img
+                <Image
                   src={product.images[0].url}
                   alt={product.name}
+                  width={40}
+                  height={40}
                   className="w-10 h-10 rounded object-cover"
                 />
               ) : (

@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useT } from '@/i18n/useT';
 
 interface Category {
@@ -123,9 +124,11 @@ export function CategoryTable({
               <td className="px-6 py-4">
                 <div className="flex items-center gap-3">
                   {cat.image ? (
-                    <img
+                    <Image
                       src={cat.image}
                       alt={cat.name}
+                      width={40}
+                      height={40}
                       className="h-10 w-10 rounded-lg object-cover"
                     />
                   ) : (

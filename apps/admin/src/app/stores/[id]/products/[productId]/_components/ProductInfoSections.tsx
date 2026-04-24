@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { Badge } from '@force/ui';
 import { useT } from '@/i18n/useT';
 import { formatPrice } from '../../../../../../lib/format';
@@ -153,9 +154,11 @@ export function ProductInfoSections({
                 key={image.id}
                 className="aspect-square rounded-lg overflow-hidden border bg-muted"
               >
-                <img
+                <Image
                   src={image.url}
                   alt={image.alt || product.name}
+                  width={300}
+                  height={300}
                   className="h-full w-full object-cover"
                 />
               </div>

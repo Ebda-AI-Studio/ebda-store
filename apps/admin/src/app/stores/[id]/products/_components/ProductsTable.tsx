@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { Button } from '@force/ui';
 import { formatPrice } from '../../../../../lib/format';
 import { useT } from '@/i18n/useT';
@@ -114,9 +115,11 @@ export function ProductsTable({
                   <div className="flex items-center gap-3">
                     <div className="h-10 w-10 rounded-lg bg-muted overflow-hidden">
                       {product.images?.[0] ? (
-                        <img
+                        <Image
                           src={product.images[0].url}
                           alt={product.name}
+                          width={40}
+                          height={40}
                           className="h-full w-full object-cover"
                         />
                       ) : (

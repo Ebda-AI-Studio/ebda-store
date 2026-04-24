@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useT } from '@/i18n/useT';
 import type { ProductSummary } from './ProductSearch';
 
@@ -15,9 +16,11 @@ export function SelectedProductCard({ product, onRemove }: SelectedProductCardPr
     <div className="flex items-center gap-3 rounded-lg border bg-card px-3 py-2">
       <div className="h-10 w-10 rounded-md bg-muted overflow-hidden flex-shrink-0">
         {product.images?.[0] ? (
-          <img
+          <Image
             src={product.images[0].url}
             alt={product.name}
+            width={40}
+            height={40}
             className="h-full w-full object-cover"
           />
         ) : (

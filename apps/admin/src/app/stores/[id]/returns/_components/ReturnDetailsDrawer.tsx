@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { Button, Badge } from '@force/ui';
 import { useT } from '@/i18n/useT';
 import { ReturnStatusBadge } from './ReturnStatusBadge';
@@ -108,9 +109,11 @@ export function ReturnDetailsDrawer({
               {record.items.map(item => (
                 <div key={item.id} className="flex items-center gap-3 p-3 bg-muted rounded-lg">
                   {item.product?.images?.[0]?.url ? (
-                    <img
+                    <Image
                       src={item.product.images[0].url}
                       alt=""
+                      width={48}
+                      height={48}
                       className="w-12 h-12 rounded object-cover"
                     />
                   ) : (

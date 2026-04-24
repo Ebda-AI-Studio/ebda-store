@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useT } from '@/i18n/useT';
 import type { PWASettings } from './types';
 
@@ -33,9 +34,11 @@ export function PwaIconUploader({ settings, pwaEnabled, onChange }: PwaIconUploa
             disabled={!pwaEnabled}
           />
           {settings.icon192 && (
-            <img
+            <Image
               src={settings.icon192}
               alt={t('icon192Alt')}
+              width={48}
+              height={48}
               className="mt-2 w-12 h-12 rounded-lg object-contain bg-muted border"
             />
           )}
@@ -54,9 +57,11 @@ export function PwaIconUploader({ settings, pwaEnabled, onChange }: PwaIconUploa
             disabled={!pwaEnabled}
           />
           {settings.icon512 && (
-            <img
+            <Image
               src={settings.icon512}
               alt={t('icon512Alt')}
+              width={48}
+              height={48}
               className="mt-2 w-12 h-12 rounded-lg object-contain bg-muted border"
             />
           )}
@@ -75,9 +80,11 @@ export function PwaIconUploader({ settings, pwaEnabled, onChange }: PwaIconUploa
             disabled={!pwaEnabled}
           />
           {settings.maskableIcon && (
-            <img
+            <Image
               src={settings.maskableIcon}
               alt={t('maskableAlt')}
+              width={48}
+              height={48}
               className="mt-2 w-12 h-12 rounded-lg object-contain bg-muted border"
             />
           )}
