@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import type { ProductCardProps } from '../types';
@@ -9,6 +9,7 @@ import { Price, ProductBadge, ProductBadgeGroup, Rating, AddToCartButton, cn } f
 import { calculateDiscount } from '../shared/display-helpers';
 import { PlaceholderImageIcon } from '../shared/icons';
 import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions';
+import { productCardPropsEqual } from '../shared/product-card-memo';
 
 /**
  * Modern Template - Product Card
@@ -19,7 +20,7 @@ import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions'
  * - Rating: Star rating display
  * - AddToCartButton: Add to cart with states
  */
-export default function ModernProductCard({
+function ModernProductCard({
   product,
   isRtl: isRtlProp,
   currency = 'KWD',
@@ -211,3 +212,5 @@ export default function ModernProductCard({
     </Link>
   );
 }
+
+export default memo(ModernProductCard, productCardPropsEqual);

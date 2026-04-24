@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import type { ProductCardProps } from '../types';
@@ -7,6 +8,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions';
 import { Price, ProductBadge, AddToCartButton, cn } from '@force/ui';
 import { PlaceholderImageIcon } from '../shared/icons';
+import { productCardPropsEqual } from '../shared/product-card-memo';
 
 /**
  * Classic Template - Product Card
@@ -15,7 +17,7 @@ import { PlaceholderImageIcon } from '../shared/icons';
  * image, serif name, classic price. No lift animation; border color change
  * + gentle image zoom on hover.
  */
-export default function ClassicProductCard({
+function ClassicProductCard({
   product,
   isRtl: isRtlProp,
   currency = 'KWD',
@@ -139,3 +141,5 @@ export default function ClassicProductCard({
     </Link>
   );
 }
+
+export default memo(ClassicProductCard, productCardPropsEqual);

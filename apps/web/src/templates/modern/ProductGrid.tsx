@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import ProductCard from './ProductCard';
 import type { ProductGridProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -12,7 +11,7 @@ import { NoProductsIcon } from '../shared/icons';
  *
  * Renders a responsive grid of ProductCards with:
  * - Responsive column layout (2 mobile → 3 tablet → 4 desktop)
- * - Staggered fade-in animation on mount
+ * - CSS-only staggered fade-in (animation-delay derived from `--i` per card)
  * - Empty state handling
  * - Cart quantity tracking per product
  */
@@ -34,21 +33,6 @@ export default function ModernProductGrid({
 }: ProductGridProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
-  const [visibleCount, setVisibleCount] = useState(0);
-
-  useEffect(() => {
-    if (products.length === 0) return;
-    let i = 0;
-    const step = () => {
-      i += 1;
-      setVisibleCount(i);
-      if (i < products.length) {
-        setTimeout(step, 60);
-      }
-    };
-    const id = setTimeout(step, 80);
-    return () => clearTimeout(id);
-  }, [products.length]);
 
   const gridCols: Record<2 | 3 | 4, string> = {
     2: 'grid-cols-2',
@@ -87,11 +71,8 @@ export default function ModernProductGrid({
         <div
           key={product.id}
           role="listitem"
-          className="transition-all duration-500 ease-out"
-          style={{
-            opacity: index < visibleCount ? 1 : 0,
-            transform: index < visibleCount ? 'translateY(0)' : 'translateY(16px)',
-          }}
+          className="motion-safe:[animation:fadeUp_0.5s_ease-out_calc(var(--i)*60ms)_both] motion-reduce:opacity-100"
+          style={{ ['--i' as string]: index } as React.CSSProperties}
         >
           <ProductCard
             product={product}

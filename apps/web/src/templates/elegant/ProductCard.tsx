@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import type { ProductCardProps } from '../types';
@@ -8,6 +8,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions';
 import { Price, ProductBadge, ProductBadgeGroup, AddToCartButton, cn } from '@force/ui';
 import { PlaceholderImageIcon } from '../shared/icons';
+import { productCardPropsEqual } from '../shared/product-card-memo';
 
 /**
  * Elegant Template - Product Card
@@ -15,7 +16,7 @@ import { PlaceholderImageIcon } from '../shared/icons';
  * Luxury fashion aesthetic: no borders, portrait aspect ratio, ultra-subtle
  * hover states. Uses shared components from @force/ui.
  */
-export default function ElegantProductCard({
+function ElegantProductCard({
   product,
   isRtl: isRtlProp,
   currency = 'KWD',
@@ -207,3 +208,5 @@ export default function ElegantProductCard({
     </Link>
   );
 }
+
+export default memo(ElegantProductCard, productCardPropsEqual);

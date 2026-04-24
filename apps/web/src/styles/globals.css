@@ -449,6 +449,20 @@
   to { opacity: 1; }
 }
 
+/* Combined fade + lift used by the modern hero and product grid. The
+   product grid sets `--i: <index>` on each card so the per-card delay
+   resolves to `calc(var(--i) * 60ms)` — the previous JS implementation
+   ran 12 setTimeouts and re-rendered on every step. */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes heroFadeIn {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: none; }
+}
+
 @keyframes slideUp {
   from {
     opacity: 0;

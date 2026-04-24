@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import type { HeroProps } from '../types';
@@ -19,12 +18,6 @@ export default function ModernHero({
 }: HeroProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    const t = setTimeout(() => setMounted(true), 50);
-    return () => clearTimeout(t);
-  }, []);
 
   const displayTitle =
     isRtl && titleAr
@@ -44,7 +37,7 @@ export default function ModernHero({
         >
           {/* Content */}
           <div
-            className={`space-y-7 ${isRtl ? 'lg:order-2 text-right' : 'lg:order-1'} transition-all duration-700 ease-out ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}
+            className={`space-y-7 ${isRtl ? 'lg:order-2 text-right' : 'lg:order-1'} motion-safe:[animation:heroFadeIn_0.7s_ease-out_both] motion-reduce:opacity-100`}
           >
             <div className="space-y-4">
               <h1
@@ -88,7 +81,7 @@ export default function ModernHero({
 
           {/* Image */}
           <div
-            className={`relative ${isRtl ? 'lg:order-1' : 'lg:order-2'} transition-all duration-700 delay-150 ease-out ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
+            className={`relative ${isRtl ? 'lg:order-1' : 'lg:order-2'} motion-safe:[animation:heroFadeIn_0.7s_ease-out_0.15s_both] motion-reduce:opacity-100`}
           >
             <div className="relative aspect-[4/3] lg:aspect-[5/4] rounded-2xl overflow-hidden shadow-2xl shadow-black/10">
               {image ? (

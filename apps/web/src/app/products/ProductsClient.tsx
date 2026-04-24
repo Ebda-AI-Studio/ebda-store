@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { api, type Product, type Category, type PaginationMeta } from '@/lib/api';
@@ -85,8 +85,14 @@ export default function ProductsClient({
   const { components: T, isLoading: templateLoading } = useTemplateComponents();
   const sortOptions = getSortOptions(t);
 
-  const cartQuantities: Record<string, number> = {};
-  for (const item of cartItems) cartQuantities[item.productId] = item.quantity;
+  // Memoise the cart-id → quantity map so memoised ProductCards stay
+  // referentially stable across unrelated re-renders. Without this, a fresh
+  // object literal on every render forces every card to re-render.
+  const cartQuantities = useMemo<Record<string, number>>(() => {
+    const map: Record<string, number> = {};
+    for (const item of cartItems) map[item.productId] = item.quantity;
+    return map;
+  }, [cartItems]);
 
   // Sync compare state from localStorage on mount (client-only)
   useEffect(() => {

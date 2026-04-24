@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import type { ProductCardProps } from '../types';
@@ -9,6 +9,7 @@ import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions'
 import { Price, ProductBadge, ProductBadgeGroup, AddToCartButton, cn } from '@force/ui';
 import { calculateDiscount } from '../shared/display-helpers';
 import { PlaceholderImageIcon } from '../shared/icons';
+import { productCardPropsEqual } from '../shared/product-card-memo';
 
 /**
  * Bold Template - Product Card
@@ -16,7 +17,7 @@ import { PlaceholderImageIcon } from '../shared/icons';
  * High-energy streetwear aesthetic: dark borders, aggressive hover,
  * bright accent colors. Uses shared components from @force/ui.
  */
-export default function BoldProductCard({
+function BoldProductCard({
   product,
   isRtl: isRtlProp,
   currency = 'KWD',
@@ -151,3 +152,5 @@ export default function BoldProductCard({
     </Link>
   );
 }
+
+export default memo(BoldProductCard, productCardPropsEqual);

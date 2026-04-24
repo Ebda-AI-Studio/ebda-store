@@ -1,11 +1,13 @@
 'use client';
 
+import { memo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import type { ProductCardProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions';
 import { Price } from '@force/ui';
+import { productCardPropsEqual } from '../shared/product-card-memo';
 
 /**
  * Minimal Template - Product Card
@@ -14,7 +16,7 @@ import { Price } from '@force/ui';
  * aspect-[3/4] image, huge whitespace, name + price only.
  * Hover: subtle opacity fade on image only.
  */
-export default function MinimalProductCard({
+function MinimalProductCard({
   product,
   isRtl: isRtlProp,
   currency = 'KWD',
@@ -93,3 +95,5 @@ export default function MinimalProductCard({
     </Link>
   );
 }
+
+export default memo(MinimalProductCard, productCardPropsEqual);
