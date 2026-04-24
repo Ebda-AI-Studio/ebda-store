@@ -155,7 +155,11 @@ export default function CompareClient() {
               '\u0645\u0642\u0627\u0631\u0646\u0629 \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a'
             )}
           </h1>
-          <button onClick={clearAll} className="text-destructive hover:text-destructive/80 text-sm">
+          <button
+            type="button"
+            onClick={clearAll}
+            className="text-destructive hover:text-destructive/80 text-sm"
+          >
             {t('Clear All', '\u0645\u0633\u062d \u0627\u0644\u0643\u0644')}
           </button>
         </div>
@@ -171,7 +175,9 @@ export default function CompareClient() {
                   <th key={product.id} className="p-4 bg-muted">
                     <div className="relative">
                       <button
+                        type="button"
                         onClick={() => removeProduct(product.id)}
+                        aria-label={t('Remove from compare', 'إزالة من المقارنة')}
                         className="absolute -top-2 -right-2 p-1 bg-destructive/20 rounded-full text-destructive hover:bg-destructive/30"
                       >
                         <svg
@@ -275,6 +281,7 @@ export default function CompareClient() {
                 {products.map(product => (
                   <td key={product.id} className="p-4 text-center">
                     <button
+                      type="button"
                       onClick={() => handleAddToCart(product)}
                       className="w-full px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
                     >

@@ -76,6 +76,7 @@ export default function ForgotPasswordClient() {
                   '\u0644\u0645 \u062a\u0633\u062a\u0644\u0645 \u0627\u0644\u0628\u0631\u064a\u062f\u061f \u062a\u062d\u0642\u0642 \u0645\u0646 \u0645\u062c\u0644\u062f \u0627\u0644\u0631\u0633\u0627\u0626\u0644 \u063a\u064a\u0631 \u0627\u0644\u0645\u0631\u063a\u0648\u0628\u0629 \u0623\u0648'
                 )}{' '}
                 <button
+                  type="button"
                   onClick={() => setIsSubmitted(false)}
                   className="text-primary hover:underline"
                 >

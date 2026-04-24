@@ -338,8 +338,10 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                 {images.map((img, index) => (
                   <button
                     key={img.id || index}
+                    type="button"
                     onClick={() => setSelectedImage(index)}
                     aria-label={`Select image ${index + 1} of ${images.length}`}
+                    aria-pressed={selectedImage === index}
                     className={`aspect-square overflow-hidden rounded-lg transition ${
                       selectedImage === index
                         ? 'ring-2 ring-primary'
@@ -405,13 +407,18 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                 </span>
                 <div className="flex items-center rounded-lg border border-border">
                   <button
+                    type="button"
                     onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                    aria-label={t('Decrease quantity', 'تقليل الكمية')}
                     className="px-4 py-2 text-muted-foreground hover:bg-muted cursor-pointer"
                   >
                     -
                   </button>
-                  <span className="w-12 text-center font-medium">{quantity}</span>
+                  <span aria-live="polite" className="w-12 text-center font-medium">
+                    {quantity}
+                  </span>
                   <button
+                    type="button"
                     onClick={() => {
                       const maxQty =
                         effectiveInventory != null && effectiveInventory > 0
@@ -419,6 +426,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                           : 10;
                       setQuantity(Math.min(quantity + 1, maxQty));
                     }}
+                    aria-label={t('Increase quantity', 'زيادة الكمية')}
                     className="px-4 py-2 text-muted-foreground hover:bg-muted cursor-pointer"
                   >
                     +

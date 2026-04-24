@@ -24,7 +24,7 @@ export function CompareButton({
   isRtl = false,
   className = '',
 }: CompareButtonProps) {
-  const side = isRtl ? 'right-3' : 'left-3';
+  // logical positioning — `start-3` flips automatically under [dir="rtl"]
   return (
     <button
       type="button"
@@ -33,7 +33,7 @@ export function CompareButton({
         e.stopPropagation();
         onToggle(productId);
       }}
-      className={`absolute top-3 ${side} z-10 flex h-9 w-9 items-center justify-center rounded-full shadow-md backdrop-blur-sm transition-all ${
+      className={`absolute top-3 start-3 z-10 flex h-11 w-11 items-center justify-center rounded-full shadow-md backdrop-blur-sm transition-all ${
         isInCompare
           ? 'bg-primary text-primary-foreground scale-105'
           : 'bg-background/95 text-muted-foreground hover:bg-background hover:text-foreground'
@@ -89,7 +89,8 @@ export function RemoveFromWishlistButton({
   isRtl = false,
   className = '',
 }: RemoveFromWishlistButtonProps) {
-  const side = isRtl ? 'left-3' : 'right-3';
+  // The remove button sits on the *opposite* side from CompareButton, so it
+  // uses `end-3` (logical, flips under [dir="rtl"]).
   return (
     <button
       type="button"
@@ -98,7 +99,7 @@ export function RemoveFromWishlistButton({
         e.stopPropagation();
         onRemove(productId);
       }}
-      className={`absolute top-3 ${side} z-10 flex h-9 w-9 items-center justify-center rounded-full bg-background/95 text-destructive shadow-md backdrop-blur-sm transition-all hover:bg-destructive hover:text-[hsl(var(--destructive-foreground))] ${className}`}
+      className={`absolute top-3 end-3 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-background/95 text-destructive shadow-md backdrop-blur-sm transition-all hover:bg-destructive hover:text-[hsl(var(--destructive-foreground))] ${className}`}
       aria-label={isRtl ? 'إزالة من المفضلة' : 'Remove from wishlist'}
       title={isRtl ? 'إزالة من المفضلة' : 'Remove from wishlist'}
     >

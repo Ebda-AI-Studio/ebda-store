@@ -98,11 +98,12 @@ export default function MinimalHeader({
           </nav>
 
           {/* Actions */}
-          <div className={`flex items-center gap-5 ${isRtl ? 'flex-row-reverse' : ''}`}>
+          <div className={`flex items-center gap-2 ${isRtl ? 'flex-row-reverse' : ''}`}>
             {/* Search */}
             <button
+              type="button"
               onClick={() => setIsSearchOpen(!isSearchOpen)}
-              className="text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer"
+              className="p-2.5 text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer"
               aria-label={isRtl ? 'بحث' : 'Search'}
               aria-expanded={isSearchOpen}
             >
@@ -129,7 +130,7 @@ export default function MinimalHeader({
             {/* Account */}
             <Link
               href={isLoggedIn ? `${urlPrefix}/account` : `${urlPrefix}/auth/login`}
-              className="hidden sm:block text-muted-foreground hover:text-foreground transition-colors duration-200"
+              className="hidden sm:block p-2.5 text-muted-foreground hover:text-foreground transition-colors duration-200"
               aria-label={isRtl ? 'الحساب' : 'Account'}
             >
               <svg
@@ -151,7 +152,7 @@ export default function MinimalHeader({
             {/* Cart */}
             <Link
               href={`${urlPrefix}/cart`}
-              className="relative text-muted-foreground hover:text-foreground transition-colors duration-200"
+              className="relative p-2.5 text-muted-foreground hover:text-foreground transition-colors duration-200"
               aria-label={isRtl ? `سلة التسوق (${cartItemCount})` : `Cart (${cartItemCount} items)`}
             >
               <svg
@@ -179,8 +180,9 @@ export default function MinimalHeader({
 
             {/* Mobile hamburger */}
             <button
+              type="button"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="lg:hidden text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer"
+              className="lg:hidden p-2.5 text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer"
               aria-label={isRtl ? 'القائمة' : 'Menu'}
               aria-expanded={isMenuOpen}
             >

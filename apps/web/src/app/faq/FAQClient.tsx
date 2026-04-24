@@ -111,7 +111,9 @@ export default function FAQClient() {
           {faqs.map((faq, index) => (
             <div key={index} className="rounded-xl border bg-card shadow-sm">
               <button
+                type="button"
                 onClick={() => setOpenIndex(openIndex === index ? null : index)}
+                aria-expanded={openIndex === index}
                 className="flex w-full items-center justify-between p-6 text-left"
               >
                 <span className="font-medium text-foreground">

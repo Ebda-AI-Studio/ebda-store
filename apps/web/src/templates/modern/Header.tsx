@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import type { HeaderProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 
@@ -60,10 +61,13 @@ export default function ModernHeader({
             {/* Logo */}
             <Link href={urlPrefix || '/'} className="flex items-center gap-2 shrink-0">
               {displayLogo ? (
-                <img
+                <Image
                   src={displayLogo}
                   alt={displayName}
+                  width={140}
+                  height={56}
                   className="h-14 max-h-14 w-auto object-contain"
+                  priority
                 />
               ) : (
                 <span className="text-xl font-bold text-primary">{displayName}</span>
@@ -87,6 +91,7 @@ export default function ModernHeader({
             <div className={`flex items-center gap-1 ${isRtl ? 'flex-row-reverse' : ''}`}>
               {/* Search Button */}
               <button
+                type="button"
                 onClick={() => setIsSearchOpen(!isSearchOpen)}
                 className="p-2 rounded-lg hover:bg-muted transition-colors duration-200 cursor-pointer"
                 aria-label={isRtl ? 'بحث' : 'Search'}
@@ -180,6 +185,7 @@ export default function ModernHeader({
 
               {/* Mobile Menu Button */}
               <button
+                type="button"
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
                 className="md:hidden p-2 rounded-lg hover:bg-muted transition-colors duration-200 cursor-pointer"
                 aria-label={isRtl ? 'القائمة' : 'Menu'}
@@ -246,6 +252,7 @@ export default function ModernHeader({
         <div className="flex items-center justify-between p-4 border-b border-border">
           <span className="font-semibold text-foreground">{isRtl ? 'القائمة' : 'Menu'}</span>
           <button
+            type="button"
             onClick={() => setIsMenuOpen(false)}
             className="p-2 rounded-lg hover:bg-muted transition-colors duration-200 cursor-pointer"
             aria-label={isRtl ? 'إغلاق' : 'Close menu'}

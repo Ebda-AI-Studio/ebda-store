@@ -99,7 +99,9 @@ export function ProductsFilterSidebar({
           </h3>
           <div className="space-y-2">
             <button
+              type="button"
               onClick={() => onCategoryChange('')}
+              aria-pressed={!categoryFilter}
               className={`flex w-full items-center justify-between rounded-xl px-4 py-2.5 text-sm transition-all ${
                 !categoryFilter
                   ? 'bg-primary text-white shadow-md shadow-primary/25'
@@ -122,7 +124,9 @@ export function ProductsFilterSidebar({
               .map(cat => (
                 <button
                   key={cat.id}
+                  type="button"
                   onClick={() => onCategoryChange(cat.slug)}
+                  aria-pressed={categoryFilter === cat.slug}
                   className={`flex w-full items-center justify-between rounded-xl px-4 py-2.5 text-sm transition-all ${
                     categoryFilter === cat.slug
                       ? 'bg-primary text-white shadow-md shadow-primary/25'
@@ -146,6 +150,7 @@ export function ProductsFilterSidebar({
 
         {/* Clear Filters */}
         <button
+          type="button"
           onClick={onClearAll}
           className="w-full rounded-xl border border-border py-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted"
         >
