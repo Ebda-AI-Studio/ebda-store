@@ -1,0 +1,2952 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "close": "Close",
+    "confirm": "Confirm",
+    "back": "Back",
+    "next": "Next",
+    "search": "Search",
+    "loading": "Loading…",
+    "saving": "Saving…",
+    "deleting": "Deleting…",
+    "noResults": "No results",
+    "loadingDashboard": "Loading dashboard…",
+    "dashboard": "Dashboard",
+    "errors": {
+      "notFound": {
+        "code": "404",
+        "title": "Page not found",
+        "message": "The admin page you are looking for does not exist or has been moved.",
+        "goHome": "Go to Dashboard"
+      },
+      "boundary": {
+        "title": "Something went wrong",
+        "message": "An unexpected error occurred in the admin panel.",
+        "errorId": "Error ID: {id}",
+        "unknown": "Unknown error",
+        "generic": "An unexpected error occurred.",
+        "retry": "Try Again",
+        "goHome": "Go to Dashboard"
+      },
+      "global": {
+        "title": "Admin Error",
+        "message": "A critical error occurred in the admin application."
+      },
+      "somethingWrong": "Something went wrong"
+    },
+    "tryAgain": "Try Again",
+    "storeNotFound": "Store not found",
+    "backToStores": "Back to stores",
+    "retry": "Retry",
+    "connectionError": "Unable to connect to the server. Please check your connection and try again.",
+    "backToStore": "Back to Store",
+    "backToSettings": "Back to Settings",
+    "saveChanges": "Save Changes",
+    "loadingEllipsis": "Loading..."
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "stores": "Stores",
+    "users": "Users",
+    "auditLogs": "Audit logs",
+    "signOut": "Sign out",
+    "language": "Language",
+    "english": "English",
+    "arabic": "العربية"
+  },
+  "dashboard": {
+    "super": {
+      "title": "Platform Dashboard",
+      "subtitleAll": "Overview of all stores and platform metrics",
+      "subtitleStore": "Overview for {store}",
+      "newStore": "New Store",
+      "retry": "Retry",
+      "loadFailed": "Failed to load dashboard data.",
+      "statTotalStores": "Total Stores",
+      "statTotalUsers": "Total Users",
+      "statTotalOrders": "Total Orders",
+      "statTotalRevenue": "Total Revenue",
+      "recentStoresTitle": "Recent Stores",
+      "recentStoresSubtitle": "Latest store registrations",
+      "recentOrdersTitle": "Recent Orders",
+      "recentOrdersAll": "Across all stores",
+      "viewAll": "View all →",
+      "noStoresTitle": "No stores yet",
+      "noStoresSubtitle": "Create your first store to get started",
+      "createStore": "Create Store",
+      "noOrdersTitle": "No orders yet",
+      "noOrdersSubtitle": "Orders will appear here when customers make purchases",
+      "quickActionsTitle": "Quick Actions",
+      "quickActionsSubtitle": "Common platform management tasks",
+      "qaCreateStoreTitle": "Create Store",
+      "qaCreateStoreDesc": "Provision a new store",
+      "qaManageUsersTitle": "Manage Users",
+      "qaManageUsersDesc": "View all platform users",
+      "qaAuditLogsTitle": "Audit Logs",
+      "qaAuditLogsDesc": "View system activity",
+      "qaAllStoresTitle": "All Stores",
+      "qaAllStoresDesc": "Manage all stores"
+    }
+  },
+  "stores": {
+    "dashboard": {
+      "editStore": "Edit Store",
+      "loadingTitle": "Store Details",
+      "loadingSubtitle": "Loading...",
+      "notFoundTitle": "Store Not Found",
+      "notFoundSubtitle": "The requested store could not be found",
+      "errorTitle": "Error Loading Store",
+      "errorSubtitle": "A network error occurred while loading this store",
+      "retry": "Retry",
+      "backToStores": "Back to Stores",
+      "stats": {
+        "products": "Products",
+        "orders": "Orders",
+        "customers": "Customers",
+        "revenue": "Revenue"
+      },
+      "details": {
+        "title": "Store Details",
+        "cancel": "Cancel",
+        "save": "Save Changes",
+        "saving": "Saving...",
+        "storeName": "Store Name",
+        "urlSlug": "URL Slug",
+        "slugPlaceholder": "my-store-name",
+        "slugHint": "Your store will be at: {slug}.forcemediakw.com",
+        "slugHintPlaceholder": "your-slug",
+        "plan": "Plan",
+        "status": "Status",
+        "planFree": "Free",
+        "planStarter": "Starter",
+        "planProfessional": "Professional",
+        "planEnterprise": "Enterprise",
+        "statusActive": "Active",
+        "statusInactive": "Inactive",
+        "statusSuspended": "Suspended",
+        "url": "URL",
+        "created": "Created",
+        "lastUpdated": "Last Updated",
+        "errors": {
+          "nameRequired": "Store name is required",
+          "nameTooShort": "Store name must be at least 2 characters",
+          "nameTooLong": "Store name must be less than 100 characters",
+          "slugRequired": "URL slug is required",
+          "slugInvalid": "Slug must be lowercase, alphanumeric, with hyphens only",
+          "slugTooShort": "Slug must be at least 3 characters",
+          "slugTooLong": "Slug must be less than 50 characters",
+          "slugTaken": "This slug is already in use"
+        }
+      },
+      "owner": {
+        "title": "Store Owner",
+        "viewProfile": "View Profile"
+      },
+      "domain": {
+        "title": "Custom Domain",
+        "add": "Add Domain",
+        "change": "Change Domain",
+        "remove": "Remove",
+        "label": "Domain",
+        "placeholder": "shop.example.com",
+        "save": "Save",
+        "saving": "Saving...",
+        "cancel": "Cancel",
+        "removeHint": "Leave empty and save to remove the custom domain.",
+        "invalid": "Please enter a valid domain (e.g., shop.example.com)",
+        "updateFailed": "Failed to update domain",
+        "verified": "Verified",
+        "pending": "Pending Verification",
+        "dnsRequired": "DNS Configuration Required",
+        "dnsInstructions": "Add the following DNS record to your domain provider:",
+        "dnsPropagation": "DNS changes can take up to 48 hours to propagate.",
+        "checkDns": "Check DNS",
+        "checkingDns": "Checking...",
+        "verifiedMessage": "Domain is verified and SSL is active. Your store is accessible at https://{domain}",
+        "empty": "No custom domain configured. This store is accessible via its default subdomain.",
+        "tableLabel": "Store overview",
+        "columnType": "Type",
+        "columnName": "Name",
+        "columnValue": "Value"
+      },
+      "quickActions": {
+        "title": "Quick Actions",
+        "suspend": "Suspend Store",
+        "suspendDescription": "Temporarily disable access",
+        "activate": "Activate Store",
+        "activateDescription": "Enable store access",
+        "viewProducts": "View Products",
+        "viewProductsCount": "{count} products",
+        "viewOrders": "View Orders",
+        "viewOrdersCount": "{count} orders",
+        "analytics": "Analytics",
+        "analyticsDescription": "View store metrics",
+        "manageFeatures": "Manage Features",
+        "manageFeaturesDescription": "Toggle store capabilities"
+      },
+      "settings": {
+        "title": "Settings & Configuration",
+        "description": "Branding, SEO, shipping, tax, payments, PWA, and more"
+      },
+      "suspendModal": {
+        "title": "Suspend Store",
+        "message": "Are you sure you want to suspend {name}? This will disable customer access to the store.",
+        "cancel": "Cancel",
+        "confirm": "Suspend Store",
+        "confirming": "Suspending..."
+      }
+    },
+    "list": {
+      "title": "Stores",
+      "subtitleCount": "{count} stores on the platform",
+      "createStore": "Create Store",
+      "searchPlaceholder": "Search by name, slug, or owner…",
+      "search": "Search",
+      "filterStatusLabel": "Filter by status",
+      "filterAll": "All",
+      "filterActive": "Active",
+      "filterInactive": "Inactive",
+      "filterSuspended": "Suspended",
+      "filterAllStatus": "All Status",
+      "gridView": "Grid view",
+      "tableView": "Table view",
+      "errorTitle": "Failed to load stores",
+      "errorDefault": "Failed to fetch stores",
+      "errorNetwork": "Unable to connect to the server. Please check your connection and try again.",
+      "status": {
+        "active": "active",
+        "inactive": "inactive",
+        "suspended": "suspended"
+      },
+      "products": "Products",
+      "orders": "Orders",
+      "plan": "Plan",
+      "createdPrefix": "Created {date}",
+      "viewDetails": "View Details →",
+      "tableLabel": "Stores",
+      "colStore": "Store",
+      "colOwner": "Owner",
+      "colStatus": "Status",
+      "colPlan": "Plan",
+      "colProducts": "Products",
+      "colOrders": "Orders",
+      "colCreated": "Created",
+      "colActions": "Actions",
+      "view": "View",
+      "paginationShowing": "Showing {from} to {to} of {total} stores",
+      "previous": "← Previous",
+      "next": "Next →",
+      "emptyTitle": "No stores found",
+      "emptyHintSearch": "Try adjusting your search or filter criteria",
+      "emptyHintDefault": "Get started by creating your first store on the platform",
+      "emptyCta": "Create Your First Store"
+    },
+    "new": {
+      "title": "Create New Store",
+      "subtitle": "Set up a new store on the platform",
+      "cancel": "Cancel",
+      "successTitle": "Store Created!",
+      "successSubtitle": "Your new store is ready",
+      "successHeading": "Store Created Successfully!",
+      "successMessage": "{name} is now live and ready for products.",
+      "storeDetails": "Store Details",
+      "storeUrl": "Store URL:",
+      "defaultUrl": "Default URL:",
+      "ownerEmail": "Owner Email:",
+      "tempPassword": "Temporary Password:",
+      "dnsRequired": "DNS Configuration Required",
+      "dnsVerified": "Verified",
+      "dnsPending": "Pending",
+      "dnsInstructions": "Add the following DNS record to your domain provider to complete setup:",
+      "dnsTableLabel": "DNS records required",
+      "colType": "Type",
+      "colName": "Name",
+      "colValue": "Value",
+      "dnsPropagation": "DNS changes can take up to 48 hours to propagate.",
+      "checkDns": "Check DNS",
+      "checkingDns": "Checking…",
+      "viewStore": "View Store",
+      "backToStores": "Back to Stores",
+      "stepStoreName": "Store Details",
+      "stepStoreDesc": "Basic store information",
+      "stepOwnerName": "Store Owner",
+      "stepOwnerDesc": "Owner account setup",
+      "stepReviewName": "Review & Create",
+      "stepReviewDesc": "Confirm and create store",
+      "step1Heading": "Store Details",
+      "step1Subtitle": "Enter the basic information for the new store",
+      "storeNameLabel": "Store Name",
+      "storeNamePlaceholder": "My Awesome Store",
+      "required": "*",
+      "storeSlugLabel": "Store URL",
+      "storeSlugPlaceholder": "my-awesome-store",
+      "customDomainLabel": "Custom Domain",
+      "customDomainOptional": "(optional)",
+      "customDomainPlaceholder": "store.example.com",
+      "customDomainHint": "Leave empty to use the default subdomain. Custom domains require DNS configuration.",
+      "step2Heading": "Store Owner",
+      "step2Subtitle": "Set up the owner account for this store",
+      "ownerNameLabel": "Owner Name",
+      "ownerNamePlaceholder": "John Doe",
+      "emailLabel": "Email Address",
+      "emailPlaceholder": "john@example.com",
+      "tempPasswordLabel": "Temporary Password",
+      "tempPasswordPlaceholder": "Min 8 characters",
+      "tempPasswordHint": "The owner will be prompted to change this on first login",
+      "step3Heading": "Review & Create",
+      "step3Subtitle": "Please review the details before creating the store",
+      "reviewStoreName": "Name:",
+      "reviewStoreUrl": "Default URL:",
+      "reviewCustomDomain": "Custom Domain:",
+      "reviewOwnerName": "Name:",
+      "reviewOwnerEmail": "Email:",
+      "edit": "Edit",
+      "back": "Back",
+      "continueBtn": "Continue",
+      "createBtn": "Create Store",
+      "creating": "Creating Store…",
+      "errors": {
+        "storeNameRequired": "Store name is required",
+        "storeUrlRequired": "Store URL is required",
+        "storeUrlInvalid": "URL can only contain lowercase letters, numbers, and hyphens",
+        "emailRequired": "Email is required",
+        "emailInvalid": "Please enter a valid email address",
+        "ownerNameRequired": "Owner name is required",
+        "passwordRequired": "Password is required",
+        "passwordTooShort": "Password must be at least 8 characters",
+        "createFailed": "Failed to create store",
+        "generic": "Something went wrong"
+      }
+    }
+  },
+  "products": {
+    "list": {
+      "title": "Products - {storeName}",
+      "subtitle": "Manage products for {storeName}",
+      "loading": "Loading...",
+      "fallbackStore": "Store",
+      "fallbackThisStore": "this store",
+      "toolbar": {
+        "addProduct": "Add Product",
+        "bulkImport": "Bulk Import",
+        "backToStore": "Back to Store"
+      },
+      "filters": {
+        "searchPlaceholder": "Search products...",
+        "all": "All",
+        "active": "Active",
+        "draft": "Draft",
+        "archived": "Archived"
+      },
+      "status": {
+        "active": "Active",
+        "draft": "Draft",
+        "archived": "Archived"
+      },
+      "table": {
+        "label": "Products",
+        "loadingLabel": "Products (loading)",
+        "product": "Product",
+        "sku": "SKU",
+        "price": "Price",
+        "inventory": "Inventory",
+        "status": "Status",
+        "actions": "Actions",
+        "hasVariants": "Has variants"
+      },
+      "actions": {
+        "variants": "Variants",
+        "edit": "Edit",
+        "view": "View",
+        "delete": "Delete"
+      },
+      "empty": {
+        "title": "No products found",
+        "description": "Add your first product to get started.",
+        "descriptionFiltered": "Try adjusting your search or filters.",
+        "addProduct": "Add Product"
+      },
+      "pagination": {
+        "showing": "Showing {from} to {to} of {total} products",
+        "previous": "Previous",
+        "next": "Next"
+      },
+      "deleteModal": {
+        "title": "Delete Product",
+        "messageBefore": "Are you sure you want to delete",
+        "messageAfter": "? This action cannot be undone.",
+        "cancel": "Cancel",
+        "confirm": "Delete Product",
+        "deleting": "Deleting..."
+      },
+      "toast": {
+        "deletedTitle": "Product deleted",
+        "deletedDescription": "{name} has been deleted.",
+        "deleteFailedTitle": "Delete failed",
+        "deleteFailedDescription": "Failed to delete the product. Please try again."
+      }
+    },
+    "detail": {
+      "loading": "Loading...",
+      "notFoundTitle": "Product Not Found",
+      "notFound": "Product not found",
+      "loadFailed": "Failed to load product",
+      "notFoundBody": "The product you're looking for doesn't exist or has been removed.",
+      "subtitle": "SKU: {sku} • Store: {storeName}",
+      "fallbackSku": "N/A",
+      "fallbackStore": "Unknown",
+      "actions": {
+        "edit": "Edit",
+        "manageVariants": "Manage Variants",
+        "recommendations": "Recommendations",
+        "delete": "Delete",
+        "backToProducts": "Back to Products"
+      },
+      "status": {
+        "active": "Active",
+        "draft": "Draft",
+        "archived": "Archived"
+      },
+      "sections": {
+        "productDetails": "Product Details",
+        "pricing": "Pricing",
+        "inventory": "Inventory",
+        "images": "Images",
+        "categories": "Categories",
+        "tags": "Tags",
+        "flags": "Product Flags",
+        "timestamps": "Timestamps"
+      },
+      "fields": {
+        "name": "Name",
+        "nameAr": "Name (Arabic)",
+        "slug": "Slug",
+        "status": "Status",
+        "description": "Description",
+        "descriptionAr": "Description (Arabic)",
+        "price": "Price",
+        "compareAtPrice": "Compare at Price",
+        "costPrice": "Cost Price",
+        "sku": "SKU",
+        "barcode": "Barcode",
+        "stock": "Stock",
+        "stockInStock": "{count} in stock",
+        "featured": "Featured",
+        "newArrival": "New Arrival",
+        "trackInventory": "Track Inventory",
+        "yes": "Yes",
+        "no": "No",
+        "created": "Created",
+        "updated": "Updated"
+      },
+      "deleteModal": {
+        "title": "Delete Product",
+        "messageBefore": "Are you sure you want to delete",
+        "messageAfter": "? This action cannot be undone.",
+        "cancel": "Cancel",
+        "confirm": "Delete Product",
+        "deleting": "Deleting..."
+      },
+      "toasts": {
+        "deletedTitle": "Product deleted",
+        "deletedDescription": "{name} has been deleted.",
+        "deleteFailedTitle": "Delete failed",
+        "deleteFailedDescription": "Failed to delete the product. Please try again."
+      }
+    },
+    "edit": {
+      "loading": "Loading...",
+      "notFoundTitle": "Product Not Found",
+      "notFound": "Product not found",
+      "loadFailed": "Failed to load product",
+      "updateFailed": "Failed to update product. Please try again.",
+      "title": "Edit: {name}",
+      "fallbackTitle": "Product",
+      "subtitle": "Store: {storeName}",
+      "fallbackStore": "Unknown",
+      "backToProducts": "Back to Products",
+      "sections": {
+        "basicInformation": "Basic Information",
+        "media": "Media",
+        "pricing": "Pricing",
+        "inventory": "Inventory",
+        "status": "Status",
+        "organization": "Organization",
+        "flags": "Product Flags"
+      },
+      "fields": {
+        "name": "Product Name",
+        "namePlaceholder": "Enter product name",
+        "nameAr": "Product Name (Arabic)",
+        "nameArPlaceholder": "ادخل اسم المنتج",
+        "description": "Description",
+        "descriptionPlaceholder": "Describe your product...",
+        "descriptionAr": "Description (Arabic)",
+        "descriptionArPlaceholder": "وصف المنتج...",
+        "mediaHint": "Drag and drop images here, or click to select",
+        "price": "Price (KWD)",
+        "compareAtPrice": "Compare at Price (KWD)",
+        "pricePlaceholder": "0.000",
+        "sku": "SKU",
+        "skuPlaceholder": "PROD-001",
+        "quantity": "Quantity",
+        "quantityPlaceholder": "0",
+        "productStatus": "Product Status",
+        "category": "Category",
+        "noCategory": "No category",
+        "featured": "Featured Product",
+        "newArrival": "New Arrival"
+      },
+      "statusOptions": {
+        "draft": "Draft",
+        "active": "Active",
+        "archived": "Archived"
+      },
+      "actions": {
+        "saveChanges": "Save Changes",
+        "cancel": "Cancel"
+      }
+    },
+    "recommendations": {
+      "loading": "Loading...",
+      "title": "Recommendations: {productName}",
+      "fallbackProductName": "Product",
+      "subtitle": "Manage cross-sell and upsell product relationships",
+      "actions": {
+        "save": "Save Recommendations",
+        "backToEdit": "Back to Edit",
+        "cancel": "Cancel"
+      },
+      "crossSell": {
+        "title": "Frequently Bought Together",
+        "description": "Products that customers commonly buy alongside this one.",
+        "maxReached": "Maximum of {max} cross-sell products reached.",
+        "empty": "No cross-sell products added yet. Search above to add some."
+      },
+      "upsell": {
+        "title": "Upsell Alternatives",
+        "description": "Higher-value products to suggest as alternatives or upgrades.",
+        "maxReached": "Maximum of {max} upsell products reached.",
+        "empty": "No upsell products added yet. Search above to add some."
+      },
+      "search": {
+        "label": "Search products",
+        "placeholder": "Type to search products...",
+        "noResults": "No products found"
+      },
+      "errors": {
+        "loadFailed": "Failed to load existing recommendations."
+      },
+      "toasts": {
+        "saveFailedTitle": "Save failed",
+        "savedTitle": "Saved",
+        "savedDescription": "Recommendations saved successfully."
+      },
+      "counts": "{count} / {max}",
+      "removeAria": "Remove {name}"
+    },
+    "variants": {
+      "loading": "Loading...",
+      "loadingSubtitle": "Please wait",
+      "notFoundTitle": "Product Not Found",
+      "notFoundSubtitle": "The requested product could not be found",
+      "backToProducts": "Back to Products",
+      "title": "Variants: {productName}",
+      "subtitle": "Manage product options and variants",
+      "summary": {
+        "basePrice": "Base Price: {price}",
+        "totalVariantStock": "Total Variant Stock"
+      },
+      "options": {
+        "title": "Options",
+        "addOption": "Add Option",
+        "empty": "No options defined yet.",
+        "emptyHint": "Add options like \"Size\" or \"Color\"",
+        "addValue": "+ Add",
+        "generateAll": "Generate All Variants"
+      },
+      "table": {
+        "label": "Product variants",
+        "variants": "Variants ({count})",
+        "variant": "Variant",
+        "sku": "SKU",
+        "price": "Price",
+        "stock": "Stock",
+        "status": "Status",
+        "actions": "Actions",
+        "dash": "-",
+        "base": "Base",
+        "active": "Active",
+        "inactive": "Inactive",
+        "edit": "Edit",
+        "delete": "Delete",
+        "empty": "No variants created yet.",
+        "emptyHint": "Add options and click \"Generate All Variants\""
+      },
+      "optionModal": {
+        "title": "Add Option",
+        "nameLabel": "Option Name",
+        "namePlaceholder": "e.g., Size, Color",
+        "nameArLabel": "Option Name (Arabic)",
+        "nameArPlaceholder": "e.g., المقاس، اللون",
+        "valuesLabel": "Values (comma-separated)",
+        "valuesPlaceholder": "e.g., Small, Medium, Large",
+        "cancel": "Cancel",
+        "submit": "Add Option"
+      },
+      "valueModal": {
+        "title": "Add Value",
+        "valueLabel": "Value",
+        "valuePlaceholder": "e.g., XL",
+        "valueArLabel": "Value (Arabic)",
+        "cancel": "Cancel",
+        "submit": "Add Value"
+      },
+      "variantModal": {
+        "title": "Edit Variant: {title}",
+        "skuLabel": "SKU",
+        "barcodeLabel": "Barcode",
+        "priceLabel": "Price (fils)",
+        "pricePlaceholder": "Base price",
+        "compareAtLabel": "Compare At",
+        "costLabel": "Cost",
+        "inventoryLabel": "Inventory",
+        "weightLabel": "Weight (kg)",
+        "cancel": "Cancel",
+        "submit": "Save Changes"
+      }
+    },
+    "new": {
+      "title": "Add New Product",
+      "subtitle": "Create a new product for your store",
+      "sections": {
+        "basicInformation": "Basic Information",
+        "media": "Media",
+        "pricing": "Pricing",
+        "inventory": "Inventory",
+        "status": "Status",
+        "organization": "Organization"
+      },
+      "fields": {
+        "name": "Product Name",
+        "namePlaceholder": "Enter product name",
+        "nameAr": "Product Name (Arabic)",
+        "nameArPlaceholder": "ادخل اسم المنتج",
+        "description": "Description",
+        "descriptionPlaceholder": "Describe your product...",
+        "descriptionAr": "Description (Arabic)",
+        "descriptionArPlaceholder": "وصف المنتج...",
+        "mediaHint": "Drag and drop images here, or click to select",
+        "price": "Price (KWD)",
+        "pricePlaceholder": "0.000",
+        "compareAtPrice": "Compare at Price (KWD)",
+        "pricingHint": "Enter prices in KWD. Compare at price is used to show a crossed-out price.",
+        "sku": "SKU",
+        "skuPlaceholder": "PROD-001",
+        "quantity": "Quantity",
+        "quantityPlaceholder": "0",
+        "productStatus": "Product Status",
+        "category": "Category",
+        "noCategory": "No category"
+      },
+      "statusOptions": {
+        "draft": "Draft",
+        "active": "Active",
+        "archived": "Archived"
+      },
+      "actions": {
+        "create": "Create Product",
+        "cancel": "Cancel"
+      },
+      "errors": {
+        "createFailed": "Failed to create product. Please try again."
+      }
+    }
+  },
+  "orders": {
+    "list": {
+      "title": "Store Orders",
+      "subtitle": "View and manage orders for this store",
+      "backToStore": "Back to Store",
+      "search": {
+        "placeholder": "Search orders..."
+      },
+      "filters": {
+        "all": "All Orders",
+        "pending": "Pending",
+        "confirmed": "Confirmed",
+        "processing": "Processing",
+        "shipped": "Shipped",
+        "delivered": "Delivered",
+        "cancelled": "Cancelled"
+      },
+      "bulk": {
+        "selected": "{count} order(s) selected",
+        "markPaid": "Mark as Paid",
+        "processing": "Processing...",
+        "clearSelection": "Clear selection"
+      },
+      "table": {
+        "label": "Orders",
+        "loadingLabel": "Orders (loading)",
+        "order": "Order",
+        "customer": "Customer",
+        "total": "Total",
+        "status": "Status",
+        "date": "Date",
+        "actions": "Actions",
+        "totalValue": "{amount} KWD"
+      },
+      "actions": {
+        "updateStatusLabel": "Update order status",
+        "updatePlaceholder": "Update...",
+        "selectOrderLabel": "Select order {order}",
+        "markPaid": "Mark Paid",
+        "markPaidTitle": "Mark COD payment as received",
+        "invoice": "Invoice",
+        "invoiceTitle": "View Invoice"
+      },
+      "empty": {
+        "title": "No orders yet",
+        "description": "Orders will appear here when customers make purchases",
+        "filteredTitle": "No matching orders",
+        "filteredDescription": "Try adjusting your search or filters"
+      },
+      "pagination": {
+        "showing": "Showing {from} to {to} of {total} orders",
+        "previous": "Previous",
+        "next": "Next"
+      },
+      "confirm": {
+        "markPaid": "Confirm cash payment received for this order?",
+        "bulkMarkPaid": "Mark {count} order(s) as paid?"
+      },
+      "toast": {
+        "errorTitle": "Error",
+        "statusUpdatedTitle": "Status Updated",
+        "statusUpdatedDescription": "Order status changed to {status}.",
+        "markedPaidTitle": "Marked as Paid",
+        "markedPaidDescription": "Order has been marked as paid.",
+        "bulkUpdateTitle": "Bulk Update",
+        "bulkUpdateDescription": "{count} order(s) marked as paid."
+      },
+      "errors": {
+        "fetchFailed": "Failed to fetch orders",
+        "connection": "Unable to connect to the server. Please check your connection and try again.",
+        "statusUpdate": "Failed to update status",
+        "markPaid": "Failed to mark as paid",
+        "bulkMarkPaid": "Failed to bulk mark as paid",
+        "retry": "Retry"
+      }
+    },
+    "status": {
+      "pending": "Pending",
+      "confirmed": "Confirmed",
+      "processing": "Processing",
+      "shipped": "Shipped",
+      "delivered": "Delivered",
+      "cancelled": "Cancelled",
+      "refunded": "Refunded",
+      "paid": "Paid",
+      "unpaid": "Unpaid"
+    }
+  },
+  "customers": {
+    "page": {
+      "title": "Customers",
+      "subtitle": "Customers who have placed orders in this store",
+      "backToStore": "Back to Store",
+      "loading": "Loading customers...",
+      "searchPlaceholder": "Search by name or email...",
+      "noMatch": "No customers match your search",
+      "empty": "No customers yet for this store",
+      "retry": "Retry",
+      "fetchFailed": "Failed to fetch customers",
+      "connectionError": "Unable to connect to the server. Please check your connection and try again.",
+      "tableLabel": "Customers",
+      "colCustomer": "Customer",
+      "colEmail": "Email",
+      "colOrders": "Total Orders",
+      "colSpent": "Total Spent",
+      "colLastOrder": "Last Order",
+      "colActions": "Actions",
+      "ordersCount": "{count} orders",
+      "orderCount": "{count} order",
+      "viewOrdersTitle": "View orders for this customer",
+      "viewOrders": "Orders",
+      "countSingular": "{count} customer",
+      "countPlural": "{count} customers"
+    }
+  },
+  "analytics": {
+    "page": {
+      "title": "Analytics",
+      "subtitle": "Store performance and insights"
+    },
+    "periods": {
+      "week": "Last 7 Days",
+      "month": "This Month",
+      "year": "This Year"
+    },
+    "periodsSubtitle": {
+      "week": "Last 7 days",
+      "month": "This month",
+      "year": "This year"
+    },
+    "stats": {
+      "totalRevenue": "Total Revenue",
+      "totalOrders": "Total Orders",
+      "totalCustomers": "Total Customers",
+      "avgOrderValue": "Avg Order Value",
+      "vsLastPeriod": "vs last period"
+    },
+    "chart": {
+      "title": "Sales Overview",
+      "revenue": "Revenue",
+      "orders": "Orders",
+      "numberOfOrders": "Number of Orders",
+      "max": "Max"
+    },
+    "topProducts": {
+      "title": "Top Products",
+      "empty": "No sales data yet",
+      "soldCount": "{count} sold"
+    },
+    "recentOrders": {
+      "title": "Recent Orders",
+      "empty": "No orders yet",
+      "guest": "Guest"
+    },
+    "orderStatus": {
+      "pending": "Pending",
+      "confirmed": "Confirmed",
+      "processing": "Processing",
+      "shipped": "Shipped",
+      "delivered": "Delivered",
+      "cancelled": "Cancelled",
+      "refunded": "Refunded"
+    },
+    "lowStock": {
+      "title": "Low Stock Alerts",
+      "allStocked": "All products are well stocked",
+      "unitsLeft": "{count} left"
+    }
+  },
+  "settings": {
+    "page": {
+      "title": "Store Settings",
+      "subtitle": "Configure all aspects of this store",
+      "backToStore": "Back to Store"
+    },
+    "cards": {
+      "branding": {
+        "title": "Branding",
+        "description": "Logo, colors, fonts, contact info and social links"
+      },
+      "navigation": {
+        "title": "Navigation",
+        "description": "Choose which links appear in the storefront header menu. Add, remove, reorder, or link to external URLs."
+      },
+      "hero": {
+        "title": "Hero Section",
+        "description": "Customize the homepage hero — title, subtitle, CTA, and background image"
+      },
+      "categories": {
+        "title": "Categories",
+        "description": "Manage product categories, images and display order"
+      },
+      "seo": {
+        "title": "SEO",
+        "description": "Meta titles, meta descriptions and search engine optimization"
+      },
+      "announcement": {
+        "title": "Announcement Bar",
+        "description": "Show a banner across the top of your store with promotions or news"
+      },
+      "domain": {
+        "title": "Domain",
+        "description": "Connect a custom domain to your store"
+      },
+      "paymentSettings": {
+        "title": "Payment Settings",
+        "description": "Configure payment providers: Tap, MyFatoorah, Hesabe, UPayments"
+      },
+      "shipping": {
+        "title": "Shipping",
+        "description": "Delivery zones, shipping rates and carrier settings"
+      },
+      "taxSettings": {
+        "title": "Tax Settings",
+        "description": "Tax rates, tax calculation rules and exemptions"
+      },
+      "pwaSettings": {
+        "title": "PWA Settings",
+        "description": "Progressive Web App configuration for mobile users"
+      },
+      "template": {
+        "title": "Template",
+        "description": "Choose and customize the storefront design template"
+      },
+      "pages": {
+        "title": "Footer & Pages",
+        "description": "Manage footer links, support pages and company pages"
+      },
+      "language": {
+        "title": "Language",
+        "description": "Set the default language for your storefront"
+      },
+      "marketingPixels": {
+        "title": "Marketing Pixels",
+        "description": "Facebook Pixel, Google Analytics, TikTok Pixel and other tracking codes"
+      },
+      "notifications": {
+        "title": "Notifications",
+        "description": "WhatsApp, SMS, and Push notification settings"
+      },
+      "affiliates": {
+        "title": "Affiliate Program",
+        "description": "Influencer referral commissions and tracking"
+      },
+      "abandonedCarts": {
+        "title": "Abandoned Cart Recovery",
+        "description": "Recover lost sales with automated reminders"
+      },
+      "shippingCarriers": {
+        "title": "Shipping Carriers",
+        "description": "iCarry and Aramex delivery integration"
+      }
+    }
+  },
+  "branding": {
+    "page": {
+      "title": "Store Branding",
+      "subtitle": "Customize {name}'s visual identity"
+    },
+    "actions": {
+      "save": "Save Changes",
+      "saving": "Saving...",
+      "backToStores": "Back to stores"
+    },
+    "messages": {
+      "notFound": "Store not found",
+      "loadFailedTitle": "Failed to load branding",
+      "connectionErrorTitle": "Connection error",
+      "connectionErrorBody": "Failed to connect to the server",
+      "connectionErrorSaveBody": "Failed to connect to the server. Please try again.",
+      "serverErrorPrefix": "Server error: ",
+      "accessDeniedTitle": "Access denied",
+      "accessDeniedBody": "You do not have permission to update this store",
+      "sessionExpiredTitle": "Session expired",
+      "sessionExpiredBody": "Please log in again",
+      "saveFailedPrefix": "Failed to save ",
+      "serverError": "Server error",
+      "saveSuccessTitle": "Branding saved",
+      "saveSuccessBody": "All changes have been saved successfully"
+    },
+    "tabs": {
+      "branding": "Branding",
+      "theme": "Theme & Colors",
+      "contact": "Contact Info",
+      "social": "Social Links"
+    },
+    "identity": {
+      "storeName": "Store Name",
+      "storeNameAr": "Store Name (Arabic)",
+      "logo": "Logo",
+      "logoAr": "Logo (Arabic)",
+      "favicon": "Favicon",
+      "logoUpload": "Upload Logo",
+      "logoArUpload": "Upload Arabic Logo",
+      "faviconUpload": "Upload Favicon",
+      "description": "Description",
+      "descriptionAr": "Description (Arabic)"
+    },
+    "theme": {
+      "primaryColor": "Primary Color",
+      "secondaryColor": "Secondary Color",
+      "fontFamily": "Font Family",
+      "borderRadius": "Border Radius",
+      "hex": "HEX",
+      "presets": {
+        "orange": "Orange",
+        "blue": "Blue",
+        "green": "Green",
+        "purple": "Purple",
+        "rose": "Rose",
+        "teal": "Teal",
+        "amber": "Amber",
+        "black": "Black"
+      },
+      "fonts": {
+        "default": "Default (Sans-serif)",
+        "serif": "Serif (Elegant)",
+        "modern": "Modern (Geometric)",
+        "rounded": "Rounded (Friendly)"
+      },
+      "radius": {
+        "none": "None (Sharp)",
+        "sm": "Small",
+        "md": "Medium",
+        "lg": "Large",
+        "xl": "Extra Large"
+      }
+    },
+    "preview": {
+      "title": "Preview",
+      "primaryButton": "Primary Button",
+      "secondaryButton": "Secondary Button",
+      "sampleText": "This is how your primary color looks as text."
+    },
+    "contact": {
+      "email": "Email",
+      "emailPlaceholder": "store@example.com",
+      "whatsapp": "WhatsApp Number",
+      "phone": "Phone",
+      "phoneAr": "Phone (Arabic Display)",
+      "phonePlaceholder": "+965 XXXX XXXX",
+      "phoneArPlaceholder": "٩٦٥ XXXX XXXX+",
+      "address": "Address",
+      "addressAr": "Address (Arabic)",
+      "addressPlaceholder": "123 Street, City, Kuwait",
+      "addressArPlaceholder": "١٢٣ شارع، المدينة، الكويت"
+    },
+    "social": {
+      "instagram": "Instagram",
+      "facebook": "Facebook",
+      "twitter": "Twitter / X",
+      "tiktok": "TikTok",
+      "youtube": "YouTube",
+      "snapchat": "Snapchat"
+    }
+  },
+  "coupons": {
+    "page": {
+      "title": "Discount Coupons",
+      "subtitle": "Manage promotional codes and discounts"
+    },
+    "actions": {
+      "create": "Create Coupon",
+      "update": "Update Coupon",
+      "cancel": "Cancel",
+      "edit": "Edit",
+      "delete": "Delete",
+      "activate": "Activate",
+      "deactivate": "Deactivate"
+    },
+    "filters": {
+      "searchPlaceholder": "Search coupons...",
+      "statusAriaLabel": "Filter by status",
+      "statusAll": "All Status",
+      "statusActive": "Active",
+      "statusInactive": "Inactive"
+    },
+    "table": {
+      "ariaLabel": "Coupons",
+      "code": "Code",
+      "name": "Name",
+      "type": "Type",
+      "value": "Value",
+      "usage": "Usage",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "status": {
+      "active": "Active",
+      "inactive": "Inactive",
+      "scheduled": "Scheduled",
+      "expired": "Expired",
+      "exhausted": "Exhausted"
+    },
+    "type": {
+      "percentage": "Percentage Off",
+      "fixed": "Fixed Amount",
+      "freeShipping": "Free Shipping"
+    },
+    "empty": {
+      "title": "No coupons found",
+      "createFirst": "Create your first coupon"
+    },
+    "modal": {
+      "createTitle": "Create Coupon",
+      "editTitle": "Edit Coupon"
+    },
+    "form": {
+      "codeLabel": "Coupon Code *",
+      "codePlaceholder": "SUMMER20",
+      "nameLabel": "Name *",
+      "namePlaceholder": "Summer Sale 20% Off",
+      "nameArLabel": "Name (Arabic)",
+      "nameArPlaceholder": "خصم الصيف ٢٠٪",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "Get 20% off on all summer items",
+      "typeLabel": "Discount Type *",
+      "valuePercentageLabel": "Percentage (%) *",
+      "valueAmountLabel": "Amount (KWD) *",
+      "minOrderLabel": "Minimum Order (KWD)",
+      "minOrderPlaceholder": "10.000",
+      "maxDiscountLabel": "Max Discount (KWD)",
+      "maxDiscountPlaceholder": "50.000",
+      "usageLimitLabel": "Total Usage Limit",
+      "usageLimitPlaceholder": "100",
+      "usageLimitPerUserLabel": "Limit Per Customer",
+      "usageLimitPerUserPlaceholder": "1",
+      "startsAt": "Start Date",
+      "expiresAt": "Expiry Date",
+      "isActiveLabel": "Coupon is active"
+    }
+  },
+  "shipping": {
+    "carriers": {
+      "page": {
+        "title": "Shipping Carriers",
+        "subtitle": "Configure iCarry and Aramex delivery integrations"
+      },
+      "empty": {
+        "title": "Shipping Carriers not enabled",
+        "description": "Enable the Shipping Carriers feature in your store features to configure iCarry and Aramex delivery integrations."
+      },
+      "shared": {
+        "enabled": "Enabled",
+        "disabled": "Disabled",
+        "save": "Save",
+        "testConnection": "Test Connection",
+        "setAsDefault": "Set as Default",
+        "defaultBadge": "Default"
+      },
+      "icarry": {
+        "title": "iCarry",
+        "subtitle": "Kuwait delivery via iCarry",
+        "fields": {
+          "apiKey": "API Key",
+          "merchantId": "Merchant ID"
+        },
+        "placeholders": {
+          "apiKey": "iCarry API key",
+          "merchantId": "e.g. MERCH-001"
+        }
+      },
+      "aramex": {
+        "title": "Aramex",
+        "subtitle": "International delivery via Aramex",
+        "fields": {
+          "accountNumber": "Account Number",
+          "accountPin": "PIN",
+          "accountEntity": "Entity",
+          "accountCountryCode": "Country Code",
+          "username": "Username",
+          "password": "Password"
+        },
+        "placeholders": {
+          "accountNumber": "Aramex account number",
+          "accountPin": "Account PIN",
+          "accountEntity": "e.g. KWI",
+          "accountCountryCode": "e.g. KW",
+          "username": "Aramex account username",
+          "password": "Aramex account password"
+        }
+      },
+      "pickup": {
+        "title": "Pickup Address",
+        "fields": {
+          "area": "Area",
+          "block": "Block",
+          "street": "Street",
+          "building": "Building"
+        },
+        "placeholders": {
+          "area": "e.g. Salmiya",
+          "block": "e.g. 12",
+          "street": "e.g. Gulf Road",
+          "building": "e.g. Al Hamra"
+        }
+      },
+      "shipments": {
+        "title": "Active Shipments",
+        "totalOne": "{total} total shipment",
+        "totalOther": "{total} total shipments",
+        "filters": {
+          "carrierLabel": "Filter by carrier",
+          "statusLabel": "Filter by status",
+          "allCarriers": "All carriers",
+          "allStatuses": "All statuses"
+        },
+        "carrierNames": {
+          "icarry": "iCarry",
+          "aramex": "Aramex"
+        },
+        "statuses": {
+          "created": "Created",
+          "picked_up": "Picked Up",
+          "in_transit": "In Transit",
+          "out_for_delivery": "Out for Delivery",
+          "delivered": "Delivered",
+          "failed": "Failed",
+          "returned": "Returned",
+          "cancelled": "Cancelled"
+        },
+        "columns": {
+          "orderNumber": "Order #",
+          "carrier": "Carrier",
+          "trackingNumber": "Tracking #",
+          "status": "Status",
+          "created": "Created"
+        },
+        "empty": "No shipments found",
+        "tableLabel": "Shipping carriers",
+        "pagination": {
+          "summary": "Page {page} of {pages} ({total} total)",
+          "previous": "Previous",
+          "next": "Next"
+        }
+      },
+      "connectionStatus": {
+        "testing": "Testing…",
+        "connected": "Connected",
+        "failed": "Failed"
+      },
+      "toast": {
+        "savedTitle": "Saved",
+        "savedDescription": "{carrier} settings saved.",
+        "errorTitle": "Error",
+        "saveFailed": "Failed to save settings.",
+        "saveFailedRetry": "Failed to save settings. Please try again.",
+        "connectionOkTitle": "Connection OK",
+        "connectionOkDescription": "{carrier} connection test passed.",
+        "connectionFailedTitle": "Connection Failed",
+        "testFailed": "Test failed.",
+        "testFailedRetry": "Test connection failed.",
+        "defaultSetTitle": "Default Set",
+        "defaultSetDescription": "{carrier} is now the default carrier.",
+        "defaultSetFailed": "Failed to set default carrier."
+      }
+    },
+    "page": {
+      "title": "Shipping Zones",
+      "subtitle": "Configure delivery areas and shipping rates"
+    },
+    "toolbar": {
+      "addZone": "Add Zone"
+    },
+    "filters": {
+      "all": "All",
+      "active": "Active",
+      "inactive": "Inactive"
+    },
+    "empty": {
+      "title": "No Shipping Zones",
+      "description": "Create shipping zones to configure delivery rates for different areas",
+      "createFirst": "Create First Zone"
+    },
+    "table": {
+      "label": "Shipping zones",
+      "zone": "Zone",
+      "areas": "Areas",
+      "deliveryFee": "Delivery Fee",
+      "freeShipping": "Free Shipping",
+      "estimatedDelivery": "Est. Delivery",
+      "status": "Status",
+      "actions": "Actions",
+      "moreAreas": "+{count} more",
+      "freeShippingOver": "Over {amount} KWD",
+      "dashPlaceholder": "-",
+      "daysRange": "{min}-{max} days",
+      "daysSingle": "{days} days",
+      "active": "Active",
+      "inactive": "Inactive",
+      "edit": "Edit",
+      "delete": "Delete",
+      "priceWithCurrency": "{amount} KWD"
+    },
+    "modal": {
+      "editTitle": "Edit Shipping Zone",
+      "newTitle": "New Shipping Zone",
+      "close": "Close",
+      "zoneNameLabel": "Zone Name",
+      "zoneNamePlaceholder": "e.g., Capital Area",
+      "zoneNameArLabel": "Zone Name (Arabic)",
+      "zoneNameArPlaceholder": "e.g., منطقة العاصمة",
+      "areasLabel": "Areas",
+      "areasPlaceholder": "Separate areas with commas: Capital, Hawalli, Farwaniya",
+      "addAllKuwaitGovernorates": "+ Add All Kuwait Governorates",
+      "areasArLabel": "Areas (Arabic)",
+      "areasArPlaceholder": "العاصمة، حولي، الفروانية",
+      "deliveryFeeLabel": "Delivery Fee (KWD)",
+      "deliveryFeePlaceholder": "1.000",
+      "freeShippingLabel": "Free Shipping Over (KWD)",
+      "freeShippingPlaceholder": "25.000",
+      "estimatedDaysLabel": "Estimated Delivery Time (Days)",
+      "estimatedDaysMinPlaceholder": "Min days",
+      "estimatedDaysMaxPlaceholder": "Max days",
+      "activeLabel": "Active",
+      "required": "required",
+      "cancel": "Cancel",
+      "createZone": "Create Zone",
+      "updateZone": "Update Zone"
+    }
+  },
+  "tax": {
+    "page": {
+      "title": "Tax Configuration",
+      "subtitle": "Configure tax rates and settings for your store"
+    },
+    "settings": {
+      "title": "General Settings",
+      "enable": {
+        "title": "Enable Tax Collection",
+        "description": "When enabled, taxes will be calculated and added to orders"
+      },
+      "included": {
+        "title": "Prices Include Tax",
+        "description": "Product prices already include tax (tax will be calculated backwards)"
+      },
+      "defaultRate": {
+        "label": "Default Tax Rate (%)",
+        "description": "Used when no specific tax rate rules apply",
+        "placeholder": "e.g., 5.00"
+      }
+    },
+    "rates": {
+      "title": "Tax Rates",
+      "subtitle": "Create specific tax rates for different regions or categories",
+      "addButton": "Add Rate",
+      "tableLabel": "Tax rules",
+      "allRegions": "All regions",
+      "filters": {
+        "all": "All",
+        "active": "Active",
+        "inactive": "Inactive"
+      },
+      "empty": {
+        "title": "No Tax Rates",
+        "enabled": "Create tax rates for specific regions or product categories",
+        "disabled": "Enable tax collection to start adding tax rates",
+        "createFirst": "Create First Rate"
+      },
+      "columns": {
+        "name": "Name",
+        "rate": "Rate",
+        "region": "Region",
+        "priority": "Priority",
+        "type": "Type",
+        "status": "Status",
+        "actions": "Actions"
+      },
+      "types": {
+        "compound": "Compound",
+        "standard": "Standard"
+      },
+      "status": {
+        "active": "Active",
+        "inactive": "Inactive"
+      },
+      "actions": {
+        "edit": "Edit",
+        "delete": "Delete"
+      }
+    },
+    "form": {
+      "newTitle": "New Tax Rate",
+      "editTitle": "Edit Tax Rate",
+      "templates": {
+        "label": "Quick Templates"
+      },
+      "name": {
+        "label": "Tax Name",
+        "placeholder": "e.g., VAT"
+      },
+      "nameAr": {
+        "label": "Tax Name (Arabic)",
+        "placeholder": "e.g., ضريبة القيمة المضافة"
+      },
+      "rate": {
+        "label": "Tax Rate (%)",
+        "placeholder": "5.00"
+      },
+      "country": {
+        "label": "Country Code",
+        "placeholder": "e.g., KW",
+        "hint": "Leave empty for all countries"
+      },
+      "state": {
+        "label": "State/Region",
+        "placeholder": "e.g., Capital",
+        "hint": "Leave empty for all states"
+      },
+      "priority": {
+        "label": "Priority",
+        "hint": "Higher priority rates are applied first"
+      },
+      "compound": {
+        "label": "Compound Tax",
+        "hint": "Calculate on subtotal + previous taxes"
+      },
+      "active": {
+        "label": "Active"
+      },
+      "cancel": "Cancel",
+      "create": "Create Rate",
+      "update": "Update Rate"
+    },
+    "info": {
+      "title": "About Tax Calculation",
+      "priority": "Tax rates are applied based on priority (highest first).",
+      "compoundLabel": "Compound taxes",
+      "compoundDescription": "are calculated on top of the subtotal plus any previously calculated taxes.",
+      "standardLabel": "Standard taxes",
+      "standardDescription": "are calculated only on the original subtotal."
+    }
+  },
+  "inventory": {
+    "page": {
+      "title": "Inventory Management",
+      "subtitle": "Track and manage your product stock levels"
+    },
+    "stats": {
+      "totalProducts": "Total Products",
+      "totalStock": "Total Stock",
+      "lowStock": "Low Stock",
+      "outOfStock": "Out of Stock",
+      "stockValue": "Stock Value",
+      "kwdValue": "{value} KWD"
+    },
+    "alertBanner": {
+      "needAttention": "{count, plural, =1 {# product needs attention} other {# products need attention}}",
+      "breakdown": "{out} out of stock, {low} low stock",
+      "viewAlerts": "View Alerts"
+    },
+    "tabs": {
+      "products": "Products",
+      "history": "History",
+      "alerts": "Alerts"
+    },
+    "status": {
+      "in_stock": "In Stock",
+      "low_stock": "Low Stock",
+      "out_of_stock": "Out of Stock"
+    },
+    "levels": {
+      "searchPlaceholder": "Search products...",
+      "tableLabel": "Product inventory",
+      "empty": "No products found",
+      "adjustAction": "Adjust",
+      "kwdValue": "{value} KWD",
+      "filters": {
+        "all": "All"
+      },
+      "columns": {
+        "product": "Product",
+        "sku": "SKU",
+        "stock": "Stock",
+        "threshold": "Threshold",
+        "status": "Status",
+        "value": "Value",
+        "actions": "Actions"
+      }
+    },
+    "history": {
+      "tableLabel": "Inventory history",
+      "empty": "No inventory history yet",
+      "columns": {
+        "date": "Date",
+        "product": "Product",
+        "type": "Type",
+        "change": "Change",
+        "stock": "Stock",
+        "reason": "Reason"
+      }
+    },
+    "historyTypes": {
+      "manual_add": "Added",
+      "manual_remove": "Removed",
+      "sale": "Sale",
+      "return_stock": "Returned",
+      "adjustment": "Adjusted",
+      "damage": "Damaged",
+      "transfer_in": "Transfer In",
+      "transfer_out": "Transfer Out",
+      "initial": "Initial"
+    },
+    "alertsTab": {
+      "tableLabel": "Low stock and out of stock",
+      "emptyTitle": "All Good!",
+      "emptySubtitle": "No low stock or out of stock products",
+      "restockAction": "Restock",
+      "columns": {
+        "product": "Product",
+        "sku": "SKU",
+        "currentStock": "Current Stock",
+        "threshold": "Threshold",
+        "status": "Status",
+        "actions": "Actions"
+      }
+    },
+    "adjust": {
+      "title": "Adjust Inventory",
+      "close": "Close",
+      "currentStock": "Current stock: {count}",
+      "typeLabel": "Adjustment Type",
+      "quantityLabel": "Quantity",
+      "quantityPlaceholder": "Enter quantity",
+      "newStockPreview": "New stock will be:",
+      "reasonLabel": "Reason",
+      "reasonPlaceholder": "Optional reason for adjustment",
+      "cancel": "Cancel",
+      "apply": "Apply"
+    },
+    "adjustTypes": {
+      "manual_add": "Add Stock",
+      "manual_remove": "Remove Stock",
+      "damage": "Damaged",
+      "adjustment": "Adjustment"
+    }
+  },
+  "pwa": {
+    "page": {
+      "title": "Progressive Web App",
+      "subtitle": "Enable app-like experience for your customers"
+    },
+    "actions": {
+      "statusLabel": "PWA Status:",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "save": "Save Settings"
+    },
+    "messages": {
+      "populated": "Populated from store branding",
+      "toggleError": "Failed to update PWA status",
+      "saveSuccess": "PWA settings saved successfully",
+      "saveError": "Failed to save PWA settings"
+    },
+    "autoPopulate": {
+      "logoAlt": "Store logo",
+      "description": "Use store branding to fill PWA settings",
+      "button": "Populate from Store"
+    },
+    "benefits": {
+      "title": "Why Enable PWA?",
+      "install": {
+        "title": "Install on Device",
+        "description": "Customers can add to home screen"
+      },
+      "offline": {
+        "title": "Offline Support",
+        "description": "Works even without internet"
+      },
+      "fast": {
+        "title": "Fast Performance",
+        "description": "Cached assets load instantly"
+      }
+    },
+    "branding": {
+      "title": "App Identity",
+      "appName": "App Name",
+      "appNamePlaceholder": "My Store",
+      "appNameAr": "App Name (Arabic)",
+      "appNameArPlaceholder": "متجري",
+      "shortName": "Short Name (max 12 chars)",
+      "shortNamePlaceholder": "Store",
+      "shortNameHelp": "Shown under home screen icon",
+      "shortNameAr": "Short Name (Arabic)",
+      "shortNameArPlaceholder": "المتجر",
+      "description": "Description",
+      "descriptionPlaceholder": "Shop the latest products at amazing prices",
+      "descriptionAr": "Description (Arabic)",
+      "descriptionArPlaceholder": "تسوق أحدث المنتجات بأسعار مميزة"
+    },
+    "manifest": {
+      "title": "Theme & Appearance",
+      "themeColor": "Theme Color",
+      "themeColorHelp": "Browser address bar color",
+      "backgroundColor": "Background Color",
+      "backgroundColorHelp": "Splash screen background",
+      "display": "Display Mode",
+      "orientation": "Orientation",
+      "displayOptions": {
+        "standalone": "Standalone",
+        "fullscreen": "Fullscreen",
+        "minimalUi": "Minimal UI",
+        "browser": "Browser"
+      },
+      "orientationOptions": {
+        "any": "Any",
+        "portrait": "Portrait",
+        "landscape": "Landscape"
+      }
+    },
+    "icons": {
+      "title": "App Icons",
+      "urlPlaceholder": "https://...",
+      "icon192": "Icon 192x192",
+      "icon192Alt": "Icon 192",
+      "icon192Help": "Standard icon for app",
+      "icon512": "Icon 512x512",
+      "icon512Alt": "Icon 512",
+      "icon512Help": "High-res icon for splash screen",
+      "maskable": "Maskable Icon",
+      "maskableAlt": "Maskable",
+      "maskableHelp": "Adaptive icon with safe zone"
+    },
+    "features": {
+      "title": "Features",
+      "installPrompt": {
+        "title": "Install Prompt",
+        "description": "Show prompt to add app to home screen"
+      },
+      "offline": {
+        "title": "Offline Support",
+        "description": "Cache pages for offline access"
+      },
+      "push": {
+        "title": "Push Notifications",
+        "description": "Send notifications to customers (requires setup)"
+      }
+    },
+    "ios": {
+      "title": "iOS Settings",
+      "statusBarStyle": "Status Bar Style",
+      "splashScreenColor": "Splash Screen Color",
+      "statusBarOptions": {
+        "default": "Default (white)",
+        "black": "Black",
+        "blackTranslucent": "Black Translucent"
+      }
+    }
+  },
+  "affiliates": {
+    "page": {
+      "title": "Affiliate Program",
+      "subtitle": "Manage influencer referrals and commissions"
+    },
+    "tabs": {
+      "affiliates": "Affiliates",
+      "config": "Configuration"
+    },
+    "stats": {
+      "totalAffiliates": "Total Affiliates",
+      "activeReferrals": "Active Referrals",
+      "conversionRate": "Conversion Rate",
+      "totalPaid": "Total Paid",
+      "conversions": "Conversions"
+    },
+    "list": {
+      "tableLabel": "Affiliates",
+      "filters": {
+        "all": "All",
+        "pending": "Pending",
+        "approved": "Approved",
+        "rejected": "Rejected",
+        "suspended": "Suspended"
+      },
+      "columns": {
+        "nameEmail": "Name / Email",
+        "referralCode": "Referral Code",
+        "status": "Status",
+        "totalEarned": "Total Earned",
+        "pendingBalance": "Pending Balance",
+        "actions": "Actions"
+      },
+      "status": {
+        "pending": "Pending",
+        "approved": "Approved",
+        "rejected": "Rejected",
+        "suspended": "Suspended"
+      },
+      "actions": {
+        "approve": "Approve",
+        "reject": "Reject",
+        "suspend": "Suspend",
+        "payout": "Payout"
+      },
+      "empty": {
+        "title": "No Affiliates Yet",
+        "description": "Affiliates will appear here when they sign up or are invited."
+      },
+      "pagination": {
+        "summary": "Page {page} of {totalPages} ({total} total)",
+        "previous": "Previous",
+        "next": "Next"
+      }
+    },
+    "config": {
+      "commissionSection": "Commission & Payouts",
+      "optionsSection": "Program Options",
+      "save": "Save Configuration",
+      "fields": {
+        "defaultCommissionRate": "Default Commission Rate (%)",
+        "cookieDurationDays": "Cookie Duration (days)",
+        "minPayoutAmount": "Min Payout Amount (fils)",
+        "minPayoutEquivalent": "{amount} KWD equivalent"
+      },
+      "toggles": {
+        "autoApprove": {
+          "title": "Auto-approve Applications",
+          "description": "Automatically approve new affiliate applications without manual review"
+        },
+        "publicSignup": {
+          "title": "Public Signup",
+          "description": "Allow influencers to sign up as affiliates through the public page"
+        }
+      }
+    },
+    "payout": {
+      "title": "Create Payout",
+      "close": "Close",
+      "cancel": "Cancel",
+      "confirm": "Confirm Payout",
+      "summary": {
+        "label": "Paying out to",
+        "available": "Available balance:"
+      },
+      "fields": {
+        "amount": "Amount (KWD)",
+        "method": "Method",
+        "notes": "Notes",
+        "notesPlaceholder": "Optional notes for this payout"
+      },
+      "methods": {
+        "bank_transfer": "Bank Transfer",
+        "knet": "KNET",
+        "cash": "Cash",
+        "manual": "Manual"
+      }
+    },
+    "toasts": {
+      "error": {
+        "title": "Error"
+      },
+      "configSaved": {
+        "title": "Config Saved",
+        "message": "Affiliate program settings updated."
+      },
+      "configError": {
+        "message": "Failed to save config."
+      },
+      "statusUpdated": {
+        "title": "Updated",
+        "approve": "Affiliate approved successfully.",
+        "reject": "Affiliate rejected successfully.",
+        "suspend": "Affiliate suspended successfully."
+      },
+      "statusError": {
+        "approve": "Failed to approve affiliate.",
+        "reject": "Failed to reject affiliate.",
+        "suspend": "Failed to suspend affiliate."
+      },
+      "payoutCreated": {
+        "title": "Payout Created",
+        "message": "Payout recorded for {name}."
+      },
+      "payoutError": {
+        "message": "Failed to create payout."
+      },
+      "invalidAmount": {
+        "title": "Invalid Amount",
+        "message": "Enter a valid payout amount."
+      }
+    }
+  },
+  "bulk": {
+    "page": {
+      "title": "Bulk Operations",
+      "subtitle": "Import and export products in bulk",
+      "backToStore": "Back to Store"
+    },
+    "tabs": {
+      "import": "Import Products",
+      "export": "Export Products"
+    },
+    "import": {
+      "instructionsTitle": "How to Import Products",
+      "step1": "Download the CSV template using the button below",
+      "step2": "Fill in your product data following the template format",
+      "step3": "Prices are in fils (1 KWD = 1000 fils)",
+      "step4": "For multiple categories/tags/images, separate with commas within quotes",
+      "step5": "Upload the completed CSV file and click Import",
+      "downloadTemplate": "Download Template",
+      "uploadTitle": "Upload CSV or XLSX File",
+      "uploadPrompt": "Click to upload a CSV or XLSX file",
+      "fileLoaded": "{name} loaded. Click to change.",
+      "csvReady": "{count} products ready for import",
+      "xlsxReady": "Workbook loaded — rows will be mapped + parsed on the server",
+      "updateExisting": "Update existing products (match by SKU or slug)",
+      "xlsxOptionsHint": "XLSX options — applied to rows that don't specify these columns explicitly.",
+      "skuPrefixLabel": "SKU prefix (e.g. <code>WJ</code> → <code>WJ-001</code>)",
+      "skuPrefixPlaceholder": "ITEM",
+      "defaultInventoryLabel": "Default inventory per row",
+      "defaultStatusLabel": "Default status",
+      "statusActive": "active",
+      "statusDraft": "draft",
+      "trackInventory": "Track inventory (decrement on sale)",
+      "importing": "Importing...",
+      "importProducts": "Import Products",
+      "clear": "Clear"
+    },
+    "results": {
+      "title": "Import Results",
+      "totalRows": "Total Rows",
+      "created": "Created",
+      "updated": "Updated",
+      "failed": "Failed",
+      "errorsHeading": "Errors:",
+      "rowLabel": "Row {row}:",
+      "successMessage": "✓ Import completed successfully! <link>View products</link>"
+    },
+    "export": {
+      "optionsTitle": "Export Options",
+      "statusLabel": "Product Status",
+      "statusAll": "All Statuses",
+      "statusActive": "Active",
+      "statusDraft": "Draft",
+      "statusArchived": "Archived",
+      "searchLabel": "Search",
+      "searchPlaceholder": "Search by name or SKU",
+      "includeDeleted": "Include deleted products",
+      "exporting": "Exporting...",
+      "exportButton": "Export to CSV",
+      "infoTitle": "Export Information",
+      "info": {
+        "allFields": "All product fields are included in the export",
+        "commaSeparated": "Categories, tags, and images are comma-separated within their columns",
+        "reImport": "The exported file can be edited and re-imported to update products",
+        "pricesInFils": "Prices are in fils (1 KWD = 1000 fils)"
+      }
+    },
+    "errors": {
+      "network": "Network error. Please try again.",
+      "importFailed": "Import failed"
+    }
+  },
+  "abandonedCarts": {
+    "page": {
+      "title": "Abandoned Cart Recovery",
+      "subtitle": "Recover lost sales with automated reminders"
+    },
+    "featureDisabled": {
+      "title": "Abandoned Cart Recovery not enabled",
+      "description": "Enable the Abandoned Cart feature in your store features to start recovering lost sales."
+    },
+    "stats": {
+      "totalAbandoned": "Total Abandoned",
+      "recovered": "Recovered",
+      "recoveryRate": "Recovery Rate",
+      "recoveredRevenue": "Revenue Recovered",
+      "kwdValue": "{amount} KWD"
+    },
+    "status": {
+      "pending": "Pending",
+      "step1_sent": "Step 1 Sent",
+      "step2_sent": "Step 2 Sent",
+      "step3_sent": "Step 3 Sent",
+      "recovered": "Recovered",
+      "expired": "Expired"
+    },
+    "campaign": {
+      "title": "Recovery Settings",
+      "sendAfter": "Send after",
+      "minutes": "min",
+      "save": "Save Settings",
+      "step1": {
+        "title": "Step 1 — First Reminder"
+      },
+      "step2": {
+        "title": "Step 2 — Follow-up Reminder"
+      },
+      "step3": {
+        "title": "Step 3 — Final Reminder"
+      },
+      "autoCoupon": {
+        "title": "Auto-coupon",
+        "discount": "Discount",
+        "maxDiscount": "Max Discount",
+        "expiry": "Expiry",
+        "noLimit": "No limit",
+        "kwd": "KWD",
+        "hours": "hours"
+      }
+    },
+    "list": {
+      "title": "Abandoned Carts",
+      "ariaLabel": "Abandoned carts",
+      "filterAriaLabel": "Filter by status",
+      "allStatuses": "All statuses",
+      "totalRecords": "{count, plural, =0 {No records} one {# total record} other {# total records}}",
+      "empty": "No abandoned carts found",
+      "previous": "Previous",
+      "next": "Next",
+      "pagination": "Page {page} of {totalPages} ({total} total)",
+      "columns": {
+        "customer": "Customer",
+        "total": "Total",
+        "items": "Items",
+        "status": "Status",
+        "date": "Date"
+      }
+    },
+    "messages": {
+      "saveSuccessTitle": "Saved",
+      "saveSuccessBody": "Abandoned cart settings saved.",
+      "saveErrorTitle": "Error",
+      "saveErrorBody": "Failed to save settings. Please try again."
+    }
+  },
+  "returns": {
+    "page": {
+      "title": "Returns & Exchanges",
+      "subtitle": "Manage return requests and refunds"
+    },
+    "stats": {
+      "total": "Total Returns",
+      "pending": "Pending",
+      "approved": "Approved",
+      "completed": "Completed"
+    },
+    "filters": {
+      "all": "All",
+      "pending": "Pending",
+      "approved": "Approved",
+      "completed": "Completed"
+    },
+    "status": {
+      "pending": "Pending",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "shipped": "Shipped",
+      "received": "Received",
+      "inspecting": "Inspecting",
+      "completed": "Completed",
+      "cancelled": "Cancelled"
+    },
+    "type": {
+      "return": "Return",
+      "exchange": "Exchange",
+      "refund": "Refund"
+    },
+    "list": {
+      "loading": "Loading returns...",
+      "empty": "No returns found",
+      "orderLabel": "Order",
+      "customerLabel": "Customer",
+      "reasonLabel": "Reason",
+      "itemCount": "{count, plural, =0 {No items} one {# item} other {# items}}",
+      "pagination": "Showing {from} to {to} of {total} returns",
+      "previous": "Previous",
+      "next": "Next",
+      "actions": {
+        "approve": "Approve",
+        "reject": "Reject",
+        "markReceived": "Mark Received",
+        "completeRefund": "Complete & Refund"
+      }
+    },
+    "details": {
+      "heading": "Return #{number}",
+      "orderReference": "Order #{number}",
+      "close": "Close",
+      "customer": "Customer",
+      "reason": "Reason",
+      "items": "Items",
+      "itemMeta": "Qty: {qty} | Condition: {condition}",
+      "notAvailable": "N/A",
+      "refundAmount": "Refund Amount",
+      "actions": {
+        "approveReturn": "Approve Return",
+        "reject": "Reject",
+        "markReceived": "Mark as Received",
+        "completeRefund": "Complete & Process Refund",
+        "close": "Close"
+      }
+    },
+    "messages": {
+      "approveSuccessTitle": "Return Approved",
+      "approveSuccessBody": "The return has been approved.",
+      "approveErrorTitle": "Error",
+      "approveErrorBody": "Failed to approve return. Please try again.",
+      "rejectPrompt": "Enter rejection reason:",
+      "rejectSuccessTitle": "Return Rejected",
+      "rejectSuccessBody": "The return has been rejected.",
+      "rejectErrorTitle": "Error",
+      "rejectErrorBody": "Failed to reject return. Please try again.",
+      "receivedSuccessTitle": "Return Received",
+      "receivedSuccessBody": "The return has been marked as received.",
+      "receivedErrorTitle": "Error",
+      "receivedErrorBody": "Failed to mark return as received. Please try again.",
+      "completePrompt": "Enter refund method (original, store_credit, bank_transfer):",
+      "completeSuccessTitle": "Return Completed",
+      "completeSuccessBody": "The return has been completed and refund processed.",
+      "completeErrorTitle": "Error",
+      "completeErrorBody": "Failed to complete return. Please try again."
+    }
+  },
+  "marketingPixels": {
+    "page": {
+      "title": "Marketing Pixels",
+      "subtitle": "Configure tracking pixels to measure ad performance and conversions"
+    },
+    "info": {
+      "title": "About Marketing Pixels",
+      "body": "Marketing pixels are small code snippets that track visitor behavior on your store. They help you measure the effectiveness of your advertising campaigns and optimize for conversions."
+    },
+    "status": {
+      "active": "Active",
+      "inactive": "Inactive"
+    },
+    "toggleAriaLabel": "Toggle platform",
+    "viewDocumentation": "View documentation",
+    "save": {
+      "button": "Save Changes",
+      "saving": "Saving...",
+      "successMessage": "Marketing pixels saved successfully.",
+      "errorMessage": "Failed to save marketing pixels. Please try again."
+    },
+    "notFound": {
+      "title": "Store not found",
+      "backToStores": "Back to stores"
+    },
+    "fields": {
+      "accessTokenLabel": "Access Token (Optional - for Conversions API)",
+      "accessTokenPlaceholder": "Enter access token for server-side tracking",
+      "accessTokenHelp": "Access tokens enable server-side event tracking for better accuracy",
+      "conversionLabelLabel": "Conversion Label (Optional)",
+      "conversionLabelPlaceholder": "e.g., AbC123def456"
+    },
+    "platforms": {
+      "meta": {
+        "name": "Meta Pixel",
+        "description": "Track conversions from Facebook and Instagram ads",
+        "idLabel": "Pixel ID"
+      },
+      "tiktok": {
+        "name": "TikTok Pixel",
+        "description": "Track conversions from TikTok ads",
+        "idLabel": "Pixel ID"
+      },
+      "snapchat": {
+        "name": "Snapchat Pixel",
+        "description": "Track conversions from Snapchat ads",
+        "idLabel": "Pixel ID"
+      },
+      "googleAnalytics": {
+        "name": "Google Analytics 4",
+        "description": "Track website traffic and user behavior",
+        "idLabel": "Measurement ID"
+      },
+      "googleTagManager": {
+        "name": "Google Tag Manager",
+        "description": "Manage all your marketing tags in one place",
+        "idLabel": "Container ID"
+      },
+      "googleAds": {
+        "name": "Google Ads",
+        "description": "Track conversions from Google Ads campaigns",
+        "idLabel": "Conversion ID"
+      },
+      "twitter": {
+        "name": "Twitter/X Pixel",
+        "description": "Track conversions from Twitter/X ads",
+        "idLabel": "Pixel ID"
+      },
+      "pinterest": {
+        "name": "Pinterest Tag",
+        "description": "Track conversions from Pinterest ads",
+        "idLabel": "Tag ID"
+      }
+    },
+    "events": {
+      "title": "Tracked Events",
+      "description": "When pixels are enabled, the following e-commerce events are automatically tracked:",
+      "pageView": {
+        "name": "Page View",
+        "description": "Every page visit"
+      },
+      "viewContent": {
+        "name": "View Content",
+        "description": "Product page views"
+      },
+      "addToCart": {
+        "name": "Add to Cart",
+        "description": "Items added to cart"
+      },
+      "initiateCheckout": {
+        "name": "Initiate Checkout",
+        "description": "Checkout started"
+      },
+      "purchase": {
+        "name": "Purchase",
+        "description": "Completed orders"
+      },
+      "search": {
+        "name": "Search",
+        "description": "Product searches"
+      },
+      "addToWishlist": {
+        "name": "Add to Wishlist",
+        "description": "Wishlist additions"
+      },
+      "lead": {
+        "name": "Lead",
+        "description": "Contact form submissions"
+      }
+    }
+  },
+  "pages": {
+    "page": {
+      "title": "Footer & Pages",
+      "subtitle": "Manage the links shown in your store's footer",
+      "loadingSubtitle": "Manage footer links and store pages",
+      "backToSettings": "Back to Settings",
+      "saveChanges": "Save Changes",
+      "saving": "Saving...",
+      "help": "Configure which links appear in your store's footer. Disable links to hide them, or add new ones. Links use relative paths (e.g.,",
+      "helpCode": "/faq",
+      "helpClose": ").",
+      "shopLinks": "Shop Links",
+      "supportLinks": "Support Links",
+      "companyLinks": "Company Links",
+      "newsletter": "Newsletter Section",
+      "newsletterHint": "Show or hide the newsletter signup form in the footer.",
+      "addLink": "Add Link",
+      "emptyLinks": "No links configured. Click \"Add Link\" to add one.",
+      "linkNamePlaceholder": "Link name",
+      "linkNameArPlaceholder": "Arabic name (optional)",
+      "linkPathPlaceholder": "/page-path",
+      "removeLink": "Remove link",
+      "toastSavedTitle": "Saved",
+      "toastSavedBody": "Footer links updated successfully.",
+      "toastErrorTitle": "Error",
+      "toastFailedSave": "Failed to save.",
+      "toastFailedSaveLinks": "Failed to save footer links."
+    }
+  },
+  "navigation": {
+    "page": {
+      "title": "Navigation",
+      "heading": "Storefront Navigation",
+      "loading": "Loading…",
+      "helpBefore": "Control the header menu on every storefront page. Use relative paths (",
+      "helpCode": "/products",
+      "helpAfter": ") for store pages, or full URLs for external links.",
+      "breadcrumbStore": "Store",
+      "breadcrumbSettings": "Settings",
+      "breadcrumbNav": "Navigation",
+      "itemNumber": "Item {number}",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "removeItem": "Remove item",
+      "labelEnglish": "Label (English)",
+      "labelEnglishPlaceholder": "Products",
+      "labelArabic": "Label (Arabic)",
+      "labelArabicPlaceholder": "المنتجات",
+      "pathOrUrl": "Path or URL",
+      "pathPlaceholder": "/products",
+      "addItem": "+ Add item",
+      "resetDefault": "Reset to defaults",
+      "saveNav": "Save navigation",
+      "toastFailedLoad": "Failed to load",
+      "toastAtLeastOne": "At least one menu item required",
+      "toastAtLeastOneBody": "Add a label and href.",
+      "toastFailedSave": "Failed to save",
+      "toastSaved": "Navigation saved",
+      "toastSavedBody": "Storefront will use the new menu on next page load."
+    }
+  },
+  "notifications": {
+    "page": {
+      "title": "Notifications",
+      "subtitle": "Configure WhatsApp, SMS, and push notification channels"
+    },
+    "empty": {
+      "title": "No notification channels enabled",
+      "description": "Enable notification channels (WhatsApp, SMS, or Push Notifications) in your store features to configure them here."
+    },
+    "shared": {
+      "save": "Save",
+      "testConnection": "Test Connection",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "channelNames": {
+        "whatsapp": "WhatsApp",
+        "sms": "SMS",
+        "push": "Push Notifications",
+        "pushShort": "Push"
+      }
+    },
+    "whatsapp": {
+      "title": "WhatsApp",
+      "subtitle": "WhatsApp Business API via Meta",
+      "fields": {
+        "phoneNumberId": "Phone Number ID",
+        "wabaId": "WABA ID",
+        "accessToken": "Access Token"
+      },
+      "placeholders": {
+        "phoneNumberId": "e.g. 123456789012345",
+        "wabaId": "WhatsApp Business Account ID",
+        "accessToken": "Meta permanent access token"
+      }
+    },
+    "sms": {
+      "title": "SMS",
+      "subtitle": "SMS via Unifonic",
+      "fields": {
+        "appSid": "App SID",
+        "senderId": "Sender ID"
+      },
+      "placeholders": {
+        "appSid": "Unifonic App SID",
+        "senderId": "e.g. MyStore"
+      }
+    },
+    "push": {
+      "title": "Push Notifications",
+      "subtitle": "Standards-based Web Push (W3C Push API)",
+      "subscribers": "{count, number} subscribers",
+      "platformNote": "Push notifications use the platform VAPID configuration. No per-store setup needed — just toggle Enabled."
+    },
+    "events": {
+      "title": "Event Configuration",
+      "subtitle": "Choose which events trigger notifications on each channel",
+      "tableLabel": "Notification event configuration",
+      "save": "Save Event Config",
+      "columns": {
+        "event": "Event"
+      },
+      "labels": {
+        "order_confirmed": "Order Confirmed",
+        "payment_success": "Payment Success",
+        "payment_failed": "Payment Failed",
+        "order_shipped": "Order Shipped",
+        "order_delivered": "Order Delivered",
+        "order_cancelled": "Order Cancelled",
+        "order_refunded": "Order Refunded"
+      }
+    },
+    "log": {
+      "title": "Recent Notifications",
+      "subtitle": "Delivery history for the last {limit} notifications",
+      "tableLabel": "Notification log",
+      "empty": "No notifications sent yet",
+      "columns": {
+        "timestamp": "Timestamp",
+        "event": "Event",
+        "channel": "Channel",
+        "recipient": "Recipient",
+        "status": "Status"
+      },
+      "filters": {
+        "channelLabel": "Filter by channel",
+        "statusLabel": "Filter by status",
+        "allChannels": "All channels",
+        "allStatuses": "All statuses"
+      },
+      "status": {
+        "sent": "Sent",
+        "delivered": "Delivered",
+        "failed": "Failed",
+        "pending": "Pending",
+        "queued": "Queued"
+      },
+      "pagination": {
+        "summary": "Page {page} of {pages} ({total} total)",
+        "previous": "Previous",
+        "next": "Next"
+      }
+    },
+    "toast": {
+      "savedTitle": "Saved",
+      "errorTitle": "Error",
+      "channelSavedDescription": "{channel} settings saved.",
+      "saveFailed": "Failed to save settings.",
+      "saveFailedRetry": "Failed to save settings. Please try again.",
+      "connectionOkTitle": "Connection OK",
+      "connectionOkDescription": "{channel} connection test passed.",
+      "connectionFailedTitle": "Connection Failed",
+      "testFailed": "Test failed.",
+      "eventsSavedDescription": "Event configuration saved.",
+      "eventsSaveFailed": "Failed to save event configuration."
+    }
+  },
+  "loyalty": {
+    "page": {
+      "title": "Loyalty Program",
+      "subtitle": "Reward your customers with points and exclusive benefits",
+      "programStatus": "Program Status:",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "saveSettings": "Save Settings",
+      "tabs": {
+        "settings": "Settings",
+        "members": "Members"
+      }
+    },
+    "stats": {
+      "totalMembers": "Total Members",
+      "pointsIssued": "Points Issued",
+      "pointsRedeemed": "Points Redeemed",
+      "outstanding": "Outstanding",
+      "tierBreakdown": "Tier Breakdown"
+    },
+    "earning": {
+      "title": "Point Earning",
+      "pointsPerDinar": "Points per 1 KWD Spent",
+      "signupBonus": "Signup Bonus",
+      "referralBonus": "Referral Bonus",
+      "reviewBonus": "Review Bonus",
+      "birthdayBonus": "Birthday Bonus"
+    },
+    "tiers": {
+      "title": "Membership Tiers",
+      "bronze": "Bronze",
+      "silver": "Silver",
+      "gold": "Gold",
+      "platinum": "Platinum",
+      "minPoints": "Min Points",
+      "multiplier": "Multiplier"
+    },
+    "redemption": {
+      "title": "Redemption",
+      "pointValue": "Point Value (fils)",
+      "pointValueHint": "1 point = {value} fils",
+      "minRedeem": "Min Points to Redeem",
+      "maxPercent": "Max % of Order",
+      "expirationMonths": "Expiration (months)",
+      "expirationHint": "0 = never expires"
+    },
+    "members": {
+      "all": "All",
+      "emptyTitle": "No Members Yet",
+      "emptyDescription": "Customers will appear here when they join your loyalty program",
+      "tableLabel": "Loyalty members",
+      "awardPoints": "Award Points",
+      "columns": {
+        "member": "Member",
+        "tier": "Tier",
+        "balance": "Points Balance",
+        "totalEarned": "Total Earned",
+        "totalRedeemed": "Total Redeemed",
+        "actions": "Actions"
+      }
+    },
+    "award": {
+      "title": "Award Points",
+      "close": "Close",
+      "description": "Award points to",
+      "pointsLabel": "Points",
+      "pointsPlaceholder": "Enter points (negative to deduct)",
+      "reasonLabel": "Reason",
+      "reasonPlaceholder": "Optional reason for adjustment",
+      "cancel": "Cancel",
+      "submit": "Award Points"
+    },
+    "disableConfirm": {
+      "title": "Disable Loyalty Program",
+      "description": "Disable the loyalty program? Customers will no longer earn or redeem points until you re-enable it.",
+      "cancel": "Cancel",
+      "confirm": "Disable"
+    },
+    "toast": {
+      "updatedTitle": "Updated",
+      "enabledDescription": "Loyalty program enabled.",
+      "disabledDescription": "Loyalty program disabled.",
+      "errorTitle": "Error",
+      "toggleFailed": "Failed to update loyalty program status. Please try again.",
+      "savedTitle": "Settings Saved",
+      "savedDescription": "Loyalty settings have been updated.",
+      "saveFailed": "Failed to save loyalty settings. Please try again.",
+      "awardedTitle": "Points Awarded",
+      "awardedDescription": "Points have been awarded to {name}.",
+      "awardFailed": "Failed to award points. Please try again."
+    }
+  },
+  "paymentSettings": {
+    "page": {
+      "title": "Payment Settings",
+      "subtitle": "Configure payment providers for this store"
+    },
+    "actions": {
+      "backToSettings": "Back to Settings"
+    },
+    "errors": {
+      "loadFailed": "Failed to load payment settings",
+      "connectionError": "Unable to connect to the server. Please check your connection and try again.",
+      "retry": "Retry"
+    },
+    "providers": {
+      "tapName": "Tap Payments",
+      "tapNameAr": "تاب للمدفوعات",
+      "myfatoorahName": "MyFatoorah",
+      "myfatoorahNameAr": "ماي فاتورة",
+      "hesabeName": "Hesabe",
+      "hesabeNameAr": "حسابي",
+      "upaymentsName": "UPayments",
+      "upaymentsNameAr": "يو بيمنتس",
+      "codName": "Cash on Delivery",
+      "codNameAr": "الدفع عند الاستلام"
+    },
+    "toggle": {
+      "enabled": "Enabled",
+      "disabled": "Disabled"
+    },
+    "configure": "Configure",
+    "cod": {
+      "displayNameLabel": "Display Name (English)",
+      "displayNamePlaceholder": "Cash on Delivery",
+      "displayNameArLabel": "Display Name (Arabic)",
+      "displayNameArPlaceholder": "الدفع عند الاستلام",
+      "fixedFeeLabel": "Surcharge Fee (fils)",
+      "fixedFeePlaceholder": "0",
+      "fixedFeeEquals": "= {amount} KWD",
+      "fixedFeeHelpPrefix": "Extra charge added to the order when the customer pays cash on delivery. Enter",
+      "fixedFeeHelpZero": "0",
+      "fixedFeeHelpSuffix": "for free COD. 1000 fils = 1 KWD.",
+      "infoBanner": "COD orders bypass the payment gateway. The customer confirms the order, and you mark it as paid from the Orders page once cash is collected."
+    },
+    "gateway": {
+      "apiKeyLabel": "API Key",
+      "apiKeyPlaceholder": "Enter API key",
+      "secretKeyLabel": "Secret Key",
+      "secretKeyPlaceholder": "Enter secret key",
+      "webhookSecretLabel": "Webhook Secret",
+      "webhookSecretPlaceholder": "Enter webhook secret",
+      "merchantIdLabel": "Merchant ID",
+      "merchantIdPlaceholder": "Enter merchant ID (if applicable)",
+      "testModeOn": "Test Mode On",
+      "testModeOff": "Test Mode Off",
+      "testModeDescriptionOn": "Using test credentials — no real payments processed",
+      "testModeDescriptionOff": "Live mode — real payments will be processed"
+    },
+    "messages": {
+      "savedSuccess": "Saved successfully",
+      "failedToSave": "Failed to save",
+      "unableToConnect": "Unable to connect to the server"
+    },
+    "save": "Save",
+    "saving": "Saving..."
+  },
+  "hero": {
+    "page": {
+      "title": "Hero Section",
+      "subtitle": "Customize your storefront homepage hero",
+      "storeNotFound": "Store not found",
+      "backToStores": "Back to stores",
+      "saving": "Saving...",
+      "saveChanges": "Save Changes",
+      "titleEnglish": "Title (English)",
+      "titleEnglishPlaceholder": "Shop the Future of E-Commerce",
+      "titleArabic": "Title (Arabic)",
+      "titleArabicPlaceholder": "اكتشف مجموعتنا",
+      "subtitleEnglish": "Subtitle (English)",
+      "subtitleEnglishPlaceholder": "Premium products, fast delivery, and secure payments",
+      "subtitleArabic": "Subtitle (Arabic)",
+      "subtitleArabicPlaceholder": "أفضل المنتجات بأفضل الأسعار",
+      "ctaEnglish": "CTA Button Text (English)",
+      "ctaEnglishPlaceholder": "Shop Now",
+      "ctaArabic": "CTA Button Text (Arabic)",
+      "ctaArabicPlaceholder": "تسوق الآن",
+      "ctaLink": "CTA Link",
+      "ctaLinkPlaceholder": "/products",
+      "heroImage": "Hero Image",
+      "uploadHeroImage": "Upload Hero Image",
+      "heroImageHint": "Recommended: 1200x900px, JPG or PNG. Leave empty to use the default visual.",
+      "toastLoadFailedTitle": "Failed to load hero",
+      "toastConnectionTitle": "Connection error",
+      "toastConnectionBody": "Failed to connect to the server",
+      "toastAccessDeniedTitle": "Access denied",
+      "toastAccessDeniedBody": "You do not have permission to update this store",
+      "toastSessionExpiredTitle": "Session expired",
+      "toastSessionExpiredBody": "Please log in again",
+      "toastSaveFailedTitle": "Failed to save hero",
+      "toastSavedTitle": "Hero saved",
+      "toastSavedBody": "Your homepage hero has been updated",
+      "toastSaveConnectionBody": "Failed to connect to the server. Please try again."
+    }
+  },
+  "announcement": {
+    "page": {
+      "title": "Announcement Bar",
+      "subtitle": "Display a banner across the top of your store",
+      "loading": "Loading...",
+      "backToSettings": "Back to Settings",
+      "saveChanges": "Save Changes",
+      "saving": "Saving...",
+      "preview": "Preview",
+      "sectionTitle": "Announcement Bar",
+      "sectionHint": "Show a banner at the top of your store for promotions, announcements or news",
+      "content": "Content",
+      "textEnglish": "Announcement Text (English)",
+      "textEnglishPlaceholder": "Free shipping on orders over 10 KWD!",
+      "textArabic": "Announcement Text (Arabic)",
+      "textArabicPlaceholder": "شحن مجاني للطلبات فوق ١٠ د.ك!",
+      "linkUrl": "Link URL (optional)",
+      "linkUrlPlaceholder": "https://example.com/sale",
+      "linkUrlHint": "The entire bar will link to this URL when clicked",
+      "linkTextEnglish": "Link Text (English)",
+      "linkTextEnglishPlaceholder": "Shop Now",
+      "linkTextArabic": "Link Text (Arabic)",
+      "linkTextArabicPlaceholder": "تسوق الآن",
+      "colors": "Colors",
+      "backgroundColor": "Background Color",
+      "textColor": "Text Color",
+      "successMessage": "Announcement settings saved successfully",
+      "failedMessage": "Failed to save announcement settings",
+      "connectionError": "Unable to connect to the server"
+    }
+  },
+  "features": {
+    "page": {
+      "title": "Store Features",
+      "subtitleLoading": "Manage feature toggles for this store",
+      "subtitle": "Enable or disable features for this store"
+    },
+    "categories": {
+      "commerce": "Commerce",
+      "marketing": "Marketing",
+      "operations": "Operations",
+      "storefront": "Storefront"
+    },
+    "category": {
+      "enabledOfTotal": "{enabled} of {total} enabled"
+    },
+    "errors": {
+      "loadFailed": "Failed to load features. Please try again.",
+      "saveFailed": "Failed to save features. Please try again.",
+      "retry": "Retry"
+    },
+    "toasts": {
+      "errorTitle": "Error",
+      "savedTitle": "Features Saved",
+      "savedDescription": "{count} features updated successfully."
+    },
+    "actions": {
+      "discard": "Discard",
+      "saveChanges": "Save Changes",
+      "unsaved": "unsaved",
+      "unsavedChanges": "{count} unsaved changes",
+      "unsavedChangesBanner": "You have"
+    },
+    "row": {
+      "enabledBy": "Enabled by",
+      "enabledOn": "on"
+    }
+  },
+  "template": {
+    "page": {
+      "title": "Choose Template",
+      "subtitleWithStore": "Select a template for {storeName}",
+      "storeNotFound": "Store not found",
+      "backToStores": "Back to stores",
+      "cancel": "Cancel",
+      "apply": "Apply Template",
+      "saving": "Saving...",
+      "current": "Current",
+      "aboutTitle": "About Templates",
+      "aboutBody": "Templates define the overall look and feel of your storefront. You can change templates at any time, and your content will automatically adapt to the new design. Customize colors and fonts in the",
+      "brandingSettings": "Branding settings"
+    }
+  },
+  "seo": {
+    "page": {
+      "title": "SEO Settings",
+      "subtitle": "Optimize your store for search engines",
+      "loading": "Loading...",
+      "backToSettings": "Back to Settings",
+      "saveChanges": "Save Changes",
+      "saving": "Saving...",
+      "searchPreview": "Search Result Preview",
+      "previewDomain": "example.com",
+      "englishSeo": "English SEO",
+      "arabicSeo": "Arabic SEO",
+      "enBadge": "EN",
+      "arBadge": "AR",
+      "advanced": "Advanced",
+      "metaTitle": "Meta Title",
+      "metaTitlePlaceholder": "My Store — Best Products in Kuwait",
+      "metaTitleHint": "Appears in browser tabs and search results. Keep under {max} characters for best results.",
+      "metaDescription": "Meta Description",
+      "metaDescriptionPlaceholder": "Discover our wide range of products with fast delivery across Kuwait...",
+      "metaDescriptionHint": "Shown in search result snippets. Keep under {max} characters for best results.",
+      "metaTitleAr": "Meta Title (Arabic)",
+      "metaTitleArPlaceholder": "متجري — أفضل المنتجات في الكويت",
+      "metaDescriptionAr": "Meta Description (Arabic)",
+      "metaDescriptionArPlaceholder": "اكتشف مجموعتنا الواسعة من المنتجات مع توصيل سريع في الكويت...",
+      "ogImage": "OG Image URL",
+      "ogImagePlaceholder": "https://example.com/og-image.jpg",
+      "ogImageHint": "Image shown when your store is shared on social media. Recommended: 1200×630px.",
+      "twitterHandle": "Twitter / X Handle",
+      "twitterPlaceholder": "yourstorehandle",
+      "googleSiteVerification": "Google Site Verification",
+      "googleSiteVerificationPlaceholder": "Verification meta tag content",
+      "googleSiteVerificationHint": "From Google Search Console verification",
+      "successMessage": "SEO settings saved successfully",
+      "failedMessage": "Failed to save SEO settings",
+      "connectionError": "Unable to connect to the server"
+    }
+  },
+  "language": {
+    "page": {
+      "title": "Language Settings",
+      "subtitle": "Set the default language for your storefront",
+      "loading": "Loading...",
+      "backToSettings": "Back to Settings",
+      "save": "Save Changes",
+      "saving": "Saving...",
+      "defaultTitle": "Default Storefront Language",
+      "defaultHint": "New visitors will see the storefront in this language. They can still switch languages manually.",
+      "englishName": "English",
+      "englishLayout": "Left-to-right layout",
+      "arabicName": "العربية",
+      "arabicLayout": "Right-to-left layout",
+      "successMessage": "Language settings saved successfully",
+      "failedMessage": "Failed to save language settings",
+      "connectionError": "Unable to connect to the server"
+    }
+  },
+  "domain": {
+    "page": {
+      "title": "Custom Domain",
+      "subtitle": "Connect a custom domain to your store",
+      "heading": "Custom Domain",
+      "storeDomainSuffix": "Domain",
+      "storeNotFound": "Store not found.",
+      "addDomain": "Add Domain",
+      "changeDomain": "Change Domain",
+      "remove": "Remove",
+      "domain": "Domain",
+      "domainPlaceholder": "shop.example.com",
+      "domainRemoveHint": "Leave empty and save to remove the custom domain.",
+      "save": "Save",
+      "saving": "Saving...",
+      "cancel": "Cancel",
+      "verified": "Verified",
+      "pending": "Pending Verification",
+      "dnsRequired": "DNS Configuration Required",
+      "dnsInstructions": "Add the following DNS record to your domain provider:",
+      "dnsPropagation": "DNS changes can take up to 48 hours to propagate.",
+      "checkDns": "Check DNS",
+      "checkingDns": "Checking...",
+      "verifiedMessage": "Domain is verified and SSL is active. Your store is accessible at https://{domain}",
+      "noDomain": "No custom domain configured. This store is accessible via its default subdomain.",
+      "dnsTableLabel": "DNS records",
+      "colType": "Type",
+      "colName": "Name",
+      "colValue": "Value",
+      "invalidDomain": "Please enter a valid domain (e.g., shop.example.com)",
+      "updateFailed": "Failed to update domain"
+    }
+  },
+  "categories": {
+    "page": {
+      "title": "Product Categories",
+      "subtitle": "Manage categories for this store",
+      "backToStore": "Back to Store",
+      "addCategory": "Add Category",
+      "retry": "Retry",
+      "connectionError": "Unable to connect to the server. Please check your connection and try again.",
+      "fetchFailed": "Failed to fetch categories",
+      "deleteTitle": "Delete Category",
+      "deleteConfirm": "Delete category \"{name}\"? This cannot be undone.",
+      "cancel": "Cancel",
+      "delete": "Delete",
+      "deleting": "Deleting...",
+      "toastDeletedTitle": "Category Deleted",
+      "toastDeletedBody": "\"{name}\" has been removed.",
+      "errorTitle": "Error",
+      "deleteFailed": "Failed to delete category"
+    },
+    "form": {
+      "editTitle": "Edit Category",
+      "addTitle": "Add Category",
+      "close": "Close",
+      "nameEnglish": "Name (English)",
+      "nameEnglishPlaceholder": "Electronics",
+      "nameArabic": "Name (Arabic)",
+      "nameArabicPlaceholder": "إلكترونيات",
+      "urlSlug": "URL Slug",
+      "urlSlugPlaceholder": "electronics",
+      "urlSlugHint": "Used in URLs: lowercase, hyphens only",
+      "description": "Description",
+      "descriptionPlaceholder": "Category description...",
+      "descriptionArabic": "Description (Arabic)",
+      "descriptionArabicPlaceholder": "وصف التصنيف...",
+      "categoryImage": "Category Image",
+      "uploadCategoryImage": "Upload Category Image",
+      "required": "*",
+      "cancel": "Cancel",
+      "saving": "Saving...",
+      "updateCategory": "Update Category",
+      "createCategory": "Create Category",
+      "errorNameRequired": "Name is required",
+      "errorSlugRequired": "Slug is required",
+      "errorSlugInvalid": "Slug must be lowercase letters, numbers, Arabic characters and hyphens only",
+      "updatedSuccess": "Category updated successfully",
+      "createdSuccess": "Category created successfully",
+      "updateFailed": "Failed to update category",
+      "createFailed": "Failed to create category",
+      "slugInUse": "This slug is already in use",
+      "connectionError": "Unable to connect to the server"
+    },
+    "table": {
+      "label": "Categories",
+      "empty": "No categories yet",
+      "addFirst": "Add your first category",
+      "category": "Category",
+      "slug": "Slug",
+      "products": "Products",
+      "status": "Status",
+      "actions": "Actions",
+      "active": "Active",
+      "inactive": "Inactive",
+      "edit": "Edit",
+      "delete": "Delete",
+      "deleting": "Deleting..."
+    }
+  },
+  "reviews": {
+    "page": {
+      "title": "Reviews",
+      "subtitle": "Manage product reviews and ratings",
+      "filterAll": "All Reviews",
+      "filterPending": "Pending Approval",
+      "filterApproved": "Approved",
+      "loading": "Loading reviews...",
+      "empty": "No reviews found",
+      "approved": "Approved",
+      "pending": "Pending",
+      "verifiedPurchase": "Verified Purchase",
+      "productLabel": "Product: ",
+      "byLabel": "By: ",
+      "anonymous": "Anonymous",
+      "helpfulSuffix": " helpful",
+      "approve": "Approve",
+      "unapprove": "Unapprove",
+      "delete": "Delete",
+      "paginationShowing": "Showing {from} to {to} of {total} reviews",
+      "previous": "Previous",
+      "next": "Next",
+      "deleteModalTitle": "Delete Review",
+      "deleteModalBody": "Are you sure you want to delete this review? This action cannot be undone.",
+      "cancel": "Cancel",
+      "toastApproveFailed": "Failed to approve review. Please try again.",
+      "toastUnapproveFailed": "Failed to unapprove review. Please try again.",
+      "toastDeleteFailed": "Failed to delete review. Please try again.",
+      "toastApproveTitle": "Review Approved",
+      "toastApproveBody": "The review is now visible to customers.",
+      "toastUnapproveTitle": "Review Unapproved",
+      "toastUnapproveBody": "The review has been unapproved.",
+      "toastDeleteTitle": "Review Deleted",
+      "toastDeleteBody": "The review has been permanently removed.",
+      "errorTitle": "Error"
+    }
+  },
+  "audit": {
+    "title": "Audit Logs",
+    "subtitle": "Track all platform activity and changes",
+    "refresh": "Refresh",
+    "filterEntityLabel": "Filter by entity",
+    "filterActionLabel": "Filter by action",
+    "allEntities": "All Entities",
+    "entityStore": "Stores",
+    "entityUser": "Users",
+    "entityProduct": "Products",
+    "entityOrder": "Orders",
+    "entitySetting": "Settings",
+    "allActions": "All Actions",
+    "actionCreate": "Create",
+    "actionUpdate": "Update",
+    "actionDelete": "Delete",
+    "actionLogin": "Login",
+    "actionLogout": "Logout",
+    "hideDetails": "Hide details",
+    "showDetails": "Show details",
+    "empty": "No audit logs found",
+    "system": "System",
+    "idPrefix": "ID:",
+    "paginationShowing": "Showing {from} to {to} of {total} logs",
+    "previous": "Previous",
+    "next": "Next"
+  },
+  "auth": {
+    "login": {
+      "title": "Admin Login",
+      "subtitle": "Sign in to access the Force Platform",
+      "email": "Email address",
+      "emailPlaceholder": "you@example.com",
+      "password": "Password",
+      "passwordPlaceholder": "Enter your password",
+      "signIn": "Sign in",
+      "signingIn": "Signing in…",
+      "loginFailed": "Login failed",
+      "footer": "Force Platform Admin Panel",
+      "brandTitle": "Force Platform",
+      "brandSubtitle": "Manage your e-commerce stores, users, and platform settings from one powerful dashboard.",
+      "statActiveStores": "Active Stores",
+      "statProducts": "Products",
+      "statOrders": "Orders"
+    }
+  },
+  "users": {
+    "title": "Users",
+    "subtitle": "Manage all users on the platform",
+    "inviteUser": "Invite User",
+    "searchPlaceholder": "Search by name or email…",
+    "filterRoleLabel": "Filter by role",
+    "allRoles": "All Roles",
+    "roleSuperAdmins": "Super Admins",
+    "roleStoreAdmins": "Store Admins",
+    "roleCustomers": "Customers",
+    "tableLabel": "Users",
+    "colUser": "User",
+    "colRole": "Role",
+    "colStatus": "Status",
+    "colStores": "Stores",
+    "colJoined": "Joined",
+    "colLastLogin": "Last Login",
+    "colActions": "Actions",
+    "view": "View",
+    "moreCount": "+{count} more",
+    "neverLoggedIn": "Never",
+    "empty": "No users found",
+    "errorTitle": "Failed to load users",
+    "errorDefault": "Failed to fetch users",
+    "errorNetwork": "Unable to connect to the server. Please check your connection and try again.",
+    "paginationShowing": "Showing {from} to {to} of {total} users",
+    "previous": "Previous",
+    "next": "Next",
+    "role": {
+      "super_admin": "super admin",
+      "store_admin": "store admin",
+      "customer": "customer"
+    },
+    "status": {
+      "active": "active",
+      "inactive": "inactive",
+      "suspended": "suspended"
+    },
+    "detail": {
+      "loadingTitle": "Loading…",
+      "loadingSubtitle": "Please wait",
+      "notFoundTitle": "User Not Found",
+      "notFoundSubtitle": "The requested user could not be found",
+      "notFoundMessage": "User not found",
+      "backToUsers": "Back to Users",
+      "profile": "Profile",
+      "role": "Role",
+      "memberSince": "Member Since",
+      "lastLogin": "Last Login",
+      "neverLoggedIn": "Never",
+      "storesCount": "Stores ({count})",
+      "viewStore": "View",
+      "editUser": "Edit User",
+      "firstName": "First Name",
+      "lastName": "Last Name",
+      "emailAddress": "Email Address",
+      "emailHint": "Email cannot be changed from admin panel",
+      "roleLabel": "Role",
+      "roleHint": "Changing to super_admin grants full platform access.",
+      "accountStatus": "Account Status",
+      "statusActiveOption": "Active — User can log in and use the platform",
+      "statusInactiveOption": "Inactive — Account disabled, cannot log in",
+      "statusSuspendedOption": "Suspended — Account suspended for policy violation",
+      "activeStatus": "Active Status",
+      "activeStatusHint": "Toggle to quickly enable or disable this account",
+      "userIdLabel": "User ID:",
+      "save": "Save Changes",
+      "saving": "Saving…",
+      "updateSuccess": "User updated successfully",
+      "updateFailed": "Failed to update user",
+      "updateNetworkError": "Unable to connect to the server",
+      "roleLabels": {
+        "super_admin": "Super Admin",
+        "store_admin": "Store Admin",
+        "customer": "Customer"
+      },
+      "statusLabels": {
+        "active": "Active",
+        "inactive": "Inactive",
+        "suspended": "Suspended"
+      },
+      "roleOptions": {
+        "customer": "Customer",
+        "store_admin": "Store Admin",
+        "super_admin": "Super Admin"
+      }
+    }
+  },
+  "components": {
+    "notificationBell": {
+      "ariaLabel": "Notifications",
+      "title": "Notifications",
+      "markAllRead": "Mark all read",
+      "clear": "Clear",
+      "empty": "No notifications yet",
+      "reconnecting": "Reconnecting to notification server…"
+    },
+    "connectionStatus": {
+      "testing": "Testing…",
+      "connected": "Connected",
+      "failed": "Failed"
+    },
+    "imageUpload": {
+      "label": "Upload Image",
+      "multiLabel": "Upload Images",
+      "browse": "Drag & drop or click to browse",
+      "browseMulti": "Drag & drop or click to browse ({count}/{max})",
+      "uploadingPercent": "{progress}%",
+      "uploadingMulti": "Uploading… {progress}%",
+      "main": "Main",
+      "moveLeft": "Move left",
+      "moveRight": "Move right",
+      "remove": "Remove",
+      "errors": {
+        "typeNotAccepted": "File type {type} not accepted",
+        "tooLarge": "File must be under 10MB",
+        "uploadFailed": "Upload failed",
+        "networkError": "Network error",
+        "cancelled": "Upload cancelled",
+        "invalidResponse": "Invalid server response",
+        "uploadFailedWithCode": "Upload failed ({code})",
+        "maxReached": "Maximum {max} images allowed",
+        "noValidFiles": "No valid image files selected"
+      },
+      "imageAlt": "Image {index}"
+    },
+    "adminLayout": {
+      "navDashboard": "Dashboard",
+      "navStores": "Stores",
+      "navUsers": "Users",
+      "navAuditLogs": "Audit Logs",
+      "navProducts": "Products",
+      "navOrders": "Orders",
+      "navCustomers": "Customers",
+      "navAnalytics": "Analytics",
+      "navSettings": "Settings",
+      "superAdmin": "Super Admin",
+      "superAdminHint": "Full platform access",
+      "storeAdmin": "Store Admin",
+      "storeAdminHint": "Managing your store",
+      "switchToDark": "Switch to dark mode",
+      "switchToLight": "Switch to light mode",
+      "logout": "Log out",
+      "openSidebar": "Open sidebar",
+      "closeSidebar": "Close sidebar",
+      "goBack": "Go back",
+      "viewStore": "View Store",
+      "forcePlatformBrand": "Platform",
+      "forceAdminBrand": "Admin",
+      "forceBrandPrefix": "Force",
+      "languageLabel": "Language"
+    },
+    "errorState": {
+      "defaultTitle": "Something went wrong",
+      "defaultRetry": "Try Again"
+    },
+    "languageSwitcher": {
+      "ariaLabel": "Language"
+    },
+    "brand": {
+      "forceMediaAlt": "Force Media"
+    }
+  }
+}
