@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { useToast } from '@force/ui';
+import { Button, useToast } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPut, apiPost, getApiUrl } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
@@ -230,12 +230,9 @@ export default function StoreOrdersPage() {
       subtitle={t('subtitle')}
       actions={
         <Link href={`/stores/${storeId}`}>
-          <button
-            type="button"
-            className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted font-medium"
-          >
+          <Button type="button" variant="outline">
             {t('backToStore')}
-          </button>
+          </Button>
         </Link>
       }
     >

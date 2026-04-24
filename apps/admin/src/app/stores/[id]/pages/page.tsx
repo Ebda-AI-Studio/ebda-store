@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AdminLayout } from '../../../../components/AdminLayout';
-import { useToast } from '@force/ui';
+import { Button, useToast } from '@force/ui';
 import { apiGet, apiPut } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
 
@@ -259,12 +259,9 @@ export default function StorePagesPage() {
       actions={
         <div className="flex gap-3">
           <Link href={`/stores/${storeId}/settings`}>
-            <button
-              type="button"
-              className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted font-medium"
-            >
+            <Button type="button" variant="outline">
               {t('backToSettings')}
-            </button>
+            </Button>
           </Link>
           <button
             type="button"

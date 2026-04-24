@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { useToast } from '@force/ui';
+import { Button, useToast } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPost, apiPut, apiDelete } from '../../../../lib/api';
 import { CategoryForm, type CategoryFormData } from './CategoryForm';
@@ -191,12 +191,9 @@ export default function StoreCategoriesPage() {
       actions={
         <div className="flex gap-2">
           <Link href={`/stores/${storeId}`}>
-            <button
-              type="button"
-              className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted font-medium"
-            >
+            <Button type="button" variant="outline">
               {t('backToStore')}
-            </button>
+            </Button>
           </Link>
           <button
             type="button"
@@ -255,21 +252,18 @@ export default function StoreCategoriesPage() {
               {t('deleteConfirm', { name: deleteTarget.name })}
             </p>
             <div className="flex items-center justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setDeleteTarget(null)}
-                className="px-4 py-2 text-sm text-foreground border border-border rounded-lg hover:bg-muted"
-              >
+              <Button type="button" variant="outline" onClick={() => setDeleteTarget(null)}>
                 {t('cancel')}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="destructive"
                 onClick={confirmDelete}
                 disabled={deletingId === deleteTarget.id}
-                className="px-4 py-2 text-sm bg-destructive text-white rounded-lg hover:bg-destructive/90 disabled:opacity-50"
+                isLoading={deletingId === deleteTarget.id}
               >
                 {deletingId === deleteTarget.id ? t('deleting') : t('delete')}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

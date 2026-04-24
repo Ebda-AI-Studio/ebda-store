@@ -2,6 +2,7 @@
 
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { Button } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { useFeatures } from '../../../../hooks/useFeatures';
 import { useT } from '@/i18n/useT';
@@ -330,12 +331,9 @@ export default function StoreSettingsPage() {
       subtitle={t('page.subtitle')}
       actions={
         <Link href={`/stores/${storeId}`}>
-          <button
-            type="button"
-            className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted font-medium"
-          >
+          <Button type="button" variant="outline">
             {t('page.backToStore')}
-          </button>
+          </Button>
         </Link>
       }
     >

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { Button } from '@force/ui';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPost, apiPut } from '../../../../lib/api';
@@ -212,12 +213,9 @@ export default function StorePaymentSettingsPage() {
       subtitle={t('page.subtitle')}
       actions={
         <Link href={`/stores/${storeId}/settings`}>
-          <button
-            type="button"
-            className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted font-medium"
-          >
+          <Button type="button" variant="outline">
             {t('actions.backToSettings')}
-          </button>
+          </Button>
         </Link>
       }
     >
