@@ -1,5 +1,6 @@
 'use client';
 
+import { Alert } from '../../../../../components/Alert';
 import type { StatusMessage } from './types';
 
 interface PwaStatusMessageProps {
@@ -7,18 +8,15 @@ interface PwaStatusMessageProps {
 }
 
 /**
- * Inline success/error banner rendered above the save action.
+ * Inline success/error banner rendered above the save action. Backed by the
+ * shared Alert component so colors and spacing stay consistent with the other
+ * admin status banners.
  */
 export function PwaStatusMessage({ message }: PwaStatusMessageProps) {
   return (
-    <div
-      className={`rounded-xl p-4 text-sm ${
-        message.type === 'success'
-          ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
-          : 'bg-destructive/5 border border-destructive/30 text-destructive'
-      }`}
-    >
-      {message.text}
-    </div>
+    <Alert
+      variant={message.type === 'success' ? 'success' : 'destructive'}
+      description={message.text}
+    />
   );
 }

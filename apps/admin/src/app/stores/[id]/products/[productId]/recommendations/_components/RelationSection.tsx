@@ -46,7 +46,7 @@ export function RelationSection({
       />
 
       {items.length >= max && (
-        <p className="mt-2 text-xs text-amber-600">{t('maxReached', { max })}</p>
+        <p className="mt-2 text-xs text-warning">{t('maxReached', { max })}</p>
       )}
 
       <div className="mt-4 space-y-2">

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Badge, Button } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { Alert } from '../../../../components/Alert';
 import { apiGet } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
 import type { CreatedOwner, CreatedStore, DomainStatus } from './types';
@@ -91,32 +92,37 @@ export function SuccessScreen({ store, owner }: SuccessScreenProps) {
 
           {/* DNS Instructions (shown when custom domain was provided) */}
           {store.domain && (
-            <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-start">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-amber-900">{t('dnsRequired')}</h3>
-                <Badge variant={domainStatus?.verified ? 'default' : 'secondary'}>
-                  {domainStatus?.verified ? t('dnsVerified') : t('dnsPending')}
-                </Badge>
-              </div>
-              <p className="mt-2 text-sm text-amber-800">{t('dnsInstructions')}</p>
-              <div className="mt-3 overflow-hidden rounded-md border border-amber-200 bg-card">
+            <Alert
+              className="mt-6 text-start"
+              variant="warning"
+              title={
+                <span className="flex items-center justify-between gap-3">
+                  <span>{t('dnsRequired')}</span>
+                  <Badge variant={domainStatus?.verified ? 'default' : 'secondary'}>
+                    {domainStatus?.verified ? t('dnsVerified') : t('dnsPending')}
+                  </Badge>
+                </span>
+              }
+            >
+              <p className="mt-2 text-sm">{t('dnsInstructions')}</p>
+              <div className="mt-3 overflow-hidden rounded-md border border-warning/40 bg-card">
                 <table className="w-full text-sm" aria-label={t('dnsTableLabel')}>
                   <thead>
-                    <tr className="border-b bg-amber-50">
-                      <th scope="col" className="px-3 py-2 text-start font-medium text-amber-900">
+                    <tr className="border-b border-warning/40 bg-warning/10">
+                      <th scope="col" className="px-3 py-2 text-start font-medium">
                         {t('colType')}
                       </th>
-                      <th scope="col" className="px-3 py-2 text-start font-medium text-amber-900">
+                      <th scope="col" className="px-3 py-2 text-start font-medium">
                         {t('colName')}
                       </th>
-                      <th scope="col" className="px-3 py-2 text-start font-medium text-amber-900">
+                      <th scope="col" className="px-3 py-2 text-start font-medium">
                         {t('colValue')}
                       </th>
                     </tr>
                   </thead>
                   <tbody>
                     {domainStatus?.dnsRecords?.map((record, i) => (
-                      <tr key={i} className="border-b last:border-0">
+                      <tr key={i} className="border-b border-warning/20 last:border-0">
                         <td className="px-3 py-2 font-mono text-xs">{record.type}</td>
                         <td className="px-3 py-2 font-mono text-xs">{record.name}</td>
                         <td className="px-3 py-2 font-mono text-xs">{record.value}</td>
@@ -132,7 +138,7 @@ export function SuccessScreen({ store, owner }: SuccessScreenProps) {
                 </table>
               </div>
               <div className="mt-3 flex items-center justify-between">
-                <p className="text-xs text-amber-700">{t('dnsPropagation')}</p>
+                <p className="text-xs opacity-80">{t('dnsPropagation')}</p>
                 <Button
                   variant="outline"
                   size="sm"
@@ -142,7 +148,7 @@ export function SuccessScreen({ store, owner }: SuccessScreenProps) {
                   {isCheckingDns ? t('checkingDns') : t('checkDns')}
                 </Button>
               </div>
-            </div>
+            </Alert>
           )}
 
           <div className="mt-8 flex justify-center gap-4">

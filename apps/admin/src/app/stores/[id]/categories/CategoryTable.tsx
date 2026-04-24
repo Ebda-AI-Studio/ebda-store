@@ -161,12 +161,12 @@ export function CategoryTable({
                 <span
                   className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${
                     cat.isActive
-                      ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300'
+                      ? 'bg-success/10 text-success dark:bg-success/20 dark:text-success'
                       : 'bg-muted text-muted-foreground'
                   }`}
                 >
                   <span
-                    className={`h-1.5 w-1.5 rounded-full ${cat.isActive ? 'bg-emerald-500' : 'bg-muted-foreground'}`}
+                    className={`h-1.5 w-1.5 rounded-full ${cat.isActive ? 'bg-success' : 'bg-muted-foreground'}`}
                   />
                   {cat.isActive ? t('active') : t('inactive')}
                 </span>

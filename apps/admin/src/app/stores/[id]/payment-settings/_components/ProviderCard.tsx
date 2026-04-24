@@ -1,5 +1,6 @@
 'use client';
 
+import { Alert } from '../../../../../components/Alert';
 import { useT } from '@/i18n/useT';
 
 export interface StorePaymentConfig {
@@ -126,15 +127,11 @@ export function ProviderCard({
           )}
 
           {message && (
-            <div
-              className={`rounded-lg p-3 text-sm ${
-                message.type === 'success'
-                  ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300'
-                  : 'bg-destructive/5 text-destructive dark:bg-destructive/30/20 dark:text-destructive'
-              }`}
-            >
-              {message.text}
-            </div>
+            <Alert
+              compact
+              variant={message.type === 'success' ? 'success' : 'destructive'}
+              description={message.text}
+            />
           )}
 
           <div className="flex justify-end">
@@ -142,7 +139,7 @@ export function ProviderCard({
               type="button"
               onClick={onSave}
               disabled={saving}
-              className="px-6 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 font-medium"
+              className="px-6 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 font-medium"
             >
               {saving ? t('saving') : t('save')}
             </button>

@@ -163,7 +163,7 @@ export function CategoryForm({
         {saveMessage && (
           <p
             className={`text-sm ${
-              saveMessage.includes('success') ? 'text-emerald-600' : 'text-destructive'
+              saveMessage.includes('success') ? 'text-success' : 'text-destructive'
             }`}
           >
             {saveMessage}

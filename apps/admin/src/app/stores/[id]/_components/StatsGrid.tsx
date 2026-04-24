@@ -19,15 +19,20 @@ export function StatsGrid({ store }: StatsGridProps) {
       icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4',
     },
     {
+      // Orders use the semantic primary accent (previously an arbitrary
+      // violet-500); revenue below also maps to primary, but these cards
+      // never render side-by-side in the same icon — separated by a
+      // success/info card. Swap to `bg-info` if revenue/orders ever
+      // collide visually.
       label: t('orders'),
       value: store._count?.orders || 0,
-      iconBg: 'bg-violet-500',
+      iconBg: 'bg-primary',
       icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2',
     },
     {
       label: t('customers'),
       value: store._count?.customers || 0,
-      iconBg: 'bg-emerald-500',
+      iconBg: 'bg-success',
       icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z',
     },
     {

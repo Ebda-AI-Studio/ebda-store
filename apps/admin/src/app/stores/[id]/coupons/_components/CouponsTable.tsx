@@ -37,7 +37,7 @@ function getCouponStatus(coupon: Coupon): CouponStatus {
   if (coupon.usageLimit && coupon.usageCount >= coupon.usageLimit) {
     return {
       labelKey: 'exhausted',
-      color: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
+      color: 'bg-warning/10 text-warning dark:bg-warning/30 dark:text-warning',
     };
   }
   return {
@@ -203,7 +203,7 @@ export function CouponsTable({
                         onClick={() => onToggleActive(coupon.id)}
                         className={`p-2 rounded-lg transition-colors ${
                           coupon.isActive
-                            ? 'text-amber-600 hover:bg-amber-50'
+                            ? 'text-warning hover:bg-warning/10'
                             : 'text-success hover:bg-success/5'
                         }`}
                         title={coupon.isActive ? tActions('deactivate') : tActions('activate')}

@@ -172,7 +172,7 @@ export default function StoreTemplatePage() {
             type="button"
             onClick={handleSave}
             disabled={isSaving || selectedTemplate === store.template}
-            className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 font-medium"
+            className="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 font-medium"
           >
             {isSaving ? t('saving') : t('apply')}
           </button>

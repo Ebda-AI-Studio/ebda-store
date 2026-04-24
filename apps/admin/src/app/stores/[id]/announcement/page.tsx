@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { Alert } from '../../../../components/Alert';
 import { apiGet, apiPut } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
 
@@ -318,15 +319,10 @@ export default function AnnouncementPage() {
 
         {/* Save message */}
         {message && (
-          <div
-            className={`rounded-xl p-4 text-sm ${
-              message.type === 'success'
-                ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
-                : 'bg-destructive/5 border border-destructive/30 text-destructive'
-            }`}
-          >
-            {message.text}
-          </div>
+          <Alert
+            variant={message.type === 'success' ? 'success' : 'destructive'}
+            description={message.text}
+          />
         )}
       </div>
     </AdminLayout>

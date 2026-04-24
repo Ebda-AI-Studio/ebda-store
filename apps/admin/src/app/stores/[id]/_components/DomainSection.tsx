@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Badge, Button, Input, Label } from '@force/ui';
 import { apiGet, apiPut } from '../../../../lib/api';
+import { Alert } from '../../../../components/Alert';
 import { useT } from '@/i18n/useT';
 
 interface DomainStatus {
@@ -172,36 +173,26 @@ export function DomainSection({ storeId, domain, onDomainChange }: DomainSection
 
               {/* DNS Instructions (always visible while unverified) */}
               {!domainStatus?.verified && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-                  <p className="text-sm font-medium text-amber-900">{t('dnsRequired')}</p>
-                  <p className="mt-1 text-sm text-amber-800">{t('dnsInstructions')}</p>
-                  <div className="mt-3 overflow-hidden rounded-md border border-amber-200 bg-white">
+                <Alert variant="warning" title={t('dnsRequired')}>
+                  <p className="mt-1 text-sm">{t('dnsInstructions')}</p>
+                  <div className="mt-3 overflow-hidden rounded-md border border-warning/40 bg-background">
                     <table className="w-full text-sm" aria-label={t('tableLabel')}>
                       <thead>
-                        <tr className="border-b bg-amber-50">
-                          <th
-                            scope="col"
-                            className="px-3 py-2 text-start font-medium text-amber-900"
-                          >
+                        <tr className="border-b border-warning/40 bg-warning/10">
+                          <th scope="col" className="px-3 py-2 text-start font-medium">
                             {t('columnType')}
                           </th>
-                          <th
-                            scope="col"
-                            className="px-3 py-2 text-start font-medium text-amber-900"
-                          >
+                          <th scope="col" className="px-3 py-2 text-start font-medium">
                             {t('columnName')}
                           </th>
-                          <th
-                            scope="col"
-                            className="px-3 py-2 text-start font-medium text-amber-900"
-                          >
+                          <th scope="col" className="px-3 py-2 text-start font-medium">
                             {t('columnValue')}
                           </th>
                         </tr>
                       </thead>
                       <tbody>
                         {domainStatus?.dnsRecords?.map((record, i) => (
-                          <tr key={i} className="border-b last:border-0">
+                          <tr key={i} className="border-b border-warning/20 last:border-0">
                             <td className="px-3 py-2 font-mono text-xs">{record.type}</td>
                             <td className="px-3 py-2 font-mono text-xs">{record.name}</td>
                             <td className="px-3 py-2 font-mono text-xs">{record.value}</td>
@@ -217,18 +208,16 @@ export function DomainSection({ storeId, domain, onDomainChange }: DomainSection
                     </table>
                   </div>
                   <div className="mt-3 flex items-center justify-between">
-                    <p className="text-xs text-amber-700">{t('dnsPropagation')}</p>
+                    <p className="text-xs opacity-80">{t('dnsPropagation')}</p>
                     <Button variant="outline" size="sm" onClick={checkDns} disabled={isChecking}>
                       {isChecking ? t('checkingDns') : t('checkDns')}
                     </Button>
                   </div>
-                </div>
+                </Alert>
               )}
 
               {domainStatus?.verified && (
-                <p className="text-sm text-[hsl(var(--success))]">
-                  {t('verifiedMessage', { domain })}
-                </p>
+                <p className="text-sm text-success">{t('verifiedMessage', { domain })}</p>
               )}
             </div>
           ) : (
