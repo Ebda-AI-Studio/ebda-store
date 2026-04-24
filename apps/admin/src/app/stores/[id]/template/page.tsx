@@ -90,28 +90,35 @@ export default function StoreTemplatePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Inlined the sibling fetchStore into the effect so the dependency list
+  // stays honest (only storeId). Cancellation flag prevents setState after
+  // unmount if the user navigates away mid-request.
   useEffect(() => {
-    fetchStore();
-  }, [storeId]);
-
-  async function fetchStore() {
-    try {
-      const { data } = await apiGet<{ store: { name: string; template?: TemplateId } }>(
-        `/api/v1/stores/${storeId}`
-      );
-      if (data?.store) {
-        setStore({
-          name: data.store.name,
-          template: data.store.template || 'modern',
-        });
-        setSelectedTemplate(data.store.template || 'modern');
+    let cancelled = false;
+    async function fetchStore() {
+      try {
+        const { data } = await apiGet<{ store: { name: string; template?: TemplateId } }>(
+          `/api/v1/stores/${storeId}`
+        );
+        if (cancelled) return;
+        if (data?.store) {
+          setStore({
+            name: data.store.name,
+            template: data.store.template || 'modern',
+          });
+          setSelectedTemplate(data.store.template || 'modern');
+        }
+      } catch (error) {
+        console.error('Failed to fetch store:', error);
+      } finally {
+        if (!cancelled) setIsLoading(false);
       }
-    } catch (error) {
-      console.error('Failed to fetch store:', error);
-    } finally {
-      setIsLoading(false);
     }
-  }
+    fetchStore();
+    return () => {
+      cancelled = true;
+    };
+  }, [storeId]);
 
   async function handleSave() {
     setIsSaving(true);

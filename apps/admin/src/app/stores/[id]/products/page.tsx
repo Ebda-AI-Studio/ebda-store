@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { useToast } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
@@ -35,18 +35,7 @@ export default function StoreProductsPage() {
   const [deleting, setDeleting] = useState(false);
   const { success: toastSuccess, error: toastError } = useToast();
 
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    fetchStore();
-    fetchProducts();
-  }, [storeId, isAuthenticated]);
-
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    fetchProducts();
-  }, [page, statusFilter, debouncedSearch]);
-
-  async function fetchStore() {
+  const fetchStore = useCallback(async () => {
     if (!isAuthenticated) return;
     try {
       const { data } = await apiGet<{ store: Store }>(`/api/v1/stores/${storeId}`);
@@ -56,9 +45,9 @@ export default function StoreProductsPage() {
     } catch (error) {
       console.error('Error fetching store:', error);
     }
-  }
+  }, [isAuthenticated, storeId]);
 
-  async function fetchProducts() {
+  const fetchProducts = useCallback(async () => {
     if (!isAuthenticated) return;
 
     try {
@@ -83,7 +72,21 @@ export default function StoreProductsPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [isAuthenticated, storeId, page, statusFilter, debouncedSearch]);
+
+  // Fetch the store only when auth/storeId change (fetchStore's own deps).
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    fetchStore();
+  }, [isAuthenticated, fetchStore]);
+
+  // Fetch products whenever any of the list-query inputs change. fetchProducts
+  // is memoized on [isAuthenticated, storeId, page, statusFilter, debouncedSearch]
+  // so a single effect covers the original two useEffects.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    fetchProducts();
+  }, [isAuthenticated, fetchProducts]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button, Input, useToast } from '@force/ui';
@@ -54,7 +54,12 @@ export default function StoreNavigationPage() {
   const [itemsHydrated, setItemsHydrated] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  const existingSettings = (store?.settings ?? {}) as Record<string, unknown>;
+  // Memoize so the object reference is stable across renders and doesn't
+  // re-trigger the hydration useEffect below every render.
+  const existingSettings = useMemo(
+    () => (store?.settings ?? {}) as Record<string, unknown>,
+    [store?.settings]
+  );
 
   // Hydrate the editor's local list from the store's saved navMenu the first
   // time the hook resolves. Subsequent refetches (e.g. after save) shouldn't

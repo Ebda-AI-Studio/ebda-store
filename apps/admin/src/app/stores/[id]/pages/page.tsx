@@ -58,38 +58,45 @@ export default function StorePagesPage() {
   const [companyLinks, setCompanyLinks] = useState<FooterLink[]>(DEFAULT_COMPANY_LINKS);
   const [newsletterEnabled, setNewsletterEnabled] = useState(true);
 
+  // loadSettings was previously a sibling function referenced in the effect
+  // below; inlining it here keeps the dependency list honest (only storeId)
+  // and uses a cancellation flag to avoid setting state after unmount.
   useEffect(() => {
-    loadSettings();
-  }, [storeId]);
-
-  async function loadSettings() {
-    try {
-      const { data } = await apiGet<{ store: { settings: StoreSettings } }>(
-        `/api/v1/stores/${storeId}`
-      );
-      if (data?.store) {
-        const settings = (data.store.settings || {}) as StoreSettings;
-        if (settings.footerLinks) {
-          if (settings.footerLinks.shop?.length) {
-            setShopLinks(settings.footerLinks.shop);
-          }
-          if (settings.footerLinks.support?.length) {
-            setSupportLinks(settings.footerLinks.support);
-          }
-          if (settings.footerLinks.company?.length) {
-            setCompanyLinks(settings.footerLinks.company);
-          }
-          if (typeof settings.footerLinks.newsletterEnabled === 'boolean') {
-            setNewsletterEnabled(settings.footerLinks.newsletterEnabled);
+    let cancelled = false;
+    async function loadSettings() {
+      try {
+        const { data } = await apiGet<{ store: { settings: StoreSettings } }>(
+          `/api/v1/stores/${storeId}`
+        );
+        if (cancelled) return;
+        if (data?.store) {
+          const settings = (data.store.settings || {}) as StoreSettings;
+          if (settings.footerLinks) {
+            if (settings.footerLinks.shop?.length) {
+              setShopLinks(settings.footerLinks.shop);
+            }
+            if (settings.footerLinks.support?.length) {
+              setSupportLinks(settings.footerLinks.support);
+            }
+            if (settings.footerLinks.company?.length) {
+              setCompanyLinks(settings.footerLinks.company);
+            }
+            if (typeof settings.footerLinks.newsletterEnabled === 'boolean') {
+              setNewsletterEnabled(settings.footerLinks.newsletterEnabled);
+            }
           }
         }
+      } catch {
+        // Use defaults
+      } finally {
+        if (!cancelled) setIsLoading(false);
       }
-    } catch {
-      // Use defaults
-    } finally {
-      setIsLoading(false);
     }
-  }
+    loadSettings();
+    return () => {
+      cancelled = true;
+    };
+  }, [storeId]);
 
   async function handleSave() {
     setIsSaving(true);
