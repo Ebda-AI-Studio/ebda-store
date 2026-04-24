@@ -1427,7 +1427,93 @@
       "completeErrorBody": "Failed to complete return. Please try again."
     }
   },
-  "marketingPixels": {},
+  "marketingPixels": {
+    "page": {
+      "title": "Marketing Pixels",
+      "subtitle": "Configure tracking pixels to measure ad performance and conversions"
+    },
+    "info": {
+      "title": "About Marketing Pixels",
+      "body": "Marketing pixels are small code snippets that track visitor behavior on your store. They help you measure the effectiveness of your advertising campaigns and optimize for conversions."
+    },
+    "status": {
+      "active": "Active",
+      "inactive": "Inactive"
+    },
+    "toggleAriaLabel": "Toggle platform",
+    "viewDocumentation": "View documentation",
+    "save": {
+      "button": "Save Changes",
+      "saving": "Saving...",
+      "successMessage": "Marketing pixels saved successfully.",
+      "errorMessage": "Failed to save marketing pixels. Please try again."
+    },
+    "notFound": {
+      "title": "Store not found",
+      "backToStores": "Back to stores"
+    },
+    "fields": {
+      "accessTokenLabel": "Access Token (Optional - for Conversions API)",
+      "accessTokenPlaceholder": "Enter access token for server-side tracking",
+      "accessTokenHelp": "Access tokens enable server-side event tracking for better accuracy",
+      "conversionLabelLabel": "Conversion Label (Optional)",
+      "conversionLabelPlaceholder": "e.g., AbC123def456"
+    },
+    "platforms": {
+      "meta": {
+        "name": "Meta Pixel",
+        "description": "Track conversions from Facebook and Instagram ads",
+        "idLabel": "Pixel ID"
+      },
+      "tiktok": {
+        "name": "TikTok Pixel",
+        "description": "Track conversions from TikTok ads",
+        "idLabel": "Pixel ID"
+      },
+      "snapchat": {
+        "name": "Snapchat Pixel",
+        "description": "Track conversions from Snapchat ads",
+        "idLabel": "Pixel ID"
+      },
+      "googleAnalytics": {
+        "name": "Google Analytics 4",
+        "description": "Track website traffic and user behavior",
+        "idLabel": "Measurement ID"
+      },
+      "googleTagManager": {
+        "name": "Google Tag Manager",
+        "description": "Manage all your marketing tags in one place",
+        "idLabel": "Container ID"
+      },
+      "googleAds": {
+        "name": "Google Ads",
+        "description": "Track conversions from Google Ads campaigns",
+        "idLabel": "Conversion ID"
+      },
+      "twitter": {
+        "name": "Twitter/X Pixel",
+        "description": "Track conversions from Twitter/X ads",
+        "idLabel": "Pixel ID"
+      },
+      "pinterest": {
+        "name": "Pinterest Tag",
+        "description": "Track conversions from Pinterest ads",
+        "idLabel": "Tag ID"
+      }
+    },
+    "events": {
+      "title": "Tracked Events",
+      "description": "When pixels are enabled, the following e-commerce events are automatically tracked:",
+      "pageView": { "name": "Page View", "description": "Every page visit" },
+      "viewContent": { "name": "View Content", "description": "Product page views" },
+      "addToCart": { "name": "Add to Cart", "description": "Items added to cart" },
+      "initiateCheckout": { "name": "Initiate Checkout", "description": "Checkout started" },
+      "purchase": { "name": "Purchase", "description": "Completed orders" },
+      "search": { "name": "Search", "description": "Product searches" },
+      "addToWishlist": { "name": "Add to Wishlist", "description": "Wishlist additions" },
+      "lead": { "name": "Lead", "description": "Contact form submissions" }
+    }
+  },
   "pages": {},
   "navigation": {},
   "notifications": {
