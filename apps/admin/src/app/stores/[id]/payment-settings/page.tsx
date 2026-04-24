@@ -3,32 +3,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPost, apiPut } from '../../../../lib/api';
-
-interface StorePaymentConfig {
-  id?: string;
-  provider: string;
-  isEnabled: boolean;
-  apiKey: string | null;
-  secretKey: string | null;
-  webhookSecret: string | null;
-  merchantId: string | null;
-  testMode: boolean;
-  displayName?: string | null;
-  displayNameAr?: string | null;
-  fixedFee?: number;
-}
-
-type ProviderKind = 'gateway' | 'cod';
-
-interface ProviderDef {
-  id: string;
-  name: string;
-  nameAr: string;
-  color: string;
-  kind: ProviderKind;
-}
+import {
+  ProviderCard,
+  type ProviderDef,
+  type ProviderSaveMessage,
+  type StorePaymentConfig,
+} from './_components/ProviderCard';
 
 const PROVIDERS: ProviderDef[] = [
   { id: 'tap', name: 'Tap Payments', nameAr: 'تاب للمدفوعات', color: '#00D4AA', kind: 'gateway' },
@@ -60,19 +43,16 @@ const emptyConfig = (provider: string): StorePaymentConfig => ({
 export default function StorePaymentSettingsPage() {
   const params = useParams();
   const storeId = params?.id as string;
+  const t = useT('paymentSettings');
 
   const [configs, setConfigs] = useState<StorePaymentConfig[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Per-provider form state: { [provider]: formData }
   const [forms, setForms] = useState<Record<string, StorePaymentConfig>>({});
   const [saving, setSaving] = useState<string | null>(null);
-  const [saveMessages, setSaveMessages] = useState<
-    Record<string, { type: 'success' | 'error'; text: string }>
-  >({});
+  const [saveMessages, setSaveMessages] = useState<Record<string, ProviderSaveMessage>>({});
 
-  // Track which providers are expanded
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   const fetchConfigs = useCallback(async () => {
@@ -86,7 +66,7 @@ export default function StorePaymentSettingsPage() {
       >(`/api/v1/payment-settings/store/${storeId}`);
 
       if (apiError) {
-        setError(apiError.message || 'Failed to load payment settings');
+        setError(apiError.message || t('errors.loadFailed'));
         return;
       }
 
@@ -99,7 +79,6 @@ export default function StorePaymentSettingsPage() {
           [];
       setConfigs(loaded);
 
-      // Initialize form state from loaded configs
       const initialForms: Record<string, StorePaymentConfig> = {};
       PROVIDERS.forEach(p => {
         const existing = loaded.find(c => c.provider === p.id);
@@ -107,11 +86,11 @@ export default function StorePaymentSettingsPage() {
       });
       setForms(initialForms);
     } catch {
-      setError('Unable to connect to the server. Please check your connection and try again.');
+      setError(t('errors.connectionError'));
     } finally {
       setIsLoading(false);
     }
-  }, [storeId]);
+  }, [storeId, t]);
 
   useEffect(() => {
     fetchConfigs();
@@ -126,7 +105,6 @@ export default function StorePaymentSettingsPage() {
       ...prev,
       [provider]: { ...prev[provider], [field]: value },
     }));
-    // Clear save message on change
     if (saveMessages[provider]) {
       setSaveMessages(prev => {
         const next = { ...prev };
@@ -137,7 +115,6 @@ export default function StorePaymentSettingsPage() {
   }
 
   async function handleToggle(provider: string, enabled: boolean) {
-    // Optimistic update
     setForms(prev => ({
       ...prev,
       [provider]: { ...prev[provider], isEnabled: enabled },
@@ -160,9 +137,6 @@ export default function StorePaymentSettingsPage() {
     const isCod = provider === 'cod';
 
     try {
-      // The API schema validates credentials with z.string().optional() —
-      // null is rejected. Omit empty/missing credential fields entirely
-      // instead of sending null.
       const body: Record<string, unknown> = isCod
         ? {
             provider,
@@ -192,15 +166,17 @@ export default function StorePaymentSettingsPage() {
       if (!saveError) {
         setSaveMessages(prev => ({
           ...prev,
-          [provider]: { type: 'success', text: 'Saved successfully' },
+          [provider]: { type: 'success', text: t('messages.savedSuccess') },
         }));
         await fetchConfigs();
       } else {
         setSaveMessages(prev => ({
           ...prev,
-          [provider]: { type: 'error', text: saveError.message || 'Failed to save' },
+          [provider]: {
+            type: 'error',
+            text: saveError.message || t('messages.failedToSave'),
+          },
         }));
-        // Revert optimistic toggle
         if (overrides?.isEnabled !== undefined) {
           setForms(prev => ({
             ...prev,
@@ -211,7 +187,7 @@ export default function StorePaymentSettingsPage() {
     } catch {
       setSaveMessages(prev => ({
         ...prev,
-        [provider]: { type: 'error', text: 'Unable to connect to the server' },
+        [provider]: { type: 'error', text: t('messages.unableToConnect') },
       }));
     } finally {
       setSaving(null);
@@ -220,7 +196,7 @@ export default function StorePaymentSettingsPage() {
 
   if (isLoading) {
     return (
-      <AdminLayout title="Payment Settings" subtitle="Configure payment providers for this store">
+      <AdminLayout title={t('page.title')} subtitle={t('page.subtitle')}>
         <div className="space-y-4">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="h-24 animate-pulse rounded-xl bg-muted" />
@@ -232,12 +208,12 @@ export default function StorePaymentSettingsPage() {
 
   return (
     <AdminLayout
-      title="Payment Settings"
-      subtitle="Configure payment providers for this store"
+      title={t('page.title')}
+      subtitle={t('page.subtitle')}
       actions={
         <Link href={`/stores/${storeId}/settings`}>
           <button className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted font-medium">
-            Back to Settings
+            {t('actions.backToSettings')}
           </button>
         </Link>
       }
@@ -245,8 +221,8 @@ export default function StorePaymentSettingsPage() {
       {error && (
         <div className="mb-6 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
           {error}
-          <button className="ml-4 font-medium underline" onClick={fetchConfigs}>
-            Retry
+          <button className="ms-4 font-medium underline" onClick={fetchConfigs}>
+            {t('errors.retry')}
           </button>
         </div>
       )}
@@ -259,239 +235,20 @@ export default function StorePaymentSettingsPage() {
           const message = saveMessages[provider.id];
 
           return (
-            <div
+            <ProviderCard
               key={provider.id}
-              className={`rounded-xl border bg-card shadow-sm overflow-hidden transition-all ${
-                form.isEnabled ? 'border-l-4' : ''
-              }`}
-              style={form.isEnabled ? { borderLeftColor: provider.color } : undefined}
-            >
-              {/* Provider header */}
-              <div className="flex items-center justify-between p-4">
-                <div className="flex items-center gap-3">
-                  <div
-                    className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg text-white text-sm font-bold"
-                    style={{ backgroundColor: provider.color }}
-                  >
-                    {provider.id[0].toUpperCase()}
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-foreground">{provider.name}</h3>
-                    <p className="text-xs text-muted-foreground">{provider.nameAr}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-4">
-                  {/* Enabled toggle */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground">
-                      {form.isEnabled ? 'Enabled' : 'Disabled'}
-                    </span>
-                    <label className="relative inline-flex cursor-pointer items-center">
-                      <input
-                        type="checkbox"
-                        checked={form.isEnabled}
-                        onChange={e => handleToggle(provider.id, e.target.checked)}
-                        disabled={isSavingThis}
-                        className="sr-only peer"
-                      />
-                      <div className="peer h-6 w-11 rounded-full bg-muted after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-border after:bg-white after:transition-all after:content-[''] peer-checked:bg-emerald-500 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-emerald-400/30 peer-disabled:opacity-50" />
-                    </label>
-                  </div>
-
-                  {/* Expand/collapse button */}
-                  <button
-                    onClick={() => setExpanded(prev => ({ ...prev, [provider.id]: !isExpanded }))}
-                    className="flex items-center gap-1 px-3 py-1.5 text-sm text-muted-foreground border border-border rounded-lg hover:bg-muted transition-colors"
-                  >
-                    Configure
-                    <svg
-                      className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M19 9l-7 7-7-7"
-                      />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-
-              {/* Config form (expanded) */}
-              {isExpanded && (
-                <div className="border-t bg-muted p-6 space-y-5">
-                  {provider.kind === 'cod' ? (
-                    <>
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <div>
-                          <label className="block text-sm font-medium text-foreground mb-1">
-                            Display Name (English)
-                          </label>
-                          <input
-                            type="text"
-                            value={form.displayName || ''}
-                            onChange={e => updateForm(provider.id, 'displayName', e.target.value)}
-                            placeholder="Cash on Delivery"
-                            className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-foreground mb-1">
-                            Display Name (Arabic)
-                          </label>
-                          <input
-                            type="text"
-                            dir="rtl"
-                            value={form.displayNameAr || ''}
-                            onChange={e => updateForm(provider.id, 'displayNameAr', e.target.value)}
-                            placeholder="الدفع عند الاستلام"
-                            className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                          />
-                        </div>
-                        <div className="sm:col-span-2">
-                          <label className="block text-sm font-medium text-foreground mb-1">
-                            Surcharge Fee (fils)
-                          </label>
-                          <div className="flex items-center gap-3">
-                            <input
-                              type="number"
-                              min={0}
-                              step={1}
-                              value={form.fixedFee ?? 0}
-                              onChange={e =>
-                                updateForm(
-                                  provider.id,
-                                  'fixedFee',
-                                  Math.max(0, Math.floor(Number(e.target.value) || 0))
-                                )
-                              }
-                              placeholder="0"
-                              className="w-40 rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                            />
-                            <span className="text-sm text-muted-foreground">
-                              = {((Number(form.fixedFee) || 0) / 1000).toFixed(3)} KWD
-                            </span>
-                          </div>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            Extra charge added to the order when the customer pays cash on delivery.
-                            Enter <strong>0</strong> for free COD. 1000 fils = 1 KWD.
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="rounded-lg border border-border bg-background p-3 text-xs text-muted-foreground">
-                        COD orders bypass the payment gateway. The customer confirms the order, and
-                        you mark it as paid from the Orders page once cash is collected.
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <div>
-                          <label className="block text-sm font-medium text-foreground mb-1">
-                            API Key
-                          </label>
-                          <input
-                            type="password"
-                            value={form.apiKey || ''}
-                            onChange={e => updateForm(provider.id, 'apiKey', e.target.value)}
-                            placeholder="Enter API key"
-                            className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-foreground mb-1">
-                            Secret Key
-                          </label>
-                          <input
-                            type="password"
-                            value={form.secretKey || ''}
-                            onChange={e => updateForm(provider.id, 'secretKey', e.target.value)}
-                            placeholder="Enter secret key"
-                            className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-foreground mb-1">
-                            Webhook Secret
-                          </label>
-                          <input
-                            type="password"
-                            value={form.webhookSecret || ''}
-                            onChange={e => updateForm(provider.id, 'webhookSecret', e.target.value)}
-                            placeholder="Enter webhook secret"
-                            className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-foreground mb-1">
-                            Merchant ID
-                          </label>
-                          <input
-                            type="text"
-                            value={form.merchantId || ''}
-                            onChange={e => updateForm(provider.id, 'merchantId', e.target.value)}
-                            placeholder="Enter merchant ID (if applicable)"
-                            className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Test mode toggle */}
-                      <div className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
-                        <label className="relative inline-flex cursor-pointer items-center">
-                          <input
-                            type="checkbox"
-                            checked={form.testMode}
-                            onChange={e => updateForm(provider.id, 'testMode', e.target.checked)}
-                            className="sr-only peer"
-                          />
-                          <div className="peer h-5 w-9 rounded-full bg-muted after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-border after:bg-white after:transition-all after:content-[''] peer-checked:bg-amber-500 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
-                        </label>
-                        <div>
-                          <p className="text-sm font-medium text-amber-800">
-                            Test Mode {form.testMode ? 'On' : 'Off'}
-                          </p>
-                          <p className="text-xs text-amber-700">
-                            {form.testMode
-                              ? 'Using test credentials — no real payments processed'
-                              : 'Live mode — real payments will be processed'}
-                          </p>
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  {/* Save message */}
-                  {message && (
-                    <div
-                      className={`rounded-lg p-3 text-sm ${
-                        message.type === 'success'
-                          ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300'
-                          : 'bg-destructive/5 text-destructive dark:bg-destructive/30/20 dark:text-destructive'
-                      }`}
-                    >
-                      {message.text}
-                    </div>
-                  )}
-
-                  <div className="flex justify-end">
-                    <button
-                      onClick={() => handleSave(provider.id)}
-                      disabled={isSavingThis}
-                      className="px-6 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 font-medium"
-                    >
-                      {isSavingThis ? 'Saving...' : 'Save'}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+              provider={provider}
+              form={form}
+              expanded={isExpanded}
+              saving={isSavingThis}
+              message={message}
+              onToggle={enabled => handleToggle(provider.id, enabled)}
+              onToggleExpanded={() =>
+                setExpanded(prev => ({ ...prev, [provider.id]: !isExpanded }))
+              }
+              onUpdateField={(field, value) => updateForm(provider.id, field, value)}
+              onSave={() => handleSave(provider.id)}
+            />
           );
         })}
       </div>

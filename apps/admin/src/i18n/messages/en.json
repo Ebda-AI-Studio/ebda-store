@@ -732,6 +732,69 @@
         "defaultSetDescription": "{carrier} is now the default carrier.",
         "defaultSetFailed": "Failed to set default carrier."
       }
+    },
+    "page": {
+      "title": "Shipping Zones",
+      "subtitle": "Configure delivery areas and shipping rates"
+    },
+    "toolbar": {
+      "addZone": "Add Zone"
+    },
+    "filters": {
+      "all": "All",
+      "active": "Active",
+      "inactive": "Inactive"
+    },
+    "empty": {
+      "title": "No Shipping Zones",
+      "description": "Create shipping zones to configure delivery rates for different areas",
+      "createFirst": "Create First Zone"
+    },
+    "table": {
+      "label": "Shipping zones",
+      "zone": "Zone",
+      "areas": "Areas",
+      "deliveryFee": "Delivery Fee",
+      "freeShipping": "Free Shipping",
+      "estimatedDelivery": "Est. Delivery",
+      "status": "Status",
+      "actions": "Actions",
+      "moreAreas": "+{count} more",
+      "freeShippingOver": "Over {amount} KWD",
+      "dashPlaceholder": "-",
+      "daysRange": "{min}-{max} days",
+      "daysSingle": "{days} days",
+      "active": "Active",
+      "inactive": "Inactive",
+      "edit": "Edit",
+      "delete": "Delete",
+      "priceWithCurrency": "{amount} KWD"
+    },
+    "modal": {
+      "editTitle": "Edit Shipping Zone",
+      "newTitle": "New Shipping Zone",
+      "close": "Close",
+      "zoneNameLabel": "Zone Name",
+      "zoneNamePlaceholder": "e.g., Capital Area",
+      "zoneNameArLabel": "Zone Name (Arabic)",
+      "zoneNameArPlaceholder": "e.g., منطقة العاصمة",
+      "areasLabel": "Areas",
+      "areasPlaceholder": "Separate areas with commas: Capital, Hawalli, Farwaniya",
+      "addAllKuwaitGovernorates": "+ Add All Kuwait Governorates",
+      "areasArLabel": "Areas (Arabic)",
+      "areasArPlaceholder": "العاصمة، حولي، الفروانية",
+      "deliveryFeeLabel": "Delivery Fee (KWD)",
+      "deliveryFeePlaceholder": "1.000",
+      "freeShippingLabel": "Free Shipping Over (KWD)",
+      "freeShippingPlaceholder": "25.000",
+      "estimatedDaysLabel": "Estimated Delivery Time (Days)",
+      "estimatedDaysMinPlaceholder": "Min days",
+      "estimatedDaysMaxPlaceholder": "Max days",
+      "activeLabel": "Active",
+      "required": "required",
+      "cancel": "Cancel",
+      "createZone": "Create Zone",
+      "updateZone": "Update Zone"
     }
   },
   "tax": {
@@ -1724,10 +1787,110 @@
       "awardFailed": "Failed to award points. Please try again."
     }
   },
-  "paymentSettings": {},
+  "paymentSettings": {
+    "page": {
+      "title": "Payment Settings",
+      "subtitle": "Configure payment providers for this store"
+    },
+    "actions": {
+      "backToSettings": "Back to Settings"
+    },
+    "errors": {
+      "loadFailed": "Failed to load payment settings",
+      "connectionError": "Unable to connect to the server. Please check your connection and try again.",
+      "retry": "Retry"
+    },
+    "providers": {
+      "tapName": "Tap Payments",
+      "tapNameAr": "تاب للمدفوعات",
+      "myfatoorahName": "MyFatoorah",
+      "myfatoorahNameAr": "ماي فاتورة",
+      "hesabeName": "Hesabe",
+      "hesabeNameAr": "حسابي",
+      "upaymentsName": "UPayments",
+      "upaymentsNameAr": "يو بيمنتس",
+      "codName": "Cash on Delivery",
+      "codNameAr": "الدفع عند الاستلام"
+    },
+    "toggle": {
+      "enabled": "Enabled",
+      "disabled": "Disabled"
+    },
+    "configure": "Configure",
+    "cod": {
+      "displayNameLabel": "Display Name (English)",
+      "displayNamePlaceholder": "Cash on Delivery",
+      "displayNameArLabel": "Display Name (Arabic)",
+      "displayNameArPlaceholder": "الدفع عند الاستلام",
+      "fixedFeeLabel": "Surcharge Fee (fils)",
+      "fixedFeePlaceholder": "0",
+      "fixedFeeEquals": "= {amount} KWD",
+      "fixedFeeHelpPrefix": "Extra charge added to the order when the customer pays cash on delivery. Enter",
+      "fixedFeeHelpZero": "0",
+      "fixedFeeHelpSuffix": "for free COD. 1000 fils = 1 KWD.",
+      "infoBanner": "COD orders bypass the payment gateway. The customer confirms the order, and you mark it as paid from the Orders page once cash is collected."
+    },
+    "gateway": {
+      "apiKeyLabel": "API Key",
+      "apiKeyPlaceholder": "Enter API key",
+      "secretKeyLabel": "Secret Key",
+      "secretKeyPlaceholder": "Enter secret key",
+      "webhookSecretLabel": "Webhook Secret",
+      "webhookSecretPlaceholder": "Enter webhook secret",
+      "merchantIdLabel": "Merchant ID",
+      "merchantIdPlaceholder": "Enter merchant ID (if applicable)",
+      "testModeOn": "Test Mode On",
+      "testModeOff": "Test Mode Off",
+      "testModeDescriptionOn": "Using test credentials — no real payments processed",
+      "testModeDescriptionOff": "Live mode — real payments will be processed"
+    },
+    "messages": {
+      "savedSuccess": "Saved successfully",
+      "failedToSave": "Failed to save",
+      "unableToConnect": "Unable to connect to the server"
+    },
+    "save": "Save",
+    "saving": "Saving..."
+  },
   "hero": {},
   "announcement": {},
-  "features": {},
+  "features": {
+    "page": {
+      "title": "Store Features",
+      "subtitleLoading": "Manage feature toggles for this store",
+      "subtitle": "Enable or disable features for this store"
+    },
+    "categories": {
+      "commerce": "Commerce",
+      "marketing": "Marketing",
+      "operations": "Operations",
+      "storefront": "Storefront"
+    },
+    "category": {
+      "enabledOfTotal": "{enabled} of {total} enabled"
+    },
+    "errors": {
+      "loadFailed": "Failed to load features. Please try again.",
+      "saveFailed": "Failed to save features. Please try again.",
+      "retry": "Retry"
+    },
+    "toasts": {
+      "errorTitle": "Error",
+      "savedTitle": "Features Saved",
+      "savedDescription": "{count} features updated successfully."
+    },
+    "actions": {
+      "discard": "Discard",
+      "saveChanges": "Save Changes",
+      "unsaved": "unsaved",
+      "unsavedChanges": "{count} unsaved changes",
+      "unsavedChangesBanner": "You have"
+    },
+    "row": {
+      "enabledBy": "Enabled by",
+      "enabledOn": "on"
+    }
+  },
   "template": {},
   "seo": {},
   "language": {},

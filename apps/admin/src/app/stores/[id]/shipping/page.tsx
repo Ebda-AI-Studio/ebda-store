@@ -2,36 +2,12 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
+import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '../../../../lib/api';
-
-interface ShippingZone {
-  id: string;
-  name: string;
-  nameAr: string | null;
-  areas: string[];
-  areasAr: string[];
-  deliveryFee: number;
-  freeShippingThreshold: number | null;
-  estimatedDays: number | null;
-  estimatedDaysMin: number | null;
-  estimatedDaysMax: number | null;
-  position: number;
-  isActive: boolean;
-  createdAt: string;
-}
-
-interface ZoneFormData {
-  name: string;
-  nameAr: string;
-  areas: string;
-  areasAr: string;
-  deliveryFee: string;
-  freeShippingThreshold: string;
-  estimatedDaysMin: string;
-  estimatedDaysMax: string;
-  isActive: boolean;
-}
+import { ShippingZonesTable, type ShippingZone } from './_components/ShippingZonesTable';
+import { ShippingZoneFormModal, type ZoneFormData } from './_components/ShippingZoneFormModal';
+import { ShippingEmptyState } from './_components/ShippingEmptyState';
 
 const KUWAIT_GOVERNORATES = [
   { en: 'Capital', ar: 'العاصمة' },
@@ -57,6 +33,9 @@ const DEFAULT_FORM: ZoneFormData = {
 export default function ShippingSettingsPage() {
   const params = useParams();
   const storeId = params.id as string;
+  const tPage = useT('shipping.page');
+  const tToolbar = useT('shipping.toolbar');
+  const tFilters = useT('shipping.filters');
 
   const [zones, setZones] = useState<ShippingZone[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,12 +48,12 @@ export default function ShippingSettingsPage() {
   const fetchZones = useCallback(async () => {
     try {
       setLoading(true);
-      const params = new URLSearchParams();
-      if (filter === 'active') params.set('isActive', 'true');
-      if (filter === 'inactive') params.set('isActive', 'false');
+      const query = new URLSearchParams();
+      if (filter === 'active') query.set('isActive', 'true');
+      if (filter === 'inactive') query.set('isActive', 'false');
 
       const { data } = await apiGet<{ zones: ShippingZone[] }>(
-        `/api/v1/stores/${storeId}/shipping?${params}`
+        `/api/v1/stores/${storeId}/shipping?${query}`
       );
       if (data) {
         setZones(data.zones || []);
@@ -88,7 +67,7 @@ export default function ShippingSettingsPage() {
 
   useEffect(() => {
     fetchZones();
-  }, [storeId, filter]);
+  }, [fetchZones]);
 
   const handleOpenModal = (zone?: ShippingZone) => {
     if (zone) {
@@ -196,20 +175,16 @@ export default function ShippingSettingsPage() {
     }));
   };
 
-  const formatDeliveryTime = (zone: ShippingZone) => {
-    if (zone.estimatedDaysMin && zone.estimatedDaysMax) {
-      return `${zone.estimatedDaysMin}-${zone.estimatedDaysMax} days`;
-    }
-    if (zone.estimatedDays) {
-      return `${zone.estimatedDays} days`;
-    }
-    return '-';
+  const filterLabels: Record<typeof filter, string> = {
+    all: tFilters('all'),
+    active: tFilters('active'),
+    inactive: tFilters('inactive'),
   };
 
   return (
     <AdminLayout
-      title="Shipping Zones"
-      subtitle="Configure delivery areas and shipping rates"
+      title={tPage('title')}
+      subtitle={tPage('subtitle')}
       actions={
         <button
           onClick={() => handleOpenModal()}
@@ -218,12 +193,11 @@ export default function ShippingSettingsPage() {
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
-          Add Zone
+          {tToolbar('addZone')}
         </button>
       }
     >
       <div className="space-y-6">
-        {/* Filters */}
         <div className="flex gap-2 mb-6">
           {(['all', 'active', 'inactive'] as const).map(f => (
             <button
@@ -235,390 +209,36 @@ export default function ShippingSettingsPage() {
                   : 'bg-muted text-foreground hover:bg-muted/80'
               }`}
             >
-              {f.charAt(0).toUpperCase() + f.slice(1)}
+              {filterLabels[f]}
             </button>
           ))}
         </div>
 
-        {/* Zones List */}
         {loading ? (
           <div className="flex items-center justify-center h-64">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
         ) : zones.length === 0 ? (
-          <div className="bg-card rounded-xl border border-border p-12 text-center">
-            <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg
-                className="w-8 h-8 text-muted-foreground"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                />
-              </svg>
-            </div>
-            <h3 className="text-lg font-semibold text-foreground mb-2">No Shipping Zones</h3>
-            <p className="text-muted-foreground mb-6">
-              Create shipping zones to configure delivery rates for different areas
-            </p>
-            <button
-              onClick={() => handleOpenModal()}
-              className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
-            >
-              Create First Zone
-            </button>
-          </div>
+          <ShippingEmptyState onCreate={() => handleOpenModal()} />
         ) : (
-          <div className="bg-card rounded-xl border border-border overflow-hidden">
-            <table className="w-full" aria-label="Shipping zones">
-              <thead>
-                <tr className="bg-muted border-b border-border">
-                  <th
-                    scope="col"
-                    className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
-                  >
-                    Zone
-                  </th>
-                  <th
-                    scope="col"
-                    className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
-                  >
-                    Areas
-                  </th>
-                  <th
-                    scope="col"
-                    className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
-                  >
-                    Delivery Fee
-                  </th>
-                  <th
-                    scope="col"
-                    className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
-                  >
-                    Free Shipping
-                  </th>
-                  <th
-                    scope="col"
-                    className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
-                  >
-                    Est. Delivery
-                  </th>
-                  <th
-                    scope="col"
-                    className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
-                  >
-                    Status
-                  </th>
-                  <th
-                    scope="col"
-                    className="text-right px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider"
-                  >
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {zones.map(zone => (
-                  <tr key={zone.id} className="hover:bg-muted">
-                    <td className="px-6 py-4">
-                      <div>
-                        <div className="font-medium text-foreground">{zone.name}</div>
-                        {zone.nameAr && (
-                          <div className="text-sm text-muted-foreground font-arabic">
-                            {zone.nameAr}
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-wrap gap-1 max-w-xs">
-                        {zone.areas.slice(0, 3).map((area, i) => (
-                          <span
-                            key={i}
-                            className="px-2 py-0.5 bg-muted text-foreground text-xs rounded"
-                          >
-                            {area}
-                          </span>
-                        ))}
-                        {zone.areas.length > 3 && (
-                          <span className="px-2 py-0.5 bg-muted text-muted-foreground text-xs rounded">
-                            +{zone.areas.length - 3} more
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="font-medium text-foreground">
-                        {(zone.deliveryFee / 1000).toFixed(3)} KWD
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      {zone.freeShippingThreshold ? (
-                        <span className="text-success text-sm">
-                          Over {(zone.freeShippingThreshold / 1000).toFixed(3)} KWD
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-muted-foreground">
-                      {formatDeliveryTime(zone)}
-                    </td>
-                    <td className="px-6 py-4">
-                      <button
-                        onClick={() => handleToggle(zone)}
-                        className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          zone.isActive
-                            ? 'bg-success/10 text-success dark:bg-success/30 dark:text-success'
-                            : 'bg-muted text-muted-foreground'
-                        }`}
-                      >
-                        {zone.isActive ? 'Active' : 'Inactive'}
-                      </button>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => handleOpenModal(zone)}
-                          className="p-2 text-muted-foreground hover:text-primary transition-colors"
-                          title="Edit"
-                        >
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                            />
-                          </svg>
-                        </button>
-                        <button
-                          onClick={() => handleDelete(zone)}
-                          className="p-2 text-muted-foreground hover:text-destructive transition-colors"
-                          title="Delete"
-                        >
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                            />
-                          </svg>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ShippingZonesTable
+            zones={zones}
+            onEdit={handleOpenModal}
+            onToggle={handleToggle}
+            onDelete={handleDelete}
+          />
         )}
 
-        {/* Modal */}
         {showModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-card rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-              <div className="flex items-center justify-between p-6 border-b border-border">
-                <h2 className="text-xl font-semibold text-foreground">
-                  {editingZone ? 'Edit Shipping Zone' : 'New Shipping Zone'}
-                </h2>
-                <button
-                  onClick={handleCloseModal}
-                  className="p-2 text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
-                </button>
-              </div>
-
-              <form onSubmit={handleSubmit} className="p-6 space-y-6">
-                {/* Zone Name */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-muted-foreground mb-2">
-                      Zone Name <span className="text-destructive">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.name}
-                      onChange={e => setFormData({ ...formData, name: e.target.value })}
-                      placeholder="e.g., Capital Area"
-                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-muted-foreground mb-2">
-                      Zone Name (Arabic)
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.nameAr}
-                      onChange={e => setFormData({ ...formData, nameAr: e.target.value })}
-                      placeholder="e.g., منطقة العاصمة"
-                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                      dir="rtl"
-                    />
-                  </div>
-                </div>
-
-                {/* Areas */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="block text-sm font-medium text-muted-foreground">
-                      Areas <span className="text-destructive">*</span>
-                    </label>
-                    <button
-                      type="button"
-                      onClick={addGovernorateAreas}
-                      className="text-xs text-primary hover:text-primary/90"
-                    >
-                      + Add All Kuwait Governorates
-                    </button>
-                  </div>
-                  <textarea
-                    value={formData.areas}
-                    onChange={e => setFormData({ ...formData, areas: e.target.value })}
-                    placeholder="Separate areas with commas: Capital, Hawalli, Farwaniya"
-                    className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                    rows={2}
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-2">
-                    Areas (Arabic)
-                  </label>
-                  <textarea
-                    value={formData.areasAr}
-                    onChange={e => setFormData({ ...formData, areasAr: e.target.value })}
-                    placeholder="العاصمة، حولي، الفروانية"
-                    className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                    rows={2}
-                    dir="rtl"
-                  />
-                </div>
-
-                {/* Delivery Fee */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-muted-foreground mb-2">
-                      Delivery Fee (KWD) <span className="text-destructive">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      step="0.001"
-                      min="0"
-                      value={formData.deliveryFee}
-                      onChange={e => setFormData({ ...formData, deliveryFee: e.target.value })}
-                      placeholder="1.000"
-                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-muted-foreground mb-2">
-                      Free Shipping Over (KWD)
-                    </label>
-                    <input
-                      type="number"
-                      step="0.001"
-                      min="0"
-                      value={formData.freeShippingThreshold}
-                      onChange={e =>
-                        setFormData({ ...formData, freeShippingThreshold: e.target.value })
-                      }
-                      placeholder="25.000"
-                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                    />
-                  </div>
-                </div>
-
-                {/* Delivery Time */}
-                <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-2">
-                    Estimated Delivery Time (Days)
-                  </label>
-                  <div className="grid grid-cols-2 gap-4">
-                    <input
-                      type="number"
-                      min="1"
-                      value={formData.estimatedDaysMin}
-                      onChange={e => setFormData({ ...formData, estimatedDaysMin: e.target.value })}
-                      placeholder="Min days"
-                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                    />
-                    <input
-                      type="number"
-                      min="1"
-                      value={formData.estimatedDaysMax}
-                      onChange={e => setFormData({ ...formData, estimatedDaysMax: e.target.value })}
-                      placeholder="Max days"
-                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                    />
-                  </div>
-                </div>
-
-                {/* Active Status */}
-                <div className="flex items-center gap-3">
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formData.isActive}
-                      onChange={e => setFormData({ ...formData, isActive: e.target.checked })}
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/30 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                  </label>
-                  <span className="text-sm text-foreground">Active</span>
-                </div>
-
-                {/* Actions */}
-                <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
-                  <button
-                    type="button"
-                    onClick={handleCloseModal}
-                    className="px-4 py-2 text-foreground border border-border rounded-lg hover:bg-muted transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                  >
-                    {saving && (
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    )}
-                    {editingZone ? 'Update Zone' : 'Create Zone'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
+          <ShippingZoneFormModal
+            editingZone={editingZone}
+            formData={formData}
+            saving={saving}
+            onChange={setFormData}
+            onClose={handleCloseModal}
+            onSubmit={handleSubmit}
+            onAddAllGovernorates={addGovernorateAreas}
+          />
         )}
       </div>
     </AdminLayout>
