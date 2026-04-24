@@ -1,535 +1,126 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { Button, Badge, useToast } from '@force/ui';
+import { useToast } from '@force/ui';
+import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
-import { apiGet, apiPost } from '../../../../lib/api';
-
-interface ReturnItem {
-  id: string;
-  productName: string;
-  quantity: number;
-  reason?: string;
-  condition?: string;
-  product?: {
-    name: string;
-    images?: { url: string }[];
-  };
-}
-
-interface Return {
-  id: string;
-  returnNumber: string;
-  type: 'return' | 'exchange' | 'refund';
-  status: string;
-  reason: string;
-  reasonDetail?: string;
-  refundAmount: number;
-  refundMethod?: string;
-  trackingNumber?: string;
-  customerNotes?: string;
-  adminNotes?: string;
-  createdAt: string;
-  approvedAt?: string;
-  receivedAt?: string;
-  refundedAt?: string;
-  order: {
-    orderNumber: string;
-    total: number;
-  };
-  customer: {
-    id: string;
-    email: string;
-    firstName: string;
-    lastName: string;
-  };
-  items: ReturnItem[];
-}
-
-interface Stats {
-  total: number;
-  pending: number;
-  approved: number;
-  completed: number;
-}
-
-function formatDate(date: string) {
-  return new Date(date).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-}
-
-function formatCurrency(amount: number) {
-  return new Intl.NumberFormat('en-KW', {
-    style: 'currency',
-    currency: 'KWD',
-    minimumFractionDigits: 3,
-  }).format(amount / 1000);
-}
-
-const statusColors: Record<string, string> = {
-  pending: 'bg-warning/10 text-warning dark:bg-warning/30 dark:text-warning',
-  approved: 'bg-info/10 text-info dark:bg-info/30 dark:text-info',
-  rejected: 'bg-destructive/10 text-destructive dark:bg-destructive/30/30 dark:text-destructive',
-  shipped: 'bg-info/10 text-info dark:bg-info/30 dark:text-info',
-  received: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300',
-  inspecting: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300',
-  completed: 'bg-success/10 text-success dark:bg-success/30 dark:text-success',
-  cancelled: 'bg-muted text-foreground',
-};
-
-const typeLabels: Record<string, string> = {
-  return: 'Return',
-  exchange: 'Exchange',
-  refund: 'Refund',
-};
+import { ReturnDetailsDrawer } from './_components/ReturnDetailsDrawer';
+import { ReturnStatusFilter } from './_components/ReturnStatusFilter';
+import { ReturnsTable } from './_components/ReturnsTable';
+import { StatsGrid } from './_components/StatsGrid';
+import type { ReturnRecord } from './_components/types';
+import { useReturns } from './_hooks/useReturns';
 
 export default function ReturnsPage() {
   const params = useParams();
   const storeId = params?.id as string;
-  const [returns, setReturns] = useState<Return[]>([]);
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'completed'>('all');
-  const [meta, setMeta] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
-  const [selectedReturn, setSelectedReturn] = useState<Return | null>(null);
-  const [showDetails, setShowDetails] = useState(false);
   const { success: toastSuccess, error: showError } = useToast();
 
-  const fetchReturns = useCallback(async () => {
-    if (!storeId) return;
-    setIsLoading(true);
-    try {
-      const statusFilter = filter === 'all' ? '' : `&status=${filter}`;
-      const { data } = await apiGet<{ returns: Return[]; meta: typeof meta }>(
-        `/api/v1/stores/${storeId}/returns/admin/list?page=${meta.page}&limit=${meta.limit}${statusFilter}`
-      );
-      if (data) {
-        setReturns(data.returns);
-        setMeta(data.meta);
-      }
-    } catch (error) {
-      console.error('Failed to fetch returns:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [storeId, filter, meta.page, meta.limit]);
+  const tPage = useT('returns.page');
+  const tMessages = useT('returns.messages');
 
-  const fetchStats = useCallback(async () => {
-    if (!storeId) return;
-    try {
-      const { data } = await apiGet<{ stats: Stats }>(
-        `/api/v1/stores/${storeId}/returns/admin/stats`
-      );
-      if (data) {
-        setStats(data.stats);
-      }
-    } catch (error) {
-      console.error('Failed to fetch stats:', error);
-    }
-  }, [storeId]);
+  const [selectedReturn, setSelectedReturn] = useState<ReturnRecord | null>(null);
+  const [showDetails, setShowDetails] = useState(false);
 
-  useEffect(() => {
-    fetchReturns();
-    fetchStats();
-  }, [fetchReturns, fetchStats]);
+  // Memo so the hook's dependency-array-based effects don't re-run when the
+  // parent re-renders (toast helpers are stable, but the messages object is
+  // a plain literal).
+  const messages = useMemo(
+    () => ({
+      approveSuccessTitle: tMessages('approveSuccessTitle'),
+      approveSuccessBody: tMessages('approveSuccessBody'),
+      approveErrorTitle: tMessages('approveErrorTitle'),
+      approveErrorBody: tMessages('approveErrorBody'),
+      rejectPrompt: tMessages('rejectPrompt'),
+      rejectSuccessTitle: tMessages('rejectSuccessTitle'),
+      rejectSuccessBody: tMessages('rejectSuccessBody'),
+      rejectErrorTitle: tMessages('rejectErrorTitle'),
+      rejectErrorBody: tMessages('rejectErrorBody'),
+      receivedSuccessTitle: tMessages('receivedSuccessTitle'),
+      receivedSuccessBody: tMessages('receivedSuccessBody'),
+      receivedErrorTitle: tMessages('receivedErrorTitle'),
+      receivedErrorBody: tMessages('receivedErrorBody'),
+      completePrompt: tMessages('completePrompt'),
+      completeSuccessTitle: tMessages('completeSuccessTitle'),
+      completeSuccessBody: tMessages('completeSuccessBody'),
+      completeErrorTitle: tMessages('completeErrorTitle'),
+      completeErrorBody: tMessages('completeErrorBody'),
+    }),
+    [tMessages]
+  );
 
-  async function handleApprove(returnId: string) {
-    try {
-      const { error } = await apiPost(
-        `/api/v1/stores/${storeId}/returns/admin/${returnId}/approve`
-      );
-      if (error) {
-        showError('Error', 'Failed to approve return. Please try again.');
-        return;
-      }
-      toastSuccess('Return Approved', 'The return has been approved.');
-      fetchReturns();
-      fetchStats();
-      setShowDetails(false);
-    } catch (error) {
-      console.error('Failed to approve return:', error);
-      showError('Error', 'Failed to approve return. Please try again.');
-    }
-  }
+  const {
+    returns,
+    stats,
+    isLoading,
+    filter,
+    meta,
+    approve,
+    reject,
+    markReceived,
+    complete,
+    changeFilter,
+    setPage,
+  } = useReturns({
+    storeId,
+    messages,
+    onSuccess: toastSuccess,
+    onError: showError,
+  });
 
-  async function handleReject(returnId: string) {
-    const reason = prompt('Enter rejection reason:');
-    if (!reason) return;
-    try {
-      const { error } = await apiPost(
-        `/api/v1/stores/${storeId}/returns/admin/${returnId}/reject`,
-        { reason }
-      );
-      if (error) {
-        showError('Error', 'Failed to reject return. Please try again.');
-        return;
-      }
-      toastSuccess('Return Rejected', 'The return has been rejected.');
-      fetchReturns();
-      fetchStats();
-      setShowDetails(false);
-    } catch (error) {
-      console.error('Failed to reject return:', error);
-      showError('Error', 'Failed to reject return. Please try again.');
-    }
-  }
+  const closeDetails = () => setShowDetails(false);
 
-  async function handleReceived(returnId: string) {
-    try {
-      const { error } = await apiPost(
-        `/api/v1/stores/${storeId}/returns/admin/${returnId}/received`
-      );
-      if (error) {
-        showError('Error', 'Failed to mark return as received. Please try again.');
-        return;
-      }
-      toastSuccess('Return Received', 'The return has been marked as received.');
-      fetchReturns();
-      fetchStats();
-      setShowDetails(false);
-    } catch (error) {
-      console.error('Failed to mark as received:', error);
-      showError('Error', 'Failed to mark return as received. Please try again.');
-    }
-  }
+  const handleApprove = async (id: string) => {
+    const ok = await approve(id);
+    if (ok) closeDetails();
+  };
 
-  async function handleComplete(returnId: string) {
-    const refundMethod = prompt('Enter refund method (original, store_credit, bank_transfer):');
-    if (!refundMethod) return;
-    try {
-      const { error } = await apiPost(
-        `/api/v1/stores/${storeId}/returns/admin/${returnId}/complete`,
-        { refundMethod }
-      );
-      if (error) {
-        showError('Error', 'Failed to complete return. Please try again.');
-        return;
-      }
-      toastSuccess('Return Completed', 'The return has been completed and refund processed.');
-      fetchReturns();
-      fetchStats();
-      setShowDetails(false);
-    } catch (error) {
-      console.error('Failed to complete return:', error);
-      showError('Error', 'Failed to complete return. Please try again.');
-    }
-  }
+  const handleReject = async (id: string) => {
+    const ok = await reject(id);
+    if (ok) closeDetails();
+  };
+
+  const handleMarkReceived = async (id: string) => {
+    const ok = await markReceived(id);
+    if (ok) closeDetails();
+  };
+
+  const handleComplete = async (id: string) => {
+    const ok = await complete(id);
+    if (ok) closeDetails();
+  };
 
   return (
-    <AdminLayout title="Returns & Exchanges" subtitle="Manage return requests and refunds">
-      {/* Stats */}
-      {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-card rounded-xl border p-4 shadow-sm">
-            <p className="text-sm text-muted-foreground">Total Returns</p>
-            <p className="text-2xl font-bold text-foreground">{stats.total}</p>
-          </div>
-          <div className="bg-card rounded-xl border p-4 shadow-sm">
-            <p className="text-sm text-muted-foreground">Pending</p>
-            <p className="text-2xl font-bold text-warning">{stats.pending}</p>
-          </div>
-          <div className="bg-card rounded-xl border p-4 shadow-sm">
-            <p className="text-sm text-muted-foreground">Approved</p>
-            <p className="text-2xl font-bold text-info">{stats.approved}</p>
-          </div>
-          <div className="bg-card rounded-xl border p-4 shadow-sm">
-            <p className="text-sm text-muted-foreground">Completed</p>
-            <p className="text-2xl font-bold text-success">{stats.completed}</p>
-          </div>
-        </div>
-      )}
+    <AdminLayout title={tPage('title')} subtitle={tPage('subtitle')}>
+      <StatsGrid stats={stats} />
 
-      {/* Filters */}
-      <div className="mb-6 flex gap-2">
-        {(['all', 'pending', 'approved', 'completed'] as const).map(f => (
-          <Button
-            key={f}
-            variant={filter === f ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setFilter(f)}
-          >
-            {f.charAt(0).toUpperCase() + f.slice(1)}
-          </Button>
-        ))}
-      </div>
+      <ReturnStatusFilter value={filter} onChange={changeFilter} />
 
-      {/* Returns List */}
-      <div className="rounded-xl border bg-card shadow-sm">
-        {isLoading ? (
-          <div className="p-8 text-center text-muted-foreground">Loading returns...</div>
-        ) : returns.length === 0 ? (
-          <div className="p-8 text-center text-muted-foreground">No returns found</div>
-        ) : (
-          <div className="divide-y">
-            {returns.map(ret => (
-              <div
-                key={ret.id}
-                className="p-6 hover:bg-muted cursor-pointer"
-                onClick={() => {
-                  setSelectedReturn(ret);
-                  setShowDetails(true);
-                }}
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <span className="font-semibold text-foreground">#{ret.returnNumber}</span>
-                      <Badge className={statusColors[ret.status] || 'bg-muted text-foreground'}>
-                        {ret.status}
-                      </Badge>
-                      <Badge variant="outline">{typeLabels[ret.type] || ret.type}</Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      <span className="font-medium">Order:</span> #{ret.order.orderNumber} |
-                      <span className="font-medium ml-2">Customer:</span> {ret.customer.firstName}{' '}
-                      {ret.customer.lastName}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      <span className="font-medium">Reason:</span> {ret.reason}
-                    </p>
-                    <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                      <span>{formatDate(ret.createdAt)}</span>
-                      <span>{ret.items.length} item(s)</span>
-                      <span className="font-medium text-foreground">
-                        {formatCurrency(ret.refundAmount)}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    {ret.status === 'pending' && (
-                      <>
-                        <Button
-                          size="sm"
-                          onClick={e => {
-                            e.stopPropagation();
-                            handleApprove(ret.id);
-                          }}
-                        >
-                          Approve
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={e => {
-                            e.stopPropagation();
-                            handleReject(ret.id);
-                          }}
-                        >
-                          Reject
-                        </Button>
-                      </>
-                    )}
-                    {ret.status === 'approved' && (
-                      <Button
-                        size="sm"
-                        onClick={e => {
-                          e.stopPropagation();
-                          handleReceived(ret.id);
-                        }}
-                      >
-                        Mark Received
-                      </Button>
-                    )}
-                    {(ret.status === 'received' || ret.status === 'inspecting') && (
-                      <Button
-                        size="sm"
-                        onClick={e => {
-                          e.stopPropagation();
-                          handleComplete(ret.id);
-                        }}
-                      >
-                        Complete & Refund
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+      <ReturnsTable
+        returns={returns}
+        meta={meta}
+        isLoading={isLoading}
+        onSelect={ret => {
+          setSelectedReturn(ret);
+          setShowDetails(true);
+        }}
+        onApprove={handleApprove}
+        onReject={handleReject}
+        onMarkReceived={handleMarkReceived}
+        onComplete={handleComplete}
+        onPageChange={setPage}
+      />
 
-        {/* Pagination */}
-        {meta.totalPages > 1 && (
-          <div className="flex items-center justify-between border-t px-6 py-3">
-            <p className="text-sm text-muted-foreground">
-              Showing {(meta.page - 1) * meta.limit + 1} to{' '}
-              {Math.min(meta.page * meta.limit, meta.total)} of {meta.total} returns
-            </p>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={meta.page === 1}
-                onClick={() => setMeta(prev => ({ ...prev, page: prev.page - 1 }))}
-              >
-                Previous
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={meta.page === meta.totalPages}
-                onClick={() => setMeta(prev => ({ ...prev, page: prev.page + 1 }))}
-              >
-                Next
-              </Button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Details Modal */}
-      {showDetails && selectedReturn && (
-        <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-          onClick={() => setShowDetails(false)}
-        >
-          <div
-            className="bg-card rounded-xl shadow-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto"
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between border-b p-4">
-              <div>
-                <h2 className="font-semibold text-foreground">
-                  Return #{selectedReturn.returnNumber}
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  Order #{selectedReturn.order.orderNumber}
-                </p>
-              </div>
-              <button
-                onClick={() => setShowDetails(false)}
-                className="text-muted-foreground hover:text-muted-foreground"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            </div>
-            <div className="p-6 space-y-6">
-              {/* Status & Type */}
-              <div className="flex items-center gap-3">
-                <Badge
-                  className={statusColors[selectedReturn.status] || 'bg-muted text-foreground'}
-                >
-                  {selectedReturn.status}
-                </Badge>
-                <Badge variant="outline">
-                  {typeLabels[selectedReturn.type] || selectedReturn.type}
-                </Badge>
-              </div>
-
-              {/* Customer Info */}
-              <div>
-                <h3 className="font-medium text-foreground mb-2">Customer</h3>
-                <p className="text-sm text-muted-foreground">
-                  {selectedReturn.customer.firstName} {selectedReturn.customer.lastName}
-                </p>
-                <p className="text-sm text-muted-foreground">{selectedReturn.customer.email}</p>
-              </div>
-
-              {/* Reason */}
-              <div>
-                <h3 className="font-medium text-foreground mb-2">Reason</h3>
-                <p className="text-sm text-muted-foreground">{selectedReturn.reason}</p>
-                {selectedReturn.reasonDetail && (
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {selectedReturn.reasonDetail}
-                  </p>
-                )}
-              </div>
-
-              {/* Items */}
-              <div>
-                <h3 className="font-medium text-foreground mb-2">Items</h3>
-                <div className="space-y-2">
-                  {selectedReturn.items.map(item => (
-                    <div key={item.id} className="flex items-center gap-3 p-3 bg-muted rounded-lg">
-                      {item.product?.images?.[0]?.url ? (
-                        <img
-                          src={item.product.images[0].url}
-                          alt=""
-                          className="w-12 h-12 rounded object-cover"
-                        />
-                      ) : (
-                        <div className="w-12 h-12 rounded bg-muted flex items-center justify-center">
-                          <svg
-                            className="w-6 h-6 text-muted-foreground"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                            />
-                          </svg>
-                        </div>
-                      )}
-                      <div className="flex-1">
-                        <p className="font-medium text-foreground">{item.productName}</p>
-                        <p className="text-sm text-muted-foreground">
-                          Qty: {item.quantity} | Condition: {item.condition || 'N/A'}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Refund Info */}
-              <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
-                <span className="font-medium text-foreground">Refund Amount</span>
-                <span className="text-lg font-bold text-primary">
-                  {formatCurrency(selectedReturn.refundAmount)}
-                </span>
-              </div>
-
-              {/* Actions */}
-              <div className="flex gap-3 pt-4 border-t">
-                {selectedReturn.status === 'pending' && (
-                  <>
-                    <Button className="flex-1" onClick={() => handleApprove(selectedReturn.id)}>
-                      Approve Return
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="flex-1"
-                      onClick={() => handleReject(selectedReturn.id)}
-                    >
-                      Reject
-                    </Button>
-                  </>
-                )}
-                {selectedReturn.status === 'approved' && (
-                  <Button className="flex-1" onClick={() => handleReceived(selectedReturn.id)}>
-                    Mark as Received
-                  </Button>
-                )}
-                {(selectedReturn.status === 'received' ||
-                  selectedReturn.status === 'inspecting') && (
-                  <Button className="flex-1" onClick={() => handleComplete(selectedReturn.id)}>
-                    Complete & Process Refund
-                  </Button>
-                )}
-                <Button variant="outline" onClick={() => setShowDetails(false)}>
-                  Close
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <ReturnDetailsDrawer
+        record={selectedReturn}
+        open={showDetails}
+        onClose={closeDetails}
+        onApprove={handleApprove}
+        onReject={handleReject}
+        onMarkReceived={handleMarkReceived}
+        onComplete={handleComplete}
+      />
     </AdminLayout>
   );
 }

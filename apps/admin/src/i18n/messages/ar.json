@@ -1339,7 +1339,94 @@
       "saveErrorBody": "Failed to save settings. Please try again."
     }
   },
-  "returns": {},
+  "returns": {
+    "page": {
+      "title": "Returns & Exchanges",
+      "subtitle": "Manage return requests and refunds"
+    },
+    "stats": {
+      "total": "Total Returns",
+      "pending": "Pending",
+      "approved": "Approved",
+      "completed": "Completed"
+    },
+    "filters": {
+      "all": "All",
+      "pending": "Pending",
+      "approved": "Approved",
+      "completed": "Completed"
+    },
+    "status": {
+      "pending": "Pending",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "shipped": "Shipped",
+      "received": "Received",
+      "inspecting": "Inspecting",
+      "completed": "Completed",
+      "cancelled": "Cancelled"
+    },
+    "type": {
+      "return": "Return",
+      "exchange": "Exchange",
+      "refund": "Refund"
+    },
+    "list": {
+      "loading": "Loading returns...",
+      "empty": "No returns found",
+      "orderLabel": "Order",
+      "customerLabel": "Customer",
+      "reasonLabel": "Reason",
+      "itemCount": "{count, plural, =0 {No items} one {# item} other {# items}}",
+      "pagination": "Showing {from} to {to} of {total} returns",
+      "previous": "Previous",
+      "next": "Next",
+      "actions": {
+        "approve": "Approve",
+        "reject": "Reject",
+        "markReceived": "Mark Received",
+        "completeRefund": "Complete & Refund"
+      }
+    },
+    "details": {
+      "heading": "Return #{number}",
+      "orderReference": "Order #{number}",
+      "close": "Close",
+      "customer": "Customer",
+      "reason": "Reason",
+      "items": "Items",
+      "itemMeta": "Qty: {qty} | Condition: {condition}",
+      "notAvailable": "N/A",
+      "refundAmount": "Refund Amount",
+      "actions": {
+        "approveReturn": "Approve Return",
+        "reject": "Reject",
+        "markReceived": "Mark as Received",
+        "completeRefund": "Complete & Process Refund",
+        "close": "Close"
+      }
+    },
+    "messages": {
+      "approveSuccessTitle": "Return Approved",
+      "approveSuccessBody": "The return has been approved.",
+      "approveErrorTitle": "Error",
+      "approveErrorBody": "Failed to approve return. Please try again.",
+      "rejectPrompt": "Enter rejection reason:",
+      "rejectSuccessTitle": "Return Rejected",
+      "rejectSuccessBody": "The return has been rejected.",
+      "rejectErrorTitle": "Error",
+      "rejectErrorBody": "Failed to reject return. Please try again.",
+      "receivedSuccessTitle": "Return Received",
+      "receivedSuccessBody": "The return has been marked as received.",
+      "receivedErrorTitle": "Error",
+      "receivedErrorBody": "Failed to mark return as received. Please try again.",
+      "completePrompt": "Enter refund method (original, store_credit, bank_transfer):",
+      "completeSuccessTitle": "Return Completed",
+      "completeSuccessBody": "The return has been completed and refund processed.",
+      "completeErrorTitle": "Error",
+      "completeErrorBody": "Failed to complete return. Please try again."
+    }
+  },
   "marketingPixels": {},
   "pages": {},
   "navigation": {},
