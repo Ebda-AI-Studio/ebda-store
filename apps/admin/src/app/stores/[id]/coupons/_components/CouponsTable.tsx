@@ -207,6 +207,7 @@ export function CouponsTable({
                             : 'text-success hover:bg-success/5'
                         }`}
                         title={coupon.isActive ? tActions('deactivate') : tActions('activate')}
+                        aria-label={coupon.isActive ? tActions('deactivate') : tActions('activate')}
                       >
                         {coupon.isActive ? (
                           <svg
@@ -243,6 +244,7 @@ export function CouponsTable({
                         onClick={() => onEdit(coupon)}
                         className="p-2 text-muted-foreground hover:bg-muted rounded-lg"
                         title={tActions('edit')}
+                        aria-label={tActions('edit')}
                       >
                         <svg
                           className="w-5 h-5"
@@ -263,6 +265,7 @@ export function CouponsTable({
                         onClick={() => onDelete(coupon.id)}
                         className="p-2 text-destructive hover:bg-destructive/5 rounded-lg"
                         title={tActions('delete')}
+                        aria-label={tActions('delete')}
                       >
                         <svg
                           className="w-5 h-5"

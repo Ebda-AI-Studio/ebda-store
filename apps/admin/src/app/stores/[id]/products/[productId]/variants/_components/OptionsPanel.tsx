@@ -57,6 +57,7 @@ export function OptionsPanel({
                     type="button"
                     onClick={() => onDeleteOption(option.id)}
                     className="text-muted-foreground hover:text-destructive"
+                    aria-label={t('deleteOption')}
                   >
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path
@@ -79,6 +80,7 @@ export function OptionsPanel({
                         type="button"
                         onClick={() => onDeleteValue(value.id)}
                         className="text-muted-foreground hover:text-destructive"
+                        aria-label={t('deleteValue')}
                       >
                         <svg
                           className="h-3 w-3"

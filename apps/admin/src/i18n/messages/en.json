@@ -566,7 +566,9 @@
         "empty": "No options defined yet.",
         "emptyHint": "Add options like \"Size\" or \"Color\"",
         "addValue": "+ Add",
-        "generateAll": "Generate All Variants"
+        "generateAll": "Generate All Variants",
+        "deleteOption": "Delete option",
+        "deleteValue": "Delete value"
       },
       "table": {
         "label": "Product variants",

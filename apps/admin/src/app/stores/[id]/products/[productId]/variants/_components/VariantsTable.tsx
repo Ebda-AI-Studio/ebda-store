@@ -99,6 +99,7 @@ export function VariantsTable({ variants, onEdit, onDelete }: VariantsTableProps
                         onClick={() => onEdit(variant)}
                         className="text-muted-foreground hover:text-primary"
                         title={t('edit')}
+                        aria-label={t('edit')}
                       >
                         <svg
                           className="h-4 w-4"
@@ -119,6 +120,7 @@ export function VariantsTable({ variants, onEdit, onDelete }: VariantsTableProps
                         onClick={() => onDelete(variant.id)}
                         className="text-muted-foreground hover:text-destructive"
                         title={t('delete')}
+                        aria-label={t('delete')}
                       >
                         <svg
                           className="h-4 w-4"
