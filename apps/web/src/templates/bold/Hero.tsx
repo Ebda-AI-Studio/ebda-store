@@ -36,7 +36,14 @@ export default function BoldHero({
       {/* Full-screen hero image with dark overlay */}
       {image && (
         <div className="absolute inset-0">
-          <Image src={image} alt={displayTitle} fill className="object-cover" priority />
+          <Image
+            src={image}
+            alt={displayTitle}
+            fill
+            sizes="100vw"
+            className="object-cover"
+            priority
+          />
           <div className="absolute inset-0 bg-gray-950/65" />
         </div>
       )}

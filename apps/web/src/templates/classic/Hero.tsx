@@ -96,7 +96,14 @@ export default function ClassicHero({
           >
             <div className="absolute inset-0 m-6">
               {image ? (
-                <Image src={image} alt={displayTitle} fill className="object-cover" priority />
+                <Image
+                  src={image}
+                  alt={displayTitle}
+                  fill
+                  sizes="(min-width: 1024px) 50vw, 100vw"
+                  className="object-cover"
+                  priority
+                />
               ) : (
                 <div className="w-full h-full bg-muted flex items-center justify-center">
                   <div className="text-center p-8">

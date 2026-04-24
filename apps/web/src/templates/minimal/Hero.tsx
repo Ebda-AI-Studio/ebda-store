@@ -60,7 +60,14 @@ export default function MinimalHero({
       {/* Full-bleed hero image */}
       <div className="relative aspect-[21/9] overflow-hidden bg-muted">
         {image ? (
-          <Image src={image} alt={displayTitle} fill className="object-cover" priority />
+          <Image
+            src={image}
+            alt={displayTitle}
+            fill
+            sizes="100vw"
+            className="object-cover"
+            priority
+          />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             <span className="text-[10px] text-muted-foreground/50 tracking-[0.3em] uppercase">

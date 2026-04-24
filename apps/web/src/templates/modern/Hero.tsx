@@ -93,7 +93,14 @@ export default function ModernHero({
             <div className="relative aspect-[4/3] lg:aspect-[5/4] rounded-2xl overflow-hidden shadow-2xl shadow-black/10">
               {image ? (
                 <>
-                  <Image src={image} alt={displayTitle} fill className="object-cover" priority />
+                  <Image
+                    src={image}
+                    alt={displayTitle}
+                    fill
+                    sizes="(min-width: 1024px) 50vw, 100vw"
+                    className="object-cover"
+                    priority
+                  />
                   {/* Gradient overlay on image */}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
                 </>

@@ -42,7 +42,14 @@ export default function ElegantHero({
           <div
             className={`relative w-full lg:w-[60%] min-h-[50vh] lg:min-h-full ${isRtl ? 'lg:order-2' : 'lg:order-1'} overflow-hidden`}
           >
-            <Image src={image} alt={displayTitle} fill className="object-cover" priority />
+            <Image
+              src={image}
+              alt={displayTitle}
+              fill
+              sizes="(min-width: 1024px) 60vw, 100vw"
+              className="object-cover"
+              priority
+            />
             <div className="absolute inset-0 bg-foreground/10" />
           </div>
 
