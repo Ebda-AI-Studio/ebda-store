@@ -1,16 +1,20 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useToast } from '@force/ui';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { RefundMethodModal } from './_components/RefundMethodModal';
+import { RejectReasonModal } from './_components/RejectReasonModal';
 import { ReturnDetailsDrawer } from './_components/ReturnDetailsDrawer';
 import { ReturnStatusFilter } from './_components/ReturnStatusFilter';
 import { ReturnsTable } from './_components/ReturnsTable';
 import { StatsGrid } from './_components/StatsGrid';
 import type { ReturnRecord } from './_components/types';
 import { useReturns } from './_hooks/useReturns';
+
+type StringResolver = (value: string | null) => void;
 
 export default function ReturnsPage() {
   const params = useParams();
@@ -22,6 +26,14 @@ export default function ReturnsPage() {
 
   const [selectedReturn, setSelectedReturn] = useState<ReturnRecord | null>(null);
   const [showDetails, setShowDetails] = useState(false);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [refundOpen, setRefundOpen] = useState(false);
+
+  // Promise resolvers held in refs so the modal flow can be modeled as an
+  // async function in the hook. When the user confirms or cancels, we resolve
+  // the pending promise; the hook then proceeds with (or aborts) the API call.
+  const rejectResolverRef = useRef<StringResolver | null>(null);
+  const refundResolverRef = useRef<StringResolver | null>(null);
 
   // Memo so the hook's dependency-array-based effects don't re-run when the
   // parent re-renders (toast helpers are stable, but the messages object is
@@ -32,7 +44,6 @@ export default function ReturnsPage() {
       approveSuccessBody: tMessages('approveSuccessBody'),
       approveErrorTitle: tMessages('approveErrorTitle'),
       approveErrorBody: tMessages('approveErrorBody'),
-      rejectPrompt: tMessages('rejectPrompt'),
       rejectSuccessTitle: tMessages('rejectSuccessTitle'),
       rejectSuccessBody: tMessages('rejectSuccessBody'),
       rejectErrorTitle: tMessages('rejectErrorTitle'),
@@ -41,7 +52,6 @@ export default function ReturnsPage() {
       receivedSuccessBody: tMessages('receivedSuccessBody'),
       receivedErrorTitle: tMessages('receivedErrorTitle'),
       receivedErrorBody: tMessages('receivedErrorBody'),
-      completePrompt: tMessages('completePrompt'),
       completeSuccessTitle: tMessages('completeSuccessTitle'),
       completeSuccessBody: tMessages('completeSuccessBody'),
       completeErrorTitle: tMessages('completeErrorTitle'),
@@ -49,6 +59,44 @@ export default function ReturnsPage() {
     }),
     [tMessages]
   );
+
+  const requestRejectReason = useCallback(() => {
+    setRejectOpen(true);
+    return new Promise<string | null>(resolve => {
+      rejectResolverRef.current = resolve;
+    });
+  }, []);
+
+  const requestRefundMethod = useCallback(() => {
+    setRefundOpen(true);
+    return new Promise<string | null>(resolve => {
+      refundResolverRef.current = resolve;
+    });
+  }, []);
+
+  const handleRejectConfirm = (reason: string) => {
+    setRejectOpen(false);
+    rejectResolverRef.current?.(reason);
+    rejectResolverRef.current = null;
+  };
+
+  const handleRejectCancel = () => {
+    setRejectOpen(false);
+    rejectResolverRef.current?.(null);
+    rejectResolverRef.current = null;
+  };
+
+  const handleRefundConfirm = (method: string) => {
+    setRefundOpen(false);
+    refundResolverRef.current?.(method);
+    refundResolverRef.current = null;
+  };
+
+  const handleRefundCancel = () => {
+    setRefundOpen(false);
+    refundResolverRef.current?.(null);
+    refundResolverRef.current = null;
+  };
 
   const {
     returns,
@@ -67,6 +115,8 @@ export default function ReturnsPage() {
     messages,
     onSuccess: toastSuccess,
     onError: showError,
+    requestRejectReason,
+    requestRefundMethod,
   });
 
   const closeDetails = () => setShowDetails(false);
@@ -120,6 +170,18 @@ export default function ReturnsPage() {
         onReject={handleReject}
         onMarkReceived={handleMarkReceived}
         onComplete={handleComplete}
+      />
+
+      <RejectReasonModal
+        open={rejectOpen}
+        onConfirm={handleRejectConfirm}
+        onClose={handleRejectCancel}
+      />
+
+      <RefundMethodModal
+        open={refundOpen}
+        onConfirm={handleRefundConfirm}
+        onClose={handleRefundCancel}
       />
     </AdminLayout>
   );

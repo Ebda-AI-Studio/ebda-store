@@ -12,6 +12,16 @@ import { OrdersBulkBar } from './_components/OrdersBulkBar';
 import { OrdersTable } from './_components/OrdersTable';
 import { OrdersPagination } from './_components/OrdersPagination';
 import type { Order, Pagination, StatusFilter } from './_components/types';
+import { ConfirmActionModal } from '../../../../components/ConfirmActionModal';
+
+type ConfirmType = 'markPaid' | 'bulkMarkPaid';
+
+interface ConfirmState {
+  open: boolean;
+  type: ConfirmType;
+  orderId?: string;
+  ids?: string[];
+}
 
 const API_URL = getApiUrl();
 
@@ -19,6 +29,7 @@ export default function StoreOrdersPage() {
   const params = useParams();
   const storeId = params?.id as string;
   const t = useT('orders.list');
+  const tConfirm = useT('orders.list.confirm');
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [pagination, setPagination] = useState<Pagination>({
@@ -34,6 +45,10 @@ export default function StoreOrdersPage() {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
+  const [confirmState, setConfirmState] = useState<ConfirmState>({
+    open: false,
+    type: 'markPaid',
+  });
   const { success: toastSuccess, error: showError } = useToast();
 
   const fetchOrders = useCallback(async () => {
@@ -100,8 +115,13 @@ export default function StoreOrdersPage() {
     window.open(`${API_URL}/api/v1/stores/${storeId}/orders/${orderId}/invoice`, '_blank');
   };
 
-  const handleMarkPaid = async (orderId: string) => {
-    if (!confirm(t('confirm.markPaid'))) return;
+  // Open the confirm modal for a single order. Actual API work runs in
+  // executeMarkPaid after the user confirms.
+  const handleMarkPaid = (orderId: string) => {
+    setConfirmState({ open: true, type: 'markPaid', orderId });
+  };
+
+  const executeMarkPaid = async (orderId: string) => {
     setUpdatingId(orderId);
     try {
       const { error: apiError } = await apiPost(
@@ -121,10 +141,13 @@ export default function StoreOrdersPage() {
     }
   };
 
-  const handleBulkMarkPaid = async () => {
+  const handleBulkMarkPaid = () => {
     const ids = Array.from(selectedOrders);
     if (ids.length === 0) return;
-    if (!confirm(t('confirm.bulkMarkPaid', { count: ids.length }))) return;
+    setConfirmState({ open: true, type: 'bulkMarkPaid', ids });
+  };
+
+  const executeBulkMarkPaid = async (ids: string[]) => {
     setIsBulkProcessing(true);
     try {
       const { data, error: apiError } = await apiPost<{ updated: number; skipped: number }>(
@@ -147,6 +170,32 @@ export default function StoreOrdersPage() {
       setIsBulkProcessing(false);
     }
   };
+
+  const handleConfirm = async () => {
+    if (confirmState.type === 'markPaid' && confirmState.orderId) {
+      const id = confirmState.orderId;
+      setConfirmState(prev => ({ ...prev, open: false }));
+      await executeMarkPaid(id);
+    } else if (confirmState.type === 'bulkMarkPaid' && confirmState.ids) {
+      const ids = confirmState.ids;
+      setConfirmState(prev => ({ ...prev, open: false }));
+      await executeBulkMarkPaid(ids);
+    }
+  };
+
+  const closeConfirm = () => setConfirmState(prev => ({ ...prev, open: false }));
+
+  const confirmTitle =
+    confirmState.type === 'markPaid' ? tConfirm('markPaidTitle') : tConfirm('bulkMarkPaidTitle');
+
+  const confirmDescription =
+    confirmState.type === 'markPaid'
+      ? tConfirm('markPaidDescription')
+      : tConfirm('bulkMarkPaidDescription', { count: confirmState.ids?.length ?? 0 });
+
+  const isConfirmLoading =
+    (confirmState.type === 'markPaid' && updatingId === confirmState.orderId) ||
+    (confirmState.type === 'bulkMarkPaid' && isBulkProcessing);
 
   const handleToggleSelected = (orderId: string, checked: boolean) => {
     setSelectedOrders(prev => {
@@ -234,6 +283,17 @@ export default function StoreOrdersPage() {
           onPageChange={updater => setPagination(prev => ({ ...prev, page: updater(prev.page) }))}
         />
       </div>
+
+      <ConfirmActionModal
+        open={confirmState.open}
+        title={confirmTitle}
+        description={confirmDescription}
+        confirmLabel={tConfirm('confirm')}
+        cancelLabel={tConfirm('cancel')}
+        onConfirm={handleConfirm}
+        onClose={closeConfirm}
+        isLoading={isConfirmLoading}
+      />
     </AdminLayout>
   );
 }

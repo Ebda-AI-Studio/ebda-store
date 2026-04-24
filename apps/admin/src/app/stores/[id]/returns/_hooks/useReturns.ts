@@ -9,7 +9,6 @@ interface ReturnsActionMessages {
   approveSuccessBody: string;
   approveErrorTitle: string;
   approveErrorBody: string;
-  rejectPrompt: string;
   rejectSuccessTitle: string;
   rejectSuccessBody: string;
   rejectErrorTitle: string;
@@ -18,7 +17,6 @@ interface ReturnsActionMessages {
   receivedSuccessBody: string;
   receivedErrorTitle: string;
   receivedErrorBody: string;
-  completePrompt: string;
   completeSuccessTitle: string;
   completeSuccessBody: string;
   completeErrorTitle: string;
@@ -30,6 +28,16 @@ interface UseReturnsArgs {
   messages: ReturnsActionMessages;
   onSuccess: (title: string, body: string) => void;
   onError: (title: string, body: string) => void;
+  /**
+   * Called when the user invokes Reject. Should resolve with the rejection
+   * reason entered in a styled modal, or null if the user cancelled.
+   */
+  requestRejectReason: () => Promise<string | null>;
+  /**
+   * Called when the user invokes Complete. Should resolve with the chosen
+   * refund method, or null if the user cancelled.
+   */
+  requestRefundMethod: () => Promise<string | null>;
 }
 
 /**
@@ -37,7 +45,14 @@ interface UseReturnsArgs {
  * mutations (approve, reject, mark received, complete). Keeps the page
  * component free of state plumbing and toast wiring.
  */
-export function useReturns({ storeId, messages, onSuccess, onError }: UseReturnsArgs) {
+export function useReturns({
+  storeId,
+  messages,
+  onSuccess,
+  onError,
+  requestRejectReason,
+  requestRefundMethod,
+}: UseReturnsArgs) {
   const [returns, setReturns] = useState<ReturnRecord[]>([]);
   const [stats, setStats] = useState<ReturnsStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -111,7 +126,7 @@ export function useReturns({ storeId, messages, onSuccess, onError }: UseReturns
 
   const reject = useCallback(
     async (returnId: string) => {
-      const reason = prompt(messages.rejectPrompt);
+      const reason = await requestRejectReason();
       if (!reason) return false;
       try {
         const { error } = await apiPost(
@@ -131,7 +146,7 @@ export function useReturns({ storeId, messages, onSuccess, onError }: UseReturns
         return false;
       }
     },
-    [storeId, onError, onSuccess, messages, refreshAll]
+    [storeId, onError, onSuccess, messages, refreshAll, requestRejectReason]
   );
 
   const markReceived = useCallback(
@@ -158,7 +173,7 @@ export function useReturns({ storeId, messages, onSuccess, onError }: UseReturns
 
   const complete = useCallback(
     async (returnId: string) => {
-      const refundMethod = prompt(messages.completePrompt);
+      const refundMethod = await requestRefundMethod();
       if (!refundMethod) return false;
       try {
         const { error } = await apiPost(
@@ -178,7 +193,7 @@ export function useReturns({ storeId, messages, onSuccess, onError }: UseReturns
         return false;
       }
     },
-    [storeId, onError, onSuccess, messages, refreshAll]
+    [storeId, onError, onSuccess, messages, refreshAll, requestRefundMethod]
   );
 
   const changeFilter = useCallback((value: ReturnFilter) => {

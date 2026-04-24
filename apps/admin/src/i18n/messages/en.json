@@ -724,7 +724,13 @@
       },
       "confirm": {
         "markPaid": "Confirm cash payment received for this order?",
-        "bulkMarkPaid": "Mark {count} order(s) as paid?"
+        "bulkMarkPaid": "Mark {count} order(s) as paid?",
+        "markPaidTitle": "Mark Order as Paid",
+        "markPaidDescription": "Confirm cash payment received for this order. This action cannot be undone.",
+        "bulkMarkPaidTitle": "Mark Orders as Paid",
+        "bulkMarkPaidDescription": "Mark {count} order(s) as paid? This action cannot be undone.",
+        "confirm": "Confirm",
+        "cancel": "Cancel"
       },
       "toast": {
         "errorTitle": "Error",
@@ -1966,7 +1972,6 @@
       "approveSuccessBody": "The return has been approved.",
       "approveErrorTitle": "Error",
       "approveErrorBody": "Failed to approve return. Please try again.",
-      "rejectPrompt": "Enter rejection reason:",
       "rejectSuccessTitle": "Return Rejected",
       "rejectSuccessBody": "The return has been rejected.",
       "rejectErrorTitle": "Error",
@@ -1975,11 +1980,34 @@
       "receivedSuccessBody": "The return has been marked as received.",
       "receivedErrorTitle": "Error",
       "receivedErrorBody": "Failed to mark return as received. Please try again.",
-      "completePrompt": "Enter refund method (original, store_credit, bank_transfer):",
       "completeSuccessTitle": "Return Completed",
       "completeSuccessBody": "The return has been completed and refund processed.",
       "completeErrorTitle": "Error",
       "completeErrorBody": "Failed to complete return. Please try again."
+    },
+    "modal": {
+      "rejectTitle": "Reject Return",
+      "rejectLabel": "Rejection reason",
+      "rejectPlaceholder": "Explain why this return is being rejected...",
+      "rejectConfirm": "Reject",
+      "refundMethodTitle": "Complete Return",
+      "refundMethodLabel": "Choose how the customer will be refunded",
+      "refundMethodConfirm": "Process Refund",
+      "refundMethodOptions": {
+        "original": {
+          "label": "Original payment method",
+          "description": "Refund to the card or wallet used at checkout."
+        },
+        "store_credit": {
+          "label": "Store credit",
+          "description": "Issue store credit the customer can spend on future orders."
+        },
+        "bank_transfer": {
+          "label": "Bank transfer",
+          "description": "Send the refund to the customer's bank account manually."
+        }
+      },
+      "cancel": "Cancel"
     }
   },
   "marketingPixels": {

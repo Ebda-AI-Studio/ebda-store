@@ -724,7 +724,13 @@
       },
       "confirm": {
         "markPaid": "هل تؤكد استلام الدفع النقدي لهذا الطلب؟",
-        "bulkMarkPaid": "تعليم {count} طلب كمدفوع؟"
+        "bulkMarkPaid": "تعليم {count} طلب كمدفوع؟",
+        "markPaidTitle": "تعليم الطلب كمدفوع",
+        "markPaidDescription": "تأكيد استلام الدفع النقدي لهذا الطلب. لا يمكن التراجع عن هذا الإجراء.",
+        "bulkMarkPaidTitle": "تعليم الطلبات كمدفوعة",
+        "bulkMarkPaidDescription": "هل تريد تعليم {count} طلب كمدفوع؟ لا يمكن التراجع عن هذا الإجراء.",
+        "confirm": "تأكيد",
+        "cancel": "إلغاء"
       },
       "toast": {
         "errorTitle": "خطأ",
@@ -1966,7 +1972,6 @@
       "approveSuccessBody": "تم اعتماد الإرجاع.",
       "approveErrorTitle": "خطأ",
       "approveErrorBody": "تعذّر اعتماد الإرجاع. يرجى المحاولة مرة أخرى.",
-      "rejectPrompt": "أدخل سبب الرفض:",
       "rejectSuccessTitle": "تم رفض الإرجاع",
       "rejectSuccessBody": "تم رفض الإرجاع.",
       "rejectErrorTitle": "خطأ",
@@ -1975,11 +1980,34 @@
       "receivedSuccessBody": "تم تعليم الإرجاع كمستلم.",
       "receivedErrorTitle": "خطأ",
       "receivedErrorBody": "تعذّر تعليم الإرجاع كمستلم. يرجى المحاولة مرة أخرى.",
-      "completePrompt": "أدخل طريقة الاسترداد (original, store_credit, bank_transfer):",
       "completeSuccessTitle": "تم إكمال الإرجاع",
       "completeSuccessBody": "تم إكمال الإرجاع ومعالجة الاسترداد.",
       "completeErrorTitle": "خطأ",
       "completeErrorBody": "تعذّر إكمال الإرجاع. يرجى المحاولة مرة أخرى."
+    },
+    "modal": {
+      "rejectTitle": "رفض الإرجاع",
+      "rejectLabel": "سبب الرفض",
+      "rejectPlaceholder": "اشرح سبب رفض هذا الإرجاع...",
+      "rejectConfirm": "رفض",
+      "refundMethodTitle": "إكمال الإرجاع",
+      "refundMethodLabel": "اختر طريقة استرداد المبلغ للعميل",
+      "refundMethodConfirm": "معالجة الاسترداد",
+      "refundMethodOptions": {
+        "original": {
+          "label": "طريقة الدفع الأصلية",
+          "description": "استرداد المبلغ إلى البطاقة أو المحفظة المستخدمة عند الدفع."
+        },
+        "store_credit": {
+          "label": "رصيد المتجر",
+          "description": "منح العميل رصيدًا في المتجر يمكن استخدامه في الطلبات القادمة."
+        },
+        "bank_transfer": {
+          "label": "تحويل بنكي",
+          "description": "تحويل المبلغ إلى الحساب البنكي للعميل يدويًا."
+        }
+      },
+      "cancel": "إلغاء"
     }
   },
   "marketingPixels": {
