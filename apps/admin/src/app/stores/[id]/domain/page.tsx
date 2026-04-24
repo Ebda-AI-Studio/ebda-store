@@ -5,31 +5,14 @@ import { useParams } from 'next/navigation';
 import { Button, Badge, Input, Label } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPut } from '../../../../lib/api';
+import { useCurrentStore } from '../../../../hooks/useCurrentStore';
 import { useT } from '@/i18n/useT';
-
-interface Store {
-  id: string;
-  name: string;
-  domain: string | null;
-}
 
 export default function StoreDomainPage() {
   const params = useParams();
   const storeId = params?.id as string;
   const t = useT('domain.page');
-  const [store, setStore] = useState<Store | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  const fetchStore = useCallback(async () => {
-    if (!storeId) return;
-    const { data } = await apiGet<{ store: Store }>(`/api/v1/stores/${storeId}`);
-    if (data?.store) setStore(data.store);
-    setIsLoading(false);
-  }, [storeId]);
-
-  useEffect(() => {
-    fetchStore();
-  }, [fetchStore]);
+  const { store, isLoading, refetch: refetchStore } = useCurrentStore(storeId);
 
   // ----- Domain section state -----
   const [isEditing, setIsEditing] = useState(false);
@@ -83,7 +66,7 @@ export default function StoreDomainPage() {
       });
       if (!apiError) {
         setIsEditing(false);
-        await fetchStore();
+        await refetchStore();
         if (trimmed) setTimeout(checkDns, 1000);
         else setDomainStatus(null);
       } else {
@@ -106,7 +89,7 @@ export default function StoreDomainPage() {
       if (!apiError) {
         setDomainStatus(null);
         setIsEditing(false);
-        await fetchStore();
+        await refetchStore();
       }
     } catch {
       // non-critical

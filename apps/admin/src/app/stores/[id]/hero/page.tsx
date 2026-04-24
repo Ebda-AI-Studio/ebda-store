@@ -1,14 +1,18 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { ImageUpload } from '../../../../components/ImageUpload';
 import { useToast } from '@force/ui';
-import { apiGet, apiPut } from '../../../../lib/api';
+import { apiPut } from '../../../../lib/api';
+import { useCurrentStore } from '../../../../hooks/useCurrentStore';
 import { useT } from '@/i18n/useT';
 
+// Narrow slice of the store record consumed by this page. The shared
+// useCurrentStore hook returns a superset; we mirror state locally so the
+// user can edit fields without mutating the cached store object.
 interface StoreHero {
   id: string;
   name: string;
@@ -28,45 +32,33 @@ export default function StoreHeroPage() {
   const toast = useToast();
   const t = useT('hero.page');
 
+  const { store, isLoading, error: loadError } = useCurrentStore(storeId);
   const [hero, setHero] = useState<StoreHero | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  const fetchHero = useCallback(async () => {
-    try {
-      const { data, error } = await apiGet<{ store: StoreHero }>(`/api/v1/stores/${storeId}`);
-
-      if (error) {
-        toast.error(t('toastLoadFailedTitle'), error.message || `Server error: ${error.status}`);
-        return;
-      }
-
-      if (data?.store) {
-        setHero({
-          id: data.store.id,
-          name: data.store.name,
-          heroTitle: data.store.heroTitle ?? '',
-          heroTitleAr: data.store.heroTitleAr ?? '',
-          heroSubtitle: data.store.heroSubtitle ?? '',
-          heroSubtitleAr: data.store.heroSubtitleAr ?? '',
-          heroCtaText: data.store.heroCtaText ?? '',
-          heroCtaTextAr: data.store.heroCtaTextAr ?? '',
-          heroCtaLink: data.store.heroCtaLink ?? '',
-          heroImage: data.store.heroImage ?? '',
-        });
-      }
-    } catch (err) {
-      console.error('Failed to fetch hero:', err);
-      toast.error(t('toastConnectionTitle'), t('toastConnectionBody'));
-    } finally {
-      setIsLoading(false);
+  // Seed local edit state once the store is fetched/cached.
+  useEffect(() => {
+    if (store) {
+      setHero({
+        id: store.id,
+        name: store.name,
+        heroTitle: store.heroTitle ?? '',
+        heroTitleAr: store.heroTitleAr ?? '',
+        heroSubtitle: store.heroSubtitle ?? '',
+        heroSubtitleAr: store.heroSubtitleAr ?? '',
+        heroCtaText: store.heroCtaText ?? '',
+        heroCtaTextAr: store.heroCtaTextAr ?? '',
+        heroCtaLink: store.heroCtaLink ?? '',
+        heroImage: store.heroImage ?? '',
+      });
     }
-  }, [storeId, toast, t]);
+  }, [store]);
 
   useEffect(() => {
-    fetchHero();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storeId]);
+    if (loadError) {
+      toast.error(t('toastLoadFailedTitle'), loadError.message);
+    }
+  }, [loadError, toast, t]);
 
   async function handleSave() {
     if (!hero) return;

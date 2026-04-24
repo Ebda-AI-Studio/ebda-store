@@ -10,12 +10,6 @@ export interface Product {
   hasVariants: boolean;
 }
 
-export interface Store {
-  id: string;
-  name: string;
-  slug: string;
-}
-
 export interface Pagination {
   page: number;
   limit: number;

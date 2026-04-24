@@ -1,7 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { apiGet, apiPut } from '../../../../../lib/api';
+import { useToast } from '@force/ui';
+import { useT } from '@/i18n/useT';
+import { apiPut } from '../../../../../lib/api';
+import { useCurrentStore } from '../../../../../hooks/useCurrentStore';
 import type { MarketingPixels, StoreData } from '../_components/types';
 
 interface UseMarketingPixelsResult {
@@ -9,8 +12,6 @@ interface UseMarketingPixelsResult {
   pixels: MarketingPixels;
   isLoading: boolean;
   isSaving: boolean;
-  saveError: boolean;
-  saveSuccess: boolean;
   save: () => Promise<void>;
   updatePixel: (platformId: string, field: string, value: string | boolean) => void;
   togglePlatform: (platformId: string) => void;
@@ -18,40 +19,34 @@ interface UseMarketingPixelsResult {
 
 /**
  * Handles the fetch / update / persist lifecycle for marketing-pixel settings.
- * Keeps the page component free of API glue and exposes boolean save flags so
- * the UI can localise the status message itself.
+ * Fetches the store via the shared `useCurrentStore` hook (dedupes with other
+ * admin pages) and owns its toasts directly so the page component no longer
+ * needs to plumb success/error flags into a status-bar render.
  */
 export function useMarketingPixels(storeId: string): UseMarketingPixelsResult {
-  const [store, setStore] = useState<StoreData | null>(null);
+  const { store: fetchedStore, isLoading } = useCurrentStore(storeId);
+  const toast = useToast();
+  const tSave = useT('marketingPixels.save');
   const [pixels, setPixels] = useState<MarketingPixels>({});
-  const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [saveError, setSaveError] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
 
-  const fetchStore = useCallback(async () => {
-    if (!storeId) return;
-    try {
-      const { data } = await apiGet<{ store: StoreData }>(`/api/v1/stores/${storeId}`);
-      if (data?.store) {
-        setStore(data.store);
-        setPixels(data.store.marketingPixels || {});
+  const store: StoreData | null = fetchedStore
+    ? {
+        id: fetchedStore.id,
+        name: fetchedStore.name,
+        marketingPixels: (fetchedStore.marketingPixels as MarketingPixels) || {},
       }
-    } catch (error) {
-      console.error('Failed to fetch store:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [storeId]);
+    : null;
 
+  // Seed the editable pixel state once the store is fetched/cached.
   useEffect(() => {
-    fetchStore();
-  }, [fetchStore]);
+    if (fetchedStore) {
+      setPixels((fetchedStore.marketingPixels as MarketingPixels) || {});
+    }
+  }, [fetchedStore]);
 
   const save = useCallback(async () => {
     setIsSaving(true);
-    setSaveError(false);
-    setSaveSuccess(false);
     try {
       const { error } = await apiPut(`/api/v1/stores/${storeId}/marketing-pixels`, {
         marketingPixels: pixels,
@@ -60,14 +55,14 @@ export function useMarketingPixels(storeId: string): UseMarketingPixelsResult {
       if (error) {
         throw new Error('Failed to save');
       }
-      setSaveSuccess(true);
+      toast.success(tSave('successMessage'));
     } catch (error) {
       console.error('Failed to save marketing pixels:', error);
-      setSaveError(true);
+      toast.error(tSave('errorMessage'));
     } finally {
       setIsSaving(false);
     }
-  }, [storeId, pixels]);
+  }, [storeId, pixels, toast, tSave]);
 
   const updatePixel = useCallback((platformId: string, field: string, value: string | boolean) => {
     setPixels(prev => {
@@ -98,8 +93,6 @@ export function useMarketingPixels(storeId: string): UseMarketingPixelsResult {
     pixels,
     isLoading,
     isSaving,
-    saveError,
-    saveSuccess,
     save,
     updatePixel,
     togglePlatform,

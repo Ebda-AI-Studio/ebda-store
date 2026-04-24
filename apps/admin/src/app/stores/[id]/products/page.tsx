@@ -6,6 +6,7 @@ import { useToast } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { useAuth } from '../../../../lib/auth';
 import { apiGet, apiDelete } from '../../../../lib/api';
+import { useCurrentStore } from '../../../../hooks/useCurrentStore';
 import { useDebouncedValue } from '../../../../hooks/useDebouncedValue';
 import { useT } from '@/i18n/useT';
 import { ProductsToolbar } from './_components/ProductsToolbar';
@@ -14,7 +15,7 @@ import { ProductsTable } from './_components/ProductsTable';
 import { ProductsPagination } from './_components/ProductsPagination';
 import { DeleteProductModal } from './_components/DeleteProductModal';
 import { ProductsLoadingSkeleton } from './_components/ProductsLoadingSkeleton';
-import type { Product, Store, Pagination, StatusFilter } from './_components/types';
+import type { Product, Pagination, StatusFilter } from './_components/types';
 
 export default function StoreProductsPage() {
   const params = useParams();
@@ -22,7 +23,7 @@ export default function StoreProductsPage() {
   const storeId = params.id as string;
   const t = useT('products.list');
 
-  const [store, setStore] = useState<Store | null>(null);
+  const { store } = useCurrentStore(isAuthenticated ? storeId : null);
   const [products, setProducts] = useState<Product[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [loading, setLoading] = useState(true);
@@ -34,18 +35,6 @@ export default function StoreProductsPage() {
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [deleting, setDeleting] = useState(false);
   const { success: toastSuccess, error: toastError } = useToast();
-
-  const fetchStore = useCallback(async () => {
-    if (!isAuthenticated) return;
-    try {
-      const { data } = await apiGet<{ store: Store }>(`/api/v1/stores/${storeId}`);
-      if (data) {
-        setStore(data.store);
-      }
-    } catch (error) {
-      console.error('Error fetching store:', error);
-    }
-  }, [isAuthenticated, storeId]);
 
   const fetchProducts = useCallback(async () => {
     if (!isAuthenticated) return;
@@ -73,12 +62,6 @@ export default function StoreProductsPage() {
       setLoading(false);
     }
   }, [isAuthenticated, storeId, page, statusFilter, debouncedSearch]);
-
-  // Fetch the store only when auth/storeId change (fetchStore's own deps).
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    fetchStore();
-  }, [isAuthenticated, fetchStore]);
 
   // Fetch products whenever any of the list-query inputs change. fetchProducts
   // is memoized on [isAuthenticated, storeId, page, statusFilter, debouncedSearch]

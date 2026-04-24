@@ -3,8 +3,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '../lib/auth';
-import { apiGet } from '../lib/api';
 import { useStore } from '../contexts/StoreContext';
+import { useCurrentStore } from '../hooks/useCurrentStore';
 import { useFeatures } from '../hooks/useFeatures';
 import { useT } from '@/i18n/useT';
 import {
@@ -90,27 +90,21 @@ export function AdminLayout({
     return null;
   }, [storeId, pathname, globalStoreId]);
 
-  // Fetch store domain/slug for "View Store" button
-  const [storeInfo, setStoreInfo] = useState<{ domain?: string; slug?: string } | null>(null);
-  useEffect(() => {
-    if (!currentStoreId || storeDomain || storeSlug) return;
-    apiGet<{ store?: { domain?: string; slug?: string }; domain?: string; slug?: string }>(
-      `/api/v1/stores/${currentStoreId}`
-    ).then(({ data }) => {
-      const s = (data as { store?: { domain?: string; slug?: string } })?.store || data;
-      if (s) setStoreInfo({ domain: s.domain || undefined, slug: s.slug });
-    });
-  }, [currentStoreId, storeDomain, storeSlug]);
+  // Fetch store domain/slug for "View Store" button. The shared useCurrentStore
+  // hook dedupes + caches, so we only hit the network once per storeId regardless
+  // of how many admin pages mount this layout.
+  const shouldFetchStore = Boolean(currentStoreId) && !storeDomain && !storeSlug;
+  const { store: fetchedStore } = useCurrentStore(shouldFetchStore ? currentStoreId : null);
 
   const viewStoreUrl = useMemo(() => {
-    const domain = storeDomain || storeInfo?.domain;
-    const slug = storeSlug || storeInfo?.slug;
+    const domain = storeDomain || fetchedStore?.domain;
+    const slug = storeSlug || fetchedStore?.slug;
     if (domain) return `https://${domain}`;
     const webBase = process.env.NEXT_PUBLIC_WEB_URL;
     if (webBase && slug) return `${webBase}/${slug}`;
     if (webBase) return webBase;
     return null;
-  }, [storeDomain, storeSlug, storeInfo]);
+  }, [storeDomain, storeSlug, fetchedStore?.domain, fetchedStore?.slug]);
 
   // Show back button on all pages except root/dashboard
   const showBackButton = pathname !== '/' && pathname !== '/dashboard';

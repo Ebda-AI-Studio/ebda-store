@@ -42,6 +42,30 @@ export interface Store {
   heroCtaTextAr?: string | null;
   heroCtaLink?: string | null;
   heroImage?: string | null;
+  // Marketing pixels — stored as a JSON blob on the store record
+  marketingPixels?: Record<string, unknown>;
+  // Dashboard/admin fields — present on GET /stores/:id responses, used by
+  // the super-admin store detail screen. Optional because narrow consumers
+  // (hero, domain, branding, etc.) don't depend on them.
+  status?: string;
+  plan?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  owner?: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+  };
+  _count?: {
+    products: number;
+    orders: number;
+    customers: number;
+  };
+  stats?: {
+    revenue: number;
+    ordersThisMonth: number;
+  };
 }
 
 // Module-scope caches dedupe concurrent calls and avoid refetching on

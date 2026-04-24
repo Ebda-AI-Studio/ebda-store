@@ -15,17 +15,8 @@ export default function MarketingPixelsPage() {
   const t = useT('marketingPixels');
   const tPage = useT('marketingPixels.page');
 
-  const {
-    store,
-    pixels,
-    isLoading,
-    isSaving,
-    saveError,
-    saveSuccess,
-    save,
-    updatePixel,
-    togglePlatform,
-  } = useMarketingPixels(storeId);
+  const { store, pixels, isLoading, isSaving, save, updatePixel, togglePlatform } =
+    useMarketingPixels(storeId);
 
   if (isLoading) {
     return (
@@ -46,32 +37,19 @@ export default function MarketingPixelsPage() {
     );
   }
 
-  const saveStatus = saveError
-    ? t('save.errorMessage')
-    : saveSuccess
-      ? t('save.successMessage')
-      : null;
-
   return (
     <AdminLayout
       title={tPage('title')}
       subtitle={tPage('subtitle')}
       actions={
-        <div className="flex items-center gap-3">
-          {saveStatus && (
-            <span className={`text-sm ${saveError ? 'text-destructive' : 'text-success'}`}>
-              {saveStatus}
-            </span>
-          )}
-          <button
-            type="button"
-            onClick={save}
-            disabled={isSaving}
-            className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 font-medium"
-          >
-            {isSaving ? t('save.saving') : t('save.button')}
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={save}
+          disabled={isSaving}
+          className="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 font-medium"
+        >
+          {isSaving ? t('save.saving') : t('save.button')}
+        </button>
       }
     >
       <div className="space-y-6">

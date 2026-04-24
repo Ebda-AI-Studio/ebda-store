@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { apiGet, apiPatch, apiPut } from '../../../../lib/api';
+import { apiPatch, apiPut } from '../../../../lib/api';
+import { useCurrentStore } from '../../../../hooks/useCurrentStore';
 import type { Store, StoreEditForm, StoreFormErrors } from '../_components/types';
 
 export type StoreLoadError = 'not_found' | 'network' | null;
@@ -28,8 +29,15 @@ export interface DashboardData {
 // Keeps the fetch + form state for the store dashboard in one place so
 // page.tsx stays focused on layout.
 export function useDashboardData(storeId: string): DashboardData {
+  const {
+    store: fetchedStore,
+    isLoading: isFetchingStore,
+    error: fetchError,
+    refetch,
+  } = useCurrentStore(storeId);
+  // Local mirror so successful PUTs can update the dashboard immediately
+  // without an extra round-trip through the cache.
   const [store, setStore] = useState<Store | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [storeError, setStoreError] = useState<StoreLoadError>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -41,36 +49,38 @@ export function useDashboardData(storeId: string): DashboardData {
     status: '',
   });
   const [formErrors, setFormErrors] = useState<StoreFormErrors>({});
+  // Mirrors the hook's loading flag but stays true until we've seeded local
+  // state, so the page never renders against an empty form.
+  const [isLoading, setIsLoading] = useState(true);
 
-  const fetchStore = useCallback(async () => {
-    if (!storeId) return;
-    try {
+  // Narrow the shared store shape to the dashboard's Store contract.
+  useEffect(() => {
+    if (fetchedStore) {
+      setStore(fetchedStore as unknown as Store);
+      setEditForm({
+        name: fetchedStore.name,
+        slug: fetchedStore.slug,
+        plan: fetchedStore.plan ?? '',
+        status: fetchedStore.status ?? '',
+      });
       setStoreError(null);
-      const { data, error } = await apiGet<{ store: Store }>(`/api/v1/stores/${storeId}`);
-      if (error) {
-        setStoreError(error.status === 404 ? 'not_found' : 'network');
-        return;
-      }
-      if (data?.store) {
-        setStore(data.store);
-        setEditForm({
-          name: data.store.name,
-          slug: data.store.slug,
-          plan: data.store.plan,
-          status: data.store.status,
-        });
-      }
-    } catch (error) {
-      console.error('Failed to fetch store:', error);
-      setStoreError('network');
-    } finally {
+      setIsLoading(false);
+    } else if (!isFetchingStore) {
       setIsLoading(false);
     }
-  }, [storeId]);
+  }, [fetchedStore, isFetchingStore]);
 
+  // Translate the hook's Error into the 'not_found' | 'network' discriminant
+  // so the page can render the existing not-found UI.
   useEffect(() => {
-    fetchStore();
-  }, [fetchStore]);
+    if (fetchError) {
+      setStoreError(fetchError.message === 'Store not found' ? 'not_found' : 'network');
+    }
+  }, [fetchError]);
+
+  const fetchStore = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
 
   function validateForm(translateError: (key: string) => string): boolean {
     const errors: StoreFormErrors = {};
