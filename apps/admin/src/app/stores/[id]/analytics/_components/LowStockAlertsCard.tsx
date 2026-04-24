@@ -1,0 +1,86 @@
+'use client';
+
+import { useT } from '@/i18n/useT';
+import type { LowStockProduct } from './types';
+
+interface LowStockAlertsCardProps {
+  products: LowStockProduct[];
+}
+
+/**
+ * Shows up to 5 products below the low-stock threshold. Inventory chip color
+ * escalates: out-of-stock (destructive) → critical (primary) → warning.
+ * When empty, renders a reassuring check-mark illustration.
+ */
+export function LowStockAlertsCard({ products }: LowStockAlertsCardProps) {
+  const t = useT('analytics.lowStock');
+
+  return (
+    <div className="bg-card rounded-xl border p-6 shadow-sm">
+      <h2 className="text-lg font-semibold text-foreground mb-4">{t('title')}</h2>
+      {products.length === 0 ? (
+        <div className="text-center py-4">
+          <svg
+            className="w-12 h-12 text-success/60 mx-auto mb-2"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+          <p className="text-muted-foreground text-sm">{t('allStocked')}</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {products.slice(0, 5).map(product => (
+            <div key={product.id} className="flex items-center gap-3">
+              {product.images?.[0]?.url ? (
+                <img
+                  src={product.images[0].url}
+                  alt={product.name}
+                  className="w-10 h-10 rounded object-cover"
+                />
+              ) : (
+                <div className="w-10 h-10 rounded bg-muted flex items-center justify-center">
+                  <svg
+                    className="w-5 h-5 text-muted-foreground"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                    />
+                  </svg>
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground truncate">{product.name}</p>
+                <p className="text-xs text-muted-foreground">{product.sku}</p>
+              </div>
+              <span
+                className={`px-2 py-1 text-xs font-semibold rounded ${
+                  product.inventory === 0
+                    ? 'bg-destructive/10 text-destructive dark:bg-destructive/30/30 dark:text-destructive'
+                    : product.inventory <= 5
+                      ? 'bg-primary/10 text-primary'
+                      : 'bg-warning/10 text-warning dark:bg-warning/30 dark:text-warning'
+                }`}
+              >
+                {t('unitsLeft', { count: product.inventory })}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

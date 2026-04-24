@@ -291,7 +291,60 @@
     }
   },
   "customers": {},
-  "analytics": {},
+  "analytics": {
+    "page": {
+      "title": "Analytics",
+      "subtitle": "Store performance and insights"
+    },
+    "periods": {
+      "week": "Last 7 Days",
+      "month": "This Month",
+      "year": "This Year"
+    },
+    "periodsSubtitle": {
+      "week": "Last 7 days",
+      "month": "This month",
+      "year": "This year"
+    },
+    "stats": {
+      "totalRevenue": "Total Revenue",
+      "totalOrders": "Total Orders",
+      "totalCustomers": "Total Customers",
+      "avgOrderValue": "Avg Order Value",
+      "vsLastPeriod": "vs last period"
+    },
+    "chart": {
+      "title": "Sales Overview",
+      "revenue": "Revenue",
+      "orders": "Orders",
+      "numberOfOrders": "Number of Orders",
+      "max": "Max"
+    },
+    "topProducts": {
+      "title": "Top Products",
+      "empty": "No sales data yet",
+      "soldCount": "{count} sold"
+    },
+    "recentOrders": {
+      "title": "Recent Orders",
+      "empty": "No orders yet",
+      "guest": "Guest"
+    },
+    "orderStatus": {
+      "pending": "Pending",
+      "confirmed": "Confirmed",
+      "processing": "Processing",
+      "shipped": "Shipped",
+      "delivered": "Delivered",
+      "cancelled": "Cancelled",
+      "refunded": "Refunded"
+    },
+    "lowStock": {
+      "title": "Low Stock Alerts",
+      "allStocked": "All products are well stocked",
+      "unitsLeft": "{count} left"
+    }
+  },
   "settings": {
     "page": {
       "title": "Store Settings",

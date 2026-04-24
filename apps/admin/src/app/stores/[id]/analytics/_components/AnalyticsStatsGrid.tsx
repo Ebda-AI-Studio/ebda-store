@@ -1,0 +1,158 @@
+'use client';
+
+import { useT } from '@/i18n/useT';
+import { formatCurrency, formatNumber, type DashboardStats } from './types';
+
+interface StatCardProps {
+  title: string;
+  value: number;
+  change?: number;
+  icon: React.ReactNode;
+  iconBg?: string;
+  format?: 'number' | 'currency' | 'percentage';
+  vsLastPeriodLabel: string;
+}
+
+function StatCard({
+  title,
+  value,
+  change,
+  icon,
+  iconBg = 'bg-primary',
+  format = 'number',
+  vsLastPeriodLabel,
+}: StatCardProps) {
+  const displayValue =
+    format === 'currency'
+      ? formatCurrency(value)
+      : format === 'percentage'
+        ? `${value.toFixed(1)}%`
+        : formatNumber(value);
+
+  const isPositive = change !== undefined && change >= 0;
+
+  return (
+    <div className="force-stat-card group">
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <p className="text-sm font-medium text-muted-foreground">{title}</p>
+          <p className="mt-2 text-3xl font-bold tracking-tight text-foreground">{displayValue}</p>
+          {change !== undefined && (
+            <div className="mt-2 flex items-center gap-1">
+              <span
+                className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs font-semibold ${
+                  isPositive
+                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300'
+                    : 'bg-destructive/5 text-destructive dark:bg-destructive/30/20 dark:text-destructive'
+                }`}
+              >
+                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2.5}
+                    d={isPositive ? 'M5 10l7-7m0 0l7 7m-7-7v18' : 'M19 14l-7 7m0 0l-7-7m7 7V3'}
+                  />
+                </svg>
+                {Math.abs(change).toFixed(1)}%
+              </span>
+              <span className="text-xs text-muted-foreground">{vsLastPeriodLabel}</span>
+            </div>
+          )}
+        </div>
+        <div
+          className={`flex h-12 w-12 items-center justify-center rounded-2xl ${iconBg} text-white shadow-lg transition-transform duration-200 group-hover:scale-110`}
+        >
+          {icon}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface AnalyticsStatsGridProps {
+  stats: DashboardStats | null;
+}
+
+/**
+ * Four-card summary strip at the top of the analytics page.
+ * Icons are inlined as SVGs so we don't introduce an icon library dep.
+ */
+export function AnalyticsStatsGrid({ stats }: AnalyticsStatsGridProps) {
+  const t = useT('analytics.stats');
+  const vsLabel = t('vsLastPeriod');
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 stagger-animation">
+      <StatCard
+        title={t('totalRevenue')}
+        value={stats?.totalRevenue || 0}
+        change={stats?.revenueChange}
+        format="currency"
+        iconBg="bg-primary"
+        vsLastPeriodLabel={vsLabel}
+        icon={
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+        }
+      />
+      <StatCard
+        title={t('totalOrders')}
+        value={stats?.totalOrders || 0}
+        change={stats?.ordersChange}
+        iconBg="bg-violet-500"
+        vsLastPeriodLabel={vsLabel}
+        icon={
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
+            />
+          </svg>
+        }
+      />
+      <StatCard
+        title={t('totalCustomers')}
+        value={stats?.totalCustomers || 0}
+        change={stats?.customersChange}
+        iconBg="bg-emerald-500"
+        vsLastPeriodLabel={vsLabel}
+        icon={
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+            />
+          </svg>
+        }
+      />
+      <StatCard
+        title={t('avgOrderValue')}
+        value={stats?.averageOrderValue || 0}
+        format="currency"
+        iconBg="bg-info"
+        vsLastPeriodLabel={vsLabel}
+        icon={
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+            />
+          </svg>
+        }
+      />
+    </div>
+  );
+}
