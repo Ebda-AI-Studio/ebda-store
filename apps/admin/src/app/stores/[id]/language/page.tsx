@@ -5,12 +5,14 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPut } from '../../../../lib/api';
+import { useT } from '@/i18n/useT';
 
 type Language = 'en' | 'ar';
 
 export default function LanguagePage() {
   const params = useParams();
   const storeId = params?.id as string;
+  const t = useT('language.page');
 
   const [defaultLanguage, setDefaultLanguage] = useState<Language>('en');
   const [isLoading, setIsLoading] = useState(true);
@@ -49,15 +51,15 @@ export default function LanguagePage() {
       });
 
       if (!error) {
-        setMessage({ type: 'success', text: 'Language settings saved successfully' });
+        setMessage({ type: 'success', text: t('successMessage') });
       } else {
         setMessage({
           type: 'error',
-          text: error.message || 'Failed to save language settings',
+          text: error.message || t('failedMessage'),
         });
       }
     } catch {
-      setMessage({ type: 'error', text: 'Unable to connect to the server' });
+      setMessage({ type: 'error', text: t('connectionError') });
     } finally {
       setIsSaving(false);
     }
@@ -65,7 +67,7 @@ export default function LanguagePage() {
 
   if (isLoading) {
     return (
-      <AdminLayout title="Language Settings" subtitle="Loading...">
+      <AdminLayout title={t('title')} subtitle={t('loading')}>
         <div className="animate-pulse space-y-4">
           <div className="h-40 rounded-xl bg-muted" />
         </div>
@@ -75,13 +77,13 @@ export default function LanguagePage() {
 
   return (
     <AdminLayout
-      title="Language Settings"
-      subtitle="Set the default language for your storefront"
+      title={t('title')}
+      subtitle={t('subtitle')}
       actions={
         <div className="flex gap-2">
           <Link href={`/stores/${storeId}/settings`}>
             <button className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted font-medium">
-              Back to Settings
+              {t('backToSettings')}
             </button>
           </Link>
           <button
@@ -89,7 +91,7 @@ export default function LanguagePage() {
             disabled={isSaving}
             className="px-6 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 font-medium"
           >
-            {isSaving ? 'Saving...' : 'Save Changes'}
+            {isSaving ? t('saving') : t('save')}
           </button>
         </div>
       }
@@ -97,11 +99,8 @@ export default function LanguagePage() {
       <div className="space-y-6">
         <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
           <div>
-            <h2 className="font-semibold text-foreground">Default Storefront Language</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              New visitors will see the storefront in this language. They can still switch languages
-              manually.
-            </p>
+            <h2 className="font-semibold text-foreground">{t('defaultTitle')}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{t('defaultHint')}</p>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
@@ -115,13 +114,13 @@ export default function LanguagePage() {
               }`}
             >
               <span className="text-2xl">🇬🇧</span>
-              <div className="text-left">
-                <p className="font-medium text-foreground">English</p>
-                <p className="text-sm text-muted-foreground">Left-to-right layout</p>
+              <div className="text-start">
+                <p className="font-medium text-foreground">{t('englishName')}</p>
+                <p className="text-sm text-muted-foreground">{t('englishLayout')}</p>
               </div>
               {defaultLanguage === 'en' && (
                 <svg
-                  className="ml-auto h-5 w-5 text-primary"
+                  className="ms-auto h-5 w-5 text-primary"
                   fill="currentColor"
                   viewBox="0 0 20 20"
                 >
@@ -144,13 +143,13 @@ export default function LanguagePage() {
               }`}
             >
               <span className="text-2xl">🇰🇼</span>
-              <div className="text-left">
-                <p className="font-medium text-foreground">العربية</p>
-                <p className="text-sm text-muted-foreground">Right-to-left layout</p>
+              <div className="text-start">
+                <p className="font-medium text-foreground">{t('arabicName')}</p>
+                <p className="text-sm text-muted-foreground">{t('arabicLayout')}</p>
               </div>
               {defaultLanguage === 'ar' && (
                 <svg
-                  className="ml-auto h-5 w-5 text-primary"
+                  className="ms-auto h-5 w-5 text-primary"
                   fill="currentColor"
                   viewBox="0 0 20 20"
                 >

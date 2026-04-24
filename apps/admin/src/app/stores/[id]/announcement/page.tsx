@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPut } from '../../../../lib/api';
+import { useT } from '@/i18n/useT';
 
 interface AnnouncementSettings {
   enabled: boolean;
@@ -31,6 +32,7 @@ const DEFAULT_SETTINGS: AnnouncementSettings = {
 export default function AnnouncementPage() {
   const params = useParams();
   const storeId = params?.id as string;
+  const t = useT('announcement.page');
 
   const [settings, setSettings] = useState<AnnouncementSettings>(DEFAULT_SETTINGS);
   const [isLoading, setIsLoading] = useState(true);
@@ -67,15 +69,15 @@ export default function AnnouncementPage() {
       const { error } = await apiPut(`/api/v1/stores/${storeId}/announcement`, settings);
 
       if (!error) {
-        setMessage({ type: 'success', text: 'Announcement settings saved successfully' });
+        setMessage({ type: 'success', text: t('successMessage') });
       } else {
         setMessage({
           type: 'error',
-          text: error.message || 'Failed to save announcement settings',
+          text: error.message || t('failedMessage'),
         });
       }
     } catch {
-      setMessage({ type: 'error', text: 'Unable to connect to the server' });
+      setMessage({ type: 'error', text: t('connectionError') });
     } finally {
       setIsSaving(false);
     }
@@ -83,7 +85,7 @@ export default function AnnouncementPage() {
 
   if (isLoading) {
     return (
-      <AdminLayout title="Announcement Bar" subtitle="Loading...">
+      <AdminLayout title={t('title')} subtitle={t('loading')}>
         <div className="animate-pulse space-y-4">
           <div className="h-20 rounded-xl bg-muted" />
           <div className="h-64 rounded-xl bg-muted" />
@@ -94,13 +96,13 @@ export default function AnnouncementPage() {
 
   return (
     <AdminLayout
-      title="Announcement Bar"
-      subtitle="Display a banner across the top of your store"
+      title={t('title')}
+      subtitle={t('subtitle')}
       actions={
         <div className="flex gap-2">
           <Link href={`/stores/${storeId}/settings`}>
             <button className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted font-medium">
-              Back to Settings
+              {t('backToSettings')}
             </button>
           </Link>
           <button
@@ -108,7 +110,7 @@ export default function AnnouncementPage() {
             disabled={isSaving}
             className="px-6 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 font-medium"
           >
-            {isSaving ? 'Saving...' : 'Save Changes'}
+            {isSaving ? t('saving') : t('saveChanges')}
           </button>
         </div>
       }
@@ -117,7 +119,7 @@ export default function AnnouncementPage() {
       {settings.text && (
         <div className="mb-6">
           <p className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Preview
+            {t('preview')}
           </p>
           <div
             className="flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg"
@@ -139,10 +141,8 @@ export default function AnnouncementPage() {
         <div className="rounded-xl border bg-card p-6 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="font-semibold text-foreground">Announcement Bar</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Show a banner at the top of your store for promotions, announcements or news
-              </p>
+              <h2 className="font-semibold text-foreground">{t('sectionTitle')}</h2>
+              <p className="mt-1 text-sm text-muted-foreground">{t('sectionHint')}</p>
             </div>
             <label className="relative inline-flex cursor-pointer items-center">
               <input
@@ -158,75 +158,71 @@ export default function AnnouncementPage() {
 
         {/* Content */}
         <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
-          <h2 className="font-semibold text-foreground">Content</h2>
+          <h2 className="font-semibold text-foreground">{t('content')}</h2>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">
-                Announcement Text (English)
+                {t('textEnglish')}
               </label>
               <input
                 type="text"
                 value={settings.text}
                 onChange={e => setSettings(prev => ({ ...prev, text: e.target.value }))}
-                placeholder="Free shipping on orders over 10 KWD!"
+                placeholder={t('textEnglishPlaceholder')}
                 className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">
-                Announcement Text (Arabic)
+                {t('textArabic')}
               </label>
               <input
                 type="text"
                 dir="rtl"
                 value={settings.textAr}
                 onChange={e => setSettings(prev => ({ ...prev, textAr: e.target.value }))}
-                placeholder="شحن مجاني للطلبات فوق ١٠ د.ك!"
+                placeholder={t('textArabicPlaceholder')}
                 className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1">
-              Link URL (optional)
-            </label>
+            <label className="block text-sm font-medium text-foreground mb-1">{t('linkUrl')}</label>
             <input
               type="url"
               value={settings.linkUrl}
               onChange={e => setSettings(prev => ({ ...prev, linkUrl: e.target.value }))}
-              placeholder="https://example.com/sale"
+              placeholder={t('linkUrlPlaceholder')}
               className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             />
-            <p className="mt-1 text-xs text-muted-foreground">
-              The entire bar will link to this URL when clicked
-            </p>
+            <p className="mt-1 text-xs text-muted-foreground">{t('linkUrlHint')}</p>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">
-                Link Text (English)
+                {t('linkTextEnglish')}
               </label>
               <input
                 type="text"
                 value={settings.linkText}
                 onChange={e => setSettings(prev => ({ ...prev, linkText: e.target.value }))}
-                placeholder="Shop Now"
+                placeholder={t('linkTextEnglishPlaceholder')}
                 className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">
-                Link Text (Arabic)
+                {t('linkTextArabic')}
               </label>
               <input
                 type="text"
                 dir="rtl"
                 value={settings.linkTextAr}
                 onChange={e => setSettings(prev => ({ ...prev, linkTextAr: e.target.value }))}
-                placeholder="تسوق الآن"
+                placeholder={t('linkTextArabicPlaceholder')}
                 className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               />
             </div>
@@ -235,12 +231,12 @@ export default function AnnouncementPage() {
 
         {/* Colors */}
         <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
-          <h2 className="font-semibold text-foreground">Colors</h2>
+          <h2 className="font-semibold text-foreground">{t('colors')}</h2>
 
           <div className="grid gap-6 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">
-                Background Color
+                {t('backgroundColor')}
               </label>
               <div className="flex items-center gap-3">
                 <input
@@ -280,7 +276,9 @@ export default function AnnouncementPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-foreground mb-2">Text Color</label>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                {t('textColor')}
+              </label>
               <div className="flex items-center gap-3">
                 <input
                   type="color"

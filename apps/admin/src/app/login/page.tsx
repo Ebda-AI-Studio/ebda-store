@@ -8,6 +8,7 @@ import { useT } from '@/i18n/useT';
 
 export default function LoginPage() {
   const t = useT('auth.login');
+  const tb = useT('components.brand');
   const { login, isLoading: authLoading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -43,7 +44,7 @@ export default function LoginPage() {
         <div className="mx-auto w-full max-w-sm lg:w-96">
           <div className="text-center">
             <div className="flex justify-center">
-              <Image src="/logo.svg" alt="Force Media" width={48} height={36} unoptimized />
+              <Image src="/logo.svg" alt={tb('forceMediaAlt')} width={48} height={36} unoptimized />
             </div>
             <h2 className="mt-6 text-3xl font-bold text-foreground">{t('title')}</h2>
             <p className="mt-2 text-sm text-muted-foreground">{t('subtitle')}</p>

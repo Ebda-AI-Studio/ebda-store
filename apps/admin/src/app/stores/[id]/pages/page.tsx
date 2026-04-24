@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { useToast } from '@force/ui';
 import { apiGet, apiPut } from '../../../../lib/api';
+import { useT } from '@/i18n/useT';
 
 interface FooterLink {
   name: string;
@@ -48,6 +49,7 @@ const DEFAULT_COMPANY_LINKS: FooterLink[] = [
 export default function StorePagesPage() {
   const params = useParams();
   const storeId = params?.id as string;
+  const t = useT('pages.page');
   const { success, error: showError } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -112,12 +114,12 @@ export default function StorePagesPage() {
         settings: newSettings,
       });
       if (!saveError) {
-        success('Saved', 'Footer links updated successfully.');
+        success(t('toastSavedTitle'), t('toastSavedBody'));
       } else {
-        showError('Error', saveError.message || 'Failed to save.');
+        showError(t('toastErrorTitle'), saveError.message || t('toastFailedSave'));
       }
     } catch {
-      showError('Error', 'Failed to save footer links.');
+      showError(t('toastErrorTitle'), t('toastFailedSaveLinks'));
     } finally {
       setIsSaving(false);
     }
@@ -169,14 +171,12 @@ export default function StorePagesPage() {
                 d="M12 4v16m8-8H4"
               />
             </svg>
-            Add Link
+            {t('addLink')}
           </button>
         </div>
 
         {links.length === 0 ? (
-          <p className="text-muted-foreground text-sm py-4 text-center">
-            No links configured. Click &quot;Add Link&quot; to add one.
-          </p>
+          <p className="text-muted-foreground text-sm py-4 text-center">{t('emptyLinks')}</p>
         ) : (
           <div className="space-y-3">
             {links.map((link, index) => (
@@ -193,14 +193,14 @@ export default function StorePagesPage() {
                   type="text"
                   value={link.name}
                   onChange={e => updateLink(section, index, 'name', e.target.value)}
-                  placeholder="Link name"
+                  placeholder={t('linkNamePlaceholder')}
                   className="flex-1 rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 />
                 <input
                   type="text"
                   value={link.nameAr || ''}
                   onChange={e => updateLink(section, index, 'nameAr', e.target.value)}
-                  placeholder="Arabic name (optional)"
+                  placeholder={t('linkNameArPlaceholder')}
                   dir="rtl"
                   className="w-40 rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 />
@@ -208,13 +208,13 @@ export default function StorePagesPage() {
                   type="text"
                   value={link.href}
                   onChange={e => updateLink(section, index, 'href', e.target.value)}
-                  placeholder="/page-path"
+                  placeholder={t('linkPathPlaceholder')}
                   className="w-40 rounded-lg border border-border px-3 py-2 text-sm font-mono focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 />
                 <button
                   onClick={() => removeLink(section, index)}
                   className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-destructive/5 hover:text-destructive transition-colors"
-                  title="Remove link"
+                  title={t('removeLink')}
                 >
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path
@@ -235,7 +235,7 @@ export default function StorePagesPage() {
 
   if (isLoading) {
     return (
-      <AdminLayout title="Footer & Pages" subtitle="Manage footer links and store pages">
+      <AdminLayout title={t('title')} subtitle={t('loadingSubtitle')}>
         <div className="flex items-center justify-center py-12">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
         </div>
@@ -245,13 +245,13 @@ export default function StorePagesPage() {
 
   return (
     <AdminLayout
-      title="Footer & Pages"
-      subtitle="Manage the links shown in your store's footer"
+      title={t('title')}
+      subtitle={t('subtitle')}
       actions={
         <div className="flex gap-3">
           <Link href={`/stores/${storeId}/settings`}>
             <button className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted font-medium">
-              Back to Settings
+              {t('backToSettings')}
             </button>
           </Link>
           <button
@@ -262,7 +262,7 @@ export default function StorePagesPage() {
             {isSaving && (
               <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
             )}
-            {isSaving ? 'Saving...' : 'Save Changes'}
+            {isSaving ? t('saving') : t('saveChanges')}
           </button>
         </div>
       }
@@ -270,24 +270,21 @@ export default function StorePagesPage() {
       <div className="space-y-6">
         <div className="rounded-xl border border-info/30 bg-info/5 p-4">
           <p className="text-sm text-info">
-            Configure which links appear in your store&apos;s footer. Disable links to hide them, or
-            add new ones. Links use relative paths (e.g.,{' '}
-            <code className="bg-info/10 px-1 rounded">/faq</code>).
+            {t('help')} <code className="bg-info/10 px-1 rounded">{t('helpCode')}</code>
+            {t('helpClose')}
           </p>
         </div>
 
-        {renderLinkEditor('Shop Links', 'shop', shopLinks)}
-        {renderLinkEditor('Support Links', 'support', supportLinks)}
-        {renderLinkEditor('Company Links', 'company', companyLinks)}
+        {renderLinkEditor(t('shopLinks'), 'shop', shopLinks)}
+        {renderLinkEditor(t('supportLinks'), 'support', supportLinks)}
+        {renderLinkEditor(t('companyLinks'), 'company', companyLinks)}
 
         {/* Newsletter Toggle */}
         <div className="rounded-xl border bg-card p-6 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-foreground">Newsletter Section</h2>
-              <p className="text-sm text-muted-foreground mt-1">
-                Show or hide the newsletter signup form in the footer.
-              </p>
+              <h2 className="text-lg font-semibold text-foreground">{t('newsletter')}</h2>
+              <p className="text-sm text-muted-foreground mt-1">{t('newsletterHint')}</p>
             </div>
             <label className="relative inline-flex items-center cursor-pointer">
               <input

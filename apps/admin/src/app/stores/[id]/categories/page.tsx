@@ -8,6 +8,7 @@ import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPost, apiPut, apiDelete } from '../../../../lib/api';
 import { CategoryForm, type CategoryFormData } from './CategoryForm';
 import { CategoryTable, type Category } from './CategoryTable';
+import { useT } from '@/i18n/useT';
 
 const emptyForm: CategoryFormData = {
   name: '',
@@ -30,6 +31,8 @@ function slugify(text: string) {
 export default function StoreCategoriesPage() {
   const params = useParams();
   const storeId = params?.id as string;
+  const t = useT('categories.page');
+  const tForm = useT('categories.form');
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -57,16 +60,16 @@ export default function StoreCategoriesPage() {
         `/api/v1/stores/${storeId}/categories`
       );
       if (apiError) {
-        setError(apiError.message || 'Failed to fetch categories');
+        setError(apiError.message || t('fetchFailed'));
       } else {
         setCategories(data?.categories || []);
       }
     } catch {
-      setError('Unable to connect to the server. Please check your connection and try again.');
+      setError(t('connectionError'));
     } finally {
       setIsLoading(false);
     }
-  }, [storeId]);
+  }, [storeId, t]);
 
   useEffect(() => {
     fetchCategories();
@@ -105,11 +108,11 @@ export default function StoreCategoriesPage() {
 
   function validateForm() {
     const errors: Record<string, string> = {};
-    if (!form.name.trim()) errors.name = 'Name is required';
+    if (!form.name.trim()) errors.name = tForm('errorNameRequired');
     if (!form.slug.trim()) {
-      errors.slug = 'Slug is required';
+      errors.slug = tForm('errorSlugRequired');
     } else if (!/^[a-z0-9\u0600-\u06FF]+(?:-[a-z0-9\u0600-\u06FF]+)*$/.test(form.slug)) {
-      errors.slug = 'Slug must be lowercase letters, numbers, Arabic characters and hyphens only';
+      errors.slug = tForm('errorSlugInvalid');
     }
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -141,23 +144,19 @@ export default function StoreCategoriesPage() {
         : await apiPost<{ category: Category }>(endpoint, body);
 
       if (!apiError) {
-        setSaveMessage(
-          isEditing ? 'Category updated successfully' : 'Category created successfully'
-        );
+        setSaveMessage(isEditing ? tForm('updatedSuccess') : tForm('createdSuccess'));
         await fetchCategories();
         setTimeout(closeForm, 800);
       } else {
-        const msg =
-          apiError.message ||
-          (isEditing ? 'Failed to update category' : 'Failed to create category');
+        const msg = apiError.message || (isEditing ? tForm('updateFailed') : tForm('createFailed'));
         if (msg.toLowerCase().includes('slug')) {
-          setFormErrors(prev => ({ ...prev, slug: 'This slug is already in use' }));
+          setFormErrors(prev => ({ ...prev, slug: tForm('slugInUse') }));
         } else {
           setSaveMessage(msg);
         }
       }
     } catch {
-      setSaveMessage('Unable to connect to the server');
+      setSaveMessage(tForm('connectionError'));
     } finally {
       setIsSaving(false);
     }
@@ -172,13 +171,13 @@ export default function StoreCategoriesPage() {
         `/api/v1/stores/${storeId}/categories/${deleteTarget.id}`
       );
       if (!deleteError) {
-        toastSuccess('Category Deleted', `"${deleteTarget.name}" has been removed.`);
+        toastSuccess(t('toastDeletedTitle'), t('toastDeletedBody', { name: deleteTarget.name }));
         await fetchCategories();
       } else {
-        showError('Error', deleteError.message || 'Failed to delete category');
+        showError(t('errorTitle'), deleteError.message || t('deleteFailed'));
       }
     } catch {
-      showError('Error', 'Unable to connect to the server');
+      showError(t('errorTitle'), t('connectionError'));
     } finally {
       setDeletingId(null);
       setDeleteTarget(null);
@@ -187,20 +186,20 @@ export default function StoreCategoriesPage() {
 
   return (
     <AdminLayout
-      title="Product Categories"
-      subtitle="Manage categories for this store"
+      title={t('title')}
+      subtitle={t('subtitle')}
       actions={
         <div className="flex gap-2">
           <Link href={`/stores/${storeId}`}>
             <button className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted font-medium">
-              Back to Store
+              {t('backToStore')}
             </button>
           </Link>
           <button
             onClick={openAddForm}
             className="px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 font-medium"
           >
-            Add Category
+            {t('addCategory')}
           </button>
         </div>
       }
@@ -209,8 +208,8 @@ export default function StoreCategoriesPage() {
       {error && (
         <div className="mb-6 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
           {error}
-          <button className="ml-4 font-medium underline" onClick={fetchCategories}>
-            Retry
+          <button className="ms-4 font-medium underline" onClick={fetchCategories}>
+            {t('retry')}
           </button>
         </div>
       )}
@@ -247,23 +246,23 @@ export default function StoreCategoriesPage() {
       {deleteTarget && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-card rounded-xl shadow-xl w-full max-w-sm p-6">
-            <h2 className="text-lg font-semibold text-foreground mb-2">Delete Category</h2>
+            <h2 className="text-lg font-semibold text-foreground mb-2">{t('deleteTitle')}</h2>
             <p className="text-sm text-muted-foreground mb-6">
-              Delete category &quot;{deleteTarget.name}&quot;? This cannot be undone.
+              {t('deleteConfirm', { name: deleteTarget.name })}
             </p>
             <div className="flex items-center justify-end gap-3">
               <button
                 onClick={() => setDeleteTarget(null)}
                 className="px-4 py-2 text-sm text-foreground border border-border rounded-lg hover:bg-muted"
               >
-                Cancel
+                {t('cancel')}
               </button>
               <button
                 onClick={confirmDelete}
                 disabled={deletingId === deleteTarget.id}
                 className="px-4 py-2 text-sm bg-destructive text-white rounded-lg hover:bg-destructive/90 disabled:opacity-50"
               >
-                {deletingId === deleteTarget.id ? 'Deleting...' : 'Delete'}
+                {deletingId === deleteTarget.id ? t('deleting') : t('delete')}
               </button>
             </div>
           </div>

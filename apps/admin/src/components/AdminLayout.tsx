@@ -133,6 +133,7 @@ export function AdminLayout({
 }: AdminLayoutProps) {
   const t = useT('components.adminLayout');
   const tc = useT('common');
+  const tb = useT('components.brand');
   const pathname = usePathname();
   const router = useRouter();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -251,7 +252,7 @@ export function AdminLayout({
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/90 shadow-lg shadow-primary/25">
                 <Image
                   src="/logo.svg"
-                  alt="Force Media"
+                  alt={tb('forceMediaAlt')}
                   width={20}
                   height={15}
                   className="brightness-0 invert"
@@ -445,6 +446,7 @@ export function AdminLayout({
       isDark,
       toggleTheme,
       t,
+      tb,
     ]
   );
 

@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPut } from '../../../../lib/api';
+import { useT } from '@/i18n/useT';
 
 type TemplateId = 'modern' | 'classic' | 'minimal' | 'bold' | 'elegant';
 
@@ -82,6 +83,7 @@ export default function StoreTemplatePage() {
   const params = useParams();
   const router = useRouter();
   const storeId = params?.id as string;
+  const t = useT('template.page');
 
   const [store, setStore] = useState<{ name: string; template: TemplateId } | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateId>('modern');
@@ -139,9 +141,9 @@ export default function StoreTemplatePage() {
   if (!store) {
     return (
       <div className="text-center py-12">
-        <p className="text-muted-foreground">Store not found</p>
+        <p className="text-muted-foreground">{t('storeNotFound')}</p>
         <Link href="/stores" className="text-primary hover:underline mt-2 inline-block">
-          Back to stores
+          {t('backToStores')}
         </Link>
       </div>
     );
@@ -149,22 +151,22 @@ export default function StoreTemplatePage() {
 
   return (
     <AdminLayout
-      title="Choose Template"
-      subtitle={`Select a template for ${store.name}`}
+      title={t('title')}
+      subtitle={t('subtitleWithStore', { storeName: store.name })}
       actions={
         <div className="flex items-center gap-3">
           <Link
             href={`/stores/${storeId}`}
             className="px-4 py-2 border border-border rounded-lg hover:bg-muted"
           >
-            Cancel
+            {t('cancel')}
           </Link>
           <button
             onClick={handleSave}
             disabled={isSaving || selectedTemplate === store.template}
             className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 font-medium"
           >
-            {isSaving ? 'Saving...' : 'Apply Template'}
+            {isSaving ? t('saving') : t('apply')}
           </button>
         </div>
       }
@@ -180,7 +182,7 @@ export default function StoreTemplatePage() {
               <button
                 key={template.id}
                 onClick={() => setSelectedTemplate(template.id)}
-                className={`relative text-left bg-card rounded-2xl border-2 overflow-hidden transition-all hover:shadow-lg ${
+                className={`relative text-start bg-card rounded-2xl border-2 overflow-hidden transition-all hover:shadow-lg ${
                   isSelected
                     ? 'border-primary ring-4 ring-primary/20'
                     : 'border-border hover:border-border'
@@ -197,7 +199,7 @@ export default function StoreTemplatePage() {
                     </div>
                     {isCurrent && (
                       <span className="bg-white/20 text-white text-xs px-2 py-1 rounded-full">
-                        Current
+                        {t('current')}
                       </span>
                     )}
                   </div>
@@ -268,13 +270,11 @@ export default function StoreTemplatePage() {
               />
             </svg>
             <div>
-              <p className="text-info font-medium">About Templates</p>
+              <p className="text-info font-medium">{t('aboutTitle')}</p>
               <p className="text-info text-sm mt-1">
-                Templates define the overall look and feel of your storefront. You can change
-                templates at any time, and your content will automatically adapt to the new design.
-                Customize colors and fonts in the
-                <Link href={`/stores/${storeId}/branding`} className="underline ml-1">
-                  Branding settings
+                {t('aboutBody')}
+                <Link href={`/stores/${storeId}/branding`} className="underline ms-1">
+                  {t('brandingSettings')}
                 </Link>
                 .
               </p>

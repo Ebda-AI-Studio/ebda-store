@@ -1,5 +1,7 @@
 'use client';
 
+import { useT } from '@/i18n/useT';
+
 interface Category {
   id: string;
   name: string;
@@ -32,6 +34,7 @@ export function CategoryTable({
   onDelete,
   onAddFirst,
 }: CategoryTableProps) {
+  const t = useT('categories.table');
   if (isLoading) {
     return (
       <div className="space-y-4 p-6">
@@ -65,9 +68,9 @@ export function CategoryTable({
             d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
           />
         </svg>
-        <p className="mt-4 text-muted-foreground">No categories yet</p>
+        <p className="mt-4 text-muted-foreground">{t('empty')}</p>
         <button onClick={onAddFirst} className="mt-4 text-sm text-primary hover:underline">
-          Add your first category
+          {t('addFirst')}
         </button>
       </div>
     );
@@ -75,38 +78,38 @@ export function CategoryTable({
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full" aria-label="Categories">
+      <table className="w-full" aria-label={t('label')}>
         <thead className="bg-muted border-b">
           <tr>
             <th
               scope="col"
-              className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
+              className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider"
             >
-              Category
+              {t('category')}
             </th>
             <th
               scope="col"
-              className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
+              className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider"
             >
-              Slug
+              {t('slug')}
             </th>
             <th
               scope="col"
-              className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
+              className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider"
             >
-              Products
+              {t('products')}
             </th>
             <th
               scope="col"
-              className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider hidden md:table-cell"
+              className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider hidden md:table-cell"
             >
-              Status
+              {t('status')}
             </th>
             <th
               scope="col"
-              className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider"
+              className="px-6 py-3 text-end text-xs font-medium text-muted-foreground uppercase tracking-wider"
             >
-              Actions
+              {t('actions')}
             </th>
           </tr>
         </thead>
@@ -158,23 +161,23 @@ export function CategoryTable({
                   <span
                     className={`h-1.5 w-1.5 rounded-full ${cat.isActive ? 'bg-emerald-500' : 'bg-muted-foreground'}`}
                   />
-                  {cat.isActive ? 'Active' : 'Inactive'}
+                  {cat.isActive ? t('active') : t('inactive')}
                 </span>
               </td>
-              <td className="px-6 py-4 text-right">
+              <td className="px-6 py-4 text-end">
                 <div className="flex items-center justify-end gap-2">
                   <button
                     onClick={() => onEdit(cat)}
                     className="px-3 py-1.5 text-xs font-medium text-foreground border border-border rounded-lg hover:bg-muted transition-colors"
                   >
-                    Edit
+                    {t('edit')}
                   </button>
                   <button
                     onClick={() => onDelete({ id: cat.id, name: cat.name })}
                     disabled={deletingId === cat.id}
                     className="px-3 py-1.5 text-xs font-medium text-destructive border border-destructive/30 rounded-lg hover:bg-destructive/5 transition-colors disabled:opacity-50"
                   >
-                    {deletingId === cat.id ? 'Deleting...' : 'Delete'}
+                    {deletingId === cat.id ? t('deleting') : t('delete')}
                   </button>
                 </div>
               </td>

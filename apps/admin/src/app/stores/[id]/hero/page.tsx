@@ -7,6 +7,7 @@ import { AdminLayout } from '../../../../components/AdminLayout';
 import { ImageUpload } from '../../../../components/ImageUpload';
 import { useToast } from '@force/ui';
 import { apiGet, apiPut } from '../../../../lib/api';
+import { useT } from '@/i18n/useT';
 
 interface StoreHero {
   id: string;
@@ -25,6 +26,7 @@ export default function StoreHeroPage() {
   const params = useParams();
   const storeId = params?.id as string;
   const toast = useToast();
+  const t = useT('hero.page');
 
   const [hero, setHero] = useState<StoreHero | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -35,7 +37,7 @@ export default function StoreHeroPage() {
       const { data, error } = await apiGet<{ store: StoreHero }>(`/api/v1/stores/${storeId}`);
 
       if (error) {
-        toast.error('Failed to load hero', error.message || `Server error: ${error.status}`);
+        toast.error(t('toastLoadFailedTitle'), error.message || `Server error: ${error.status}`);
         return;
       }
 
@@ -55,11 +57,11 @@ export default function StoreHeroPage() {
       }
     } catch (err) {
       console.error('Failed to fetch hero:', err);
-      toast.error('Connection error', 'Failed to connect to the server');
+      toast.error(t('toastConnectionTitle'), t('toastConnectionBody'));
     } finally {
       setIsLoading(false);
     }
-  }, [storeId, toast]);
+  }, [storeId, toast, t]);
 
   useEffect(() => {
     fetchHero();
@@ -83,19 +85,19 @@ export default function StoreHeroPage() {
 
       if (error) {
         if (error.status === 403) {
-          toast.error('Access denied', 'You do not have permission to update this store');
+          toast.error(t('toastAccessDeniedTitle'), t('toastAccessDeniedBody'));
         } else if (error.status === 401) {
-          toast.error('Session expired', 'Please log in again');
+          toast.error(t('toastSessionExpiredTitle'), t('toastSessionExpiredBody'));
         } else {
-          toast.error('Failed to save hero', error.message || 'Server error');
+          toast.error(t('toastSaveFailedTitle'), error.message || 'Server error');
         }
         return;
       }
 
-      toast.success('Hero saved', 'Your homepage hero has been updated');
+      toast.success(t('toastSavedTitle'), t('toastSavedBody'));
     } catch (err) {
       console.error('Failed to save hero:', err);
-      toast.error('Connection error', 'Failed to connect to the server. Please try again.');
+      toast.error(t('toastConnectionTitle'), t('toastSaveConnectionBody'));
     } finally {
       setIsSaving(false);
     }
@@ -103,12 +105,7 @@ export default function StoreHeroPage() {
 
   if (isLoading) {
     return (
-      <AdminLayout
-        title="Hero Section"
-        subtitle="Customize your storefront homepage hero"
-        mode="store_admin"
-        storeId={storeId}
-      >
+      <AdminLayout title={t('title')} subtitle={t('subtitle')} mode="store_admin" storeId={storeId}>
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
@@ -118,16 +115,11 @@ export default function StoreHeroPage() {
 
   if (!hero) {
     return (
-      <AdminLayout
-        title="Hero Section"
-        subtitle="Customize your storefront homepage hero"
-        mode="store_admin"
-        storeId={storeId}
-      >
+      <AdminLayout title={t('title')} subtitle={t('subtitle')} mode="store_admin" storeId={storeId}>
         <div className="text-center py-12">
-          <p className="text-muted-foreground">Store not found</p>
+          <p className="text-muted-foreground">{t('storeNotFound')}</p>
           <Link href="/stores" className="text-primary hover:underline mt-2 inline-block">
-            Back to stores
+            {t('backToStores')}
           </Link>
         </div>
       </AdminLayout>
@@ -136,8 +128,8 @@ export default function StoreHeroPage() {
 
   return (
     <AdminLayout
-      title="Hero Section"
-      subtitle="Customize your storefront homepage hero"
+      title={t('title')}
+      subtitle={t('subtitle')}
       mode="store_admin"
       storeId={storeId}
       actions={
@@ -146,7 +138,7 @@ export default function StoreHeroPage() {
           disabled={isSaving}
           className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 font-medium"
         >
-          {isSaving ? 'Saving...' : 'Save Changes'}
+          {isSaving ? t('saving') : t('saveChanges')}
         </button>
       }
     >
@@ -155,26 +147,26 @@ export default function StoreHeroPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">
-                Title (English)
+                {t('titleEnglish')}
               </label>
               <input
                 type="text"
                 value={hero.heroTitle || ''}
                 onChange={e => setHero({ ...hero, heroTitle: e.target.value })}
-                placeholder="Shop the Future of E-Commerce"
+                placeholder={t('titleEnglishPlaceholder')}
                 className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">
-                Title (Arabic)
+                {t('titleArabic')}
               </label>
               <input
                 type="text"
                 dir="rtl"
                 value={hero.heroTitleAr || ''}
                 onChange={e => setHero({ ...hero, heroTitleAr: e.target.value })}
-                placeholder="اكتشف مجموعتنا"
+                placeholder={t('titleArabicPlaceholder')}
                 className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
               />
             </div>
@@ -183,26 +175,26 @@ export default function StoreHeroPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">
-                Subtitle (English)
+                {t('subtitleEnglish')}
               </label>
               <textarea
                 value={hero.heroSubtitle || ''}
                 onChange={e => setHero({ ...hero, heroSubtitle: e.target.value })}
                 rows={3}
-                placeholder="Premium products, fast delivery, and secure payments"
+                placeholder={t('subtitleEnglishPlaceholder')}
                 className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">
-                Subtitle (Arabic)
+                {t('subtitleArabic')}
               </label>
               <textarea
                 dir="rtl"
                 value={hero.heroSubtitleAr || ''}
                 onChange={e => setHero({ ...hero, heroSubtitleAr: e.target.value })}
                 rows={3}
-                placeholder="أفضل المنتجات بأفضل الأسعار"
+                placeholder={t('subtitleArabicPlaceholder')}
                 className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
               />
             </div>
@@ -211,54 +203,56 @@ export default function StoreHeroPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">
-                CTA Button Text (English)
+                {t('ctaEnglish')}
               </label>
               <input
                 type="text"
                 value={hero.heroCtaText || ''}
                 onChange={e => setHero({ ...hero, heroCtaText: e.target.value })}
-                placeholder="Shop Now"
+                placeholder={t('ctaEnglishPlaceholder')}
                 className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">
-                CTA Button Text (Arabic)
+                {t('ctaArabic')}
               </label>
               <input
                 type="text"
                 dir="rtl"
                 value={hero.heroCtaTextAr || ''}
                 onChange={e => setHero({ ...hero, heroCtaTextAr: e.target.value })}
-                placeholder="تسوق الآن"
+                placeholder={t('ctaArabicPlaceholder')}
                 className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1">CTA Link</label>
+              <label className="block text-sm font-medium text-foreground mb-1">
+                {t('ctaLink')}
+              </label>
               <input
                 type="text"
                 value={hero.heroCtaLink || ''}
                 onChange={e => setHero({ ...hero, heroCtaLink: e.target.value })}
-                placeholder="/products"
+                placeholder={t('ctaLinkPlaceholder')}
                 className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-2">Hero Image</label>
+            <label className="block text-sm font-medium text-foreground mb-2">
+              {t('heroImage')}
+            </label>
             <ImageUpload
               value={hero.heroImage || undefined}
               onUpload={url => setHero({ ...hero, heroImage: url })}
               onRemove={() => setHero({ ...hero, heroImage: '' })}
               folder="hero"
-              label="Upload Hero Image"
+              label={t('uploadHeroImage')}
               accept="image/jpeg,image/png,image/webp"
             />
-            <p className="mt-2 text-xs text-muted-foreground">
-              Recommended: 1200x900px, JPG or PNG. Leave empty to use the default visual.
-            </p>
+            <p className="mt-2 text-xs text-muted-foreground">{t('heroImageHint')}</p>
           </div>
         </div>
       </div>

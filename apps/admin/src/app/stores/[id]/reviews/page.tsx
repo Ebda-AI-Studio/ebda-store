@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { Button, Badge, Modal, useToast } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPost, apiDelete } from '../../../../lib/api';
+import { useT } from '@/i18n/useT';
 
 interface Review {
   id: string;
@@ -56,6 +57,7 @@ function StarRating({ rating }: { rating: number }) {
 export default function ReviewsPage() {
   const params = useParams();
   const storeId = params?.id as string;
+  const t = useT('reviews.page');
   const [reviews, setReviews] = useState<Review[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved'>('all');
@@ -91,14 +93,14 @@ export default function ReviewsPage() {
         `/api/v1/stores/${storeId}/reviews/admin/${reviewId}/approve`
       );
       if (error) {
-        showError('Error', 'Failed to approve review. Please try again.');
+        showError(t('errorTitle'), t('toastApproveFailed'));
         return;
       }
-      toastSuccess('Review Approved', 'The review is now visible to customers.');
+      toastSuccess(t('toastApproveTitle'), t('toastApproveBody'));
       fetchReviews();
     } catch (err) {
       console.error('Failed to approve review:', err);
-      showError('Error', 'Failed to approve review. Please try again.');
+      showError(t('errorTitle'), t('toastApproveFailed'));
     }
   }
 
@@ -106,14 +108,14 @@ export default function ReviewsPage() {
     try {
       const { error } = await apiPost(`/api/v1/stores/${storeId}/reviews/admin/${reviewId}/reject`);
       if (error) {
-        showError('Error', 'Failed to unapprove review. Please try again.');
+        showError(t('errorTitle'), t('toastUnapproveFailed'));
         return;
       }
-      toastSuccess('Review Unapproved', 'The review has been unapproved.');
+      toastSuccess(t('toastUnapproveTitle'), t('toastUnapproveBody'));
       fetchReviews();
     } catch (err) {
       console.error('Failed to reject review:', err);
-      showError('Error', 'Failed to unapprove review. Please try again.');
+      showError(t('errorTitle'), t('toastUnapproveFailed'));
     }
   }
 
@@ -122,21 +124,21 @@ export default function ReviewsPage() {
     try {
       const { error } = await apiDelete(`/api/v1/stores/${storeId}/reviews/admin/${deleteTarget}`);
       if (error) {
-        showError('Error', 'Failed to delete review. Please try again.');
+        showError(t('errorTitle'), t('toastDeleteFailed'));
         return;
       }
-      toastSuccess('Review Deleted', 'The review has been permanently removed.');
+      toastSuccess(t('toastDeleteTitle'), t('toastDeleteBody'));
       fetchReviews();
     } catch (err) {
       console.error('Failed to delete review:', err);
-      showError('Error', 'Failed to delete review. Please try again.');
+      showError(t('errorTitle'), t('toastDeleteFailed'));
     } finally {
       setDeleteTarget(null);
     }
   }
 
   return (
-    <AdminLayout title="Reviews" subtitle="Manage product reviews and ratings">
+    <AdminLayout title={t('title')} subtitle={t('subtitle')}>
       {/* Filters */}
       <div className="mb-6 flex gap-2">
         <Button
@@ -144,30 +146,30 @@ export default function ReviewsPage() {
           size="sm"
           onClick={() => setFilter('all')}
         >
-          All Reviews
+          {t('filterAll')}
         </Button>
         <Button
           variant={filter === 'pending' ? 'default' : 'outline'}
           size="sm"
           onClick={() => setFilter('pending')}
         >
-          Pending Approval
+          {t('filterPending')}
         </Button>
         <Button
           variant={filter === 'approved' ? 'default' : 'outline'}
           size="sm"
           onClick={() => setFilter('approved')}
         >
-          Approved
+          {t('filterApproved')}
         </Button>
       </div>
 
       {/* Reviews List */}
       <div className="rounded-xl border bg-card shadow-sm">
         {isLoading ? (
-          <div className="p-8 text-center text-muted-foreground">Loading reviews...</div>
+          <div className="p-8 text-center text-muted-foreground">{t('loading')}</div>
         ) : reviews.length === 0 ? (
-          <div className="p-8 text-center text-muted-foreground">No reviews found</div>
+          <div className="p-8 text-center text-muted-foreground">{t('empty')}</div>
         ) : (
           <div className="divide-y">
             {reviews.map(review => (
@@ -177,11 +179,11 @@ export default function ReviewsPage() {
                     <div className="flex items-center gap-3 mb-2">
                       <StarRating rating={review.rating} />
                       <Badge variant={review.isApproved ? 'default' : 'secondary'}>
-                        {review.isApproved ? 'Approved' : 'Pending'}
+                        {review.isApproved ? t('approved') : t('pending')}
                       </Badge>
                       {review.isVerified && (
                         <Badge variant="outline" className="text-success border-success/40">
-                          Verified Purchase
+                          {t('verifiedPurchase')}
                         </Badge>
                       )}
                     </div>
@@ -196,31 +198,34 @@ export default function ReviewsPage() {
 
                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
                       <span>
-                        Product:{' '}
+                        {t('productLabel')}
                         <span className="font-medium text-foreground">{review.product.name}</span>
                       </span>
                       <span>
-                        By:{' '}
+                        {t('byLabel')}
                         <span className="font-medium text-foreground">
                           {review.customer
                             ? `${review.customer.firstName} ${review.customer.lastName}`
-                            : 'Anonymous'}
+                            : t('anonymous')}
                         </span>
                       </span>
                       <span>{formatDate(review.createdAt)}</span>
-                      <span>{review.helpfulCount} helpful</span>
+                      <span>
+                        {review.helpfulCount}
+                        {t('helpfulSuffix')}
+                      </span>
                     </div>
                   </div>
 
                   <div className="flex gap-2">
                     {!review.isApproved && (
                       <Button size="sm" onClick={() => handleApprove(review.id)}>
-                        Approve
+                        {t('approve')}
                       </Button>
                     )}
                     {review.isApproved && (
                       <Button variant="outline" size="sm" onClick={() => handleReject(review.id)}>
-                        Unapprove
+                        {t('unapprove')}
                       </Button>
                     )}
                     <Button
@@ -229,7 +234,7 @@ export default function ReviewsPage() {
                       className="text-destructive hover:bg-destructive/5"
                       onClick={() => setDeleteTarget(review.id)}
                     >
-                      Delete
+                      {t('delete')}
                     </Button>
                   </div>
                 </div>
@@ -242,8 +247,11 @@ export default function ReviewsPage() {
         {meta.totalPages > 1 && (
           <div className="flex items-center justify-between border-t px-6 py-3">
             <p className="text-sm text-muted-foreground">
-              Showing {(meta.page - 1) * meta.limit + 1} to{' '}
-              {Math.min(meta.page * meta.limit, meta.total)} of {meta.total} reviews
+              {t('paginationShowing', {
+                from: (meta.page - 1) * meta.limit + 1,
+                to: Math.min(meta.page * meta.limit, meta.total),
+                total: meta.total,
+              })}
             </p>
             <div className="flex gap-2">
               <Button
@@ -252,7 +260,7 @@ export default function ReviewsPage() {
                 disabled={meta.page === 1}
                 onClick={() => setMeta(prev => ({ ...prev, page: prev.page - 1 }))}
               >
-                Previous
+                {t('previous')}
               </Button>
               <Button
                 variant="outline"
@@ -260,7 +268,7 @@ export default function ReviewsPage() {
                 disabled={meta.page === meta.totalPages}
                 onClick={() => setMeta(prev => ({ ...prev, page: prev.page + 1 }))}
               >
-                Next
+                {t('next')}
               </Button>
             </div>
           </div>
@@ -268,16 +276,18 @@ export default function ReviewsPage() {
       </div>
 
       {/* Delete Confirmation Dialog */}
-      <Modal isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Delete Review">
-        <p className="text-sm text-muted-foreground">
-          Are you sure you want to delete this review? This action cannot be undone.
-        </p>
+      <Modal
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        title={t('deleteModalTitle')}
+      >
+        <p className="text-sm text-muted-foreground">{t('deleteModalBody')}</p>
         <div className="mt-6 flex justify-end gap-3">
           <Button variant="outline" size="sm" onClick={() => setDeleteTarget(null)}>
-            Cancel
+            {t('cancel')}
           </Button>
           <Button variant="destructive" size="sm" onClick={confirmDelete}>
-            Delete
+            {t('delete')}
           </Button>
         </div>
       </Modal>

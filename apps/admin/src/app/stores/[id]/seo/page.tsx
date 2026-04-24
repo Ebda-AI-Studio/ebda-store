@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPut } from '../../../../lib/api';
+import { useT } from '@/i18n/useT';
 
 interface SeoSettings {
   metaTitle: string;
@@ -52,6 +53,7 @@ function CharCount({ value, max }: { value: string; max: number }) {
 export default function StoreSeoPage() {
   const params = useParams();
   const storeId = params?.id as string;
+  const t = useT('seo.page');
 
   const [settings, setSettings] = useState<SeoSettings>(DEFAULT_SETTINGS);
   const [isLoading, setIsLoading] = useState(true);
@@ -97,15 +99,15 @@ export default function StoreSeoPage() {
       const { error } = await apiPut(`/api/v1/stores/${storeId}/seo`, settings);
 
       if (!error) {
-        setMessage({ type: 'success', text: 'SEO settings saved successfully' });
+        setMessage({ type: 'success', text: t('successMessage') });
       } else {
         setMessage({
           type: 'error',
-          text: error.message || 'Failed to save SEO settings',
+          text: error.message || t('failedMessage'),
         });
       }
     } catch {
-      setMessage({ type: 'error', text: 'Unable to connect to the server' });
+      setMessage({ type: 'error', text: t('connectionError') });
     } finally {
       setIsSaving(false);
     }
@@ -113,7 +115,7 @@ export default function StoreSeoPage() {
 
   if (isLoading) {
     return (
-      <AdminLayout title="SEO Settings" subtitle="Loading...">
+      <AdminLayout title={t('title')} subtitle={t('loading')}>
         <div className="animate-pulse space-y-4">
           <div className="h-64 rounded-xl bg-muted" />
           <div className="h-64 rounded-xl bg-muted" />
@@ -124,13 +126,13 @@ export default function StoreSeoPage() {
 
   return (
     <AdminLayout
-      title="SEO Settings"
-      subtitle="Optimize your store for search engines"
+      title={t('title')}
+      subtitle={t('subtitle')}
       actions={
         <div className="flex gap-2">
           <Link href={`/stores/${storeId}/settings`}>
             <button className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted font-medium">
-              Back to Settings
+              {t('backToSettings')}
             </button>
           </Link>
           <button
@@ -138,7 +140,7 @@ export default function StoreSeoPage() {
             disabled={isSaving}
             className="px-6 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 font-medium"
           >
-            {isSaving ? 'Saving...' : 'Save Changes'}
+            {isSaving ? t('saving') : t('saveChanges')}
           </button>
         </div>
       }
@@ -146,9 +148,9 @@ export default function StoreSeoPage() {
       {/* SERP Preview */}
       {settings.metaTitle && (
         <div className="mb-6 rounded-xl border bg-card p-6 shadow-sm">
-          <h2 className="mb-4 text-sm font-medium text-foreground">Search Result Preview</h2>
+          <h2 className="mb-4 text-sm font-medium text-foreground">{t('searchPreview')}</h2>
           <div className="rounded-lg border border-border p-4 max-w-xl">
-            <p className="text-xs text-muted-foreground mb-1">example.com</p>
+            <p className="text-xs text-muted-foreground mb-1">{t('previewDomain')}</p>
             <p className="text-lg font-medium text-info leading-tight line-clamp-1">
               {settings.metaTitle}
             </p>
@@ -166,41 +168,40 @@ export default function StoreSeoPage() {
         <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
           <div className="flex items-center gap-2">
             <div className="flex h-6 w-6 items-center justify-center rounded bg-info/10">
-              <span className="text-xs font-bold text-info">EN</span>
+              <span className="text-xs font-bold text-info">{t('enBadge')}</span>
             </div>
-            <h2 className="font-semibold text-foreground">English SEO</h2>
+            <h2 className="font-semibold text-foreground">{t('englishSeo')}</h2>
           </div>
 
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="text-sm font-medium text-foreground">Meta Title</label>
+              <label className="text-sm font-medium text-foreground">{t('metaTitle')}</label>
               <CharCount value={settings.metaTitle} max={TITLE_MAX} />
             </div>
             <input
               type="text"
               value={settings.metaTitle}
               onChange={e => setSettings(prev => ({ ...prev, metaTitle: e.target.value }))}
-              placeholder="My Store — Best Products in Kuwait"
+              placeholder={t('metaTitlePlaceholder')}
               maxLength={TITLE_MAX + 20}
               className={`w-full rounded-lg border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary ${
                 settings.metaTitle.length > TITLE_MAX ? 'border-destructive/40' : 'border-border'
               }`}
             />
             <p className="mt-1 text-xs text-muted-foreground">
-              Appears in browser tabs and search results. Keep under {TITLE_MAX} characters for best
-              results.
+              {t('metaTitleHint', { max: TITLE_MAX })}
             </p>
           </div>
 
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="text-sm font-medium text-foreground">Meta Description</label>
+              <label className="text-sm font-medium text-foreground">{t('metaDescription')}</label>
               <CharCount value={settings.metaDescription} max={DESC_MAX} />
             </div>
             <textarea
               value={settings.metaDescription}
               onChange={e => setSettings(prev => ({ ...prev, metaDescription: e.target.value }))}
-              placeholder="Discover our wide range of products with fast delivery across Kuwait..."
+              placeholder={t('metaDescriptionPlaceholder')}
               rows={3}
               maxLength={DESC_MAX + 50}
               className={`w-full rounded-lg border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none ${
@@ -210,7 +211,7 @@ export default function StoreSeoPage() {
               }`}
             />
             <p className="mt-1 text-xs text-muted-foreground">
-              Shown in search result snippets. Keep under {DESC_MAX} characters for best results.
+              {t('metaDescriptionHint', { max: DESC_MAX })}
             </p>
           </div>
         </div>
@@ -219,14 +220,14 @@ export default function StoreSeoPage() {
         <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
           <div className="flex items-center gap-2">
             <div className="flex h-6 w-6 items-center justify-center rounded bg-success/10">
-              <span className="text-xs font-bold text-success">AR</span>
+              <span className="text-xs font-bold text-success">{t('arBadge')}</span>
             </div>
-            <h2 className="font-semibold text-foreground">Arabic SEO</h2>
+            <h2 className="font-semibold text-foreground">{t('arabicSeo')}</h2>
           </div>
 
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="text-sm font-medium text-foreground">Meta Title (Arabic)</label>
+              <label className="text-sm font-medium text-foreground">{t('metaTitleAr')}</label>
               <CharCount value={settings.metaTitleAr} max={TITLE_MAX} />
             </div>
             <input
@@ -234,7 +235,7 @@ export default function StoreSeoPage() {
               dir="rtl"
               value={settings.metaTitleAr}
               onChange={e => setSettings(prev => ({ ...prev, metaTitleAr: e.target.value }))}
-              placeholder="متجري — أفضل المنتجات في الكويت"
+              placeholder={t('metaTitleArPlaceholder')}
               maxLength={TITLE_MAX + 20}
               className={`w-full rounded-lg border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary ${
                 settings.metaTitleAr.length > TITLE_MAX ? 'border-destructive/40' : 'border-border'
@@ -245,7 +246,7 @@ export default function StoreSeoPage() {
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="text-sm font-medium text-foreground">
-                Meta Description (Arabic)
+                {t('metaDescriptionAr')}
               </label>
               <CharCount value={settings.metaDescriptionAr} max={DESC_MAX} />
             </div>
@@ -253,7 +254,7 @@ export default function StoreSeoPage() {
               dir="rtl"
               value={settings.metaDescriptionAr}
               onChange={e => setSettings(prev => ({ ...prev, metaDescriptionAr: e.target.value }))}
-              placeholder="اكتشف مجموعتنا الواسعة من المنتجات مع توصيل سريع في الكويت..."
+              placeholder={t('metaDescriptionArPlaceholder')}
               rows={3}
               maxLength={DESC_MAX + 50}
               className={`w-full rounded-lg border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none ${
@@ -267,29 +268,27 @@ export default function StoreSeoPage() {
 
         {/* Advanced */}
         <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
-          <h2 className="font-semibold text-foreground">Advanced</h2>
+          <h2 className="font-semibold text-foreground">{t('advanced')}</h2>
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1">OG Image URL</label>
+            <label className="block text-sm font-medium text-foreground mb-1">{t('ogImage')}</label>
             <input
               type="url"
               value={settings.ogImage}
               onChange={e => setSettings(prev => ({ ...prev, ogImage: e.target.value }))}
-              placeholder="https://example.com/og-image.jpg"
+              placeholder={t('ogImagePlaceholder')}
               className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             />
-            <p className="mt-1 text-xs text-muted-foreground">
-              Image shown when your store is shared on social media. Recommended: 1200×630px.
-            </p>
+            <p className="mt-1 text-xs text-muted-foreground">{t('ogImageHint')}</p>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">
-                Twitter / X Handle
+                {t('twitterHandle')}
               </label>
               <div className="flex">
-                <span className="inline-flex items-center rounded-l-lg border border-r-0 border-border bg-muted px-3 text-sm text-muted-foreground">
+                <span className="inline-flex items-center rounded-s-lg border border-e-0 border-border bg-muted px-3 text-sm text-muted-foreground">
                   @
                 </span>
                 <input
@@ -301,15 +300,15 @@ export default function StoreSeoPage() {
                       twitterHandle: e.target.value.replace('@', ''),
                     }))
                   }
-                  placeholder="yourstorehandle"
-                  className="flex-1 rounded-r-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  placeholder={t('twitterPlaceholder')}
+                  className="flex-1 rounded-e-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 />
               </div>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">
-                Google Site Verification
+                {t('googleSiteVerification')}
               </label>
               <input
                 type="text"
@@ -317,11 +316,11 @@ export default function StoreSeoPage() {
                 onChange={e =>
                   setSettings(prev => ({ ...prev, googleSiteVerification: e.target.value }))
                 }
-                placeholder="Verification meta tag content"
+                placeholder={t('googleSiteVerificationPlaceholder')}
                 className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               />
               <p className="mt-1 text-xs text-muted-foreground">
-                From Google Search Console verification
+                {t('googleSiteVerificationHint')}
               </p>
             </div>
           </div>

@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet } from '../../../../lib/api';
+import { useT } from '@/i18n/useT';
 
 interface OrderCustomer {
   id: string;
@@ -44,6 +45,7 @@ function formatDate(dateString: string) {
 export default function StoreCustomersPage() {
   const params = useParams();
   const storeId = params?.id as string;
+  const t = useT('customers.page');
 
   const [customers, setCustomers] = useState<CustomerRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -72,7 +74,7 @@ export default function StoreCustomersPage() {
       }>(`/api/v1/stores/${storeId}/orders?page=1&limit=${limit}`);
 
       if (firstError || !firstData) {
-        setError(firstError?.message || 'Failed to fetch customers');
+        setError(firstError?.message || t('fetchFailed'));
         return;
       }
 
@@ -132,11 +134,11 @@ export default function StoreCustomersPage() {
       const sorted = Array.from(customerMap.values()).sort((a, b) => b.totalSpent - a.totalSpent);
       setCustomers(sorted);
     } catch {
-      setError('Unable to connect to the server. Please check your connection and try again.');
+      setError(t('connectionError'));
     } finally {
       setIsLoading(false);
     }
-  }, [storeId]);
+  }, [storeId, t]);
 
   useEffect(() => {
     fetchCustomers();
@@ -154,12 +156,12 @@ export default function StoreCustomersPage() {
 
   return (
     <AdminLayout
-      title="Customers"
-      subtitle="Customers who have placed orders in this store"
+      title={t('title')}
+      subtitle={t('subtitle')}
       actions={
         <Link href={`/stores/${storeId}`}>
           <button className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted font-medium">
-            Back to Store
+            {t('backToStore')}
           </button>
         </Link>
       }
@@ -169,8 +171,10 @@ export default function StoreCustomersPage() {
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">
             {isLoading || isFetchingAll
-              ? 'Loading customers...'
-              : `${filteredCustomers.length} customer${filteredCustomers.length !== 1 ? 's' : ''}`}
+              ? t('loading')
+              : filteredCustomers.length === 1
+                ? t('countSingular', { count: filteredCustomers.length })
+                : t('countPlural', { count: filteredCustomers.length })}
           </span>
           {isFetchingAll && (
             <div className="h-3 w-3 animate-spin rounded-full border-2 border-primary border-t-transparent" />
@@ -179,7 +183,7 @@ export default function StoreCustomersPage() {
 
         <div className="relative w-full sm:w-72">
           <svg
-            className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+            className="absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -193,10 +197,10 @@ export default function StoreCustomersPage() {
           </svg>
           <input
             type="text"
-            placeholder="Search by name or email..."
+            placeholder={t('searchPlaceholder')}
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full rounded-lg border py-2 pl-10 pr-4 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className="w-full rounded-lg border py-2 ps-10 pe-4 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </div>
       </div>
@@ -205,8 +209,8 @@ export default function StoreCustomersPage() {
       {error && (
         <div className="mb-6 rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive">
           {error}
-          <button className="ml-4 font-medium underline" onClick={fetchCustomers}>
-            Retry
+          <button className="ms-4 font-medium underline" onClick={fetchCustomers}>
+            {t('retry')}
           </button>
         </div>
       )}
@@ -242,50 +246,48 @@ export default function StoreCustomersPage() {
                 d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
               />
             </svg>
-            <p className="mt-4 text-muted-foreground">
-              {search ? 'No customers match your search' : 'No customers yet for this store'}
-            </p>
+            <p className="mt-4 text-muted-foreground">{search ? t('noMatch') : t('empty')}</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full" aria-label="Customers">
+            <table className="w-full" aria-label={t('tableLabel')}>
               <thead className="bg-muted border-b">
                 <tr>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                    className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider"
                   >
-                    Customer
+                    {t('colCustomer')}
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                    className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider"
                   >
-                    Email
+                    {t('colEmail')}
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                    className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider"
                   >
-                    Total Orders
+                    {t('colOrders')}
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                    className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider"
                   >
-                    Total Spent
+                    {t('colSpent')}
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider hidden md:table-cell"
+                    className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider hidden md:table-cell"
                   >
-                    Last Order
+                    {t('colLastOrder')}
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                    className="px-6 py-3 text-end text-xs font-medium text-muted-foreground uppercase tracking-wider"
                   >
-                    Actions
+                    {t('colActions')}
                   </th>
                 </tr>
               </thead>
@@ -307,7 +309,9 @@ export default function StoreCustomersPage() {
                     <td className="px-6 py-4 text-sm text-muted-foreground">{customer.email}</td>
                     <td className="px-6 py-4">
                       <span className="inline-flex items-center rounded-full bg-info/5 px-2.5 py-1 text-xs font-medium text-info">
-                        {customer.totalOrders} order{customer.totalOrders !== 1 ? 's' : ''}
+                        {customer.totalOrders === 1
+                          ? t('orderCount', { count: customer.totalOrders })
+                          : t('ordersCount', { count: customer.totalOrders })}
                       </span>
                     </td>
                     <td className="px-6 py-4">
@@ -318,12 +322,12 @@ export default function StoreCustomersPage() {
                     <td className="px-6 py-4 hidden md:table-cell text-sm text-muted-foreground">
                       {formatDate(customer.lastOrderDate)}
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-4 text-end">
                       {/* Link to store orders filtered by this customer's name/email */}
                       <Link
                         href={`/stores/${storeId}/orders`}
                         className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-foreground border border-border rounded-lg hover:bg-muted transition-colors"
-                        title="View orders for this customer"
+                        title={t('viewOrdersTitle')}
                       >
                         <svg
                           className="h-3.5 w-3.5"
@@ -338,7 +342,7 @@ export default function StoreCustomersPage() {
                             d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
                           />
                         </svg>
-                        Orders
+                        {t('viewOrders')}
                       </Link>
                     </td>
                   </tr>

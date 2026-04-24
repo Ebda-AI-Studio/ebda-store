@@ -7,23 +7,25 @@ import { AdminLayout } from '../../../../../components/AdminLayout';
 import { MultiImageUpload } from '../../../../../components/ImageUpload';
 import { useAuth } from '../../../../../lib/auth';
 import { apiGet, apiPost } from '../../../../../lib/api';
+import { useT } from '@/i18n/useT';
 
 interface Category {
   id: string;
   name: string;
 }
 
-const statuses = [
-  { value: 'draft', label: 'Draft' },
-  { value: 'active', label: 'Active' },
-  { value: 'archived', label: 'Archived' },
-];
-
 export default function NewProductPage() {
   const router = useRouter();
   const params = useParams();
   const storeId = params?.id as string;
   const { isAuthenticated } = useAuth();
+  const t = useT('products.new');
+
+  const statuses = [
+    { value: 'draft', label: t('statusOptions.draft') },
+    { value: 'active', label: t('statusOptions.active') },
+    { value: 'archived', label: t('statusOptions.archived') },
+  ];
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -105,19 +107,19 @@ export default function NewProductPage() {
         router.push(`/stores/${storeId}/products`);
       }
     } catch {
-      setError('Failed to create product. Please try again.');
+      setError(t('errors.createFailed'));
     } finally {
       setIsLoading(false);
     }
   };
 
   const categoryOptions = [
-    { value: '', label: 'No category' },
+    { value: '', label: t('fields.noCategory') },
     ...categories.map(c => ({ value: c.id, label: c.name })),
   ];
 
   return (
-    <AdminLayout title="Add New Product" subtitle="Create a new product for your store">
+    <AdminLayout title={t('title')} subtitle={t('subtitle')}>
       <form onSubmit={handleSubmit}>
         {error && (
           <div className="mb-6 rounded-lg bg-destructive/10 p-4 text-sm text-destructive">
@@ -129,34 +131,36 @@ export default function NewProductPage() {
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
             <div className="rounded-xl border bg-card p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-foreground mb-4">Basic Information</h2>
+              <h2 className="text-lg font-semibold text-foreground mb-4">
+                {t('sections.basicInformation')}
+              </h2>
               <div className="space-y-4">
                 <Input
-                  label="Product Name"
+                  label={t('fields.name')}
                   value={formData.name}
                   onChange={e => updateField('name', e.target.value)}
-                  placeholder="Enter product name"
+                  placeholder={t('fields.namePlaceholder')}
                   required
                 />
                 <Input
-                  label="Product Name (Arabic)"
+                  label={t('fields.nameAr')}
                   value={formData.nameAr}
                   onChange={e => updateField('nameAr', e.target.value)}
-                  placeholder="ادخل اسم المنتج"
+                  placeholder={t('fields.nameArPlaceholder')}
                   dir="rtl"
                 />
                 <Textarea
-                  label="Description"
+                  label={t('fields.description')}
                   value={formData.description}
                   onChange={e => updateField('description', e.target.value)}
-                  placeholder="Describe your product..."
+                  placeholder={t('fields.descriptionPlaceholder')}
                   rows={4}
                 />
                 <Textarea
-                  label="Description (Arabic)"
+                  label={t('fields.descriptionAr')}
                   value={formData.descriptionAr}
                   onChange={e => updateField('descriptionAr', e.target.value)}
-                  placeholder="وصف المنتج..."
+                  placeholder={t('fields.descriptionArPlaceholder')}
                   rows={4}
                   dir="rtl"
                 />
@@ -164,57 +168,59 @@ export default function NewProductPage() {
             </div>
 
             <div className="rounded-xl border bg-card p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-foreground mb-4">Media</h2>
+              <h2 className="text-lg font-semibold text-foreground mb-4">{t('sections.media')}</h2>
               <MultiImageUpload
                 values={images}
                 onChange={setImages}
                 folder="products"
-                label="Drag and drop images here, or click to select"
+                label={t('fields.mediaHint')}
                 max={10}
               />
             </div>
 
             <div className="rounded-xl border bg-card p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-foreground mb-4">Pricing</h2>
+              <h2 className="text-lg font-semibold text-foreground mb-4">
+                {t('sections.pricing')}
+              </h2>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Input
-                  label="Price (KWD)"
+                  label={t('fields.price')}
                   type="number"
                   step="0.001"
                   value={formData.price}
                   onChange={e => updateField('price', e.target.value)}
-                  placeholder="0.000"
+                  placeholder={t('fields.pricePlaceholder')}
                   required
                 />
                 <Input
-                  label="Compare at Price (KWD)"
+                  label={t('fields.compareAtPrice')}
                   type="number"
                   step="0.001"
                   value={formData.compareAtPrice}
                   onChange={e => updateField('compareAtPrice', e.target.value)}
-                  placeholder="0.000"
+                  placeholder={t('fields.pricePlaceholder')}
                 />
               </div>
-              <p className="mt-2 text-xs text-muted-foreground">
-                Enter prices in KWD. Compare at price is used to show a crossed-out price.
-              </p>
+              <p className="mt-2 text-xs text-muted-foreground">{t('fields.pricingHint')}</p>
             </div>
 
             <div className="rounded-xl border bg-card p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-foreground mb-4">Inventory</h2>
+              <h2 className="text-lg font-semibold text-foreground mb-4">
+                {t('sections.inventory')}
+              </h2>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Input
-                  label="SKU"
+                  label={t('fields.sku')}
                   value={formData.sku}
                   onChange={e => updateField('sku', e.target.value)}
-                  placeholder="PROD-001"
+                  placeholder={t('fields.skuPlaceholder')}
                 />
                 <Input
-                  label="Quantity"
+                  label={t('fields.quantity')}
                   type="number"
                   value={formData.inventory}
                   onChange={e => updateField('inventory', e.target.value)}
-                  placeholder="0"
+                  placeholder={t('fields.quantityPlaceholder')}
                 />
               </div>
             </div>
@@ -223,9 +229,9 @@ export default function NewProductPage() {
           {/* Sidebar */}
           <div className="space-y-6">
             <div className="rounded-xl border bg-card p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-foreground mb-4">Status</h2>
+              <h2 className="text-lg font-semibold text-foreground mb-4">{t('sections.status')}</h2>
               <Select
-                label="Product Status"
+                label={t('fields.productStatus')}
                 value={formData.status}
                 onChange={e => updateField('status', e.target.value)}
                 options={statuses}
@@ -233,9 +239,11 @@ export default function NewProductPage() {
             </div>
 
             <div className="rounded-xl border bg-card p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-foreground mb-4">Organization</h2>
+              <h2 className="text-lg font-semibold text-foreground mb-4">
+                {t('sections.organization')}
+              </h2>
               <Select
-                label="Category"
+                label={t('fields.category')}
                 value={formData.category}
                 onChange={e => updateField('category', e.target.value)}
                 options={categoryOptions}
@@ -245,7 +253,7 @@ export default function NewProductPage() {
             <div className="rounded-xl border bg-card p-6 shadow-sm">
               <div className="space-y-3">
                 <Button type="submit" className="w-full" isLoading={isLoading}>
-                  Create Product
+                  {t('actions.create')}
                 </Button>
                 <Button
                   type="button"
@@ -253,7 +261,7 @@ export default function NewProductPage() {
                   className="w-full"
                   onClick={() => router.push(`/stores/${storeId}/products`)}
                 >
-                  Cancel
+                  {t('actions.cancel')}
                 </Button>
               </div>
             </div>

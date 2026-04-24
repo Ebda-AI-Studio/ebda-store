@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { Button, Badge, Input, Label } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPut } from '../../../../lib/api';
+import { useT } from '@/i18n/useT';
 
 interface Store {
   id: string;
@@ -15,6 +16,7 @@ interface Store {
 export default function StoreDomainPage() {
   const params = useParams();
   const storeId = params?.id as string;
+  const t = useT('domain.page');
   const [store, setStore] = useState<Store | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -70,7 +72,7 @@ export default function StoreDomainPage() {
       trimmed &&
       !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(trimmed)
     ) {
-      setDomainError('Please enter a valid domain (e.g., shop.example.com)');
+      setDomainError(t('invalidDomain'));
       return;
     }
     setIsSaving(true);
@@ -85,10 +87,10 @@ export default function StoreDomainPage() {
         if (trimmed) setTimeout(checkDns, 1000);
         else setDomainStatus(null);
       } else {
-        setDomainError(apiError.message || 'Failed to update domain');
+        setDomainError(apiError.message || t('updateFailed'));
       }
     } catch {
-      setDomainError('Failed to update domain');
+      setDomainError(t('updateFailed'));
     } finally {
       setIsSaving(false);
     }
@@ -115,12 +117,7 @@ export default function StoreDomainPage() {
 
   if (isLoading) {
     return (
-      <AdminLayout
-        title="Custom Domain"
-        subtitle="Connect a custom domain to your store"
-        mode="store_admin"
-        storeId={storeId}
-      >
+      <AdminLayout title={t('title')} subtitle={t('subtitle')} mode="store_admin" storeId={storeId}>
         <div className="mx-auto max-w-4xl p-6">
           <div className="h-64 animate-pulse rounded-xl bg-muted" />
         </div>
@@ -130,14 +127,9 @@ export default function StoreDomainPage() {
 
   if (!store) {
     return (
-      <AdminLayout
-        title="Custom Domain"
-        subtitle="Connect a custom domain to your store"
-        mode="store_admin"
-        storeId={storeId}
-      >
+      <AdminLayout title={t('title')} subtitle={t('subtitle')} mode="store_admin" storeId={storeId}>
         <div className="mx-auto max-w-4xl p-6">
-          <p className="text-muted-foreground">Store not found.</p>
+          <p className="text-muted-foreground">{t('storeNotFound')}</p>
         </div>
       </AdminLayout>
     );
@@ -146,23 +138,18 @@ export default function StoreDomainPage() {
   const domain = store.domain;
 
   return (
-    <AdminLayout
-      title="Custom Domain"
-      subtitle="Connect a custom domain to your store"
-      mode="store_admin"
-      storeId={storeId}
-    >
+    <AdminLayout title={t('title')} subtitle={t('subtitle')} mode="store_admin" storeId={storeId}>
       <div className="mx-auto max-w-4xl p-6">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-foreground">Custom Domain</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Connect a custom domain to your store
-          </p>
+          <h1 className="text-2xl font-bold text-foreground">{t('heading')}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">{t('subtitle')}</p>
         </div>
 
         <div className="rounded-xl border bg-card shadow-sm">
           <div className="flex items-center justify-between border-b p-4">
-            <h2 className="font-semibold text-foreground">{store.name} Domain</h2>
+            <h2 className="font-semibold text-foreground">
+              {store.name} {t('storeDomainSuffix')}
+            </h2>
             <div className="flex gap-2">
               {!isEditing && (
                 <Button
@@ -174,7 +161,7 @@ export default function StoreDomainPage() {
                     setDomainError('');
                   }}
                 >
-                  {domain ? 'Change Domain' : 'Add Domain'}
+                  {domain ? t('changeDomain') : t('addDomain')}
                 </Button>
               )}
               {domain && !isEditing && (
@@ -184,7 +171,7 @@ export default function StoreDomainPage() {
                   onClick={handleRemoveDomain}
                   disabled={isSaving}
                 >
-                  Remove
+                  {t('remove')}
                 </Button>
               )}
             </div>
@@ -193,7 +180,7 @@ export default function StoreDomainPage() {
             {isEditing ? (
               <div className="space-y-4">
                 <div>
-                  <Label htmlFor="domain">Domain</Label>
+                  <Label htmlFor="domain">{t('domain')}</Label>
                   <Input
                     id="domain"
                     value={newDomain}
@@ -201,17 +188,15 @@ export default function StoreDomainPage() {
                       setNewDomain(e.target.value.toLowerCase());
                       setDomainError('');
                     }}
-                    placeholder="shop.example.com"
+                    placeholder={t('domainPlaceholder')}
                     className={`mt-1 ${domainError ? 'border-destructive' : ''}`}
                   />
                   {domainError && <p className="mt-1 text-sm text-destructive">{domainError}</p>}
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Leave empty and save to remove the custom domain.
-                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">{t('domainRemoveHint')}</p>
                 </div>
                 <div className="flex gap-2">
                   <Button size="sm" onClick={handleSaveDomain} disabled={isSaving}>
-                    {isSaving ? 'Saving...' : 'Save'}
+                    {isSaving ? t('saving') : t('save')}
                   </Button>
                   <Button
                     variant="outline"
@@ -221,7 +206,7 @@ export default function StoreDomainPage() {
                       setDomainError('');
                     }}
                   >
-                    Cancel
+                    {t('cancel')}
                   </Button>
                 </div>
               </div>
@@ -230,37 +215,35 @@ export default function StoreDomainPage() {
                 <div className="flex items-center gap-3">
                   <p className="font-medium text-foreground">{domain}</p>
                   <Badge variant={domainStatus?.verified ? 'default' : 'secondary'}>
-                    {domainStatus?.verified ? 'Verified' : 'Pending Verification'}
+                    {domainStatus?.verified ? t('verified') : t('pending')}
                   </Badge>
                 </div>
 
                 {!domainStatus?.verified && (
                   <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-                    <p className="text-sm font-medium text-amber-900">DNS Configuration Required</p>
-                    <p className="mt-1 text-sm text-amber-800">
-                      Add the following DNS record to your domain provider:
-                    </p>
+                    <p className="text-sm font-medium text-amber-900">{t('dnsRequired')}</p>
+                    <p className="mt-1 text-sm text-amber-800">{t('dnsInstructions')}</p>
                     <div className="mt-3 overflow-hidden rounded-md border border-amber-200 bg-white">
-                      <table className="w-full text-sm" aria-label="DNS records">
+                      <table className="w-full text-sm" aria-label={t('dnsTableLabel')}>
                         <thead>
                           <tr className="border-b bg-amber-50">
                             <th
                               scope="col"
-                              className="px-3 py-2 text-left font-medium text-amber-900"
+                              className="px-3 py-2 text-start font-medium text-amber-900"
                             >
-                              Type
+                              {t('colType')}
                             </th>
                             <th
                               scope="col"
-                              className="px-3 py-2 text-left font-medium text-amber-900"
+                              className="px-3 py-2 text-start font-medium text-amber-900"
                             >
-                              Name
+                              {t('colName')}
                             </th>
                             <th
                               scope="col"
-                              className="px-3 py-2 text-left font-medium text-amber-900"
+                              className="px-3 py-2 text-start font-medium text-amber-900"
                             >
-                              Value
+                              {t('colValue')}
                             </th>
                           </tr>
                         </thead>
@@ -282,11 +265,9 @@ export default function StoreDomainPage() {
                       </table>
                     </div>
                     <div className="mt-3 flex items-center justify-between">
-                      <p className="text-xs text-amber-700">
-                        DNS changes can take up to 48 hours to propagate.
-                      </p>
+                      <p className="text-xs text-amber-700">{t('dnsPropagation')}</p>
                       <Button variant="outline" size="sm" onClick={checkDns} disabled={isChecking}>
-                        {isChecking ? 'Checking...' : 'Check DNS'}
+                        {isChecking ? t('checkingDns') : t('checkDns')}
                       </Button>
                     </div>
                   </div>
@@ -294,15 +275,12 @@ export default function StoreDomainPage() {
 
                 {domainStatus?.verified && (
                   <p className="text-sm text-[hsl(var(--success))]">
-                    Domain is verified and SSL is active. Your store is accessible at https://
-                    {domain}
+                    {t('verifiedMessage', { domain })}
                   </p>
                 )}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">
-                No custom domain configured. This store is accessible via its default subdomain.
-              </p>
+              <p className="text-sm text-muted-foreground">{t('noDomain')}</p>
             )}
           </div>
         </div>

@@ -7,6 +7,7 @@ import { Button, Input, useToast } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiPut } from '../../../../lib/api';
 import { useCurrentStore } from '../../../../hooks/useCurrentStore';
+import { useT } from '@/i18n/useT';
 
 interface NavItem {
   label: string;
@@ -46,6 +47,7 @@ export default function StoreNavigationPage() {
   const params = useParams();
   const storeId = params?.id as string;
   const toast = useToast();
+  const t = useT('navigation.page');
 
   const { store, isLoading, error: fetchError } = useCurrentStore(storeId);
   const [items, setItems] = useState<NavItem[]>([]);
@@ -66,8 +68,8 @@ export default function StoreNavigationPage() {
   }, [store, existingSettings, itemsHydrated]);
 
   useEffect(() => {
-    if (fetchError) toast.error('Failed to load', fetchError.message);
-  }, [fetchError, toast]);
+    if (fetchError) toast.error(t('toastFailedLoad'), fetchError.message);
+  }, [fetchError, toast, t]);
 
   function update(index: number, field: keyof NavItem, value: string) {
     setItems(prev => prev.map((it, i) => (i === index ? { ...it, [field]: value } : it)));
@@ -106,7 +108,7 @@ export default function StoreNavigationPage() {
       .filter(it => it.label && it.href);
 
     if (cleaned.length === 0) {
-      toast.error('At least one menu item required', 'Add a label and href.');
+      toast.error(t('toastAtLeastOne'), t('toastAtLeastOneBody'));
       return;
     }
 
@@ -117,40 +119,42 @@ export default function StoreNavigationPage() {
     setIsSaving(false);
 
     if (error) {
-      toast.error('Failed to save', error.message);
+      toast.error(t('toastFailedSave'), error.message);
       return;
     }
-    toast.success('Navigation saved', 'Storefront will use the new menu on next page load.');
+    toast.success(t('toastSaved'), t('toastSavedBody'));
   }
 
   if (isLoading) {
     return (
-      <AdminLayout title="Navigation">
-        <div className="flex h-64 items-center justify-center text-muted-foreground">Loading…</div>
+      <AdminLayout title={t('title')}>
+        <div className="flex h-64 items-center justify-center text-muted-foreground">
+          {t('loading')}
+        </div>
       </AdminLayout>
     );
   }
 
   return (
-    <AdminLayout title="Navigation">
+    <AdminLayout title={t('title')}>
       <div className="mx-auto max-w-3xl p-6">
         <div className="mb-6 flex items-center gap-2 text-sm text-muted-foreground">
           <Link href={`/stores/${storeId}`} className="hover:text-primary">
-            Store
+            {t('breadcrumbStore')}
           </Link>
           <span>/</span>
           <Link href={`/stores/${storeId}/settings`} className="hover:text-primary">
-            Settings
+            {t('breadcrumbSettings')}
           </Link>
           <span>/</span>
-          <span className="text-foreground">Navigation</span>
+          <span className="text-foreground">{t('breadcrumbNav')}</span>
         </div>
 
-        <h1 className="text-2xl font-bold text-foreground">Storefront Navigation</h1>
+        <h1 className="text-2xl font-bold text-foreground">{t('heading')}</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Control the header menu on every storefront page. Use relative paths (
-          <code className="rounded bg-muted px-1">/products</code>) for store pages, or full URLs
-          for external links.
+          {t('helpBefore')}
+          <code className="rounded bg-muted px-1">{t('helpCode')}</code>
+          {t('helpAfter')}
         </p>
 
         <div className="mt-8 space-y-4">
@@ -158,7 +162,7 @@ export default function StoreNavigationPage() {
             <div key={index} className="rounded-xl border bg-card p-4 shadow-sm">
               <div className="mb-2 flex items-center justify-between">
                 <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Item {index + 1}
+                  {t('itemNumber', { number: index + 1 })}
                 </span>
                 <div className="flex items-center gap-1">
                   <button
@@ -166,7 +170,7 @@ export default function StoreNavigationPage() {
                     onClick={() => move(index, -1)}
                     disabled={index === 0}
                     className="rounded p-1 text-muted-foreground hover:bg-muted disabled:opacity-30"
-                    aria-label="Move up"
+                    aria-label={t('moveUp')}
                   >
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path
@@ -182,7 +186,7 @@ export default function StoreNavigationPage() {
                     onClick={() => move(index, 1)}
                     disabled={index === items.length - 1}
                     className="rounded p-1 text-muted-foreground hover:bg-muted disabled:opacity-30"
-                    aria-label="Move down"
+                    aria-label={t('moveDown')}
                   >
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path
@@ -197,7 +201,7 @@ export default function StoreNavigationPage() {
                     type="button"
                     onClick={() => removeItem(index)}
                     className="rounded p-1 text-destructive hover:bg-destructive/10"
-                    aria-label="Remove item"
+                    aria-label={t('removeItem')}
                   >
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path
@@ -212,22 +216,22 @@ export default function StoreNavigationPage() {
               </div>
               <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                 <Input
-                  label="Label (English)"
+                  label={t('labelEnglish')}
                   value={item.label}
                   onChange={e => update(index, 'label', e.target.value)}
-                  placeholder="Products"
+                  placeholder={t('labelEnglishPlaceholder')}
                 />
                 <Input
-                  label="Label (Arabic)"
+                  label={t('labelArabic')}
                   value={item.labelAr ?? ''}
                   onChange={e => update(index, 'labelAr', e.target.value)}
-                  placeholder="المنتجات"
+                  placeholder={t('labelArabicPlaceholder')}
                 />
                 <Input
-                  label="Path or URL"
+                  label={t('pathOrUrl')}
                   value={item.href}
                   onChange={e => update(index, 'href', e.target.value)}
-                  placeholder="/products"
+                  placeholder={t('pathPlaceholder')}
                 />
               </div>
             </div>
@@ -236,14 +240,14 @@ export default function StoreNavigationPage() {
 
         <div className="mt-6 flex flex-wrap items-center gap-3">
           <Button onClick={addItem} variant="outline">
-            + Add item
+            {t('addItem')}
           </Button>
           <Button onClick={resetToDefault} variant="ghost">
-            Reset to defaults
+            {t('resetDefault')}
           </Button>
           <div className="flex-1" />
           <Button onClick={handleSave} isLoading={isSaving}>
-            Save navigation
+            {t('saveNav')}
           </Button>
         </div>
       </div>

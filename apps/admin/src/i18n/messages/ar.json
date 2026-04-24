@@ -37,7 +37,15 @@
       },
       "somethingWrong": "Something went wrong"
     },
-    "tryAgain": "Try Again"
+    "tryAgain": "Try Again",
+    "storeNotFound": "Store not found",
+    "backToStores": "Back to stores",
+    "retry": "Retry",
+    "connectionError": "Unable to connect to the server. Please check your connection and try again.",
+    "backToStore": "Back to Store",
+    "backToSettings": "Back to Settings",
+    "saveChanges": "Save Changes",
+    "loadingEllipsis": "Loading..."
   },
   "nav": {
     "dashboard": "لوحة التحكم",
@@ -610,6 +618,52 @@
         "cancel": "Cancel",
         "submit": "Save Changes"
       }
+    },
+    "new": {
+      "title": "Add New Product",
+      "subtitle": "Create a new product for your store",
+      "sections": {
+        "basicInformation": "Basic Information",
+        "media": "Media",
+        "pricing": "Pricing",
+        "inventory": "Inventory",
+        "status": "Status",
+        "organization": "Organization"
+      },
+      "fields": {
+        "name": "Product Name",
+        "namePlaceholder": "Enter product name",
+        "nameAr": "Product Name (Arabic)",
+        "nameArPlaceholder": "ادخل اسم المنتج",
+        "description": "Description",
+        "descriptionPlaceholder": "Describe your product...",
+        "descriptionAr": "Description (Arabic)",
+        "descriptionArPlaceholder": "وصف المنتج...",
+        "mediaHint": "Drag and drop images here, or click to select",
+        "price": "Price (KWD)",
+        "pricePlaceholder": "0.000",
+        "compareAtPrice": "Compare at Price (KWD)",
+        "pricingHint": "Enter prices in KWD. Compare at price is used to show a crossed-out price.",
+        "sku": "SKU",
+        "skuPlaceholder": "PROD-001",
+        "quantity": "Quantity",
+        "quantityPlaceholder": "0",
+        "productStatus": "Product Status",
+        "category": "Category",
+        "noCategory": "No category"
+      },
+      "statusOptions": {
+        "draft": "Draft",
+        "active": "Active",
+        "archived": "Archived"
+      },
+      "actions": {
+        "create": "Create Product",
+        "cancel": "Cancel"
+      },
+      "errors": {
+        "createFailed": "Failed to create product. Please try again."
+      }
     }
   },
   "orders": {
@@ -700,7 +754,33 @@
       "unpaid": "Unpaid"
     }
   },
-  "customers": {},
+  "customers": {
+    "page": {
+      "title": "Customers",
+      "subtitle": "Customers who have placed orders in this store",
+      "backToStore": "Back to Store",
+      "loading": "Loading customers...",
+      "searchPlaceholder": "Search by name or email...",
+      "noMatch": "No customers match your search",
+      "empty": "No customers yet for this store",
+      "retry": "Retry",
+      "fetchFailed": "Failed to fetch customers",
+      "connectionError": "Unable to connect to the server. Please check your connection and try again.",
+      "tableLabel": "Customers",
+      "colCustomer": "Customer",
+      "colEmail": "Email",
+      "colOrders": "Total Orders",
+      "colSpent": "Total Spent",
+      "colLastOrder": "Last Order",
+      "colActions": "Actions",
+      "ordersCount": "{count} orders",
+      "orderCount": "{count} order",
+      "viewOrdersTitle": "View orders for this customer",
+      "viewOrders": "Orders",
+      "countSingular": "{count} customer",
+      "countPlural": "{count} customers"
+    }
+  },
   "analytics": {
     "page": {
       "title": "Analytics",
@@ -2011,8 +2091,67 @@
       }
     }
   },
-  "pages": {},
-  "navigation": {},
+  "pages": {
+    "page": {
+      "title": "Footer & Pages",
+      "subtitle": "Manage the links shown in your store's footer",
+      "loadingSubtitle": "Manage footer links and store pages",
+      "backToSettings": "Back to Settings",
+      "saveChanges": "Save Changes",
+      "saving": "Saving...",
+      "help": "Configure which links appear in your store's footer. Disable links to hide them, or add new ones. Links use relative paths (e.g.,",
+      "helpCode": "/faq",
+      "helpClose": ").",
+      "shopLinks": "Shop Links",
+      "supportLinks": "Support Links",
+      "companyLinks": "Company Links",
+      "newsletter": "Newsletter Section",
+      "newsletterHint": "Show or hide the newsletter signup form in the footer.",
+      "addLink": "Add Link",
+      "emptyLinks": "No links configured. Click \"Add Link\" to add one.",
+      "linkNamePlaceholder": "Link name",
+      "linkNameArPlaceholder": "Arabic name (optional)",
+      "linkPathPlaceholder": "/page-path",
+      "removeLink": "Remove link",
+      "toastSavedTitle": "Saved",
+      "toastSavedBody": "Footer links updated successfully.",
+      "toastErrorTitle": "Error",
+      "toastFailedSave": "Failed to save.",
+      "toastFailedSaveLinks": "Failed to save footer links."
+    }
+  },
+  "navigation": {
+    "page": {
+      "title": "Navigation",
+      "heading": "Storefront Navigation",
+      "loading": "Loading…",
+      "helpBefore": "Control the header menu on every storefront page. Use relative paths (",
+      "helpCode": "/products",
+      "helpAfter": ") for store pages, or full URLs for external links.",
+      "breadcrumbStore": "Store",
+      "breadcrumbSettings": "Settings",
+      "breadcrumbNav": "Navigation",
+      "itemNumber": "Item {number}",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "removeItem": "Remove item",
+      "labelEnglish": "Label (English)",
+      "labelEnglishPlaceholder": "Products",
+      "labelArabic": "Label (Arabic)",
+      "labelArabicPlaceholder": "المنتجات",
+      "pathOrUrl": "Path or URL",
+      "pathPlaceholder": "/products",
+      "addItem": "+ Add item",
+      "resetDefault": "Reset to defaults",
+      "saveNav": "Save navigation",
+      "toastFailedLoad": "Failed to load",
+      "toastAtLeastOne": "At least one menu item required",
+      "toastAtLeastOneBody": "Add a label and href.",
+      "toastFailedSave": "Failed to save",
+      "toastSaved": "Navigation saved",
+      "toastSavedBody": "Storefront will use the new menu on next page load."
+    }
+  },
   "notifications": {
     "page": {
       "title": "Notifications",
@@ -2286,8 +2425,75 @@
     "save": "Save",
     "saving": "Saving..."
   },
-  "hero": {},
-  "announcement": {},
+  "hero": {
+    "page": {
+      "title": "Hero Section",
+      "subtitle": "Customize your storefront homepage hero",
+      "storeNotFound": "Store not found",
+      "backToStores": "Back to stores",
+      "saving": "Saving...",
+      "saveChanges": "Save Changes",
+      "titleEnglish": "Title (English)",
+      "titleEnglishPlaceholder": "Shop the Future of E-Commerce",
+      "titleArabic": "Title (Arabic)",
+      "titleArabicPlaceholder": "اكتشف مجموعتنا",
+      "subtitleEnglish": "Subtitle (English)",
+      "subtitleEnglishPlaceholder": "Premium products, fast delivery, and secure payments",
+      "subtitleArabic": "Subtitle (Arabic)",
+      "subtitleArabicPlaceholder": "أفضل المنتجات بأفضل الأسعار",
+      "ctaEnglish": "CTA Button Text (English)",
+      "ctaEnglishPlaceholder": "Shop Now",
+      "ctaArabic": "CTA Button Text (Arabic)",
+      "ctaArabicPlaceholder": "تسوق الآن",
+      "ctaLink": "CTA Link",
+      "ctaLinkPlaceholder": "/products",
+      "heroImage": "Hero Image",
+      "uploadHeroImage": "Upload Hero Image",
+      "heroImageHint": "Recommended: 1200x900px, JPG or PNG. Leave empty to use the default visual.",
+      "toastLoadFailedTitle": "Failed to load hero",
+      "toastConnectionTitle": "Connection error",
+      "toastConnectionBody": "Failed to connect to the server",
+      "toastAccessDeniedTitle": "Access denied",
+      "toastAccessDeniedBody": "You do not have permission to update this store",
+      "toastSessionExpiredTitle": "Session expired",
+      "toastSessionExpiredBody": "Please log in again",
+      "toastSaveFailedTitle": "Failed to save hero",
+      "toastSavedTitle": "Hero saved",
+      "toastSavedBody": "Your homepage hero has been updated",
+      "toastSaveConnectionBody": "Failed to connect to the server. Please try again."
+    }
+  },
+  "announcement": {
+    "page": {
+      "title": "Announcement Bar",
+      "subtitle": "Display a banner across the top of your store",
+      "loading": "Loading...",
+      "backToSettings": "Back to Settings",
+      "saveChanges": "Save Changes",
+      "saving": "Saving...",
+      "preview": "Preview",
+      "sectionTitle": "Announcement Bar",
+      "sectionHint": "Show a banner at the top of your store for promotions, announcements or news",
+      "content": "Content",
+      "textEnglish": "Announcement Text (English)",
+      "textEnglishPlaceholder": "Free shipping on orders over 10 KWD!",
+      "textArabic": "Announcement Text (Arabic)",
+      "textArabicPlaceholder": "شحن مجاني للطلبات فوق ١٠ د.ك!",
+      "linkUrl": "Link URL (optional)",
+      "linkUrlPlaceholder": "https://example.com/sale",
+      "linkUrlHint": "The entire bar will link to this URL when clicked",
+      "linkTextEnglish": "Link Text (English)",
+      "linkTextEnglishPlaceholder": "Shop Now",
+      "linkTextArabic": "Link Text (Arabic)",
+      "linkTextArabicPlaceholder": "تسوق الآن",
+      "colors": "Colors",
+      "backgroundColor": "Background Color",
+      "textColor": "Text Color",
+      "successMessage": "Announcement settings saved successfully",
+      "failedMessage": "Failed to save announcement settings",
+      "connectionError": "Unable to connect to the server"
+    }
+  },
   "features": {
     "page": {
       "title": "Store Features",
@@ -2325,12 +2531,215 @@
       "enabledOn": "on"
     }
   },
-  "template": {},
-  "seo": {},
-  "language": {},
-  "domain": {},
-  "categories": {},
-  "reviews": {},
+  "template": {
+    "page": {
+      "title": "Choose Template",
+      "subtitleWithStore": "Select a template for {storeName}",
+      "storeNotFound": "Store not found",
+      "backToStores": "Back to stores",
+      "cancel": "Cancel",
+      "apply": "Apply Template",
+      "saving": "Saving...",
+      "current": "Current",
+      "aboutTitle": "About Templates",
+      "aboutBody": "Templates define the overall look and feel of your storefront. You can change templates at any time, and your content will automatically adapt to the new design. Customize colors and fonts in the",
+      "brandingSettings": "Branding settings"
+    }
+  },
+  "seo": {
+    "page": {
+      "title": "SEO Settings",
+      "subtitle": "Optimize your store for search engines",
+      "loading": "Loading...",
+      "backToSettings": "Back to Settings",
+      "saveChanges": "Save Changes",
+      "saving": "Saving...",
+      "searchPreview": "Search Result Preview",
+      "previewDomain": "example.com",
+      "englishSeo": "English SEO",
+      "arabicSeo": "Arabic SEO",
+      "enBadge": "EN",
+      "arBadge": "AR",
+      "advanced": "Advanced",
+      "metaTitle": "Meta Title",
+      "metaTitlePlaceholder": "My Store — Best Products in Kuwait",
+      "metaTitleHint": "Appears in browser tabs and search results. Keep under {max} characters for best results.",
+      "metaDescription": "Meta Description",
+      "metaDescriptionPlaceholder": "Discover our wide range of products with fast delivery across Kuwait...",
+      "metaDescriptionHint": "Shown in search result snippets. Keep under {max} characters for best results.",
+      "metaTitleAr": "Meta Title (Arabic)",
+      "metaTitleArPlaceholder": "متجري — أفضل المنتجات في الكويت",
+      "metaDescriptionAr": "Meta Description (Arabic)",
+      "metaDescriptionArPlaceholder": "اكتشف مجموعتنا الواسعة من المنتجات مع توصيل سريع في الكويت...",
+      "ogImage": "OG Image URL",
+      "ogImagePlaceholder": "https://example.com/og-image.jpg",
+      "ogImageHint": "Image shown when your store is shared on social media. Recommended: 1200×630px.",
+      "twitterHandle": "Twitter / X Handle",
+      "twitterPlaceholder": "yourstorehandle",
+      "googleSiteVerification": "Google Site Verification",
+      "googleSiteVerificationPlaceholder": "Verification meta tag content",
+      "googleSiteVerificationHint": "From Google Search Console verification",
+      "successMessage": "SEO settings saved successfully",
+      "failedMessage": "Failed to save SEO settings",
+      "connectionError": "Unable to connect to the server"
+    }
+  },
+  "language": {
+    "page": {
+      "title": "Language Settings",
+      "subtitle": "Set the default language for your storefront",
+      "loading": "Loading...",
+      "backToSettings": "Back to Settings",
+      "save": "Save Changes",
+      "saving": "Saving...",
+      "defaultTitle": "Default Storefront Language",
+      "defaultHint": "New visitors will see the storefront in this language. They can still switch languages manually.",
+      "englishName": "English",
+      "englishLayout": "Left-to-right layout",
+      "arabicName": "العربية",
+      "arabicLayout": "Right-to-left layout",
+      "successMessage": "Language settings saved successfully",
+      "failedMessage": "Failed to save language settings",
+      "connectionError": "Unable to connect to the server"
+    }
+  },
+  "domain": {
+    "page": {
+      "title": "Custom Domain",
+      "subtitle": "Connect a custom domain to your store",
+      "heading": "Custom Domain",
+      "storeDomainSuffix": "Domain",
+      "storeNotFound": "Store not found.",
+      "addDomain": "Add Domain",
+      "changeDomain": "Change Domain",
+      "remove": "Remove",
+      "domain": "Domain",
+      "domainPlaceholder": "shop.example.com",
+      "domainRemoveHint": "Leave empty and save to remove the custom domain.",
+      "save": "Save",
+      "saving": "Saving...",
+      "cancel": "Cancel",
+      "verified": "Verified",
+      "pending": "Pending Verification",
+      "dnsRequired": "DNS Configuration Required",
+      "dnsInstructions": "Add the following DNS record to your domain provider:",
+      "dnsPropagation": "DNS changes can take up to 48 hours to propagate.",
+      "checkDns": "Check DNS",
+      "checkingDns": "Checking...",
+      "verifiedMessage": "Domain is verified and SSL is active. Your store is accessible at https://{domain}",
+      "noDomain": "No custom domain configured. This store is accessible via its default subdomain.",
+      "dnsTableLabel": "DNS records",
+      "colType": "Type",
+      "colName": "Name",
+      "colValue": "Value",
+      "invalidDomain": "Please enter a valid domain (e.g., shop.example.com)",
+      "updateFailed": "Failed to update domain"
+    }
+  },
+  "categories": {
+    "page": {
+      "title": "Product Categories",
+      "subtitle": "Manage categories for this store",
+      "backToStore": "Back to Store",
+      "addCategory": "Add Category",
+      "retry": "Retry",
+      "connectionError": "Unable to connect to the server. Please check your connection and try again.",
+      "fetchFailed": "Failed to fetch categories",
+      "deleteTitle": "Delete Category",
+      "deleteConfirm": "Delete category \"{name}\"? This cannot be undone.",
+      "cancel": "Cancel",
+      "delete": "Delete",
+      "deleting": "Deleting...",
+      "toastDeletedTitle": "Category Deleted",
+      "toastDeletedBody": "\"{name}\" has been removed.",
+      "errorTitle": "Error",
+      "deleteFailed": "Failed to delete category"
+    },
+    "form": {
+      "editTitle": "Edit Category",
+      "addTitle": "Add Category",
+      "close": "Close",
+      "nameEnglish": "Name (English)",
+      "nameEnglishPlaceholder": "Electronics",
+      "nameArabic": "Name (Arabic)",
+      "nameArabicPlaceholder": "إلكترونيات",
+      "urlSlug": "URL Slug",
+      "urlSlugPlaceholder": "electronics",
+      "urlSlugHint": "Used in URLs: lowercase, hyphens only",
+      "description": "Description",
+      "descriptionPlaceholder": "Category description...",
+      "descriptionArabic": "Description (Arabic)",
+      "descriptionArabicPlaceholder": "وصف التصنيف...",
+      "categoryImage": "Category Image",
+      "uploadCategoryImage": "Upload Category Image",
+      "required": "*",
+      "cancel": "Cancel",
+      "saving": "Saving...",
+      "updateCategory": "Update Category",
+      "createCategory": "Create Category",
+      "errorNameRequired": "Name is required",
+      "errorSlugRequired": "Slug is required",
+      "errorSlugInvalid": "Slug must be lowercase letters, numbers, Arabic characters and hyphens only",
+      "updatedSuccess": "Category updated successfully",
+      "createdSuccess": "Category created successfully",
+      "updateFailed": "Failed to update category",
+      "createFailed": "Failed to create category",
+      "slugInUse": "This slug is already in use",
+      "connectionError": "Unable to connect to the server"
+    },
+    "table": {
+      "label": "Categories",
+      "empty": "No categories yet",
+      "addFirst": "Add your first category",
+      "category": "Category",
+      "slug": "Slug",
+      "products": "Products",
+      "status": "Status",
+      "actions": "Actions",
+      "active": "Active",
+      "inactive": "Inactive",
+      "edit": "Edit",
+      "delete": "Delete",
+      "deleting": "Deleting..."
+    }
+  },
+  "reviews": {
+    "page": {
+      "title": "Reviews",
+      "subtitle": "Manage product reviews and ratings",
+      "filterAll": "All Reviews",
+      "filterPending": "Pending Approval",
+      "filterApproved": "Approved",
+      "loading": "Loading reviews...",
+      "empty": "No reviews found",
+      "approved": "Approved",
+      "pending": "Pending",
+      "verifiedPurchase": "Verified Purchase",
+      "productLabel": "Product: ",
+      "byLabel": "By: ",
+      "anonymous": "Anonymous",
+      "helpfulSuffix": " helpful",
+      "approve": "Approve",
+      "unapprove": "Unapprove",
+      "delete": "Delete",
+      "paginationShowing": "Showing {from} to {to} of {total} reviews",
+      "previous": "Previous",
+      "next": "Next",
+      "deleteModalTitle": "Delete Review",
+      "deleteModalBody": "Are you sure you want to delete this review? This action cannot be undone.",
+      "cancel": "Cancel",
+      "toastApproveFailed": "Failed to approve review. Please try again.",
+      "toastUnapproveFailed": "Failed to unapprove review. Please try again.",
+      "toastDeleteFailed": "Failed to delete review. Please try again.",
+      "toastApproveTitle": "Review Approved",
+      "toastApproveBody": "The review is now visible to customers.",
+      "toastUnapproveTitle": "Review Unapproved",
+      "toastUnapproveBody": "The review has been unapproved.",
+      "toastDeleteTitle": "Review Deleted",
+      "toastDeleteBody": "The review has been permanently removed.",
+      "errorTitle": "Error"
+    }
+  },
   "audit": {
     "title": "Audit Logs",
     "subtitle": "Track all platform activity and changes",
@@ -2532,6 +2941,12 @@
     "errorState": {
       "defaultTitle": "Something went wrong",
       "defaultRetry": "Try Again"
+    },
+    "languageSwitcher": {
+      "ariaLabel": "Language"
+    },
+    "brand": {
+      "forceMediaAlt": "Force Media"
     }
   }
 }

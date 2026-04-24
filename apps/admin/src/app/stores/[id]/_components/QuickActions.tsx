@@ -29,7 +29,7 @@ export function QuickActions({
           <button
             disabled={isChangingStatus}
             onClick={onRequestSuspend}
-            className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm transition-all duration-200 hover:border-destructive/40 hover:shadow-md cursor-pointer text-left disabled:opacity-60 disabled:cursor-not-allowed"
+            className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm transition-all duration-200 hover:border-destructive/40 hover:shadow-md cursor-pointer text-start disabled:opacity-60 disabled:cursor-not-allowed"
           >
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-destructive/10">
               {isChangingStatus ? (
@@ -59,7 +59,7 @@ export function QuickActions({
           <button
             disabled={isChangingStatus}
             onClick={onActivate}
-            className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm transition-all duration-200 hover:border-success/40 hover:shadow-md cursor-pointer text-left disabled:opacity-60 disabled:cursor-not-allowed"
+            className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm transition-all duration-200 hover:border-success/40 hover:shadow-md cursor-pointer text-start disabled:opacity-60 disabled:cursor-not-allowed"
           >
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success/10">
               {isChangingStatus ? (

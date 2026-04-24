@@ -1,6 +1,7 @@
 'use client';
 
 import { ImageUpload } from '../../../../components/ImageUpload';
+import { useT } from '@/i18n/useT';
 
 interface CategoryFormData {
   name: string;
@@ -38,16 +39,17 @@ export function CategoryForm({
   onClose,
   slugify,
 }: CategoryFormProps) {
+  const t = useT('categories.form');
   return (
     <div className="mb-6 rounded-xl border bg-card shadow-sm">
       <div className="flex items-center justify-between border-b p-4">
         <h2 className="font-semibold text-foreground">
-          {editingId ? 'Edit Category' : 'Add Category'}
+          {editingId ? t('editTitle') : t('addTitle')}
         </h2>
         <button
           onClick={onClose}
           className="p-1 text-muted-foreground hover:text-muted-foreground"
-          aria-label="Close"
+          aria-label={t('close')}
         >
           <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path
@@ -63,7 +65,7 @@ export function CategoryForm({
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">
-              Name (English) <span className="text-destructive">*</span>
+              {t('nameEnglish')} <span className="text-destructive">{t('required')}</span>
             </label>
             <input
               type="text"
@@ -78,19 +80,21 @@ export function CategoryForm({
                 }));
                 if (formErrors.name) onFormErrorChange(prev => ({ ...prev, name: '' }));
               }}
-              placeholder="Electronics"
+              placeholder={t('nameEnglishPlaceholder')}
               className={`w-full rounded-lg border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary ${formErrors.name ? 'border-destructive' : 'border-border'}`}
             />
             {formErrors.name && <p className="mt-1 text-xs text-destructive">{formErrors.name}</p>}
           </div>
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1">Name (Arabic)</label>
+            <label className="block text-sm font-medium text-foreground mb-1">
+              {t('nameArabic')}
+            </label>
             <input
               type="text"
               dir="rtl"
               value={form.nameAr}
               onChange={e => onFormChange(prev => ({ ...prev, nameAr: e.target.value }))}
-              placeholder="إلكترونيات"
+              placeholder={t('nameArabicPlaceholder')}
               className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             />
           </div>
@@ -98,7 +102,7 @@ export function CategoryForm({
 
         <div>
           <label className="block text-sm font-medium text-foreground mb-1">
-            URL Slug <span className="text-destructive">*</span>
+            {t('urlSlug')} <span className="text-destructive">{t('required')}</span>
           </label>
           <input
             type="text"
@@ -107,35 +111,35 @@ export function CategoryForm({
               onFormChange(prev => ({ ...prev, slug: slugify(e.target.value) }));
               if (formErrors.slug) onFormErrorChange(prev => ({ ...prev, slug: '' }));
             }}
-            placeholder="electronics"
+            placeholder={t('urlSlugPlaceholder')}
             className={`w-full rounded-lg border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary ${formErrors.slug ? 'border-destructive' : 'border-border'}`}
           />
           {formErrors.slug && <p className="mt-1 text-xs text-destructive">{formErrors.slug}</p>}
-          <p className="mt-1 text-xs text-muted-foreground">
-            Used in URLs: lowercase, hyphens only
-          </p>
+          <p className="mt-1 text-xs text-muted-foreground">{t('urlSlugHint')}</p>
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1">Description</label>
+            <label className="block text-sm font-medium text-foreground mb-1">
+              {t('description')}
+            </label>
             <textarea
               value={form.description}
               onChange={e => onFormChange(prev => ({ ...prev, description: e.target.value }))}
-              placeholder="Category description..."
+              placeholder={t('descriptionPlaceholder')}
               rows={3}
               className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
             />
           </div>
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">
-              Description (Arabic)
+              {t('descriptionArabic')}
             </label>
             <textarea
               dir="rtl"
               value={form.descriptionAr}
               onChange={e => onFormChange(prev => ({ ...prev, descriptionAr: e.target.value }))}
-              placeholder="وصف التصنيف..."
+              placeholder={t('descriptionArabicPlaceholder')}
               rows={3}
               className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
             />
@@ -143,13 +147,15 @@ export function CategoryForm({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-foreground mb-1">Category Image</label>
+          <label className="block text-sm font-medium text-foreground mb-1">
+            {t('categoryImage')}
+          </label>
           <ImageUpload
             value={form.image || undefined}
             onUpload={url => onFormChange(prev => ({ ...prev, image: url }))}
             onRemove={() => onFormChange(prev => ({ ...prev, image: '' }))}
             folder="categories"
-            label="Upload Category Image"
+            label={t('uploadCategoryImage')}
           />
         </div>
 
@@ -169,14 +175,14 @@ export function CategoryForm({
             onClick={onClose}
             className="px-4 py-2 text-sm text-foreground border border-border rounded-lg hover:bg-muted"
           >
-            Cancel
+            {t('cancel')}
           </button>
           <button
             type="submit"
             disabled={isSaving}
             className="px-6 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 font-medium"
           >
-            {isSaving ? 'Saving...' : editingId ? 'Update Category' : 'Create Category'}
+            {isSaving ? t('saving') : editingId ? t('updateCategory') : t('createCategory')}
           </button>
         </div>
       </form>

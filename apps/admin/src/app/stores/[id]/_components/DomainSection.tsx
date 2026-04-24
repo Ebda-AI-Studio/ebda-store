@@ -181,19 +181,19 @@ export function DomainSection({ storeId, domain, onDomainChange }: DomainSection
                         <tr className="border-b bg-amber-50">
                           <th
                             scope="col"
-                            className="px-3 py-2 text-left font-medium text-amber-900"
+                            className="px-3 py-2 text-start font-medium text-amber-900"
                           >
                             {t('columnType')}
                           </th>
                           <th
                             scope="col"
-                            className="px-3 py-2 text-left font-medium text-amber-900"
+                            className="px-3 py-2 text-start font-medium text-amber-900"
                           >
                             {t('columnName')}
                           </th>
                           <th
                             scope="col"
-                            className="px-3 py-2 text-left font-medium text-amber-900"
+                            className="px-3 py-2 text-start font-medium text-amber-900"
                           >
                             {t('columnValue')}
                           </th>
