@@ -1,12 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Button, Input, Textarea, Select } from '@force/ui';
+import { Button, Input, Textarea } from '@force/ui';
+import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../../../components/AdminLayout';
 import { MultiImageUpload } from '../../../../../../components/ImageUpload';
 import { useAuth } from '../../../../../../lib/auth';
 import { apiGet, apiPut } from '../../../../../../lib/api';
+import { EditSidebar } from './_components/EditSidebar';
 
 interface Product {
   id: string;
@@ -33,18 +35,16 @@ interface Category {
   name: string;
 }
 
-const statuses = [
-  { value: 'draft', label: 'Draft' },
-  { value: 'active', label: 'Active' },
-  { value: 'archived', label: 'Archived' },
-];
-
 export default function EditProductPage() {
   const params = useParams();
   const router = useRouter();
   const { isAuthenticated } = useAuth();
   const storeId = params?.id as string;
   const productId = params?.productId as string;
+  const t = useT('products.edit');
+  const tSections = useT('products.edit.sections');
+  const tFields = useT('products.edit.fields');
+  const tStatusOptions = useT('products.edit.statusOptions');
 
   const [product, setProduct] = useState<Product | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -68,6 +68,15 @@ export default function EditProductPage() {
     category: '',
   });
 
+  const statuses = useMemo(
+    () => [
+      { value: 'draft', label: tStatusOptions('draft') },
+      { value: 'active', label: tStatusOptions('active') },
+      { value: 'archived', label: tStatusOptions('archived') },
+    ],
+    [tStatusOptions]
+  );
+
   useEffect(() => {
     async function fetchProductAndCategories() {
       if (!isAuthenticated || !storeId || !productId) return;
@@ -82,24 +91,22 @@ export default function EditProductPage() {
           apiGet<{ categories: Category[] }>(`/api/v1/stores/${storeId}/categories`),
         ]);
 
-        // Handle categories
         if (categoriesResult.data?.categories) {
           setCategories(categoriesResult.data.categories);
         } else {
           setCategories([]);
         }
 
-        // Handle product
         const { data, error: apiError } = productResult;
 
         if (apiError) {
-          setError(apiError.status === 404 ? 'Product not found' : 'Failed to load product');
+          setError(apiError.status === 404 ? t('notFound') : t('loadFailed'));
           return;
         }
 
         const p = data?.product || data;
         if (!p) {
-          setError('Failed to load product');
+          setError(t('loadFailed'));
           return;
         }
         setProduct(p);
@@ -127,14 +134,14 @@ export default function EditProductPage() {
           category: p.categories?.[0]?.categoryId || p.categories?.[0]?.category?.id || '',
         });
       } catch {
-        setError('Failed to load product');
+        setError(t('loadFailed'));
       } finally {
         setLoading(false);
       }
     }
 
     fetchProductAndCategories();
-  }, [productId, storeId, isAuthenticated]);
+  }, [productId, storeId, isAuthenticated, t]);
 
   const updateField = (field: string, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -186,20 +193,20 @@ export default function EditProductPage() {
 
       router.push(`/stores/${storeId}/products/${productId}`);
     } catch {
-      setError('Failed to update product. Please try again.');
+      setError(t('updateFailed'));
     } finally {
       setSaving(false);
     }
   };
 
   const categoryOptions = [
-    { value: '', label: 'No category' },
+    { value: '', label: tFields('noCategory') },
     ...categories.map(c => ({ value: c.id, label: c.name })),
   ];
 
   if (loading) {
     return (
-      <AdminLayout title="Loading..." subtitle="">
+      <AdminLayout title={t('loading')} subtitle="">
         <div className="flex items-center justify-center py-12">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
         </div>
@@ -209,11 +216,11 @@ export default function EditProductPage() {
 
   if (error && !product) {
     return (
-      <AdminLayout title="Product Not Found" subtitle="">
+      <AdminLayout title={t('notFoundTitle')} subtitle="">
         <div className="rounded-xl border bg-card p-8 text-center">
           <h3 className="mt-4 text-lg font-medium text-foreground">{error}</h3>
           <Button className="mt-6" onClick={() => router.push(`/stores/${storeId}/products`)}>
-            Back to Products
+            {t('backToProducts')}
           </Button>
         </div>
       </AdminLayout>
@@ -222,8 +229,8 @@ export default function EditProductPage() {
 
   return (
     <AdminLayout
-      title={`Edit: ${product?.name || 'Product'}`}
-      subtitle={`Store: ${product?.store?.name || 'Unknown'}`}
+      title={t('title', { name: product?.name || t('fallbackTitle') })}
+      subtitle={t('subtitle', { storeName: product?.store?.name || t('fallbackStore') })}
     >
       <form onSubmit={handleSubmit}>
         {error && (
@@ -235,34 +242,36 @@ export default function EditProductPage() {
         <div className="grid gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2 space-y-6">
             <div className="rounded-xl border bg-card p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-foreground mb-4">Basic Information</h2>
+              <h2 className="text-lg font-semibold text-foreground mb-4">
+                {tSections('basicInformation')}
+              </h2>
               <div className="space-y-4">
                 <Input
-                  label="Product Name"
+                  label={tFields('name')}
                   value={formData.name}
                   onChange={e => updateField('name', e.target.value)}
-                  placeholder="Enter product name"
+                  placeholder={tFields('namePlaceholder')}
                   required
                 />
                 <Input
-                  label="Product Name (Arabic)"
+                  label={tFields('nameAr')}
                   value={formData.nameAr}
                   onChange={e => updateField('nameAr', e.target.value)}
-                  placeholder="ادخل اسم المنتج"
+                  placeholder={tFields('nameArPlaceholder')}
                   dir="rtl"
                 />
                 <Textarea
-                  label="Description"
+                  label={tFields('description')}
                   value={formData.description}
                   onChange={e => updateField('description', e.target.value)}
-                  placeholder="Describe your product..."
+                  placeholder={tFields('descriptionPlaceholder')}
                   rows={4}
                 />
                 <Textarea
-                  label="Description (Arabic)"
+                  label={tFields('descriptionAr')}
                   value={formData.descriptionAr}
                   onChange={e => updateField('descriptionAr', e.target.value)}
-                  placeholder="وصف المنتج..."
+                  placeholder={tFields('descriptionArPlaceholder')}
                   rows={4}
                   dir="rtl"
                 />
@@ -270,120 +279,75 @@ export default function EditProductPage() {
             </div>
 
             <div className="rounded-xl border bg-card p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-foreground mb-4">Media</h2>
+              <h2 className="text-lg font-semibold text-foreground mb-4">{tSections('media')}</h2>
               <MultiImageUpload
                 values={images}
                 onChange={setImages}
                 folder="products"
-                label="Drag and drop images here, or click to select"
+                label={tFields('mediaHint')}
                 max={10}
               />
             </div>
 
             <div className="rounded-xl border bg-card p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-foreground mb-4">Pricing</h2>
+              <h2 className="text-lg font-semibold text-foreground mb-4">{tSections('pricing')}</h2>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Input
-                  label="Price (KWD)"
+                  label={tFields('price')}
                   type="number"
                   step="0.001"
                   value={formData.price}
                   onChange={e => updateField('price', e.target.value)}
-                  placeholder="0.000"
+                  placeholder={tFields('pricePlaceholder')}
                   required
                 />
                 <Input
-                  label="Compare at Price (KWD)"
+                  label={tFields('compareAtPrice')}
                   type="number"
                   step="0.001"
                   value={formData.compareAtPrice}
                   onChange={e => updateField('compareAtPrice', e.target.value)}
-                  placeholder="0.000"
+                  placeholder={tFields('pricePlaceholder')}
                 />
               </div>
             </div>
 
             <div className="rounded-xl border bg-card p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-foreground mb-4">Inventory</h2>
+              <h2 className="text-lg font-semibold text-foreground mb-4">
+                {tSections('inventory')}
+              </h2>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Input
-                  label="SKU"
+                  label={tFields('sku')}
                   value={formData.sku}
                   onChange={e => updateField('sku', e.target.value)}
-                  placeholder="PROD-001"
+                  placeholder={tFields('skuPlaceholder')}
                 />
                 <Input
-                  label="Quantity"
+                  label={tFields('quantity')}
                   type="number"
                   value={formData.inventory}
                   onChange={e => updateField('inventory', e.target.value)}
-                  placeholder="0"
+                  placeholder={tFields('quantityPlaceholder')}
                 />
               </div>
             </div>
           </div>
 
-          <div className="space-y-6">
-            <div className="rounded-xl border bg-card p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-foreground mb-4">Status</h2>
-              <Select
-                label="Product Status"
-                value={formData.status}
-                onChange={e => updateField('status', e.target.value)}
-                options={statuses}
-              />
-            </div>
-
-            <div className="rounded-xl border bg-card p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-foreground mb-4">Organization</h2>
-              <Select
-                label="Category"
-                value={formData.category}
-                onChange={e => updateField('category', e.target.value)}
-                options={categoryOptions}
-              />
-            </div>
-
-            <div className="rounded-xl border bg-card p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-foreground mb-4">Product Flags</h2>
-              <div className="space-y-3">
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.isFeatured}
-                    onChange={e => updateField('isFeatured', e.target.checked)}
-                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-                  />
-                  <span className="text-sm text-foreground">Featured Product</span>
-                </label>
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.isNew}
-                    onChange={e => updateField('isNew', e.target.checked)}
-                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-                  />
-                  <span className="text-sm text-foreground">New Arrival</span>
-                </label>
-              </div>
-            </div>
-
-            <div className="rounded-xl border bg-card p-6 shadow-sm">
-              <div className="space-y-3">
-                <Button type="submit" className="w-full" isLoading={saving}>
-                  Save Changes
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => router.push(`/stores/${storeId}/products/${productId}`)}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          </div>
+          <EditSidebar
+            status={formData.status}
+            onStatusChange={value => updateField('status', value)}
+            statuses={statuses}
+            category={formData.category}
+            onCategoryChange={value => updateField('category', value)}
+            categoryOptions={categoryOptions}
+            isFeatured={formData.isFeatured}
+            onFeaturedChange={value => updateField('isFeatured', value)}
+            isNew={formData.isNew}
+            onIsNewChange={value => updateField('isNew', value)}
+            saving={saving}
+            onCancel={() => router.push(`/stores/${storeId}/products/${productId}`)}
+          />
         </div>
       </form>
     </AdminLayout>

@@ -200,6 +200,236 @@
         "deleteFailedTitle": "Delete failed",
         "deleteFailedDescription": "Failed to delete the product. Please try again."
       }
+    },
+    "detail": {
+      "loading": "Loading...",
+      "notFoundTitle": "Product Not Found",
+      "notFound": "Product not found",
+      "loadFailed": "Failed to load product",
+      "notFoundBody": "The product you're looking for doesn't exist or has been removed.",
+      "subtitle": "SKU: {sku} • Store: {storeName}",
+      "fallbackSku": "N/A",
+      "fallbackStore": "Unknown",
+      "actions": {
+        "edit": "Edit",
+        "manageVariants": "Manage Variants",
+        "recommendations": "Recommendations",
+        "delete": "Delete",
+        "backToProducts": "Back to Products"
+      },
+      "status": {
+        "active": "Active",
+        "draft": "Draft",
+        "archived": "Archived"
+      },
+      "sections": {
+        "productDetails": "Product Details",
+        "pricing": "Pricing",
+        "inventory": "Inventory",
+        "images": "Images",
+        "categories": "Categories",
+        "tags": "Tags",
+        "flags": "Product Flags",
+        "timestamps": "Timestamps"
+      },
+      "fields": {
+        "name": "Name",
+        "nameAr": "Name (Arabic)",
+        "slug": "Slug",
+        "status": "Status",
+        "description": "Description",
+        "descriptionAr": "Description (Arabic)",
+        "price": "Price",
+        "compareAtPrice": "Compare at Price",
+        "costPrice": "Cost Price",
+        "sku": "SKU",
+        "barcode": "Barcode",
+        "stock": "Stock",
+        "stockInStock": "{count} in stock",
+        "featured": "Featured",
+        "newArrival": "New Arrival",
+        "trackInventory": "Track Inventory",
+        "yes": "Yes",
+        "no": "No",
+        "created": "Created",
+        "updated": "Updated"
+      },
+      "deleteModal": {
+        "title": "Delete Product",
+        "messageBefore": "Are you sure you want to delete",
+        "messageAfter": "? This action cannot be undone.",
+        "cancel": "Cancel",
+        "confirm": "Delete Product",
+        "deleting": "Deleting..."
+      },
+      "toasts": {
+        "deletedTitle": "Product deleted",
+        "deletedDescription": "{name} has been deleted.",
+        "deleteFailedTitle": "Delete failed",
+        "deleteFailedDescription": "Failed to delete the product. Please try again."
+      }
+    },
+    "edit": {
+      "loading": "Loading...",
+      "notFoundTitle": "Product Not Found",
+      "notFound": "Product not found",
+      "loadFailed": "Failed to load product",
+      "updateFailed": "Failed to update product. Please try again.",
+      "title": "Edit: {name}",
+      "fallbackTitle": "Product",
+      "subtitle": "Store: {storeName}",
+      "fallbackStore": "Unknown",
+      "backToProducts": "Back to Products",
+      "sections": {
+        "basicInformation": "Basic Information",
+        "media": "Media",
+        "pricing": "Pricing",
+        "inventory": "Inventory",
+        "status": "Status",
+        "organization": "Organization",
+        "flags": "Product Flags"
+      },
+      "fields": {
+        "name": "Product Name",
+        "namePlaceholder": "Enter product name",
+        "nameAr": "Product Name (Arabic)",
+        "nameArPlaceholder": "ادخل اسم المنتج",
+        "description": "Description",
+        "descriptionPlaceholder": "Describe your product...",
+        "descriptionAr": "Description (Arabic)",
+        "descriptionArPlaceholder": "وصف المنتج...",
+        "mediaHint": "Drag and drop images here, or click to select",
+        "price": "Price (KWD)",
+        "compareAtPrice": "Compare at Price (KWD)",
+        "pricePlaceholder": "0.000",
+        "sku": "SKU",
+        "skuPlaceholder": "PROD-001",
+        "quantity": "Quantity",
+        "quantityPlaceholder": "0",
+        "productStatus": "Product Status",
+        "category": "Category",
+        "noCategory": "No category",
+        "featured": "Featured Product",
+        "newArrival": "New Arrival"
+      },
+      "statusOptions": {
+        "draft": "Draft",
+        "active": "Active",
+        "archived": "Archived"
+      },
+      "actions": {
+        "saveChanges": "Save Changes",
+        "cancel": "Cancel"
+      }
+    },
+    "recommendations": {
+      "loading": "Loading...",
+      "title": "Recommendations: {productName}",
+      "fallbackProductName": "Product",
+      "subtitle": "Manage cross-sell and upsell product relationships",
+      "actions": {
+        "save": "Save Recommendations",
+        "backToEdit": "Back to Edit",
+        "cancel": "Cancel"
+      },
+      "crossSell": {
+        "title": "Frequently Bought Together",
+        "description": "Products that customers commonly buy alongside this one.",
+        "maxReached": "Maximum of {max} cross-sell products reached.",
+        "empty": "No cross-sell products added yet. Search above to add some."
+      },
+      "upsell": {
+        "title": "Upsell Alternatives",
+        "description": "Higher-value products to suggest as alternatives or upgrades.",
+        "maxReached": "Maximum of {max} upsell products reached.",
+        "empty": "No upsell products added yet. Search above to add some."
+      },
+      "search": {
+        "label": "Search products",
+        "placeholder": "Type to search products...",
+        "noResults": "No products found"
+      },
+      "errors": {
+        "loadFailed": "Failed to load existing recommendations."
+      },
+      "toasts": {
+        "saveFailedTitle": "Save failed",
+        "savedTitle": "Saved",
+        "savedDescription": "Recommendations saved successfully."
+      },
+      "counts": "{count} / {max}",
+      "removeAria": "Remove {name}"
+    },
+    "variants": {
+      "loading": "Loading...",
+      "loadingSubtitle": "Please wait",
+      "notFoundTitle": "Product Not Found",
+      "notFoundSubtitle": "The requested product could not be found",
+      "backToProducts": "Back to Products",
+      "title": "Variants: {productName}",
+      "subtitle": "Manage product options and variants",
+      "summary": {
+        "basePrice": "Base Price: {price}",
+        "totalVariantStock": "Total Variant Stock"
+      },
+      "options": {
+        "title": "Options",
+        "addOption": "Add Option",
+        "empty": "No options defined yet.",
+        "emptyHint": "Add options like \"Size\" or \"Color\"",
+        "addValue": "+ Add",
+        "generateAll": "Generate All Variants"
+      },
+      "table": {
+        "label": "Product variants",
+        "variants": "Variants ({count})",
+        "variant": "Variant",
+        "sku": "SKU",
+        "price": "Price",
+        "stock": "Stock",
+        "status": "Status",
+        "actions": "Actions",
+        "dash": "-",
+        "base": "Base",
+        "active": "Active",
+        "inactive": "Inactive",
+        "edit": "Edit",
+        "delete": "Delete",
+        "empty": "No variants created yet.",
+        "emptyHint": "Add options and click \"Generate All Variants\""
+      },
+      "optionModal": {
+        "title": "Add Option",
+        "nameLabel": "Option Name",
+        "namePlaceholder": "e.g., Size, Color",
+        "nameArLabel": "Option Name (Arabic)",
+        "nameArPlaceholder": "e.g., المقاس، اللون",
+        "valuesLabel": "Values (comma-separated)",
+        "valuesPlaceholder": "e.g., Small, Medium, Large",
+        "cancel": "Cancel",
+        "submit": "Add Option"
+      },
+      "valueModal": {
+        "title": "Add Value",
+        "valueLabel": "Value",
+        "valuePlaceholder": "e.g., XL",
+        "valueArLabel": "Value (Arabic)",
+        "cancel": "Cancel",
+        "submit": "Add Value"
+      },
+      "variantModal": {
+        "title": "Edit Variant: {title}",
+        "skuLabel": "SKU",
+        "barcodeLabel": "Barcode",
+        "priceLabel": "Price (fils)",
+        "pricePlaceholder": "Base price",
+        "compareAtLabel": "Compare At",
+        "costLabel": "Cost",
+        "inventoryLabel": "Inventory",
+        "weightLabel": "Weight (kg)",
+        "cancel": "Cancel",
+        "submit": "Save Changes"
+      }
     }
   },
   "orders": {

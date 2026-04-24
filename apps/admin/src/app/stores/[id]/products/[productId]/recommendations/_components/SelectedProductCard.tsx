@@ -1,0 +1,54 @@
+'use client';
+
+import { useT } from '@/i18n/useT';
+import type { ProductSummary } from './ProductSearch';
+
+interface SelectedProductCardProps {
+  product: ProductSummary;
+  onRemove: () => void;
+}
+
+export function SelectedProductCard({ product, onRemove }: SelectedProductCardProps) {
+  const t = useT('products.recommendations');
+
+  return (
+    <div className="flex items-center gap-3 rounded-lg border bg-card px-3 py-2">
+      <div className="h-10 w-10 rounded-md bg-muted overflow-hidden flex-shrink-0">
+        {product.images?.[0] ? (
+          <img
+            src={product.images[0].url}
+            alt={product.name}
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <div className="h-full w-full flex items-center justify-center text-muted-foreground">
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+              />
+            </svg>
+          </div>
+        )}
+      </div>
+      <span className="flex-1 text-sm font-medium text-foreground truncate">{product.name}</span>
+      <button
+        type="button"
+        onClick={onRemove}
+        className="flex-shrink-0 rounded-md p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+        aria-label={t('removeAria', { name: product.name })}
+      >
+        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M6 18L18 6M6 6l12 12"
+          />
+        </svg>
+      </button>
+    </div>
+  );
+}

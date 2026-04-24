@@ -1,0 +1,121 @@
+'use client';
+
+import { Button, Input, Label } from '@force/ui';
+import { useT } from '@/i18n/useT';
+import type { Variant, VariantFormState } from './types';
+
+interface EditVariantModalProps {
+  variant: Variant;
+  form: VariantFormState;
+  onChange: (next: VariantFormState) => void;
+  onCancel: () => void;
+  onSubmit: () => void;
+}
+
+export function EditVariantModal({
+  variant,
+  form,
+  onChange,
+  onCancel,
+  onSubmit,
+}: EditVariantModalProps) {
+  const t = useT('products.variants.variantModal');
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="w-full max-w-lg rounded-xl bg-card p-6 shadow-xl max-h-[90vh] overflow-y-auto">
+        <h3 className="text-lg font-semibold text-foreground mb-4">
+          {t('title', { title: variant.title })}
+        </h3>
+
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="variantSku">{t('skuLabel')}</Label>
+              <Input
+                id="variantSku"
+                value={form.sku}
+                onChange={e => onChange({ ...form, sku: e.target.value })}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="variantBarcode">{t('barcodeLabel')}</Label>
+              <Input
+                id="variantBarcode"
+                value={form.barcode}
+                onChange={e => onChange({ ...form, barcode: e.target.value })}
+                className="mt-1"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <Label htmlFor="variantPrice">{t('priceLabel')}</Label>
+              <Input
+                id="variantPrice"
+                type="number"
+                value={form.price}
+                onChange={e => onChange({ ...form, price: e.target.value })}
+                placeholder={t('pricePlaceholder')}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="variantCompareAt">{t('compareAtLabel')}</Label>
+              <Input
+                id="variantCompareAt"
+                type="number"
+                value={form.compareAtPrice}
+                onChange={e => onChange({ ...form, compareAtPrice: e.target.value })}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="variantCost">{t('costLabel')}</Label>
+              <Input
+                id="variantCost"
+                type="number"
+                value={form.costPrice}
+                onChange={e => onChange({ ...form, costPrice: e.target.value })}
+                className="mt-1"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="variantInventory">{t('inventoryLabel')}</Label>
+              <Input
+                id="variantInventory"
+                type="number"
+                value={form.inventory}
+                onChange={e => onChange({ ...form, inventory: e.target.value })}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="variantWeight">{t('weightLabel')}</Label>
+              <Input
+                id="variantWeight"
+                type="number"
+                step="0.01"
+                value={form.weight}
+                onChange={e => onChange({ ...form, weight: e.target.value })}
+                className="mt-1"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 mt-6">
+          <Button variant="outline" onClick={onCancel}>
+            {t('cancel')}
+          </Button>
+          <Button onClick={onSubmit}>{t('submit')}</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
