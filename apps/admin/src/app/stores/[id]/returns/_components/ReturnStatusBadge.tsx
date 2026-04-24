@@ -16,8 +16,8 @@ const STATUS_COLORS: Record<string, string> = {
   approved: 'bg-info/10 text-info dark:bg-info/30 dark:text-info',
   rejected: 'bg-destructive/10 text-destructive dark:bg-destructive/30 dark:text-destructive',
   shipped: 'bg-info/10 text-info dark:bg-info/30 dark:text-info',
-  received: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300',
-  inspecting: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300',
+  received: 'bg-info/10 text-info dark:bg-info/30 dark:text-info',
+  inspecting: 'bg-info/20 text-info dark:bg-info/40 dark:text-info',
   completed: 'bg-success/10 text-success dark:bg-success/30 dark:text-success',
   cancelled: 'bg-muted text-foreground',
 };

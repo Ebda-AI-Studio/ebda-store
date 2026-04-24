@@ -6,7 +6,7 @@ import { formatCurrency, type RecentOrder } from './types';
 const STATUS_COLORS: Record<string, string> = {
   pending: 'bg-warning/10 text-warning dark:bg-warning/30 dark:text-warning',
   confirmed: 'bg-info/10 text-info dark:bg-info/30 dark:text-info',
-  processing: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300',
+  processing: 'bg-info/10 text-info dark:bg-info/30 dark:text-info',
   shipped: 'bg-info/10 text-info dark:bg-info/30 dark:text-info',
   delivered: 'bg-success/10 text-success dark:bg-success/30 dark:text-success',
   cancelled: 'bg-destructive/10 text-destructive dark:bg-destructive/30/30 dark:text-destructive',

@@ -171,9 +171,9 @@ export function QuickActions({
             href={`/stores/${store.id}/features`}
             className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm transition-all duration-200 hover:border-primary hover:shadow-md cursor-pointer"
           >
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-100">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-info/10">
               <svg
-                className="h-5 w-5 text-indigo-600"
+                className="h-5 w-5 text-info"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"

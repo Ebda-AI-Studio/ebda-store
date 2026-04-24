@@ -27,7 +27,7 @@ export default function StoreSettingsPage() {
     {
       key: 'branding',
       href: `/stores/${storeId}/branding`,
-      color: 'bg-pink-100 text-pink-600 dark:bg-pink-900/30 dark:text-pink-300',
+      color: 'bg-primary/10 text-primary',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
@@ -118,7 +118,7 @@ export default function StoreSettingsPage() {
     {
       key: 'domain',
       href: `/stores/${storeId}/domain`,
-      color: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-300',
+      color: 'bg-info/10 text-info dark:bg-info/30 dark:text-info',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
