@@ -11,6 +11,7 @@ import { NotificationBell } from './NotificationBell';
 import AdminLanguageSwitcher from './AdminLanguageSwitcher';
 import { useStore } from '../contexts/StoreContext';
 import { useFeatures } from '../hooks/useFeatures';
+import { useT } from '@/i18n/useT';
 
 interface NavItem {
   name: string;
@@ -20,63 +21,77 @@ interface NavItem {
   featureKey?: string;
 }
 
+type NavLabels = {
+  dashboard: string;
+  stores: string;
+  users: string;
+  auditLogs: string;
+  products: string;
+  orders: string;
+  customers: string;
+  analytics: string;
+  settings: string;
+};
+
 // Super Admin navigation (Force Media platform admin)
-const superAdminNav: NavItem[] = [
-  {
-    name: 'Dashboard',
-    href: '/',
-    icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6',
-  },
-  {
-    name: 'Stores',
-    href: '/stores',
-    icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4',
-  },
-  {
-    name: 'Users',
-    href: '/users',
-    icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z',
-  },
-  {
-    name: 'Audit Logs',
-    href: '/audit-logs',
-    icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
-  },
-];
+function buildSuperAdminNav(labels: NavLabels): NavItem[] {
+  return [
+    {
+      name: labels.dashboard,
+      href: '/',
+      icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6',
+    },
+    {
+      name: labels.stores,
+      href: '/stores',
+      icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4',
+    },
+    {
+      name: labels.users,
+      href: '/users',
+      icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z',
+    },
+    {
+      name: labels.auditLogs,
+      href: '/audit-logs',
+      icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
+    },
+  ];
+}
 
 // Store Admin navigation factory — returns nav items scoped to the given storeId.
 // Using a function instead of a static array ensures that Customers and Analytics
 // link to the correct store-scoped URLs rather than the super-admin root pages.
 // Items with a `featureKey` will be filtered out when that feature is disabled.
-function buildStoreAdminNav(storeId: string): NavItem[] {
+function buildStoreAdminNav(storeId: string, labels: NavLabels): NavItem[] {
   return [
     {
-      name: 'Dashboard',
+      name: labels.dashboard,
       href: `/stores/${storeId}`,
       icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6',
     },
     {
-      name: 'Products',
+      name: labels.products,
       href: `/stores/${storeId}/products`,
       icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4',
     },
     {
-      name: 'Orders',
+      name: labels.orders,
       href: `/stores/${storeId}/orders`,
       icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01',
     },
     {
-      name: 'Customers',
+      name: labels.customers,
       href: `/stores/${storeId}/customers`,
       icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z',
     },
     {
-      name: 'Analytics',
+      name: labels.analytics,
       href: `/stores/${storeId}/analytics`,
       icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
     },
     {
-      name: 'Settings',
+      name: labels.settings,
       href: `/stores/${storeId}/settings`,
       icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z',
     },
@@ -116,6 +131,8 @@ export function AdminLayout({
   storeDomain,
   storeSlug,
 }: AdminLayoutProps) {
+  const t = useT('components.adminLayout');
+  const tc = useT('common');
   const pathname = usePathname();
   const router = useRouter();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -123,6 +140,18 @@ export function AdminLayout({
   const { user, logout, isLoading } = useAuth();
   const { selectedStoreId: globalStoreId } = useStore();
   const { isEnabled: isFeatureEnabled } = useFeatures();
+
+  const navLabels: NavLabels = {
+    dashboard: t('navDashboard'),
+    stores: t('navStores'),
+    users: t('navUsers'),
+    auditLogs: t('navAuditLogs'),
+    products: t('navProducts'),
+    orders: t('navOrders'),
+    customers: t('navCustomers'),
+    analytics: t('navAnalytics'),
+    settings: t('navSettings'),
+  };
 
   // Sync dark mode with localStorage and system preference
   useEffect(() => {
@@ -178,7 +207,10 @@ export function AdminLayout({
   // resolve to store-scoped URLs (/stores/:id/customers, /stores/:id/analytics)
   // rather than the super-admin root pages (/customers, /analytics).
   // Items with a `featureKey` are hidden when that feature is disabled.
-  const allNavItems = mode === 'super_admin' ? superAdminNav : buildStoreAdminNav(storeId ?? '');
+  const allNavItems =
+    mode === 'super_admin'
+      ? buildSuperAdminNav(navLabels)
+      : buildStoreAdminNav(storeId ?? '', navLabels);
   const navItems = allNavItems.filter(
     item => !item.featureKey || isFeatureEnabled(item.featureKey)
   );
@@ -228,10 +260,10 @@ export function AdminLayout({
               </div>
               <div>
                 <span className="text-lg font-bold tracking-tight">
-                  <span className="text-primary">Force</span>
+                  <span className="text-primary">{t('forceBrandPrefix')}</span>
                   <span className="text-foreground">
                     {' '}
-                    {mode === 'super_admin' ? 'Platform' : 'Admin'}
+                    {mode === 'super_admin' ? t('forcePlatformBrand') : t('forceAdminBrand')}
                   </span>
                 </span>
               </div>
@@ -247,8 +279,8 @@ export function AdminLayout({
                 SA
               </div>
               <div>
-                <span className="text-xs font-semibold text-foreground">Super Admin</span>
-                <p className="text-[10px] text-muted-foreground">Full platform access</p>
+                <span className="text-xs font-semibold text-foreground">{t('superAdmin')}</span>
+                <p className="text-[10px] text-muted-foreground">{t('superAdminHint')}</p>
               </div>
             </div>
           </div>
@@ -269,8 +301,8 @@ export function AdminLayout({
                 </svg>
               </div>
               <div className="flex-1 min-w-0">
-                <span className="text-xs font-semibold text-foreground">Store Admin</span>
-                <p className="text-[10px] text-muted-foreground truncate">Managing your store</p>
+                <span className="text-xs font-semibold text-foreground">{t('storeAdmin')}</span>
+                <p className="text-[10px] text-muted-foreground truncate">{t('storeAdminHint')}</p>
               </div>
             </div>
           </div>
@@ -334,7 +366,7 @@ export function AdminLayout({
           <button
             onClick={toggleTheme}
             className="flex h-11 w-11 items-center justify-center rounded-lg border border-border/60 bg-muted/40 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary cursor-pointer"
-            aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+            aria-label={isDark ? t('switchToLight') : t('switchToDark')}
           >
             {isDark ? (
               <svg
@@ -386,7 +418,7 @@ export function AdminLayout({
             <button
               onClick={logout}
               className="flex h-10 w-10 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-              aria-label="Log out"
+              aria-label={t('logout')}
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
@@ -412,6 +444,7 @@ export function AdminLayout({
       globalStoreId,
       isDark,
       toggleTheme,
+      t,
     ]
   );
 
@@ -426,7 +459,7 @@ export function AdminLayout({
               <div className="h-6 w-6 rounded-full bg-gradient-to-br from-primary to-primary/90 animate-pulse" />
             </div>
           </div>
-          <p className="text-sm font-medium text-muted-foreground">Loading dashboard...</p>
+          <p className="text-sm font-medium text-muted-foreground">{tc('loadingDashboard')}</p>
         </div>
       </div>
     );
@@ -445,15 +478,15 @@ export function AdminLayout({
 
       {/* Mobile Sidebar */}
       <aside
-        className={`fixed inset-y-0 start-0 z-50 w-72 transform border-r border-border/50 bg-card shadow-2xl transition-transform duration-300 ease-out lg:hidden ${
+        className={`fixed inset-y-0 start-0 z-50 w-72 transform border-e border-border/50 bg-card shadow-2xl transition-transform duration-300 ease-out lg:hidden ${
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         <div className="flex h-full flex-col">
           <button
             onClick={() => setIsSidebarOpen(false)}
-            className="absolute right-3 top-4 flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:hidden"
-            aria-label="Close sidebar"
+            className="absolute end-3 top-4 flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:hidden"
+            aria-label={t('closeSidebar')}
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
@@ -469,7 +502,7 @@ export function AdminLayout({
       </aside>
 
       {/* Desktop Sidebar */}
-      <aside className="fixed inset-y-0 start-0 z-30 hidden w-72 border-r border-border/50 bg-card lg:flex lg:flex-col">
+      <aside className="fixed inset-y-0 start-0 z-30 hidden w-72 border-e border-border/50 bg-card lg:flex lg:flex-col">
         {sidebarContent}
       </aside>
 
@@ -482,7 +515,7 @@ export function AdminLayout({
             <button
               onClick={() => setIsSidebarOpen(true)}
               className="flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:hidden"
-              aria-label="Open sidebar"
+              aria-label={t('openSidebar')}
             >
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
@@ -497,7 +530,7 @@ export function AdminLayout({
               <button
                 onClick={() => router.back()}
                 className="flex h-10 w-10 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                aria-label="Go back"
+                aria-label={t('goBack')}
               >
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path
@@ -542,7 +575,7 @@ export function AdminLayout({
                       d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
                     />
                   </svg>
-                  View Store
+                  {t('viewStore')}
                 </Button>
               </Link>
             )}

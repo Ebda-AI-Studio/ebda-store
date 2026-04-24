@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNotifications } from '@/contexts/NotificationContext';
 import { formatDistanceToNow } from 'date-fns';
+import { useT } from '@/i18n/useT';
 
 const iconMap: Record<string, string> = {
   new_order: '🛒',
@@ -23,6 +24,7 @@ const colorMap: Record<string, string> = {
 };
 
 export function NotificationBell() {
+  const t = useT('components.notificationBell');
   const { notifications, unreadCount, isConnected, markAsRead, markAllAsRead, clearNotifications } =
     useNotifications();
   const [isOpen, setIsOpen] = useState(false);
@@ -46,7 +48,7 @@ export function NotificationBell() {
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="relative p-2 rounded-lg hover:bg-muted dark:hover:bg-foreground transition-colors"
-        aria-label="Notifications"
+        aria-label={t('ariaLabel')}
       >
         <svg
           className="w-6 h-6 text-muted-foreground dark:text-muted-foreground"
@@ -64,14 +66,14 @@ export function NotificationBell() {
 
         {/* Unread Badge */}
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-destructive rounded-full">
+          <span className="absolute -top-1 -end-1 flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-destructive rounded-full">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
 
         {/* Connection Status Indicator */}
         <span
-          className={`absolute bottom-1 right-1 w-2 h-2 rounded-full ${
+          className={`absolute bottom-1 end-1 w-2 h-2 rounded-full ${
             isConnected ? 'bg-success' : 'bg-muted-foreground'
           }`}
         />
@@ -79,17 +81,17 @@ export function NotificationBell() {
 
       {/* Dropdown */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-card rounded-xl shadow-2xl border border-border z-50 overflow-hidden">
+        <div className="absolute end-0 mt-2 w-80 sm:w-96 bg-card rounded-xl shadow-2xl border border-border z-50 overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 bg-muted border-b border-border">
-            <h3 className="font-semibold text-foreground">Notifications</h3>
+            <h3 className="font-semibold text-foreground">{t('title')}</h3>
             <div className="flex gap-2">
               {unreadCount > 0 && (
                 <button
                   onClick={markAllAsRead}
                   className="text-xs text-primary hover:text-primary/80 font-medium"
                 >
-                  Mark all read
+                  {t('markAllRead')}
                 </button>
               )}
               {notifications.length > 0 && (
@@ -97,7 +99,7 @@ export function NotificationBell() {
                   onClick={clearNotifications}
                   className="text-xs text-muted-foreground hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground"
                 >
-                  Clear
+                  {t('clear')}
                 </button>
               )}
             </div>
@@ -121,7 +123,7 @@ export function NotificationBell() {
                   />
                 </svg>
                 <p className="mt-3 text-sm text-muted-foreground dark:text-muted-foreground">
-                  No notifications yet
+                  {t('empty')}
                 </p>
               </div>
             ) : (
@@ -173,7 +175,7 @@ export function NotificationBell() {
             <div className="px-4 py-2 bg-warning/5 dark:bg-warning/30 border-t border-warning/30 dark:border-yellow-800">
               <p className="text-xs text-warning dark:text-warning flex items-center gap-1">
                 <span className="w-2 h-2 bg-warning rounded-full animate-pulse" />
-                Reconnecting to notification server...
+                {t('reconnecting')}
               </p>
             </div>
           )}

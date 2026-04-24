@@ -1,0 +1,62 @@
+export interface Store {
+  id: string;
+  name: string;
+  slug: string;
+  domain: string | null;
+  status: 'active' | 'inactive' | 'suspended';
+  plan: 'free' | 'starter' | 'professional' | 'enterprise';
+  createdAt: string;
+  owner: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+  };
+  _count?: {
+    products: number;
+    orders: number;
+  };
+}
+
+export interface Pagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+export const statusConfig = {
+  active: {
+    variant: 'default' as const,
+    bg: 'bg-emerald-50',
+    text: 'text-emerald-700',
+    dot: 'bg-emerald-500',
+  },
+  inactive: {
+    variant: 'secondary' as const,
+    bg: 'bg-muted',
+    text: 'text-muted-foreground',
+    dot: 'bg-muted-foreground',
+  },
+  suspended: {
+    variant: 'destructive' as const,
+    bg: 'bg-destructive/5',
+    text: 'text-destructive',
+    dot: 'bg-destructive',
+  },
+};
+
+export const planConfig = {
+  free: { bg: 'bg-muted', text: 'text-foreground', icon: '🆓' },
+  starter: { bg: 'bg-info/5', text: 'text-info', icon: '🚀' },
+  professional: { bg: 'bg-violet-50', text: 'text-violet-700', icon: '💼' },
+  enterprise: { bg: 'bg-amber-50', text: 'text-amber-700', icon: '👑' },
+};
+
+export function formatDate(date: string) {
+  return new Date(date).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}

@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback } from 'react';
 import Image from 'next/image';
 import { getApiUrl } from '../lib/api';
+import { useT } from '@/i18n/useT';
 
 interface ImageUploadProps {
   value?: string;
@@ -28,10 +29,12 @@ export function ImageUpload({
   onUpload,
   onRemove,
   folder = 'products',
-  label = 'Upload Image',
+  label,
   accept = 'image/jpeg,image/png,image/webp,image/gif',
   className = '',
 }: ImageUploadProps) {
+  const t = useT('components.imageUpload');
+  const resolvedLabel = label ?? t('label');
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -64,23 +67,27 @@ export function ImageUpload({
                 if (data.success && data.data?.url) {
                   resolve(data.data.url);
                 } else {
-                  reject(new Error(data.error?.message || 'Upload failed'));
+                  reject(new Error(data.error?.message || t('errors.uploadFailed')));
                 }
               } catch {
-                reject(new Error('Invalid server response'));
+                reject(new Error(t('errors.invalidResponse')));
               }
             } else {
               try {
                 const data = JSON.parse(xhr.responseText);
-                reject(new Error(data.error?.message || `Upload failed (${xhr.status})`));
+                reject(
+                  new Error(
+                    data.error?.message || t('errors.uploadFailedWithCode', { code: xhr.status })
+                  )
+                );
               } catch {
-                reject(new Error(`Upload failed (${xhr.status})`));
+                reject(new Error(t('errors.uploadFailedWithCode', { code: xhr.status })));
               }
             }
           });
 
-          xhr.addEventListener('error', () => reject(new Error('Network error')));
-          xhr.addEventListener('abort', () => reject(new Error('Upload cancelled')));
+          xhr.addEventListener('error', () => reject(new Error(t('errors.networkError'))));
+          xhr.addEventListener('abort', () => reject(new Error(t('errors.cancelled'))));
 
           xhr.open(
             'POST',
@@ -93,13 +100,13 @@ export function ImageUpload({
 
         onUpload(url);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Upload failed');
+        setError(err instanceof Error ? err.message : t('errors.uploadFailed'));
       } finally {
         setUploading(false);
         setProgress(0);
       }
     },
-    [folder, onUpload]
+    [folder, onUpload, t]
   );
 
   const handleFile = useCallback(
@@ -107,19 +114,20 @@ export function ImageUpload({
       const acceptTypes = accept.split(',').map(t => t.trim());
       if (
         !acceptTypes.some(
-          t => file.type === t || (t.endsWith('/*') && file.type.startsWith(t.replace('/*', '/')))
+          tp =>
+            file.type === tp || (tp.endsWith('/*') && file.type.startsWith(tp.replace('/*', '/')))
         )
       ) {
-        setError(`File type ${file.type} not accepted`);
+        setError(t('errors.typeNotAccepted', { type: file.type }));
         return;
       }
       if (file.size > 10 * 1024 * 1024) {
-        setError('File must be under 10MB');
+        setError(t('errors.tooLarge'));
         return;
       }
       uploadFile(file);
     },
-    [accept, uploadFile]
+    [accept, uploadFile, t]
   );
 
   const handleDrop = useCallback(
@@ -147,7 +155,7 @@ export function ImageUpload({
         <div className="rounded-lg border bg-muted p-3">
           <Image
             src={value}
-            alt={label}
+            alt={resolvedLabel}
             width={200}
             height={96}
             className="h-24 w-auto object-contain mx-auto"
@@ -157,7 +165,8 @@ export function ImageUpload({
           <button
             type="button"
             onClick={onRemove}
-            className="absolute top-1 right-1 p-1 bg-destructive text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+            className="absolute top-1 end-1 p-1 bg-destructive text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+            aria-label={t('remove')}
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
@@ -198,7 +207,7 @@ export function ImageUpload({
         {uploading ? (
           <div className="space-y-2">
             <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-            <p className="text-sm text-muted-foreground">{progress}%</p>
+            <p className="text-sm text-muted-foreground">{t('uploadingPercent', { progress })}</p>
             <div className="mx-auto w-32 h-1.5 bg-muted rounded-full overflow-hidden">
               <div
                 className="h-full bg-primary rounded-full transition-all"
@@ -221,8 +230,8 @@ export function ImageUpload({
                 d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
               />
             </svg>
-            <p className="mt-1 text-sm text-muted-foreground">{label}</p>
-            <p className="text-xs text-muted-foreground">Drag & drop or click to browse</p>
+            <p className="mt-1 text-sm text-muted-foreground">{resolvedLabel}</p>
+            <p className="text-xs text-muted-foreground">{t('browse')}</p>
           </>
         )}
       </div>
@@ -236,10 +245,12 @@ export function MultiImageUpload({
   values,
   onChange,
   folder = 'products',
-  label = 'Upload Images',
+  label,
   max = 10,
   className = '',
 }: MultiImageUploadProps) {
+  const t = useT('components.imageUpload');
+  const resolvedLabel = label ?? t('multiLabel');
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -250,7 +261,7 @@ export function MultiImageUpload({
     async (files: File[]) => {
       const remaining = max - values.length;
       if (remaining <= 0) {
-        setError(`Maximum ${max} images allowed`);
+        setError(t('errors.maxReached', { max }));
         return;
       }
 
@@ -279,22 +290,26 @@ export function MultiImageUpload({
                 if (data.success && data.data?.files) {
                   resolve(data.data.files.map((f: { url: string }) => f.url));
                 } else {
-                  reject(new Error(data.error?.message || 'Upload failed'));
+                  reject(new Error(data.error?.message || t('errors.uploadFailed')));
                 }
               } catch {
-                reject(new Error('Invalid server response'));
+                reject(new Error(t('errors.invalidResponse')));
               }
             } else {
               try {
                 const data = JSON.parse(xhr.responseText);
-                reject(new Error(data.error?.message || `Upload failed (${xhr.status})`));
+                reject(
+                  new Error(
+                    data.error?.message || t('errors.uploadFailedWithCode', { code: xhr.status })
+                  )
+                );
               } catch {
-                reject(new Error(`Upload failed (${xhr.status})`));
+                reject(new Error(t('errors.uploadFailedWithCode', { code: xhr.status })));
               }
             }
           });
 
-          xhr.addEventListener('error', () => reject(new Error('Network error')));
+          xhr.addEventListener('error', () => reject(new Error(t('errors.networkError'))));
 
           xhr.open(
             'POST',
@@ -307,13 +322,13 @@ export function MultiImageUpload({
 
         onChange([...values, ...newUrls]);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Upload failed');
+        setError(err instanceof Error ? err.message : t('errors.uploadFailed'));
       } finally {
         setUploading(false);
         setProgress(0);
       }
     },
-    [folder, max, onChange, values]
+    [folder, max, onChange, values, t]
   );
 
   const handleFiles = useCallback(
@@ -324,12 +339,12 @@ export function MultiImageUpload({
         return true;
       });
       if (files.length === 0) {
-        setError('No valid image files selected');
+        setError(t('errors.noValidFiles'));
         return;
       }
       uploadFiles(files);
     },
-    [uploadFiles]
+    [uploadFiles, t]
   );
 
   const handleDrop = useCallback(
@@ -377,10 +392,15 @@ export function MultiImageUpload({
               key={url}
               className="relative group aspect-square rounded-lg border bg-muted overflow-hidden"
             >
-              <Image src={url} alt={`Image ${i + 1}`} fill className="object-cover" />
+              <Image
+                src={url}
+                alt={t('imageAlt', { index: i + 1 })}
+                fill
+                className="object-cover"
+              />
               {i === 0 && (
-                <span className="absolute top-1 left-1 bg-primary text-white text-[10px] font-medium px-1.5 py-0.5 rounded">
-                  Main
+                <span className="absolute top-1 start-1 bg-primary text-white text-[10px] font-medium px-1.5 py-0.5 rounded">
+                  {t('main')}
                 </span>
               )}
               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100">
@@ -389,7 +409,8 @@ export function MultiImageUpload({
                     type="button"
                     onClick={() => moveImage(i, i - 1)}
                     className="p-1 bg-white rounded-full shadow"
-                    title="Move left"
+                    title={t('moveLeft')}
+                    aria-label={t('moveLeft')}
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path
@@ -406,7 +427,8 @@ export function MultiImageUpload({
                     type="button"
                     onClick={() => moveImage(i, i + 1)}
                     className="p-1 bg-white rounded-full shadow"
-                    title="Move right"
+                    title={t('moveRight')}
+                    aria-label={t('moveRight')}
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path
@@ -422,7 +444,8 @@ export function MultiImageUpload({
                   type="button"
                   onClick={() => removeImage(i)}
                   className="p-1 bg-destructive text-white rounded-full shadow"
-                  title="Remove"
+                  title={t('remove')}
+                  aria-label={t('remove')}
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path
@@ -465,7 +488,7 @@ export function MultiImageUpload({
           {uploading ? (
             <div className="space-y-2">
               <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              <p className="text-sm text-muted-foreground">Uploading... {progress}%</p>
+              <p className="text-sm text-muted-foreground">{t('uploadingMulti', { progress })}</p>
               <div className="mx-auto w-40 h-1.5 bg-muted rounded-full overflow-hidden">
                 <div
                   className="h-full bg-primary rounded-full transition-all"
@@ -488,9 +511,9 @@ export function MultiImageUpload({
                   d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
                 />
               </svg>
-              <p className="mt-2 text-sm text-muted-foreground">{label}</p>
+              <p className="mt-2 text-sm text-muted-foreground">{resolvedLabel}</p>
               <p className="text-xs text-muted-foreground">
-                Drag & drop or click to browse ({values.length}/{max})
+                {t('browseMulti', { count: values.length, max })}
               </p>
             </>
           )}

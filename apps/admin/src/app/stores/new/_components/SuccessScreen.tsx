@@ -1,0 +1,160 @@
+'use client';
+
+import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
+import { Badge, Button } from '@force/ui';
+import { AdminLayout } from '../../../../components/AdminLayout';
+import { apiGet } from '../../../../lib/api';
+import { useT } from '@/i18n/useT';
+import type { CreatedOwner, CreatedStore, DomainStatus } from './types';
+
+interface SuccessScreenProps {
+  store: CreatedStore;
+  owner: CreatedOwner;
+}
+
+export function SuccessScreen({ store, owner }: SuccessScreenProps) {
+  const t = useT('stores.new');
+  const [domainStatus, setDomainStatus] = useState<DomainStatus | null>(null);
+  const [isCheckingDns, setIsCheckingDns] = useState(false);
+
+  const checkDomainStatus = useCallback(async (storeId: string) => {
+    setIsCheckingDns(true);
+    try {
+      const { data } = await apiGet<DomainStatus>(`/api/v1/stores/${storeId}/domain`);
+      if (data) {
+        setDomainStatus(data);
+      }
+    } catch {
+      // Silently fail — DNS check is non-critical
+    } finally {
+      setIsCheckingDns(false);
+    }
+  }, []);
+
+  // Auto-check DNS on mount if a custom domain was provided
+  useEffect(() => {
+    if (store.domain) {
+      checkDomainStatus(store.id);
+    }
+  }, [store.domain, store.id, checkDomainStatus]);
+
+  return (
+    <AdminLayout title={t('successTitle')} subtitle={t('successSubtitle')}>
+      <div className="mx-auto max-w-2xl">
+        <div className="rounded-xl border bg-card p-8 shadow-sm text-center">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[hsl(var(--success))]/10">
+            <svg
+              className="h-8 w-8 text-[hsl(var(--success))]"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M5 13l4 4L19 7"
+              />
+            </svg>
+          </div>
+          <h2 className="mt-4 text-2xl font-bold text-foreground">{t('successHeading')}</h2>
+          <p className="mt-2 text-muted-foreground">{t('successMessage', { name: store.name })}</p>
+
+          <div className="mt-6 rounded-lg bg-muted p-4 text-start">
+            <h3 className="font-semibold text-foreground">{t('storeDetails')}</h3>
+            <dl className="mt-2 space-y-1 text-sm">
+              <div className="flex justify-between">
+                <dt className="text-muted-foreground">{t('storeUrl')}</dt>
+                <dd className="font-medium">{store.domain || `${store.slug}.forcemediakw.com`}</dd>
+              </div>
+              {store.domain && (
+                <div className="flex justify-between">
+                  <dt className="text-muted-foreground">{t('defaultUrl')}</dt>
+                  <dd className="font-medium text-muted-foreground">
+                    {store.slug}.forcemediakw.com
+                  </dd>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <dt className="text-muted-foreground">{t('ownerEmail')}</dt>
+                <dd className="font-medium">{owner.email}</dd>
+              </div>
+              {owner.temporaryPassword && (
+                <div className="flex justify-between">
+                  <dt className="text-muted-foreground">{t('tempPassword')}</dt>
+                  <dd className="font-mono font-medium text-primary">{owner.temporaryPassword}</dd>
+                </div>
+              )}
+            </dl>
+          </div>
+
+          {/* DNS Instructions (shown when custom domain was provided) */}
+          {store.domain && (
+            <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-start">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-amber-900">{t('dnsRequired')}</h3>
+                <Badge variant={domainStatus?.verified ? 'default' : 'secondary'}>
+                  {domainStatus?.verified ? t('dnsVerified') : t('dnsPending')}
+                </Badge>
+              </div>
+              <p className="mt-2 text-sm text-amber-800">{t('dnsInstructions')}</p>
+              <div className="mt-3 overflow-hidden rounded-md border border-amber-200 bg-card">
+                <table className="w-full text-sm" aria-label={t('dnsTableLabel')}>
+                  <thead>
+                    <tr className="border-b bg-amber-50">
+                      <th scope="col" className="px-3 py-2 text-start font-medium text-amber-900">
+                        {t('colType')}
+                      </th>
+                      <th scope="col" className="px-3 py-2 text-start font-medium text-amber-900">
+                        {t('colName')}
+                      </th>
+                      <th scope="col" className="px-3 py-2 text-start font-medium text-amber-900">
+                        {t('colValue')}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {domainStatus?.dnsRecords?.map((record, i) => (
+                      <tr key={i} className="border-b last:border-0">
+                        <td className="px-3 py-2 font-mono text-xs">{record.type}</td>
+                        <td className="px-3 py-2 font-mono text-xs">{record.name}</td>
+                        <td className="px-3 py-2 font-mono text-xs">{record.value}</td>
+                      </tr>
+                    )) || (
+                      <tr>
+                        <td className="px-3 py-2 font-mono text-xs">CNAME</td>
+                        <td className="px-3 py-2 font-mono text-xs">{store.domain}</td>
+                        <td className="px-3 py-2 font-mono text-xs">cname.vercel-dns.com</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <div className="mt-3 flex items-center justify-between">
+                <p className="text-xs text-amber-700">{t('dnsPropagation')}</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => checkDomainStatus(store.id)}
+                  disabled={isCheckingDns}
+                >
+                  {isCheckingDns ? t('checkingDns') : t('checkDns')}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          <div className="mt-8 flex justify-center gap-4">
+            <Link href={`/stores/${store.id}`}>
+              <Button>{t('viewStore')}</Button>
+            </Link>
+            <Link href="/stores">
+              <Button variant="outline">{t('backToStores')}</Button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    </AdminLayout>
+  );
+}
