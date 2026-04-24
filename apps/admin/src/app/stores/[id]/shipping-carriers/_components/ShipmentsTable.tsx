@@ -1,7 +1,8 @@
 'use client';
 
 import { useT } from '@/i18n/useT';
-import { ShipmentStatusBadge } from './ShipmentStatusBadge';
+import { OrderStatusBadge } from '../../../../../components/OrderStatusBadge';
+import { SHIPMENT_COLORS } from './types';
 import type { Shipment } from './types';
 
 interface ShipmentsTableProps {
@@ -158,7 +159,11 @@ export function ShipmentsTable({
                       {shipment.trackingNumber || '—'}
                     </td>
                     <td className="px-6 py-3">
-                      <ShipmentStatusBadge status={shipment.status} />
+                      <OrderStatusBadge
+                        status={shipment.status}
+                        namespace="shipping.carriers.shipments.statuses"
+                        colorMap={SHIPMENT_COLORS}
+                      />
                     </td>
                     <td className="px-6 py-3 text-sm text-muted-foreground whitespace-nowrap">
                       {new Date(shipment.createdAt).toLocaleDateString()}

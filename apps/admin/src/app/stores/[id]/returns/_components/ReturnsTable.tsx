@@ -2,7 +2,8 @@
 
 import { Button, Badge } from '@force/ui';
 import { useT } from '@/i18n/useT';
-import { ReturnStatusBadge } from './ReturnStatusBadge';
+import { OrderStatusBadge } from '../../../../../components/OrderStatusBadge';
+import { RETURN_COLORS } from './types';
 import type { ListMeta, ReturnRecord } from './types';
 
 function formatDate(date: string) {
@@ -69,7 +70,11 @@ export function ReturnsTable({
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
                     <span className="font-semibold text-foreground">#{ret.returnNumber}</span>
-                    <ReturnStatusBadge status={ret.status} />
+                    <OrderStatusBadge
+                      status={ret.status}
+                      namespace="returns.status"
+                      colorMap={RETURN_COLORS}
+                    />
                     <Badge variant="outline">{tType(ret.type)}</Badge>
                   </div>
                   <p className="text-sm text-muted-foreground mb-2">

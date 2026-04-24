@@ -73,3 +73,23 @@ export type ReturnType = (typeof RETURN_TYPE_KEYS)[number];
 export const RETURN_FILTER_KEYS = ['all', 'pending', 'approved', 'completed'] as const;
 
 export type ReturnFilter = (typeof RETURN_FILTER_KEYS)[number];
+
+/**
+ * Color palette for the return status pill. Handed to the shared
+ * OrderStatusBadge via `colorMap`. The return lifecycle is a superset of the
+ * order lifecycle (approved/rejected/received/inspecting/completed are
+ * return-specific and several share-named statuses carry different semantics)
+ * so we don't defer to the default orders palette.
+ */
+export const RETURN_COLORS = {
+  pending: { className: 'bg-warning/10 text-warning dark:bg-warning/30 dark:text-warning' },
+  approved: { className: 'bg-info/10 text-info dark:bg-info/30 dark:text-info' },
+  rejected: {
+    className: 'bg-destructive/10 text-destructive dark:bg-destructive/30 dark:text-destructive',
+  },
+  shipped: { className: 'bg-info/10 text-info dark:bg-info/30 dark:text-info' },
+  received: { className: 'bg-info/10 text-info dark:bg-info/30 dark:text-info' },
+  inspecting: { className: 'bg-info/20 text-info dark:bg-info/40 dark:text-info' },
+  completed: { className: 'bg-success/10 text-success dark:bg-success/30 dark:text-success' },
+  cancelled: { className: 'bg-muted text-foreground' },
+} as const;

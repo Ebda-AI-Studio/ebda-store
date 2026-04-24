@@ -1,8 +1,8 @@
 'use client';
 
 import { useT } from '@/i18n/useT';
-import { AbandonedCartStatusBadge } from './AbandonedCartStatusBadge';
-import { CART_STATUS_KEYS } from './types';
+import { OrderStatusBadge } from '../../../../../components/OrderStatusBadge';
+import { ABANDONED_CART_COLORS, CART_STATUS_KEYS } from './types';
 import type { AbandonedCartRecord, ListMeta } from './types';
 
 /** Formats fils to a KWD string with 3 decimals. */
@@ -137,7 +137,11 @@ export function AbandonedCartsTable({
                       {record.cartItemCount}
                     </td>
                     <td className="px-6 py-3">
-                      <AbandonedCartStatusBadge status={record.status} />
+                      <OrderStatusBadge
+                        status={record.status}
+                        namespace="abandonedCarts.status"
+                        colorMap={ABANDONED_CART_COLORS}
+                      />
                     </td>
                     <td className="px-6 py-3 text-sm text-muted-foreground whitespace-nowrap">
                       {new Date(record.createdAt).toLocaleDateString()}

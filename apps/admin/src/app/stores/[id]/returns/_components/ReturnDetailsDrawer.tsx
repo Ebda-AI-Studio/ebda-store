@@ -3,7 +3,8 @@
 import Image from 'next/image';
 import { Button, Badge } from '@force/ui';
 import { useT } from '@/i18n/useT';
-import { ReturnStatusBadge } from './ReturnStatusBadge';
+import { OrderStatusBadge } from '../../../../../components/OrderStatusBadge';
+import { RETURN_COLORS } from './types';
 import type { ReturnRecord } from './types';
 
 function formatCurrency(amount: number) {
@@ -80,7 +81,11 @@ export function ReturnDetailsDrawer({
         <div className="p-6 space-y-6">
           {/* Status & Type */}
           <div className="flex items-center gap-3">
-            <ReturnStatusBadge status={record.status} />
+            <OrderStatusBadge
+              status={record.status}
+              namespace="returns.status"
+              colorMap={RETURN_COLORS}
+            />
             <Badge variant="outline">{tType(record.type)}</Badge>
           </div>
 

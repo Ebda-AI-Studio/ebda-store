@@ -2,7 +2,8 @@
 
 import { Button } from '@force/ui';
 import { useT } from '@/i18n/useT';
-import { NotificationStatusBadge } from './NotificationStatusBadge';
+import { OrderStatusBadge } from '../../../../../components/OrderStatusBadge';
+import { NOTIFICATION_COLORS } from './types';
 import type { NotificationLog } from './types';
 
 interface NotificationsLogProps {
@@ -165,7 +166,11 @@ export function NotificationsLog({
                       {log.recipient || '—'}
                     </td>
                     <td className="px-6 py-3">
-                      <NotificationStatusBadge status={log.status} />
+                      <OrderStatusBadge
+                        status={log.status}
+                        namespace="notifications.log.status"
+                        colorMap={NOTIFICATION_COLORS}
+                      />
                       {log.error && (
                         <p
                           className="text-xs text-destructive mt-1 truncate max-w-[200px]"
