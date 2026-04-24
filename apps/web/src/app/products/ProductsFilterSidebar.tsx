@@ -1,7 +1,9 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import type { Category, PaginationMeta } from '@/lib/api';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 
 interface ProductsFilterSidebarProps {
   search: string;
@@ -14,6 +16,8 @@ interface ProductsFilterSidebarProps {
   onClearAll: () => void;
   onSearchSubmit: (e: React.FormEvent) => void;
 }
+
+const SEARCH_DEBOUNCE_MS = 300;
 
 export function ProductsFilterSidebar({
   search,
@@ -28,12 +32,38 @@ export function ProductsFilterSidebar({
 }: ProductsFilterSidebarProps) {
   const { t } = useLanguage();
 
+  // Local controlled value for the input. Submitting via Enter still works,
+  // but we also fire `onSearchChange` after 300ms of keystroke stillness
+  // so listings update without requiring a click on a Search button.
+  const [localSearch, setLocalSearch] = useState(search);
+  const debouncedSearch = useDebouncedValue(localSearch, SEARCH_DEBOUNCE_MS);
+
+  // Keep local state aligned when parent resets the search (e.g. "Clear all")
+  useEffect(() => {
+    setLocalSearch(search);
+  }, [search]);
+
+  // Push debounced changes back up to the parent. The empty-string update is
+  // important so clearing the input refilters immediately on debounce tick.
+  useEffect(() => {
+    if (debouncedSearch !== search) {
+      onSearchChange(debouncedSearch);
+    }
+    // We deliberately exclude `search` and `onSearchChange` from deps —
+    // the effect's job is to fire on local changes only; including parent
+    // values causes a feedback loop with the prop-sync effect above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch]);
+
   return (
     <aside className="w-full shrink-0 lg:w-64">
       <div className="sticky top-24 space-y-6">
         {/* Search */}
         <form onSubmit={onSearchSubmit}>
-          <label className="mb-2 block text-sm font-medium text-foreground">
+          <label
+            htmlFor="products-search"
+            className="mb-2 block text-sm font-medium text-foreground"
+          >
             {t('Search', translations['Search'])}
           </label>
           <div className="search-box">
@@ -42,6 +72,7 @@ export function ProductsFilterSidebar({
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
+              aria-hidden="true"
             >
               <path
                 strokeLinecap="round"
@@ -51,10 +82,11 @@ export function ProductsFilterSidebar({
               />
             </svg>
             <input
+              id="products-search"
               type="text"
-              placeholder="Search products..."
-              value={search}
-              onChange={e => onSearchChange(e.target.value)}
+              placeholder={t('Search products...', 'ابحث عن المنتجات...')}
+              value={localSearch}
+              onChange={e => setLocalSearch(e.target.value)}
               className="search-input"
             />
           </div>
