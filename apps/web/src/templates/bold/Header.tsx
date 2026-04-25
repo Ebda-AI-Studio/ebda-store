@@ -215,9 +215,10 @@ export default function BoldHeader({
         <div className="absolute inset-0 bg-black/60" />
       </div>
 
-      {/* Mobile Menu Drawer */}
+      {/* Mobile Menu Drawer — capped at 320px so on a 320px screen the
+          overlay still has a touch-target outside the panel for dismiss. */}
       <div
-        className={`fixed top-0 ${isRtl ? 'left-0' : 'right-0'} z-50 h-full w-72 bg-gray-950 border-l border-white/10 md:hidden transition-transform duration-200 ease-out ${isMenuOpen ? 'translate-x-0' : isRtl ? '-translate-x-full' : 'translate-x-full'}`}
+        className={`fixed top-0 ${isRtl ? 'left-0' : 'right-0'} z-50 h-full w-[85vw] max-w-xs bg-gray-950 border-l border-white/10 md:hidden transition-transform duration-200 ease-out overscroll-contain ${isMenuOpen ? 'translate-x-0' : isRtl ? '-translate-x-full' : 'translate-x-full'}`}
         aria-label={isRtl ? 'قائمة التنقل' : 'Navigation menu'}
       >
         <div className="flex items-center justify-between p-4 border-b border-white/10">
