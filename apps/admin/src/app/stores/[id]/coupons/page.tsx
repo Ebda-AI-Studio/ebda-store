@@ -53,6 +53,7 @@ export default function CouponsPage() {
       name: coupon.name,
       nameAr: coupon.nameAr || '',
       description: coupon.description || '',
+      descriptionAr: coupon.descriptionAr || '',
       type: coupon.type,
       value: coupon.value,
       minOrderAmount: coupon.minOrderAmount ? String(coupon.minOrderAmount / 1000) : '',

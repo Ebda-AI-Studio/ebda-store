@@ -96,6 +96,21 @@ export function CouponFormModal({
             </div>
           </div>
 
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1">
+              {tForm('descriptionArLabel')}
+            </label>
+            <input
+              type="text"
+              lang="ar"
+              dir="rtl"
+              value={formData.descriptionAr}
+              onChange={e => onChange({ ...formData, descriptionAr: e.target.value })}
+              placeholder={tForm('descriptionArPlaceholder')}
+              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            />
+          </div>
+
           {/* Discount Type & Value */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>

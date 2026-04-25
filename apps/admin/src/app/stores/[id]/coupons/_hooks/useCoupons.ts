@@ -62,6 +62,7 @@ export function useCoupons(storeId: string): UseCouponsResult {
           name: formData.name,
           nameAr: formData.nameAr || undefined,
           description: formData.description || undefined,
+          descriptionAr: formData.descriptionAr || undefined,
           type: formData.type,
           value: formData.value,
           minOrderAmount: formData.minOrderAmount

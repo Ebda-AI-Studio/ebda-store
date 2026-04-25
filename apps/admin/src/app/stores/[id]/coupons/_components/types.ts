@@ -6,6 +6,7 @@ export interface Coupon {
   name: string;
   nameAr?: string;
   description?: string;
+  descriptionAr?: string;
   type: CouponType;
   value: number;
   minOrderAmount?: number;
@@ -24,6 +25,7 @@ export interface CouponFormData {
   name: string;
   nameAr: string;
   description: string;
+  descriptionAr: string;
   type: CouponType;
   value: number;
   minOrderAmount: string;
@@ -42,6 +44,7 @@ export const INITIAL_FORM_DATA: CouponFormData = {
   name: '',
   nameAr: '',
   description: '',
+  descriptionAr: '',
   type: 'percentage',
   value: 0,
   minOrderAmount: '',

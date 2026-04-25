@@ -1091,6 +1091,8 @@
       "nameArPlaceholder": "خصم الصيف ٢٠٪",
       "descriptionLabel": "الوصف",
       "descriptionPlaceholder": "احصل على خصم 20٪ على جميع منتجات الصيف",
+      "descriptionArLabel": "الوصف (بالعربية)",
+      "descriptionArPlaceholder": "احصل على خصم 20٪ على جميع منتجات الصيف",
       "typeLabel": "نوع الخصم *",
       "valuePercentageLabel": "النسبة (%) *",
       "valueAmountLabel": "المبلغ (د.ك) *",
