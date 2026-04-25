@@ -495,14 +495,18 @@ export default function CheckoutClient() {
 
       const order = orderResult.data.order;
 
-      // Create payment
+      // Create payment.
+      // Send RELATIVE paths so the api can absolutify them against the order's
+      // resolved storefront base url (custom domain or slug). Sending absolute
+      // urls with the store's custom domain trips the schema's platform-origin
+      // refinement, which is intended to block open-redirect attacks.
       const paymentResult = await api.post<{ paymentUrl?: string; cod?: boolean }>(
         '/payments/create',
         {
           orderId: order.id,
           provider: selectedProvider,
-          successUrl: `${window.location.origin}/checkout/success?orderId=${order.id}`,
-          errorUrl: `${window.location.origin}/checkout/error?orderId=${order.id}`,
+          successUrl: `/checkout/success?orderId=${order.id}`,
+          errorUrl: `/checkout/error?orderId=${order.id}`,
         }
       );
 

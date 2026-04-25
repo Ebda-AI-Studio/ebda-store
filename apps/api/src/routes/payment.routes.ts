@@ -275,8 +275,19 @@ router.post(
             unitPrice: item.price,
             sku: item.sku || undefined,
           })),
-          callbackUrl: data.successUrl || `${storefrontBaseUrl}/checkout/success`,
-          errorUrl: data.errorUrl || `${storefrontBaseUrl}/checkout/error`,
+          // Resolve relative paths against the order's storefront base URL so
+          // payment providers always receive an absolute URL that points back
+          // at the correct tenant domain (custom domain or platform slug).
+          callbackUrl: data.successUrl
+            ? data.successUrl.startsWith('/')
+              ? `${storefrontBaseUrl}${data.successUrl}`
+              : data.successUrl
+            : `${storefrontBaseUrl}/checkout/success`,
+          errorUrl: data.errorUrl
+            ? data.errorUrl.startsWith('/')
+              ? `${storefrontBaseUrl}${data.errorUrl}`
+              : data.errorUrl
+            : `${storefrontBaseUrl}/checkout/error`,
           webhookUrl: `${config.apiUrl}/webhooks/payment`,
         },
         data.provider
