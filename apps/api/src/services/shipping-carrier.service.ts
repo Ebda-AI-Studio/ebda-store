@@ -180,6 +180,25 @@ class ShippingCarrierService {
       '[ShippingCarrierService] createShipmentForOrder'
     );
 
+    // Idempotency guard: if a shipment already exists for this order, return
+    // it instead of calling the carrier again. Without this, every retry
+    // (admin re-clicks "ship", auto-ship retry on order confirmation, etc.)
+    // would print a duplicate label and bill the carrier a second time.
+    // Note: this only protects when a Shipment row was committed. If the DB
+    // write previously failed AFTER the carrier created a shipment, the
+    // next call will hit the carrier again — that's an accepted edge-case
+    // requiring manual reconciliation (logged below).
+    const existingShipment = await prisma.shipment.findFirst({
+      where: { orderId, storeId },
+    });
+    if (existingShipment) {
+      logger.info(
+        { shipmentId: existingShipment.id, orderId, storeId },
+        '[ShippingCarrierService] Shipment already exists for order — returning existing'
+      );
+      return existingShipment;
+    }
+
     // Get order + shipping address
     const order = await prisma.order.findFirst({
       where: { id: orderId, storeId },
@@ -248,36 +267,68 @@ class ShippingCarrierService {
       weight: settings.defaultWeight ?? 0.5,
     });
 
-    // Create Shipment record
-    const shipment = await prisma.shipment.create({
-      data: {
-        storeId,
-        orderId,
-        carrier: resolvedCarrierCode,
-        trackingNumber: response.trackingNumber,
-        trackingUrl: response.trackingUrl,
-        labelUrl: response.labelUrl,
-        status: 'created',
-        carrierShipmentId: response.carrierShipmentId,
-        pickupAddress: pickupAddress as any,
-        deliveryAddress: deliveryAddress as any,
-        weight: settings.defaultWeight ? String(settings.defaultWeight) : null,
-        estimatedDeliveryAt: response.estimatedDelivery,
-        statusHistory: [
-          {
+    // Persist Shipment + flip Order to 'shipped' atomically. Previously these
+    // were two sequential writes, so a partial failure (e.g. db hiccup
+    // between them) could strand a real carrier shipment — admin sees an
+    // order still "processing" while the carrier already has the package
+    // out for delivery. The carrier API call stays OUTSIDE the transaction
+    // because it's external and non-rollbackable.
+    let shipment;
+    try {
+      shipment = await prisma.$transaction(async tx => {
+        const created = await tx.shipment.create({
+          data: {
+            storeId,
+            orderId,
+            carrier: resolvedCarrierCode,
+            trackingNumber: response.trackingNumber,
+            trackingUrl: response.trackingUrl,
+            labelUrl: response.labelUrl,
             status: 'created',
-            timestamp: new Date().toISOString(),
-            description: `Shipment created via ${resolvedCarrierCode}`,
+            carrierShipmentId: response.carrierShipmentId,
+            pickupAddress: pickupAddress as any,
+            deliveryAddress: deliveryAddress as any,
+            weight: settings.defaultWeight ? String(settings.defaultWeight) : null,
+            estimatedDeliveryAt: response.estimatedDelivery,
+            statusHistory: [
+              {
+                status: 'created',
+                timestamp: new Date().toISOString(),
+                description: `Shipment created via ${resolvedCarrierCode}`,
+              },
+            ],
           },
-        ],
-      },
-    });
+        });
 
-    // Update order with tracking info and mark as shipped
-    await prisma.order.update({
-      where: { id: orderId },
-      data: { status: 'shipped' },
-    });
+        await tx.order.update({
+          where: { id: orderId },
+          data: { status: 'shipped' },
+        });
+
+        return created;
+      });
+    } catch (txError) {
+      // Carrier shipment exists but our DB rolled back — log loudly with the
+      // carrier-side identifiers so finance / ops can manually reconcile.
+      // Do NOT attempt to cancel the carrier shipment automatically: that's
+      // a real-money external action and the audit explicitly requires
+      // manual reconcile here. The idempotency guard at top of this method
+      // means a future retry won't double-up *if* the DB row eventually
+      // commits; if not, the carrier shipment is the source of truth.
+      logger.error(
+        {
+          err: txError,
+          orderId,
+          storeId,
+          carrier: resolvedCarrierCode,
+          carrierShipmentId: response.carrierShipmentId,
+          trackingNumber: response.trackingNumber,
+          labelUrl: response.labelUrl,
+        },
+        '[ShippingCarrierService] DB transaction failed AFTER carrier created shipment — manual reconciliation required'
+      );
+      throw txError;
+    }
 
     // Dispatch shipment notification fully fire-and-forget — including the
     // store-name lookup, so neither Prisma nor the notification provider can
