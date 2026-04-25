@@ -716,19 +716,12 @@ router.put(
       const store = await StoreService.getById(id);
       const oldDomain = store.domain;
 
-      // Remove old domain from Vercel
-      if (oldDomain && oldDomain !== domain) {
-        try {
-          await VercelDomainService.removeDomain(oldDomain);
-        } catch (error) {
-          logger.error(
-            { err: error instanceof Error ? error.message : 'Unknown error', oldDomain },
-            '[STORE] Failed to remove old domain from Vercel'
-          );
-        }
-      }
-
-      // Add new domain to Vercel
+      // Add new domain to Vercel FIRST (before touching the old one). If we
+      // removed the old domain first and then add-new failed, the storefront
+      // on the old domain would go dark AND the new domain wouldn't work —
+      // a customer-visible outage. With this ordering, the old domain keeps
+      // serving traffic until everything else (Vercel add + DB update)
+      // succeeds; old-domain removal moves to AFTER the DB commit below.
       if (domain && domain !== oldDomain) {
         // Check platform configuration first — domain feature is unusable
         // without the Vercel API credentials configured on the API
@@ -805,6 +798,26 @@ router.put(
       // DB update committed — disarm the rollback so a successful change is
       // never undone by a downstream error (e.g. CORS-cache bust, status fetch).
       rollbackVercelAdd = null;
+
+      // Remove old domain from Vercel AFTER the DB commit. Doing this before
+      // (and especially before adding the new domain) created a window where
+      // an addDomain failure left BOTH domains broken — old removed, new not
+      // added. Now: new domain is live, DB points at it, then we tear down
+      // the old one. Fire-and-forget — if the carrier-side removal fails we
+      // log it; the worst case is a stranded domain alias on Vercel (no
+      // customer impact, just manual cleanup).
+      if (oldDomain && oldDomain !== domain) {
+        const domainToRemove = oldDomain;
+        void VercelDomainService.removeDomain(domainToRemove).catch(error =>
+          logger.error(
+            {
+              err: error instanceof Error ? error.message : 'Unknown error',
+              oldDomain: domainToRemove,
+            },
+            '[STORE] Failed to remove old domain from Vercel after DB commit — manual cleanup may be required'
+          )
+        );
+      }
 
       // Bust CORS cache so the new domain works immediately
       if (domain) bustCorsCache(domain);
