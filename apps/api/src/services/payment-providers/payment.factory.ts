@@ -593,26 +593,51 @@ export class PaymentService {
     // Update payment record
     const isFullRefund = !request.amount || request.amount >= payment.amount;
 
-    await prisma.payment.update({
-      where: { id: payment.id },
-      data: {
-        status: isFullRefund ? 'refunded' : 'partially_refunded',
-        refundId: response.refundId,
-        refundedAmount: { increment: request.amount || payment.amount },
-        metadata: {
-          ...((payment.metadata as object) || {}),
+    // Wrap the two db writes in a transaction so payment + order rows can't
+    // disagree after a partial failure (e.g. payment marked 'refunded' but
+    // the order still shows status 'paid'). External provider refund stays
+    // OUTSIDE the transaction — refunds are terminal at the provider level
+    // (no undo API), and money is already back to the customer. If the
+    // transaction below fails, log loudly with the refund transaction id
+    // so finance can manually reconcile the rows; we cannot reverse the
+    // refund itself.
+    try {
+      await prisma.$transaction([
+        prisma.payment.update({
+          where: { id: payment.id },
+          data: {
+            status: isFullRefund ? 'refunded' : 'partially_refunded',
+            refundId: response.refundId,
+            refundedAmount: { increment: request.amount || payment.amount },
+            metadata: {
+              ...((payment.metadata as object) || {}),
+              refundId: response.refundId,
+              refundStatus: response.status,
+            },
+          },
+        }),
+        ...(isFullRefund
+          ? [
+              prisma.order.update({
+                where: { id: payment.orderId },
+                data: { status: 'refunded', paymentStatus: 'refunded' },
+              }),
+            ]
+          : []),
+      ]);
+    } catch (txError) {
+      logger.error(
+        {
+          err: txError,
+          paymentId: payment.id,
+          orderId: payment.orderId,
           refundId: response.refundId,
-          refundStatus: response.status,
+          refundAmount: request.amount || payment.amount,
+          isFullRefund,
         },
-      },
-    });
-
-    // Update order if full refund
-    if (isFullRefund) {
-      await prisma.order.update({
-        where: { id: payment.orderId },
-        data: { status: 'refunded', paymentStatus: 'refunded' },
-      });
+        '[PAYMENT] DB transaction failed AFTER provider refund succeeded — manual reconciliation required (refund already executed at provider, cannot undo)'
+      );
+      throw txError;
     }
 
     return response;
