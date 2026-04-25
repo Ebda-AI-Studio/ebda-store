@@ -8,6 +8,14 @@ import { PWAService } from '../services/pwa.service';
 const router = Router();
 
 // Validation schemas
+// The admin form uses controlled inputs that emit '' when cleared. Coerce
+// '' to undefined for url-typed fields so a cleared icon doesn't trip
+// z.string().url() and 400 the whole save.
+const optionalUrl = z.preprocess(
+  v => (v === '' || v === null ? undefined : v),
+  z.string().url().optional()
+);
+
 const updateSettingsSchema = z.object({
   pwaEnabled: z.boolean().optional(),
   settings: z
@@ -26,9 +34,9 @@ const updateSettingsSchema = z.object({
         .string()
         .regex(/^#[0-9A-Fa-f]{6}$/)
         .optional(),
-      icon192: z.string().url().optional(),
-      icon512: z.string().url().optional(),
-      maskableIcon: z.string().url().optional(),
+      icon192: optionalUrl,
+      icon512: optionalUrl,
+      maskableIcon: optionalUrl,
       display: z.enum(['fullscreen', 'standalone', 'minimal-ui', 'browser']).optional(),
       orientation: z.enum(['any', 'portrait', 'landscape']).optional(),
       startUrl: z.string().optional(),
