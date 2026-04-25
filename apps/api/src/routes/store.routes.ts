@@ -123,6 +123,9 @@ const socialSchema = z
   })
   .strip();
 
+// Announcement payload mirrors the @force/shared AnnouncementBar shape. The
+// storefront renders linkText / linkTextAr / dismissible alongside the link
+// itself, so the schema must accept (and the .strip() must not drop) them.
 const announcementSchema = z
   .object({
     enabled: z.boolean().optional(),
@@ -131,6 +134,9 @@ const announcementSchema = z
     bgColor: z.string().max(50).optional(),
     textColor: z.string().max(50).optional(),
     link: optionalUrl,
+    linkText: optionalStr(200),
+    linkTextAr: optionalStr(200),
+    dismissible: z.boolean().optional(),
   })
   .strip();
 

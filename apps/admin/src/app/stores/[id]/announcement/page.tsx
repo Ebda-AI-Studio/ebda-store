@@ -9,26 +9,32 @@ import { Alert } from '../../../../components/Alert';
 import { apiGet, apiPut } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
 
+// Field names mirror the canonical AnnouncementBar shape from @force/shared
+// and the API's announcementSchema (`bgColor`, `link`). The previous local
+// names (`backgroundColor`, `linkUrl`) were silently dropped by Zod's
+// .strip() so the bg color and link never reached the DB.
 interface AnnouncementSettings {
   enabled: boolean;
   text: string;
   textAr: string;
-  backgroundColor: string;
+  bgColor: string;
   textColor: string;
-  linkUrl: string;
+  link: string;
   linkText: string;
   linkTextAr: string;
+  dismissible: boolean;
 }
 
 const DEFAULT_SETTINGS: AnnouncementSettings = {
   enabled: false,
   text: '',
   textAr: '',
-  backgroundColor: '#000000',
+  bgColor: '#000000',
   textColor: '#ffffff',
-  linkUrl: '',
+  link: '',
   linkText: '',
   linkTextAr: '',
+  dismissible: false,
 };
 
 export default function AnnouncementPage() {
@@ -127,12 +133,12 @@ export default function AnnouncementPage() {
           <div
             className="flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg"
             style={{
-              backgroundColor: settings.backgroundColor,
+              backgroundColor: settings.bgColor,
               color: settings.textColor,
             }}
           >
             <span>{settings.text}</span>
-            {settings.linkUrl && settings.linkText && (
+            {settings.link && settings.linkText && (
               <span className="underline">{settings.linkText}</span>
             )}
           </div>
@@ -196,8 +202,8 @@ export default function AnnouncementPage() {
             <label className="block text-sm font-medium text-foreground mb-1">{t('linkUrl')}</label>
             <input
               type="url"
-              value={settings.linkUrl}
-              onChange={e => setSettings(prev => ({ ...prev, linkUrl: e.target.value }))}
+              value={settings.link}
+              onChange={e => setSettings(prev => ({ ...prev, link: e.target.value }))}
               placeholder={t('linkUrlPlaceholder')}
               className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             />
@@ -246,18 +252,14 @@ export default function AnnouncementPage() {
               <div className="flex items-center gap-3">
                 <input
                   type="color"
-                  value={settings.backgroundColor}
-                  onChange={e =>
-                    setSettings(prev => ({ ...prev, backgroundColor: e.target.value }))
-                  }
+                  value={settings.bgColor}
+                  onChange={e => setSettings(prev => ({ ...prev, bgColor: e.target.value }))}
                   className="h-10 w-14 cursor-pointer rounded-lg border border-border p-1"
                 />
                 <input
                   type="text"
-                  value={settings.backgroundColor}
-                  onChange={e =>
-                    setSettings(prev => ({ ...prev, backgroundColor: e.target.value }))
-                  }
+                  value={settings.bgColor}
+                  onChange={e => setSettings(prev => ({ ...prev, bgColor: e.target.value }))}
                   placeholder="#000000"
                   className="flex-1 rounded-lg border border-border px-4 py-2 text-sm font-mono focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 />
@@ -268,9 +270,9 @@ export default function AnnouncementPage() {
                   <button
                     type="button"
                     key={color}
-                    onClick={() => setSettings(prev => ({ ...prev, backgroundColor: color }))}
+                    onClick={() => setSettings(prev => ({ ...prev, bgColor: color }))}
                     className={`h-6 w-6 rounded-full border-2 transition-transform hover:scale-110 ${
-                      settings.backgroundColor === color
+                      settings.bgColor === color
                         ? 'border-foreground scale-110'
                         : 'border-transparent'
                     }`}
