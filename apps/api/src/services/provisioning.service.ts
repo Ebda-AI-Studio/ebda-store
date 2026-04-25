@@ -163,6 +163,26 @@ export class ProvisioningService {
         },
       });
 
+      // Provision Cash on Delivery as the default payment method.
+      // Without this row the storefront's POST /payments/create returns 400
+      // (COD_NOT_AVAILABLE) and customers can't check out — even though the
+      // UI offers COD by default. Store owners can disable / configure a fee
+      // later via /admin/payment-settings.
+      await tx.paymentConfig.create({
+        data: {
+          storeId: store.id,
+          provider: 'cod',
+          isEnabled: true,
+          displayName: 'Cash on Delivery',
+          displayNameAr: 'الدفع عند الاستلام',
+          testMode: false,
+          supportedMethods: ['cod'],
+          supportedCurrencies: ['KWD'],
+          fixedFee: 0,
+          percentageFee: 0,
+        },
+      });
+
       return { store, owner, isNewUser };
     });
 
