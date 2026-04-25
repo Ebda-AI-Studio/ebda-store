@@ -101,6 +101,15 @@ export async function generateMetadata(): Promise<Metadata> {
   const description =
     store.metaDescription || `Shop online at ${store.name}. Free delivery on orders over 20 KWD.`;
 
+  // Prefer admin-configured Open Graph image; fall back to store logo.
+  const ogImageUrl = store.ogImage || store.logo;
+  // Normalize Twitter handle to leading-@ form expected by Twitter card meta.
+  const twitterHandle = store.twitterHandle
+    ? store.twitterHandle.startsWith('@')
+      ? store.twitterHandle
+      : `@${store.twitterHandle}`
+    : undefined;
+
   return {
     metadataBase: new URL(siteUrl),
     title: {
@@ -122,19 +131,23 @@ export async function generateMetadata(): Promise<Metadata> {
       locale: 'en_KW',
       alternateLocale: 'ar_KW',
       siteName: store.name,
-      images: store.logo ? [{ url: store.logo }] : undefined,
+      images: ogImageUrl ? [{ url: ogImageUrl }] : undefined,
     },
     twitter: {
       card: 'summary_large_image',
       title: store.metaTitle || `${store.name} - Online Shopping in Kuwait`,
       description,
-      ...(store.logo ? { images: [store.logo] } : {}),
+      ...(ogImageUrl ? { images: [ogImageUrl] } : {}),
+      ...(twitterHandle ? { site: twitterHandle, creator: twitterHandle } : {}),
     },
     robots: {
       index: true,
       follow: true,
     },
     icons: store.favicon ? { icon: store.favicon } : undefined,
+    ...(store.googleSiteVerification
+      ? { verification: { google: store.googleSiteVerification } }
+      : {}),
   };
 }
 

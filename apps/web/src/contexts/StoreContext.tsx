@@ -76,6 +76,9 @@ export interface StoreData {
   metaTitleAr?: string;
   metaDescription?: string;
   metaDescriptionAr?: string;
+  ogImage?: string;
+  twitterHandle?: string;
+  googleSiteVerification?: string;
   settings?: Record<string, unknown>;
   enabledFeatures?: string[];
   heroTitle?: string | null;

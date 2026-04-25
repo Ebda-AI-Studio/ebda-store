@@ -164,10 +164,13 @@ model Store {
   announcementBar Json?         @map("announcement_bar") // AnnouncementBar JSON
 
   // SEO
-  metaTitle         String?     @map("meta_title")
-  metaTitleAr       String?     @map("meta_title_ar")
-  metaDescription   String?     @map("meta_description")
-  metaDescriptionAr String?     @map("meta_description_ar")
+  metaTitle              String?     @map("meta_title")
+  metaTitleAr            String?     @map("meta_title_ar")
+  metaDescription        String?     @map("meta_description")
+  metaDescriptionAr      String?     @map("meta_description_ar")
+  ogImage                String?     @map("og_image")
+  twitterHandle          String?     @map("twitter_handle")
+  googleSiteVerification String?     @map("google_site_verification")
 
   // Marketing Pixels & Analytics
   marketingPixels   Json        @default("{}") @map("marketing_pixels") // MarketingPixels JSON

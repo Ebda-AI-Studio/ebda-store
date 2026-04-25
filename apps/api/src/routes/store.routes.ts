@@ -65,15 +65,6 @@ const themeSchema = z.record(z.string(), z.unknown()).refine(
   { message: 'Theme field values exceed maximum length' }
 );
 
-const seoSchema = z
-  .object({
-    metaTitle: z.string().max(200).optional(),
-    metaTitleAr: z.string().max(200).optional(),
-    metaDescription: z.string().max(500).optional(),
-    metaDescriptionAr: z.string().max(500).optional(),
-  })
-  .strip();
-
 // Helpers that coerce empty strings and nulls to undefined before validation
 const optionalStr = (maxLen: number) =>
   z.preprocess(v => (v === '' || v === null ? undefined : v), z.string().max(maxLen).optional());
@@ -87,6 +78,18 @@ const optionalEmail = z.preprocess(
   v => (v === '' || v === null ? undefined : v),
   z.string().email().max(255).optional()
 );
+
+const seoSchema = z
+  .object({
+    metaTitle: optionalStr(200),
+    metaTitleAr: optionalStr(200),
+    metaDescription: optionalStr(500),
+    metaDescriptionAr: optionalStr(500),
+    ogImage: optionalUrl,
+    twitterHandle: optionalStr(50),
+    googleSiteVerification: optionalStr(200),
+  })
+  .strip();
 
 const contactSchema = z
   .object({
@@ -581,6 +584,9 @@ router.get(
           metaTitleAr: true,
           metaDescription: true,
           metaDescriptionAr: true,
+          ogImage: true,
+          twitterHandle: true,
+          googleSiteVerification: true,
         },
       });
 

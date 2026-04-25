@@ -464,6 +464,9 @@ export class StoreService {
       metaTitleAr?: string;
       metaDescription?: string;
       metaDescriptionAr?: string;
+      ogImage?: string;
+      twitterHandle?: string;
+      googleSiteVerification?: string;
     }
   ) {
     const store = await this.getById(storeId);
@@ -475,6 +478,9 @@ export class StoreService {
         metaTitleAr: seo.metaTitleAr,
         metaDescription: seo.metaDescription,
         metaDescriptionAr: seo.metaDescriptionAr,
+        ogImage: seo.ogImage,
+        twitterHandle: seo.twitterHandle,
+        googleSiteVerification: seo.googleSiteVerification,
       },
     });
 

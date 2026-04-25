@@ -47,6 +47,9 @@ export interface ResolvedStore {
   metaTitleAr?: string;
   metaDescription?: string;
   metaDescriptionAr?: string;
+  ogImage?: string;
+  twitterHandle?: string;
+  googleSiteVerification?: string;
 
   // Marketing Pixels
   marketingPixels?: Record<string, unknown>;
@@ -180,6 +183,9 @@ async function fetchStoreByDomain(domain: string): Promise<ResolvedStore | null>
       metaTitleAr: storeData.metaTitleAr,
       metaDescription: storeData.metaDescription,
       metaDescriptionAr: storeData.metaDescriptionAr,
+      ogImage: storeData.ogImage,
+      twitterHandle: storeData.twitterHandle,
+      googleSiteVerification: storeData.googleSiteVerification,
       marketingPixels:
         typeof storeData.marketingPixels === 'object' ? storeData.marketingPixels : undefined,
       settings: typeof storeData.settings === 'object' ? storeData.settings : undefined,
@@ -279,6 +285,9 @@ async function fetchStoreBySlug(slug: string): Promise<ResolvedStore | null> {
       metaTitleAr: storeData.metaTitleAr,
       metaDescription: storeData.metaDescription,
       metaDescriptionAr: storeData.metaDescriptionAr,
+      ogImage: storeData.ogImage,
+      twitterHandle: storeData.twitterHandle,
+      googleSiteVerification: storeData.googleSiteVerification,
       marketingPixels:
         typeof storeData.marketingPixels === 'object' ? storeData.marketingPixels : undefined,
       settings: typeof storeData.settings === 'object' ? storeData.settings : undefined,
@@ -404,6 +413,9 @@ export async function getStoreById(storeId: string): Promise<ResolvedStore | nul
       metaTitleAr: storeData.metaTitleAr,
       metaDescription: storeData.metaDescription,
       metaDescriptionAr: storeData.metaDescriptionAr,
+      ogImage: storeData.ogImage,
+      twitterHandle: storeData.twitterHandle,
+      googleSiteVerification: storeData.googleSiteVerification,
       marketingPixels:
         typeof storeData.marketingPixels === 'object' ? storeData.marketingPixels : undefined,
       settings: typeof storeData.settings === 'object' ? storeData.settings : undefined,
