@@ -268,11 +268,18 @@ class ApiClient {
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
     const headers = this.buildHeaders(options);
 
+    // 45s request timeout — long enough for cold-start + complex order
+    // creation, short enough to surface a real error before the user
+    // gives up on a stuck spinner.
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 45_000);
+
     try {
       const response = await fetch(`${this.baseUrl}${endpoint}`, {
         ...options,
         credentials: 'include',
         headers,
+        signal: options.signal ?? controller.signal,
       });
 
       // On 401, attempt a single token refresh and retry the request
@@ -285,6 +292,7 @@ class ApiClient {
             ...options,
             credentials: 'include',
             headers: retryHeaders,
+            signal: options.signal ?? controller.signal,
           });
 
           let retryData: ApiResponse<T>;
@@ -331,11 +339,22 @@ class ApiClient {
       }
 
       return data;
-    } catch {
+    } catch (e) {
+      if (e instanceof Error && e.name === 'AbortError') {
+        return {
+          success: false,
+          error: {
+            code: 'TIMEOUT',
+            message: 'The server took too long to respond. Please try again.',
+          },
+        };
+      }
       return {
         success: false,
         error: { code: 'NETWORK_ERROR', message: 'Network error' },
       };
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 
