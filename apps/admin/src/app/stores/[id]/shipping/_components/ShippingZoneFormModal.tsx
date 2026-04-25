@@ -85,6 +85,7 @@ export function ShippingZoneFormModal({
                 onChange={e => onChange({ ...formData, nameAr: e.target.value })}
                 placeholder={t('zoneNameArPlaceholder')}
                 className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                lang="ar"
                 dir="rtl"
               />
             </div>
@@ -123,6 +124,7 @@ export function ShippingZoneFormModal({
               placeholder={t('areasArPlaceholder')}
               className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
               rows={2}
+              lang="ar"
               dir="rtl"
             />
           </div>

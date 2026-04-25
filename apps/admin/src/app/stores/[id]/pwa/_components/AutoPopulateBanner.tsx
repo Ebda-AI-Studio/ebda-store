@@ -29,7 +29,11 @@ export function AutoPopulateBanner({ storeInfo, onPopulate }: AutoPopulateBanner
           <p className="font-medium text-foreground">
             {storeInfo.name}
             {storeInfo.nameAr && <span className="text-muted-foreground mx-2">|</span>}
-            {storeInfo.nameAr && <span dir="rtl">{storeInfo.nameAr}</span>}
+            {storeInfo.nameAr && (
+              <span lang="ar" dir="rtl">
+                {storeInfo.nameAr}
+              </span>
+            )}
           </p>
           <p className="text-sm text-muted-foreground">{t('description')}</p>
         </div>

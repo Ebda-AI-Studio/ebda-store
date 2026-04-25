@@ -2,6 +2,7 @@
 
 import { Button } from '@force/ui';
 import { useT } from '@/i18n/useT';
+import { StatusFilterPills } from '@/components/StatusFilterPills';
 
 interface StoresFiltersProps {
   search: string;
@@ -66,21 +67,14 @@ export function StoresFilters({
 
       <div className="flex items-center gap-3">
         {/* Status Filter Pills */}
-        <div className="hidden sm:flex items-center gap-1 rounded-xl bg-muted/50 p-1">
-          {STATUS_KEYS.map(({ value, labelKey }) => (
-            <button
-              type="button"
-              key={value}
-              onClick={() => setStatusFilter(value)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
-                statusFilter === value
-                  ? 'bg-card text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {t(labelKey)}
-            </button>
-          ))}
+        <div className="hidden sm:block">
+          <StatusFilterPills
+            ariaLabel={t('filterStatusLabel')}
+            options={STATUS_KEYS.map(({ value, labelKey }) => ({ value, label: t(labelKey) }))}
+            value={statusFilter}
+            onChange={setStatusFilter}
+            className="flex items-center gap-1 rounded-xl bg-muted/50 p-1"
+          />
         </div>
 
         {/* Mobile Status Dropdown */}

@@ -209,6 +209,7 @@ export default function StorePagesPage() {
                   value={link.nameAr || ''}
                   onChange={e => updateLink(section, index, 'nameAr', e.target.value)}
                   placeholder={t('linkNameArPlaceholder')}
+                  lang="ar"
                   dir="rtl"
                   className="w-40 rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 />

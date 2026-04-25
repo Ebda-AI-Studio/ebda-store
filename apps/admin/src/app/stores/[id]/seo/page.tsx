@@ -234,6 +234,7 @@ export default function StoreSeoPage() {
             </div>
             <input
               type="text"
+              lang="ar"
               dir="rtl"
               value={settings.metaTitleAr}
               onChange={e => setSettings(prev => ({ ...prev, metaTitleAr: e.target.value }))}
@@ -253,6 +254,7 @@ export default function StoreSeoPage() {
               <CharCount value={settings.metaDescriptionAr} max={DESC_MAX} />
             </div>
             <textarea
+              lang="ar"
               dir="rtl"
               value={settings.metaDescriptionAr}
               onChange={e => setSettings(prev => ({ ...prev, metaDescriptionAr: e.target.value }))}

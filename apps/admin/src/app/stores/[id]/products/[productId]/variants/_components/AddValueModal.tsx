@@ -45,6 +45,7 @@ export function AddValueModal({
               id="newValueAr"
               value={valueAr}
               onChange={e => onValueArChange(e.target.value)}
+              lang="ar"
               dir="rtl"
               className="mt-1"
             />

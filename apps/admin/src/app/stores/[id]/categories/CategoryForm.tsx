@@ -92,6 +92,7 @@ export function CategoryForm({
             </label>
             <input
               type="text"
+              lang="ar"
               dir="rtl"
               value={form.nameAr}
               onChange={e => onFormChange(prev => ({ ...prev, nameAr: e.target.value }))}
@@ -137,6 +138,7 @@ export function CategoryForm({
               {t('descriptionArabic')}
             </label>
             <textarea
+              lang="ar"
               dir="rtl"
               value={form.descriptionAr}
               onChange={e => onFormChange(prev => ({ ...prev, descriptionAr: e.target.value }))}

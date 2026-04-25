@@ -33,6 +33,7 @@ export function BrandingIdentityTab({ branding, onChange }: BrandingIdentityTabP
           </label>
           <input
             type="text"
+            lang="ar"
             dir="rtl"
             value={branding.nameAr || ''}
             onChange={e => onChange({ ...branding, nameAr: e.target.value })}
@@ -60,6 +61,7 @@ export function BrandingIdentityTab({ branding, onChange }: BrandingIdentityTabP
             {t('descriptionAr')}
           </label>
           <textarea
+            lang="ar"
             dir="rtl"
             value={branding.descriptionAr || ''}
             onChange={e => onChange({ ...branding, descriptionAr: e.target.value })}

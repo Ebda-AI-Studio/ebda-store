@@ -50,6 +50,7 @@ export function AddOptionModal({
               value={nameAr}
               onChange={e => onNameArChange(e.target.value)}
               placeholder={t('nameArPlaceholder')}
+              lang="ar"
               dir="rtl"
               className="mt-1"
             />

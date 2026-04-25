@@ -171,7 +171,7 @@ export function CouponsTable({
                     <div>
                       <p className="font-medium text-foreground">{coupon.name}</p>
                       {coupon.nameAr && (
-                        <p className="text-sm text-muted-foreground" dir="rtl">
+                        <p className="text-sm text-muted-foreground" lang="ar" dir="rtl">
                           {coupon.nameAr}
                         </p>
                       )}

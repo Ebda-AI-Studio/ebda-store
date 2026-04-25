@@ -69,7 +69,7 @@ export function VariantsTable({ variants, onEdit, onDelete }: VariantsTableProps
                   <td className="px-4 py-3">
                     <p className="font-medium text-foreground">{variant.title}</p>
                     {variant.titleAr && (
-                      <p className="text-xs text-muted-foreground" dir="rtl">
+                      <p className="text-xs text-muted-foreground" lang="ar" dir="rtl">
                         {variant.titleAr}
                       </p>
                     )}

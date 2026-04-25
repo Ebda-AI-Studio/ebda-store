@@ -180,6 +180,7 @@ function CodFields({
           </label>
           <input
             type="text"
+            lang="ar"
             dir="rtl"
             value={form.displayNameAr || ''}
             onChange={e => onUpdateField('displayNameAr', e.target.value)}

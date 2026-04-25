@@ -167,6 +167,16 @@
   :where(button, [role='button'], a)[aria-disabled='true'] {
     cursor: not-allowed;
   }
+
+  /* Native form controls + scrollbars follow theme */
+  html { color-scheme: light; }
+  html.dark { color-scheme: dark; }
+
+  /* Eliminate 300ms tap-zoom delay on touch devices */
+  html { touch-action: manipulation; }
+
+  /* Prevent scroll-chaining out of modals/drawers */
+  :where([role='dialog'], [data-overlay]) { overscroll-behavior: contain; }
 }
 
 @layer components {

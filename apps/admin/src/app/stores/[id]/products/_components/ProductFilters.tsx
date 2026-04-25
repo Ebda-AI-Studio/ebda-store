@@ -1,7 +1,9 @@
 'use client';
 
+import { useMemo } from 'react';
 import { Input } from '@force/ui';
 import { useT } from '@/i18n/useT';
+import { StatusFilterPills } from '../../../../../components/StatusFilterPills';
 import type { StatusFilter } from './types';
 
 interface ProductFiltersProps {
@@ -22,6 +24,10 @@ export function ProductFilters({
   onStatusFilterChange,
 }: ProductFiltersProps) {
   const t = useT('products.list.filters');
+
+  // Options depend on translation state so we memoize them; keeping the
+  // array reference stable also keeps StatusFilterPills' effect deps tidy.
+  const options = useMemo(() => STATUS_VALUES.map(v => ({ value: v, label: t(v) })), [t]);
 
   return (
     <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -51,22 +57,12 @@ export function ProductFilters({
         </div>
       </div>
 
-      <div className="flex items-center gap-1 rounded-xl bg-muted p-1">
-        {STATUS_VALUES.map(s => (
-          <button
-            type="button"
-            key={s}
-            onClick={() => onStatusFilterChange(s)}
-            className={`cursor-pointer rounded-lg px-3 py-1.5 text-xs font-medium capitalize transition-all duration-200 ${
-              statusFilter === s
-                ? 'bg-card text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            {t(s)}
-          </button>
-        ))}
-      </div>
+      <StatusFilterPills
+        ariaLabel={t('ariaLabel')}
+        options={options}
+        value={statusFilter}
+        onChange={onStatusFilterChange}
+      />
     </div>
   );
 }

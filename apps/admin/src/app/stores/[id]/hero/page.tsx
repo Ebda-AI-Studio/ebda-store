@@ -156,6 +156,7 @@ export default function StoreHeroPage() {
               </label>
               <input
                 type="text"
+                lang="ar"
                 dir="rtl"
                 value={hero.heroTitleAr || ''}
                 onChange={e => setHero({ ...hero, heroTitleAr: e.target.value })}
@@ -183,6 +184,7 @@ export default function StoreHeroPage() {
                 {t('subtitleArabic')}
               </label>
               <textarea
+                lang="ar"
                 dir="rtl"
                 value={hero.heroSubtitleAr || ''}
                 onChange={e => setHero({ ...hero, heroSubtitleAr: e.target.value })}
@@ -212,6 +214,7 @@ export default function StoreHeroPage() {
               </label>
               <input
                 type="text"
+                lang="ar"
                 dir="rtl"
                 value={hero.heroCtaTextAr || ''}
                 onChange={e => setHero({ ...hero, heroCtaTextAr: e.target.value })}

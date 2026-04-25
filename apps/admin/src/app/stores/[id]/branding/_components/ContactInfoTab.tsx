@@ -54,6 +54,7 @@ export function ContactInfoTab({ branding, onChange }: ContactInfoTabProps) {
           <label className="block text-sm font-medium text-foreground mb-1">{t('phoneAr')}</label>
           <input
             type="text"
+            lang="ar"
             dir="rtl"
             value={branding.phoneAr || ''}
             onChange={e => onChange({ ...branding, phoneAr: e.target.value })}
@@ -77,6 +78,7 @@ export function ContactInfoTab({ branding, onChange }: ContactInfoTabProps) {
         <div>
           <label className="block text-sm font-medium text-foreground mb-1">{t('addressAr')}</label>
           <textarea
+            lang="ar"
             dir="rtl"
             value={branding.addressAr || ''}
             onChange={e => onChange({ ...branding, addressAr: e.target.value })}

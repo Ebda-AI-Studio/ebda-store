@@ -258,7 +258,7 @@ export default function ProductVariantsPage() {
           <div>
             <h2 className="font-semibold text-foreground">{product.name}</h2>
             {product.nameAr && (
-              <p className="text-sm text-muted-foreground" dir="rtl">
+              <p className="text-sm text-muted-foreground" lang="ar" dir="rtl">
                 {product.nameAr}
               </p>
             )}

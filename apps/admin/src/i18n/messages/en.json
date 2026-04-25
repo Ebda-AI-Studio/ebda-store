@@ -955,6 +955,7 @@
       "saveSuccessBody": "All changes have been saved successfully"
     },
     "tabs": {
+      "ariaLabel": "Branding settings tabs",
       "branding": "Branding",
       "theme": "Theme & Colors",
       "contact": "Contact Info",
@@ -1763,6 +1764,7 @@
       "backToStore": "Back to Store"
     },
     "tabs": {
+      "ariaLabel": "Bulk operations tabs",
       "import": "Import Products",
       "export": "Export Products"
     },

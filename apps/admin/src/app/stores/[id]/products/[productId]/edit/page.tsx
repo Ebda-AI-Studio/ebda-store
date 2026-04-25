@@ -258,6 +258,7 @@ export default function EditProductPage() {
                   value={formData.nameAr}
                   onChange={e => updateField('nameAr', e.target.value)}
                   placeholder={tFields('nameArPlaceholder')}
+                  lang="ar"
                   dir="rtl"
                 />
                 <Textarea
@@ -273,6 +274,7 @@ export default function EditProductPage() {
                   onChange={e => updateField('descriptionAr', e.target.value)}
                   placeholder={tFields('descriptionArPlaceholder')}
                   rows={4}
+                  lang="ar"
                   dir="rtl"
                 />
               </div>

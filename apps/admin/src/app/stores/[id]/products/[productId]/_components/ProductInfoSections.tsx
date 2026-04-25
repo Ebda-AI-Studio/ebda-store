@@ -53,7 +53,7 @@ export function ProductInfoSections({
               <label className="text-sm font-medium text-muted-foreground">
                 {tFields('nameAr')}
               </label>
-              <p className="mt-1 text-foreground" dir="rtl">
+              <p className="mt-1 text-foreground" lang="ar" dir="rtl">
                 {product.nameAr}
               </p>
             </div>
@@ -80,7 +80,7 @@ export function ProductInfoSections({
             <label className="text-sm font-medium text-muted-foreground">
               {tFields('descriptionAr')}
             </label>
-            <p className="mt-1 text-foreground" dir="rtl">
+            <p className="mt-1 text-foreground" lang="ar" dir="rtl">
               {product.descriptionAr}
             </p>
           </div>

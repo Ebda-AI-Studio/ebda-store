@@ -96,6 +96,7 @@ export function TaxRateFormModal({
                 onChange={e => onFormChange({ nameAr: e.target.value })}
                 placeholder={t('nameAr.placeholder')}
                 className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                lang="ar"
                 dir="rtl"
               />
             </div>

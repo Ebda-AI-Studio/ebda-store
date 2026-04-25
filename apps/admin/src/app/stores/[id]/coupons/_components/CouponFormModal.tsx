@@ -74,6 +74,7 @@ export function CouponFormModal({
               </label>
               <input
                 type="text"
+                lang="ar"
                 dir="rtl"
                 value={formData.nameAr}
                 onChange={e => onChange({ ...formData, nameAr: e.target.value })}

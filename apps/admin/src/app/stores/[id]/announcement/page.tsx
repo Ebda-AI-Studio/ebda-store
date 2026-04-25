@@ -182,6 +182,7 @@ export default function AnnouncementPage() {
               </label>
               <input
                 type="text"
+                lang="ar"
                 dir="rtl"
                 value={settings.textAr}
                 onChange={e => setSettings(prev => ({ ...prev, textAr: e.target.value }))}
@@ -222,6 +223,7 @@ export default function AnnouncementPage() {
               </label>
               <input
                 type="text"
+                lang="ar"
                 dir="rtl"
                 value={settings.linkTextAr}
                 onChange={e => setSettings(prev => ({ ...prev, linkTextAr: e.target.value }))}

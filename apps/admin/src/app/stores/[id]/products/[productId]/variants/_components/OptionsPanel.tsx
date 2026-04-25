@@ -48,7 +48,7 @@ export function OptionsPanel({
                   <div>
                     <p className="font-medium text-foreground">{option.name}</p>
                     {option.nameAr && (
-                      <p className="text-xs text-muted-foreground" dir="rtl">
+                      <p className="text-xs text-muted-foreground" lang="ar" dir="rtl">
                         {option.nameAr}
                       </p>
                     )}

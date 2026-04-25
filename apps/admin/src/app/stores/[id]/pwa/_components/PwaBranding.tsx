@@ -42,6 +42,7 @@ export function PwaBranding({ settings, pwaEnabled, onChange }: PwaBrandingProps
             onChange={e => onChange({ ...settings, appNameAr: e.target.value })}
             placeholder={t('appNameArPlaceholder')}
             className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+            lang="ar"
             dir="rtl"
             disabled={!pwaEnabled}
           />
@@ -72,6 +73,7 @@ export function PwaBranding({ settings, pwaEnabled, onChange }: PwaBrandingProps
             onChange={e => onChange({ ...settings, shortNameAr: e.target.value })}
             placeholder={t('shortNameArPlaceholder')}
             className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+            lang="ar"
             dir="rtl"
             disabled={!pwaEnabled}
           />
@@ -99,6 +101,7 @@ export function PwaBranding({ settings, pwaEnabled, onChange }: PwaBrandingProps
             placeholder={t('descriptionArPlaceholder')}
             className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
             rows={2}
+            lang="ar"
             dir="rtl"
             disabled={!pwaEnabled}
           />

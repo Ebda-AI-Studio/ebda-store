@@ -1,5 +1,6 @@
 'use client';
 
+import { useRef, type KeyboardEvent } from 'react';
 import { useT } from '@/i18n/useT';
 import type { BulkTab } from './types';
 
@@ -8,58 +9,106 @@ interface BulkTabsProps {
   onTabChange: (tab: BulkTab) => void;
 }
 
+const TABS: ReadonlyArray<{
+  id: BulkTab;
+  key: string;
+  iconPath: string;
+}> = [
+  {
+    id: 'import',
+    key: 'import',
+    iconPath: 'M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12',
+  },
+  {
+    id: 'export',
+    key: 'export',
+    iconPath: 'M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4',
+  },
+];
+
 /**
  * Top-level tab switch between the import wizard and the export panel.
- * Icons are placed via flex+gap so the layout mirrors cleanly in RTL.
+ * Implements the WAI-ARIA tab pattern with arrow-key navigation.
  */
 export function BulkTabs({ activeTab, onTabChange }: BulkTabsProps) {
   const t = useT('bulk.tabs');
+  const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  function focusIndex(idx: number) {
+    const clamped = ((idx % TABS.length) + TABS.length) % TABS.length;
+    buttonRefs.current[clamped]?.focus();
+    const next = TABS[clamped];
+    if (next && next.id !== activeTab) onTabChange(next.id);
+  }
+
+  function handleKeyDown(e: KeyboardEvent<HTMLButtonElement>, index: number) {
+    switch (e.key) {
+      case 'ArrowRight':
+      case 'ArrowDown':
+        e.preventDefault();
+        focusIndex(index + 1);
+        break;
+      case 'ArrowLeft':
+      case 'ArrowUp':
+        e.preventDefault();
+        focusIndex(index - 1);
+        break;
+      case 'Home':
+        e.preventDefault();
+        focusIndex(0);
+        break;
+      case 'End':
+        e.preventDefault();
+        focusIndex(TABS.length - 1);
+        break;
+      default:
+        break;
+    }
+  }
 
   return (
     <div className="mb-6 border-b">
-      <nav className="flex gap-4">
-        <button
-          type="button"
-          onClick={() => onTabChange('import')}
-          className={`pb-3 text-sm font-medium transition ${
-            activeTab === 'import'
-              ? 'border-b-2 border-primary text-primary'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          <span className="inline-flex items-center gap-2">
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
-              />
-            </svg>
-            {t('import')}
-          </span>
-        </button>
-        <button
-          type="button"
-          onClick={() => onTabChange('export')}
-          className={`pb-3 text-sm font-medium transition ${
-            activeTab === 'export'
-              ? 'border-b-2 border-primary text-primary'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          <span className="inline-flex items-center gap-2">
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-              />
-            </svg>
-            {t('export')}
-          </span>
-        </button>
+      <nav role="tablist" aria-label={t('ariaLabel')} className="flex gap-4">
+        {TABS.map((tab, index) => {
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              ref={el => {
+                buttonRefs.current[index] = el;
+              }}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              tabIndex={isActive ? 0 : -1}
+              onClick={() => onTabChange(tab.id)}
+              onKeyDown={e => handleKeyDown(e, index)}
+              className={`pb-3 text-sm font-medium transition ${
+                isActive
+                  ? 'border-b-2 border-primary text-primary'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <span className="inline-flex items-center gap-2">
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d={tab.iconPath}
+                  />
+                </svg>
+                {t(tab.key)}
+              </span>
+            </button>
+          );
+        })}
       </nav>
     </div>
   );
