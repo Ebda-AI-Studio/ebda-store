@@ -471,7 +471,10 @@ export default function CheckoutClient() {
     setCheckoutError(null);
 
     try {
-      // Create order
+      // Create order. Include the form's email on the shipping address so
+      // the invoice / order confirmation can show the *buyer's* contact email
+      // — not the authenticated user's profile email (which can differ when
+      // a logged-in admin checks out for someone else).
       const orderResult = await api.createOrder({
         shippingAddress: {
           firstName: formData.firstName,
@@ -483,6 +486,7 @@ export default function CheckoutClient() {
           postalCode: '',
           country: 'KW',
           phone: formData.phone,
+          email: formData.email,
         },
         paymentMethod: selectedProvider,
         notes: formData.notes,

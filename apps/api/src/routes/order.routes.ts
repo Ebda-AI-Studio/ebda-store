@@ -24,6 +24,7 @@ const addressSchema = z.object({
   postalCode: z.string().optional().default(''),
   country: z.string().min(2).max(2),
   phone: z.string().optional(),
+  email: z.string().email().optional(),
 });
 
 const createOrderSchema = z.object({

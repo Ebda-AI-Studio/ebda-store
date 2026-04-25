@@ -117,6 +117,7 @@ const shippingAddressSchema = z.object({
   postalCode: z.string().optional().default(''),
   country: z.string().min(1),
   phone: z.string().optional(),
+  email: z.string().email().optional(),
 });
 
 const createOrderSchema = z.object({

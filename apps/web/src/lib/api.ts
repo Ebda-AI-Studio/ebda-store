@@ -145,31 +145,26 @@ interface ApiResponse<T> {
   };
 }
 
+interface OrderAddress {
+  firstName: string;
+  lastName: string;
+  company?: string;
+  address1: string;
+  address2?: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  country: string;
+  phone?: string;
+  /** Buyer-supplied contact email captured at checkout. Persisted on the
+   * order so the invoice / confirmation use the actual customer's address,
+   * not the authenticated user's profile email. */
+  email?: string;
+}
+
 interface CreateOrderData {
-  shippingAddress: {
-    firstName: string;
-    lastName: string;
-    company?: string;
-    address1: string;
-    address2?: string;
-    city: string;
-    state: string;
-    postalCode: string;
-    country: string;
-    phone?: string;
-  };
-  billingAddress?: {
-    firstName: string;
-    lastName: string;
-    company?: string;
-    address1: string;
-    address2?: string;
-    city: string;
-    state: string;
-    postalCode: string;
-    country: string;
-    phone?: string;
-  };
+  shippingAddress: OrderAddress;
+  billingAddress?: OrderAddress;
   paymentMethod: string;
   notes?: string;
   couponCode?: string;

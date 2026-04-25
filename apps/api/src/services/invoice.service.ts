@@ -162,12 +162,38 @@ export class InvoiceService {
       border-radius: 16px;
       overflow: hidden;
       box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 8px 24px rgba(15,23,42,0.06);
+      position: relative;
     }
     .ribbon {
       height: 6px;
-      background: var(--brand);
+      background: linear-gradient(90deg, var(--brand) 0%, color-mix(in srgb, var(--brand) 70%, white 30%) 100%);
     }
-    .pad { padding: 40px 48px; }
+    .pad { padding: 44px 52px; position: relative; z-index: 1; }
+    /* Subtle header backdrop — uses the brand color at very low alpha */
+    .header-bg {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 220px;
+      background: linear-gradient(180deg, color-mix(in srgb, var(--brand) 4%, white 96%) 0%, transparent 100%);
+      pointer-events: none;
+      z-index: 0;
+    }
+    /* Diagonal status stamp — pure CSS, prints faithfully */
+    .stamp {
+      position: absolute;
+      top: 38%; left: 50%;
+      transform: translate(-50%, -50%) rotate(-18deg);
+      font-size: 96px; font-weight: 900;
+      letter-spacing: 0.08em;
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.06;
+      white-space: nowrap;
+      user-select: none;
+    }
+    .stamp.paid { color: var(--success); }
+    .stamp.unpaid { color: var(--warning); }
+    .stamp.cancelled, .stamp.refunded { color: var(--danger); }
 
     /* Header */
     .header { display: flex; align-items: flex-start; justify-content: space-between; gap: 32px; padding-bottom: 32px; border-bottom: 1px solid var(--line); }
@@ -176,9 +202,9 @@ export class InvoiceService {
     .store-name { font-size: 22px; font-weight: 700; color: var(--ink); letter-spacing: -0.01em; }
     .store-meta { font-size: 12px; color: var(--ink-soft); }
     .invoice-side { text-align: right; flex-shrink: 0; }
-    .invoice-eyebrow { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.12em; color: var(--ink-mute); }
-    .invoice-number { font-size: 20px; font-weight: 700; color: var(--ink); margin-top: 4px; font-variant-numeric: tabular-nums; }
-    .invoice-date { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
+    .invoice-eyebrow { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.18em; color: var(--brand); }
+    .invoice-number { font-size: 22px; font-weight: 800; color: var(--ink); margin-top: 6px; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+    .invoice-date { font-size: 12px; color: var(--ink-soft); margin-top: 4px; }
     .badge { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; padding: 6px 12px; border-radius: 999px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
     .badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
     .badge.paid { background: var(--success-bg); color: var(--success); }
@@ -230,8 +256,14 @@ export class InvoiceService {
     .totals .row .label { color: var(--ink-soft); }
     .totals .row .val { color: var(--ink); font-variant-numeric: tabular-nums; }
     .totals .discount .val { color: var(--success); }
-    .totals .grand { margin-top: 8px; padding-top: 14px; border-top: 2px solid var(--ink); font-size: 18px; font-weight: 700; }
-    .totals .grand .val { color: var(--brand); }
+    .totals .grand {
+      margin-top: 10px; padding: 14px 16px;
+      background: color-mix(in srgb, var(--brand) 8%, white 92%);
+      border-radius: 10px;
+      border-left: 3px solid var(--brand);
+      font-size: 18px; font-weight: 800;
+    }
+    .totals .grand .val { color: var(--brand); font-size: 22px; }
 
     /* Notes */
     .notes { margin-top: 28px; padding: 18px 20px; background: var(--bg-soft); border-radius: 12px; }
@@ -239,9 +271,10 @@ export class InvoiceService {
     .notes .body { font-size: 13px; color: var(--ink); line-height: 1.55; white-space: pre-wrap; }
 
     /* Footer */
-    .footer { margin-top: 36px; padding-top: 24px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
-    .footer-text { font-size: 12px; color: var(--ink-mute); line-height: 1.55; }
-    .footer-thank { font-weight: 600; color: var(--ink-soft); }
+    .footer { margin-top: 36px; padding-top: 24px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; flex-wrap: wrap; }
+    .footer-text { font-size: 12px; color: var(--ink-mute); line-height: 1.6; flex: 1; min-width: 200px; }
+    .footer-thank { font-weight: 600; color: var(--ink-soft); margin-bottom: 4px; }
+    .footer-contact { font-size: 11px; color: var(--ink-mute); line-height: 1.6; text-align: right; }
 
     /* Actions */
     .actions { text-align: center; padding: 0 0 36px; }
@@ -283,6 +316,8 @@ export class InvoiceService {
 <body>
   <div class="page">
     <div class="ribbon"></div>
+    <div class="header-bg" aria-hidden="true"></div>
+    <div class="stamp ${statusClass}" aria-hidden="true">${escapeHtml(statusLabel)}</div>
 
     <div class="pad">
       <header class="header">
@@ -309,7 +344,16 @@ export class InvoiceService {
         <div class="addr-card">
           <div class="addr-label">Bill to</div>
           <div class="addr-name">${escapeHtml(billingAddr?.firstName || order.customer?.firstName || '')} ${escapeHtml(billingAddr?.lastName || order.customer?.lastName || '')}</div>
-          ${order.customer?.email ? `<div class="addr-line">${escapeHtml(order.customer.email)}</div>` : ''}
+          ${
+            // Prefer the email collected at checkout (buyer's actual contact)
+            // over the authenticated user's profile email — a logged-in admin
+            // checking out for someone else would otherwise have their admin
+            // email leak onto the customer's invoice.
+            (() => {
+              const email = billingAddr?.email || shippingAddr?.email || order.customer?.email;
+              return email ? `<div class="addr-line">${escapeHtml(email)}</div>` : '';
+            })()
+          }
           ${billingAddr?.phone ? `<div class="addr-line">${escapeHtml(billingAddr.phone)}</div>` : ''}
         </div>
         ${
@@ -388,6 +432,15 @@ export class InvoiceService {
           <div class="footer-thank">Thank you for shopping with ${escapeHtml(order.store.name)}.</div>
           <div>This invoice was generated automatically.</div>
         </div>
+        ${
+          order.store.email || order.store.phone || order.store.address
+            ? `<div class="footer-contact">
+                ${order.store.email ? `<div>${escapeHtml(order.store.email)}</div>` : ''}
+                ${order.store.phone ? `<div>${escapeHtml(order.store.phone)}</div>` : ''}
+                ${order.store.address ? `<div>${escapeHtml(order.store.address)}</div>` : ''}
+              </div>`
+            : ''
+        }
       </footer>
     </div>
   </div>
