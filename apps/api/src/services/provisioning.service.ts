@@ -88,10 +88,16 @@ export class ProvisioningService {
       }
     }
 
-    // Add domain to Vercel (non-blocking — don't fail store creation)
+    // Add domain to Vercel BEFORE the DB transaction. If Vercel succeeds but
+    // the transaction below fails (slug collision in concurrent provision,
+    // owner email race, etc.), we MUST remove the domain from Vercel — a
+    // phantom Vercel domain serves traffic + bills us but is invisible to
+    // admin since no Store row references it.
+    let vercelAdded = false;
     if (domain) {
       try {
         await VercelDomainService.addDomain(domain);
+        vercelAdded = true;
       } catch (error) {
         logger.error({ err: error, domain }, 'Failed to add domain to Vercel during provisioning');
       }
@@ -103,88 +109,111 @@ export class ProvisioningService {
     // Hash password before entering transaction
     const passwordHash = await bcrypt.hash(tempPassword, 12);
 
-    // Create store, owner, and default category in a single transaction
-    const result = await prisma.$transaction(async tx => {
-      // Check if owner email exists
-      const existingUser = await tx.user.findUnique({
-        where: { email: ownerEmail },
-      });
+    let result;
+    try {
+      // Create store, owner, and default category in a single transaction
+      result = await prisma.$transaction(async tx => {
+        // Check if owner email exists
+        const existingUser = await tx.user.findUnique({
+          where: { email: ownerEmail },
+        });
 
-      let owner;
-      const isNewUser = !existingUser;
+        let owner;
+        const isNewUser = !existingUser;
 
-      if (existingUser) {
-        owner = existingUser;
-      } else {
-        // Parse name into first/last
-        const nameParts = ownerName.trim().split(' ');
-        const firstName = nameParts[0];
-        const lastName = nameParts.slice(1).join(' ') || '';
+        if (existingUser) {
+          owner = existingUser;
+        } else {
+          // Parse name into first/last
+          const nameParts = ownerName.trim().split(' ');
+          const firstName = nameParts[0];
+          const lastName = nameParts.slice(1).join(' ') || '';
 
-        // Create owner directly inside the transaction
-        owner = await tx.user.create({
+          // Create owner directly inside the transaction
+          owner = await tx.user.create({
+            data: {
+              email: ownerEmail,
+              passwordHash,
+              firstName,
+              lastName,
+              role: 'store_admin',
+              emailVerified: false,
+            },
+          });
+        }
+
+        // Create the store
+        const store = await tx.store.create({
           data: {
-            email: ownerEmail,
-            passwordHash,
-            firstName,
-            lastName,
-            role: 'store_admin',
-            emailVerified: false,
+            name: storeName,
+            slug,
+            domain,
+            ownerId: owner.id,
+            status: 'active',
+            plan,
+            settings: {
+              theme: settings?.theme || 'default',
+              currency: settings?.currency || 'USD',
+              timezone: settings?.timezone || 'UTC',
+              ...(settings || {}),
+            },
           },
         });
-      }
 
-      // Create the store
-      const store = await tx.store.create({
-        data: {
-          name: storeName,
-          slug,
-          domain,
-          ownerId: owner.id,
-          status: 'active',
-          plan,
-          settings: {
-            theme: settings?.theme || 'default',
-            currency: settings?.currency || 'USD',
-            timezone: settings?.timezone || 'UTC',
-            ...(settings || {}),
+        // Create default category
+        await tx.category.create({
+          data: {
+            storeId: store.id,
+            name: 'Products',
+            slug: 'products',
+            description: 'All products',
+            position: 0,
           },
-        },
+        });
+
+        // Provision Cash on Delivery as the default payment method.
+        // Without this row the storefront's POST /payments/create returns 400
+        // (COD_NOT_AVAILABLE) and customers can't check out — even though the
+        // UI offers COD by default. Store owners can disable / configure a fee
+        // later via /admin/payment-settings.
+        await tx.paymentConfig.create({
+          data: {
+            storeId: store.id,
+            provider: 'cod',
+            isEnabled: true,
+            displayName: 'Cash on Delivery',
+            displayNameAr: 'الدفع عند الاستلام',
+            testMode: false,
+            supportedMethods: ['cod'],
+            supportedCurrencies: ['KWD'],
+            fixedFee: 0,
+            percentageFee: 0,
+          },
+        });
+
+        return { store, owner, isNewUser };
       });
 
-      // Create default category
-      await tx.category.create({
-        data: {
-          storeId: store.id,
-          name: 'Products',
-          slug: 'products',
-          description: 'All products',
-          position: 0,
-        },
-      });
-
-      // Provision Cash on Delivery as the default payment method.
-      // Without this row the storefront's POST /payments/create returns 400
-      // (COD_NOT_AVAILABLE) and customers can't check out — even though the
-      // UI offers COD by default. Store owners can disable / configure a fee
-      // later via /admin/payment-settings.
-      await tx.paymentConfig.create({
-        data: {
-          storeId: store.id,
-          provider: 'cod',
-          isEnabled: true,
-          displayName: 'Cash on Delivery',
-          displayNameAr: 'الدفع عند الاستلام',
-          testMode: false,
-          supportedMethods: ['cod'],
-          supportedCurrencies: ['KWD'],
-          fixedFee: 0,
-          percentageFee: 0,
-        },
-      });
-
-      return { store, owner, isNewUser };
-    });
+      // Transaction committed — disarm the Vercel rollback so a successful
+      // provision is never undone by a downstream error (e.g. welcome email
+      // failure handled below).
+      vercelAdded = false;
+    } catch (error) {
+      // Compensating action: if we registered the domain with Vercel but the
+      // DB transaction failed, remove it so we don't strand a phantom domain
+      // billing + serving traffic with no admin visibility. Fire-and-forget;
+      // log on failure so ops can manually clean up.
+      if (vercelAdded && domain) {
+        const domainToRollback = domain;
+        void VercelDomainService.removeDomain(domainToRollback).catch(rollbackErr =>
+          logger.error(
+            { err: rollbackErr, domain: domainToRollback },
+            '[PROVISIONING] Failed to roll back Vercel domain after transaction failure — manual cleanup required'
+          )
+        );
+      }
+      throw error;
+    }
 
     // Store is provisioned — fire-and-forget the welcome email so SMTP latency
     // can't stall the provisioning API response.
