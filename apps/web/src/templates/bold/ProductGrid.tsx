@@ -28,7 +28,7 @@ export default function BoldProductGrid({
 
   return (
     <section
-      className="py-20 md:py-28 bg-background relative overflow-hidden"
+      className="py-12 sm:py-16 md:py-28 bg-background relative overflow-hidden"
       dir={isRtl ? 'rtl' : 'ltr'}
     >
       {/* Background accents */}
@@ -37,8 +37,8 @@ export default function BoldProductGrid({
       <div className="container mx-auto px-4 relative z-10">
         {/* Section Header */}
         {displayTitle && (
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl lg:text-6xl font-black text-foreground tracking-tight">
+          <div className="text-center mb-10 sm:mb-12 md:mb-16">
+            <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black text-foreground tracking-tight">
               {displayTitle}
             </h2>
             <div className="mt-4 w-24 h-2 bg-primary mx-auto rounded-full" />

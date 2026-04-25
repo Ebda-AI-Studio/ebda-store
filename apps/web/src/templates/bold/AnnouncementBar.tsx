@@ -17,10 +17,10 @@ export default function BoldAnnouncementBar({
   if (!displayText) return null;
 
   const content = (
-    <div className="flex items-center justify-center gap-3">
-      <span className="text-xl">🔥</span>
-      <span className="font-black tracking-wide">{displayText}</span>
-      {link && <span className="inline-flex items-center gap-1 font-black">→</span>}
+    <div className="flex items-center justify-center gap-2 sm:gap-3 text-sm sm:text-base">
+      <span className="text-base sm:text-xl shrink-0">🔥</span>
+      <span className="font-black tracking-wide text-center">{displayText}</span>
+      {link && <span className="inline-flex items-center gap-1 font-black shrink-0">→</span>}
     </div>
   );
 

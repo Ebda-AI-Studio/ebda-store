@@ -27,11 +27,11 @@ export default function ElegantProductGrid({
   const gridCols = getGridColsClass(columns);
 
   return (
-    <section className="py-20 md:py-28 bg-background" dir={isRtl ? 'rtl' : 'ltr'}>
+    <section className="py-12 sm:py-16 md:py-28 bg-background" dir={isRtl ? 'rtl' : 'ltr'}>
       <div className="container mx-auto px-4">
         {/* Section Header - Editorial style */}
         {displayTitle && (
-          <div className="text-center mb-16">
+          <div className="text-center mb-10 sm:mb-12 md:mb-16">
             <p className="text-xs tracking-[0.4em] uppercase text-muted-foreground mb-4">
               {isRtl ? 'اكتشف' : 'Discover'}
             </p>

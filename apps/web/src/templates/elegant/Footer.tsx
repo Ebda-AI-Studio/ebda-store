@@ -30,7 +30,7 @@ export default function ElegantFooter({
     <footer className="bg-muted border-t border-border mt-auto" dir={isRtl ? 'rtl' : 'ltr'}>
       {/* Newsletter */}
       <div className="border-b border-border/50">
-        <div className="container mx-auto px-4 py-16">
+        <div className="container mx-auto px-4 py-10 sm:py-12 md:py-16">
           <div className="max-w-xl mx-auto text-center">
             <h3 className="text-[10px] tracking-[0.4em] uppercase text-muted-foreground/60 mb-4 font-serif">
               {isRtl ? 'ابق على اطلاع' : 'Stay Informed'}
@@ -46,7 +46,7 @@ export default function ElegantFooter({
               </p>
             ) : (
               <form
-                className="flex gap-0 max-w-md mx-auto"
+                className="flex flex-col gap-2 sm:flex-row sm:gap-0 max-w-md mx-auto"
                 onSubmit={e => {
                   e.preventDefault();
                   setSubscribed(true);
@@ -54,15 +54,16 @@ export default function ElegantFooter({
               >
                 <input
                   type="email"
+                  autoComplete="email"
                   placeholder={isRtl ? 'البريد الإلكتروني' : 'Enter your email'}
                   aria-label={isRtl ? 'البريد الإلكتروني' : 'Email address'}
-                  className="flex-1 px-6 py-4 bg-background border border-border focus:border-foreground focus:outline-none text-xs tracking-[0.1em] placeholder:text-muted-foreground/40 transition-colors duration-500"
+                  className="h-12 flex-1 px-6 bg-background border border-border focus:border-foreground focus:outline-none text-xs tracking-[0.1em] placeholder:text-muted-foreground/40 transition-colors duration-500"
                   dir={isRtl ? 'rtl' : 'ltr'}
                   required
                 />
                 <button
                   type="submit"
-                  className="px-8 py-4 bg-foreground text-background text-[10px] tracking-[0.25em] uppercase hover:bg-foreground/80 transition-colors duration-300 cursor-pointer"
+                  className="h-12 px-8 bg-foreground text-background text-[10px] tracking-[0.25em] uppercase hover:bg-foreground/80 transition-colors duration-300 cursor-pointer"
                 >
                   {isRtl ? 'اشتراك' : 'Subscribe'}
                 </button>
@@ -73,8 +74,8 @@ export default function ElegantFooter({
       </div>
 
       {/* Main footer */}
-      <div className="container mx-auto px-4 py-16">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-12">
+      <div className="container mx-auto px-4 py-10 sm:py-12 md:py-16">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 sm:gap-10 md:gap-12">
           {/* Brand */}
           <div className="col-span-2 md:col-span-1">
             {displayLogo ? (

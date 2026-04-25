@@ -58,7 +58,7 @@ export default function ElegantHero({
             className={`w-full lg:w-[40%] bg-background flex items-center ${isRtl ? 'lg:order-1' : 'lg:order-2'}`}
           >
             <div
-              className={`px-8 md:px-12 lg:px-16 py-16 max-w-lg ${isRtl ? 'text-right mr-auto' : 'text-left'}`}
+              className={`px-6 sm:px-8 md:px-12 lg:px-16 py-10 sm:py-12 md:py-16 max-w-lg ${isRtl ? 'text-right mr-auto' : 'text-left'}`}
             >
               <p className="text-[10px] tracking-[0.5em] uppercase text-muted-foreground/60 mb-10">
                 {isRtl ? 'مجموعة جديدة' : 'New Collection'}

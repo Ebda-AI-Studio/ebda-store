@@ -29,7 +29,7 @@ export default function ClassicProductGrid({
   const gridCols = getGridColsClass(columns);
 
   return (
-    <section className="py-16 md:py-24 bg-background" dir={isRtl ? 'rtl' : 'ltr'}>
+    <section className="py-10 sm:py-14 md:py-24 bg-background" dir={isRtl ? 'rtl' : 'ltr'}>
       <div className="container mx-auto px-4">
         {/* Section Header - Elegant centered */}
         {displayTitle && (

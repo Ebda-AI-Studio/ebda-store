@@ -86,7 +86,7 @@ export function HomePageContent({
       />
 
       {templateCategories.length > 0 && (
-        <section className="py-16 lg:py-20">
+        <section className="py-10 sm:py-12 lg:py-20">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <T.CategoryGrid
               categories={templateCategories}
@@ -99,7 +99,7 @@ export function HomePageContent({
       )}
 
       {templateProducts.length > 0 && (
-        <section className="bg-muted/30 py-16 lg:py-20">
+        <section className="bg-muted/30 py-10 sm:py-12 lg:py-20">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <T.ProductGrid
               products={templateProducts}
@@ -114,18 +114,18 @@ export function HomePageContent({
         </section>
       )}
 
-      <section className="force-gradient-primary py-16 lg:py-20">
+      <section className="force-gradient-primary py-12 sm:py-14 lg:py-20">
         <div className="mx-auto max-w-7xl px-4 text-center sm:px-6 lg:px-8">
           <div className="mx-auto max-w-2xl">
-            <h2 className="text-3xl font-bold text-white lg:text-4xl">
+            <h2 className="text-2xl font-bold text-white sm:text-3xl lg:text-4xl">
               {isRtl ? 'جاهز للتسوق؟' : 'Ready to Start Shopping?'}
             </h2>
-            <p className="mx-auto mt-4 max-w-xl text-lg text-primary-foreground/80">
+            <p className="mx-auto mt-4 max-w-xl text-base sm:text-lg text-primary-foreground/80">
               {isRtl
                 ? 'انضم إلى آلاف العملاء الراضين واكتشف منتجاتنا المميزة'
                 : 'Join thousands of satisfied customers and discover our amazing products.'}
             </p>
-            <div className="mt-8">
+            <div className="mt-6 sm:mt-8">
               <Link href={storeUrl('/products')}>
                 <Button
                   size="lg"

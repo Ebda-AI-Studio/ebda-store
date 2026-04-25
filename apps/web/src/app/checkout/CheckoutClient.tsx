@@ -652,6 +652,8 @@ export default function CheckoutClient() {
                           '\u0627\u0644\u0628\u0631\u064a\u062f \u0627\u0644\u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a'
                         )}
                         type="email"
+                        autoComplete="email"
+                        inputMode="email"
                         value={formData.email}
                         onChange={e => updateField('email', e.target.value)}
                         aria-invalid={formErrors.email ? true : undefined}
@@ -675,6 +677,7 @@ export default function CheckoutClient() {
                             'First name',
                             '\u0627\u0644\u0627\u0633\u0645 \u0627\u0644\u0623\u0648\u0644'
                           )}
+                          autoComplete="given-name"
                           value={formData.firstName}
                           onChange={e => updateField('firstName', e.target.value)}
                           aria-invalid={formErrors.firstName ? true : undefined}
@@ -696,6 +699,7 @@ export default function CheckoutClient() {
                             'Last name',
                             '\u0627\u0633\u0645 \u0627\u0644\u0639\u0627\u0626\u0644\u0629'
                           )}
+                          autoComplete="family-name"
                           value={formData.lastName}
                           onChange={e => updateField('lastName', e.target.value)}
                           aria-invalid={formErrors.lastName ? true : undefined}
@@ -717,6 +721,8 @@ export default function CheckoutClient() {
                       <Input
                         label={t('Phone', translations['Phone'])}
                         type="tel"
+                        autoComplete="tel"
+                        inputMode="tel"
                         placeholder="+965 XXXX XXXX"
                         value={formData.phone}
                         onChange={e => updateField('phone', e.target.value)}
@@ -775,6 +781,7 @@ export default function CheckoutClient() {
                           'Block & Street',
                           '\u0627\u0644\u0642\u0637\u0639\u0629 \u0648\u0627\u0644\u0634\u0627\u0631\u0639'
                         )}
+                        autoComplete="street-address"
                         value={formData.address}
                         onChange={e => updateField('address', e.target.value)}
                         aria-invalid={formErrors.address ? true : undefined}
@@ -796,6 +803,7 @@ export default function CheckoutClient() {
                         'Building / House / Apartment',
                         '\u0627\u0644\u0645\u0628\u0646\u0649 / \u0627\u0644\u0645\u0646\u0632\u0644 / \u0627\u0644\u0634\u0642\u0629'
                       )}
+                      autoComplete="address-line2"
                       value={formData.apartment}
                       onChange={e => updateField('apartment', e.target.value)}
                     />
@@ -803,6 +811,7 @@ export default function CheckoutClient() {
                     <div data-error={!!formErrors.city}>
                       <Input
                         label={t('City', '\u0627\u0644\u0645\u062f\u064a\u0646\u0629')}
+                        autoComplete="address-level2"
                         value={formData.city}
                         onChange={e => updateField('city', e.target.value)}
                         aria-invalid={formErrors.city ? true : undefined}
@@ -838,7 +847,7 @@ export default function CheckoutClient() {
                         value={formData.notes}
                         onChange={e => updateField('notes', e.target.value)}
                         rows={3}
-                        className="w-full rounded-lg border border-border px-4 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
+                        className="min-h-24 w-full rounded-lg border border-border bg-background px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                         placeholder={t(
                           'Any special delivery instructions...',
                           '\u0623\u064a \u062a\u0639\u0644\u064a\u0645\u0627\u062a \u062e\u0627\u0635\u0629 \u0644\u0644\u062a\u0648\u0635\u064a\u0644...'
@@ -847,13 +856,16 @@ export default function CheckoutClient() {
                     </div>
                   </div>
 
-                  <div className="mt-6 flex justify-between">
-                    <Link href={storeUrl('/cart')} className="text-sm text-primary hover:underline">
+                  <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                    <Link
+                      href={storeUrl('/cart')}
+                      className="inline-flex min-h-11 items-center text-sm text-primary hover:underline"
+                    >
                       {language === 'ar'
                         ? '\u0627\u0644\u0639\u0648\u062f\u0629 \u0625\u0644\u0649 \u0627\u0644\u0633\u0644\u0629 \u2192'
                         : '\u2190 Return to cart'}
                     </Link>
-                    <Button type="submit">
+                    <Button type="submit" className="w-full sm:w-auto" size="lg">
                       {t(
                         'Continue to Payment',
                         '\u0627\u0644\u0645\u062a\u0627\u0628\u0639\u0629 \u0644\u0644\u062f\u0641\u0639'
