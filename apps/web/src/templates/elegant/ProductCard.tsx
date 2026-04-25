@@ -108,13 +108,14 @@ function ElegantProductCard({
           </div>
         )}
 
-        {/* Wishlist */}
+        {/* Wishlist — always visible on touch; fades in on hover for pointer devices */}
         <button
           onClick={handleWishlist}
           className={cn(
-            'absolute top-4 p-2 transition-all duration-300 cursor-pointer',
+            'absolute top-4 p-2 min-h-[44px] min-w-[44px] flex items-center justify-center transition-all duration-300 cursor-pointer',
             isRtl ? 'left-4' : 'right-4',
-            isHovered || isWishlisted ? 'opacity-100' : 'opacity-0'
+            'opacity-100 lg:opacity-0',
+            (isHovered || isWishlisted) && 'lg:opacity-100'
           )}
           aria-label={isRtl ? 'إضافة للمفضلة' : 'Add to wishlist'}
           aria-pressed={isWishlisted}
@@ -160,11 +161,13 @@ function ElegantProductCard({
           )}
         </ProductBadgeGroup>
 
-        {/* Quick Add — slides up from bottom */}
+        {/* Quick Add — always visible on touch; slides up on hover for pointer devices */}
         <div
           className={cn(
             'absolute bottom-0 inset-x-0 bg-background/95 backdrop-blur-sm transition-all duration-300',
-            isHovered ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-full'
+            'opacity-100 translate-y-0',
+            'lg:opacity-0 lg:translate-y-full',
+            isHovered && 'lg:opacity-100 lg:translate-y-0'
           )}
           onClick={e => e.preventDefault()}
         >

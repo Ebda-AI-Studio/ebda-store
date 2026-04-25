@@ -85,7 +85,7 @@ export default function BoldHeader({
               {/* Search */}
               <button
                 onClick={() => setIsSearchOpen(!isSearchOpen)}
-                className="p-2 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors duration-200 cursor-pointer"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors duration-200 cursor-pointer"
                 aria-label={isRtl ? 'بحث' : 'Search'}
               >
                 <svg
@@ -107,7 +107,7 @@ export default function BoldHeader({
               {/* Account */}
               <Link
                 href={isLoggedIn ? `${urlPrefix}/account` : `${urlPrefix}/auth/login`}
-                className="hidden sm:flex p-2 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors duration-200 cursor-pointer"
+                className="hidden sm:inline-flex h-11 w-11 items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors duration-200 cursor-pointer"
                 aria-label={isRtl ? 'الحساب' : 'Account'}
               >
                 <svg
@@ -129,7 +129,7 @@ export default function BoldHeader({
               {/* Cart */}
               <Link
                 href={`${urlPrefix}/cart`}
-                className="relative p-2 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors duration-200 cursor-pointer"
+                className="relative inline-flex h-11 w-11 items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors duration-200 cursor-pointer"
                 aria-label={isRtl ? `سلة (${cartItemCount})` : `Cart (${cartItemCount})`}
               >
                 <svg
@@ -158,7 +158,7 @@ export default function BoldHeader({
               {/* Mobile Menu */}
               <button
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
-                className="md:hidden p-2 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors duration-200 cursor-pointer"
+                className="md:hidden inline-flex h-11 w-11 items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors duration-200 cursor-pointer"
                 aria-label={isRtl ? 'القائمة' : 'Menu'}
                 aria-expanded={isMenuOpen}
               >
@@ -226,7 +226,7 @@ export default function BoldHeader({
           </span>
           <button
             onClick={() => setIsMenuOpen(false)}
-            className="p-2 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors duration-200 cursor-pointer"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors duration-200 cursor-pointer"
             aria-label={isRtl ? 'إغلاق' : 'Close menu'}
           >
             <svg

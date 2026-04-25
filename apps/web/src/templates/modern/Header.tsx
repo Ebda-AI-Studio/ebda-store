@@ -93,7 +93,7 @@ export default function ModernHeader({
               <button
                 type="button"
                 onClick={() => setIsSearchOpen(!isSearchOpen)}
-                className="p-2 rounded-lg hover:bg-muted transition-colors duration-200 cursor-pointer"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-lg hover:bg-muted transition-colors duration-200 cursor-pointer"
                 aria-label={isRtl ? 'بحث' : 'Search'}
                 aria-expanded={isSearchOpen}
               >
@@ -133,7 +133,7 @@ export default function ModernHeader({
               {/* Account */}
               <Link
                 href={isLoggedIn ? `${urlPrefix}/account` : `${urlPrefix}/auth/login`}
-                className="p-2 rounded-lg hover:bg-muted transition-colors duration-200"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-lg hover:bg-muted transition-colors duration-200"
                 aria-label={isRtl ? 'الحساب' : 'Account'}
               >
                 <svg
@@ -155,7 +155,7 @@ export default function ModernHeader({
               {/* Cart */}
               <Link
                 href={`${urlPrefix}/cart`}
-                className="relative p-2 rounded-lg hover:bg-muted transition-colors duration-200"
+                className="relative inline-flex h-11 w-11 items-center justify-center rounded-lg hover:bg-muted transition-colors duration-200"
                 aria-label={
                   isRtl ? `سلة التسوق (${cartItemCount})` : `Cart (${cartItemCount} items)`
                 }
@@ -187,7 +187,7 @@ export default function ModernHeader({
               <button
                 type="button"
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
-                className="md:hidden p-2 rounded-lg hover:bg-muted transition-colors duration-200 cursor-pointer"
+                className="md:hidden inline-flex h-11 w-11 items-center justify-center rounded-lg hover:bg-muted transition-colors duration-200 cursor-pointer"
                 aria-label={isRtl ? 'القائمة' : 'Menu'}
                 aria-expanded={isMenuOpen}
               >
@@ -254,7 +254,7 @@ export default function ModernHeader({
           <button
             type="button"
             onClick={() => setIsMenuOpen(false)}
-            className="p-2 rounded-lg hover:bg-muted transition-colors duration-200 cursor-pointer"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-lg hover:bg-muted transition-colors duration-200 cursor-pointer"
             aria-label={isRtl ? 'إغلاق' : 'Close menu'}
           >
             <svg

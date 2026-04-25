@@ -62,7 +62,7 @@ export default function ElegantHeader({
           <button
             type="button"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="md:hidden p-2.5 text-foreground/60 hover:text-foreground transition-opacity duration-300 cursor-pointer"
+            className="md:hidden inline-flex h-11 w-11 items-center justify-center text-foreground/60 hover:text-foreground transition-opacity duration-300 cursor-pointer"
             aria-label={isRtl ? 'القائمة' : 'Menu'}
             aria-expanded={isMenuOpen}
           >
@@ -108,7 +108,7 @@ export default function ElegantHeader({
             <button
               type="button"
               onClick={() => setIsSearchOpen(!isSearchOpen)}
-              className="hidden md:block p-2.5 text-foreground/50 hover:text-foreground transition-opacity duration-300 cursor-pointer"
+              className="hidden md:inline-flex h-11 w-11 items-center justify-center text-foreground/50 hover:text-foreground transition-opacity duration-300 cursor-pointer"
               aria-label={isRtl ? 'بحث' : 'Search'}
             >
               <svg
@@ -130,7 +130,7 @@ export default function ElegantHeader({
             {/* Account */}
             <Link
               href={isLoggedIn ? `${urlPrefix}/account` : `${urlPrefix}/auth/login`}
-              className="hidden md:block p-2.5 text-foreground/50 hover:text-foreground transition-opacity duration-300 cursor-pointer"
+              className="hidden md:inline-flex h-11 w-11 items-center justify-center text-foreground/50 hover:text-foreground transition-opacity duration-300 cursor-pointer"
               aria-label={isRtl ? 'الحساب' : 'Account'}
             >
               <svg
@@ -152,7 +152,7 @@ export default function ElegantHeader({
             {/* Cart */}
             <Link
               href={`${urlPrefix}/cart`}
-              className="relative p-2.5 text-foreground/50 hover:text-foreground transition-opacity duration-300 cursor-pointer"
+              className="relative inline-flex h-11 w-11 items-center justify-center text-foreground/50 hover:text-foreground transition-opacity duration-300 cursor-pointer"
               aria-label={isRtl ? `السلة (${cartItemCount})` : `Cart (${cartItemCount})`}
             >
               <svg

@@ -66,7 +66,7 @@ export default function ClassicHeader({
           {/* Mobile menu toggle */}
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="md:hidden p-2 cursor-pointer text-foreground hover:text-primary transition-colors duration-200"
+            className="md:hidden inline-flex h-11 w-11 items-center justify-center cursor-pointer text-foreground hover:text-primary transition-colors duration-200"
             aria-label={isRtl ? 'القائمة' : 'Menu'}
             aria-expanded={isMenuOpen}
           >
@@ -216,10 +216,10 @@ export default function ClassicHeader({
           </nav>
 
           {/* Mobile: action icons */}
-          <div className={`flex md:hidden items-center gap-3 ${isRtl ? 'flex-row-reverse' : ''}`}>
+          <div className={`flex md:hidden items-center gap-1 ${isRtl ? 'flex-row-reverse' : ''}`}>
             <Link
               href={isLoggedIn ? `${urlPrefix}/account` : `${urlPrefix}/auth/login`}
-              className="text-foreground/60 hover:text-foreground transition-colors duration-200"
+              className="inline-flex h-11 w-11 items-center justify-center text-foreground/60 hover:text-foreground transition-colors duration-200"
               aria-label={isRtl ? 'الحساب' : 'Account'}
             >
               <svg
@@ -239,7 +239,7 @@ export default function ClassicHeader({
             </Link>
             <Link
               href={`${urlPrefix}/cart`}
-              className="relative text-foreground/60 hover:text-foreground transition-colors duration-200 cursor-pointer"
+              className="relative inline-flex h-11 w-11 items-center justify-center text-foreground/60 hover:text-foreground transition-colors duration-200 cursor-pointer"
               aria-label={isRtl ? 'السلة' : 'Cart'}
             >
               <svg

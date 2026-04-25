@@ -103,7 +103,7 @@ export default function MinimalHeader({
             <button
               type="button"
               onClick={() => setIsSearchOpen(!isSearchOpen)}
-              className="p-2.5 text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer"
+              className="inline-flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer"
               aria-label={isRtl ? 'بحث' : 'Search'}
               aria-expanded={isSearchOpen}
             >
@@ -130,7 +130,7 @@ export default function MinimalHeader({
             {/* Account */}
             <Link
               href={isLoggedIn ? `${urlPrefix}/account` : `${urlPrefix}/auth/login`}
-              className="hidden sm:block p-2.5 text-muted-foreground hover:text-foreground transition-colors duration-200"
+              className="hidden sm:inline-flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-foreground transition-colors duration-200"
               aria-label={isRtl ? 'الحساب' : 'Account'}
             >
               <svg
@@ -152,7 +152,7 @@ export default function MinimalHeader({
             {/* Cart */}
             <Link
               href={`${urlPrefix}/cart`}
-              className="relative p-2.5 text-muted-foreground hover:text-foreground transition-colors duration-200"
+              className="relative inline-flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-foreground transition-colors duration-200"
               aria-label={isRtl ? `سلة التسوق (${cartItemCount})` : `Cart (${cartItemCount} items)`}
             >
               <svg
@@ -182,7 +182,7 @@ export default function MinimalHeader({
             <button
               type="button"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="lg:hidden p-2.5 text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer"
+              className="lg:hidden inline-flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer"
               aria-label={isRtl ? 'القائمة' : 'Menu'}
               aria-expanded={isMenuOpen}
             >

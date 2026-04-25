@@ -26,7 +26,10 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? errorId : undefined}
           className={cn(
-            'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background transition-all duration-200',
+            // h-11 (44px) is the minimum recommended tap target on mobile;
+            // sm:h-10 keeps the denser appearance on desktop where pointer
+            // accuracy isn't constrained.
+            'flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background transition-all duration-200 sm:h-10',
             'file:border-0 file:bg-transparent file:text-sm file:font-medium',
             'placeholder:text-muted-foreground',
             'hover:bg-muted/30',

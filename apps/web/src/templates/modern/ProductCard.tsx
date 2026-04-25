@@ -126,7 +126,10 @@ function ModernProductCard({
             className={cn(
               'absolute top-3 flex flex-col gap-2 transition-all duration-300',
               isRtl ? 'left-3' : 'right-3',
-              isHovered ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-3'
+              // Always visible on touch; slides in on hover for pointer devices.
+              'opacity-100 translate-x-0',
+              'lg:opacity-0 lg:translate-x-3',
+              isHovered && 'lg:opacity-100 lg:translate-x-0'
             )}
           >
             <button
@@ -158,11 +161,13 @@ function ModernProductCard({
           </div>
         )}
 
-        {/* Quick Add Button — slides up from bottom */}
+        {/* Quick Add Button — always visible on touch; slides up on hover for pointer devices */}
         <div
           className={cn(
             'absolute bottom-0 inset-x-0 transition-all duration-300 ease-out',
-            isHovered ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-full'
+            'opacity-100 translate-y-0',
+            'lg:opacity-0 lg:translate-y-full',
+            isHovered && 'lg:opacity-100 lg:translate-y-0'
           )}
           onClick={e => e.preventDefault()}
         >

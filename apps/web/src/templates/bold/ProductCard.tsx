@@ -105,11 +105,14 @@ function BoldProductCard({
           )}
         </ProductBadgeGroup>
 
-        {/* Quick Add — slides up */}
+        {/* Quick Add — always visible on touch (mobile/tablet); slides up on hover for pointer devices.
+            Touch devices can't trigger :hover, so the button stayed unreachable on phones. */}
         <div
           className={cn(
             'absolute bottom-0 inset-x-0 transition-all duration-200',
-            isHovered ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-full'
+            'opacity-100 translate-y-0',
+            'lg:opacity-0 lg:translate-y-full',
+            isHovered && 'lg:opacity-100 lg:translate-y-0'
           )}
           onClick={e => e.preventDefault()}
         >

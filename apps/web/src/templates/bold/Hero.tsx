@@ -30,7 +30,7 @@ export default function BoldHero({
 
   return (
     <section
-      className="relative min-h-screen bg-gray-950 overflow-hidden"
+      className="relative min-h-[640px] sm:min-h-[720px] md:min-h-screen bg-gray-950 overflow-hidden"
       dir={isRtl ? 'rtl' : 'ltr'}
     >
       {/* Full-screen hero image with dark overlay */}
@@ -69,32 +69,32 @@ export default function BoldHero({
       )}
 
       {/* Content */}
-      <div className="relative z-10 container mx-auto px-4 min-h-screen flex flex-col justify-center py-24">
+      <div className="relative z-10 container mx-auto px-4 min-h-[640px] sm:min-h-[720px] md:min-h-screen flex flex-col justify-center py-16 sm:py-20 md:py-24">
         <div
           className={`max-w-3xl motion-reduce:animate-none ${isRtl ? 'mr-auto ml-0 text-right' : 'ml-0 text-left'}`}
           style={{ animation: 'boldSlideIn 0.6s ease-out both' }}
         >
           {/* Label */}
-          <div className="inline-flex items-center gap-2 mb-8 px-4 py-2 border border-white/20 rounded-full">
+          <div className="inline-flex items-center gap-2 mb-6 sm:mb-8 px-4 py-2 border border-white/20 rounded-full">
             <span className="text-xs font-bold text-white/70 tracking-[0.2em] uppercase">
               {isRtl ? 'مجموعة جديدة' : 'New Drop'}
             </span>
           </div>
 
-          {/* Headline — massive */}
-          <h1 className="text-6xl md:text-8xl font-black uppercase tracking-tight text-white leading-[0.9] mb-8">
+          {/* Headline — scales down on mobile so 320–414px viewports don't overflow */}
+          <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-black uppercase tracking-tight text-white leading-[0.95] sm:leading-[0.9] mb-6 sm:mb-8 break-words">
             {displayTitle}
           </h1>
 
           {/* Subtitle */}
-          <p className="text-lg md:text-xl text-white/60 font-medium max-w-lg mb-12 leading-relaxed">
+          <p className="text-base sm:text-lg md:text-xl text-white/60 font-medium max-w-lg mb-8 sm:mb-12 leading-relaxed">
             {displaySubtitle}
           </p>
 
           {/* CTA */}
           <Link
             href={resolvedCtaLink}
-            className="inline-flex items-center gap-3 px-10 py-5 bg-primary text-primary-foreground rounded-none font-black text-base uppercase tracking-wider hover:bg-primary/90 hover:scale-[1.02] transition-all duration-200 shadow-2xl shadow-primary/30 cursor-pointer"
+            className="inline-flex items-center gap-3 px-8 sm:px-10 py-4 sm:py-5 min-h-[44px] bg-primary text-primary-foreground rounded-none font-black text-sm sm:text-base uppercase tracking-wider hover:bg-primary/90 hover:scale-[1.02] transition-all duration-200 shadow-2xl shadow-primary/30 cursor-pointer"
           >
             {displayCta}
             <svg

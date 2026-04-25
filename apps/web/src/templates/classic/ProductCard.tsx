@@ -71,9 +71,10 @@ function ClassicProductCard({
           </div>
         )}
 
-        {/* Quick add overlay — slides up from bottom */}
+        {/* Quick add overlay — always visible on touch; slides up on hover for pointer devices.
+            Without this, mobile users couldn't reach the quick-add affordance at all. */}
         <div
-          className="absolute bottom-0 inset-x-0 bg-foreground/90 py-3 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out"
+          className="absolute bottom-0 inset-x-0 bg-foreground/90 py-3 translate-y-0 lg:translate-y-full lg:group-hover:translate-y-0 transition-transform duration-300 ease-out"
           onClick={e => e.preventDefault()}
         >
           <AddToCartButton

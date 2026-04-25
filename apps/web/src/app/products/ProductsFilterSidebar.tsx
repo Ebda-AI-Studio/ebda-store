@@ -55,9 +55,61 @@ export function ProductsFilterSidebar({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch]);
 
+  // Filters take a lot of vertical space when stacked above the grid on mobile;
+  // collapse them by default below `lg:` and let the user expand. The sidebar
+  // remains always-visible on desktop (`lg:block`).
+  const [isOpen, setIsOpen] = useState(false);
+
+  const activeFilterCount = (search.trim() ? 1 : 0) + (categoryFilter ? 1 : 0);
+
   return (
     <aside className="w-full shrink-0 lg:w-64">
-      <div className="sticky top-24 space-y-6">
+      {/* Mobile-only toggle. The expanded sidebar collapses by default on
+          phones so it doesn't push the product grid below the fold. */}
+      <button
+        type="button"
+        onClick={() => setIsOpen(o => !o)}
+        aria-expanded={isOpen}
+        aria-controls="products-filter-panel"
+        className="lg:hidden mb-4 flex h-11 w-full items-center justify-between rounded-xl border border-border bg-card px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+      >
+        <span className="inline-flex items-center gap-2">
+          <svg
+            className="h-4 w-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            aria-hidden="true"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
+            />
+          </svg>
+          {t('Filters', 'الفلاتر')}
+          {activeFilterCount > 0 && (
+            <span className="rounded-full bg-primary px-2 py-0.5 text-xs text-white">
+              {activeFilterCount}
+            </span>
+          )}
+        </span>
+        <svg
+          className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          aria-hidden="true"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      <div
+        id="products-filter-panel"
+        className={`${isOpen ? 'block' : 'hidden'} lg:block lg:sticky lg:top-24 space-y-6`}
+      >
         {/* Search */}
         <form onSubmit={onSearchSubmit}>
           <label
