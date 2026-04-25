@@ -337,8 +337,9 @@ export default function CheckoutClient() {
     } else {
       // Remove spaces, dashes and plus sign for validation
       const cleanPhone = formData.phone.replace(/[\s\-+]/g, '');
-      // Kuwait numbers: 965 + 8 digits OR just 8 digits starting with 5,6,9
-      if (!/^(965)?[569]\d{7}$/.test(cleanPhone)) {
+      // Kuwait numbers: 965 + 8 digits OR 8 digits.
+      // Mobile prefixes: 5/6/9. Landline prefixes: 2/4. All 8 digits total.
+      if (!/^(965)?[24569]\d{7}$/.test(cleanPhone)) {
         errors.phone = t(
           'Please enter a valid Kuwait phone number',
           'يرجى إدخال رقم هاتف كويتي صحيح'
