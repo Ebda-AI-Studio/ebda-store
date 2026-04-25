@@ -203,8 +203,9 @@ export class ReturnService {
       },
     });
 
-    // Send confirmation email
-    await EmailService.sendReturnConfirmation({
+    // Return is committed — fire-and-forget the confirmation email so SMTP
+    // latency can't stall the API response.
+    void EmailService.sendReturnConfirmation({
       email: order.customer?.email || '',
       customerName:
         `${order.customer?.firstName || ''} ${order.customer?.lastName || ''}`.trim() || 'Customer',
@@ -212,7 +213,7 @@ export class ReturnService {
       returnNumber,
       orderNumber: order.orderNumber,
       type: data.type,
-    });
+    }).catch(err => logger.error({ err }, 'Failed to send return confirmation email'));
 
     // Send real-time notification to store admins
     try {
@@ -286,15 +287,16 @@ export class ReturnService {
       },
     });
 
-    // Send status update email
-    await EmailService.sendReturnStatusUpdate({
+    // Status was updated — fire-and-forget the email so SMTP latency can't
+    // stall the API response.
+    void EmailService.sendReturnStatusUpdate({
       email: updatedReturn.customer.email,
       customerName: `${updatedReturn.customer.firstName} ${updatedReturn.customer.lastName}`,
       storeName: updatedReturn.store.name,
       returnNumber: updatedReturn.returnNumber,
       status,
       notes,
-    });
+    }).catch(err => logger.error({ err }, 'Failed to send return status email'));
 
     // Send real-time notification to customer
     try {

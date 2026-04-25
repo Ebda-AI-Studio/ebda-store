@@ -166,19 +166,15 @@ export class ProvisioningService {
       return { store, owner, isNewUser };
     });
 
-    // Send welcome email to new owner
+    // Store is provisioned — fire-and-forget the welcome email so SMTP latency
+    // can't stall the provisioning API response.
     if (result.isNewUser) {
-      try {
-        await EmailService.sendWelcome({
-          email: ownerEmail,
-          name: ownerName,
-        });
-      } catch (error) {
-        logger.error(
-          { err: error, email: ownerEmail },
-          'Failed to send welcome email during provisioning'
-        );
-      }
+      void EmailService.sendWelcome({
+        email: ownerEmail,
+        name: ownerName,
+      }).catch(err =>
+        logger.error({ err, email: ownerEmail }, 'Failed to send welcome email during provisioning')
+      );
     }
 
     return {

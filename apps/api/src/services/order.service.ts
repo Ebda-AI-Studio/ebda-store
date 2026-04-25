@@ -560,119 +560,121 @@ export class OrderService {
         .catch(err => logger.error({ err, storeId }, 'Auto-ship feature check failed'));
     }
 
-    // Send status update emails
-    try {
-      const customerEmail = updatedOrder.customer?.email || '';
-      const customerName =
-        `${updatedOrder.customer?.firstName || ''} ${updatedOrder.customer?.lastName || ''}`.trim() ||
-        customerEmail ||
-        'Customer';
+    // Status was committed — return to caller as fast as possible.
+    // Emails + notifications fan out fire-and-forget so a slow / unreachable
+    // SMTP host or notification provider can't block the admin status-change
+    // response (mirrors the OrderService.create fix).
+    const customerEmail = updatedOrder.customer?.email || '';
+    const customerName =
+      `${updatedOrder.customer?.firstName || ''} ${updatedOrder.customer?.lastName || ''}`.trim() ||
+      customerEmail ||
+      'Customer';
+    const shippingAddrFull = updatedOrder.shippingAddress as {
+      firstName: string;
+      lastName: string;
+      address1: string;
+      address2?: string;
+      city: string;
+      state: string;
+      postalCode: string;
+      country: string;
+      phone?: string;
+    } | null;
+    const customerPhone = shippingAddrFull?.phone ?? undefined;
 
-      if (status === 'shipped') {
-        await EmailService.sendOrderShipped({
-          customerEmail,
-          customerName,
-          orderNumber: updatedOrder.orderNumber,
-          // trackingNumber and trackingUrl can be passed when available
-        });
-      } else if (status === 'confirmed') {
-        // Payment success / order confirmed
-        const shippingAddr = updatedOrder.shippingAddress as {
-          firstName: string;
-          lastName: string;
-          address1: string;
-          address2?: string;
-          city: string;
-          state: string;
-          postalCode: string;
-          country: string;
-        };
-        await EmailService.sendPaymentSuccess({
-          orderNumber: updatedOrder.orderNumber,
-          customerName,
-          customerEmail,
-          items: updatedOrder.items.map(item => ({
-            name: item.productName,
-            quantity: item.quantity,
-            price: item.price,
-          })),
-          subtotal: updatedOrder.subtotal,
-          tax: updatedOrder.tax,
-          shipping: updatedOrder.shipping,
-          total: updatedOrder.total,
-          shippingAddress: shippingAddr,
-        });
-      } else if (status === 'refunded') {
-        await EmailService.sendAdminRefund({
-          orderNumber: updatedOrder.orderNumber,
-          amount: updatedOrder.total,
-          reason: 'Order refunded',
-        });
-      }
-    } catch (emailError) {
-      logger.error({ err: emailError }, 'Failed to send order status email');
-      // Don't throw - status was updated successfully
+    if (status === 'shipped') {
+      void EmailService.sendOrderShipped({
+        customerEmail,
+        customerName,
+        orderNumber: updatedOrder.orderNumber,
+        // trackingNumber and trackingUrl can be passed when available
+      }).catch(err => logger.error({ err }, 'Failed to send order shipped email'));
+    } else if (status === 'confirmed' && shippingAddrFull) {
+      // Payment success / order confirmed
+      void EmailService.sendPaymentSuccess({
+        orderNumber: updatedOrder.orderNumber,
+        customerName,
+        customerEmail,
+        items: updatedOrder.items.map(item => ({
+          name: item.productName,
+          quantity: item.quantity,
+          price: item.price,
+        })),
+        subtotal: updatedOrder.subtotal,
+        tax: updatedOrder.tax,
+        shipping: updatedOrder.shipping,
+        total: updatedOrder.total,
+        shippingAddress: shippingAddrFull,
+      }).catch(err => logger.error({ err }, 'Failed to send payment success email'));
+    } else if (status === 'refunded') {
+      void EmailService.sendAdminRefund({
+        orderNumber: updatedOrder.orderNumber,
+        amount: updatedOrder.total,
+        reason: 'Order refunded',
+      }).catch(err => logger.error({ err }, 'Failed to send admin refund email'));
     }
 
-    // Dispatch to WhatsApp/SMS/Push channels (fire-and-forget)
-    {
-      const customerName =
-        `${updatedOrder.customer?.firstName || ''} ${updatedOrder.customer?.lastName || ''}`.trim() ||
-        updatedOrder.customer?.email ||
-        'Customer';
-      const shippingAddr = updatedOrder.shippingAddress as { phone?: string } | null;
-      const customerPhone = shippingAddr?.phone ?? undefined;
-
-      const storeForNotification = await prisma.store
+    // Dispatch to WhatsApp/SMS/Push channels (fire-and-forget, including the
+    // store-name lookup so we never block the response on Prisma either).
+    if (
+      status === 'shipped' ||
+      status === 'delivered' ||
+      status === 'cancelled' ||
+      status === 'refunded'
+    ) {
+      void prisma.store
         .findUnique({ where: { id: storeId }, select: { name: true } })
-        .catch(() => null);
-      const storeName = storeForNotification?.name ?? storeId;
-
-      if (status === 'shipped') {
-        notificationDispatcher
-          .dispatch(storeId, 'order_shipped', {
-            customerName,
-            customerPhone,
-            orderNumber: updatedOrder.orderNumber,
-            total: updatedOrder.total,
-            storeId,
-            storeName,
-          })
-          .catch(err => logger.error({ err }, 'Notification dispatch failed (shipped)'));
-      } else if (status === 'delivered') {
-        notificationDispatcher
-          .dispatch(storeId, 'order_delivered', {
-            customerName,
-            customerPhone,
-            orderNumber: updatedOrder.orderNumber,
-            total: updatedOrder.total,
-            storeId,
-            storeName,
-          })
-          .catch(err => logger.error({ err }, 'Notification dispatch failed (delivered)'));
-      } else if (status === 'cancelled') {
-        notificationDispatcher
-          .dispatch(storeId, 'order_cancelled', {
-            customerName,
-            customerPhone,
-            orderNumber: updatedOrder.orderNumber,
-            total: updatedOrder.total,
-            storeId,
-            storeName,
-          })
-          .catch(err => logger.error({ err }, 'Notification dispatch failed (cancelled)'));
-      } else if (status === 'refunded') {
-        notificationDispatcher
-          .dispatch(storeId, 'refund_processed', {
-            customerName,
-            customerPhone,
-            orderNumber: updatedOrder.orderNumber,
-            amount: updatedOrder.total,
-            storeId,
-            storeName,
-          })
-          .catch(err => logger.error({ err }, 'Notification dispatch failed (refunded)'));
-      }
+        .catch(() => null)
+        .then(storeForNotification => {
+          const storeName = storeForNotification?.name ?? storeId;
+          if (status === 'shipped') {
+            return notificationDispatcher
+              .dispatch(storeId, 'order_shipped', {
+                customerName,
+                customerPhone,
+                orderNumber: updatedOrder.orderNumber,
+                total: updatedOrder.total,
+                storeId,
+                storeName,
+              })
+              .catch(err => logger.error({ err }, 'Notification dispatch failed (shipped)'));
+          }
+          if (status === 'delivered') {
+            return notificationDispatcher
+              .dispatch(storeId, 'order_delivered', {
+                customerName,
+                customerPhone,
+                orderNumber: updatedOrder.orderNumber,
+                total: updatedOrder.total,
+                storeId,
+                storeName,
+              })
+              .catch(err => logger.error({ err }, 'Notification dispatch failed (delivered)'));
+          }
+          if (status === 'cancelled') {
+            return notificationDispatcher
+              .dispatch(storeId, 'order_cancelled', {
+                customerName,
+                customerPhone,
+                orderNumber: updatedOrder.orderNumber,
+                total: updatedOrder.total,
+                storeId,
+                storeName,
+              })
+              .catch(err => logger.error({ err }, 'Notification dispatch failed (cancelled)'));
+          }
+          // status === 'refunded'
+          return notificationDispatcher
+            .dispatch(storeId, 'refund_processed', {
+              customerName,
+              customerPhone,
+              orderNumber: updatedOrder.orderNumber,
+              amount: updatedOrder.total,
+              storeId,
+              storeName,
+            })
+            .catch(err => logger.error({ err }, 'Notification dispatch failed (refunded)'));
+        });
     }
 
     // Send real-time notification to customer

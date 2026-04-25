@@ -37,16 +37,20 @@ function platformUrlOrRelative(url: string): boolean {
 const createPaymentSchema = z.object({
   orderId: z.string().uuid(),
   provider: z.enum(['tap', 'myfatoorah', 'hesabe', 'upayments', 'cod']).optional(),
+  // Accept relative paths (preferred — server absolutifies against the order's
+  // store domain) OR absolute URLs on the platform origin. We do NOT chain
+  // `.url()` because that rejects relative paths; the refinement handles both
+  // shapes explicitly.
   successUrl: z
     .string()
-    .url()
+    .min(1)
     .optional()
     .refine(val => val === undefined || platformUrlOrRelative(val), {
       message: 'successUrl must be a relative path or a URL on the platform domain',
     }),
   errorUrl: z
     .string()
-    .url()
+    .min(1)
     .optional()
     .refine(val => val === undefined || platformUrlOrRelative(val), {
       message: 'errorUrl must be a relative path or a URL on the platform domain',

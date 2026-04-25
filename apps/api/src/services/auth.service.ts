@@ -6,6 +6,7 @@ import { config } from '../config';
 import { AppError } from '../middleware/error-handler';
 import { EmailService } from './email.service';
 import { accountLockout } from './account-lockout.service';
+import logger from '../lib/logger';
 
 interface TokenPayload {
   userId: string;
@@ -77,20 +78,21 @@ export class AuthService {
       role: user.role,
     });
 
-    // Send verification email (non-blocking — don't fail registration if email fails)
-    let emailVerificationSent = false;
-    try {
-      await this.sendVerificationEmail(
-        user.id,
-        user.email,
-        `${user.firstName} ${user.lastName}`.trim() || user.email
-      );
-      emailVerificationSent = true;
-    } catch {
-      // Email sending failed — user is still registered, they can request verification later
-    }
+    // User is registered — return to caller as fast as possible. Verification
+    // email goes out fire-and-forget so a slow / unreachable SMTP host can't
+    // stall the registration response. If delivery fails the customer can
+    // request a resend via /auth/resend-verification.
+    void this.sendVerificationEmail(
+      user.id,
+      user.email,
+      `${user.firstName} ${user.lastName}`.trim() || user.email
+    ).catch(err =>
+      logger.error({ err, userId: user.id }, 'Failed to send verification email after register')
+    );
 
-    return { user, ...tokens, emailVerificationSent };
+    // Reflect the optimistic dispatch — the email was queued, not necessarily
+    // delivered; clients use this only to tell the user to check their inbox.
+    return { user, ...tokens, emailVerificationSent: true };
   }
 
   /**
@@ -179,13 +181,19 @@ export class AuthService {
       }),
     ]);
 
-    // Send welcome email
-    await EmailService.sendWelcome({
+    // Welcome email is a follow-up — fire-and-forget so SMTP latency can't
+    // delay the verify-email API response.
+    void EmailService.sendWelcome({
       email: verificationToken.user.email,
       name:
         `${verificationToken.user.firstName} ${verificationToken.user.lastName}`.trim() ||
         verificationToken.user.email,
-    });
+    }).catch(err =>
+      logger.error(
+        { err, userId: verificationToken.userId },
+        'Failed to send welcome email after verify'
+      )
+    );
 
     return { success: true, message: 'Email verified successfully' };
   }

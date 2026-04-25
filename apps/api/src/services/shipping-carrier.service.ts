@@ -279,26 +279,32 @@ class ShippingCarrierService {
       data: { status: 'shipped' },
     });
 
-    // Dispatch shipment notification (fire-and-forget)
-    const store = await prisma.store
+    // Dispatch shipment notification fully fire-and-forget — including the
+    // store-name lookup, so neither Prisma nor the notification provider can
+    // block the createShipmentForOrder response (called from the admin
+    // /orders/:id/ship route as well as auto-ship on order confirmation).
+    void prisma.store
       .findUnique({
         where: { id: storeId },
         select: { name: true },
       })
-      .catch(() => null);
-
-    notificationDispatcher
-      .dispatch(storeId, 'order_shipped', {
-        customerName:
-          `${order.customer?.firstName ?? ''} ${order.customer?.lastName ?? ''}`.trim() ||
-          'Customer',
-        customerPhone: shippingAddr.phone ?? undefined,
-        orderNumber: order.orderNumber,
-        total: order.total,
-        storeId,
-        storeName: store?.name ?? storeId,
-      })
-      .catch(err => logger.error({ err }, '[ShippingCarrierService] Notification dispatch failed'));
+      .catch(() => null)
+      .then(store =>
+        notificationDispatcher
+          .dispatch(storeId, 'order_shipped', {
+            customerName:
+              `${order.customer?.firstName ?? ''} ${order.customer?.lastName ?? ''}`.trim() ||
+              'Customer',
+            customerPhone: shippingAddr.phone ?? undefined,
+            orderNumber: order.orderNumber,
+            total: order.total,
+            storeId,
+            storeName: store?.name ?? storeId,
+          })
+          .catch(err =>
+            logger.error({ err }, '[ShippingCarrierService] Notification dispatch failed')
+          )
+      );
 
     logger.info(
       { shipmentId: shipment.id, trackingNumber: response.trackingNumber },
