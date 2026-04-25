@@ -694,6 +694,13 @@ router.put(
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
+    // Compensation context for partial-success rollback: if we successfully
+    // register a new domain with Vercel but the subsequent DB update fails,
+    // we must remove the domain from Vercel so it doesn't strand as a
+    // phantom (admin can't see it, but Vercel is still serving / billing).
+    // Cleared once the DB update commits.
+    let rollbackVercelAdd: (() => Promise<void>) | null = null;
+
     try {
       const { id } = req.params;
       const rawDomain = (req.body as { domain: string | null }).domain;
@@ -759,6 +766,29 @@ router.put(
           });
           return;
         }
+
+        // Vercel-add succeeded — arm the compensating action in case the DB
+        // update below throws (slug collision race, DB hiccup, etc.). Without
+        // this, the domain would be registered in Vercel but invisible to
+        // the admin in our DB.
+        const domainToRollback = domain;
+        rollbackVercelAdd = async () => {
+          try {
+            await VercelDomainService.removeDomain(domainToRollback);
+            logger.info(
+              { domain: domainToRollback },
+              '[STORE] Rolled back Vercel domain after DB update failure'
+            );
+          } catch (rollbackError) {
+            logger.error(
+              {
+                err: rollbackError instanceof Error ? rollbackError.message : 'Unknown error',
+                domain: domainToRollback,
+              },
+              '[STORE] Failed to roll back Vercel domain — manual cleanup required'
+            );
+          }
+        };
       }
 
       // Update domain in DB (use prisma directly for null clearing)
@@ -771,6 +801,10 @@ router.put(
               owner: { select: { id: true, email: true, firstName: true, lastName: true } },
             },
           });
+
+      // DB update committed — disarm the rollback so a successful change is
+      // never undone by a downstream error (e.g. CORS-cache bust, status fetch).
+      rollbackVercelAdd = null;
 
       // Bust CORS cache so the new domain works immediately
       if (domain) bustCorsCache(domain);
@@ -799,6 +833,10 @@ router.put(
         },
       });
     } catch (error) {
+      // Run any compensating action that was armed above
+      if (rollbackVercelAdd) {
+        await rollbackVercelAdd();
+      }
       next(error);
     }
   }
