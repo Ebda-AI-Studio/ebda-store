@@ -130,6 +130,24 @@ export default function StoreOrdersPage() {
       );
       if (!apiError) {
         toastSuccess(t('toast.markedPaidTitle'), t('toast.markedPaidDescription'));
+        // Optimistically reflect the new state so the "Mark Paid" button
+        // hides immediately. The authoritative refetch below corrects any
+        // drift; without this, the button can linger until the round-trip
+        // completes and look like the action didn't take effect.
+        setOrders(prev =>
+          prev.map(o =>
+            o.id === orderId
+              ? {
+                  ...o,
+                  paymentStatus: 'paid',
+                  status: 'confirmed',
+                  payments: o.payments?.map(p =>
+                    p.provider === 'cod' ? { ...p, status: 'completed' } : p
+                  ),
+                }
+              : o
+          )
+        );
         fetchOrders();
       } else {
         showError(t('toast.errorTitle'), apiError.message || t('errors.markPaid'));
@@ -158,6 +176,23 @@ export default function StoreOrdersPage() {
         toastSuccess(
           t('toast.bulkUpdateTitle'),
           t('toast.bulkUpdateDescription', { count: data.updated })
+        );
+        // Optimistic update for every selected order (same shape as single
+        // mark-paid above) so the bulk-bar mark-paid buttons hide instantly.
+        const idSet = new Set(ids);
+        setOrders(prev =>
+          prev.map(o =>
+            idSet.has(o.id)
+              ? {
+                  ...o,
+                  paymentStatus: 'paid',
+                  status: 'confirmed',
+                  payments: o.payments?.map(p =>
+                    p.provider === 'cod' ? { ...p, status: 'completed' } : p
+                  ),
+                }
+              : o
+          )
         );
         setSelectedOrders(new Set());
         fetchOrders();
