@@ -570,11 +570,14 @@ export class OrderService {
   ) {
     const order = await this.getById(storeId, orderId);
 
-    // Validate status transition
+    // Validate status transition. Admins can jump ahead (e.g. pending →
+    // delivered for same-day COD with cash on hand) instead of stepping
+    // through every intermediate state. Backwards moves remain blocked.
+    // Mirror this list in apps/admin/.../orders/_components/types.ts.
     const validTransitions: Record<string, string[]> = {
-      pending: ['confirmed', 'cancelled'],
-      confirmed: ['processing', 'cancelled'],
-      processing: ['shipped', 'cancelled'],
+      pending: ['confirmed', 'processing', 'shipped', 'delivered', 'cancelled'],
+      confirmed: ['processing', 'shipped', 'delivered', 'cancelled'],
+      processing: ['shipped', 'delivered', 'cancelled'],
       shipped: ['delivered'],
       delivered: ['refunded'],
       cancelled: [],
