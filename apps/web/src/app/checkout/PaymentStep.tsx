@@ -124,61 +124,72 @@ export default function PaymentStep({
         </p>
 
         <div className="mt-6 space-y-3">
-          {/* Render payment providers dynamically */}
-          {(paymentProviders.length > 0 ? paymentProviders : DEFAULT_PAYMENT_PROVIDERS).map(
-            provider => {
-              // Get display info - use API data or fallback to defaults
-              const defaultInfo = DEFAULT_PAYMENT_PROVIDERS.find(p => p.id === provider.id);
-              const displayName =
-                language === 'ar'
-                  ? provider.nameAr || provider.name || defaultInfo?.name || provider.id
-                  : provider.name || defaultInfo?.name || provider.id;
-              const displayDescription =
-                language === 'ar'
-                  ? provider.descriptionAr || provider.description || defaultInfo?.description || ''
-                  : provider.description || defaultInfo?.description || '';
-
-              return (
-                <label
-                  key={provider.id}
-                  className={`flex items-center gap-4 rounded-lg border p-4 cursor-pointer transition ${
-                    selectedProvider === provider.id
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border hover:border-border/80'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="paymentMethod"
-                    value={provider.id}
-                    checked={selectedProvider === provider.id}
-                    onChange={e => onSelectProvider(e.target.value)}
-                    className="h-4 w-4 text-primary focus:ring-primary"
-                  />
-                  <div className="flex-1">
-                    <span className="font-medium text-foreground">{displayName}</span>
-                    {displayDescription && (
-                      <p className="text-sm text-muted-foreground">{displayDescription}</p>
-                    )}
-                  </div>
-                  {/* Render icon from logo URL or use default icon */}
-                  {provider.logo ? (
-                    <div className="flex h-8 w-12 items-center justify-center">
-                      <Image
-                        src={provider.logo}
-                        alt={displayName}
-                        width={48}
-                        height={32}
-                        className="object-contain"
-                      />
-                    </div>
-                  ) : (
-                    getPaymentIcon(provider.id)
-                  )}
-                </label>
-              );
-            }
+          {paymentProviders.length === 0 && (
+            <div
+              role="alert"
+              className="rounded-lg border border-warning/30 bg-warning/10 p-4 text-sm text-foreground"
+            >
+              {t(
+                'No payment methods are configured for this store. Please contact the store owner.',
+                'لا توجد طرق دفع مُعدّة لهذا المتجر. يرجى التواصل مع صاحب المتجر.'
+              )}
+            </div>
           )}
+          {/* Render payment providers dynamically. We never fall back to
+              DEFAULT_PAYMENT_PROVIDERS here — that list was a visual mock
+              and showed payment options the backend would 400 on. */}
+          {paymentProviders.map(provider => {
+            // Get display info - use API data or fallback to defaults
+            const defaultInfo = DEFAULT_PAYMENT_PROVIDERS.find(p => p.id === provider.id);
+            const displayName =
+              language === 'ar'
+                ? provider.nameAr || provider.name || defaultInfo?.name || provider.id
+                : provider.name || defaultInfo?.name || provider.id;
+            const displayDescription =
+              language === 'ar'
+                ? provider.descriptionAr || provider.description || defaultInfo?.description || ''
+                : provider.description || defaultInfo?.description || '';
+
+            return (
+              <label
+                key={provider.id}
+                className={`flex items-center gap-4 rounded-lg border p-4 cursor-pointer transition ${
+                  selectedProvider === provider.id
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border hover:border-border/80'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="paymentMethod"
+                  value={provider.id}
+                  checked={selectedProvider === provider.id}
+                  onChange={e => onSelectProvider(e.target.value)}
+                  className="h-4 w-4 text-primary focus:ring-primary"
+                />
+                <div className="flex-1">
+                  <span className="font-medium text-foreground">{displayName}</span>
+                  {displayDescription && (
+                    <p className="text-sm text-muted-foreground">{displayDescription}</p>
+                  )}
+                </div>
+                {/* Render icon from logo URL or use default icon */}
+                {provider.logo ? (
+                  <div className="flex h-8 w-12 items-center justify-center">
+                    <Image
+                      src={provider.logo}
+                      alt={displayName}
+                      width={48}
+                      height={32}
+                      className="object-contain"
+                    />
+                  </div>
+                ) : (
+                  getPaymentIcon(provider.id)
+                )}
+              </label>
+            );
+          })}
         </div>
       </div>
 
