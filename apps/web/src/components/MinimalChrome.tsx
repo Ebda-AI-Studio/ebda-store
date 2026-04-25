@@ -42,19 +42,19 @@ export function MinimalChrome({
         className="border-b bg-background"
         aria-label={displayLabel || (isRtl ? 'التنقل' : 'Navigation')}
       >
-        <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex h-24 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <Link href={storeUrl('/')} className="flex items-center gap-2">
             {store.logo ? (
               <Image
                 src={store.logo}
                 alt={store.name}
-                width={160}
-                height={48}
+                width={280}
+                height={80}
                 priority
-                className="h-10 w-auto max-w-[200px] object-contain"
+                className="h-14 w-auto max-w-[280px] object-contain sm:h-16 sm:max-w-[320px]"
               />
             ) : (
-              <span className="text-2xl font-bold text-primary">{store.name}</span>
+              <span className="text-2xl font-bold text-primary sm:text-3xl">{store.name}</span>
             )}
           </Link>
           {displayLabel && (
