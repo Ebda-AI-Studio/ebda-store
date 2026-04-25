@@ -446,6 +446,116 @@ export class OrderService {
     return order;
   }
 
+  /**
+   * Compensating action when /payments/create fails AFTER an order has been
+   * committed (cart cleared, inventory decremented, coupon usage incremented).
+   *
+   * Rebuilds the customer's cart from the order items, restores inventory,
+   * rolls back any coupon redemption, and marks the order as cancelled. Idempotent
+   * — safe to call twice; will return early if the order is already cancelled
+   * or has any payment record.
+   *
+   * Without this, every failed payment attempt strands an unpaid pending order
+   * with empty-cart-on-server, blocking the customer from retrying and slowly
+   * draining inventory.
+   */
+  static async rollbackForPaymentFailure(
+    storeId: string,
+    orderId: string,
+    sessionId: string
+  ): Promise<void> {
+    await prisma.$transaction(async tx => {
+      const order = await tx.order.findFirst({
+        where: { id: orderId, storeId },
+        include: { items: true, payments: true },
+      });
+
+      // Idempotent guards
+      if (!order) return;
+      if (order.status === 'cancelled') return;
+      if (order.payments.length > 0) return;
+      if (order.status !== 'pending') return; // Don't roll back further-progressed orders
+
+      // 1. Restore inventory (mirror what create() decremented)
+      for (const item of order.items) {
+        const product = await tx.product.findUnique({
+          where: { id: item.productId },
+          select: { trackInventory: true, inventory: true },
+        });
+        if (!product?.trackInventory) continue;
+
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { inventory: { increment: item.quantity } },
+        });
+
+        await tx.inventoryHistory.create({
+          data: {
+            productId: item.productId,
+            storeId,
+            type: 'adjustment',
+            quantity: item.quantity,
+            previousStock: product.inventory,
+            newStock: product.inventory + item.quantity,
+            reason: 'Order rollback — payment step failed',
+            reference: order.id,
+          },
+        });
+      }
+
+      // 2. Roll back coupon usage if one was reserved
+      if (order.couponCode) {
+        await tx.coupon.updateMany({
+          where: { storeId, code: order.couponCode },
+          data: { usageCount: { decrement: 1 } },
+        });
+      }
+
+      // 3. Rebuild the cart from the order items so the customer can retry
+      const cart = await tx.cart.findFirst({
+        where: { storeId, sessionId },
+      });
+      const cartId =
+        cart?.id ??
+        (
+          await tx.cart.create({
+            data: { storeId, sessionId, customerId: order.customerId },
+          })
+        ).id;
+
+      // Clear any current items first (defensive — usually empty post-create)
+      await tx.cartItem.deleteMany({ where: { cartId } });
+      // Re-create items from the order. CartItem has no price column —
+      // price is read from the product at cart-render time.
+      for (const item of order.items) {
+        await tx.cartItem.create({
+          data: {
+            cartId,
+            productId: item.productId,
+            variantId: item.variantId ?? undefined,
+            quantity: item.quantity,
+          },
+        });
+      }
+
+      // 4. Mark the order cancelled with a paper trail
+      await tx.order.update({
+        where: { id: order.id },
+        data: {
+          status: 'cancelled',
+          notes:
+            (order.notes ? order.notes + '\n' : '') +
+            '[auto-cancelled: payment step failed before completion]',
+        },
+      });
+    });
+
+    logger.info(
+      { orderId, storeId },
+      'Order rolled back after payment-create failure (inventory + cart restored)'
+    );
+  }
+
   static async updateStatus(
     storeId: string,
     orderId: string,

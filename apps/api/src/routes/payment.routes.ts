@@ -8,6 +8,8 @@ import { prisma } from '@force/database';
 import { paymentLimiter, auditLog } from '../middleware/security';
 import { config } from '../config';
 import { getAuthUser } from '../utils/store-helpers';
+import { OrderService } from '../services/order.service';
+import logger from '../lib/logger';
 
 const router = Router();
 
@@ -149,6 +151,8 @@ router.post(
   authenticate,
   paymentLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
+    let rollbackContext: { orderId: string; storeId: string; sessionId: string } | null = null;
+
     try {
       const data = createPaymentSchema.parse(req.body);
       const user = getAuthUser(req);
@@ -172,6 +176,17 @@ router.post(
         return;
       }
 
+      // Set rollback context for the catch block. We only roll back if there's
+      // no payment yet — paid orders don't get auto-cancelled by retry attempts.
+      const sessionIdHeader = (req.headers['x-session-id'] as string | undefined) ?? '';
+      if (sessionIdHeader && order.status === 'pending') {
+        rollbackContext = {
+          orderId: order.id,
+          storeId: order.storeId,
+          sessionId: sessionIdHeader,
+        };
+      }
+
       // ==========================================
       // COD (Cash on Delivery) — skip payment gateway
       // ==========================================
@@ -188,6 +203,15 @@ router.post(
         });
 
         if (!codConfig) {
+          if (rollbackContext) {
+            await OrderService.rollbackForPaymentFailure(
+              rollbackContext.storeId,
+              rollbackContext.orderId,
+              rollbackContext.sessionId
+            ).catch(err =>
+              logger.error({ err, ...rollbackContext }, 'Order rollback failed (cod-not-available)')
+            );
+          }
           res.status(400).json({
             success: false,
             error: {
@@ -220,6 +244,10 @@ router.post(
             metadata: { codFee, originalTotal: order.total },
           },
         });
+
+        // Payment record created — clear rollback context so we never undo a
+        // successfully-initiated payment, even if a downstream step throws.
+        rollbackContext = null;
 
         await auditLog({
           action: 'payment.created',
@@ -259,7 +287,10 @@ router.post(
           ? `${config.webUrl}/${order.store.slug}`
           : config.webUrl;
 
-      // Create payment
+      // Create payment. PaymentService.createPayment throws on provider-not-
+      // configured / provider-error / validation-failure — the catch block at
+      // the end of this handler runs the rollback so the customer's cart is
+      // restored and inventory isn't drained by a failed attempt.
       const result = await PaymentService.createPayment(
         {
           orderId: order.id,
@@ -297,6 +328,11 @@ router.post(
         data.provider
       );
 
+      // Payment provider accepted the request — clear rollback context so we
+      // never undo a successfully-initiated payment, even if audit-log writing
+      // throws below.
+      rollbackContext = null;
+
       // Audit log
       await auditLog({
         action: 'payment.created',
@@ -322,6 +358,19 @@ router.post(
         },
       });
     } catch (error) {
+      // Compensating rollback: if the order was committed (cart cleared,
+      // inventory decremented) but the payment step failed, undo all of that
+      // so the customer can retry without losing their cart or seeing stock
+      // drain on every attempt.
+      if (rollbackContext) {
+        await OrderService.rollbackForPaymentFailure(
+          rollbackContext.storeId,
+          rollbackContext.orderId,
+          rollbackContext.sessionId
+        ).catch(rbErr =>
+          logger.error({ err: rbErr, ...rollbackContext }, 'Order rollback failed in catch block')
+        );
+      }
       next(error);
     }
   }
