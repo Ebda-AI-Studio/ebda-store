@@ -36,6 +36,11 @@ export class InvoiceService {
 
     const formatPrice = (fils: number) => `${(fils / 1000).toFixed(3)} KWD`;
     const shippingAddr = order.shippingAddress as Record<string, string> | null;
+    // Bill To should reflect the buyer info entered in checkout, not the
+    // authenticated account (a logged-in admin testing checkout would otherwise
+    // see their admin name on every invoice). Billing falls back to shipping
+    // when the storefront didn't collect a separate billing address.
+    const billingAddr = (order.billingAddress as Record<string, string> | null) ?? shippingAddr;
     const payment = order.payments?.[0];
 
     return `<!DOCTYPE html>
@@ -47,6 +52,8 @@ export class InvoiceService {
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #1a1a1a; padding: 40px; max-width: 800px; margin: 0 auto; }
     .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; border-bottom: 2px solid #ff6e00; padding-bottom: 20px; }
+    .store-info { display: flex; flex-direction: column; gap: 6px; }
+    .store-logo { max-height: 64px; max-width: 220px; object-fit: contain; margin-bottom: 4px; }
     .store-name { font-size: 24px; font-weight: 700; color: #ff6e00; }
     .store-contact { font-size: 12px; color: #666; margin-top: 4px; }
     .invoice-title { text-align: right; }
@@ -74,7 +81,12 @@ export class InvoiceService {
 </head>
 <body>
   <div class="header">
-    <div>
+    <div class="store-info">
+      ${
+        order.store.logo
+          ? `<img src="${escapeHtml(order.store.logo)}" alt="${escapeHtml(order.store.name)}" class="store-logo" />`
+          : ''
+      }
       <div class="store-name">${escapeHtml(order.store.name)}</div>
       ${order.store.email ? `<div class="store-contact">${escapeHtml(order.store.email)}</div>` : ''}
       ${order.store.phone ? `<div class="store-contact">${escapeHtml(order.store.phone)}</div>` : ''}
@@ -93,8 +105,9 @@ export class InvoiceService {
   <div class="addresses">
     <div class="address-block">
       <h3>Bill To</h3>
-      <p><strong>${escapeHtml(order.customer?.firstName || '')} ${escapeHtml(order.customer?.lastName || '')}</strong></p>
-      <p>${escapeHtml(order.customer?.email || '')}</p>
+      <p><strong>${escapeHtml(billingAddr?.firstName || order.customer?.firstName || '')} ${escapeHtml(billingAddr?.lastName || order.customer?.lastName || '')}</strong></p>
+      ${order.customer?.email ? `<p>${escapeHtml(order.customer.email)}</p>` : ''}
+      ${billingAddr?.phone ? `<p>${escapeHtml(billingAddr.phone)}</p>` : ''}
     </div>
     ${
       shippingAddr

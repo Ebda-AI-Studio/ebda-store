@@ -104,12 +104,26 @@ router.get('/config', async (req: Request, res: Response, next: NextFunction) =>
       };
     }
 
+    // Compute a defaultProvider that's actually offerable. If the global env
+    // default is in the returned providers list, use it. Otherwise fall back
+    // to the first listed provider, or 'cod' if available, or null. Returning
+    // a default the storefront can't actually submit (e.g. 'tap' when only
+    // cod is offered) auto-selects the broken option and 500s on click.
+    // providers is a PaymentProvider[] (string union), not objects.
+    const offerable = new Set<string>(providers as unknown as string[]);
+    if (codConfig) offerable.add('cod');
+    const envDefault = config.defaultPaymentProvider;
+    const defaultProvider =
+      envDefault && offerable.has(envDefault)
+        ? envDefault
+        : (providers[0] ?? (codConfig ? 'cod' : null));
+
     res.json({
       success: true,
       data: {
         providers,
         cod: codConfig,
-        defaultProvider: config.defaultPaymentProvider,
+        defaultProvider,
         defaultCurrency: config.defaultCurrency,
         supportedCurrencies: ['KWD', 'USD', 'EUR', 'GBP', 'AED', 'SAR', 'BHD'],
         supportedMethods: ['knet', 'visa', 'mastercard', 'apple_pay', 'google_pay', 'samsung_pay'],
