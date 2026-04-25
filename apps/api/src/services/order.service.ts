@@ -375,55 +375,59 @@ export class OrderService {
         .catch(err => logger.error({ err }, 'Affiliate referral link failed'));
     }
 
-    // Send order confirmation email
-    try {
-      const emailData: OrderEmailData = {
-        orderNumber: order.orderNumber,
-        customerName:
-          `${order.customer?.firstName || ''} ${order.customer?.lastName || ''}`.trim() ||
-          order.customer?.email ||
-          'Customer',
-        customerEmail: order.customer?.email || '',
-        items: order.items.map(item => ({
-          name: item.productName,
-          quantity: item.quantity,
-          price: item.price,
-        })),
-        subtotal: order.subtotal,
-        tax: order.tax,
-        shipping: order.shipping,
-        discount: order.discount,
-        couponCode: order.couponCode ?? undefined,
-        total: order.total,
-        shippingAddress: data.shippingAddress,
-      };
+    // Order is committed — return to caller as fast as possible.
+    // Emails + notifications fan out fire-and-forget so a slow / unreachable
+    // SMTP host or notification provider can't block the checkout response
+    // (this previously caused 45s+ "Processing…" hangs on the storefront).
+    const emailData: OrderEmailData = {
+      orderNumber: order.orderNumber,
+      customerName:
+        `${order.customer?.firstName || ''} ${order.customer?.lastName || ''}`.trim() ||
+        order.customer?.email ||
+        'Customer',
+      customerEmail: order.customer?.email || '',
+      items: order.items.map(item => ({
+        name: item.productName,
+        quantity: item.quantity,
+        price: item.price,
+      })),
+      subtotal: order.subtotal,
+      tax: order.tax,
+      shipping: order.shipping,
+      discount: order.discount,
+      couponCode: order.couponCode ?? undefined,
+      total: order.total,
+      shippingAddress: data.shippingAddress,
+    };
 
-      await Promise.all([
-        EmailService.sendOrderConfirmation(emailData),
-        EmailService.sendAdminNewOrder(emailData),
-      ]);
-    } catch (emailError) {
-      logger.error({ err: emailError }, 'Failed to send order confirmation email');
-      // Don't throw - order was created successfully
-    }
+    void Promise.all([
+      EmailService.sendOrderConfirmation(emailData).catch(err =>
+        logger.error({ err }, 'Failed to send customer order confirmation email')
+      ),
+      EmailService.sendAdminNewOrder(emailData).catch(err =>
+        logger.error({ err }, 'Failed to send admin new-order email')
+      ),
+    ]);
 
     // Dispatch to WhatsApp/SMS/Push channels (fire-and-forget)
-    const storeForNotification = await prisma.store
+    void prisma.store
       .findUnique({ where: { id: storeId }, select: { name: true } })
-      .catch(() => null);
-    notificationDispatcher
-      .dispatch(storeId, 'order_confirmed', {
-        customerName:
-          `${order.customer?.firstName || ''} ${order.customer?.lastName || ''}`.trim() ||
-          order.customer?.email ||
-          'Customer',
-        customerPhone: data.shippingAddress.phone ?? undefined,
-        orderNumber: order.orderNumber,
-        total: order.total,
-        storeId,
-        storeName: storeForNotification?.name ?? storeId,
-      })
-      .catch(err => logger.error({ err }, 'Notification dispatch failed'));
+      .catch(() => null)
+      .then(storeForNotification =>
+        notificationDispatcher
+          .dispatch(storeId, 'order_confirmed', {
+            customerName:
+              `${order.customer?.firstName || ''} ${order.customer?.lastName || ''}`.trim() ||
+              order.customer?.email ||
+              'Customer',
+            customerPhone: data.shippingAddress.phone ?? undefined,
+            orderNumber: order.orderNumber,
+            total: order.total,
+            storeId,
+            storeName: storeForNotification?.name ?? storeId,
+          })
+          .catch(err => logger.error({ err }, 'Notification dispatch failed'))
+      );
 
     // Send real-time notification to store admins
     try {
