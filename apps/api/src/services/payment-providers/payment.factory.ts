@@ -115,10 +115,20 @@ class PaymentFactory {
         });
       }
 
-      // Fall back to environment variables if no database config
-      if (dbConfigs.length === 0) {
+      // Fall back to environment variables ONLY for platform-level lookups
+      // (storeId === null). For any specific store, providers must come from
+      // a paymentConfig row created via admin settings — otherwise a globally-
+      // set TAP_API_KEY env var would leak Tap as "available" to every tenant
+      // even though they never enabled it. Per-store configuration is the
+      // explicit requirement; don't reintroduce a cross-tenant fallback.
+      if (dbConfigs.length === 0 && storeId === null) {
         logger.info('[PAYMENT] No database config found, using environment variables');
         this.initializeFromEnv(providers, configs);
+      } else if (dbConfigs.length === 0) {
+        logger.info(
+          { storeId },
+          '[PAYMENT] No paymentConfig rows for store; no online providers available'
+        );
       } else {
         // Initialize from database config
         for (const dbConfig of dbConfigs) {

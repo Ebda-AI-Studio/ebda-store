@@ -490,7 +490,11 @@ export default function CheckoutClient() {
       });
 
       if (!orderResult.success || !orderResult.data?.order) {
-        throw new Error(orderResult.error?.message || 'Failed to create order');
+        // Throw the API error CODE (not message) so the catch maps it to
+        // customer-friendly copy. Raw message goes to console only.
+        const err = new Error(orderResult.error?.code || 'ORDER_CREATE_FAILED');
+        (err as Error & { rawMessage?: string }).rawMessage = orderResult.error?.message || '';
+        throw err;
       }
 
       const order = orderResult.data.order;
@@ -528,13 +532,78 @@ export default function CheckoutClient() {
         // Online payment — redirect to payment gateway
         window.location.href = paymentResult.data.paymentUrl;
       } else {
-        throw new Error(paymentResult.error?.message || 'Failed to initiate payment');
+        // Throw an Error so the catch block runs the customer-friendly mapping.
+        // We pass the API error code (not message) so the catch can decide.
+        const err = new Error(paymentResult.error?.code || 'PAYMENT_FAILED');
+        // Attach the raw message for the dev console only.
+        (err as Error & { rawMessage?: string }).rawMessage = paymentResult.error?.message || '';
+        throw err;
       }
     } catch (error) {
-      console.error('Checkout error:', error);
-      setCheckoutError(
-        error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.'
-      );
+      // Log the technical detail for debugging — never show it to the customer.
+      const raw =
+        error instanceof Error
+          ? ((error as Error & { rawMessage?: string }).rawMessage ?? error.message)
+          : String(error);
+      console.error('Checkout error:', raw);
+
+      // Map known backend error codes to friendly customer copy. Anything
+      // unrecognized falls through to a generic "try again" message —
+      // customers never see internal terminology like "provider not
+      // configured" or "schema validation".
+      const code = error instanceof Error ? error.message : '';
+      let friendly: string;
+      switch (code) {
+        case 'COD_NOT_AVAILABLE':
+          friendly = t(
+            'Cash on delivery is currently unavailable. Please choose another payment method.',
+            'الدفع عند الاستلام غير متاح حالياً. يرجى اختيار طريقة دفع أخرى.'
+          );
+          break;
+        case 'PAYMENT_PROVIDER_NOT_CONFIGURED':
+        case 'PAYMENT_NOT_CONFIGURED':
+          friendly = t(
+            'This payment method is not available right now. Please choose another option.',
+            'طريقة الدفع هذه غير متاحة حالياً. يرجى اختيار طريقة أخرى.'
+          );
+          break;
+        case 'EMPTY_CART':
+          friendly = t(
+            'Your cart is empty. Please add items before checking out.',
+            'سلة التسوق فارغة. يرجى إضافة منتجات قبل إتمام الشراء.'
+          );
+          break;
+        case 'COUPON_LIMIT_REACHED':
+          friendly = t(
+            'The coupon you applied has reached its usage limit. Please remove it and try again.',
+            'تم استخدام الكوبون الذي طبّقته بالكامل. يرجى إزالته والمحاولة مرة أخرى.'
+          );
+          break;
+        case 'MIN_ORDER_NOT_MET':
+          friendly = t(
+            'Your order does not meet the minimum amount required for this coupon.',
+            'طلبك لا يستوفي الحد الأدنى للمبلغ المطلوب لهذا الكوبون.'
+          );
+          break;
+        case 'INSUFFICIENT_INVENTORY':
+          friendly = t(
+            'One of the items in your cart is out of stock. Please review your cart.',
+            'أحد المنتجات في سلتك غير متوفر. يرجى مراجعة سلة التسوق.'
+          );
+          break;
+        case 'TIMEOUT':
+          friendly = t(
+            'The server took too long to respond. Please try again.',
+            'استغرق الخادم وقتاً طويلاً للاستجابة. يرجى المحاولة مرة أخرى.'
+          );
+          break;
+        default:
+          friendly = t(
+            'Something went wrong while processing your order. Please try again or contact support if the problem persists.',
+            'حدث خطأ أثناء معالجة طلبك. يرجى المحاولة مرة أخرى أو التواصل مع الدعم إذا استمرت المشكلة.'
+          );
+      }
+      setCheckoutError(friendly);
       setIsProcessing(false);
     }
   };
