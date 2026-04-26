@@ -449,7 +449,11 @@ describe('OrderService', () => {
     });
 
     describe('invalid transitions', () => {
-      it('should reject pending -> delivered', async () => {
+      // pending → delivered is now allowed by design (commit 0ee3741) so an
+      // admin can mark a same-day COD as delivered without stepping through
+      // every intermediate state. Test left as a sanity-check that the
+      // transition resolves rather than rejects.
+      it('should allow pending -> delivered (admin shortcut)', async () => {
         vi.mocked(prisma.order.findFirst).mockResolvedValue({
           ...mockOrder,
           status: 'pending',
@@ -457,7 +461,7 @@ describe('OrderService', () => {
 
         await expect(
           OrderService.updateStatus(mockStoreId, 'order-123', 'delivered')
-        ).rejects.toThrow('Cannot transition from pending to delivered');
+        ).resolves.toBeDefined();
       });
 
       it('should reject cancelled -> any', async () => {
