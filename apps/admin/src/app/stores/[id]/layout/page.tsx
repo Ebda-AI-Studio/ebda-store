@@ -79,13 +79,15 @@ export default function StoreLayoutPage() {
 
   // Build a preview URL pointing at the storefront's home page. Prefer the
   // store's custom domain when available so the preview reflects the
-  // production environment exactly; fall back to the default web app +
-  // ?storeSlug query (handled by the web app's middleware).
+  // production environment exactly; otherwise fall back to the platform
+  // domain + path-based slug (`/<store-slug>`) — that is the route shape the
+  // web app's middleware actually resolves; a `?storeSlug=` query gets
+  // ignored and falls through to whichever store the platform serves at /.
   const previewUrl =
     storeInfo?.domain && storeInfo.domain.length > 0
       ? `https://${storeInfo.domain}`
       : storeInfo?.slug
-        ? `${process.env.NEXT_PUBLIC_WEB_URL ?? 'https://force-web-sigma.vercel.app'}/?storeSlug=${storeInfo.slug}`
+        ? `${process.env.NEXT_PUBLIC_WEB_URL ?? 'https://force-web-sigma.vercel.app'}/${storeInfo.slug}`
         : null;
 
   return (
