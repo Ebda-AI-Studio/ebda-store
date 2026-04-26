@@ -1,0 +1,235 @@
+'use client';
+
+import { memo, useState } from 'react';
+import Image from 'next/image';
+import Link from 'next/link';
+import type { ProductCardProps } from '../types';
+import type { TemplateId } from '@force/shared';
+import { useLanguage } from '../../contexts/LanguageContext';
+import { getPackStyles } from './pack-styles';
+import { productCardPropsEqual } from './product-card-memo';
+import { TaxInclusiveLabel } from './tax-inclusive-label';
+
+interface PecannbeeProductCardProps extends ProductCardProps {
+  pack?: TemplateId;
+}
+
+/**
+ * Pecannbee-spec product card used on the PLP grid (and any other surface
+ * that wants the canonical card layout). Contract per spec § 4.3:
+ *
+ * ┌──────────────────────────┐
+ * │ [♥]                  [-25%]│  ← wishlist top-START, sale/sold-out top-END
+ * │                              │
+ * │      square 1:1 image       │
+ * │                              │
+ * ├──────────────────────────┤
+ * │ Product name (1–2 lines)    │
+ * │ KD 5.000  KD 6.000        │
+ * │ ┌────────────────────┐ │
+ * │ │  Add to cart  🛒  │ │  ← full-width pill CTA
+ * │ └────────────────────┘ │
+ * └──────────────────────────┘
+ *
+ * Sold-out variant: ribbon + disabled bg-muted CTA.
+ * Pack styling driven by `pack-styles.ts` so each template's voice survives.
+ */
+function PecannbeeProductCardImpl({
+  product,
+  isRtl: isRtlProp,
+  currency = 'KWD',
+  onAddToCart,
+  onAddToWishlist,
+  onRemoveFromWishlist,
+  urlPrefix = '',
+  pack,
+}: PecannbeeProductCardProps) {
+  const { isRtl: ctxIsRtl } = useLanguage();
+  const isRtl = isRtlProp ?? ctxIsRtl;
+  const styles = getPackStyles(pack);
+  const [isWishlisted, setIsWishlisted] = useState(false);
+  const [isAdding, setIsAdding] = useState(false);
+
+  const inStock = product.inStock !== false;
+  const onSale = !!(product.compareAtPrice && product.compareAtPrice > product.price);
+  const discountPct = onSale
+    ? Math.round((1 - product.price / (product.compareAtPrice ?? product.price)) * 100)
+    : 0;
+
+  const name = isRtl && product.nameAr ? product.nameAr : product.name;
+  const href = `${urlPrefix}/products/${product.slug}`;
+  const img = product.images?.[0]?.url;
+
+  const handleWishlist = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (onRemoveFromWishlist) {
+      onRemoveFromWishlist(product.id);
+      return;
+    }
+    setIsWishlisted(w => !w);
+    onAddToWishlist?.(product.id);
+  };
+
+  const handleAdd = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!inStock || !onAddToCart) return;
+    setIsAdding(true);
+    try {
+      await onAddToCart(product.id);
+    } finally {
+      setIsAdding(false);
+    }
+  };
+
+  return (
+    <div className={`flex flex-col overflow-hidden ${styles.card}`} dir={isRtl ? 'rtl' : 'ltr'}>
+      <Link
+        href={href}
+        className="group/img block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      >
+        <div className="relative aspect-square overflow-hidden bg-muted">
+          {img ? (
+            <>
+              <Image
+                src={img}
+                alt={product.images?.[0]?.alt ?? name}
+                fill
+                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 200px"
+                className="object-cover transition-opacity duration-500 group-hover/img:opacity-0"
+              />
+              {product.images?.[1]?.url && (
+                <Image
+                  src={product.images[1].url}
+                  alt={product.images[1].alt ?? name}
+                  fill
+                  sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 200px"
+                  loading="lazy"
+                  className="absolute inset-0 object-cover opacity-0 transition-opacity duration-500 group-hover/img:opacity-100"
+                />
+              )}
+            </>
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+              <svg
+                className="h-10 w-10"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                aria-hidden
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                />
+              </svg>
+            </div>
+          )}
+
+          {/* Wishlist heart — top-START (RTL right, LTR left) per spec § 4.3 */}
+          <button
+            type="button"
+            onClick={handleWishlist}
+            aria-label={isRtl ? 'إضافة للمفضلة' : 'Add to wishlist'}
+            aria-pressed={isWishlisted}
+            className={`absolute top-2 start-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white shadow-sm transition-all hover:scale-105 cursor-pointer ${
+              isWishlisted ? 'text-destructive' : 'text-foreground/70 hover:text-foreground'
+            }`}
+          >
+            <svg
+              className="h-4 w-4"
+              fill={isWishlisted ? 'currentColor' : 'none'}
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+              />
+            </svg>
+          </button>
+
+          {/* Sold-out ribbon top-END (RTL left, LTR right) */}
+          {!inStock && (
+            <span className="absolute top-2 end-2 rounded-full bg-destructive px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-destructive-foreground">
+              {isRtl ? 'نفدت الكمية' : 'Sold out'}
+            </span>
+          )}
+          {/* Sale chip top-END when in stock */}
+          {inStock && onSale && (
+            <span className="absolute top-2 end-2 rounded-full bg-foreground px-2 py-0.5 text-[10px] font-semibold text-background">
+              -{discountPct}%
+            </span>
+          )}
+        </div>
+      </Link>
+
+      <div className="flex flex-1 flex-col gap-2 p-3">
+        <Link href={href} className="focus:outline-none focus-visible:underline">
+          <p
+            className={`line-clamp-2 min-h-[2.5em] ${styles.productCardName}`}
+            style={{ textWrap: 'balance' }}
+          >
+            {name}
+          </p>
+        </Link>
+        <div className="flex items-baseline gap-2">
+          <span className="font-semibold text-foreground">
+            {(product.price / 1000).toFixed(3)} {currency}
+          </span>
+          {onSale && product.compareAtPrice && (
+            <span className="text-xs text-muted-foreground line-through">
+              {(product.compareAtPrice / 1000).toFixed(3)}
+            </span>
+          )}
+        </div>
+        <TaxInclusiveLabel className="block text-[11px] text-muted-foreground" />
+
+        <button
+          type="button"
+          disabled={!inStock || isAdding}
+          onClick={handleAdd}
+          className={`mt-auto inline-flex w-full items-center justify-center gap-2 ${styles.productCardCta} disabled:cursor-not-allowed disabled:opacity-60`}
+        >
+          {!inStock ? (
+            isRtl ? (
+              'نفدت الكمية'
+            ) : (
+              'Sold out'
+            )
+          ) : (
+            <>
+              {isAdding ? (
+                <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+              ) : (
+                <svg
+                  className="h-3.5 w-3.5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  aria-hidden
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
+                  />
+                </svg>
+              )}
+              {isRtl ? 'إضافة للسلة' : 'Add to cart'}
+            </>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export const PecannbeeProductCard = memo(PecannbeeProductCardImpl, productCardPropsEqual);

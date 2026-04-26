@@ -19,6 +19,8 @@ interface EditSidebarProps {
   onFeaturedChange: (value: boolean) => void;
   isNew: boolean;
   onIsNewChange: (value: boolean) => void;
+  isBestSeller: boolean;
+  onIsBestSellerChange: (value: boolean) => void;
   saving: boolean;
   onCancel: () => void;
 }
@@ -34,6 +36,8 @@ export function EditSidebar({
   onFeaturedChange,
   isNew,
   onIsNewChange,
+  isBestSeller,
+  onIsBestSellerChange,
   saving,
   onCancel,
 }: EditSidebarProps) {
@@ -83,6 +87,15 @@ export function EditSidebar({
               className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
             />
             <span className="text-sm text-foreground">{tFields('newArrival')}</span>
+          </label>
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={isBestSeller}
+              onChange={e => onIsBestSellerChange(e.target.checked)}
+              className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+            />
+            <span className="text-sm text-foreground">{tFields('bestSeller')}</span>
           </label>
         </div>
       </div>

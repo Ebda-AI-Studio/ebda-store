@@ -116,9 +116,10 @@ export default function ClassicHeader({
               <Image
                 src={displayLogo}
                 alt={displayName}
-                width={130}
-                height={60}
-                className="h-14 max-h-14 w-auto"
+                width={320}
+                height={120}
+                className="h-20 max-h-20 w-auto sm:h-24 sm:max-h-24"
+                priority
               />
             ) : (
               <span className="text-2xl font-serif font-bold tracking-wider text-foreground">

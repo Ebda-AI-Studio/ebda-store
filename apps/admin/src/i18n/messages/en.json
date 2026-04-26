@@ -436,6 +436,7 @@
         "stockInStock": "{count} in stock",
         "featured": "Featured",
         "newArrival": "New Arrival",
+        "bestSeller": "Best Seller",
         "trackInventory": "Track Inventory",
         "yes": "Yes",
         "no": "No",
@@ -498,7 +499,8 @@
         "category": "Category",
         "noCategory": "No category",
         "featured": "Featured Product",
-        "newArrival": "New Arrival"
+        "newArrival": "New Arrival",
+        "bestSeller": "Best Seller"
       },
       "statusOptions": {
         "draft": "Draft",
@@ -720,7 +722,8 @@
       "pagination": {
         "showing": "Showing {from} to {to} of {total} orders",
         "previous": "Previous",
-        "next": "Next"
+        "next": "Next",
+        "perPage": "Per page"
       },
       "confirm": {
         "markPaid": "Confirm cash payment received for this order?",
@@ -760,6 +763,150 @@
       "refunded": "Refunded",
       "paid": "Paid",
       "unpaid": "Unpaid"
+    },
+    "detail": {
+      "back": "Back",
+      "openInvoice": "Invoice",
+      "editDeliveryStatus": "Edit delivery status",
+      "delivery": "Delivery",
+      "deliverTo": "Deliver to",
+      "deliverBy": "Deliver by",
+      "deliverAt": "Deliver at",
+      "selfShipping": "Self Shipping",
+      "payment": "Payment Details",
+      "editPayment": "Edit payment",
+      "paid": "Paid",
+      "unpaid": "Unpaid",
+      "remain": "Remain {amount}",
+      "paymentLink": "Payment link",
+      "summary": "Summary",
+      "subtotal": "Subtotal",
+      "discount": "Discount",
+      "tax": "Taxes",
+      "deliveryFee": "Delivery",
+      "total": "Total",
+      "items": "Items",
+      "itemCount": "{count} items",
+      "viewAll": "View all",
+      "showLess": "Show less",
+      "qty": "Qty",
+      "platform": "Platform",
+      "web": "Web",
+      "mobile": "Mobile",
+      "pos": "POS",
+      "customer": "Customer",
+      "phone": "Phone",
+      "email": "Email",
+      "callCustomer": "Call",
+      "whatsappCustomer": "WhatsApp",
+      "actions": {
+        "processed": "Processed",
+        "cancel": "Cancel",
+        "more": "More",
+        "printInvoice": "Print Invoice",
+        "markPaid": "Mark Paid",
+        "addNote": "Add Note",
+        "refund": "Refund"
+      },
+      "loading": "Loading order…",
+      "errors": {
+        "fetchFailed": "Failed to load order",
+        "statusUpdateFailed": "Failed to update status"
+      },
+      "toast": {
+        "statusUpdated": "Order status updated"
+      },
+      "notes": "Order notes",
+      "customerNotes": "Customer notes"
+    },
+    "layout": {
+      "title": "Storefront layout",
+      "subtitle": "Toggle home sections, switch banner mode, choose category layout — applies across every template",
+      "save": "Save changes",
+      "saving": "Saving…",
+      "saved": "Layout saved",
+      "saveError": "Failed to save layout",
+      "loadError": "Failed to load layout",
+      "sections": {
+        "hero": {
+          "title": "Hero banner",
+          "description": "Top-of-page banner. Single image or autoplay slider — same size either way.",
+          "modeSingle": "Single banner",
+          "modeSlider": "Slider",
+          "autoplay": "Autoplay (ms)"
+        },
+        "categories": {
+          "title": "Categories section",
+          "description": "Browseable category cards under the hero",
+          "layoutGrid": "Grid",
+          "layoutHorizontal": "Horizontal scroll",
+          "captionBelow": "Caption below image",
+          "captionOverlay": "Caption over image",
+          "desktopColumns": "Desktop columns",
+          "mobileColumns": "Mobile columns"
+        },
+        "newArrivals": {
+          "title": "New arrivals carousel",
+          "description": "Horizontal strip showing the latest products",
+          "limit": "Number of products"
+        },
+        "bestSellers": {
+          "title": "Best sellers carousel",
+          "description": "Horizontal strip of best-selling products",
+          "limit": "Number of products"
+        },
+        "filterSidebar": {
+          "title": "PLP filter sidebar",
+          "description": "Sort + price + attribute filters on category list pages",
+          "defaultOpen": "Open by default on desktop"
+        },
+        "testimonials": {
+          "title": "Customer testimonials",
+          "description": "Hidden automatically when no qualifying reviews exist",
+          "minRating": "Minimum rating",
+          "verifiedOnly": "Verified purchases only"
+        },
+        "sizing": {
+          "title": "Sizing contract",
+          "description": "Locked across all 5 templates so logos, images, and spacing stay consistent",
+          "heroAspect": "Hero aspect",
+          "productImageAspect": "Product image",
+          "categoryImageAspect": "Category image"
+        }
+      },
+      "common": {
+        "enabled": "Enabled",
+        "disabled": "Disabled"
+      }
+    },
+    "devices": {
+      "title": "Notification devices",
+      "subtitle": "Browsers and devices that receive push notifications for your account",
+      "empty": "No devices have enabled notifications yet. Visit any page in this admin to register this browser.",
+      "registered": "Registered {date}",
+      "remove": "Remove",
+      "removeConfirmTitle": "Remove this device?",
+      "removeConfirmDescription": "Push notifications will stop arriving on this device. You can re-enable from the same browser.",
+      "loading": "Loading devices…",
+      "error": "Failed to load devices",
+      "removeError": "Failed to remove device"
+    },
+    "invoice": {
+      "title": "Invoice",
+      "loading": "Loading invoice…",
+      "actions": {
+        "print": "Print",
+        "downloadPdf": "Download PDF",
+        "email": "Email customer"
+      },
+      "errors": {
+        "loadFailed": "Failed to load invoice",
+        "printFailed": "Print failed",
+        "emailFailed": "Failed to send invoice email"
+      },
+      "toast": {
+        "emailSent": "Invoice emailed to customer"
+      }
     }
   },
   "customers": {
@@ -2978,6 +3125,7 @@
       "navOrders": "Orders",
       "navCustomers": "Customers",
       "navAnalytics": "Analytics",
+      "navLayout": "Layout",
       "navSettings": "Settings",
       "superAdmin": "Super Admin",
       "superAdminHint": "Full platform access",

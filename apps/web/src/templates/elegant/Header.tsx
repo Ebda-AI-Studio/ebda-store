@@ -91,9 +91,10 @@ export default function ElegantHeader({
               <Image
                 src={displayLogo}
                 alt={displayName}
-                width={200}
-                height={80}
-                className="h-20 max-h-20 w-auto"
+                width={320}
+                height={120}
+                className="h-20 max-h-20 w-auto sm:h-24 sm:max-h-24"
+                priority
               />
             ) : (
               <span className="text-3xl font-light tracking-[0.25em] text-foreground">

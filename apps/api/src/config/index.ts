@@ -104,6 +104,12 @@ export const config = {
   vapidPrivateKey: process.env.VAPID_PRIVATE_KEY || '',
   vapidSubject: process.env.VAPID_SUBJECT || 'mailto:contact@forcemediakw.com',
 
+  // OneSignal — admin-side push notifications. Tags are scoped per-user with
+  // (role, store_id) so notifyAdminsOfOrder() can filter to the order's store
+  // admins plus all super_admins, never bleeding to other tenants' admins.
+  onesignalAppId: process.env.ONESIGNAL_APP_ID || '',
+  onesignalRestApiKey: process.env.ONESIGNAL_REST_API_KEY || '',
+
   // Email
   smtpHost: process.env.SMTP_HOST || 'localhost',
   smtpPort: parseInt(process.env.SMTP_PORT || '1025', 10),

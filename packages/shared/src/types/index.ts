@@ -3,6 +3,9 @@
 // Store Theme & Template Types
 export * from './store-theme';
 
+// Store Layout Settings (Pecannbee-style flow toggles)
+export * from './store-layout';
+
 // API Response Types
 export interface ApiResponse<T = unknown> {
   success: boolean;

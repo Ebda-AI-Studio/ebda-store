@@ -436,6 +436,7 @@
         "stockInStock": "{count} متوفر في المخزون",
         "featured": "مميّز",
         "newArrival": "وصل حديثًا",
+        "bestSeller": "الأكثر مبيعاً",
         "trackInventory": "تتبع المخزون",
         "yes": "نعم",
         "no": "لا",
@@ -498,7 +499,8 @@
         "category": "الفئة",
         "noCategory": "بدون فئة",
         "featured": "منتج مميّز",
-        "newArrival": "وصل حديثًا"
+        "newArrival": "وصل حديثًا",
+        "bestSeller": "الأكثر مبيعاً"
       },
       "statusOptions": {
         "draft": "مسودة",
@@ -720,7 +722,8 @@
       "pagination": {
         "showing": "عرض {from} إلى {to} من {total} طلب",
         "previous": "السابق",
-        "next": "التالي"
+        "next": "التالي",
+        "perPage": "في الصفحة"
       },
       "confirm": {
         "markPaid": "هل تؤكد استلام الدفع النقدي لهذا الطلب؟",
@@ -760,6 +763,150 @@
       "refunded": "مُسترد",
       "paid": "مدفوع",
       "unpaid": "غير مدفوع"
+    },
+    "detail": {
+      "back": "رجوع",
+      "openInvoice": "الفاتورة",
+      "editDeliveryStatus": "تعديل حالة التوصيل",
+      "delivery": "التوصيل",
+      "deliverTo": "العنوان",
+      "deliverBy": "وسيلة التوصيل",
+      "deliverAt": "وقت التوصيل",
+      "selfShipping": "توصيل ذاتي",
+      "payment": "تفاصيل الدفع",
+      "editPayment": "تعديل الدفع",
+      "paid": "مدفوع",
+      "unpaid": "غير مدفوع",
+      "remain": "المتبقي {amount}",
+      "paymentLink": "رابط الدفع",
+      "summary": "الملخص",
+      "subtotal": "المجموع الفرعي",
+      "discount": "الخصم",
+      "tax": "الضريبة",
+      "deliveryFee": "التوصيل",
+      "total": "الإجمالي",
+      "items": "المنتجات",
+      "itemCount": "{count} منتج",
+      "viewAll": "عرض الكل",
+      "showLess": "عرض أقل",
+      "qty": "الكمية",
+      "platform": "المنصة",
+      "web": "الموقع",
+      "mobile": "تطبيق",
+      "pos": "نقطة بيع",
+      "customer": "العميل",
+      "phone": "الهاتف",
+      "email": "البريد الإلكتروني",
+      "callCustomer": "اتصال",
+      "whatsappCustomer": "واتساب",
+      "actions": {
+        "processed": "تمت المعالجة",
+        "cancel": "إلغاء",
+        "more": "المزيد",
+        "printInvoice": "طباعة الفاتورة",
+        "markPaid": "وضع كمدفوع",
+        "addNote": "إضافة ملاحظة",
+        "refund": "استرداد"
+      },
+      "loading": "جاري تحميل الطلب…",
+      "errors": {
+        "fetchFailed": "فشل تحميل الطلب",
+        "statusUpdateFailed": "فشل تحديث الحالة"
+      },
+      "toast": {
+        "statusUpdated": "تم تحديث حالة الطلب"
+      },
+      "notes": "ملاحظات الطلب",
+      "customerNotes": "ملاحظات العميل"
+    },
+    "layout": {
+      "title": "تخطيط المتجر",
+      "subtitle": "فعّل وعطّل أقسام الصفحة الرئيسية، بدّل بين البانر الواحد والسلايدر، اختر شكل الفئات — يُطبَّق على جميع القوالب",
+      "save": "حفظ التغييرات",
+      "saving": "جاري الحفظ…",
+      "saved": "تم حفظ التخطيط",
+      "saveError": "فشل حفظ التخطيط",
+      "loadError": "فشل تحميل التخطيط",
+      "sections": {
+        "hero": {
+          "title": "البانر الرئيسي",
+          "description": "بانر أعلى الصفحة. صورة واحدة أو سلايدر تلقائي — بنفس المقاس",
+          "modeSingle": "بانر واحد",
+          "modeSlider": "سلايدر",
+          "autoplay": "وقت العرض (ms)"
+        },
+        "categories": {
+          "title": "قسم الفئات",
+          "description": "بطاقات الفئات أسفل البانر",
+          "layoutGrid": "شبكة",
+          "layoutHorizontal": "تمرير أفقي",
+          "captionBelow": "اسم الفئة تحت الصورة",
+          "captionOverlay": "اسم الفئة فوق الصورة",
+          "desktopColumns": "أعمدة الشاشة الكبيرة",
+          "mobileColumns": "أعمدة الجوال"
+        },
+        "newArrivals": {
+          "title": "أحدث المنتجات",
+          "description": "شريط أفقي بأحدث المنتجات",
+          "limit": "عدد المنتجات"
+        },
+        "bestSellers": {
+          "title": "الأكثر مبيعاً",
+          "description": "شريط أفقي بالأكثر مبيعاً",
+          "limit": "عدد المنتجات"
+        },
+        "filterSidebar": {
+          "title": "شريط فلاتر صفحة الفئة",
+          "description": "ترتيب + سعر + خصائص في صفحات قوائم المنتجات",
+          "defaultOpen": "مفتوح افتراضياً على الشاشة الكبيرة"
+        },
+        "testimonials": {
+          "title": "آراء العملاء",
+          "description": "تختفي تلقائياً عند عدم وجود تقييمات كافية",
+          "minRating": "أقل تقييم",
+          "verifiedOnly": "المشتريات الموثقة فقط"
+        },
+        "sizing": {
+          "title": "مقاسات موحّدة",
+          "description": "مقفلة على جميع القوالب الخمسة لضمان تناسق الشعار والصور والمسافات",
+          "heroAspect": "نسبة البانر",
+          "productImageAspect": "صورة المنتج",
+          "categoryImageAspect": "صورة الفئة"
+        }
+      },
+      "common": {
+        "enabled": "مفعل",
+        "disabled": "معطل"
+      }
+    },
+    "devices": {
+      "title": "أجهزة الإشعارات",
+      "subtitle": "المتصفحات والأجهزة التي تتلقى الإشعارات الفورية لحسابك",
+      "empty": "لم يتم تفعيل الإشعارات على أي جهاز بعد. تصفح أي صفحة في لوحة الإدارة لتسجيل هذا المتصفح.",
+      "registered": "مسجل بتاريخ {date}",
+      "remove": "إزالة",
+      "removeConfirmTitle": "إزالة هذا الجهاز؟",
+      "removeConfirmDescription": "لن تصل الإشعارات الفورية إلى هذا الجهاز. يمكنك إعادة التفعيل من نفس المتصفح.",
+      "loading": "جاري تحميل الأجهزة…",
+      "error": "فشل تحميل الأجهزة",
+      "removeError": "فشل حذف الجهاز"
+    },
+    "invoice": {
+      "title": "الفاتورة",
+      "loading": "جاري تحميل الفاتورة…",
+      "actions": {
+        "print": "طباعة",
+        "downloadPdf": "تنزيل PDF",
+        "email": "إرسال للعميل"
+      },
+      "errors": {
+        "loadFailed": "فشل تحميل الفاتورة",
+        "printFailed": "فشلت الطباعة",
+        "emailFailed": "فشل إرسال الفاتورة"
+      },
+      "toast": {
+        "emailSent": "تم إرسال الفاتورة للعميل"
+      }
     }
   },
   "customers": {
@@ -2978,6 +3125,7 @@
       "navOrders": "الطلبات",
       "navCustomers": "العملاء",
       "navAnalytics": "التحليلات",
+      "navLayout": "التخطيط",
       "navSettings": "الإعدادات",
       "superAdmin": "مدير عام",
       "superAdminHint": "صلاحية كاملة على المنصة",

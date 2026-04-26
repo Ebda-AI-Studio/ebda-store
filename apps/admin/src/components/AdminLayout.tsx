@@ -62,6 +62,7 @@ export function AdminLayout({
     orders: t('navOrders'),
     customers: t('navCustomers'),
     analytics: t('navAnalytics'),
+    layout: t('navLayout'),
     settings: t('navSettings'),
   };
 

@@ -5,6 +5,7 @@ import { ToastProvider } from '@force/ui';
 import { AuthProvider, useAuth } from '../lib/auth';
 import { StoreProvider } from '../contexts/StoreContext';
 import { NotificationProvider } from '../contexts/NotificationContext';
+import { OneSignalInit } from '../components/OneSignalInit';
 
 function AuthenticatedProviders({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -16,7 +17,10 @@ function AuthenticatedProviders({ children }: { children: ReactNode }) {
   return (
     <StoreProvider>
       <NotificationProvider>
-        <ToastProvider>{children}</ToastProvider>
+        <ToastProvider>
+          <OneSignalInit />
+          {children}
+        </ToastProvider>
       </NotificationProvider>
     </StoreProvider>
   );

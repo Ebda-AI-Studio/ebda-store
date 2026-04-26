@@ -54,6 +54,7 @@ model User {
   loyaltyTransactions LoyaltyTransaction[]
   featureToggles      StoreFeature[]       @relation("FeatureToggledBy")
   pushSubscriptions   PushSubscription[]   @relation("UserPushSubscriptions")
+  onesignalSubscriptions OneSignalSubscription[] @relation("UserOneSignalSubscriptions")
   abandonedCarts      AbandonedCart[]      @relation("AbandonedCartCustomer")
 
   @@index([role])
@@ -148,6 +149,7 @@ model Store {
   // Template & Theme
   template        StoreTemplate @default(modern)
   theme           Json          @default("{}") // StoreTheme JSON
+  layoutSettings  Json          @default("{}") @map("layout_settings") // StoreLayoutSettings JSON — empty object means "use packaged defaults" (the Pecannbee flow)
 
   // Social Links
   socialLinks     Json          @default("{}") @map("social_links") // StoreSocialLinks JSON
@@ -337,6 +339,10 @@ model Product {
   status           ProductStatus @default(draft)
   featured         Boolean       @default(false)
   isNew            Boolean       @default(false) @map("is_new")
+  // Manually curated by the store admin — drives the storefront's
+  // "Best Sellers" carousel. Independent of actual order data so a merchant
+  // can stage products at launch before any sales data exists.
+  isBestSeller     Boolean       @default(false) @map("is_best_seller")
   viewCount        Int           @default(0) @map("view_count")
   metaTitle        String?       @map("meta_title")
   metaTitleAr      String?       @map("meta_title_ar")
@@ -971,6 +977,21 @@ model PushSubscription {
   @@index([storeId])
   @@index([customerId])
   @@map("push_subscriptions")
+}
+
+model OneSignalSubscription {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  playerId    String   @map("player_id")          // OneSignal player / subscription ID
+  deviceLabel String?  @map("device_label")        // e.g. "Chrome on Mac" — for the user devices page
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user User @relation("UserOneSignalSubscriptions", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, playerId])
+  @@index([userId])
+  @@map("onesignal_subscriptions")
 }
 
 model NotificationLog {

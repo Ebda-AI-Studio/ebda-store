@@ -1,0 +1,149 @@
+/**
+ * Store layout settings — admin GET/PUT for the layout-toggle page +
+ * a public read used by the storefront when rendering the home composition.
+ *
+ * The shape is `StoreLayoutSettings` from @force/shared; an empty `{}` blob
+ * resolves to packaged Pecannbee-flow defaults via `resolveLayoutSettings`,
+ * so existing tenants don't need a backfill before this ships.
+ */
+
+import { Router, Request, Response, NextFunction } from 'express';
+import { z } from 'zod';
+import { prisma } from '@force/database';
+import { resolveLayoutSettings } from '@force/shared';
+import { authenticate } from '../middleware/auth';
+import { requireStoreAccess } from '../middleware/store-access';
+import { auditLog, writeLimiter } from '../middleware/security';
+import { getAuthUser } from '../utils/store-helpers';
+
+const router = Router({ mergeParams: true });
+
+// Permissive Zod schema — `resolveLayoutSettings` is the source of truth for
+// merging with defaults. Validating the parts that absolutely must be right
+// (numeric ranges, enum values) and letting unknown extras through keeps
+// the column forward-compatible.
+const heroSlideSchema = z.object({
+  image: z.string().url().or(z.string().min(1)),
+  imageAr: z.string().optional(),
+  alt: z.string().optional(),
+  headline: z.string().optional(),
+  headlineAr: z.string().optional(),
+  ctaText: z.string().optional(),
+  ctaTextAr: z.string().optional(),
+  ctaHref: z.string().optional(),
+});
+
+const layoutSchema = z
+  .object({
+    hero: z.object({
+      enabled: z.boolean(),
+      mode: z.enum(['single', 'slider']),
+      autoplayMs: z.number().int().min(1000).max(30000),
+      slides: z.array(heroSlideSchema).max(10),
+    }),
+    categories: z.object({
+      enabled: z.boolean(),
+      layout: z.enum(['grid', 'horizontal']),
+      captionPosition: z.enum(['below', 'overlay']),
+      desktopColumns: z.union([z.literal(2), z.literal(3), z.literal(4)]),
+      mobileColumns: z.union([z.literal(1), z.literal(2)]),
+    }),
+    newArrivals: z.object({
+      enabled: z.boolean(),
+      limit: z.number().int().min(1).max(48),
+    }),
+    bestSellers: z.object({
+      enabled: z.boolean(),
+      limit: z.number().int().min(1).max(48),
+    }),
+    filterSidebar: z.object({
+      enabled: z.boolean(),
+      defaultOpen: z.boolean(),
+    }),
+    testimonials: z.object({
+      enabled: z.boolean(),
+      minRating: z.number().min(1).max(5),
+      verifiedOnly: z.boolean(),
+    }),
+    sizing: z.object({
+      heroAspect: z.enum(['2.45:1', '16:9', '4:3']),
+      productImageAspect: z.enum(['1:1', '3:4']),
+      categoryImageAspect: z.enum(['1:1', '3:4', '2:3']),
+    }),
+  })
+  // Allow partial bodies so the admin UI can patch a single section without
+  // re-sending every field. We re-merge with the existing JSON before save.
+  .partial();
+
+/**
+ * GET /admin/stores/:storeId/layout
+ * Returns the resolved (= defaults-merged) layout settings.
+ */
+router.get(
+  '/',
+  authenticate,
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const store = await prisma.store.findUnique({
+        where: { id: storeId },
+        select: { layoutSettings: true },
+      });
+      const layout = resolveLayoutSettings(store?.layoutSettings ?? {});
+      res.json({ success: true, data: { layout } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * PUT /admin/stores/:storeId/layout
+ * Patches the layout settings. The request body can contain any subset of
+ * the section keys; missing sections keep their current values. The whole
+ * shape is re-merged through `resolveLayoutSettings` before persisting so
+ * the on-disk JSON is always a complete, valid `StoreLayoutSettings`.
+ */
+router.put(
+  '/',
+  authenticate,
+  requireStoreAccess,
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const patch = layoutSchema.parse(req.body);
+
+      const current = await prisma.store.findUnique({
+        where: { id: storeId },
+        select: { layoutSettings: true },
+      });
+      const merged = resolveLayoutSettings({
+        ...resolveLayoutSettings(current?.layoutSettings ?? {}),
+        ...patch,
+      });
+
+      await prisma.store.update({
+        where: { id: storeId },
+        data: { layoutSettings: merged as unknown as object },
+      });
+
+      await auditLog({
+        action: 'store.layout.updated',
+        userId: getAuthUser(req).userId,
+        resourceType: 'store',
+        resourceId: storeId,
+        details: { keys: Object.keys(patch).join(',') },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+
+      res.json({ success: true, data: { layout: merged } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+export default router;

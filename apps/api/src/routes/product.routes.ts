@@ -25,6 +25,9 @@ const createProductSchema = z.object({
   sku: z.string().optional(),
   inventory: z.number().int().min(0).optional(),
   status: z.enum(['draft', 'active', 'archived']).optional(),
+  isFeatured: z.boolean().optional(),
+  isNew: z.boolean().optional(),
+  isBestSeller: z.boolean().optional(),
   categories: z.array(z.string()).optional(),
   images: z
     .array(

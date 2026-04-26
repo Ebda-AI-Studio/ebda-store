@@ -30,12 +30,16 @@ import recommendationRoutes from './recommendation.routes';
 import shippingCarrierRoutes from './shipping-carrier.routes';
 import affiliateRoutes from './affiliate.routes';
 import newsletterRoutes from './newsletter.routes';
+import onesignalRoutes from './onesignal.routes';
+import storeLayoutRoutes from './store-layout.routes';
+import publicStoreLayoutRoutes from './public-store-layout.routes';
 import { tenantContext } from '../middleware/tenant-context';
 
 const router = Router();
 
 // Public routes (no auth required)
 router.use('/public', publicRoutes);
+router.use('/public', publicStoreLayoutRoutes);
 router.use('/auth', authRoutes);
 
 // Payment routes
@@ -50,6 +54,11 @@ router.use('/uploads', uploadRoutes);
 // Admin routes (super_admin only — tenantContext activates per-route via :id param)
 router.use('/admin', tenantContext, adminRoutes);
 
+// OneSignal admin push subscription endpoints (any authenticated user can
+// subscribe their own device; tags + REST filters scope which devices receive
+// each notification — see services/onesignal.service.ts).
+router.use('/admin', onesignalRoutes);
+
 // Feature management routes (super_admin: /admin/stores/:id/features, store_admin: /stores/:storeId/my-features)
 router.use('/admin', tenantContext, featureRoutes);
 router.use('/stores', tenantContext, featureRoutes);
@@ -58,6 +67,7 @@ router.use('/stores', tenantContext, featureRoutes);
 router.use('/stores', tenantContext, storeRoutes);
 
 // Store-scoped routes — tenantContext wraps all downstream handlers in an RLS transaction
+router.use('/admin/stores/:storeId/layout', tenantContext, storeLayoutRoutes);
 router.use('/stores/:storeId/products', tenantContext, productRoutes);
 router.use('/stores/:storeId/categories', tenantContext, categoryRoutes);
 router.use('/stores/:storeId/cart', tenantContext, cartRoutes);

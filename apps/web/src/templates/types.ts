@@ -154,6 +154,104 @@ export interface HeroProps {
 }
 
 /**
+ * Single hero banner — used when layout.hero.mode === 'single'. One image,
+ * one optional headline + CTA, no autoplay. Storefronts that don't supply
+ * any slides at all fall back to the per-store hero text in T.Hero.
+ */
+export interface HeroBannerProps {
+  image: string;
+  imageAr?: string;
+  alt?: string;
+  headline?: string;
+  headlineAr?: string;
+  subtitle?: string;
+  subtitleAr?: string;
+  ctaText?: string;
+  ctaTextAr?: string;
+  ctaHref?: string;
+  isRtl?: boolean;
+  /**
+   * Active template id, used by shared section components to pick per-pack
+   * style tokens (see `templates/shared/pack-styles.ts`). When omitted the
+   * components fall back to the Modern style.
+   */
+  pack?: import('@force/shared').TemplateId;
+  /**
+   * Pass `priority` to the underlying next/image so the LCP banner preloads.
+   * Default true for the standalone single banner; set false from HeroSlider
+   * for non-active slides so we don't burn the priority budget on 6 images.
+   */
+  priority?: boolean;
+}
+
+/**
+ * Autoplay hero slider — used when layout.hero.mode === 'slider'. Pagination
+ * dots, no arrows, full-bleed image, optional overlay headline. RTL flips
+ * direction automatically via the parent's `dir` attribute.
+ */
+export interface HeroSliderProps {
+  slides: HeroBannerProps[];
+  /** Autoplay interval in ms; 0 disables autoplay (manual swipe only). */
+  autoplayMs?: number;
+  isRtl?: boolean;
+  pack?: import('@force/shared').TemplateId;
+}
+
+/**
+ * Horizontal-scroll product strip used for "New Arrivals" / "Best Sellers".
+ * Square 146px cards on desktop, 6 visible at 1440 / 4 at tablet / 2.5 at
+ * mobile (the half hint signals scrollability). Snap-scroll engaged.
+ */
+export interface ProductCarouselProps {
+  products: TemplateProduct[];
+  title?: string;
+  titleAr?: string;
+  /** Optional href for the "See all" link. Hidden when omitted. */
+  seeAllHref?: string;
+  isRtl?: boolean;
+  currency?: string;
+  onAddToCart?: (productId: string) => Promise<void> | void;
+  urlPrefix?: string;
+  pack?: import('@force/shared').TemplateId;
+}
+
+/**
+ * Horizontal-scroll category strip — alternative to CategoryGrid. Used when
+ * layout.categories.layout === 'horizontal'. Same card recipe (1:1 image +
+ * caption-below) but laid out with snap-scroll instead of a grid.
+ */
+export interface CategoryStripProps {
+  categories: TemplateCategory[];
+  title?: string;
+  titleAr?: string;
+  seeAllHref?: string;
+  isRtl?: boolean;
+  urlPrefix?: string;
+  pack?: import('@force/shared').TemplateId;
+}
+
+/**
+ * 5-star testimonial / review row. Hides itself when no testimonials exist
+ * so empty data never leaks an empty section to the storefront.
+ */
+export interface TestimonialItem {
+  id: string;
+  rating: number;
+  title?: string | null;
+  comment: string;
+  authorName: string;
+  authorCity?: string | null;
+  createdAt: string;
+}
+export interface TestimonialRowProps {
+  testimonials: TestimonialItem[];
+  title?: string;
+  titleAr?: string;
+  isRtl?: boolean;
+  pack?: import('@force/shared').TemplateId;
+}
+
+/**
  * Product card props
  */
 export interface ProductCardProps {
@@ -344,10 +442,20 @@ export interface TemplateComponents {
   Header: React.ComponentType<HeaderProps>;
   Footer: React.ComponentType<FooterProps>;
   Hero: React.ComponentType<HeroProps>;
+  /** Optional new-style single hero banner. Falls back to Hero when missing. */
+  HeroBanner?: React.ComponentType<HeroBannerProps>;
+  /** Optional autoplay slider. Falls back to first slide rendered as banner. */
+  HeroSlider?: React.ComponentType<HeroSliderProps>;
   ProductCard: React.ComponentType<ProductCardProps>;
   ProductGrid: React.ComponentType<ProductGridProps>;
+  /** Horizontal product strip. Falls back to ProductGrid (4-up) when missing. */
+  ProductCarousel?: React.ComponentType<ProductCarouselProps>;
   CategoryCard: React.ComponentType<CategoryCardProps>;
   CategoryGrid: React.ComponentType<CategoryGridProps>;
+  /** Horizontal category strip. Falls back to CategoryGrid when missing. */
+  CategoryStrip?: React.ComponentType<CategoryStripProps>;
+  /** 3-up testimonial row. Hidden by orchestrator when no data. */
+  TestimonialRow?: React.ComponentType<TestimonialRowProps>;
   AnnouncementBar: React.ComponentType<AnnouncementBarProps>;
   /**
    * Optional — templates that haven't implemented CartTable yet fall back

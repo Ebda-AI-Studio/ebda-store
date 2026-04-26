@@ -11,3 +11,12 @@ export { default as CartTable } from './CartTable';
 export { default as OrderSummary } from './OrderSummary';
 export { default as EmptyState } from './EmptyState';
 export { default as FormCard } from './FormCard';
+
+// Pecannbee-flow sections (Epic A) — shared shells, theme-token-styled so
+// each pack inherits its own --primary, --foreground, font weights, etc.
+// Replace per-pack later if a pack needs distinct visual treatment.
+export { HeroBanner } from '../shared/HeroBanner';
+export { HeroSlider } from '../shared/HeroSlider';
+export { CategoryStrip } from '../shared/CategoryStrip';
+export { ProductCarousel } from '../shared/ProductCarousel';
+export { TestimonialRow } from '../shared/TestimonialRow';

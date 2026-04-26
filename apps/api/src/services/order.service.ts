@@ -6,6 +6,7 @@ import { CouponService } from './coupon.service';
 import { EmailService, type OrderEmailData } from './email.service';
 import { socketService } from './socket.service';
 import { notificationDispatcher } from './notification-dispatcher.service';
+import { OneSignalService } from './onesignal.service';
 import { featureService } from './feature.service';
 import { shippingCarrierService } from './shipping-carrier.service';
 import { affiliateService } from './affiliate.service';
@@ -442,6 +443,26 @@ export class OrderService {
     } catch (notifyError) {
       logger.error({ err: notifyError }, 'Failed to send order notification');
     }
+
+    // Fire-and-forget OneSignal browser push to store admins + super admins.
+    // Tag-filtered server-side so other tenants' admins are never reached.
+    void prisma.store
+      .findUnique({ where: { id: storeId }, select: { name: true } })
+      .catch(() => null)
+      .then(s =>
+        OneSignalService.notifyAdminsOfOrder({
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          storeId,
+          storeName: s?.name ?? storeId,
+          customerName:
+            `${order.customer?.firstName || ''} ${order.customer?.lastName || ''}`.trim() ||
+            order.customer?.email ||
+            'Customer',
+          total: order.total,
+          currency: order.currency,
+        }).catch(err => logger.error({ err }, 'OneSignal admin push failed'))
+      );
 
     return order;
   }

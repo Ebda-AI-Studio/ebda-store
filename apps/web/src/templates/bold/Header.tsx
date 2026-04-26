@@ -47,7 +47,7 @@ export default function BoldHeader({
     <>
       <header className="bg-gray-950 text-white sticky top-0 z-50 border-b border-white/10">
         <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between h-16 gap-4">
+          <div className="flex items-center justify-between h-24 gap-4 sm:h-28">
             {/* Logo */}
             <Link
               href={urlPrefix || '/'}
@@ -57,7 +57,7 @@ export default function BoldHeader({
                 <img
                   src={displayLogo}
                   alt={displayName}
-                  className="h-14 max-h-14 w-auto brightness-0 invert"
+                  className="h-20 max-h-20 w-auto brightness-0 invert sm:h-24 sm:max-h-24"
                 />
               ) : (
                 <span className="text-xl font-black uppercase tracking-wider text-white">

@@ -69,9 +69,10 @@ export default function MinimalHeader({
               <Image
                 src={displayLogo}
                 alt={displayName}
-                width={100}
-                height={36}
-                className="h-9 max-h-9 w-auto"
+                width={320}
+                height={120}
+                className="h-20 max-h-20 w-auto sm:h-24 sm:max-h-24"
+                priority
               />
             ) : (
               <span className="text-xs tracking-[0.3em] uppercase font-light text-foreground">

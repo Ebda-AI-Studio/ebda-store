@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import { useT } from '@/i18n/useT';
 import { OrderStatusBadge } from '@/components/OrderStatusBadge';
 import { EmptyOrdersState } from './EmptyOrdersState';
@@ -15,6 +17,13 @@ interface OrdersTableProps {
   onMarkPaid: (orderId: string) => void;
   onOpenInvoice: (orderId: string) => void;
   onToggleSelected: (orderId: string, checked: boolean) => void;
+}
+
+// Buttons / selects / checkboxes inside a row should not also trigger the
+// row-level navigation — clicks on these elements are swallowed.
+function isInteractive(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return !!target.closest('button, a, select, input, [role="button"], [data-row-stop]');
 }
 
 function formatDate(dateString: string) {
@@ -37,6 +46,8 @@ export function OrdersTable({
   onToggleSelected,
 }: OrdersTableProps) {
   const t = useT('orders.list');
+  const params = useParams();
+  const storeId = params?.id as string;
 
   if (isLoading) {
     return (
@@ -140,15 +151,24 @@ export function OrdersTable({
             const isCodUnpaid =
               order.paymentStatus === 'unpaid' && order.payments?.some(p => p.provider === 'cod');
 
+            const detailHref = `/stores/${storeId}/orders/${order.id}`;
             return (
               <tr
                 key={order.id}
                 className="hover:bg-muted/50 transition-colors duration-150 cursor-pointer"
+                onClick={e => {
+                  if (isInteractive(e.target)) return;
+                  window.location.href = detailHref;
+                }}
               >
                 <td className="px-6 py-4">
-                  <p className="font-semibold text-primary">
+                  <Link
+                    href={detailHref}
+                    className="font-semibold text-primary hover:underline"
+                    onClick={e => e.stopPropagation()}
+                  >
                     {order.orderNumber || `#${order.id.slice(0, 8).toUpperCase()}`}
-                  </p>
+                  </Link>
                 </td>
                 <td className="px-6 py-4">
                   <p className="font-medium text-foreground">

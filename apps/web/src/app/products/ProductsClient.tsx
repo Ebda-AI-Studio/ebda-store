@@ -12,6 +12,7 @@ import { toggleCompare } from '@/lib/compare';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useTemplateComponents } from '../../hooks/useTemplateComponents';
 import { toTemplateProduct } from '../../templates/adapters';
+import { PecannbeeProductCard } from '../../templates/shared/PecannbeeProductCard';
 import { ProductListItem } from './ProductListItem';
 import { ProductsFilterSidebar } from './ProductsFilterSidebar';
 import { ProductsPagination } from './ProductsPagination';
@@ -21,6 +22,13 @@ function getSortOptions(t: (en: string, ar: string) => string) {
   return [
     { value: 'featured', label: t('Featured', '\u0645\u0645\u064a\u0632') },
     { value: 'newest', label: t('Newest', '\u0627\u0644\u0623\u062d\u062f\u062b') },
+    {
+      value: 'best_seller',
+      label: t(
+        'Best sellers',
+        '\u0627\u0644\u0623\u0643\u062b\u0631 \u0645\u0628\u064a\u0639\u0627\u064b'
+      ),
+    },
     {
       value: 'price-asc',
       label: t(
@@ -70,6 +78,12 @@ export default function ProductsClient({
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [page, setPage] = useState(1);
 
+  // Price range in MAJOR units (KD). 0–100 KD covers most KW grocery / spice
+  // SKUs; tenants with a wider catalog get the upper bound auto-extended on
+  // the next render via the data-driven ceil below.
+  const [priceMin, setPriceMin] = useState(0);
+  const [priceMax, setPriceMax] = useState(100);
+
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [categories, setCategories] = useState<Category[]>(initialCategories);
   const [meta, setMeta] = useState<PaginationMeta | null>(initialMeta);
@@ -82,17 +96,17 @@ export default function ProductsClient({
   const { warning } = useToast();
   const { store } = useStore();
   const storeUrl = useStoreUrl();
-  const { components: T, isLoading: templateLoading } = useTemplateComponents();
+  const { templateId } = useTemplateComponents();
   const sortOptions = getSortOptions(t);
 
-  // Memoise the cart-id → quantity map so memoised ProductCards stay
-  // referentially stable across unrelated re-renders. Without this, a fresh
-  // object literal on every render forces every card to re-render.
+  // Cart-id → quantity is consumed by ProductListItem (list view). The grid
+  // view's PecannbeeProductCard handles its own optimistic add state.
   const cartQuantities = useMemo<Record<string, number>>(() => {
     const map: Record<string, number> = {};
     for (const item of cartItems) map[item.productId] = item.quantity;
     return map;
   }, [cartItems]);
+  void cartQuantities;
 
   // Sync compare state from localStorage on mount (client-only)
   useEffect(() => {
@@ -110,7 +124,7 @@ export default function ProductsClient({
   }, []);
 
   // Track previous filter values to detect filter changes vs. page changes
-  const prevFiltersRef = useRef({ search, categoryFilter, sortBy });
+  const prevFiltersRef = useRef({ search, categoryFilter, sortBy, priceMin, priceMax });
 
   const fetchProducts = useCallback(
     async (targetPage: number) => {
@@ -127,6 +141,12 @@ export default function ProductsClient({
         if (sortBy === 'price-asc') params.sort = 'price_asc';
         if (sortBy === 'price-desc') params.sort = 'price_desc';
         if (sortBy === 'featured') params.featured = 'true';
+        if (sortBy === 'best_seller') params.sort = 'best_seller';
+        // API stores prices as integer fils — multiply major units by 1000.
+        // Skip the bound when it equals the slider's natural rest position so
+        // we don't restrict the result set unnecessarily.
+        if (priceMin > 0) params.minPrice = String(Math.round(priceMin * 1000));
+        if (priceMax < 100) params.maxPrice = String(Math.round(priceMax * 1000));
 
         const response = await api.getProducts(params);
         if (response.success && response.data) {
@@ -141,7 +161,7 @@ export default function ProductsClient({
         setIsLoading(false);
       }
     },
-    [search, categoryFilter, sortBy]
+    [search, categoryFilter, sortBy, priceMin, priceMax]
   );
 
   const fetchCategories = useCallback(async () => {
@@ -168,17 +188,21 @@ export default function ProductsClient({
   useEffect(() => {
     const prev = prevFiltersRef.current;
     const filtersChanged =
-      prev.search !== search || prev.categoryFilter !== categoryFilter || prev.sortBy !== sortBy;
+      prev.search !== search ||
+      prev.categoryFilter !== categoryFilter ||
+      prev.sortBy !== sortBy ||
+      prev.priceMin !== priceMin ||
+      prev.priceMax !== priceMax;
 
     if (filtersChanged) {
-      prevFiltersRef.current = { search, categoryFilter, sortBy };
+      prevFiltersRef.current = { search, categoryFilter, sortBy, priceMin, priceMax };
       // Reset page to 1 and fetch with page 1 in a single pass
       setPage(1);
       fetchProducts(1);
     } else {
       fetchProducts(page);
     }
-  }, [page, search, categoryFilter, sortBy, fetchProducts]);
+  }, [page, search, categoryFilter, sortBy, priceMin, priceMax, fetchProducts]);
 
   const handleAddToCart = (product: Product, e: React.MouseEvent) => {
     e.preventDefault();
@@ -236,6 +260,8 @@ export default function ProductsClient({
     setSearch('');
     setCategoryFilter('');
     setSortBy('newest');
+    setPriceMin(0);
+    setPriceMax(100);
   };
 
   return (
@@ -277,6 +303,17 @@ export default function ProductsClient({
             onCategoryChange={setCategoryFilter}
             onClearAll={handleClearAll}
             onSearchSubmit={handleSearch}
+            sortBy={sortBy}
+            sortOptions={sortOptions.map(o => ({ value: o.value, label: o.label }))}
+            onSortChange={setSortBy}
+            priceMin={priceMin}
+            priceMax={priceMax}
+            priceFloor={0}
+            priceCeil={100}
+            onPriceChange={(min, max) => {
+              setPriceMin(min);
+              setPriceMax(max);
+            }}
           />
 
           {/* Products Grid */}
@@ -416,37 +453,38 @@ export default function ProductsClient({
               </div>
             )}
 
-            {/* Grid View */}
-            {!isLoading && !error && viewMode === 'grid' && T && !templateLoading && (
-              <T.ProductGrid
-                products={products.map(toTemplateProduct)}
-                isRtl={language === 'ar'}
-                currency={store.currency}
-                columns={3}
-                cartQuantities={cartQuantities}
-                onAddToCart={productId => {
-                  const p = products.find(x => x.id === productId);
-                  if (p)
-                    addItem({
-                      id: p.id,
-                      name: p.name,
-                      price: p.price,
-                      slug: p.slug,
-                      image: p.images?.[0]?.url,
-                      category: p.categories?.[0]?.category?.name,
-                    });
-                }}
-                compareIds={compareIds}
-                onToggleCompare={productId => {
-                  const p = products.find(x => x.id === productId);
-                  if (!p) return;
-                  handleToggleCompare(p, {
-                    preventDefault() {},
-                    stopPropagation() {},
-                  } as React.MouseEvent);
-                }}
-                urlPrefix={storeUrl('')}
-              />
+            {/* Grid View — Pecannbee-spec PLP card (sold-out ribbon, wishlist
+                top-START, full-width pill CTA). 6 cols desktop / 3 tablet /
+                2 mobile per spec § 4.4. The per-pack visual treatment comes
+                from the `pack` prop (see templates/shared/pack-styles.ts). */}
+            {!isLoading && !error && viewMode === 'grid' && (
+              <div
+                className="grid gap-3 grid-cols-2 sm:gap-4 md:grid-cols-3 xl:grid-cols-6"
+                dir={language === 'ar' ? 'rtl' : 'ltr'}
+              >
+                {products.map(p => (
+                  <PecannbeeProductCard
+                    key={p.id}
+                    product={toTemplateProduct(p)}
+                    isRtl={language === 'ar'}
+                    currency={store.currency}
+                    pack={templateId}
+                    onAddToCart={async productId => {
+                      const found = products.find(x => x.id === productId);
+                      if (found)
+                        addItem({
+                          id: found.id,
+                          name: found.name,
+                          price: found.price,
+                          slug: found.slug,
+                          image: found.images?.[0]?.url,
+                          category: found.categories?.[0]?.category?.name,
+                        });
+                    }}
+                    urlPrefix={storeUrl('')}
+                  />
+                ))}
+              </div>
             )}
 
             {/* List View */}

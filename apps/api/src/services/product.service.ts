@@ -15,6 +15,9 @@ interface CreateProductData {
   sku?: string;
   inventory?: number;
   status?: 'draft' | 'active' | 'archived';
+  isFeatured?: boolean;
+  isNew?: boolean;
+  isBestSeller?: boolean;
   categories?: string[];
   images?: { url: string; alt?: string }[];
 }
@@ -28,6 +31,10 @@ interface ListProductsOptions {
   category?: string;
   search?: string;
   featured?: boolean;
+  /** Inclusive lower bound on `Product.price` (in fils). */
+  minPrice?: number;
+  /** Inclusive upper bound on `Product.price` (in fils). */
+  maxPrice?: number;
 }
 
 interface AdvancedSearchOptions {
@@ -186,6 +193,9 @@ export class ProductService {
         sku: data.sku,
         inventory: data.inventory ?? 0,
         status: data.status ?? 'draft',
+        featured: data.isFeatured ?? false,
+        isNew: data.isNew ?? false,
+        isBestSeller: data.isBestSeller ?? false,
         images: data.images
           ? {
               create: data.images.map((img, index) => ({
@@ -276,6 +286,12 @@ export class ProductService {
           sku: data.sku,
           inventory: data.inventory,
           status: data.status,
+          // Curated flags driven by the admin product edit form. We accept
+          // them only when explicitly present in the patch so callers that
+          // omit them don't accidentally clear the existing value.
+          ...(data.isFeatured !== undefined ? { featured: data.isFeatured } : {}),
+          ...(data.isNew !== undefined ? { isNew: data.isNew } : {}),
+          ...(data.isBestSeller !== undefined ? { isBestSeller: data.isBestSeller } : {}),
         },
         include: {
           images: { orderBy: { position: 'asc' } },
@@ -309,14 +325,29 @@ export class ProductService {
   }
 
   // Public methods (no store scope required)
-  static async listPublic(storeId: string, options: ListProductsOptions = {}) {
-    const { status = 'active', category, search, featured } = options;
+  static async listPublic(
+    storeId: string,
+    options: ListProductsOptions & {
+      sort?: 'newest' | 'price_asc' | 'price_desc' | 'best_seller';
+    } = {}
+  ) {
+    const { status = 'active', category, search, featured, minPrice, maxPrice, sort } = options;
     const page = Math.max(1, options.page || 1);
     const limit = Math.min(100, Math.max(1, options.limit || 20));
     const skip = (page - 1) * limit;
 
     // Build a stable cache key from params (best-effort cache, 30s TTL)
-    const cacheParams = JSON.stringify({ status, category, search, featured, page, limit });
+    const cacheParams = JSON.stringify({
+      status,
+      category,
+      search,
+      featured,
+      minPrice,
+      maxPrice,
+      sort,
+      page,
+      limit,
+    });
     const cacheKey = `products:store:${storeId}:${cacheParams}`;
     try {
       const cached = await redis.get<string>(cacheKey);
@@ -353,6 +384,28 @@ export class ProductService {
       };
     }
 
+    if (minPrice !== undefined) {
+      where.price = { ...((where.price as object) || {}), gte: minPrice };
+    }
+    if (maxPrice !== undefined) {
+      where.price = { ...((where.price as object) || {}), lte: maxPrice };
+    }
+
+    // `sort=best_seller` is curator-driven: filter to manually-flagged items
+    // so the storefront's Best Sellers carousel reflects the merchant's
+    // explicit picks rather than algorithmic guesses.
+    if (sort === 'best_seller') {
+      where.isBestSeller = true;
+    }
+
+    let orderBy: Prisma.ProductOrderByWithRelationInput | Prisma.ProductOrderByWithRelationInput[] =
+      {
+        createdAt: 'desc',
+      };
+    if (sort === 'price_asc') orderBy = { price: 'asc' };
+    else if (sort === 'price_desc') orderBy = { price: 'desc' };
+    else if (sort === 'best_seller') orderBy = [{ featured: 'desc' }, { updatedAt: 'desc' }];
+
     const [products, total] = await Promise.all([
       prisma.product.findMany({
         where,
@@ -363,7 +416,7 @@ export class ProductService {
           categories: { include: { category: true } },
           store: { select: { id: true, name: true, slug: true } },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy,
       }),
       prisma.product.count({ where }),
     ]);

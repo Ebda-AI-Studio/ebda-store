@@ -4,6 +4,7 @@ import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { OrderService } from '../services/order.service';
 import { InvoiceService } from '../services/invoice.service';
+import { EmailService } from '../services/email.service';
 import { requirePermission, requireRole } from '../middleware/rbac';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { getAuthUser } from '../utils/store-helpers';
@@ -185,6 +186,50 @@ router.get(
       const html = await InvoiceService.generateInvoice(storeId, orderId);
       res.setHeader('Content-Type', 'text/html');
       res.send(html);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /stores/:storeId/orders/:orderId/invoice/email
+ * Email the invoice to the customer associated with the order. Admin only.
+ */
+router.post(
+  '/:orderId/invoice/email',
+  authenticate,
+  requireRole(['store_admin', 'super_admin']),
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, orderId } = req.params;
+      const order = await OrderService.getById(storeId, orderId);
+      const customerEmail =
+        order.customer?.email ?? (order.shippingAddress as Record<string, string> | null)?.email;
+      if (!customerEmail) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'NO_EMAIL', message: 'Order has no customer email on file' },
+        });
+        return;
+      }
+      const html = await InvoiceService.generateInvoice(storeId, orderId);
+      await EmailService.send({
+        to: customerEmail,
+        subject: `Invoice ${order.orderNumber}`,
+        html,
+      });
+      await auditLog({
+        action: 'order.invoice.emailed',
+        userId: getAuthUser(req).userId,
+        resourceType: 'order',
+        resourceId: orderId,
+        details: { to: customerEmail },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.json({ success: true });
     } catch (error) {
       next(error);
     }

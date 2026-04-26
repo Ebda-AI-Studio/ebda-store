@@ -25,6 +25,7 @@ interface Product {
   status: string;
   isFeatured: boolean;
   isNew: boolean;
+  isBestSeller: boolean;
   categories: { categoryId: string; category: { id: string; name: string } }[];
   images: { id: string; url: string; alt?: string; position: number }[];
   store: { id: string; name: string; slug: string };
@@ -65,6 +66,7 @@ export default function EditProductPage() {
     status: 'draft',
     isFeatured: false,
     isNew: false,
+    isBestSeller: false,
     category: '',
   });
 
@@ -131,6 +133,7 @@ export default function EditProductPage() {
           status: p.status || 'draft',
           isFeatured: p.isFeatured || false,
           isNew: p.isNew || false,
+          isBestSeller: p.isBestSeller || false,
           category: p.categories?.[0]?.categoryId || p.categories?.[0]?.category?.id || '',
         });
       } catch {
@@ -172,6 +175,7 @@ export default function EditProductPage() {
         status: formData.status,
         isFeatured: formData.isFeatured,
         isNew: formData.isNew,
+        isBestSeller: formData.isBestSeller,
         images: images.map((url, i) => ({ url, position: i })),
       };
 
@@ -347,6 +351,8 @@ export default function EditProductPage() {
             onFeaturedChange={value => updateField('isFeatured', value)}
             isNew={formData.isNew}
             onIsNewChange={value => updateField('isNew', value)}
+            isBestSeller={formData.isBestSeller}
+            onIsBestSellerChange={value => updateField('isBestSeller', value)}
             saving={saving}
             onCancel={() => router.push(`/stores/${storeId}/products/${productId}`)}
           />

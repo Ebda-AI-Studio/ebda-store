@@ -31,10 +31,21 @@ export default function StoreOrdersPage() {
   const t = useT('orders.list');
   const tConfirm = useT('orders.list.confirm');
 
+  // Per-page preference is persisted per store so the user's choice survives
+  // navigation. Falls back to 25 (admin default) when nothing is stored or the
+  // stored value is malformed.
+  const limitStorageKey = storeId ? `orders.perPage.${storeId}` : null;
+  const initialLimit = (() => {
+    if (typeof window === 'undefined' || !limitStorageKey) return 25;
+    const stored = window.localStorage.getItem(limitStorageKey);
+    const parsed = stored ? parseInt(stored, 10) : NaN;
+    return [10, 25, 50, 100].includes(parsed) ? parsed : 25;
+  })();
+
   const [orders, setOrders] = useState<Order[]>([]);
   const [pagination, setPagination] = useState<Pagination>({
     page: 1,
-    limit: 20,
+    limit: initialLimit,
     total: 0,
     totalPages: 0,
   });
@@ -313,6 +324,10 @@ export default function StoreOrdersPage() {
         <OrdersPagination
           pagination={pagination}
           onPageChange={updater => setPagination(prev => ({ ...prev, page: updater(prev.page) }))}
+          onLimitChange={limit => {
+            if (limitStorageKey) window.localStorage.setItem(limitStorageKey, String(limit));
+            setPagination(prev => ({ ...prev, limit, page: 1 }));
+          }}
         />
       </div>
 

@@ -132,11 +132,16 @@ const createOrderSchema = z.object({
 // GET /products - List all public products (cached 30s)
 router.get('/products', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { page, limit, category, search, featured } = req.query;
+    const { page, limit, category, search, featured, sort, minPrice, maxPrice } = req.query;
     const storeId = await getStoreIdFromRequest(req);
 
+    const sortValue =
+      sort === 'newest' || sort === 'price_asc' || sort === 'price_desc' || sort === 'best_seller'
+        ? sort
+        : undefined;
+
     // Build a cache key from query params so different filters get their own entry
-    const cacheKey = `public:products:${storeId}:${page || 1}:${limit || 20}:${category || ''}:${search || ''}:${featured || ''}`;
+    const cacheKey = `public:products:${storeId}:${page || 1}:${limit || 20}:${category || ''}:${search || ''}:${featured || ''}:${sortValue || ''}:${minPrice || ''}:${maxPrice || ''}`;
 
     const result = await getCached(cacheKey, 30, () =>
       ProductService.listPublic(storeId, {
@@ -145,6 +150,9 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
         category: category as string,
         search: search as string,
         featured: featured === 'true',
+        sort: sortValue,
+        minPrice: minPrice ? parseInt(minPrice as string, 10) : undefined,
+        maxPrice: maxPrice ? parseInt(maxPrice as string, 10) : undefined,
       })
     );
 

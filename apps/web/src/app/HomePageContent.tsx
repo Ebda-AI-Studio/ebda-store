@@ -9,7 +9,7 @@ import { useCart } from '../contexts/CartContext';
 import { ShopChrome } from '../components';
 import { toTemplateProduct, toTemplateCategory } from '../templates/adapters';
 import { getHomepageTemplate } from '../lib/serverTemplate';
-import type { TemplateId } from '@force/shared';
+import type { TemplateId, StoreLayoutSettings } from '@force/shared';
 
 /**
  * Thin client wrapper for the homepage. Server-fetched products + categories
@@ -21,17 +21,35 @@ import type { TemplateId } from '@force/shared';
  * `'use client'` page.tsx blocked LCP behind JS parse → chunk fetch → API
  * round-trip.
  */
+interface HomepageTestimonial {
+  id: string;
+  rating: number;
+  title: string | null;
+  comment: string;
+  authorName: string;
+  authorCity: string | null;
+  createdAt: string;
+}
+
 interface HomePageContentProps {
   templateId: TemplateId;
   featuredProducts: Product[];
+  newArrivals: Product[];
+  bestSellers: Product[];
   categories: Category[];
+  testimonials: HomepageTestimonial[];
   storeName: string;
+  layout: StoreLayoutSettings;
 }
 
 export function HomePageContent({
   templateId,
   featuredProducts,
+  newArrivals,
+  bestSellers,
   categories,
+  testimonials,
+  layout,
 }: HomePageContentProps) {
   const { store } = useStore();
   const { language } = useLanguage();
@@ -41,8 +59,13 @@ export function HomePageContent({
   const isRtl = language === 'ar';
   const T = getHomepageTemplate(templateId);
 
+  // Build a single lookup so the cart-add handler works for products from any
+  // of the three sources (featured, new arrivals, best sellers).
+  const allProducts = [...featuredProducts, ...newArrivals, ...bestSellers];
+  const productById = new Map(allProducts.map(p => [p.id, p]));
+
   const handleAddToCart = async (productId: string) => {
-    const product = featuredProducts.find(p => p.id === productId);
+    const product = productById.get(productId);
     if (!product) return;
     addItem(
       {
@@ -57,6 +80,8 @@ export function HomePageContent({
   };
 
   const templateProducts = featuredProducts.map(toTemplateProduct);
+  const templateNewArrivals = newArrivals.map(toTemplateProduct);
+  const templateBestSellers = bestSellers.map(toTemplateProduct);
   const templateCategories = categories.map(toTemplateCategory);
 
   // Hero customization (per-store, with fallbacks). Read from the StoreContext
@@ -71,48 +96,153 @@ export function HomePageContent({
   const heroCtaLink = store.heroCtaLink ? storeUrl(store.heroCtaLink) : storeUrl('/products');
   const heroImage = store.heroImage || undefined;
 
+  // Hero rendering: prefer the new HeroSlider/HeroBanner shells when the
+  // store has supplied slides via layout.hero. When no slides exist we fall
+  // back to the legacy T.Hero (which uses the per-store hero text fields).
+  const sliderEligible =
+    layout.hero.mode === 'slider' && layout.hero.slides.length > 0 && !!T.HeroSlider;
+  const bannerEligible =
+    layout.hero.mode === 'single' && layout.hero.slides.length > 0 && !!T.HeroBanner;
+
   return (
     <ShopChrome>
-      <T.Hero
-        title={heroTitleEn}
-        titleAr={heroTitleArVal}
-        subtitle={heroSubtitleEn}
-        subtitleAr={heroSubtitleArVal}
-        image={heroImage}
-        ctaText={heroCtaEn}
-        ctaTextAr={heroCtaArVal}
-        ctaLink={heroCtaLink}
-        isRtl={isRtl}
-      />
+      {/* Hero — toggleable + mode-aware. */}
+      {layout.hero.enabled && sliderEligible && T.HeroSlider && (
+        <T.HeroSlider
+          slides={layout.hero.slides}
+          autoplayMs={layout.hero.autoplayMs}
+          isRtl={isRtl}
+          pack={templateId}
+        />
+      )}
+      {layout.hero.enabled && bannerEligible && T.HeroBanner && (
+        <T.HeroBanner {...layout.hero.slides[0]} isRtl={isRtl} pack={templateId} />
+      )}
+      {layout.hero.enabled && !sliderEligible && !bannerEligible && (
+        <T.Hero
+          title={heroTitleEn}
+          titleAr={heroTitleArVal}
+          subtitle={heroSubtitleEn}
+          subtitleAr={heroSubtitleArVal}
+          image={heroImage}
+          ctaText={heroCtaEn}
+          ctaTextAr={heroCtaArVal}
+          ctaLink={heroCtaLink}
+          isRtl={isRtl}
+        />
+      )}
 
-      {templateCategories.length > 0 && (
+      {/* Categories — grid or horizontal strip. */}
+      {layout.categories.enabled && templateCategories.length > 0 && (
         <section className="py-10 sm:py-12 lg:py-20">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <T.CategoryGrid
+          {layout.categories.layout === 'horizontal' && T.CategoryStrip ? (
+            <T.CategoryStrip
               categories={templateCategories}
               title="Shop by Category"
               titleAr="تسوق حسب الفئة"
+              seeAllHref={storeUrl('/products')}
               isRtl={isRtl}
+              pack={templateId}
             />
-          </div>
+          ) : (
+            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+              <T.CategoryGrid
+                categories={templateCategories}
+                title="Shop by Category"
+                titleAr="تسوق حسب الفئة"
+                isRtl={isRtl}
+              />
+            </div>
+          )}
         </section>
       )}
 
-      {templateProducts.length > 0 && (
-        <section className="bg-muted/30 py-10 sm:py-12 lg:py-20">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <T.ProductGrid
-              products={templateProducts}
-              title="Featured Products"
-              titleAr="منتجات مميزة"
+      {/* New Arrivals carousel — uses dedicated horizontal strip when the
+          pack ships ProductCarousel; falls back to the existing ProductGrid. */}
+      {layout.newArrivals.enabled && templateNewArrivals.length > 0 && (
+        <section className="py-10 sm:py-12 lg:py-16">
+          {T.ProductCarousel ? (
+            <T.ProductCarousel
+              products={templateNewArrivals}
+              title="New Arrivals"
+              titleAr="أحدث المنتجات"
+              seeAllHref={storeUrl('/products?sort=newest')}
               isRtl={isRtl}
               currency={store.currency}
-              columns={4}
               onAddToCart={handleAddToCart}
+              pack={templateId}
             />
-          </div>
+          ) : (
+            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+              <T.ProductGrid
+                products={templateNewArrivals}
+                title="New Arrivals"
+                titleAr="أحدث المنتجات"
+                isRtl={isRtl}
+                currency={store.currency}
+                columns={4}
+                onAddToCart={handleAddToCart}
+              />
+            </div>
+          )}
         </section>
       )}
+
+      {/* Best Sellers carousel */}
+      {layout.bestSellers.enabled && templateBestSellers.length > 0 && (
+        <section className="bg-muted/30 py-10 sm:py-12 lg:py-16">
+          {T.ProductCarousel ? (
+            <T.ProductCarousel
+              products={templateBestSellers}
+              title="Best Sellers"
+              titleAr="الأكثر مبيعاً"
+              seeAllHref={storeUrl('/products?sort=best_seller')}
+              isRtl={isRtl}
+              currency={store.currency}
+              onAddToCart={handleAddToCart}
+              pack={templateId}
+            />
+          ) : (
+            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+              <T.ProductGrid
+                products={templateBestSellers}
+                title="Best Sellers"
+                titleAr="الأكثر مبيعاً"
+                isRtl={isRtl}
+                currency={store.currency}
+                columns={4}
+                onAddToCart={handleAddToCart}
+              />
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* Testimonials — auto-hides when no qualifying reviews. */}
+      {layout.testimonials.enabled && testimonials.length > 0 && T.TestimonialRow && (
+        <section className="py-10 sm:py-12 lg:py-16">
+          <T.TestimonialRow testimonials={testimonials} isRtl={isRtl} pack={templateId} />
+        </section>
+      )}
+
+      {/* Featured products fallback when both carousels are disabled OR empty */}
+      {!layout.newArrivals.enabled &&
+        !layout.bestSellers.enabled &&
+        templateProducts.length > 0 && (
+          <section className="bg-muted/30 py-10 sm:py-12 lg:py-20">
+            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+              <T.ProductGrid
+                products={templateProducts}
+                title="Featured Products"
+                titleAr="منتجات مميزة"
+                isRtl={isRtl}
+                currency={store.currency}
+                columns={4}
+                onAddToCart={handleAddToCart}
+              />
+            </div>
+          </section>
+        )}
 
       <section className="force-gradient-primary py-12 sm:py-14 lg:py-20">
         <div className="mx-auto max-w-7xl px-4 text-center sm:px-6 lg:px-8">

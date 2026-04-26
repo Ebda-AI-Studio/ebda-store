@@ -1,10 +1,18 @@
 import type { TemplateId } from '@force/shared';
-import type { HeroProps, ProductGridProps, CategoryGridProps } from '../templates/types';
+import type {
+  HeroProps,
+  HeroBannerProps,
+  HeroSliderProps,
+  ProductGridProps,
+  ProductCarouselProps,
+  CategoryGridProps,
+  CategoryStripProps,
+  TestimonialRowProps,
+} from '../templates/types';
 
-// Static imports for the homepage's critical-path components (Hero,
-// ProductGrid, CategoryGrid). Each template's chunk gets bundled into the
-// homepage server payload, but only the active template renders, so the
-// runtime cost is bounded to one Hero + one ProductGrid + one CategoryGrid.
+// Static imports for the homepage's critical-path components. Each template's
+// chunk gets bundled into the homepage server payload, but only the active
+// template renders, so the runtime cost is bounded.
 //
 // Importing statically here is what enables the `/` route to render fully
 // on the server — `useTemplateComponents` is a client-only hook (it runs
@@ -30,6 +38,15 @@ import ElegantHero from '../templates/elegant/Hero';
 import ElegantProductGrid from '../templates/elegant/ProductGrid';
 import ElegantCategoryGrid from '../templates/elegant/CategoryGrid';
 
+// Pecannbee-flow shared sections — same component for all 5 packs because
+// they're styled with theme tokens. Per-pack overrides can replace these
+// later by exporting a same-named component from the pack's index.ts.
+import { HeroBanner } from '../templates/shared/HeroBanner';
+import { HeroSlider } from '../templates/shared/HeroSlider';
+import { CategoryStrip } from '../templates/shared/CategoryStrip';
+import { ProductCarousel } from '../templates/shared/ProductCarousel';
+import { TestimonialRow } from '../templates/shared/TestimonialRow';
+
 /**
  * Subset of template components needed by the homepage. Keeps the server
  * import surface small (no Header/Footer/Cart/etc. imports needed — those
@@ -37,27 +54,54 @@ import ElegantCategoryGrid from '../templates/elegant/CategoryGrid';
  */
 export interface HomepageTemplateComponents {
   Hero: React.ComponentType<HeroProps>;
+  HeroBanner: React.ComponentType<HeroBannerProps>;
+  HeroSlider: React.ComponentType<HeroSliderProps>;
   ProductGrid: React.ComponentType<ProductGridProps>;
+  ProductCarousel: React.ComponentType<ProductCarouselProps>;
   CategoryGrid: React.ComponentType<CategoryGridProps>;
+  CategoryStrip: React.ComponentType<CategoryStripProps>;
+  TestimonialRow: React.ComponentType<TestimonialRowProps>;
 }
 
+// Shared section components used by every pack until per-pack overrides ship.
+const shared = {
+  HeroBanner,
+  HeroSlider,
+  CategoryStrip,
+  ProductCarousel,
+  TestimonialRow,
+};
+
 const homepageTemplates: Record<TemplateId, HomepageTemplateComponents> = {
-  modern: { Hero: ModernHero, ProductGrid: ModernProductGrid, CategoryGrid: ModernCategoryGrid },
+  modern: {
+    Hero: ModernHero,
+    ProductGrid: ModernProductGrid,
+    CategoryGrid: ModernCategoryGrid,
+    ...shared,
+  },
   classic: {
     Hero: ClassicHero,
     ProductGrid: ClassicProductGrid,
     CategoryGrid: ClassicCategoryGrid,
+    ...shared,
   },
   minimal: {
     Hero: MinimalHero,
     ProductGrid: MinimalProductGrid,
     CategoryGrid: MinimalCategoryGrid,
+    ...shared,
   },
-  bold: { Hero: BoldHero, ProductGrid: BoldProductGrid, CategoryGrid: BoldCategoryGrid },
+  bold: {
+    Hero: BoldHero,
+    ProductGrid: BoldProductGrid,
+    CategoryGrid: BoldCategoryGrid,
+    ...shared,
+  },
   elegant: {
     Hero: ElegantHero,
     ProductGrid: ElegantProductGrid,
     CategoryGrid: ElegantCategoryGrid,
+    ...shared,
   },
 };
 

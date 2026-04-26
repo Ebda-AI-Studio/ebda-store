@@ -57,16 +57,16 @@ export default function ModernHeader({
         className={`sticky top-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg border-b border-border/60 transition-shadow duration-200 ${isScrolled ? 'shadow-sm' : 'shadow-none'}`}
       >
         <div className="container mx-auto px-4">
-          <div className="flex h-16 items-center justify-between gap-4">
+          <div className="flex h-24 items-center justify-between gap-4 sm:h-28">
             {/* Logo */}
             <Link href={urlPrefix || '/'} className="flex items-center gap-2 shrink-0">
               {displayLogo ? (
                 <Image
                   src={displayLogo}
                   alt={displayName}
-                  width={140}
-                  height={56}
-                  className="h-14 max-h-14 w-auto object-contain"
+                  width={320}
+                  height={120}
+                  className="h-20 max-h-20 w-auto object-contain sm:h-24 sm:max-h-24"
                   priority
                 />
               ) : (
