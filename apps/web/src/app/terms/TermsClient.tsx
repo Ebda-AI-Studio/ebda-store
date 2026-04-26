@@ -1,12 +1,14 @@
 'use client';
 
 import { ShopChrome } from '../../components';
-import { useStoreContact } from '../../contexts/StoreContext';
+import { useStore, useStoreContact } from '../../contexts/StoreContext';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { formatDate } from '../../lib/format-date';
 
 export default function TermsClient() {
   const { email } = useStoreContact();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const { store } = useStore();
   const legalEmail = email || t('our support team', 'فريق الدعم');
   return (
     <ShopChrome>
@@ -17,10 +19,10 @@ export default function TermsClient() {
           </h1>
           <p className="mt-2 text-muted-foreground">
             {t('Last updated:', 'آخر تحديث:')}{' '}
-            {new Date().toLocaleDateString('en-US', {
-              month: 'long',
-              day: 'numeric',
-              year: 'numeric',
+            {formatDate(new Date(), {
+              timezone: store.timezone,
+              language,
+              style: 'long',
             })}
           </p>
         </div>

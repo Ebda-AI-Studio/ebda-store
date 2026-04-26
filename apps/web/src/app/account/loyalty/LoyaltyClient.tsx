@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useStore } from '../../../contexts/StoreContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { API_URL } from '../../../lib/api';
+import { formatDate as formatStoreDate } from '../../../lib/format-date';
 
 interface LoyaltyPoints {
   points: number;
@@ -19,14 +20,6 @@ interface LoyaltyTransaction {
   createdAt: string;
 }
 
-function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
-}
-
 /** Fetch wrapper that sends auth cookies. */
 async function authFetch(url: string) {
   return fetch(url, {
@@ -37,8 +30,18 @@ async function authFetch(url: string) {
 
 export default function LoyaltyClient() {
   const { store } = useStore();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const storeId = store.id;
+
+  // Tenant-aware wrapper around the shared formatter so the JSX below
+  // can stay terse. Loyalty rows show date only (no time) — picks the
+  // long preset to keep the existing visual.
+  const formatDate = (dateStr: string) =>
+    formatStoreDate(dateStr, {
+      timezone: store.timezone,
+      language,
+      style: 'long',
+    });
 
   const [loyaltyPoints, setLoyaltyPoints] = useState<LoyaltyPoints | null>(null);
   const [transactions, setTransactions] = useState<LoyaltyTransaction[]>([]);

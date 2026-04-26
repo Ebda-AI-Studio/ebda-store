@@ -6,19 +6,21 @@ import Link from 'next/link';
 import { Button } from '@force/ui';
 import { api, type Order } from '@/lib/api';
 import { MinimalChrome } from '../../../components';
-import { useStoreUrl } from '../../../contexts/StoreContext';
+import { useStore, useStoreUrl } from '../../../contexts/StoreContext';
 import { useCart } from '../../../contexts/CartContext';
 import { trackPurchase } from '../../../components/MarketingPixels';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { formatPrice } from '@/lib/format';
+import { formatDate } from '@/lib/format-date';
 
 function SuccessContent() {
   const searchParams = useSearchParams();
   const orderId = searchParams?.get('orderId');
   const isCod = searchParams?.get('cod') === '1';
   const storeUrl = useStoreUrl();
+  const { store } = useStore();
   const { clearCart } = useCart();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
 
   const [order, setOrder] = useState<Order | null>(null);
   const [, setIsLoading] = useState(true);
@@ -132,9 +134,11 @@ function SuccessContent() {
                   {t('Date', '\u0627\u0644\u062a\u0627\u0631\u064a\u062e')}
                 </p>
                 <p className="text-foreground">
-                  {order?.createdAt
-                    ? new Date(order.createdAt).toLocaleDateString()
-                    : new Date().toLocaleDateString()}
+                  {formatDate(order?.createdAt ?? new Date(), {
+                    timezone: store.timezone,
+                    language,
+                    style: 'short',
+                  })}
                 </p>
               </div>
             </div>

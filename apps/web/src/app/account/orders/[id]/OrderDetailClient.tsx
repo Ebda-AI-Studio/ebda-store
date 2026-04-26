@@ -5,9 +5,13 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useParams } from 'next/navigation';
 import { api } from '@/lib/api';
-import { useStoreUrl } from '../../../../contexts/StoreContext';
+import { useStore, useStoreUrl } from '../../../../contexts/StoreContext';
 import { useLanguage } from '../../../../contexts/LanguageContext';
 import { formatPrice } from '@/lib/format';
+import {
+  formatDate as formatStoreDate,
+  formatDateTime as formatStoreDateTime,
+} from '@/lib/format-date';
 
 interface OrderDetail {
   id: string;
@@ -84,7 +88,8 @@ interface OrderDetail {
 export default function OrderDetailClient() {
   const params = useParams();
   const storeUrl = useStoreUrl();
-  const { t } = useLanguage();
+  const { store } = useStore();
+  const { t, language } = useLanguage();
   // Safe cast: this is a standard [id] route (not catch-all [...id]), so
   // params.id is always a single string in Next.js App Router.
   const orderId = params.id as string;
@@ -119,21 +124,22 @@ export default function OrderDetailClient() {
     }
   }
 
+  // Per-tenant wrappers — render in the store's timezone using the
+  // visitor's chosen language. The bare-date version uses the long preset
+  // (matches the previous month-day-year visual); the datetime version
+  // adds hour + minute.
   function formatDate(date: string) {
-    return new Date(date).toLocaleDateString('en-US', {
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
+    return formatStoreDate(date, {
+      timezone: store.timezone,
+      language,
+      style: 'long',
     });
   }
 
   function formatDateTime(date: string) {
-    return new Date(date).toLocaleDateString('en-US', {
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
+    return formatStoreDateTime(date, {
+      timezone: store.timezone,
+      language,
     });
   }
 

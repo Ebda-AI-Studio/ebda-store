@@ -4,13 +4,15 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { api, type Order } from '@/lib/api';
-import { useStoreUrl } from '../../../contexts/StoreContext';
+import { useStore, useStoreUrl } from '../../../contexts/StoreContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { formatPrice } from '@/lib/format';
+import { formatDate as formatStoreDate } from '@/lib/format-date';
 
 export default function OrdersClient() {
   const storeUrl = useStoreUrl();
-  const { t } = useLanguage();
+  const { store } = useStore();
+  const { t, language } = useLanguage();
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -37,11 +39,15 @@ export default function OrdersClient() {
     }
   }
 
+  // Per-tenant wrapper. Renders dates in the store's timezone using the
+  // visitor's chosen language so an order placed at 23:30 UTC from a
+  // Kuwait store displays as the next day Asia/Kuwait, not the visitor's
+  // home timezone.
   function formatDate(date: string) {
-    return new Date(date).toLocaleDateString('en-US', {
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
+    return formatStoreDate(date, {
+      timezone: store.timezone,
+      language,
+      style: 'long',
     });
   }
 

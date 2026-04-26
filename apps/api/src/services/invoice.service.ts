@@ -47,6 +47,7 @@ export class InvoiceService {
             logo: true,
             theme: true,
             currency: true,
+            timezone: true,
           },
         },
         customer: { select: { email: true, firstName: true, lastName: true } },
@@ -89,10 +90,15 @@ export class InvoiceService {
           ? 'paid'
           : 'unpaid';
 
+    // Render the invoice date in the store's timezone so a Kuwait merchant's
+    // invoice doesn't show the UTC day on edge-of-midnight orders. Falls back
+    // to Asia/Kuwait when a tenant hasn't set a timezone yet (matches the
+    // storefront default).
     const dateText = new Date(order.createdAt).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
+      timeZone: order.store.timezone || 'Asia/Kuwait',
     });
 
     const itemsHtml = order.items

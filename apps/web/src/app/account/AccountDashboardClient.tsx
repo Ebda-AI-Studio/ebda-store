@@ -3,13 +3,15 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { api, type Order } from '@/lib/api';
-import { useStoreUrl } from '../../contexts/StoreContext';
+import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { formatPrice } from '@/lib/format';
+import { formatDate as formatStoreDate } from '@/lib/format-date';
 
 export default function AccountDashboardClient() {
   const storeUrl = useStoreUrl();
-  const { t } = useLanguage();
+  const { store } = useStore();
+  const { t, language } = useLanguage();
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -35,11 +37,15 @@ export default function AccountDashboardClient() {
     }
   }
 
+  // Wrap the shared per-tenant formatter so the rest of the file can keep
+  // calling `formatDate(order.createdAt)` without threading store/language
+  // into every JSX site. Uses the long preset (Mon-day-year) to match the
+  // dashboard's existing visual.
   function formatDate(date: string) {
-    return new Date(date).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
+    return formatStoreDate(date, {
+      timezone: store.timezone,
+      language,
+      style: 'long',
     });
   }
 

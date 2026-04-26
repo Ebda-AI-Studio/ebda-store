@@ -6,6 +6,7 @@ import { Button } from '@force/ui';
 import { useStore } from '../contexts/StoreContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { API_URL } from '../lib/api';
+import { formatDate as formatStoreDate } from '../lib/format-date';
 
 interface Review {
   id: string;
@@ -84,14 +85,6 @@ function StarSelector({ value, onChange }: { value: number; onChange: (rating: n
   );
 }
 
-function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
-}
-
 function getReviewerName(review: Review): string {
   if (review.reviewerName) return review.reviewerName;
   if (review.reviewer?.firstName || review.reviewer?.lastName) {
@@ -102,7 +95,18 @@ function getReviewerName(review: Review): string {
 
 export default function ReviewSection({ storeId, productId }: Props) {
   const { store } = useStore();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+
+  // Tenant-aware date formatter for review timestamps. Uses the store's
+  // timezone so a 23:30 UTC review from a Kuwait store reads "Jan 5"
+  // (Asia/Kuwait), not "Jan 4" (UTC). Switches to Arabic numerals for
+  // ar-KW visitors.
+  const formatDate = (dateStr: string) =>
+    formatStoreDate(dateStr, {
+      timezone: store.timezone,
+      language,
+      style: 'long',
+    });
 
   const [reviews, setReviews] = useState<Review[]>([]);
   const [averageRating, setAverageRating] = useState<number>(0);
