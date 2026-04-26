@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { resolveFooterSections } from '../shared/display-helpers';
 import { getSocialLinks } from '../shared/icons';
 
 export default function BoldFooter({
@@ -10,6 +11,7 @@ export default function BoldFooter({
   contact,
   socials,
   navigation = [],
+  footerLinks,
   isRtl: isRtlProp,
   urlPrefix = '',
 }: FooterProps) {
@@ -23,12 +25,25 @@ export default function BoldFooter({
   const displayAddress = isRtl && contact.addressAr ? contact.addressAr : contact.address;
 
   const socialLinks = getSocialLinks(socials);
+  // Per-store columns replace the single "Quick Links" block; with nothing
+  // configured we keep the navigation-driven default below. Bold has no
+  // newsletter form so newsletterEnabled does not apply here.
+  const footerSections = resolveFooterSections(footerLinks, isRtl);
+
+  // Brand always spans 2 cols. With sections (1 fallback or N footerSections)
+  // + contact, total cells = 2 + N + 1. Grow the lg grid accordingly.
+  const linkColumnsCount = footerSections.length > 0 ? footerSections.length : 1;
+  const totalCells = 2 + linkColumnsCount + 1;
+  const lgColsClass =
+    totalCells >= 6 ? 'lg:grid-cols-6' : totalCells === 5 ? 'lg:grid-cols-5' : 'lg:grid-cols-4';
 
   return (
     <footer className="bg-gray-950 text-white mt-auto" dir={isRtl ? 'rtl' : 'ltr'}>
       <div className="container mx-auto px-4 py-10 sm:py-12 md:py-16">
         {/* Main grid */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 sm:gap-10 md:gap-12 mb-10 sm:mb-12 md:mb-16">
+        <div
+          className={`grid md:grid-cols-2 ${lgColsClass} gap-8 sm:gap-10 md:gap-12 mb-10 sm:mb-12 md:mb-16`}
+        >
           {/* Brand */}
           <div className="lg:col-span-2">
             {displayLogo ? (
@@ -74,25 +89,49 @@ export default function BoldFooter({
             )}
           </div>
 
-          {/* Quick Links */}
-          <div>
-            <h4 className="text-xs font-black uppercase tracking-[0.2em] mb-6 text-white">
-              {isRtl ? 'روابط سريعة' : 'Quick Links'}
-            </h4>
-            <ul className="space-y-3">
-              {navigation.map(item => (
-                <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    className="text-sm text-gray-300 hover:text-primary transition-colors duration-200 font-medium inline-flex items-center gap-2 group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                  >
-                    <span className="w-0 group-hover:w-3 h-0.5 bg-primary transition-all duration-200 shrink-0" />
-                    {isRtl && item.labelAr ? item.labelAr : item.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
+          {/* Quick Links — per-store columns when configured, else the
+              navigation-driven default. */}
+          {footerSections.length > 0 ? (
+            footerSections.map(section => (
+              <div key={section.key}>
+                <h4 className="text-xs font-black uppercase tracking-[0.2em] mb-6 text-white">
+                  {section.heading}
+                </h4>
+                <ul className="space-y-3">
+                  {section.links.map(link => (
+                    <li key={link.href}>
+                      <Link
+                        href={link.href}
+                        className="text-sm text-gray-300 hover:text-primary transition-colors duration-200 font-medium inline-flex items-center gap-2 group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                      >
+                        <span className="w-0 group-hover:w-3 h-0.5 bg-primary transition-all duration-200 shrink-0" />
+                        {link.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))
+          ) : (
+            <div>
+              <h4 className="text-xs font-black uppercase tracking-[0.2em] mb-6 text-white">
+                {isRtl ? 'روابط سريعة' : 'Quick Links'}
+              </h4>
+              <ul className="space-y-3">
+                {navigation.map(item => (
+                  <li key={item.href}>
+                    <Link
+                      href={item.href}
+                      className="text-sm text-gray-300 hover:text-primary transition-colors duration-200 font-medium inline-flex items-center gap-2 group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                    >
+                      <span className="w-0 group-hover:w-3 h-0.5 bg-primary transition-all duration-200 shrink-0" />
+                      {isRtl && item.labelAr ? item.labelAr : item.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {/* Contact */}
           <div>

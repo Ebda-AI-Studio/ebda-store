@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { isNewsletterEnabled, resolveFooterSections } from '../shared/display-helpers';
 import { getSocialLinks } from '../shared/icons';
 
 export default function ElegantFooter({
@@ -11,6 +12,7 @@ export default function ElegantFooter({
   contact,
   socials,
   navigation = [],
+  footerLinks,
   isRtl: isRtlProp,
   urlPrefix = '',
 }: FooterProps) {
@@ -25,57 +27,74 @@ export default function ElegantFooter({
 
   const socialLinks = getSocialLinks(socials);
   const [subscribed, setSubscribed] = useState(false);
+  // Per-store footer columns replace the single "Explore" column when at
+  // least one section has active links. With nothing configured we render
+  // the pack's classic Explore / Contact / Follow trio.
+  const footerSections = resolveFooterSections(footerLinks, isRtl);
+  const showNewsletter = isNewsletterEnabled(footerLinks);
 
   return (
     <footer className="bg-muted border-t border-border mt-auto" dir={isRtl ? 'rtl' : 'ltr'}>
-      {/* Newsletter */}
-      <div className="border-b border-border/50">
-        <div className="container mx-auto px-4 py-10 sm:py-12 md:py-16">
-          <div className="max-w-xl mx-auto text-center">
-            <h3 className="text-[10px] tracking-[0.4em] uppercase text-muted-foreground/60 mb-4 font-serif">
-              {isRtl ? 'ابق على اطلاع' : 'Stay Informed'}
-            </h3>
-            <p className="text-foreground font-light text-base mb-8 tracking-wide">
-              {isRtl
-                ? 'اشترك لتصلك آخر الأخبار والعروض الحصرية'
-                : 'Subscribe for exclusive offers and new arrivals'}
-            </p>
-            {subscribed ? (
-              <p className="text-sm text-primary font-medium tracking-wide">
-                {isRtl ? 'شكراً لاشتراكك!' : 'Thank you for subscribing!'}
+      {/* Newsletter — hidden when the store explicitly opts out. */}
+      {showNewsletter && (
+        <div className="border-b border-border/50">
+          <div className="container mx-auto px-4 py-10 sm:py-12 md:py-16">
+            <div className="max-w-xl mx-auto text-center">
+              <h3 className="text-[10px] tracking-[0.4em] uppercase text-muted-foreground/60 mb-4 font-serif">
+                {isRtl ? 'ابق على اطلاع' : 'Stay Informed'}
+              </h3>
+              <p className="text-foreground font-light text-base mb-8 tracking-wide">
+                {isRtl
+                  ? 'اشترك لتصلك آخر الأخبار والعروض الحصرية'
+                  : 'Subscribe for exclusive offers and new arrivals'}
               </p>
-            ) : (
-              <form
-                className="flex flex-col gap-2 sm:flex-row sm:gap-0 max-w-md mx-auto"
-                onSubmit={e => {
-                  e.preventDefault();
-                  setSubscribed(true);
-                }}
-              >
-                <input
-                  type="email"
-                  autoComplete="email"
-                  placeholder={isRtl ? 'البريد الإلكتروني' : 'Enter your email'}
-                  aria-label={isRtl ? 'البريد الإلكتروني' : 'Email address'}
-                  className="h-12 flex-1 px-6 bg-background border border-border focus:border-foreground focus:outline-none text-xs tracking-[0.1em] placeholder:text-muted-foreground/40 transition-colors duration-500"
-                  dir={isRtl ? 'rtl' : 'ltr'}
-                  required
-                />
-                <button
-                  type="submit"
-                  className="h-12 px-8 bg-foreground text-background text-[10px] tracking-[0.25em] uppercase hover:bg-foreground/80 transition-colors duration-300 cursor-pointer"
+              {subscribed ? (
+                <p className="text-sm text-primary font-medium tracking-wide">
+                  {isRtl ? 'شكراً لاشتراكك!' : 'Thank you for subscribing!'}
+                </p>
+              ) : (
+                <form
+                  className="flex flex-col gap-2 sm:flex-row sm:gap-0 max-w-md mx-auto"
+                  onSubmit={e => {
+                    e.preventDefault();
+                    setSubscribed(true);
+                  }}
                 >
-                  {isRtl ? 'اشتراك' : 'Subscribe'}
-                </button>
-              </form>
-            )}
+                  <input
+                    type="email"
+                    autoComplete="email"
+                    placeholder={isRtl ? 'البريد الإلكتروني' : 'Enter your email'}
+                    aria-label={isRtl ? 'البريد الإلكتروني' : 'Email address'}
+                    className="h-12 flex-1 px-6 bg-background border border-border focus:border-foreground focus:outline-none text-xs tracking-[0.1em] placeholder:text-muted-foreground/40 transition-colors duration-500"
+                    dir={isRtl ? 'rtl' : 'ltr'}
+                    required
+                  />
+                  <button
+                    type="submit"
+                    className="h-12 px-8 bg-foreground text-background text-[10px] tracking-[0.25em] uppercase hover:bg-foreground/80 transition-colors duration-300 cursor-pointer"
+                  >
+                    {isRtl ? 'اشتراك' : 'Subscribe'}
+                  </button>
+                </form>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Main footer */}
       <div className="container mx-auto px-4 py-10 sm:py-12 md:py-16">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 sm:gap-10 md:gap-12">
+        {/* Brand + (sections|explore) + Contact + Follow. Grow the grid so
+            extra sections don't crowd the contact / follow columns. */}
+        <div
+          className={`grid grid-cols-2 gap-8 sm:gap-10 ${
+            footerSections.length >= 3
+              ? 'md:grid-cols-6'
+              : footerSections.length === 2
+                ? 'md:grid-cols-5'
+                : 'md:grid-cols-4'
+          } md:gap-12`}
+        >
           {/* Brand */}
           <div className="col-span-2 md:col-span-1">
             {displayLogo ? (
@@ -96,24 +115,47 @@ export default function ElegantFooter({
             )}
           </div>
 
-          {/* Navigation */}
-          <div>
-            <h4 className="text-[10px] tracking-[0.3em] uppercase text-muted-foreground/60 mb-6 font-serif">
-              {isRtl ? 'التصفح' : 'Explore'}
-            </h4>
-            <ul className="space-y-4">
-              {navigation.slice(0, 5).map(item => (
-                <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    className="text-xs text-foreground/60 hover:text-foreground transition-opacity duration-300 tracking-wide cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                  >
-                    {isRtl && item.labelAr ? item.labelAr : item.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
+          {/* Navigation — per-store sections when configured, otherwise the
+              single "Explore" column driven by the navigation prop. */}
+          {footerSections.length > 0 ? (
+            footerSections.map(section => (
+              <div key={section.key}>
+                <h4 className="text-[10px] tracking-[0.3em] uppercase text-muted-foreground/60 mb-6 font-serif">
+                  {section.heading}
+                </h4>
+                <ul className="space-y-4">
+                  {section.links.map(link => (
+                    <li key={link.href}>
+                      <Link
+                        href={link.href}
+                        className="text-xs text-foreground/60 hover:text-foreground transition-opacity duration-300 tracking-wide cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                      >
+                        {link.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))
+          ) : (
+            <div>
+              <h4 className="text-[10px] tracking-[0.3em] uppercase text-muted-foreground/60 mb-6 font-serif">
+                {isRtl ? 'التصفح' : 'Explore'}
+              </h4>
+              <ul className="space-y-4">
+                {navigation.slice(0, 5).map(item => (
+                  <li key={item.href}>
+                    <Link
+                      href={item.href}
+                      className="text-xs text-foreground/60 hover:text-foreground transition-opacity duration-300 tracking-wide cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                    >
+                      {isRtl && item.labelAr ? item.labelAr : item.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {/* Contact */}
           <div>
