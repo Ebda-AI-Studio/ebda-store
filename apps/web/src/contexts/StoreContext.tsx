@@ -79,6 +79,8 @@ export interface StoreData {
   ogImage?: string;
   twitterHandle?: string;
   googleSiteVerification?: string;
+  pwaEnabled?: boolean;
+  pwaSettings?: Record<string, unknown>;
   settings?: Record<string, unknown>;
   enabledFeatures?: string[];
   heroTitle?: string | null;

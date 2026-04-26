@@ -98,8 +98,34 @@ export const viewport: Viewport = {
 export async function generateMetadata(): Promise<Metadata> {
   const store = await getStore();
   const siteUrl = getSiteUrl(store);
+
+  // Honour the admin's `defaultLanguage` setting when picking which SEO copy
+  // to surface. The arabic meta fields existed in the resolver and admin form
+  // for months but nothing actually read them — same bug class as the
+  // footerLinks audit. Fall back to the english variant whenever the arabic
+  // one is empty so partially-translated stores degrade gracefully.
+  const defaultLanguage = (store.settings as Record<string, unknown>)?.defaultLanguage as
+    | 'en'
+    | 'ar'
+    | undefined;
+  const preferAr = defaultLanguage === 'ar';
+  const localizedTitle = preferAr ? store.metaTitleAr || store.metaTitle : store.metaTitle;
+  const localizedDescription = preferAr
+    ? store.metaDescriptionAr || store.metaDescription
+    : store.metaDescription;
+  const localizedStoreName = preferAr && store.nameAr ? store.nameAr : store.name;
+
   const description =
-    store.metaDescription || `Shop online at ${store.name}. Free delivery on orders over 20 KWD.`;
+    localizedDescription ||
+    (preferAr
+      ? `تسوق أونلاين من ${localizedStoreName}. توصيل مجاني للطلبات فوق 20 د.ك.`
+      : `Shop online at ${localizedStoreName}. Free delivery on orders over 20 KWD.`);
+
+  const titleDefault =
+    localizedTitle ||
+    (preferAr
+      ? `${localizedStoreName} - تسوق أونلاين في الكويت`
+      : `${localizedStoreName} - Online Shopping in Kuwait`);
 
   // Prefer admin-configured Open Graph image; fall back to store logo.
   const ogImageUrl = store.ogImage || store.logo;
@@ -110,17 +136,61 @@ export async function generateMetadata(): Promise<Metadata> {
       : `@${store.twitterHandle}`
     : undefined;
 
+  // PWA-driven Apple meta. The admin's PWA settings page lets owners override
+  // the install title, status-bar style, and maskable icon — but until now the
+  // storefront ignored them and emitted nothing. Build an apple-specific block
+  // when the feature is on, keyed off pwaSettings so iOS devices get the right
+  // status bar tint, the right home-screen title, and a real touch icon.
+  const pwa = (store.pwaSettings as Record<string, unknown> | undefined) || undefined;
+  const pwaIosStatusBar =
+    typeof pwa?.iosStatusBarStyle === 'string'
+      ? (pwa.iosStatusBarStyle as 'default' | 'black' | 'black-translucent')
+      : undefined;
+  const pwaTouchIcon =
+    typeof pwa?.maskableIcon === 'string' && pwa.maskableIcon
+      ? (pwa.maskableIcon as string)
+      : typeof pwa?.icon512 === 'string' && pwa.icon512
+        ? (pwa.icon512 as string)
+        : typeof pwa?.icon192 === 'string' && pwa.icon192
+          ? (pwa.icon192 as string)
+          : store.favicon || undefined;
+  const pwaAppTitle =
+    typeof pwa?.shortName === 'string' && pwa.shortName
+      ? (pwa.shortName as string)
+      : typeof pwa?.appName === 'string' && pwa.appName
+        ? (pwa.appName as string)
+        : localizedStoreName;
+  const pwaActive = store.pwaEnabled === true;
+
+  // Build the icons block: regular favicon + (when pwa is on) apple-touch-icon
+  // so installing-to-home-screen on iOS uses the store's branding rather than
+  // a screenshot of the page chrome.
+  const iconsBlock: NonNullable<Metadata['icons']> | undefined = (() => {
+    const icons: NonNullable<Metadata['icons']> = {};
+    if (store.favicon) icons.icon = store.favicon;
+    if (pwaActive && pwaTouchIcon) icons.apple = pwaTouchIcon;
+    return icons.icon || icons.apple ? icons : undefined;
+  })();
+
   return {
     metadataBase: new URL(siteUrl),
     title: {
-      default: store.metaTitle || `${store.name} - Online Shopping in Kuwait`,
-      template: `%s | ${store.name}`,
+      default: titleDefault,
+      template: `%s | ${localizedStoreName}`,
     },
     description,
-    keywords: ['e-commerce', 'online store', 'shopping', 'Kuwait', 'KWD', 'delivery', store.name],
-    authors: [{ name: store.name }],
-    creator: store.name,
-    publisher: store.name,
+    keywords: [
+      'e-commerce',
+      'online store',
+      'shopping',
+      'Kuwait',
+      'KWD',
+      'delivery',
+      localizedStoreName,
+    ],
+    authors: [{ name: localizedStoreName }],
+    creator: localizedStoreName,
+    publisher: localizedStoreName,
     formatDetection: {
       email: false,
       address: false,
@@ -128,14 +198,14 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     openGraph: {
       type: 'website',
-      locale: 'en_KW',
-      alternateLocale: 'ar_KW',
-      siteName: store.name,
+      locale: preferAr ? 'ar_KW' : 'en_KW',
+      alternateLocale: preferAr ? 'en_KW' : 'ar_KW',
+      siteName: localizedStoreName,
       images: ogImageUrl ? [{ url: ogImageUrl }] : undefined,
     },
     twitter: {
       card: 'summary_large_image',
-      title: store.metaTitle || `${store.name} - Online Shopping in Kuwait`,
+      title: titleDefault,
       description,
       ...(ogImageUrl ? { images: [ogImageUrl] } : {}),
       ...(twitterHandle ? { site: twitterHandle, creator: twitterHandle } : {}),
@@ -144,7 +214,19 @@ export async function generateMetadata(): Promise<Metadata> {
       index: true,
       follow: true,
     },
-    icons: store.favicon ? { icon: store.favicon } : undefined,
+    icons: iconsBlock,
+    ...(pwaActive
+      ? {
+          // Tells iOS Safari that the page can be installed as a standalone
+          // web app and to use the configured status-bar tint + home-screen
+          // title instead of falling back to the document title.
+          appleWebApp: {
+            capable: true,
+            title: pwaAppTitle,
+            statusBarStyle: pwaIosStatusBar || 'default',
+          },
+        }
+      : {}),
     ...(store.googleSiteVerification
       ? { verification: { google: store.googleSiteVerification } }
       : {}),

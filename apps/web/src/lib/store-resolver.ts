@@ -54,6 +54,14 @@ export interface ResolvedStore {
   // Marketing Pixels
   marketingPixels?: Record<string, unknown>;
 
+  // PWA — set by the admin's PWA settings page. The storefront's
+  // app/manifest.ts already pulls a fully-formed manifest from the API, but
+  // the values are mirrored here so app/layout.tsx can emit the matching iOS
+  // meta tags (status-bar style, web-app-capable, apple-touch-icon) without
+  // a second round-trip per request.
+  pwaEnabled?: boolean;
+  pwaSettings?: Record<string, unknown>;
+
   // General Settings (footer links, etc.)
   settings?: Record<string, unknown>;
 
@@ -188,6 +196,13 @@ async function fetchStoreByDomain(domain: string): Promise<ResolvedStore | null>
       googleSiteVerification: storeData.googleSiteVerification,
       marketingPixels:
         typeof storeData.marketingPixels === 'object' ? storeData.marketingPixels : undefined,
+      pwaEnabled: typeof storeData.pwaEnabled === 'boolean' ? storeData.pwaEnabled : undefined,
+      pwaSettings:
+        storeData.pwaSettings &&
+        typeof storeData.pwaSettings === 'object' &&
+        !Array.isArray(storeData.pwaSettings)
+          ? (storeData.pwaSettings as Record<string, unknown>)
+          : undefined,
       settings: typeof storeData.settings === 'object' ? storeData.settings : undefined,
       enabledFeatures,
       heroTitle: storeData.heroTitle ?? null,
@@ -290,6 +305,13 @@ async function fetchStoreBySlug(slug: string): Promise<ResolvedStore | null> {
       googleSiteVerification: storeData.googleSiteVerification,
       marketingPixels:
         typeof storeData.marketingPixels === 'object' ? storeData.marketingPixels : undefined,
+      pwaEnabled: typeof storeData.pwaEnabled === 'boolean' ? storeData.pwaEnabled : undefined,
+      pwaSettings:
+        storeData.pwaSettings &&
+        typeof storeData.pwaSettings === 'object' &&
+        !Array.isArray(storeData.pwaSettings)
+          ? (storeData.pwaSettings as Record<string, unknown>)
+          : undefined,
       settings: typeof storeData.settings === 'object' ? storeData.settings : undefined,
       enabledFeatures,
       heroTitle: storeData.heroTitle ?? null,
@@ -418,6 +440,13 @@ export async function getStoreById(storeId: string): Promise<ResolvedStore | nul
       googleSiteVerification: storeData.googleSiteVerification,
       marketingPixels:
         typeof storeData.marketingPixels === 'object' ? storeData.marketingPixels : undefined,
+      pwaEnabled: typeof storeData.pwaEnabled === 'boolean' ? storeData.pwaEnabled : undefined,
+      pwaSettings:
+        storeData.pwaSettings &&
+        typeof storeData.pwaSettings === 'object' &&
+        !Array.isArray(storeData.pwaSettings)
+          ? (storeData.pwaSettings as Record<string, unknown>)
+          : undefined,
       settings: typeof storeData.settings === 'object' ? storeData.settings : undefined,
       heroTitle: storeData.heroTitle ?? null,
       heroTitleAr: storeData.heroTitleAr ?? null,
