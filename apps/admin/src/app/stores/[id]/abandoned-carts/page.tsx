@@ -8,8 +8,13 @@ import { AbandonedCartsTable } from './_components/AbandonedCartsTable';
 import { RecoveryCampaignForm } from './_components/RecoveryCampaignForm';
 import { StatsGrid } from './_components/StatsGrid';
 import { useAbandonedCarts } from './_hooks/useAbandonedCarts';
+import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 
 export default function AbandonedCartsPage() {
+  // Hide this page when the super_admin disabled the abandoned_cart feature for
+  // this store. The hook redirects to the store dashboard if disabled.
+  useRequireFeature('abandoned_cart');
+
   const params = useParams();
   const storeId = params?.id as string;
   const { isEnabled } = useFeatures();

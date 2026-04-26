@@ -8,8 +8,13 @@ import { MarketingPixelsInfoBanner } from './_components/MarketingPixelsInfoBann
 import { PixelsList } from './_components/PixelsList';
 import { TrackedEventsCard } from './_components/TrackedEventsCard';
 import { useMarketingPixels } from './_hooks/useMarketingPixels';
+import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 
 export default function MarketingPixelsPage() {
+  // Hide this page when the super_admin disabled the marketing_pixels feature for
+  // this store. The hook redirects to the store dashboard if disabled.
+  useRequireFeature('marketing_pixels');
+
   const params = useParams();
   const storeId = params?.id as string;
   const t = useT('marketingPixels');

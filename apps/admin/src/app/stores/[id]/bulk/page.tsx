@@ -10,8 +10,13 @@ import { BulkImportWizard } from './_components/BulkImportWizard';
 import { BulkTabs } from './_components/BulkTabs';
 import type { BulkTab } from './_components/types';
 import { useBulkOperations } from './_hooks/useBulkOperations';
+import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 
 export default function BulkOperationsPage() {
+  // Hide this page when the super_admin disabled the bulk_operations feature for
+  // this store. The hook redirects to the store dashboard if disabled.
+  useRequireFeature('bulk_operations');
+
   const params = useParams();
   const router = useRouter();
   const storeId = params?.id as string;

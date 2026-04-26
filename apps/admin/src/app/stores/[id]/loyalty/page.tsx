@@ -20,7 +20,10 @@ import {
   type LoyaltyStats,
 } from './_components/types';
 
+import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 export default function LoyaltySettingsPage() {
+  useRequireFeature('loyalty');
+
   const params = useParams();
   const storeId = params.id as string;
   const tPage = useT('loyalty.page');

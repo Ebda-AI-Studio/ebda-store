@@ -18,6 +18,7 @@ import {
   type AffiliateStatusAction,
   type Meta,
 } from './_components/types';
+import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 
 type TabKey = 'affiliates' | 'config';
 
@@ -39,6 +40,10 @@ interface AffiliatesEnvelope {
 }
 
 export default function AffiliatesPage() {
+  // Hide this page when the super_admin disabled the affiliate feature for
+  // this store. The hook redirects to the store dashboard if disabled.
+  useRequireFeature('affiliate');
+
   const params = useParams();
   const storeId = params?.id as string;
   const { success: toastSuccess, error: showError } = useToast();

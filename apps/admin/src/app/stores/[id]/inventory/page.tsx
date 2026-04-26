@@ -14,10 +14,15 @@ import { StockLevelsTable } from './_components/StockLevelsTable';
 import { StockMovementLog } from './_components/StockMovementLog';
 import type { InventoryTab, ProductInventory } from './_components/types';
 import { useInventory } from './_hooks/useInventory';
+import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 
 const REMOVE_ADJUSTMENT_TYPES = ['manual_remove', 'damage'];
 
 export default function InventoryPage() {
+  // Hide this page when the super_admin disabled the inventory feature for
+  // this store. The hook redirects to the store dashboard if disabled.
+  useRequireFeature('inventory');
+
   const params = useParams();
   const storeId = params.id as string;
   const tPage = useT('inventory.page');

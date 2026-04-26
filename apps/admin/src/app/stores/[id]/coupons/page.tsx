@@ -11,8 +11,11 @@ import { CouponsTable } from './_components/CouponsTable';
 import type { Coupon, CouponFormData } from './_components/types';
 import { INITIAL_FORM_DATA } from './_components/types';
 import { useCoupons } from './_hooks/useCoupons';
+import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 
 export default function CouponsPage() {
+  useRequireFeature('coupons');
+
   const params = useParams();
   const storeId = params?.id as string;
 

@@ -24,12 +24,17 @@ import {
   type TestStatus,
 } from './_components/types';
 
+import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 const CARRIER_NAME_KEYS: Record<CarrierKey, string> = {
   icarry: 'carrierNames.icarry',
   aramex: 'carrierNames.aramex',
 };
 
 export default function ShippingCarriersPage() {
+  // Hide this page when the super_admin disabled the shipping_carriers feature for
+  // this store. The hook redirects to the store dashboard if disabled.
+  useRequireFeature('shipping_carriers');
+
   const params = useParams();
   const storeId = params.id as string;
   const { isEnabled } = useFeatures();

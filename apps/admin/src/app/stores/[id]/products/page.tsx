@@ -24,8 +24,20 @@ export default function StoreProductsPage() {
   const t = useT('products.list');
 
   const { store } = useCurrentStore(isAuthenticated ? storeId : null);
+
+  // Per-page preference is persisted per store so the user's choice survives
+  // navigation. Falls back to 25 when nothing is stored.
+  const limitStorageKey = storeId ? `products.perPage.${storeId}` : null;
+  const initialLimit = (() => {
+    if (typeof window === 'undefined' || !limitStorageKey) return 25;
+    const stored = window.localStorage.getItem(limitStorageKey);
+    const parsed = stored ? parseInt(stored, 10) : NaN;
+    return [10, 25, 50, 100, 200].includes(parsed) ? parsed : 25;
+  })();
+
   const [products, setProducts] = useState<Product[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
+  const [limit, setLimit] = useState(initialLimit);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search, 300);
@@ -43,7 +55,7 @@ export default function StoreProductsPage() {
       setLoading(true);
       const queryParams = new URLSearchParams({
         page: page.toString(),
-        limit: '20',
+        limit: String(limit),
       });
       if (statusFilter !== 'all') queryParams.append('status', statusFilter);
       if (debouncedSearch) queryParams.append('search', debouncedSearch);
@@ -61,7 +73,7 @@ export default function StoreProductsPage() {
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated, storeId, page, statusFilter, debouncedSearch]);
+  }, [isAuthenticated, storeId, page, limit, statusFilter, debouncedSearch]);
 
   // Fetch products whenever any of the list-query inputs change. fetchProducts
   // is memoized on [isAuthenticated, storeId, page, statusFilter, debouncedSearch]
@@ -143,7 +155,16 @@ export default function StoreProductsPage() {
       />
 
       {pagination && (
-        <ProductsPagination pagination={pagination} page={page} onPageChange={setPage} />
+        <ProductsPagination
+          pagination={pagination}
+          page={page}
+          onPageChange={setPage}
+          onLimitChange={next => {
+            if (limitStorageKey) window.localStorage.setItem(limitStorageKey, String(next));
+            setLimit(next);
+            setPage(1);
+          }}
+        />
       )}
 
       <DeleteProductModal

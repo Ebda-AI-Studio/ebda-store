@@ -12,8 +12,13 @@ import { PwaIosSettings } from './_components/PwaIosSettings';
 import { PwaManifestPreview } from './_components/PwaManifestPreview';
 import { PwaStatusMessage } from './_components/PwaStatusMessage';
 import { usePwaSettings } from './_hooks/usePwaSettings';
+import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 
 export default function PWASettingsPage() {
+  // Hide this page when the super_admin disabled the pwa feature for
+  // this store. The hook redirects to the store dashboard if disabled.
+  useRequireFeature('pwa');
+
   const params = useParams();
   const storeId = params.id as string;
   const tPage = useT('pwa.page');

@@ -373,7 +373,8 @@
       "pagination": {
         "showing": "عرض {from} إلى {to} من {total} منتج",
         "previous": "السابق",
-        "next": "التالي"
+        "next": "التالي",
+        "perPage": "في الصفحة"
       },
       "deleteModal": {
         "title": "حذف المنتج",

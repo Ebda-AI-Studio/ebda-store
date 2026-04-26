@@ -12,10 +12,15 @@ import { ReturnsTable } from './_components/ReturnsTable';
 import { StatsGrid } from './_components/StatsGrid';
 import type { ReturnRecord } from './_components/types';
 import { useReturns } from './_hooks/useReturns';
+import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 
 type StringResolver = (value: string | null) => void;
 
 export default function ReturnsPage() {
+  // Hide this page when the super_admin disabled the returns feature for
+  // this store. The hook redirects to the store dashboard if disabled.
+  useRequireFeature('returns');
+
   const params = useParams();
   const storeId = params?.id as string;
 

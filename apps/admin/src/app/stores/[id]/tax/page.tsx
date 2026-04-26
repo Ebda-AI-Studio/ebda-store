@@ -18,7 +18,12 @@ import {
   type TaxTemplate,
 } from './_components/types';
 
+import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 export default function TaxSettingsPage() {
+  // Hide this page when the super_admin disabled the tax feature for
+  // this store. The hook redirects to the store dashboard if disabled.
+  useRequireFeature('tax');
+
   const params = useParams();
   const storeId = params.id as string;
   const tPage = useT('tax.page');

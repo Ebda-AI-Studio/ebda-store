@@ -4,30 +4,58 @@ import { Button } from '@force/ui';
 import { useT } from '@/i18n/useT';
 import type { Pagination } from './types';
 
+const PER_PAGE_OPTIONS = [10, 25, 50, 100, 200] as const;
+
 interface ProductsPaginationProps {
   pagination: Pagination;
   page: number;
   onPageChange: (updater: (prev: number) => number) => void;
+  /** Optional — when provided the user can switch how many products per page. */
+  onLimitChange?: (limit: number) => void;
 }
 
-export function ProductsPagination({ pagination, page, onPageChange }: ProductsPaginationProps) {
+export function ProductsPagination({
+  pagination,
+  page,
+  onPageChange,
+  onLimitChange,
+}: ProductsPaginationProps) {
   const t = useT('products.list.pagination');
 
-  if (pagination.totalPages <= 1) return null;
-
-  const from = (page - 1) * pagination.limit + 1;
+  // Always render so the per-page selector is reachable, even on a single
+  // page of results. The Prev/Next buttons stay disabled appropriately.
+  const from = pagination.total === 0 ? 0 : (page - 1) * pagination.limit + 1;
   const to = Math.min(page * pagination.limit, pagination.total);
 
   return (
-    <div className="mt-4 flex items-center justify-between">
-      <p className="text-sm text-muted-foreground">
-        {t('showing', { from, to, total: pagination.total })}
-      </p>
+    <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-center gap-3">
+        <p className="text-sm text-muted-foreground">
+          {t('showing', { from, to, total: pagination.total })}
+        </p>
+        {onLimitChange && (
+          <label className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span className="hidden sm:inline">{t('perPage')}</span>
+            <select
+              value={pagination.limit}
+              onChange={e => onLimitChange(Number(e.target.value))}
+              className="rounded-lg border border-border bg-card px-2 py-1 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              aria-label={t('perPage')}
+            >
+              {PER_PAGE_OPTIONS.map(n => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+      </div>
       <div className="flex gap-2">
         <Button
           variant="outline"
           size="sm"
-          disabled={page === 1}
+          disabled={page <= 1}
           onClick={() => onPageChange(p => p - 1)}
         >
           {t('previous')}
@@ -35,7 +63,7 @@ export function ProductsPagination({ pagination, page, onPageChange }: ProductsP
         <Button
           variant="outline"
           size="sm"
-          disabled={page === pagination.totalPages}
+          disabled={page >= pagination.totalPages}
           onClick={() => onPageChange(p => p + 1)}
         >
           {t('next')}
