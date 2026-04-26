@@ -237,6 +237,9 @@ jobs:
       - name: Build database package
         run: npm run build -w packages/database
 
+      - name: Build shared package
+        run: npm run build -w packages/shared
+
       - name: Run database migrations
         run: npx prisma migrate deploy --schema=packages/database/prisma/schema.prisma
         env:
