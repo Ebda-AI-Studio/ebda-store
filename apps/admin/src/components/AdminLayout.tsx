@@ -37,7 +37,7 @@ export function AdminLayout({
   title,
   subtitle,
   actions,
-  mode = 'super_admin',
+  mode: explicitMode,
   storeBranding,
   storeId,
   storeDomain,
@@ -52,6 +52,15 @@ export function AdminLayout({
   const { user, logout, isLoading } = useAuth();
   const { selectedStoreId: globalStoreId } = useStore();
   const { isEnabled: isFeatureEnabled } = useFeatures();
+
+  // Derive the mode from the authenticated user's role unless the page
+  // explicitly opts out. A store_admin can never see super_admin chrome
+  // (security + UX), so even if a page passes mode="super_admin" we coerce
+  // it to store_admin when the user only has store_admin privileges.
+  const mode: 'super_admin' | 'store_admin' =
+    user?.role === 'store_admin'
+      ? 'store_admin'
+      : (explicitMode ?? (user?.role === 'super_admin' ? 'super_admin' : 'super_admin'));
 
   const navLabels: NavLabels = {
     dashboard: t('navDashboard'),
@@ -91,11 +100,13 @@ export function AdminLayout({
     return null;
   }, [storeId, pathname, globalStoreId]);
 
-  // Fetch store domain/slug for "View Store" button. The shared useCurrentStore
-  // hook dedupes + caches, so we only hit the network once per storeId regardless
-  // of how many admin pages mount this layout.
-  const shouldFetchStore = Boolean(currentStoreId) && !storeDomain && !storeSlug;
-  const { store: fetchedStore } = useCurrentStore(shouldFetchStore ? currentStoreId : null);
+  // Fetch store domain/slug + branding for "View Store" button and sidebar
+  // header. The shared useCurrentStore hook dedupes + caches, so we only hit
+  // the network once per storeId regardless of how many admin pages mount
+  // this layout. We always fetch when we have a storeId so the sidebar can
+  // show the store name; previously we skipped when storeDomain/storeSlug
+  // were already known but that left the sidebar without branding.
+  const { store: fetchedStore } = useCurrentStore(currentStoreId);
 
   const viewStoreUrl = useMemo(() => {
     const domain = storeDomain || fetchedStore?.domain;
@@ -114,20 +125,38 @@ export function AdminLayout({
   // resolve to store-scoped URLs (/stores/:id/customers, /stores/:id/analytics)
   // rather than the super-admin root pages (/customers, /analytics).
   // Items with a `featureKey` are hidden when that feature is disabled.
+  // Fall back to the resolved currentStoreId so a store_admin lands on
+  // sensible nav links even on pages that don't pass `storeId` explicitly.
+  const navStoreId = storeId ?? currentStoreId ?? '';
   const allNavItems =
     mode === 'super_admin'
       ? buildSuperAdminNav(navLabels)
-      : buildStoreAdminNav(storeId ?? '', navLabels);
+      : buildStoreAdminNav(navStoreId, navLabels);
   const navItems = allNavItems.filter(
     item => !item.featureKey || isFeatureEnabled(item.featureKey)
   );
-  const isStoreAdminWithBranding = mode === 'store_admin' && !!storeBranding;
+
+  // Auto-derive store branding for the sidebar header when the page didn't
+  // pass it explicitly. The shared useCurrentStore hook already fetched the
+  // store's logo + name, so we hand them straight to SidebarHeader.
+  const resolvedStoreBranding =
+    storeBranding ??
+    (mode === 'store_admin' && fetchedStore
+      ? {
+          id: fetchedStore.id,
+          name: fetchedStore.name,
+          nameAr: fetchedStore.nameAr ?? undefined,
+          logo: fetchedStore.logo ?? undefined,
+          logoAr: fetchedStore.logoAr ?? undefined,
+        }
+      : undefined);
+  const isStoreAdminWithBranding = mode === 'store_admin' && !!resolvedStoreBranding;
 
   const sidebarContent = (
     <>
       <SidebarHeader
         mode={mode}
-        storeBranding={storeBranding}
+        storeBranding={resolvedStoreBranding}
         isStoreAdminWithBranding={isStoreAdminWithBranding}
       />
       <SidebarNav

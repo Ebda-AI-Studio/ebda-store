@@ -2,10 +2,12 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Button, Badge } from '@force/ui';
 import { AdminLayout } from '../../components/AdminLayout';
 import { ErrorState } from '../../components/ErrorState';
 import { apiGet } from '../../lib/api';
+import { useAuth } from '../../lib/auth';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { useT } from '@/i18n/useT';
 
@@ -43,6 +45,17 @@ const statusColors = {
 export default function UsersPage() {
   const t = useT('users');
   const tc = useT('common');
+  const router = useRouter();
+  const { user: currentUser } = useAuth();
+
+  // Super-admin only. Store admins shouldn't reach this URL via the nav,
+  // but if they manually browse here, bounce them back to root.
+  useEffect(() => {
+    if (currentUser && currentUser.role !== 'super_admin') {
+      router.replace('/');
+    }
+  }, [currentUser, router]);
+
   const [users, setUsers] = useState<User[]>([]);
   const [pagination, setPagination] = useState<Pagination>({
     page: 1,

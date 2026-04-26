@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { useToast } from '@force/ui';
 import { useT } from '@/i18n/useT';
@@ -29,9 +29,6 @@ export default function StoreLayoutPage() {
   const [storeInfo, setStoreInfo] = useState<StoreInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [previewKey, setPreviewKey] = useState(0);
-  const [previewMode, setPreviewMode] = useState<'desktop' | 'mobile'>('desktop');
-  const previewRef = useRef<HTMLIFrameElement>(null);
 
   const fetchData = useCallback(async () => {
     if (!storeId) return;
@@ -74,10 +71,6 @@ export default function StoreLayoutPage() {
         toastError(t('saveError'));
       } else {
         toastSuccess(t('saved'));
-        // Bump the iframe key so the preview reloads with the just-saved
-        // layout. The storefront's `app/page.tsx` reads via SSR, so the
-        // iframe needs a fresh navigation rather than a soft re-render.
-        setPreviewKey(k => k + 1);
       }
     } finally {
       setIsSaving(false);
@@ -340,47 +333,41 @@ export default function StoreLayoutPage() {
             forms front-and-centre on small screens. */}
         <aside className="hidden lg:block">
           <div className="sticky top-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-foreground">Preview</h3>
-              <div className="inline-flex rounded-lg border border-border bg-card p-1">
-                <button
-                  type="button"
-                  onClick={() => setPreviewMode('desktop')}
-                  className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer ${
-                    previewMode === 'desktop'
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                  aria-pressed={previewMode === 'desktop'}
-                >
-                  Desktop
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPreviewMode('mobile')}
-                  className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer ${
-                    previewMode === 'mobile'
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                  aria-pressed={previewMode === 'mobile'}
-                >
-                  Mobile
-                </button>
-              </div>
-            </div>
+            <h3 className="text-sm font-semibold text-foreground">Preview</h3>
             {previewUrl ? (
-              <div className="overflow-hidden rounded-2xl border border-border bg-muted">
-                <iframe
-                  key={previewKey}
-                  ref={previewRef}
-                  src={previewUrl}
-                  title="Storefront preview"
-                  className={`mx-auto block bg-white transition-all ${
-                    previewMode === 'mobile' ? 'h-[720px] w-[390px]' : 'h-[720px] w-full'
-                  }`}
-                />
-              </div>
+              // The storefront's CSP refuses to be framed (X-Frame-Options:
+              // DENY + frame-ancestors 'none'), which is correct for a
+              // public e-commerce site to avoid clickjacking. We open the
+              // preview in a new tab instead so changes are visible without
+              // weakening storefront security.
+              <a
+                href={previewUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block rounded-2xl border border-border bg-card p-6 text-center hover:bg-muted transition-colors"
+              >
+                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <svg
+                    className="h-6 w-6"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    aria-hidden
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                    />
+                  </svg>
+                </div>
+                <p className="text-sm font-semibold text-foreground">Open storefront preview</p>
+                <p className="mt-1 text-xs text-muted-foreground break-all">{previewUrl}</p>
+                <p className="mt-3 text-[11px] text-muted-foreground">
+                  Opens in a new tab — your storefront blocks framing for security.
+                </p>
+              </a>
             ) : (
               <div className="rounded-2xl border border-border bg-card p-6 text-center text-xs text-muted-foreground">
                 Preview unavailable — the store has no slug or domain configured.

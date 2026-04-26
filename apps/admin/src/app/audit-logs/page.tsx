@@ -2,9 +2,11 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Button, Badge } from '@force/ui';
 import { AdminLayout } from '../../components/AdminLayout';
 import { apiGet } from '../../lib/api';
+import { useAuth } from '../../lib/auth';
 import { useStore } from '../../contexts/StoreContext';
 import { useT } from '@/i18n/useT';
 
@@ -70,6 +72,16 @@ const entityIcons: Record<string, string> = {
 
 export default function AuditLogsPage() {
   const t = useT('audit');
+  const router = useRouter();
+  const { user: currentUser } = useAuth();
+
+  // Audit logs are super-admin only. Bounce store admins back to root.
+  useEffect(() => {
+    if (currentUser && currentUser.role !== 'super_admin') {
+      router.replace('/');
+    }
+  }, [currentUser, router]);
+
   const { selectedStoreId } = useStore();
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [pagination, setPagination] = useState<Pagination>({
