@@ -4,7 +4,12 @@ import Link from 'next/link';
 import { useState } from 'react';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { getDisplayBranding, getDisplayText } from '../shared/display-helpers';
+import {
+  getDisplayBranding,
+  getDisplayText,
+  isNewsletterEnabled,
+  resolveFooterSections,
+} from '../shared/display-helpers';
 import { getSocialLinks } from '../shared/icons';
 
 export default function ModernFooter({
@@ -12,6 +17,7 @@ export default function ModernFooter({
   contact,
   socials,
   navigation = [],
+  footerLinks,
   isRtl: isRtlProp,
   urlPrefix = '',
 }: FooterProps) {
@@ -29,6 +35,11 @@ export default function ModernFooter({
   const displayAddress = getDisplayText(contact.address, contact.addressAr, isRtl);
 
   const socialLinks = getSocialLinks(socials);
+  // Per-store footer columns (shop / company / support) replace the single
+  // "Links" column when the owner has configured at least one section. With
+  // an empty config we fall back to the navigation-driven default below.
+  const footerSections = resolveFooterSections(footerLinks, isRtl);
+  const showNewsletter = isNewsletterEnabled(footerLinks);
 
   const handleNewsletter = (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,10 +47,23 @@ export default function ModernFooter({
     setSubscribed(true);
   };
 
+  // Brand + sections (1 fallback col, or N footerSections) + contact + (newsletter?).
+  // Grow the lg grid so each cell stays full-width without wrapping.
+  const linkColumnsCount = footerSections.length > 0 ? footerSections.length : 1;
+  const totalColumns = 1 + linkColumnsCount + 1 + (showNewsletter ? 1 : 0);
+  const lgColsClass =
+    totalColumns >= 6
+      ? 'lg:grid-cols-6'
+      : totalColumns === 5
+        ? 'lg:grid-cols-5'
+        : totalColumns === 4
+          ? 'lg:grid-cols-4'
+          : 'lg:grid-cols-3';
+
   return (
     <footer className="bg-gray-950 text-gray-300 mt-auto" dir={isRtl ? 'rtl' : 'ltr'}>
       <div className="container mx-auto px-4 py-14">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 lg:gap-12">
+        <div className={`grid grid-cols-1 md:grid-cols-2 ${lgColsClass} gap-10 lg:gap-12`}>
           {/* Brand Column */}
           <div className="lg:col-span-1 space-y-5">
             {displayLogo ? (
@@ -81,24 +105,47 @@ export default function ModernFooter({
             )}
           </div>
 
-          {/* Navigation */}
-          <div className="space-y-4">
-            <h4 className="text-sm font-semibold text-white uppercase tracking-wider">
-              {isRtl ? 'الروابط' : 'Links'}
-            </h4>
-            <ul className="space-y-2.5">
-              {navigation.map(item => (
-                <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    className="text-sm text-gray-400 hover:text-white transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                  >
-                    {isRtl && item.labelAr ? item.labelAr : item.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
+          {/* Navigation — per-store footerLinks columns when configured, else
+              fall back to the single navigation-driven column. */}
+          {footerSections.length > 0 ? (
+            footerSections.map(section => (
+              <div key={section.key} className="space-y-4">
+                <h4 className="text-sm font-semibold text-white uppercase tracking-wider">
+                  {section.heading}
+                </h4>
+                <ul className="space-y-2.5">
+                  {section.links.map(link => (
+                    <li key={link.href}>
+                      <Link
+                        href={link.href}
+                        className="text-sm text-gray-400 hover:text-white transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                      >
+                        {link.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))
+          ) : (
+            <div className="space-y-4">
+              <h4 className="text-sm font-semibold text-white uppercase tracking-wider">
+                {isRtl ? 'الروابط' : 'Links'}
+              </h4>
+              <ul className="space-y-2.5">
+                {navigation.map(item => (
+                  <li key={item.href}>
+                    <Link
+                      href={item.href}
+                      className="text-sm text-gray-400 hover:text-white transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                    >
+                      {isRtl && item.labelAr ? item.labelAr : item.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {/* Contact */}
           <div className="space-y-4">
@@ -203,41 +250,43 @@ export default function ModernFooter({
             </ul>
           </div>
 
-          {/* Newsletter */}
-          <div className="space-y-4">
-            <h4 className="text-sm font-semibold text-white uppercase tracking-wider">
-              {isRtl ? 'النشرة الإخبارية' : 'Newsletter'}
-            </h4>
-            <p className="text-sm text-gray-400 leading-relaxed">
-              {isRtl
-                ? 'اشترك للحصول على آخر العروض والأخبار'
-                : 'Subscribe for the latest offers and news'}
-            </p>
-            {subscribed ? (
-              <p className="text-sm text-primary font-medium">
-                {isRtl ? 'شكراً لاشتراكك!' : 'Thank you for subscribing!'}
+          {/* Newsletter — hidden when the store explicitly opts out. */}
+          {showNewsletter && (
+            <div className="space-y-4">
+              <h4 className="text-sm font-semibold text-white uppercase tracking-wider">
+                {isRtl ? 'النشرة الإخبارية' : 'Newsletter'}
+              </h4>
+              <p className="text-sm text-gray-400 leading-relaxed">
+                {isRtl
+                  ? 'اشترك للحصول على آخر العروض والأخبار'
+                  : 'Subscribe for the latest offers and news'}
               </p>
-            ) : (
-              <form onSubmit={handleNewsletter} className="space-y-2">
-                <input
-                  type="email"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  placeholder={isRtl ? 'البريد الإلكتروني' : 'Email address'}
-                  aria-label={isRtl ? 'البريد الإلكتروني' : 'Email address'}
-                  className="w-full px-4 py-2.5 bg-white/8 rounded-lg border border-white/10 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 text-sm text-white placeholder:text-gray-500 transition-colors duration-200"
-                  dir={isRtl ? 'rtl' : 'ltr'}
-                  required
-                />
-                <button
-                  type="submit"
-                  className="w-full px-4 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors duration-200 font-semibold text-sm cursor-pointer"
-                >
-                  {isRtl ? 'اشتراك' : 'Subscribe'}
-                </button>
-              </form>
-            )}
-          </div>
+              {subscribed ? (
+                <p className="text-sm text-primary font-medium">
+                  {isRtl ? 'شكراً لاشتراكك!' : 'Thank you for subscribing!'}
+                </p>
+              ) : (
+                <form onSubmit={handleNewsletter} className="space-y-2">
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    placeholder={isRtl ? 'البريد الإلكتروني' : 'Email address'}
+                    aria-label={isRtl ? 'البريد الإلكتروني' : 'Email address'}
+                    className="w-full px-4 py-2.5 bg-white/8 rounded-lg border border-white/10 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 text-sm text-white placeholder:text-gray-500 transition-colors duration-200"
+                    dir={isRtl ? 'rtl' : 'ltr'}
+                    required
+                  />
+                  <button
+                    type="submit"
+                    className="w-full px-4 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors duration-200 font-semibold text-sm cursor-pointer"
+                  >
+                    {isRtl ? 'اشتراك' : 'Subscribe'}
+                  </button>
+                </form>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Bottom Bar */}

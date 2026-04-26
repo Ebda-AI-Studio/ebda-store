@@ -3,7 +3,11 @@
 import Link from 'next/link';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { getDisplayBranding, getDisplayText } from '../shared/display-helpers';
+import {
+  getDisplayBranding,
+  getDisplayText,
+  resolveFooterSections,
+} from '../shared/display-helpers';
 import { getSocialLinks } from '../shared/icons';
 
 export default function ClassicFooter({
@@ -11,6 +15,7 @@ export default function ClassicFooter({
   contact,
   socials,
   navigation = [],
+  footerLinks,
   isRtl: isRtlProp,
   urlPrefix = '',
 }: FooterProps) {
@@ -26,11 +31,17 @@ export default function ClassicFooter({
 
   const socialLinks = getSocialLinks(socials);
 
-  // Split nav into up to 4 columns of roughly equal size
-  const chunkSize = Math.ceil(navigation.length / 4);
+  // Per-store footer columns take priority. Fall back to chunking the
+  // navigation into up to 3 columns when no footerLinks have been saved so
+  // long-standing tenants keep their existing layout.
+  const footerSections = resolveFooterSections(footerLinks, isRtl);
+  const useDefaultNavChunks = footerSections.length === 0;
   const navChunks: (typeof navigation)[] = [];
-  for (let i = 0; i < navigation.length; i += chunkSize) {
-    navChunks.push(navigation.slice(i, i + chunkSize));
+  if (useDefaultNavChunks && navigation.length > 0) {
+    const chunkSize = Math.ceil(navigation.length / 3);
+    for (let i = 0; i < navigation.length; i += chunkSize) {
+      navChunks.push(navigation.slice(i, i + chunkSize));
+    }
   }
 
   return (
@@ -111,40 +122,61 @@ export default function ClassicFooter({
             )}
           </div>
 
-          {/* Navigation columns */}
-          {navChunks.map((chunk, ci) => (
-            <div key={ci}>
-              <h4 className="font-serif text-xs uppercase tracking-[0.2em] text-foreground mb-5">
-                {ci === 0
-                  ? isRtl
-                    ? 'روابط'
-                    : 'Links'
-                  : ci === 1
-                    ? isRtl
-                      ? 'تسوق'
-                      : 'Shop'
-                    : ci === 2
+          {/* Navigation columns — per-store sections when configured, else
+              chunked navigation as before. */}
+          {footerSections.length > 0
+            ? footerSections.map(section => (
+                <div key={section.key}>
+                  <h4 className="font-serif text-xs uppercase tracking-[0.2em] text-foreground mb-5">
+                    {section.heading}
+                  </h4>
+                  <ul className="space-y-3">
+                    {section.links.map(link => (
+                      <li key={link.href}>
+                        <Link
+                          href={link.href}
+                          className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                        >
+                          {link.label}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))
+            : navChunks.map((chunk, ci) => (
+                <div key={ci}>
+                  <h4 className="font-serif text-xs uppercase tracking-[0.2em] text-foreground mb-5">
+                    {ci === 0
                       ? isRtl
-                        ? 'مساعدة'
-                        : 'Help'
-                      : isRtl
-                        ? 'المزيد'
-                        : 'More'}
-              </h4>
-              <ul className="space-y-3">
-                {chunk.map(item => (
-                  <li key={item.href}>
-                    <Link
-                      href={item.href}
-                      className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                    >
-                      {isRtl && item.labelAr ? item.labelAr : item.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+                        ? 'روابط'
+                        : 'Links'
+                      : ci === 1
+                        ? isRtl
+                          ? 'تسوق'
+                          : 'Shop'
+                        : ci === 2
+                          ? isRtl
+                            ? 'مساعدة'
+                            : 'Help'
+                          : isRtl
+                            ? 'المزيد'
+                            : 'More'}
+                  </h4>
+                  <ul className="space-y-3">
+                    {chunk.map(item => (
+                      <li key={item.href}>
+                        <Link
+                          href={item.href}
+                          className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                        >
+                          {isRtl && item.labelAr ? item.labelAr : item.label}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
         </div>
 
         {/* Divider */}
