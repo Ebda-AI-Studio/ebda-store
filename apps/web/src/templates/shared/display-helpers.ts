@@ -5,7 +5,19 @@
  * logic that was previously duplicated in every template.
  */
 
-import type { StoreBranding } from '../types';
+import type { FooterLinkSection, FooterLinksConfig, StoreBranding } from '../types';
+
+/**
+ * A single footer column ready to render: header copy already picked for the
+ * active direction, plus the filtered/active links. The `key` is stable
+ * (`shop` / `company` / `support`) so templates can react keys + apply
+ * section-specific styling if needed.
+ */
+export interface ResolvedFooterSection {
+  key: 'shop' | 'company' | 'support';
+  heading: string;
+  links: Array<{ label: string; href: string }>;
+}
 
 /**
  * Return the appropriate text based on RTL mode.
@@ -42,4 +54,58 @@ export function getDisplayBranding(
 export function calculateDiscount(price: number, compareAtPrice: number | undefined): number {
   if (!compareAtPrice || compareAtPrice <= price) return 0;
   return Math.round(((compareAtPrice - price) / compareAtPrice) * 100);
+}
+
+const FOOTER_SECTION_HEADINGS: Record<ResolvedFooterSection['key'], { en: string; ar: string }> = {
+  shop: { en: 'Shop', ar: 'تسوق' },
+  company: { en: 'Company', ar: 'الشركة' },
+  support: { en: 'Support', ar: 'الدعم' },
+};
+
+function resolveFooterSection(
+  key: ResolvedFooterSection['key'],
+  links: FooterLinkSection[] | undefined,
+  isRtl: boolean
+): ResolvedFooterSection | null {
+  if (!Array.isArray(links) || links.length === 0) return null;
+  const active = links
+    .filter(link => link.enabled !== false)
+    .map(link => ({
+      label: getDisplayText(link.name, link.nameAr, isRtl),
+      href: link.href,
+    }));
+  if (active.length === 0) return null;
+  return {
+    key,
+    heading: isRtl ? FOOTER_SECTION_HEADINGS[key].ar : FOOTER_SECTION_HEADINGS[key].en,
+    links: active,
+  };
+}
+
+/**
+ * Turn the raw `FooterLinksConfig` into the ordered list of sections each
+ * template should render. Empty/disabled-only sections are dropped, and
+ * Arabic labels are picked when `isRtl` is true. Returns `[]` when no
+ * section has any active links — templates use that to fall back to their
+ * built-in default column layout.
+ */
+export function resolveFooterSections(
+  config: FooterLinksConfig | undefined,
+  isRtl: boolean
+): ResolvedFooterSection[] {
+  if (!config) return [];
+  return [
+    resolveFooterSection('shop', config.shop, isRtl),
+    resolveFooterSection('company', config.company, isRtl),
+    resolveFooterSection('support', config.support, isRtl),
+  ].filter((s): s is ResolvedFooterSection => s !== null);
+}
+
+/**
+ * Whether the newsletter form should render given the per-store config.
+ * Defaults to `true` (preserve existing behaviour) when the config or the
+ * `newsletterEnabled` flag is absent.
+ */
+export function isNewsletterEnabled(config: FooterLinksConfig | undefined): boolean {
+  return config?.newsletterEnabled !== false;
 }

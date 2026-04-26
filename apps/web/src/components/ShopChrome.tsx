@@ -5,7 +5,7 @@ import { useStore, useStoreBranding, useStoreContact, useStoreUrl } from '../con
 import { useLanguage } from '../contexts/LanguageContext';
 import { useCart } from '../contexts/CartContext';
 import { useTemplateComponents } from '../hooks/useTemplateComponents';
-import type { NavItem } from '../templates/types';
+import type { FooterLinkSection, FooterLinksConfig, NavItem } from '../templates/types';
 import { ReactNode } from 'react';
 
 /**
@@ -53,6 +53,48 @@ export function ShopChrome({ children }: { children: ReactNode }) {
           href: item.href.startsWith('http') ? item.href : storeUrl(item.href),
         }))
     : defaultNav;
+
+  // Per-store footer columns are saved in `store.settings.footerLinks` by the
+  // admin's pages settings UI. Mirror the navMenu treatment: only forward if
+  // the saved value is a plain object, drop malformed sections, and rewrite
+  // relative hrefs through storeUrl() so multi-tenant platform URLs get the
+  // correct slug prefix. Each template handles a missing/empty config by
+  // falling back to its built-in default layout.
+  const rawFooterLinks = store.settings?.footerLinks;
+  const footerLinks: FooterLinksConfig | undefined =
+    rawFooterLinks && typeof rawFooterLinks === 'object' && !Array.isArray(rawFooterLinks)
+      ? (() => {
+          const src = rawFooterLinks as Record<string, unknown>;
+          const normalizeSection = (value: unknown): FooterLinkSection[] | undefined => {
+            if (!Array.isArray(value)) return undefined;
+            const items = value
+              .filter(
+                (
+                  item
+                ): item is { name: string; href: string; nameAr?: string; enabled?: boolean } =>
+                  !!item &&
+                  typeof item === 'object' &&
+                  typeof (item as { name?: unknown }).name === 'string' &&
+                  typeof (item as { href?: unknown }).href === 'string'
+              )
+              .map(item => ({
+                name: item.name,
+                nameAr: typeof item.nameAr === 'string' ? item.nameAr : undefined,
+                href: item.href.startsWith('http') ? item.href : storeUrl(item.href),
+                enabled: typeof item.enabled === 'boolean' ? item.enabled : true,
+              }));
+            return items.length ? items : undefined;
+          };
+          const newsletter =
+            typeof src.newsletterEnabled === 'boolean' ? src.newsletterEnabled : undefined;
+          return {
+            shop: normalizeSection(src.shop),
+            company: normalizeSection(src.company),
+            support: normalizeSection(src.support),
+            newsletterEnabled: newsletter,
+          };
+        })()
+      : undefined;
 
   const handleSearch = (query: string) => {
     router.push(storeUrl(`/search?q=${encodeURIComponent(query)}`));
@@ -106,6 +148,7 @@ export function ShopChrome({ children }: { children: ReactNode }) {
         }}
         socials={contact.socialLinks}
         navigation={navigation}
+        footerLinks={footerLinks}
         isRtl={isRtl}
         urlPrefix={urlPrefix}
       />

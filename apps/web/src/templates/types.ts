@@ -93,6 +93,33 @@ export interface HeaderProps {
 }
 
 /**
+ * A single link inside a footer column. Saved per-tenant in
+ * `store.settings.footerLinks` via the admin's footer-settings page. The
+ * `enabled` flag lets owners toggle items off without deleting them; absent
+ * or `true` means the link renders.
+ */
+export interface FooterLinkSection {
+  name: string;
+  nameAr?: string;
+  href: string;
+  enabled?: boolean;
+}
+
+/**
+ * Per-store footer configuration sourced from `store.settings.footerLinks`.
+ * Each section is independently optional — the template falls back to its
+ * own default column layout when the whole config (or every section) is
+ * missing/empty. `newsletterEnabled` defaults to `true` when undefined so
+ * stores that haven't touched the setting keep showing the form.
+ */
+export interface FooterLinksConfig {
+  shop?: FooterLinkSection[];
+  company?: FooterLinkSection[];
+  support?: FooterLinkSection[];
+  newsletterEnabled?: boolean;
+}
+
+/**
  * Footer component props
  */
 export interface FooterProps {
@@ -100,6 +127,12 @@ export interface FooterProps {
   contact: StoreContact;
   socials: StoreSocials;
   navigation?: NavItem[];
+  /**
+   * Per-store footer columns (shop / company / support) and newsletter
+   * toggle. When undefined or every section is empty, the template renders
+   * its built-in default layout instead.
+   */
+  footerLinks?: FooterLinksConfig;
   isRtl?: boolean;
   urlPrefix?: string;
 }
