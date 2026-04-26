@@ -251,14 +251,17 @@ describe('Checkout Flow', () => {
         data: {
           storeId: testStoreId!,
           code: `TEST-${Date.now()}`,
-          discountType: 'percentage',
-          discountValue: 10, // 10% off
-          minOrderValue: 5000,
+          name: 'Test Coupon',
+          // schema renamed these fields — value/minOrderAmount/expires* —
+          // mirror the production model exactly here.
+          type: 'percentage',
+          value: 10, // 10% off
+          minOrderAmount: 5000,
           usageLimit: 100,
           usageCount: 0,
           isActive: true,
-          validFrom: new Date(Date.now() - 86400000),
-          validUntil: new Date(Date.now() + 86400000),
+          startsAt: new Date(Date.now() - 86400000),
+          expiresAt: new Date(Date.now() + 86400000),
         },
       });
       couponId = coupon.id;

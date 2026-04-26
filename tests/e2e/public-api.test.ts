@@ -64,23 +64,26 @@ describe('Public Storefront API', () => {
     });
     testStoreId = store.id;
 
-    // Create test category
+    // Create test category. The Category model has no `status` enum —
+    // use the `isActive` boolean instead.
     const category = await prisma.category.create({
       data: {
         storeId: store.id,
         name: 'Test Category',
         nameAr: 'فئة اختبار',
         slug: `test-category-${Date.now()}`,
-        status: 'active',
+        isActive: true,
       },
     });
     testCategoryId = category.id;
 
-    // Create test products
+    // Create test products. Product ↔ Category is a many-to-many join
+    // (`ProductCategory`), and images are a separate `ProductImage` table —
+    // neither the direct `categoryId` nor an `images: string[]` shortcut
+    // exists on the model.
     const product = await prisma.product.create({
       data: {
         storeId: store.id,
-        categoryId: category.id,
         name: 'Public Test Product',
         nameAr: 'منتج اختبار عام',
         slug: `public-test-product-${Date.now()}`,
@@ -89,7 +92,13 @@ describe('Public Storefront API', () => {
         compareAtPrice: 7500,
         inventory: 50,
         status: 'active',
-        images: ['https://example.com/image1.jpg', 'https://example.com/image2.jpg'],
+        categories: { create: [{ categoryId: category.id }] },
+        images: {
+          create: [
+            { url: 'https://example.com/image1.jpg', position: 0 },
+            { url: 'https://example.com/image2.jpg', position: 1 },
+          ],
+        },
       },
     });
     testProductId = product.id;
@@ -99,12 +108,12 @@ describe('Public Storefront API', () => {
       await prisma.product.create({
         data: {
           storeId: store.id,
-          categoryId: category.id,
           name: `Additional Product ${i + 1}`,
           slug: `additional-product-${i + 1}-${Date.now()}`,
           price: 3000 + i * 1000,
           inventory: 20,
           status: 'active',
+          categories: { create: [{ categoryId: category.id }] },
         },
       });
     }
