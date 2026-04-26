@@ -1,3 +1,4 @@
+import { randomBytes } from 'crypto';
 import { prisma, Prisma } from '@force/database';
 import { redis } from './redis.service';
 import { featureService } from './feature.service';
@@ -76,9 +77,8 @@ function slugify(text: string): string {
 }
 
 function randomChars(length: number): string {
-  const crypto = require('crypto');
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-  const bytes = crypto.randomBytes(length);
+  const bytes = randomBytes(length);
   let result = '';
   for (let i = 0; i < length; i++) {
     result += chars.charAt(bytes[i] % chars.length);

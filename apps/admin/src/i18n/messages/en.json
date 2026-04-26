@@ -335,6 +335,7 @@
         "backToStore": "Back to Store"
       },
       "filters": {
+        "ariaLabel": "Filter products by status",
         "searchPlaceholder": "Search products...",
         "all": "All",
         "active": "Active",
@@ -692,6 +693,17 @@
         "markPaid": "Mark as Paid",
         "processing": "Processing...",
         "clearSelection": "Clear selection"
+      },
+      "status": {
+        "pending": "Pending",
+        "confirmed": "Confirmed",
+        "processing": "Processing",
+        "shipped": "Shipped",
+        "delivered": "Delivered",
+        "cancelled": "Cancelled",
+        "refunded": "Refunded",
+        "paid": "Paid",
+        "unpaid": "Unpaid"
       },
       "table": {
         "label": "Orders",

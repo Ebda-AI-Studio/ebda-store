@@ -254,12 +254,15 @@ export class ProvisioningService {
       limit?: number;
       status?: string;
       search?: string;
+      /** When set, only stores owned by this user are returned (store_admin scoping). */
+      ownerId?: string;
     } = {}
   ) {
-    const { page = 1, limit = 20, status, search } = options;
+    const { page = 1, limit = 20, status, search, ownerId } = options;
     const skip = (page - 1) * limit;
 
     const where: Prisma.StoreWhereInput = {};
+    if (ownerId) where.ownerId = ownerId;
     if (status) where.status = status as StoreStatus;
     if (search) {
       where.OR = [

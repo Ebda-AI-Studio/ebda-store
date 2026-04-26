@@ -29,11 +29,14 @@ function MarketingPixelsInner({ pixels }: MarketingPixelsProps) {
   const { isEnabled } = useFeatures();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const featureEnabled = isEnabled('marketing_pixels');
 
-  if (!isEnabled('marketing_pixels')) return null;
-
-  // Track page views on route change
+  // Track page views on route change. The hook MUST be unconditional —
+  // moving the early-return above this useEffect violates rules-of-hooks.
+  // Instead we gate the body on `featureEnabled` so it no-ops when the
+  // feature is off, and short-circuit the render below the hook.
   useEffect(() => {
+    if (!featureEnabled) return;
     if (typeof window === 'undefined') return;
 
     // Meta Pixel PageView
@@ -60,7 +63,9 @@ function MarketingPixelsInner({ pixels }: MarketingPixelsProps) {
     if (pixels.pinterest?.enabled && 'pintrk' in window) {
       (window as { pintrk: (...args: string[]) => void }).pintrk('page');
     }
-  }, [pathname, searchParams, pixels]);
+  }, [pathname, searchParams, pixels, featureEnabled]);
+
+  if (!featureEnabled) return null;
 
   // Validate all pixel IDs before rendering
   const validMeta = pixels.meta?.enabled && isValidPixelId(pixels.meta.pixelId);

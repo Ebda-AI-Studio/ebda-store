@@ -47,11 +47,14 @@ export function slugify(text: string): string {
  */
 export function generateId(length = 12): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  const bytes =
-    typeof globalThis.crypto !== 'undefined' && globalThis.crypto.getRandomValues
-      ? globalThis.crypto.getRandomValues(new Uint8Array(length))
-      : require('crypto').randomBytes(length);
-  return Array.from(bytes as Uint8Array, (b: number) => chars[b % chars.length]).join('');
+  // WebCrypto is available in every supported runtime (Node 18+, Edge,
+  // browsers). The previous `require('crypto')` fallback was a leftover
+  // for ancient Node and tripped @typescript-eslint/no-require-imports.
+  if (typeof globalThis.crypto === 'undefined' || !globalThis.crypto.getRandomValues) {
+    throw new Error('generateId requires a runtime with WebCrypto (Node 18+, Edge, browser)');
+  }
+  const bytes = globalThis.crypto.getRandomValues(new Uint8Array(length));
+  return Array.from(bytes, (b: number) => chars[b % chars.length]).join('');
 }
 
 /**

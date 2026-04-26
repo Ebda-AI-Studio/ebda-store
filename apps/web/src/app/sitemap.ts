@@ -6,7 +6,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const siteUrl = getSiteUrl();
 
   // Try to resolve store for API headers — gracefully degrade if unavailable
-  let storeHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+  const storeHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
   try {
     const { getStore } = await import('../lib/store-resolver');
     const store = await getStore();

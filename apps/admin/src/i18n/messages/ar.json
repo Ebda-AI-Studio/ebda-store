@@ -335,6 +335,7 @@
         "backToStore": "العودة إلى المتجر"
       },
       "filters": {
+        "ariaLabel": "تصفية المنتجات حسب الحالة",
         "searchPlaceholder": "البحث عن منتجات...",
         "all": "الكل",
         "active": "نشط",
@@ -692,6 +693,17 @@
         "markPaid": "تعليم كمدفوع",
         "processing": "جارٍ المعالجة...",
         "clearSelection": "إلغاء التحديد"
+      },
+      "status": {
+        "pending": "قيد الانتظار",
+        "confirmed": "مؤكد",
+        "processing": "قيد المعالجة",
+        "shipped": "تم الشحن",
+        "delivered": "تم التسليم",
+        "cancelled": "ملغى",
+        "refunded": "مُسترد",
+        "paid": "مدفوع",
+        "unpaid": "غير مدفوع"
       },
       "table": {
         "label": "الطلبات",

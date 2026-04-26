@@ -4,6 +4,7 @@ import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { featureService } from '../services/feature.service';
 import { recommendationService } from '../services/recommendation.service';
+import logger from '../lib/logger';
 
 const router = Router();
 
@@ -123,7 +124,6 @@ router.post(
 
       // Kick off async — don't await so request returns immediately
       recommendationService.recalculateFBT(storeId).catch(err => {
-        const logger = require('../lib/logger').default;
         logger.error({ err, storeId }, '[FBT] Manual recalculation failed');
       });
 
