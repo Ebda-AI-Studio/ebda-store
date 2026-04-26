@@ -38,7 +38,7 @@ export function CategoryStrip({
           pack={pack}
         />
         <ul
-          className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 sm:gap-6 lg:gap-8"
+          className="-mx-4 flex snap-x snap-mandatory gap-5 overflow-x-auto px-4 pb-4 sm:gap-7 lg:gap-10"
           style={{ scrollbarWidth: 'thin' }}
         >
           {categories.map(cat => {
@@ -47,11 +47,11 @@ export function CategoryStrip({
             return (
               <li
                 key={cat.id}
-                className="snap-start shrink-0 w-[40vw] sm:w-[28vw] lg:w-[18vw] max-w-[260px]"
+                className="snap-start shrink-0 w-[42vw] sm:w-[28vw] lg:w-[20vw] max-w-[280px]"
               >
                 <Link
                   href={href}
-                  className="group block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                  className="group block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-4 rounded-2xl"
                 >
                   <div className={`relative aspect-square overflow-hidden ${styles.categoryFrame}`}>
                     {cat.image ? (
@@ -59,13 +59,13 @@ export function CategoryStrip({
                         src={cat.image}
                         alt={name ?? ''}
                         fill
-                        sizes="(max-width: 640px) 40vw, (max-width: 1024px) 28vw, 18vw"
-                        className="object-cover transition-transform duration-300 group-hover:scale-105"
+                        sizes="(max-width: 640px) 42vw, (max-width: 1024px) 28vw, 20vw"
+                        className="object-cover transition-transform duration-500 ease-out group-hover:scale-105"
                       />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center text-muted-foreground">
                         <svg
-                          className="h-10 w-10"
+                          className="h-12 w-12"
                           fill="none"
                           viewBox="0 0 24 24"
                           stroke="currentColor"
@@ -81,7 +81,7 @@ export function CategoryStrip({
                       </div>
                     )}
                   </div>
-                  <p className={`mt-3 text-center line-clamp-2 ${styles.categoryCaption}`}>
+                  <p className={`mt-4 text-center line-clamp-2 ${styles.categoryCaption}`}>
                     {name}
                   </p>
                 </Link>

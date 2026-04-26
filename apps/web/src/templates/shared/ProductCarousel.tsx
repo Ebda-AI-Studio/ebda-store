@@ -42,7 +42,7 @@ export function ProductCarousel({
           pack={pack}
         />
         <ul
-          className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 sm:gap-4"
+          className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-4 sm:gap-6 lg:gap-8"
           style={{ scrollbarWidth: 'thin' }}
         >
           {products.map(product => {
@@ -54,12 +54,12 @@ export function ProductCarousel({
             return (
               <li
                 key={product.id}
-                className="snap-start shrink-0 w-[42vw] sm:w-[28vw] lg:w-[16vw] max-w-[200px]"
+                className="snap-start shrink-0 w-[60vw] sm:w-[36vw] lg:w-[18vw] max-w-[260px]"
               >
-                <div className={`overflow-hidden transition-shadow hover:shadow-md ${styles.card}`}>
+                <div className={`overflow-hidden ${styles.card}`}>
                   <Link
                     href={href}
-                    className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                   >
                     <div className="group/img relative aspect-square overflow-hidden bg-muted">
                       {img ? (
@@ -68,7 +68,7 @@ export function ProductCarousel({
                             src={img}
                             alt={name}
                             fill
-                            sizes="(max-width: 640px) 42vw, (max-width: 1024px) 28vw, 200px"
+                            sizes="(max-width: 640px) 60vw, (max-width: 1024px) 36vw, 260px"
                             className="object-cover transition-opacity duration-500 group-hover/img:opacity-0"
                           />
                           {product.images?.[1]?.url && (
@@ -76,7 +76,7 @@ export function ProductCarousel({
                               src={product.images[1].url}
                               alt={name}
                               fill
-                              sizes="(max-width: 640px) 42vw, (max-width: 1024px) 28vw, 200px"
+                              sizes="(max-width: 640px) 60vw, (max-width: 1024px) 36vw, 260px"
                               loading="lazy"
                               className="absolute inset-0 object-cover opacity-0 transition-opacity duration-500 group-hover/img:opacity-100"
                             />
@@ -101,7 +101,7 @@ export function ProductCarousel({
                         </div>
                       )}
                       {onSale && (
-                        <span className="absolute end-2 top-2 rounded-full bg-destructive px-2 py-0.5 text-[10px] font-semibold text-destructive-foreground">
+                        <span className="absolute end-3 top-3 rounded-full bg-destructive px-2.5 py-1 text-xs font-bold text-destructive-foreground shadow-md">
                           -
                           {Math.round(
                             (1 - product.price / (product.compareAtPrice ?? product.price)) * 100
@@ -110,16 +110,14 @@ export function ProductCarousel({
                         </span>
                       )}
                     </div>
-                    <div className="px-3 py-2.5">
-                      <p className={`line-clamp-2 min-h-[2.5em] ${styles.productCardName}`}>
-                        {name}
-                      </p>
-                      <div className="mt-1 flex items-baseline gap-2">
-                        <span className="font-semibold text-foreground">
+                    <div className="px-4 py-4 space-y-2">
+                      <p className={`line-clamp-2 min-h-[3em] ${styles.productCardName}`}>{name}</p>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-base font-bold text-foreground">
                           {(product.price / 1000).toFixed(3)} {currency}
                         </span>
                         {onSale && product.compareAtPrice && (
-                          <span className="text-xs text-muted-foreground line-through">
+                          <span className="text-sm text-muted-foreground line-through">
                             {(product.compareAtPrice / 1000).toFixed(3)}
                           </span>
                         )}
@@ -130,7 +128,7 @@ export function ProductCarousel({
                     <button
                       type="button"
                       onClick={() => onAddToCart(product.id)}
-                      className={`block w-full text-center transition-colors cursor-pointer ${styles.productCardCta}`}
+                      className={`block w-full text-center cursor-pointer ${styles.productCardCta}`}
                     >
                       {isRtl ? 'إضافة للسلة' : 'Add to cart'}
                     </button>

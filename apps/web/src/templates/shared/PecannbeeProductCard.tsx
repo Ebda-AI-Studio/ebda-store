@@ -135,12 +135,12 @@ function PecannbeeProductCardImpl({
             onClick={handleWishlist}
             aria-label={isRtl ? 'إضافة للمفضلة' : 'Add to wishlist'}
             aria-pressed={isWishlisted}
-            className={`absolute top-2 start-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white shadow-sm transition-all hover:scale-105 cursor-pointer ${
+            className={`absolute top-3 start-3 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-md transition-all hover:scale-110 cursor-pointer ${
               isWishlisted ? 'text-destructive' : 'text-foreground/70 hover:text-foreground'
             }`}
           >
             <svg
-              className="h-4 w-4"
+              className="h-5 w-5"
               fill={isWishlisted ? 'currentColor' : 'none'}
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -157,45 +157,45 @@ function PecannbeeProductCardImpl({
 
           {/* Sold-out ribbon top-END (RTL left, LTR right) */}
           {!inStock && (
-            <span className="absolute top-2 end-2 rounded-full bg-destructive px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-destructive-foreground">
+            <span className="absolute top-3 end-3 rounded-full bg-destructive px-3 py-1 text-xs font-bold uppercase tracking-wide text-destructive-foreground shadow-md">
               {isRtl ? 'نفدت الكمية' : 'Sold out'}
             </span>
           )}
           {/* Sale chip top-END when in stock */}
           {inStock && onSale && (
-            <span className="absolute top-2 end-2 rounded-full bg-foreground px-2 py-0.5 text-[10px] font-semibold text-background">
+            <span className="absolute top-3 end-3 rounded-full bg-foreground px-2.5 py-1 text-xs font-bold text-background shadow-md">
               -{discountPct}%
             </span>
           )}
         </div>
       </Link>
 
-      <div className="flex flex-1 flex-col gap-2 p-3">
+      <div className="flex flex-1 flex-col gap-3 p-4 sm:p-5">
         <Link href={href} className="focus:outline-none focus-visible:underline">
           <p
-            className={`line-clamp-2 min-h-[2.5em] ${styles.productCardName}`}
+            className={`line-clamp-2 min-h-[3em] ${styles.productCardName}`}
             style={{ textWrap: 'balance' }}
           >
             {name}
           </p>
         </Link>
         <div className="flex items-baseline gap-2">
-          <span className="font-semibold text-foreground">
+          <span className="text-lg font-bold text-foreground">
             {(product.price / 1000).toFixed(3)} {currency}
           </span>
           {onSale && product.compareAtPrice && (
-            <span className="text-xs text-muted-foreground line-through">
+            <span className="text-sm text-muted-foreground line-through">
               {(product.compareAtPrice / 1000).toFixed(3)}
             </span>
           )}
         </div>
-        <TaxInclusiveLabel className="block text-[11px] text-muted-foreground" />
+        <TaxInclusiveLabel className="block text-xs text-muted-foreground" />
 
         <button
           type="button"
           disabled={!inStock || isAdding}
           onClick={handleAdd}
-          className={`mt-auto inline-flex w-full items-center justify-center gap-2 ${styles.productCardCta} disabled:cursor-not-allowed disabled:opacity-60`}
+          className={`mt-auto inline-flex w-full items-center justify-center gap-2 min-h-[44px] ${styles.productCardCta} disabled:cursor-not-allowed disabled:opacity-60`}
         >
           {!inStock ? (
             isRtl ? (
@@ -209,7 +209,7 @@ function PecannbeeProductCardImpl({
                 <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
               ) : (
                 <svg
-                  className="h-3.5 w-3.5"
+                  className="h-4 w-4"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"

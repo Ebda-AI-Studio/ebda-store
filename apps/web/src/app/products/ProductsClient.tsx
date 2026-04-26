@@ -459,7 +459,7 @@ export default function ProductsClient({
                 from the `pack` prop (see templates/shared/pack-styles.ts). */}
             {!isLoading && !error && viewMode === 'grid' && (
               <div
-                className="grid gap-3 grid-cols-2 sm:gap-4 md:grid-cols-3 xl:grid-cols-6"
+                className="grid gap-4 grid-cols-2 sm:gap-5 md:grid-cols-3 lg:grid-cols-4 lg:gap-6 xl:grid-cols-5 2xl:grid-cols-6"
                 dir={language === 'ar' ? 'rtl' : 'ltr'}
               >
                 {products.map(p => (

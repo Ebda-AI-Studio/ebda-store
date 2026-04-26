@@ -134,7 +134,7 @@ export function HomePageContent({
 
       {/* Categories — grid or horizontal strip. */}
       {layout.categories.enabled && templateCategories.length > 0 && (
-        <section className="py-10 sm:py-12 lg:py-20">
+        <section className="py-14 sm:py-16 lg:py-24">
           {layout.categories.layout === 'horizontal' && T.CategoryStrip ? (
             <T.CategoryStrip
               categories={templateCategories}
@@ -160,7 +160,7 @@ export function HomePageContent({
       {/* New Arrivals carousel — uses dedicated horizontal strip when the
           pack ships ProductCarousel; falls back to the existing ProductGrid. */}
       {layout.newArrivals.enabled && templateNewArrivals.length > 0 && (
-        <section className="py-10 sm:py-12 lg:py-16">
+        <section className="py-14 sm:py-16 lg:py-20">
           {T.ProductCarousel ? (
             <T.ProductCarousel
               products={templateNewArrivals}
@@ -190,7 +190,7 @@ export function HomePageContent({
 
       {/* Best Sellers carousel */}
       {layout.bestSellers.enabled && templateBestSellers.length > 0 && (
-        <section className="bg-muted/30 py-10 sm:py-12 lg:py-16">
+        <section className="bg-muted/30 py-14 sm:py-16 lg:py-20">
           {T.ProductCarousel ? (
             <T.ProductCarousel
               products={templateBestSellers}
@@ -220,7 +220,7 @@ export function HomePageContent({
 
       {/* Testimonials — auto-hides when no qualifying reviews. */}
       {layout.testimonials.enabled && testimonials.length > 0 && T.TestimonialRow && (
-        <section className="py-10 sm:py-12 lg:py-16">
+        <section className="py-14 sm:py-16 lg:py-20">
           <T.TestimonialRow testimonials={testimonials} isRtl={isRtl} pack={templateId} />
         </section>
       )}
@@ -229,7 +229,7 @@ export function HomePageContent({
       {!layout.newArrivals.enabled &&
         !layout.bestSellers.enabled &&
         templateProducts.length > 0 && (
-          <section className="bg-muted/30 py-10 sm:py-12 lg:py-20">
+          <section className="bg-muted/30 py-14 sm:py-16 lg:py-24">
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
               <T.ProductGrid
                 products={templateProducts}
@@ -244,18 +244,18 @@ export function HomePageContent({
           </section>
         )}
 
-      <section className="force-gradient-primary py-12 sm:py-14 lg:py-20">
+      <section className="force-gradient-primary py-16 sm:py-20 lg:py-24">
         <div className="mx-auto max-w-7xl px-4 text-center sm:px-6 lg:px-8">
           <div className="mx-auto max-w-2xl">
-            <h2 className="text-2xl font-bold text-white sm:text-3xl lg:text-4xl">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white tracking-tight leading-tight">
               {isRtl ? 'جاهز للتسوق؟' : 'Ready to Start Shopping?'}
             </h2>
-            <p className="mx-auto mt-4 max-w-xl text-base sm:text-lg text-primary-foreground/80">
+            <p className="mx-auto mt-5 max-w-xl text-lg sm:text-xl text-primary-foreground/85 leading-relaxed">
               {isRtl
                 ? 'انضم إلى آلاف العملاء الراضين واكتشف منتجاتنا المميزة'
                 : 'Join thousands of satisfied customers and discover our amazing products.'}
             </p>
-            <div className="mt-6 sm:mt-8">
+            <div className="mt-8 sm:mt-10">
               <Link href={storeUrl('/products')}>
                 <Button
                   size="lg"

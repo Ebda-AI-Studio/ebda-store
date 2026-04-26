@@ -21,21 +21,23 @@ export function TestimonialRow({ testimonials, title, titleAr, isRtl, pack }: Te
     <section className="px-4 sm:px-6 lg:px-8" dir={isRtl ? 'rtl' : 'ltr'}>
       <div className="mx-auto max-w-7xl">
         <SectionHeading title={heading} isRtl={isRtl} pack={pack} />
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 lg:gap-8">
           {testimonials.slice(0, 6).map(t => (
             <article key={t.id} className={styles.testimonialCard}>
               <Stars rating={t.rating} />
               {t.title && (
-                <h3 className="mt-3 text-sm font-semibold text-foreground line-clamp-1">
+                <h3 className="mt-4 text-lg font-semibold text-foreground line-clamp-1">
                   {t.title}
                 </h3>
               )}
-              <p className="mt-2 text-sm text-muted-foreground leading-relaxed line-clamp-4">
+              <p className="mt-3 text-base text-foreground/80 leading-relaxed line-clamp-5">
                 {t.comment}
               </p>
-              <footer className="mt-4 border-t border-border pt-3">
+              <footer className="mt-6 border-t border-border pt-4">
                 <p className={styles.testimonialAuthor}>{t.authorName}</p>
-                {t.authorCity && <p className="text-xs text-muted-foreground">{t.authorCity}</p>}
+                {t.authorCity && (
+                  <p className="text-sm text-muted-foreground mt-1">{t.authorCity}</p>
+                )}
               </footer>
             </article>
           ))}
@@ -48,11 +50,11 @@ export function TestimonialRow({ testimonials, title, titleAr, isRtl, pack }: Te
 function Stars({ rating }: { rating: number }) {
   const full = Math.max(0, Math.min(5, Math.round(rating)));
   return (
-    <div className="flex items-center gap-0.5" aria-label={`${full} of 5 stars`}>
+    <div className="flex items-center gap-1" aria-label={`${full} of 5 stars`}>
       {Array.from({ length: 5 }).map((_, i) => (
         <svg
           key={i}
-          className={`h-4 w-4 ${i < full ? 'text-warning' : 'text-muted'}`}
+          className={`h-5 w-5 ${i < full ? 'text-warning' : 'text-muted'}`}
           fill="currentColor"
           viewBox="0 0 20 20"
           aria-hidden
