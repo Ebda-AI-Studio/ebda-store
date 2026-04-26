@@ -7,6 +7,7 @@ import type { ProductCardProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions';
 import { Price } from '@force/ui';
+import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
 import { productCardPropsEqual } from '../shared/product-card-memo';
 
 /**
@@ -91,6 +92,7 @@ function MinimalProductCard({
           showDiscount={false}
           className="text-[11px] tracking-wide font-light text-muted-foreground"
         />
+        <TaxInclusiveLabel className="block text-[10px] tracking-wide font-light text-muted-foreground/70" />
       </div>
     </Link>
   );

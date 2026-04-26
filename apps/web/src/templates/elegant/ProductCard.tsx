@@ -8,6 +8,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions';
 import { Price, ProductBadge, ProductBadgeGroup, AddToCartButton, cn } from '@force/ui';
 import { PlaceholderImageIcon } from '../shared/icons';
+import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
 import { productCardPropsEqual } from '../shared/product-card-memo';
 
 /**
@@ -207,6 +208,7 @@ function ElegantProductCard({
           showDiscount={false}
           className="justify-center text-muted-foreground font-light"
         />
+        <TaxInclusiveLabel className="block text-[10px] tracking-[0.2em] uppercase text-muted-foreground/60" />
       </div>
     </Link>
   );

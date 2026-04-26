@@ -16,6 +16,7 @@ import { trackViewContent, trackAddToCart } from '../../../components/MarketingP
 import { VariantSelector } from '../../../components/VariantSelector';
 import { useTemplateComponents } from '../../../hooks/useTemplateComponents';
 import { toTemplateProduct } from '../../../templates/adapters';
+import { TaxInclusiveLabel } from '../../../templates/shared/tax-inclusive-label';
 import { formatPrice } from '@/lib/format';
 
 // Lazy-load heavy below-the-fold components to reduce initial bundle size
@@ -385,6 +386,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                 </span>
               )}
             </div>
+            <TaxInclusiveLabel className="mt-1 block text-xs text-muted-foreground" />
 
             {product.description && (
               <p className="mt-6 text-muted-foreground leading-relaxed">{product.description}</p>

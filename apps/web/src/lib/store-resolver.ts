@@ -65,6 +65,12 @@ export interface ResolvedStore {
   // General Settings (footer links, etc.)
   settings?: Record<string, unknown>;
 
+  // Tax — when taxIncludedInPrice is true the storefront should label
+  // prices with "Includes VAT" so customers don't expect the tax to be
+  // added on top at checkout. taxEnabled is mirrored for parity.
+  taxEnabled?: boolean;
+  taxIncludedInPrice?: boolean;
+
   // Feature flags
   enabledFeatures?: string[];
 
@@ -204,6 +210,11 @@ async function fetchStoreByDomain(domain: string): Promise<ResolvedStore | null>
           ? (storeData.pwaSettings as Record<string, unknown>)
           : undefined,
       settings: typeof storeData.settings === 'object' ? storeData.settings : undefined,
+      taxEnabled: typeof storeData.taxEnabled === 'boolean' ? storeData.taxEnabled : undefined,
+      taxIncludedInPrice:
+        typeof storeData.taxIncludedInPrice === 'boolean'
+          ? storeData.taxIncludedInPrice
+          : undefined,
       enabledFeatures,
       heroTitle: storeData.heroTitle ?? null,
       heroTitleAr: storeData.heroTitleAr ?? null,
@@ -313,6 +324,11 @@ async function fetchStoreBySlug(slug: string): Promise<ResolvedStore | null> {
           ? (storeData.pwaSettings as Record<string, unknown>)
           : undefined,
       settings: typeof storeData.settings === 'object' ? storeData.settings : undefined,
+      taxEnabled: typeof storeData.taxEnabled === 'boolean' ? storeData.taxEnabled : undefined,
+      taxIncludedInPrice:
+        typeof storeData.taxIncludedInPrice === 'boolean'
+          ? storeData.taxIncludedInPrice
+          : undefined,
       enabledFeatures,
       heroTitle: storeData.heroTitle ?? null,
       heroTitleAr: storeData.heroTitleAr ?? null,
@@ -448,6 +464,11 @@ export async function getStoreById(storeId: string): Promise<ResolvedStore | nul
           ? (storeData.pwaSettings as Record<string, unknown>)
           : undefined,
       settings: typeof storeData.settings === 'object' ? storeData.settings : undefined,
+      taxEnabled: typeof storeData.taxEnabled === 'boolean' ? storeData.taxEnabled : undefined,
+      taxIncludedInPrice:
+        typeof storeData.taxIncludedInPrice === 'boolean'
+          ? storeData.taxIncludedInPrice
+          : undefined,
       heroTitle: storeData.heroTitle ?? null,
       heroTitleAr: storeData.heroTitleAr ?? null,
       heroSubtitle: storeData.heroSubtitle ?? null,

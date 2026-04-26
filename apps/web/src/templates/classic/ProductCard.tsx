@@ -8,6 +8,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions';
 import { Price, ProductBadge, AddToCartButton, cn } from '@force/ui';
 import { PlaceholderImageIcon } from '../shared/icons';
+import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
 import { productCardPropsEqual } from '../shared/product-card-memo';
 
 /**
@@ -138,6 +139,7 @@ function ClassicProductCard({
           showDiscount={false}
           className="justify-center font-serif text-muted-foreground"
         />
+        <TaxInclusiveLabel className="mt-1 block font-serif text-xs text-muted-foreground/70" />
       </div>
     </Link>
   );

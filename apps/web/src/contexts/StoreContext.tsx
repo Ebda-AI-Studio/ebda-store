@@ -82,6 +82,11 @@ export interface StoreData {
   pwaEnabled?: boolean;
   pwaSettings?: Record<string, unknown>;
   settings?: Record<string, unknown>;
+  /** When true, customer-facing prices already include VAT and the
+   * storefront should label them with an "Includes VAT" note so the
+   * customer understands they're not paying tax on top at checkout. */
+  taxEnabled?: boolean;
+  taxIncludedInPrice?: boolean;
   enabledFeatures?: string[];
   heroTitle?: string | null;
   heroTitleAr?: string | null;

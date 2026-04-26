@@ -9,6 +9,7 @@ import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions'
 import { Price, ProductBadge, ProductBadgeGroup, AddToCartButton, cn } from '@force/ui';
 import { calculateDiscount } from '../shared/display-helpers';
 import { PlaceholderImageIcon } from '../shared/icons';
+import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
 import { productCardPropsEqual } from '../shared/product-card-memo';
 
 /**
@@ -151,6 +152,7 @@ function BoldProductCard({
           showDiscount={false}
           className="mt-2 font-black"
         />
+        <TaxInclusiveLabel className="mt-1 block text-xs uppercase tracking-wide text-muted-foreground" />
       </div>
     </Link>
   );

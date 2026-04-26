@@ -9,6 +9,7 @@ import { Price, ProductBadge, ProductBadgeGroup, Rating, AddToCartButton, cn } f
 import { calculateDiscount } from '../shared/display-helpers';
 import { PlaceholderImageIcon } from '../shared/icons';
 import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions';
+import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
 import { productCardPropsEqual } from '../shared/product-card-memo';
 
 /**
@@ -212,6 +213,7 @@ function ModernProductCard({
             size="md"
             showDiscount={false}
           />
+          <TaxInclusiveLabel className="mt-1 block text-xs text-muted-foreground" />
         </div>
       </div>
     </Link>
