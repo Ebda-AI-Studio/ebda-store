@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { api } from '../../lib/api';
 import {
   getDisplayBranding,
   getDisplayText,
@@ -21,10 +22,12 @@ export default function ModernFooter({
   isRtl: isRtlProp,
   urlPrefix = '',
 }: FooterProps) {
-  const { isRtl: ctxIsRtl } = useLanguage();
+  const { isRtl: ctxIsRtl, language } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const [email, setEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const {
     name: displayName,
@@ -41,10 +44,30 @@ export default function ModernFooter({
   const footerSections = resolveFooterSections(footerLinks, isRtl);
   const showNewsletter = isNewsletterEnabled(footerLinks);
 
-  const handleNewsletter = (e: React.FormEvent) => {
+  // Real signup wired to /public/newsletter/subscribe. We tag the source
+  // so admin analytics can tell apart footer signups from any future popup.
+  const handleNewsletter = async (e: React.FormEvent) => {
     e.preventDefault();
-    setEmail('');
-    setSubscribed(true);
+    if (submitting) return;
+    setSubmitting(true);
+    setErrorMsg(null);
+    try {
+      const result = await api.subscribeNewsletter({
+        email: email.trim(),
+        language,
+        source: 'footer',
+      });
+      if (result.success) {
+        setSubscribed(true);
+        setEmail('');
+      } else {
+        setErrorMsg(isRtl ? 'تعذر الاشتراك، حاول لاحقاً' : 'Could not subscribe, please try again');
+      }
+    } catch {
+      setErrorMsg(isRtl ? 'تعذر الاشتراك، حاول لاحقاً' : 'Could not subscribe, please try again');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   // Brand + sections (1 fallback col, or N footerSections) + contact + (newsletter?).
@@ -276,13 +299,26 @@ export default function ModernFooter({
                     className="w-full px-4 py-2.5 bg-white/8 rounded-lg border border-white/10 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 text-sm text-white placeholder:text-gray-500 transition-colors duration-200"
                     dir={isRtl ? 'rtl' : 'ltr'}
                     required
+                    disabled={submitting}
                   />
                   <button
                     type="submit"
-                    className="w-full px-4 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors duration-200 font-semibold text-sm cursor-pointer"
+                    disabled={submitting}
+                    className="w-full px-4 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors duration-200 font-semibold text-sm cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                   >
-                    {isRtl ? 'اشتراك' : 'Subscribe'}
+                    {submitting
+                      ? isRtl
+                        ? 'جاري الاشتراك...'
+                        : 'Subscribing...'
+                      : isRtl
+                        ? 'اشتراك'
+                        : 'Subscribe'}
                   </button>
+                  {errorMsg && (
+                    <p className="text-xs text-destructive" role="alert">
+                      {errorMsg}
+                    </p>
+                  )}
                 </form>
               )}
             </div>

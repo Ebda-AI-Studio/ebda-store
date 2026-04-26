@@ -925,6 +925,10 @@
       "shippingCarriers": {
         "title": "شركات الشحن",
         "description": "تكامل التوصيل مع iCarry و Aramex"
+      },
+      "newsletter": {
+        "title": "مشتركو النشرة الإخبارية",
+        "description": "عرض وتصدير قائمة البريد المسجلة من واجهة متجرك"
       }
     }
   },
@@ -1829,6 +1833,25 @@
     "errors": {
       "network": "خطأ في الشبكة. يرجى المحاولة مرة أخرى.",
       "importFailed": "فشل الاستيراد"
+    }
+  },
+  "newsletter": {
+    "page": {
+      "title": "مشتركو النشرة الإخبارية",
+      "subtitle": "العملاء الذين اشتركوا عبر تذييل واجهة المتجر",
+      "exportCsv": "تصدير CSV",
+      "totalCount": "{count} مشترك",
+      "emptyTitle": "لا يوجد مشتركون بعد",
+      "emptyDescription": "عندما يسجل العملاء في النشرة الإخبارية من واجهة المتجر، ستظهر بياناتهم هنا."
+    },
+    "table": {
+      "email": "البريد الإلكتروني",
+      "language": "اللغة",
+      "source": "المصدر",
+      "status": "الحالة",
+      "subscribedAt": "تاريخ الاشتراك",
+      "active": "نشط",
+      "unsubscribed": "ملغي الاشتراك"
     }
   },
   "abandonedCarts": {

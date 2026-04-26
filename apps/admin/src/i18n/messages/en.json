@@ -925,6 +925,10 @@
       "shippingCarriers": {
         "title": "Shipping Carriers",
         "description": "iCarry and Aramex delivery integration"
+      },
+      "newsletter": {
+        "title": "Newsletter Subscribers",
+        "description": "View and export the email list captured from your storefront"
       }
     }
   },
@@ -1829,6 +1833,25 @@
     "errors": {
       "network": "Network error. Please try again.",
       "importFailed": "Import failed"
+    }
+  },
+  "newsletter": {
+    "page": {
+      "title": "Newsletter Subscribers",
+      "subtitle": "People who signed up via your storefront footer",
+      "exportCsv": "Export CSV",
+      "totalCount": "{count} subscribers",
+      "emptyTitle": "No subscribers yet",
+      "emptyDescription": "When customers submit the newsletter form on your storefront, they appear here."
+    },
+    "table": {
+      "email": "Email",
+      "language": "Language",
+      "source": "Source",
+      "status": "Status",
+      "subscribedAt": "Joined",
+      "active": "Active",
+      "unsubscribed": "Unsubscribed"
     }
   },
   "abandonedCarts": {

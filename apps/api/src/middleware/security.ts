@@ -305,6 +305,25 @@ export const cartLimiter = rateLimit({
   },
 });
 
+// Newsletter signup limiter — stricter than the cart limiter because the
+// signup form has no spam mitigations (no captcha, no email confirmation
+// loop). 5 attempts per minute per IP+session is generous for a real human
+// who fat-fingered their address but cuts off bot enumeration.
+export const newsletterLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 5,
+  message: {
+    success: false,
+    error: { code: 'RATE_LIMITED', message: 'Too many newsletter requests, please slow down.' },
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: req => {
+    const sessionId = req.headers['x-session-id'] as string;
+    return `${sessionId || 'anon'}:${req.ip || 'noip'}`;
+  },
+});
+
 // ==========================================
 // Audit Logging
 // ==========================================

@@ -1513,6 +1513,12 @@ model NewsletterSubscriber {
   email        String
   firstName    String?  @map("first_name")
   lastName     String?  @map("last_name")
+  /// Visitor language at signup ('en' or 'ar'). Lets admins segment
+  /// future campaigns by audience language.
+  language     String?
+  /// Signup origin: 'footer' | 'popup' | 'manual'. Useful for analytics
+  /// + identifying which surface drove the signup.
+  source       String?
   isActive     Boolean  @default(true) @map("is_active")
   subscribedAt DateTime @default(now()) @map("subscribed_at")
   unsubscribedAt DateTime? @map("unsubscribed_at")

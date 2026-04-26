@@ -29,6 +29,7 @@ import abandonedCartRoutes from './abandoned-cart.routes';
 import recommendationRoutes from './recommendation.routes';
 import shippingCarrierRoutes from './shipping-carrier.routes';
 import affiliateRoutes from './affiliate.routes';
+import newsletterRoutes from './newsletter.routes';
 import { tenantContext } from '../middleware/tenant-context';
 
 const router = Router();
@@ -94,6 +95,10 @@ router.use('/public', shippingCarrierRoutes);
 // Affiliate routes (admin + public apply/track)
 router.use('/stores', tenantContext, affiliateRoutes);
 router.use('/public', affiliateRoutes);
+
+// Newsletter admin routes (list + CSV export). Public signup is in
+// public.routes.ts so visitors don't need a JWT to subscribe.
+router.use('/stores', tenantContext, newsletterRoutes);
 
 // Wishlist routes (user-scoped, no store context)
 router.use('/wishlist', wishlistRoutes);

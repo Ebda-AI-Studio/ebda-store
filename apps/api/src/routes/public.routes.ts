@@ -12,6 +12,7 @@ import {
   storeResolveLimiter,
   cartLimiter,
   writeLimiter,
+  newsletterLimiter,
 } from '../middleware/security';
 import { getStoreIdFromRequest } from '../utils/store-helpers';
 import { redis } from '../services/redis.service';
@@ -803,6 +804,85 @@ router.get(
       res.json({
         success: true,
         data: { store, enabledFeatures },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// POST /newsletter/subscribe - Customer newsletter signup
+//
+// Idempotent: re-submitting an already-subscribed email returns 200 with
+// `alreadySubscribed: true` (so the storefront can show the same friendly
+// "thanks!" state without leaking whether the address is on the list to a
+// would-be enumerator). The welcome email is fire-and-forget so SMTP
+// problems don't block the response — the row is the source of truth.
+router.post(
+  '/newsletter/subscribe',
+  newsletterLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const subscribeSchema = z.object({
+        email: z.string().email('Invalid email address').max(254),
+        language: z.enum(['en', 'ar']).optional(),
+        source: z.enum(['footer', 'popup', 'manual']).optional(),
+      });
+
+      const data = subscribeSchema.parse(req.body);
+      const storeId = await getStoreIdFromRequest(req);
+      const normalizedEmail = data.email.trim().toLowerCase();
+
+      const existing = await prisma.newsletterSubscriber.findUnique({
+        where: {
+          storeId_email: { storeId, email: normalizedEmail },
+        },
+      });
+
+      if (existing) {
+        // If they had previously unsubscribed, re-activate the row so the
+        // admin's send count stays correct.
+        if (!existing.isActive) {
+          await prisma.newsletterSubscriber.update({
+            where: { id: existing.id },
+            data: {
+              isActive: true,
+              unsubscribedAt: null,
+              language: data.language ?? existing.language,
+              source: data.source ?? existing.source,
+            },
+          });
+        }
+
+        res.json({
+          success: true,
+          data: { alreadySubscribed: true },
+        });
+        return;
+      }
+
+      await prisma.newsletterSubscriber.create({
+        data: {
+          storeId,
+          email: normalizedEmail,
+          language: data.language ?? null,
+          source: data.source ?? 'footer',
+          isActive: true,
+        },
+      });
+
+      // Fire-and-forget welcome email — don't await so a slow / misconfigured
+      // SMTP server doesn't keep the customer staring at a spinner.
+      EmailService.sendWelcome({ email: normalizedEmail, name: '' }).catch(err => {
+        logger.warn(
+          { err: err instanceof Error ? err.message : 'unknown', storeId },
+          '[NEWSLETTER] welcome email failed'
+        );
+      });
+
+      res.json({
+        success: true,
+        data: { alreadySubscribed: false },
       });
     } catch (error) {
       next(error);

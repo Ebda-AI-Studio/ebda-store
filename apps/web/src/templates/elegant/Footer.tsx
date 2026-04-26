@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { api } from '../../lib/api';
 import { isNewsletterEnabled, resolveFooterSections } from '../shared/display-helpers';
 import { getSocialLinks } from '../shared/icons';
 
@@ -16,7 +17,7 @@ export default function ElegantFooter({
   isRtl: isRtlProp,
   urlPrefix = '',
 }: FooterProps) {
-  const { isRtl: ctxIsRtl } = useLanguage();
+  const { isRtl: ctxIsRtl, language } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const displayName = isRtl && branding.nameAr ? branding.nameAr : branding.name;
   const displayLogo = isRtl && branding.logoAr ? branding.logoAr : branding.logo;
@@ -26,7 +27,37 @@ export default function ElegantFooter({
   const displayAddress = isRtl && contact.addressAr ? contact.addressAr : contact.address;
 
   const socialLinks = getSocialLinks(socials);
+  const [email, setEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Real signup wired to /public/newsletter/subscribe. The Elegant template
+  // never had local form state for the email — adding it here so we can
+  // forward the value and clear it on success.
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (submitting) return;
+    setSubmitting(true);
+    setErrorMsg(null);
+    try {
+      const result = await api.subscribeNewsletter({
+        email: email.trim(),
+        language,
+        source: 'footer',
+      });
+      if (result.success) {
+        setSubscribed(true);
+        setEmail('');
+      } else {
+        setErrorMsg(isRtl ? 'تعذر الاشتراك، حاول لاحقاً' : 'Could not subscribe, please try again');
+      }
+    } catch {
+      setErrorMsg(isRtl ? 'تعذر الاشتراك، حاول لاحقاً' : 'Could not subscribe, please try again');
+    } finally {
+      setSubmitting(false);
+    }
+  };
   // Per-store footer columns replace the single "Explore" column when at
   // least one section has active links. With nothing configured we render
   // the pack's classic Explore / Contact / Follow trio.
@@ -53,29 +84,43 @@ export default function ElegantFooter({
                   {isRtl ? 'شكراً لاشتراكك!' : 'Thank you for subscribing!'}
                 </p>
               ) : (
-                <form
-                  className="flex flex-col gap-2 sm:flex-row sm:gap-0 max-w-md mx-auto"
-                  onSubmit={e => {
-                    e.preventDefault();
-                    setSubscribed(true);
-                  }}
-                >
-                  <input
-                    type="email"
-                    autoComplete="email"
-                    placeholder={isRtl ? 'البريد الإلكتروني' : 'Enter your email'}
-                    aria-label={isRtl ? 'البريد الإلكتروني' : 'Email address'}
-                    className="h-12 flex-1 px-6 bg-background border border-border focus:border-foreground focus:outline-none text-xs tracking-[0.1em] placeholder:text-muted-foreground/40 transition-colors duration-500"
-                    dir={isRtl ? 'rtl' : 'ltr'}
-                    required
-                  />
-                  <button
-                    type="submit"
-                    className="h-12 px-8 bg-foreground text-background text-[10px] tracking-[0.25em] uppercase hover:bg-foreground/80 transition-colors duration-300 cursor-pointer"
+                <>
+                  <form
+                    className="flex flex-col gap-2 sm:flex-row sm:gap-0 max-w-md mx-auto"
+                    onSubmit={handleSubmit}
                   >
-                    {isRtl ? 'اشتراك' : 'Subscribe'}
-                  </button>
-                </form>
+                    <input
+                      type="email"
+                      autoComplete="email"
+                      value={email}
+                      onChange={e => setEmail(e.target.value)}
+                      placeholder={isRtl ? 'البريد الإلكتروني' : 'Enter your email'}
+                      aria-label={isRtl ? 'البريد الإلكتروني' : 'Email address'}
+                      className="h-12 flex-1 px-6 bg-background border border-border focus:border-foreground focus:outline-none text-xs tracking-[0.1em] placeholder:text-muted-foreground/40 transition-colors duration-500"
+                      dir={isRtl ? 'rtl' : 'ltr'}
+                      required
+                      disabled={submitting}
+                    />
+                    <button
+                      type="submit"
+                      disabled={submitting}
+                      className="h-12 px-8 bg-foreground text-background text-[10px] tracking-[0.25em] uppercase hover:bg-foreground/80 transition-colors duration-300 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      {submitting
+                        ? isRtl
+                          ? 'جاري...'
+                          : 'Sending...'
+                        : isRtl
+                          ? 'اشتراك'
+                          : 'Subscribe'}
+                    </button>
+                  </form>
+                  {errorMsg && (
+                    <p className="mt-3 text-[10px] tracking-wide text-destructive" role="alert">
+                      {errorMsg}
+                    </p>
+                  )}
+                </>
               )}
             </div>
           </div>

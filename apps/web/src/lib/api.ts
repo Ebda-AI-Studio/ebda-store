@@ -418,6 +418,22 @@ class ApiClient {
     });
   }
 
+  /**
+   * Subscribe an email to this store's newsletter list. Idempotent — the
+   * API returns `alreadySubscribed: true` for repeat addresses so the UI
+   * can show the same success state without leaking list membership.
+   */
+  async subscribeNewsletter(data: {
+    email: string;
+    language?: 'en' | 'ar';
+    source?: 'footer' | 'popup' | 'manual';
+  }) {
+    return this.request<{ alreadySubscribed: boolean }>('/public/newsletter/subscribe', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   async forgotPassword(email: string) {
     return this.request<{ message: string }>('/auth/forgot-password', {
       method: 'POST',
