@@ -32,7 +32,7 @@ describe('Product Management', () => {
     const user = await prisma.user.create({
       data: {
         email: `product-test-${Date.now()}@example.com`,
-        password: hashedPassword,
+        passwordHash: hashedPassword,
         firstName: 'Product',
         lastName: 'Tester',
         role: 'super_admin',

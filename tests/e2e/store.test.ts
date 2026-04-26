@@ -49,7 +49,7 @@ describe('Store Management', () => {
     const superAdmin = await prisma.user.create({
       data: {
         email: superAdminUser.email,
-        password: hashedPassword,
+        passwordHash: hashedPassword,
         firstName: superAdminUser.firstName,
         lastName: superAdminUser.lastName,
         role: 'super_admin',
@@ -62,7 +62,7 @@ describe('Store Management', () => {
     const storeAdmin = await prisma.user.create({
       data: {
         email: storeAdminUser.email,
-        password: hashedPassword,
+        passwordHash: hashedPassword,
         firstName: storeAdminUser.firstName,
         lastName: storeAdminUser.lastName,
         role: 'store_admin',
@@ -237,7 +237,7 @@ describe('Store Management', () => {
       const otherUser = await prisma.user.create({
         data: {
           email: `other-${Date.now()}@example.com`,
-          password: hashedPassword,
+          passwordHash: hashedPassword,
           firstName: 'Other',
           lastName: 'Admin',
           role: 'store_admin',

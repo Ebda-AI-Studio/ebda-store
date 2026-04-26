@@ -219,6 +219,10 @@ jobs:
           JWT_SECRET: test-jwt-secret-for-ci-only-32chars
           ENCRYPTION_KEY: test-encryption-key-for-ci-32ch
           NODE_ENV: test
+          # Match the value passed to the seed step above so the login test
+          # can authenticate with the seeded super admin.
+          ADMIN_PASSWORD: test-admin-password-ci
+          ADMIN_EMAIL: admin@forcemedia.com
 
       - name: Stop API server
         if: always()

@@ -36,7 +36,7 @@ describe('Order Flow', () => {
     const user = await prisma.user.create({
       data: {
         email: `order-test-${Date.now()}@example.com`,
-        password: hashedPassword,
+        passwordHash: hashedPassword,
         firstName: 'Order',
         lastName: 'Tester',
         role: 'super_admin',
