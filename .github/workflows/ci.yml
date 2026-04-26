@@ -181,6 +181,35 @@ jobs:
           DIRECT_URL: postgresql://test:test@localhost:5432/force_test
           ADMIN_PASSWORD: test-admin-password-ci
 
+      - name: Build API
+        run: npm run build -w apps/api
+
+      - name: Start API server
+        # tests/integration hit a real HTTP server at localhost:4000.
+        # Background-launch the built API and poll /health until it is
+        # ready; tear it down in a later step regardless of test outcome.
+        run: |
+          node apps/api/dist/index.js > /tmp/api-server.log 2>&1 &
+          echo $! > /tmp/api-server.pid
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:4000/health > /dev/null; then
+              echo "API server is healthy after ${i} attempts"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "API server failed to start within 30 seconds"
+          cat /tmp/api-server.log
+          exit 1
+        env:
+          PORT: '4000'
+          DATABASE_URL: postgresql://test:test@localhost:5432/force_test
+          DIRECT_URL: postgresql://test:test@localhost:5432/force_test
+          REDIS_URL: redis://localhost:6379
+          JWT_SECRET: test-jwt-secret-for-ci-only-32chars
+          ENCRYPTION_KEY: test-encryption-key-for-ci-32ch
+          NODE_ENV: test
+
       - name: Run integration tests
         run: npx vitest run tests/integration --reporter=verbose
         env:
@@ -190,6 +219,17 @@ jobs:
           JWT_SECRET: test-jwt-secret-for-ci-only-32chars
           ENCRYPTION_KEY: test-encryption-key-for-ci-32ch
           NODE_ENV: test
+
+      - name: Stop API server
+        if: always()
+        run: |
+          if [ -f /tmp/api-server.pid ]; then
+            kill "$(cat /tmp/api-server.pid)" 2>/dev/null || true
+          fi
+          if [ -f /tmp/api-server.log ]; then
+            echo '--- api server log tail ---'
+            tail -100 /tmp/api-server.log
+          fi
 
   test-e2e:
     name: E2E Tests

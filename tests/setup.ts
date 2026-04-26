@@ -5,11 +5,15 @@
 
 import { beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 
-// Mock environment variables
-process.env.NODE_ENV = 'test';
-process.env.JWT_SECRET = 'test-jwt-secret-key-for-testing';
-process.env.JWT_REFRESH_SECRET = 'test-jwt-refresh-secret-key';
-process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/test_db';
+// Mock environment variables — only set when not already provided by the
+// caller. CI passes a real DATABASE_URL pointing at the test postgres
+// service and we must not clobber it; local unit tests use mocked prisma
+// so the placeholder is fine when nothing is set.
+process.env.NODE_ENV = process.env.NODE_ENV || 'test';
+process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret-key-for-testing';
+process.env.JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'test-jwt-refresh-secret-key';
+process.env.DATABASE_URL =
+  process.env.DATABASE_URL || 'postgresql://test:test@localhost:5432/test_db';
 
 // Global test lifecycle hooks
 beforeAll(async () => {
