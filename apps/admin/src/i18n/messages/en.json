@@ -353,6 +353,8 @@
         "product": "Product",
         "sku": "SKU",
         "price": "Price",
+        "profit": "Profit",
+        "profitHint": "Per-unit margin (price − cost). Set the cost on the product to track profit.",
         "inventory": "Inventory",
         "status": "Status",
         "actions": "Actions",
@@ -1011,6 +1013,7 @@
     },
     "stats": {
       "totalRevenue": "Total Revenue",
+      "totalProfit": "Total Profit",
       "totalOrders": "Total Orders",
       "totalCustomers": "Total Customers",
       "avgOrderValue": "Avg Order Value",

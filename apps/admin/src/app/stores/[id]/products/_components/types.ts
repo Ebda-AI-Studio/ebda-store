@@ -4,6 +4,8 @@ export interface Product {
   nameAr?: string;
   sku: string | null;
   price: number;
+  /** Cost-of-goods in fils. Optional — older rows may not have this set. */
+  costPrice?: number | null;
   inventory: number;
   status: string;
   images: { url: string }[];

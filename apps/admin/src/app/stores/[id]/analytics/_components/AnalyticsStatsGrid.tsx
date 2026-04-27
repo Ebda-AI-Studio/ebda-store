@@ -83,7 +83,7 @@ export function AnalyticsStatsGrid({ stats }: AnalyticsStatsGridProps) {
   const vsLabel = t('vsLastPeriod');
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 stagger-animation">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-8 stagger-animation">
       <StatCard
         title={t('totalRevenue')}
         value={stats?.totalRevenue || 0}
@@ -98,6 +98,24 @@ export function AnalyticsStatsGrid({ stats }: AnalyticsStatsGridProps) {
               strokeLinejoin="round"
               strokeWidth={2}
               d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+        }
+      />
+      <StatCard
+        title={t('totalProfit')}
+        value={stats?.totalProfit || 0}
+        change={stats?.profitChange}
+        format="currency"
+        iconBg="bg-emerald-600"
+        vsLastPeriodLabel={vsLabel}
+        icon={
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M3 17l6-6 4 4 8-8M14 7h7v7"
             />
           </svg>
         }

@@ -52,6 +52,13 @@ export function ProductsTable({
             <th
               scope="col"
               className="px-4 py-3 text-start text-sm font-medium text-muted-foreground"
+              title={t('table.profitHint')}
+            >
+              {t('table.profit')}
+            </th>
+            <th
+              scope="col"
+              className="px-4 py-3 text-start text-sm font-medium text-muted-foreground"
             >
               {t('table.inventory')}
             </th>
@@ -86,6 +93,9 @@ export function ProductsTable({
                   <div className="h-4 w-16 force-skeleton" />
                 </td>
                 <td className="px-4 py-3">
+                  <div className="h-4 w-16 force-skeleton" />
+                </td>
+                <td className="px-4 py-3">
                   <div className="h-4 w-10 force-skeleton" />
                 </td>
                 <td className="px-4 py-3">
@@ -101,7 +111,7 @@ export function ProductsTable({
             ))
           ) : products.length === 0 ? (
             <tr>
-              <td colSpan={6} className="px-4 py-16 text-center">
+              <td colSpan={7} className="px-4 py-16 text-center">
                 <EmptyProductsState storeId={storeId} hasActiveFilters={hasActiveFilters} />
               </td>
             </tr>
@@ -152,6 +162,32 @@ export function ProductsTable({
                   {product.sku || '-'}
                 </td>
                 <td className="px-4 py-3 text-sm font-medium">{formatPrice(product.price)}</td>
+                <td className="px-4 py-3 text-sm">
+                  {/* Per-unit margin = price − costPrice. We render a dash
+                      with a hint when costPrice isn't set so the merchant
+                      knows where to fix it. Loss is highlighted red so
+                      cost > price stays visible. */}
+                  {(() => {
+                    if (product.costPrice == null) {
+                      return (
+                        <span className="text-muted-foreground/70" title={t('table.profitHint')}>
+                          —
+                        </span>
+                      );
+                    }
+                    const margin = product.price - product.costPrice;
+                    const profitable = margin > 0;
+                    return (
+                      <span
+                        className={`font-medium ${
+                          profitable ? 'text-[hsl(var(--success))]' : 'text-destructive'
+                        }`}
+                      >
+                        {formatPrice(margin)}
+                      </span>
+                    );
+                  })()}
+                </td>
                 <td className="px-4 py-3">
                   <span
                     className={`text-sm font-medium ${

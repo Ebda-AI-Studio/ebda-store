@@ -7,6 +7,9 @@ export interface DashboardStats {
   revenueChange: number;
   ordersChange: number;
   customersChange: number;
+  /** Sum of (price - costPrice) * qty across order items in the window. */
+  totalProfit: number;
+  profitChange: number;
 }
 
 export interface SalesData {
