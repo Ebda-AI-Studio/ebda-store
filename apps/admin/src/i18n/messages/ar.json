@@ -882,17 +882,29 @@
           "captionBelow": "اسم الفئة تحت الصورة",
           "captionOverlay": "اسم الفئة فوق الصورة",
           "desktopColumns": "أعمدة الشاشة الكبيرة",
-          "mobileColumns": "أعمدة الجوال"
+          "mobileColumns": "أعمدة الجوال",
+          "headingLabel": "عنوان القسم (إنجليزي)",
+          "headingArLabel": "عنوان القسم (عربي)",
+          "headingPlaceholder": "Shop by Category",
+          "headingArPlaceholder": "تسوق حسب الفئة"
         },
         "newArrivals": {
           "title": "أحدث المنتجات",
           "description": "شريط أفقي بأحدث المنتجات",
-          "limit": "عدد المنتجات"
+          "limit": "عدد المنتجات",
+          "headingLabel": "عنوان القسم (إنجليزي)",
+          "headingArLabel": "عنوان القسم (عربي)",
+          "headingPlaceholder": "New Arrivals",
+          "headingArPlaceholder": "أحدث المنتجات"
         },
         "bestSellers": {
           "title": "الأكثر مبيعاً",
           "description": "شريط أفقي بالأكثر مبيعاً",
-          "limit": "عدد المنتجات"
+          "limit": "عدد المنتجات",
+          "headingLabel": "عنوان القسم (إنجليزي)",
+          "headingArLabel": "عنوان القسم (عربي)",
+          "headingPlaceholder": "Best Sellers",
+          "headingArPlaceholder": "الأكثر مبيعاً"
         },
         "filterSidebar": {
           "title": "شريط فلاتر صفحة الفئة",
@@ -903,7 +915,11 @@
           "title": "آراء العملاء",
           "description": "تختفي تلقائياً عند عدم وجود تقييمات كافية",
           "minRating": "أقل تقييم",
-          "verifiedOnly": "المشتريات الموثقة فقط"
+          "verifiedOnly": "المشتريات الموثقة فقط",
+          "headingLabel": "عنوان القسم (إنجليزي)",
+          "headingArLabel": "عنوان القسم (عربي)",
+          "headingPlaceholder": "Customer Reviews",
+          "headingArPlaceholder": "آراء العملاء"
         },
         "sizing": {
           "title": "مقاسات موحّدة",

@@ -147,98 +147,122 @@ export function HomePageContent({
         />
       )}
 
-      {/* Categories — grid or horizontal strip. */}
-      {layout.categories.enabled && templateCategories.length > 0 && (
-        <section className="py-14 sm:py-16 lg:py-24">
-          {layout.categories.layout === 'horizontal' && T.CategoryStrip ? (
-            <T.CategoryStrip
-              categories={templateCategories}
-              title="Shop by Category"
-              titleAr="تسوق حسب الفئة"
-              seeAllHref={storeUrl('/products')}
-              isRtl={isRtl}
-              pack={templateId}
-            />
-          ) : (
-            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-              <T.CategoryGrid
-                categories={templateCategories}
-                title="Shop by Category"
-                titleAr="تسوق حسب الفئة"
-                isRtl={isRtl}
-              />
-            </div>
-          )}
-        </section>
-      )}
+      {/* Section titles. Each section settings type extends
+          SectionTitleOverride, so the merchant can change the heading
+          via the admin Layout page. Empty / unset falls back to the
+          platform default. */}
+      {(() => {
+        const categoriesTitle = layout.categories.title || 'Shop by Category';
+        const categoriesTitleAr = layout.categories.titleAr || 'تسوق حسب الفئة';
+        const newArrivalsTitle = layout.newArrivals.title || 'New Arrivals';
+        const newArrivalsTitleAr = layout.newArrivals.titleAr || 'أحدث المنتجات';
+        const bestSellersTitle = layout.bestSellers.title || 'Best Sellers';
+        const bestSellersTitleAr = layout.bestSellers.titleAr || 'الأكثر مبيعاً';
+        const testimonialsTitle = layout.testimonials.title || 'Customer Reviews';
+        const testimonialsTitleAr = layout.testimonials.titleAr || 'آراء العملاء';
 
-      {/* New Arrivals carousel — uses dedicated horizontal strip when the
-          pack ships ProductCarousel; falls back to the existing ProductGrid. */}
-      {layout.newArrivals.enabled && templateNewArrivals.length > 0 && (
-        <section className="py-14 sm:py-16 lg:py-20">
-          {T.ProductCarousel ? (
-            <T.ProductCarousel
-              products={templateNewArrivals}
-              title="New Arrivals"
-              titleAr="أحدث المنتجات"
-              seeAllHref={storeUrl('/products?sort=newest')}
-              isRtl={isRtl}
-              currency={store.currency}
-              onAddToCart={handleAddToCart}
-              pack={templateId}
-            />
-          ) : (
-            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-              <T.ProductGrid
-                products={templateNewArrivals}
-                title="New Arrivals"
-                titleAr="أحدث المنتجات"
-                isRtl={isRtl}
-                currency={store.currency}
-                columns={4}
-                onAddToCart={handleAddToCart}
-              />
-            </div>
-          )}
-        </section>
-      )}
+        return (
+          <>
+            {/* Categories — grid or horizontal strip. */}
+            {layout.categories.enabled && templateCategories.length > 0 && (
+              <section className="py-14 sm:py-16 lg:py-24">
+                {layout.categories.layout === 'horizontal' && T.CategoryStrip ? (
+                  <T.CategoryStrip
+                    categories={templateCategories}
+                    title={categoriesTitle}
+                    titleAr={categoriesTitleAr}
+                    seeAllHref={storeUrl('/products')}
+                    isRtl={isRtl}
+                    pack={templateId}
+                  />
+                ) : (
+                  <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                    <T.CategoryGrid
+                      categories={templateCategories}
+                      title={categoriesTitle}
+                      titleAr={categoriesTitleAr}
+                      isRtl={isRtl}
+                    />
+                  </div>
+                )}
+              </section>
+            )}
 
-      {/* Best Sellers carousel */}
-      {layout.bestSellers.enabled && templateBestSellers.length > 0 && (
-        <section className="bg-muted/30 py-14 sm:py-16 lg:py-20">
-          {T.ProductCarousel ? (
-            <T.ProductCarousel
-              products={templateBestSellers}
-              title="Best Sellers"
-              titleAr="الأكثر مبيعاً"
-              seeAllHref={storeUrl('/products?sort=best_seller')}
-              isRtl={isRtl}
-              currency={store.currency}
-              onAddToCart={handleAddToCart}
-              pack={templateId}
-            />
-          ) : (
-            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-              <T.ProductGrid
-                products={templateBestSellers}
-                title="Best Sellers"
-                titleAr="الأكثر مبيعاً"
-                isRtl={isRtl}
-                currency={store.currency}
-                columns={4}
-                onAddToCart={handleAddToCart}
-              />
-            </div>
-          )}
-        </section>
-      )}
+            {/* New Arrivals — pack ProductCarousel or ProductGrid fallback. */}
+            {layout.newArrivals.enabled && templateNewArrivals.length > 0 && (
+              <section className="py-14 sm:py-16 lg:py-20">
+                {T.ProductCarousel ? (
+                  <T.ProductCarousel
+                    products={templateNewArrivals}
+                    title={newArrivalsTitle}
+                    titleAr={newArrivalsTitleAr}
+                    seeAllHref={storeUrl('/products?sort=newest')}
+                    isRtl={isRtl}
+                    currency={store.currency}
+                    onAddToCart={handleAddToCart}
+                    pack={templateId}
+                  />
+                ) : (
+                  <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                    <T.ProductGrid
+                      products={templateNewArrivals}
+                      title={newArrivalsTitle}
+                      titleAr={newArrivalsTitleAr}
+                      isRtl={isRtl}
+                      currency={store.currency}
+                      columns={4}
+                      onAddToCart={handleAddToCart}
+                    />
+                  </div>
+                )}
+              </section>
+            )}
 
-      {/* Testimonials — auto-hides when no qualifying reviews. */}
-      {layout.testimonials.enabled && testimonials.length > 0 && T.TestimonialRow && (
-        <section className="py-14 sm:py-16 lg:py-20">
-          <T.TestimonialRow testimonials={testimonials} isRtl={isRtl} pack={templateId} />
-        </section>
-      )}
+            {/* Best Sellers carousel */}
+            {layout.bestSellers.enabled && templateBestSellers.length > 0 && (
+              <section className="bg-muted/30 py-14 sm:py-16 lg:py-20">
+                {T.ProductCarousel ? (
+                  <T.ProductCarousel
+                    products={templateBestSellers}
+                    title={bestSellersTitle}
+                    titleAr={bestSellersTitleAr}
+                    seeAllHref={storeUrl('/products?sort=best_seller')}
+                    isRtl={isRtl}
+                    currency={store.currency}
+                    onAddToCart={handleAddToCart}
+                    pack={templateId}
+                  />
+                ) : (
+                  <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                    <T.ProductGrid
+                      products={templateBestSellers}
+                      title={bestSellersTitle}
+                      titleAr={bestSellersTitleAr}
+                      isRtl={isRtl}
+                      currency={store.currency}
+                      columns={4}
+                      onAddToCart={handleAddToCart}
+                    />
+                  </div>
+                )}
+              </section>
+            )}
+
+            {/* Testimonials — auto-hides when no qualifying reviews. */}
+            {layout.testimonials.enabled && testimonials.length > 0 && T.TestimonialRow && (
+              <section className="py-14 sm:py-16 lg:py-20">
+                <T.TestimonialRow
+                  testimonials={testimonials}
+                  title={testimonialsTitle}
+                  titleAr={testimonialsTitleAr}
+                  isRtl={isRtl}
+                  pack={templateId}
+                />
+              </section>
+            )}
+          </>
+        );
+      })()}
 
       {/* Featured products fallback when both carousels are disabled OR empty */}
       {!layout.newArrivals.enabled &&

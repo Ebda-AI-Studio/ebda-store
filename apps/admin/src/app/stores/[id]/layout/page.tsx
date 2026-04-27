@@ -215,6 +215,16 @@ export default function StoreLayoutPage() {
                     }
                   />
                 </div>
+                <SectionTitleFields
+                  title={layout.categories.title}
+                  titleAr={layout.categories.titleAr}
+                  labelEn={t('sections.categories.headingLabel')}
+                  labelAr={t('sections.categories.headingArLabel')}
+                  placeholderEn={t('sections.categories.headingPlaceholder')}
+                  placeholderAr={t('sections.categories.headingArPlaceholder')}
+                  onChangeTitle={v => updateSection('categories', s => ({ ...s, title: v }))}
+                  onChangeTitleAr={v => updateSection('categories', s => ({ ...s, titleAr: v }))}
+                />
               </SectionCard>
 
               {/* New arrivals */}
@@ -232,6 +242,16 @@ export default function StoreLayoutPage() {
                   step={1}
                   onChange={v => updateSection('newArrivals', s => ({ ...s, limit: v }))}
                 />
+                <SectionTitleFields
+                  title={layout.newArrivals.title}
+                  titleAr={layout.newArrivals.titleAr}
+                  labelEn={t('sections.newArrivals.headingLabel')}
+                  labelAr={t('sections.newArrivals.headingArLabel')}
+                  placeholderEn={t('sections.newArrivals.headingPlaceholder')}
+                  placeholderAr={t('sections.newArrivals.headingArPlaceholder')}
+                  onChangeTitle={v => updateSection('newArrivals', s => ({ ...s, title: v }))}
+                  onChangeTitleAr={v => updateSection('newArrivals', s => ({ ...s, titleAr: v }))}
+                />
               </SectionCard>
 
               {/* Best sellers */}
@@ -248,6 +268,16 @@ export default function StoreLayoutPage() {
                   max={48}
                   step={1}
                   onChange={v => updateSection('bestSellers', s => ({ ...s, limit: v }))}
+                />
+                <SectionTitleFields
+                  title={layout.bestSellers.title}
+                  titleAr={layout.bestSellers.titleAr}
+                  labelEn={t('sections.bestSellers.headingLabel')}
+                  labelAr={t('sections.bestSellers.headingArLabel')}
+                  placeholderEn={t('sections.bestSellers.headingPlaceholder')}
+                  placeholderAr={t('sections.bestSellers.headingArPlaceholder')}
+                  onChangeTitle={v => updateSection('bestSellers', s => ({ ...s, title: v }))}
+                  onChangeTitleAr={v => updateSection('bestSellers', s => ({ ...s, titleAr: v }))}
                 />
               </SectionCard>
 
@@ -287,6 +317,16 @@ export default function StoreLayoutPage() {
                     onChange={v => updateSection('testimonials', s => ({ ...s, verifiedOnly: v }))}
                   />
                 </div>
+                <SectionTitleFields
+                  title={layout.testimonials.title}
+                  titleAr={layout.testimonials.titleAr}
+                  labelEn={t('sections.testimonials.headingLabel')}
+                  labelAr={t('sections.testimonials.headingArLabel')}
+                  placeholderEn={t('sections.testimonials.headingPlaceholder')}
+                  placeholderAr={t('sections.testimonials.headingArPlaceholder')}
+                  onChangeTitle={v => updateSection('testimonials', s => ({ ...s, title: v }))}
+                  onChangeTitleAr={v => updateSection('testimonials', s => ({ ...s, titleAr: v }))}
+                />
               </SectionCard>
 
               {/* Sizing contract */}
@@ -512,6 +552,44 @@ function SelectField<T extends string | number>({
         ))}
       </select>
     </label>
+  );
+}
+
+function SectionTitleFields({
+  title,
+  titleAr,
+  labelEn,
+  labelAr,
+  placeholderEn,
+  placeholderAr,
+  onChangeTitle,
+  onChangeTitleAr,
+}: {
+  title: string | undefined;
+  titleAr: string | undefined;
+  labelEn: string;
+  labelAr: string;
+  placeholderEn: string;
+  placeholderAr: string;
+  onChangeTitle: (v: string) => void;
+  onChangeTitleAr: (v: string) => void;
+}) {
+  return (
+    <div className="mt-4 grid grid-cols-1 gap-3 border-t border-border pt-4 sm:grid-cols-2">
+      <TextField
+        label={labelEn}
+        placeholder={placeholderEn}
+        value={title ?? ''}
+        onChange={onChangeTitle}
+      />
+      <TextField
+        label={labelAr}
+        placeholder={placeholderAr}
+        value={titleAr ?? ''}
+        onChange={onChangeTitleAr}
+        dir="rtl"
+      />
+    </div>
   );
 }
 

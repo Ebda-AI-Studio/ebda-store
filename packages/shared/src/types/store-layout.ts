@@ -40,7 +40,18 @@ export interface HeroSettings {
 export type CategoriesLayout = 'grid' | 'horizontal';
 export type CategoriesCaption = 'below' | 'overlay';
 
-export interface CategoriesSettings {
+/**
+ * Per-section heading override. When `title` / `titleAr` are non-empty
+ * strings the storefront uses them as the section heading; otherwise the
+ * platform's default applies (e.g. "Shop by Category"). The fields are
+ * optional so old persisted layout blobs keep working.
+ */
+export interface SectionTitleOverride {
+  title?: string;
+  titleAr?: string;
+}
+
+export interface CategoriesSettings extends SectionTitleOverride {
   enabled: boolean;
   layout: CategoriesLayout;
   captionPosition: CategoriesCaption;
@@ -48,7 +59,7 @@ export interface CategoriesSettings {
   mobileColumns: 1 | 2;
 }
 
-export interface ProductCarouselSettings {
+export interface ProductCarouselSettings extends SectionTitleOverride {
   enabled: boolean;
   /** Max products to load */
   limit: number;
@@ -60,7 +71,7 @@ export interface FilterSidebarSettings {
   defaultOpen: boolean;
 }
 
-export interface TestimonialsSettings {
+export interface TestimonialsSettings extends SectionTitleOverride {
   enabled: boolean;
   minRating: number;
   verifiedOnly: boolean;
