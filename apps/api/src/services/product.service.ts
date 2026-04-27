@@ -66,7 +66,10 @@ export class ProductService {
   static async list(storeId: string, options: ListProductsOptions = {}) {
     const { status, category, search, featured } = options;
     const page = Math.max(1, options.page || 1);
-    const limit = Math.min(100, Math.max(1, options.limit || 20));
+    // Cap matches the admin per-page selector's max option (500). 100 was
+    // too low — merchants hitting 200/500 in the UI got silently
+    // truncated to 100, which looked like "products are missing".
+    const limit = Math.min(500, Math.max(1, options.limit || 20));
     const skip = (page - 1) * limit;
 
     const where: Prisma.ProductWhereInput = { storeId, deletedAt: null };

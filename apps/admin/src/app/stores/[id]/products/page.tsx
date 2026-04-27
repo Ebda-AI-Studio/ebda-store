@@ -32,7 +32,7 @@ export default function StoreProductsPage() {
     if (typeof window === 'undefined' || !limitStorageKey) return 25;
     const stored = window.localStorage.getItem(limitStorageKey);
     const parsed = stored ? parseInt(stored, 10) : NaN;
-    return [10, 25, 50, 100, 200].includes(parsed) ? parsed : 25;
+    return [10, 25, 50, 100, 200, 500].includes(parsed) ? parsed : 25;
   })();
 
   const [products, setProducts] = useState<Product[]>([]);
