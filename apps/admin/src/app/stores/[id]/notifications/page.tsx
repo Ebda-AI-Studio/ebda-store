@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useToast } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPut, apiPost } from '../../../../lib/api';
 import { useFeatures } from '../../../../hooks/useFeatures';
+import { useAuth } from '../../../../lib/auth';
 import { useT } from '@/i18n/useT';
 import { NotificationsEmptyState } from './_components/NotificationsEmptyState';
 import { WhatsAppChannelCard } from './_components/WhatsAppChannelCard';
@@ -33,8 +34,10 @@ const CHANNEL_NAME_KEYS: Record<ChannelKey, string> = {
 
 export default function NotificationsPage() {
   const params = useParams();
+  const router = useRouter();
   const storeId = params.id as string;
-  const { isEnabled } = useFeatures();
+  const { isEnabled, isLoading: featuresLoading } = useFeatures();
+  const { user } = useAuth();
   const { success: toastSuccess, error: showError } = useToast();
   const tPage = useT('notifications.page');
   const tShared = useT('notifications.shared');
@@ -66,6 +69,17 @@ export default function NotificationsPage() {
   const smsEnabled = isEnabled('sms');
   const pushEnabled = isEnabled('push_notifications');
   const anyChannelEnabled = whatsappEnabled || smsEnabled || pushEnabled;
+
+  // Hide the page from store_admins when the super_admin hasn't enabled
+  // any notification channels for their store. Super_admins still get
+  // through (they're the ones who flip the toggles). Wait until features
+  // have loaded to avoid a redirect race on first paint.
+  useEffect(() => {
+    if (featuresLoading) return;
+    if (anyChannelEnabled) return;
+    if (user?.role === 'super_admin') return;
+    router.replace(`/stores/${storeId}`);
+  }, [featuresLoading, anyChannelEnabled, user?.role, router, storeId]);
 
   // ─── Data Fetching ──────────────────────────────────────────────────────────
 
