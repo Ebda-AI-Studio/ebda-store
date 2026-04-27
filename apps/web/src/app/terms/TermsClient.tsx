@@ -10,6 +10,10 @@ export default function TermsClient() {
   const { t, language } = useLanguage();
   const { store } = useStore();
   const legalEmail = email || t('our support team', 'فريق الدعم');
+  // Tenant-aware brand string. Storefront is multi-tenant — these terms run
+  // under the merchant's brand, not "Force". Falls back to whichever localized
+  // store name exists if the active language doesn't have one.
+  const brandName = (language === 'ar' ? store.nameAr : store.name) || store.name || store.nameAr;
   return (
     <ShopChrome>
       <div className="mx-auto w-full max-w-3xl flex-1 px-4 py-12 sm:px-6 lg:px-8">
@@ -35,8 +39,8 @@ export default function TermsClient() {
               </h2>
               <p className="mt-2 text-muted-foreground">
                 {t(
-                  'By accessing and using Force Store, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our services.',
-                  'باستخدامك لمتجر Force، فإنك توافق على الالتزام بهذه الشروط والأحكام. إذا كنت لا توافق على هذه الشروط، يرجى عدم استخدام خدماتنا.'
+                  `By accessing and using ${brandName}, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our services.`,
+                  `باستخدامك لمتجر ${brandName}، فإنك توافق على الالتزام بهذه الشروط والأحكام. إذا كنت لا توافق على هذه الشروط، يرجى عدم استخدام خدماتنا.`
                 )}
               </p>
             </section>
@@ -214,8 +218,8 @@ export default function TermsClient() {
               </h2>
               <p className="mt-2 text-muted-foreground">
                 {t(
-                  'All content on this site, including text, graphics, logos, and software, is the property of Force Media and is protected by intellectual property laws. You may not reproduce, distribute, or create derivative works without our written consent.',
-                  'جميع المحتويات على هذا الموقع، بما في ذلك النصوص والرسومات والشعارات والبرامج، هي ملك لـ Force Media ومحمية بقوانين الملكية الفكرية. لا يجوز لك النسخ أو التوزيع أو إنشاء أعمال مشتقة دون موافقتنا الخطية.'
+                  `All content on this site, including text, graphics, logos, and software, is the property of ${brandName} and is protected by intellectual property laws. You may not reproduce, distribute, or create derivative works without our written consent.`,
+                  `جميع المحتويات على هذا الموقع، بما في ذلك النصوص والرسومات والشعارات والبرامج، هي ملك لـ ${brandName} ومحمية بقوانين الملكية الفكرية. لا يجوز لك النسخ أو التوزيع أو إنشاء أعمال مشتقة دون موافقتنا الخطية.`
                 )}
               </p>
             </section>
@@ -226,8 +230,8 @@ export default function TermsClient() {
               </h2>
               <p className="mt-2 text-muted-foreground">
                 {t(
-                  'To the maximum extent permitted by law, Force Media shall not be liable for any indirect, incidental, special, or consequential damages arising from your use of our services.',
-                  'إلى أقصى حد يسمح به القانون، لن تكون Force Media مسؤولة عن أي أضرار غير مباشرة أو عرضية أو خاصة أو تبعية ناتجة عن استخدامك لخدماتنا.'
+                  `To the maximum extent permitted by law, ${brandName} shall not be liable for any indirect, incidental, special, or consequential damages arising from your use of our services.`,
+                  `إلى أقصى حد يسمح به القانون، لن يكون ${brandName} مسؤولاً عن أي أضرار غير مباشرة أو عرضية أو خاصة أو تبعية ناتجة عن استخدامك لخدماتنا.`
                 )}
               </p>
             </section>
