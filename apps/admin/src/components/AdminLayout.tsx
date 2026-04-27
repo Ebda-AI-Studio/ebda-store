@@ -118,8 +118,15 @@ export function AdminLayout({
     return null;
   }, [storeDomain, storeSlug, fetchedStore?.domain, fetchedStore?.slug]);
 
-  // Show back button on all pages except root/dashboard
-  const showBackButton = pathname !== '/' && pathname !== '/dashboard';
+  // Hide the back button on top-level "home" pages — there's nowhere to
+  // go back to. For super_admins that's `/` and `/dashboard`. For
+  // store_admins their home is `/stores/<id>`, the store dashboard, so
+  // we hide the button there too. We match the exact dashboard path
+  // rather than any `/stores/<id>/*` so deeper pages still get the back
+  // button (e.g. `/stores/<id>/orders` should show it).
+  const isStoreDashboard =
+    /^\/stores\/[^/]+\/?$/.test(pathname) || pathname === '/' || pathname === '/dashboard';
+  const showBackButton = !isStoreDashboard;
 
   // Store admin nav is computed dynamically so that Customers and Analytics
   // resolve to store-scoped URLs (/stores/:id/customers, /stores/:id/analytics)
