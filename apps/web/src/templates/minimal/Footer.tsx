@@ -66,7 +66,7 @@ export default function MinimalFooter({
                 <a
                   key={href}
                   href={href}
-                  className="text-[11px] tracking-wide text-muted-foreground hover:text-foreground transition-colors duration-200"
+                  className="text-sm tracking-wide text-muted-foreground hover:text-foreground transition-colors duration-200"
                 >
                   {label}
                 </a>
@@ -74,26 +74,29 @@ export default function MinimalFooter({
             </nav>
           )}
 
-          {/* Social + legal */}
-          <div className={`flex items-center gap-5 ${isRtl ? 'flex-row-reverse' : ''}`}>
-            {socialEntries.map(([key, url]) => (
-              <a
-                key={key}
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[10px] tracking-widest uppercase text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer"
-                aria-label={key}
-              >
-                {key}
-              </a>
-            ))}
-          </div>
+          {/* Social — only render the row when at least one social link is
+              configured, so empty stores don't show a hollow column. */}
+          {socialEntries.length > 0 && (
+            <div className={`flex items-center gap-5 ${isRtl ? 'flex-row-reverse' : ''}`}>
+              {socialEntries.map(([key, url]) => (
+                <a
+                  key={key}
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs tracking-widest uppercase text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer"
+                  aria-label={key}
+                >
+                  {key}
+                </a>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Bottom bar — copyright + legal links */}
         <div
-          className={`mt-10 pt-6 border-t border-border/20 flex flex-col sm:flex-row items-center justify-between gap-3 text-[10px] text-muted-foreground ${
+          className={`mt-10 pt-6 border-t border-border/20 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground ${
             isRtl ? 'flex-row-reverse' : ''
           }`}
         >

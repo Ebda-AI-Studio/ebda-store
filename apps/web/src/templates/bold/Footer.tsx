@@ -30,10 +30,14 @@ export default function BoldFooter({
   // newsletter form so newsletterEnabled does not apply here.
   const footerSections = resolveFooterSections(footerLinks, isRtl);
 
+  // Hide the contact column entirely when the store has no contact details
+  // configured — empty heading + empty list reads as half-built.
+  const hasContact = !!(contact.email || displayPhone || displayAddress);
+
   // Brand always spans 2 cols. With sections (1 fallback or N footerSections)
-  // + contact, total cells = 2 + N + 1. Grow the lg grid accordingly.
+  // + (contact?), total cells = 2 + N + (hasContact ? 1 : 0).
   const linkColumnsCount = footerSections.length > 0 ? footerSections.length : 1;
-  const totalCells = 2 + linkColumnsCount + 1;
+  const totalCells = 2 + linkColumnsCount + (hasContact ? 1 : 0);
   const lgColsClass =
     totalCells >= 6 ? 'lg:grid-cols-6' : totalCells === 5 ? 'lg:grid-cols-5' : 'lg:grid-cols-4';
 
@@ -133,36 +137,39 @@ export default function BoldFooter({
             </div>
           )}
 
-          {/* Contact */}
-          <div>
-            <h4 className="text-xs font-black uppercase tracking-[0.2em] mb-6 text-white">
-              {isRtl ? 'تواصل معنا' : 'Get in Touch'}
-            </h4>
-            <ul className="space-y-3">
-              {contact.email && (
-                <li>
-                  <a
-                    href={`mailto:${contact.email}`}
-                    className="text-sm text-gray-300 hover:text-primary transition-colors duration-200 font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                  >
-                    {contact.email}
-                  </a>
-                </li>
-              )}
-              {displayPhone && (
-                <li>
-                  <a
-                    href={`tel:${contact.phone}`}
-                    className="text-sm text-gray-300 hover:text-primary transition-colors duration-200 font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                    dir="ltr"
-                  >
-                    {displayPhone}
-                  </a>
-                </li>
-              )}
-              {displayAddress && <li className="text-sm text-gray-300">{displayAddress}</li>}
-            </ul>
-          </div>
+          {/* Contact — gated on hasContact so empty stores don't show a
+              hollow column. */}
+          {hasContact && (
+            <div>
+              <h4 className="text-xs font-black uppercase tracking-[0.2em] mb-6 text-white">
+                {isRtl ? 'تواصل معنا' : 'Get in Touch'}
+              </h4>
+              <ul className="space-y-3">
+                {contact.email && (
+                  <li>
+                    <a
+                      href={`mailto:${contact.email}`}
+                      className="text-sm text-gray-300 hover:text-primary transition-colors duration-200 font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                    >
+                      {contact.email}
+                    </a>
+                  </li>
+                )}
+                {displayPhone && (
+                  <li>
+                    <a
+                      href={`tel:${contact.phone}`}
+                      className="text-sm text-gray-300 hover:text-primary transition-colors duration-200 font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                      dir="ltr"
+                    >
+                      {displayPhone}
+                    </a>
+                  </li>
+                )}
+                {displayAddress && <li className="text-sm text-gray-300">{displayAddress}</li>}
+              </ul>
+            </div>
+          )}
         </div>
 
         {/* Bottom bar */}

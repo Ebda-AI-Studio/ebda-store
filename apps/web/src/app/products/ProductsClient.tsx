@@ -17,6 +17,12 @@ import { ProductListItem } from './ProductListItem';
 import { ProductsFilterSidebar } from './ProductsFilterSidebar';
 import { ProductsPagination } from './ProductsPagination';
 
+/**
+ * How many products the user can choose to load per PLP page. Capped at 96
+ * because larger pages start to hurt mobile data + LCP without much UX win.
+ */
+const PER_PAGE_OPTIONS: readonly number[] = [12, 24, 48, 96];
+
 /** Sort option labels are translated at render time via the t() helper */
 function getSortOptions(t: (en: string, ar: string) => string) {
   return [
@@ -77,6 +83,15 @@ export default function ProductsClient({
   const [sortBy, setSortBy] = useState('newest');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [page, setPage] = useState(1);
+  // How many products to load per page. The user can pick from a small
+  // allow-list (12 / 24 / 48 / 96); we persist their choice to localStorage
+  // so it survives reloads but never trust it blindly — anything outside the
+  // allow-list falls back to 12 (Pecannbee default).
+  const [perPage, setPerPage] = useState<number>(() => {
+    if (typeof window === 'undefined') return 12;
+    const stored = Number(window.localStorage.getItem('plp-per-page'));
+    return PER_PAGE_OPTIONS.includes(stored) ? stored : 12;
+  });
 
   // Price range in MAJOR units (KD). 0–100 KD covers most KW grocery / spice
   // SKUs; tenants with a wider catalog get the upper bound auto-extended on
@@ -123,8 +138,11 @@ export default function ProductsClient({
     setCompareIds(ids);
   }, []);
 
-  // Track previous filter values to detect filter changes vs. page changes
-  const prevFiltersRef = useRef({ search, categoryFilter, sortBy, priceMin, priceMax });
+  // Track previous filter values to detect filter changes vs. page changes.
+  // perPage is treated as a filter so increasing it snaps the user back to
+  // page 1 (otherwise they could land on an out-of-range page when the new
+  // page count drops).
+  const prevFiltersRef = useRef({ search, categoryFilter, sortBy, priceMin, priceMax, perPage });
 
   const fetchProducts = useCallback(
     async (targetPage: number) => {
@@ -133,7 +151,7 @@ export default function ProductsClient({
       try {
         const params: Record<string, string> = {
           page: String(targetPage),
-          limit: '12',
+          limit: String(perPage),
         };
         if (search) params.search = search;
         if (categoryFilter) params.category = categoryFilter;
@@ -161,7 +179,7 @@ export default function ProductsClient({
         setIsLoading(false);
       }
     },
-    [search, categoryFilter, sortBy, priceMin, priceMax]
+    [search, categoryFilter, sortBy, priceMin, priceMax, perPage]
   );
 
   const fetchCategories = useCallback(async () => {
@@ -192,17 +210,25 @@ export default function ProductsClient({
       prev.categoryFilter !== categoryFilter ||
       prev.sortBy !== sortBy ||
       prev.priceMin !== priceMin ||
-      prev.priceMax !== priceMax;
+      prev.priceMax !== priceMax ||
+      prev.perPage !== perPage;
 
     if (filtersChanged) {
-      prevFiltersRef.current = { search, categoryFilter, sortBy, priceMin, priceMax };
+      prevFiltersRef.current = {
+        search,
+        categoryFilter,
+        sortBy,
+        priceMin,
+        priceMax,
+        perPage,
+      };
       // Reset page to 1 and fetch with page 1 in a single pass
       setPage(1);
       fetchProducts(1);
     } else {
       fetchProducts(page);
     }
-  }, [page, search, categoryFilter, sortBy, priceMin, priceMax, fetchProducts]);
+  }, [page, search, categoryFilter, sortBy, priceMin, priceMax, perPage, fetchProducts]);
 
   const handleAddToCart = (product: Product, e: React.MouseEvent) => {
     e.preventDefault();
@@ -333,6 +359,27 @@ export default function ProductsClient({
                 )}
               </p>
               <div className="flex items-center gap-4">
+                {/* Per-page — shoppers can see more products on a single
+                    page instead of paginating. Allow-list capped at 96.
+                    Persisted to localStorage. */}
+                <div className="flex items-center gap-2">
+                  <Select
+                    label={t('Show:', 'عرض:')}
+                    value={String(perPage)}
+                    onChange={e => {
+                      const next = Number(e.target.value);
+                      if (PER_PAGE_OPTIONS.includes(next)) {
+                        setPerPage(next);
+                        if (typeof window !== 'undefined') {
+                          window.localStorage.setItem('plp-per-page', String(next));
+                        }
+                      }
+                    }}
+                    options={PER_PAGE_OPTIONS.map(n => ({ value: String(n), label: String(n) }))}
+                    className="h-9 rounded-lg border border-border bg-background px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                </div>
+
                 {/* Sort */}
                 <div className="flex items-center gap-2">
                   <Select

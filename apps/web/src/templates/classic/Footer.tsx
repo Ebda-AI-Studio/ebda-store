@@ -70,31 +70,35 @@ export default function ClassicFooter({
               </p>
             )}
 
-            {/* Contact details */}
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              {contact.email && (
-                <li>
-                  <a
-                    href={`mailto:${contact.email}`}
-                    className="hover:text-foreground transition-colors duration-200"
-                  >
-                    {contact.email}
-                  </a>
-                </li>
-              )}
-              {displayPhone && (
-                <li>
-                  <a
-                    href={`tel:${contact.phone}`}
-                    className="hover:text-foreground transition-colors duration-200"
-                    dir="ltr"
-                  >
-                    {displayPhone}
-                  </a>
-                </li>
-              )}
-              {displayAddress && <li>{displayAddress}</li>}
-            </ul>
+            {/* Contact details — only render the list if at least one
+                detail is present. Classic mixes contact into the brand
+                column so an empty <ul> would create dead space. */}
+            {(contact.email || displayPhone || displayAddress) && (
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                {contact.email && (
+                  <li>
+                    <a
+                      href={`mailto:${contact.email}`}
+                      className="hover:text-foreground transition-colors duration-200"
+                    >
+                      {contact.email}
+                    </a>
+                  </li>
+                )}
+                {displayPhone && (
+                  <li>
+                    <a
+                      href={`tel:${contact.phone}`}
+                      className="hover:text-foreground transition-colors duration-200"
+                      dir="ltr"
+                    >
+                      {displayPhone}
+                    </a>
+                  </li>
+                )}
+                {displayAddress && <li>{displayAddress}</li>}
+              </ul>
+            )}
 
             {/* Social icons */}
             {socialLinks.length > 0 && (

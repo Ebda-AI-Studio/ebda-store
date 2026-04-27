@@ -71,10 +71,10 @@ export default function ElegantFooter({
         <div className="border-b border-border/50">
           <div className="container mx-auto px-4 py-10 sm:py-12 md:py-16">
             <div className="max-w-xl mx-auto text-center">
-              <h3 className="text-[10px] tracking-[0.4em] uppercase text-muted-foreground/60 mb-4 font-serif">
+              <h3 className="text-xs tracking-[0.3em] uppercase text-muted-foreground/70 mb-4 font-serif">
                 {isRtl ? 'ابق على اطلاع' : 'Stay Informed'}
               </h3>
-              <p className="text-foreground font-light text-base mb-8 tracking-wide">
+              <p className="text-foreground font-light text-lg sm:text-xl mb-8 tracking-wide leading-relaxed">
                 {isRtl
                   ? 'اشترك لتصلك آخر الأخبار والعروض الحصرية'
                   : 'Subscribe for exclusive offers and new arrivals'}
@@ -96,7 +96,7 @@ export default function ElegantFooter({
                       onChange={e => setEmail(e.target.value)}
                       placeholder={isRtl ? 'البريد الإلكتروني' : 'Enter your email'}
                       aria-label={isRtl ? 'البريد الإلكتروني' : 'Email address'}
-                      className="h-12 flex-1 px-6 bg-background border border-border focus:border-foreground focus:outline-none text-xs tracking-[0.1em] placeholder:text-muted-foreground/40 transition-colors duration-500"
+                      className="h-12 flex-1 px-6 bg-background border border-border focus:border-foreground focus:outline-none text-sm tracking-wide placeholder:text-muted-foreground/50 transition-colors duration-500"
                       dir={isRtl ? 'rtl' : 'ltr'}
                       required
                       disabled={submitting}
@@ -104,7 +104,7 @@ export default function ElegantFooter({
                     <button
                       type="submit"
                       disabled={submitting}
-                      className="h-12 px-8 bg-foreground text-background text-[10px] tracking-[0.25em] uppercase hover:bg-foreground/80 transition-colors duration-300 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                      className="h-12 px-8 bg-foreground text-background text-xs tracking-[0.2em] uppercase hover:bg-foreground/80 transition-colors duration-300 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                       {submitting
                         ? isRtl
@@ -154,7 +154,7 @@ export default function ElegantFooter({
               </h3>
             )}
             {displayDescription && (
-              <p className="text-xs text-muted-foreground leading-loose tracking-wide">
+              <p className="text-sm text-muted-foreground leading-loose tracking-wide">
                 {displayDescription}
               </p>
             )}
@@ -165,7 +165,7 @@ export default function ElegantFooter({
           {footerSections.length > 0 ? (
             footerSections.map(section => (
               <div key={section.key}>
-                <h4 className="text-[10px] tracking-[0.3em] uppercase text-muted-foreground/60 mb-6 font-serif">
+                <h4 className="text-xs tracking-[0.25em] uppercase text-foreground/70 mb-6 font-serif">
                   {section.heading}
                 </h4>
                 <ul className="space-y-4">
@@ -173,7 +173,7 @@ export default function ElegantFooter({
                     <li key={link.href}>
                       <Link
                         href={link.href}
-                        className="text-xs text-foreground/60 hover:text-foreground transition-opacity duration-300 tracking-wide cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                        className="text-sm text-foreground/70 hover:text-foreground transition-opacity duration-300 tracking-wide cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                       >
                         {link.label}
                       </Link>
@@ -184,7 +184,7 @@ export default function ElegantFooter({
             ))
           ) : (
             <div>
-              <h4 className="text-[10px] tracking-[0.3em] uppercase text-muted-foreground/60 mb-6 font-serif">
+              <h4 className="text-xs tracking-[0.25em] uppercase text-foreground/70 mb-6 font-serif">
                 {isRtl ? 'التصفح' : 'Explore'}
               </h4>
               <ul className="space-y-4">
@@ -192,7 +192,7 @@ export default function ElegantFooter({
                   <li key={item.href}>
                     <Link
                       href={item.href}
-                      className="text-xs text-foreground/60 hover:text-foreground transition-opacity duration-300 tracking-wide cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                      className="text-sm text-foreground/70 hover:text-foreground transition-opacity duration-300 tracking-wide cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                     >
                       {isRtl && item.labelAr ? item.labelAr : item.label}
                     </Link>
@@ -202,73 +202,78 @@ export default function ElegantFooter({
             </div>
           )}
 
-          {/* Contact */}
-          <div>
-            <h4 className="text-[10px] tracking-[0.3em] uppercase text-muted-foreground/60 mb-6 font-serif">
-              {isRtl ? 'تواصل' : 'Contact'}
-            </h4>
-            <ul className="space-y-4 text-xs">
-              {contact.email && (
-                <li>
-                  <a
-                    href={`mailto:${contact.email}`}
-                    className="text-foreground/60 hover:text-foreground transition-opacity duration-300 tracking-wide cursor-pointer"
-                  >
-                    {contact.email}
-                  </a>
-                </li>
-              )}
-              {displayPhone && (
-                <li>
-                  <a
-                    href={`tel:${contact.phone}`}
-                    className="text-foreground/60 hover:text-foreground transition-opacity duration-300 tracking-wide cursor-pointer"
-                    dir="ltr"
-                  >
-                    {displayPhone}
-                  </a>
-                </li>
-              )}
-              {displayAddress && (
-                <li className="text-foreground/60 leading-loose">{displayAddress}</li>
-              )}
-            </ul>
-          </div>
-
-          {/* Social — small, understated */}
-          <div>
-            <h4 className="text-[10px] tracking-[0.3em] uppercase text-muted-foreground/60 mb-6 font-serif">
-              {isRtl ? 'تابعنا' : 'Follow'}
-            </h4>
-            <div className="flex flex-wrap gap-3">
-              {socialLinks.map(({ key, icon, url }) => (
-                <a
-                  key={key}
-                  href={url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-8 h-8 border border-border flex items-center justify-center text-foreground/40 hover:text-foreground hover:border-foreground transition-all duration-300 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                  aria-label={key}
-                >
-                  <svg
-                    className="w-3.5 h-3.5"
-                    fill="currentColor"
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
-                  >
-                    <path d={icon} />
-                  </svg>
-                </a>
-              ))}
+          {/* Contact — hidden entirely if the store has no contact details
+              configured. Empty heading + empty list looks unfinished. */}
+          {(contact.email || displayPhone || displayAddress) && (
+            <div>
+              <h4 className="text-xs tracking-[0.25em] uppercase text-foreground/70 mb-6 font-serif">
+                {isRtl ? 'تواصل' : 'Contact'}
+              </h4>
+              <ul className="space-y-4 text-sm">
+                {contact.email && (
+                  <li>
+                    <a
+                      href={`mailto:${contact.email}`}
+                      className="text-foreground/70 hover:text-foreground transition-opacity duration-300 tracking-wide cursor-pointer"
+                    >
+                      {contact.email}
+                    </a>
+                  </li>
+                )}
+                {displayPhone && (
+                  <li>
+                    <a
+                      href={`tel:${contact.phone}`}
+                      className="text-foreground/70 hover:text-foreground transition-opacity duration-300 tracking-wide cursor-pointer"
+                      dir="ltr"
+                    >
+                      {displayPhone}
+                    </a>
+                  </li>
+                )}
+                {displayAddress && (
+                  <li className="text-foreground/70 leading-loose">{displayAddress}</li>
+                )}
+              </ul>
             </div>
-          </div>
+          )}
+
+          {/* Social — hidden when there are no social links configured. */}
+          {socialLinks.length > 0 && (
+            <div>
+              <h4 className="text-xs tracking-[0.25em] uppercase text-foreground/70 mb-6 font-serif">
+                {isRtl ? 'تابعنا' : 'Follow'}
+              </h4>
+              <div className="flex flex-wrap gap-3">
+                {socialLinks.map(({ key, icon, url }) => (
+                  <a
+                    key={key}
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-8 h-8 border border-border flex items-center justify-center text-foreground/40 hover:text-foreground hover:border-foreground transition-all duration-300 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                    aria-label={key}
+                  >
+                    <svg
+                      className="w-3.5 h-3.5"
+                      fill="currentColor"
+                      viewBox="0 0 24 24"
+                      aria-hidden="true"
+                    >
+                      <path d={icon} />
+                    </svg>
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Bottom bar */}
       <div className="border-t border-border/50">
         <div className="container mx-auto px-4 py-6">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-[10px] tracking-[0.15em] text-muted-foreground/50">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-xs tracking-wide text-muted-foreground/70">
             <p>
               © {new Date().getFullYear()} {displayName}.{' '}
               {isRtl ? 'جميع الحقوق محفوظة.' : 'All rights reserved.'}
