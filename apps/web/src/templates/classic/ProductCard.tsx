@@ -100,17 +100,30 @@ function ClassicProductCard({
           />
         </div>
 
-        {/* Badges — top corner */}
-        {product.isNew && (
+        {/* Badges — top corner. Sale badge wins over "new" when both apply
+            because shoppers care about price more than recency. */}
+        {product.compareAtPrice && product.compareAtPrice > product.price ? (
           <ProductBadge
-            variant="new"
+            variant="sale"
             isRtl={isRtl}
             size="sm"
             absolute
             position={isRtl ? 'top-right' : 'top-left'}
-            className="font-serif tracking-widest uppercase bg-foreground text-background rounded-none text-[10px]"
-            label={isRtl ? 'جديد' : 'New'}
+            className="font-serif tracking-widest uppercase bg-destructive text-destructive-foreground rounded-none text-[10px]"
+            label={isRtl ? 'تخفيض' : 'Sale'}
           />
+        ) : (
+          product.isNew && (
+            <ProductBadge
+              variant="new"
+              isRtl={isRtl}
+              size="sm"
+              absolute
+              position={isRtl ? 'top-right' : 'top-left'}
+              className="font-serif tracking-widest uppercase bg-foreground text-background rounded-none text-[10px]"
+              label={isRtl ? 'جديد' : 'New'}
+            />
+          )
         )}
         {product.inStock === false && (
           <ProductBadge

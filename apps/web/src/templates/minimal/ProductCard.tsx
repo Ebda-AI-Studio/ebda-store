@@ -86,12 +86,20 @@ function MinimalProductCard({
         </h3>
         <Price
           price={product.price}
+          compareAtPrice={product.compareAtPrice}
           currency={currency}
           isRtl={isRtl}
           size="sm"
           showDiscount={false}
           className="text-[11px] tracking-wide font-light text-muted-foreground"
         />
+        {/* Discount indicator — minimal pack stays chrome-free, so use a
+            short uppercase 'sale' label inline rather than a badge box. */}
+        {product.compareAtPrice && product.compareAtPrice > product.price && (
+          <p className="text-[10px] tracking-[0.25em] uppercase text-foreground/80">
+            {isRtl ? 'تخفيض' : 'Sale'}
+          </p>
+        )}
         <TaxInclusiveLabel className="block text-[10px] tracking-wide font-light text-muted-foreground/70" />
       </div>
     </Link>
