@@ -1,7 +1,5 @@
 'use client';
 
-import Link from 'next/link';
-import { Button } from '@force/ui';
 import type { Product, Category } from '@/lib/api';
 import { useStore, useStoreUrl } from '../contexts/StoreContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -283,31 +281,10 @@ export function HomePageContent({
           </section>
         )}
 
-      <section className="force-gradient-primary py-16 sm:py-20 lg:py-24">
-        <div className="mx-auto max-w-7xl px-4 text-center sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-2xl">
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white tracking-tight leading-tight">
-              {isRtl ? 'جاهز للتسوق؟' : 'Ready to Start Shopping?'}
-            </h2>
-            <p className="mx-auto mt-5 max-w-xl text-lg sm:text-xl text-primary-foreground/85 leading-relaxed">
-              {isRtl
-                ? 'انضم إلى آلاف العملاء الراضين واكتشف منتجاتنا المميزة'
-                : 'Join thousands of satisfied customers and discover our amazing products.'}
-            </p>
-            <div className="mt-8 sm:mt-10">
-              <Link href={storeUrl('/products')}>
-                <Button
-                  size="lg"
-                  variant="secondary"
-                  className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 shadow-lg"
-                >
-                  {isRtl ? 'تصفح المنتجات' : 'Browse Products'}
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* "Ready to Start Shopping? / Join thousands of satisfied customers"
+          banner removed — was hardcoded marketing copy that competed with
+          merchant content. Stores that want a closing CTA can use the
+          AnnouncementBar or surface it through their hero / categories. */}
     </ShopChrome>
   );
 }
