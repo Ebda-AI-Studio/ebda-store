@@ -29,12 +29,11 @@ export default function ElegantProductGrid({
   return (
     <section className="py-12 sm:py-16 md:py-28 bg-background" dir={isRtl ? 'rtl' : 'ltr'}>
       <div className="container mx-auto px-4">
-        {/* Section Header - Editorial style */}
+        {/* Section header — editorial style. Eyebrow line ("Discover")
+            removed; was hardcoded marketing copy. The merchant's title
+            stands on its own. */}
         {displayTitle && (
           <div className="text-center mb-10 sm:mb-12 md:mb-16">
-            <p className="text-xs tracking-[0.4em] uppercase text-muted-foreground mb-4">
-              {isRtl ? 'اكتشف' : 'Discover'}
-            </p>
             <h2 className="text-3xl md:text-4xl font-light text-foreground tracking-wide">
               {displayTitle}
             </h2>

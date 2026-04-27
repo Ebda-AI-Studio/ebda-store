@@ -38,12 +38,13 @@ export default function ClassicHeader({
 
   return (
     <header className="bg-background shadow-sm" dir={isRtl ? 'rtl' : 'ltr'}>
-      {/* Top utility bar */}
+      {/* Top utility bar — Contact + About only. The "Unmatched Quality
+          Since Establishment" tagline that used to live here was a
+          hardcoded template demo string and didn't apply to every tenant.
+          Stores that want a tagline up top should configure the
+          AnnouncementBar instead. */}
       <div className="hidden md:block bg-foreground text-background py-2">
-        <div className="container mx-auto px-4 flex items-center justify-between text-xs tracking-wide">
-          <span className="font-serif italic opacity-80">
-            {isRtl ? 'جودة لا مثيل لها منذ التأسيس' : 'Unmatched Quality Since Establishment'}
-          </span>
+        <div className="container mx-auto px-4 flex items-center justify-end text-xs tracking-wide">
           <div className={`flex items-center gap-6 ${isRtl ? 'flex-row-reverse' : ''}`}>
             <Link
               href={`${urlPrefix}/contact`}
