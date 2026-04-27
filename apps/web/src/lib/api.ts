@@ -354,17 +354,28 @@ class ApiClient {
   }
 
   // Auth
-  async register(data: { email: string; password: string; firstName: string; lastName: string }) {
+  async register(data: {
+    email: string;
+    password: string;
+    firstName: string;
+    lastName: string;
+    /**
+     * Storefront tenant scope. The web app sends the active store's id so
+     * registrations are isolated per tenant; admin app omits this and the
+     * API treats the request as an admin-side registration.
+     */
+    storeId?: string;
+  }) {
     return this.request<{ user: User; accessToken: string; refreshToken: string }>(
       '/auth/register',
       { method: 'POST', body: JSON.stringify(data) }
     );
   }
 
-  async login(email: string, password: string) {
+  async login(email: string, password: string, storeId?: string) {
     const result = await this.request<{ user: User; accessToken: string; refreshToken: string }>(
       '/auth/login',
-      { method: 'POST', body: JSON.stringify({ email, password }) }
+      { method: 'POST', body: JSON.stringify({ email, password, storeId }) }
     );
 
     if (result.success && result.data) {
@@ -434,10 +445,10 @@ class ApiClient {
     });
   }
 
-  async forgotPassword(email: string) {
+  async forgotPassword(email: string, storeId?: string) {
     return this.request<{ message: string }>('/auth/forgot-password', {
       method: 'POST',
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ email, storeId }),
     });
   }
 

@@ -41,6 +41,9 @@ const registerSchema = z
     name: z.string().min(1).optional(),
     firstName: z.string().min(1).optional(),
     lastName: z.string().optional(),
+    // Storefront sends the current tenant's storeId so registrations
+    // are isolated per store. Admin app omits it.
+    storeId: z.string().uuid().optional(),
   })
   .refine(data => data.name || data.firstName, {
     message: 'Name or firstName is required',
@@ -50,6 +53,9 @@ const registerSchema = z
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
   password: z.string().min(1, 'Password is required'),
+  // Same as registerSchema — storefront passes storeId so login finds
+  // the right tenant's account.
+  storeId: z.string().uuid().optional(),
 });
 
 /**
@@ -110,7 +116,10 @@ const loginSchema = z.object({
 router.post('/register', authLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = registerSchema.parse(req.body);
-    const result = await AuthService.register(data);
+    const result = await AuthService.register({
+      ...data,
+      storeId: data.storeId ?? null,
+    });
 
     // Audit log
     await auditLog({
@@ -183,7 +192,7 @@ router.post('/register', authLimiter, async (req: Request, res: Response, next: 
 router.post('/login', authLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = loginSchema.parse(req.body);
-    const result = await AuthService.login(data.email, data.password);
+    const result = await AuthService.login(data.email, data.password, req.ip, data.storeId ?? null);
 
     // Generate CSRF token for session
     const sessionId = req.headers['x-session-id'] as string;
@@ -379,7 +388,7 @@ router.post(
   authLimiter,
   async (req: Request, res: Response, _next: NextFunction) => {
     try {
-      const { email } = req.body;
+      const { email, storeId } = req.body;
 
       if (!email) {
         res.status(400).json({
@@ -390,7 +399,7 @@ router.post(
       }
 
       // Always return success to prevent email enumeration
-      await AuthService.requestPasswordReset(email);
+      await AuthService.requestPasswordReset(email, typeof storeId === 'string' ? storeId : null);
 
       res.json({
         success: true,
@@ -490,7 +499,7 @@ router.post(
   authLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { email } = req.body;
+      const { email, storeId } = req.body;
 
       if (!email) {
         res.status(400).json({
@@ -500,7 +509,10 @@ router.post(
         return;
       }
 
-      const result = await AuthService.resendVerificationEmail(email);
+      const result = await AuthService.resendVerificationEmail(
+        email,
+        typeof storeId === 'string' ? storeId : null
+      );
 
       res.json({
         success: true,

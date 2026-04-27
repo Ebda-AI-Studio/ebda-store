@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import { api, type User } from '../lib/api';
+import { useStore } from './StoreContext';
 
 interface AuthContextType {
   user: User | null;
@@ -23,6 +24,10 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  // The current tenant. Customer registrations + logins must be scoped to
+  // this store so a single email can belong to different accounts on
+  // different storefronts (the schema's `@@unique([storeId, email])`).
+  const { store } = useStore();
 
   const refreshUser = useCallback(async () => {
     // Auth is handled via HTTP-only cookies sent automatically with
@@ -45,18 +50,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshUser();
   }, [refreshUser]);
 
-  const login = useCallback(async (email: string, password: string) => {
-    const result = await api.login(email, password);
-    if (result.success && result.data) {
-      setUser(result.data.user);
-      return { success: true };
-    }
-    return { success: false, error: result.error?.message || 'Failed to login' };
-  }, []);
+  const login = useCallback(
+    async (email: string, password: string) => {
+      const result = await api.login(email, password, store.id);
+      if (result.success && result.data) {
+        setUser(result.data.user);
+        return { success: true };
+      }
+      return { success: false, error: result.error?.message || 'Failed to login' };
+    },
+    [store.id]
+  );
 
   const register = useCallback(
     async (data: { email: string; password: string; firstName: string; lastName: string }) => {
-      const result = await api.register(data);
+      const result = await api.register({ ...data, storeId: store.id });
       if (result.success && result.data) {
         // Access token is set as HTTP-only cookie by the API.
         // Only store the refresh token in localStorage.
@@ -71,7 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       return { success: false, error: result.error?.message || 'Failed to register' };
     },
-    []
+    [store.id]
   );
 
   const logout = useCallback(async () => {

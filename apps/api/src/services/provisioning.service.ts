@@ -113,9 +113,12 @@ export class ProvisioningService {
     try {
       // Create store, owner, and default category in a single transaction
       result = await prisma.$transaction(async tx => {
-        // Check if owner email exists
-        const existingUser = await tx.user.findUnique({
-          where: { email: ownerEmail },
+        // Check if owner email exists. Admin/store-owner accounts live in
+        // the global namespace (storeId NULL); customers are scoped per
+        // store via the composite unique. Provisioning a store always
+        // looks up against the global admin scope.
+        const existingUser = await tx.user.findFirst({
+          where: { email: ownerEmail, storeId: null },
         });
 
         let owner;

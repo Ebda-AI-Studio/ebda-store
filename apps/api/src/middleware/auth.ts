@@ -7,6 +7,15 @@ export interface AuthPayload {
   userId: string;
   email: string;
   role: string;
+  /**
+   * Tenant scope. Set on customer tokens (= the store the customer
+   * registered with). NULL/undefined for admin tokens, which are
+   * authorized via Store.ownerId + requireStoreAccess instead. Older
+   * tokens issued before this field shipped will simply be `undefined`
+   * and callers should treat that as "not tenant-scoped" — those tokens
+   * still work as before until they expire.
+   */
+  storeId?: string | null;
 }
 
 declare module 'express-serve-static-core' {

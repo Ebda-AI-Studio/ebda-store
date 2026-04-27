@@ -12,11 +12,23 @@ interface TokenPayload {
   userId: string;
   email: string;
   role: string;
+  /** Tenant scope for customer accounts; NULL for platform admins. */
+  storeId: string | null;
 }
 
 interface AuthTokens {
   accessToken: string;
   refreshToken: string;
+}
+
+/**
+ * Resolve the auth scope for a user lookup. Customers register/login under a
+ * specific store and the schema's `@@unique([storeId, email])` constraint
+ * keeps them isolated; admins (storeId NULL) live in a global namespace
+ * enforced by the partial unique index `users_admin_email_key`.
+ */
+function authScope(email: string, storeId: string | null) {
+  return storeId === null ? { email, storeId: null as null } : { email, storeId };
 }
 
 export class AuthService {
@@ -28,10 +40,19 @@ export class AuthService {
     name?: string;
     firstName?: string;
     lastName?: string;
+    /**
+     * Storefront passes the current tenant's storeId. Admin app passes
+     * `null`. Mixing the two scopes deliberately so a registration from
+     * Store A doesn't conflict with an existing global admin email.
+     */
+    storeId?: string | null;
   }) {
-    // Check if user exists
-    const existingUser = await prisma.user.findUnique({
-      where: { email: data.email },
+    const storeId = data.storeId ?? null;
+
+    // Check if user exists in the target scope. Customers in different
+    // stores can share an email — the lookup must use the composite key.
+    const existingUser = await prisma.user.findFirst({
+      where: authScope(data.email, storeId),
     });
 
     if (existingUser) {
@@ -54,6 +75,7 @@ export class AuthService {
     const user = await prisma.user.create({
       data: {
         email: data.email,
+        storeId,
         passwordHash,
         firstName: firstName || '',
         lastName: lastName || '',
@@ -63,6 +85,7 @@ export class AuthService {
       select: {
         id: true,
         email: true,
+        storeId: true,
         firstName: true,
         lastName: true,
         role: true,
@@ -76,6 +99,7 @@ export class AuthService {
       userId: user.id,
       email: user.email,
       role: user.role,
+      storeId: user.storeId,
     });
 
     // User is registered — return to caller as fast as possible. Verification
@@ -199,13 +223,15 @@ export class AuthService {
   }
 
   /**
-   * Resend verification email
+   * Resend verification email. Storefront callers pass `storeId` so we
+   * find the right tenant's account; admin app omits it.
    */
   static async resendVerificationEmail(
-    email: string
+    email: string,
+    storeId: string | null = null
   ): Promise<{ success: boolean; message: string }> {
-    const user = await prisma.user.findUnique({
-      where: { email },
+    const user = await prisma.user.findFirst({
+      where: authScope(email, storeId),
     });
 
     if (!user) {
@@ -247,9 +273,12 @@ export class AuthService {
     return { success: true, message: 'Verification email sent' };
   }
 
-  static async login(email: string, password: string, ip?: string) {
-    // Check if account is locked
-    const lockStatus = await accountLockout.isLocked(email);
+  static async login(email: string, password: string, ip?: string, storeId: string | null = null) {
+    // Lockout key is scoped per tenant so a brute-force attempt against
+    // Store A doesn't lock the same email out on Store B (or on the admin
+    // app). Bare email is still used for admin (storeId NULL).
+    const lockoutKey = storeId ? `${storeId}:${email}` : email;
+    const lockStatus = await accountLockout.isLocked(lockoutKey);
     if (lockStatus.locked) {
       const remainingMinutes = Math.ceil((lockStatus.remainingMs || 0) / 60000);
       throw new AppError(
@@ -259,21 +288,21 @@ export class AuthService {
       );
     }
 
-    // Find user (exclude soft-deleted accounts)
-    const user = await prisma.user.findUnique({
-      where: { email, deletedAt: null },
+    // Find user inside the requested scope (exclude soft-deleted).
+    const user = await prisma.user.findFirst({
+      where: { ...authScope(email, storeId), deletedAt: null },
     });
 
     if (!user) {
       // Record failed attempt even for non-existent users (prevent enumeration)
-      await accountLockout.recordFailedAttempt(email, ip);
+      await accountLockout.recordFailedAttempt(lockoutKey, ip);
       throw new AppError(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
     }
 
     // Verify password
     const isValidPassword = await bcrypt.compare(password, user.passwordHash);
     if (!isValidPassword) {
-      const result = await accountLockout.recordFailedAttempt(email, ip);
+      const result = await accountLockout.recordFailedAttempt(lockoutKey, ip);
 
       if (result.locked) {
         const remainingMinutes = Math.ceil((result.lockoutDurationMs || 0) / 60000);
@@ -288,19 +317,21 @@ export class AuthService {
     }
 
     // Successful login - reset lockout
-    await accountLockout.recordSuccessfulLogin(email, ip);
+    await accountLockout.recordSuccessfulLogin(lockoutKey, ip);
 
     // Generate tokens
     const tokens = await this.generateTokens({
       userId: user.id,
       email: user.email,
       role: user.role,
+      storeId: user.storeId,
     });
 
     return {
       user: {
         id: user.id,
         email: user.email,
+        storeId: user.storeId,
         firstName: user.firstName,
         lastName: user.lastName,
         role: user.role,
@@ -337,11 +368,14 @@ export class AuthService {
     // Delete old refresh token
     await prisma.refreshToken.delete({ where: { id: storedToken.id } });
 
-    // Generate new tokens
+    // Generate new tokens — preserve the original tenant scope from the
+    // user record so the new access token still authenticates against the
+    // same store.
     return this.generateTokens({
       userId: storedToken.user.id,
       email: storedToken.user.email,
       role: storedToken.user.role,
+      storeId: storedToken.user.storeId,
     });
   }
 
@@ -432,9 +466,11 @@ export class AuthService {
     });
   }
 
-  static async requestPasswordReset(email: string): Promise<void> {
-    const user = await prisma.user.findUnique({
-      where: { email },
+  static async requestPasswordReset(email: string, storeId: string | null = null): Promise<void> {
+    // Tenant-scoped lookup so a Store A reset request doesn't leak the
+    // existence of an account on Store B with the same email.
+    const user = await prisma.user.findFirst({
+      where: authScope(email, storeId),
     });
 
     if (!user) {
