@@ -4,9 +4,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { useToast } from '@force/ui';
 import { useT } from '@/i18n/useT';
-import { resolveLayoutSettings, type StoreLayoutSettings } from '@force/shared';
+import { resolveLayoutSettings, type StoreLayoutSettings, type HeroSlide } from '@force/shared';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { Toggle } from '../../../../components/Toggle';
+import { ImageUpload } from '../../../../components/ImageUpload';
 import { apiGet, apiPut } from '../../../../lib/api';
 
 interface StoreInfo {
@@ -146,6 +147,11 @@ export default function StoreLayoutPage() {
                     onChange={v => updateSection('hero', s => ({ ...s, autoplayMs: v }))}
                   />
                 )}
+                <SlidesEditor
+                  slides={layout.hero.slides}
+                  storeId={storeId}
+                  onChange={next => updateSection('hero', s => ({ ...s, slides: next }))}
+                />
               </SectionCard>
 
               {/* Categories */}
@@ -523,5 +529,261 @@ function RowToggle({
       <span className="text-foreground">{label}</span>
       <Toggle checked={checked} onChange={onChange} />
     </label>
+  );
+}
+
+interface SlidesEditorProps {
+  slides: HeroSlide[];
+  storeId: string;
+  onChange: (next: HeroSlide[]) => void;
+}
+
+function SlidesEditor({ slides, storeId, onChange }: SlidesEditorProps) {
+  const t = useT('orders.layout.sections.hero.slides');
+
+  const updateSlide = (index: number, patch: Partial<HeroSlide>) => {
+    onChange(slides.map((s, i) => (i === index ? { ...s, ...patch } : s)));
+  };
+
+  const removeSlide = (index: number) => {
+    onChange(slides.filter((_, i) => i !== index));
+  };
+
+  const moveSlide = (from: number, to: number) => {
+    if (to < 0 || to >= slides.length) return;
+    const next = [...slides];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    onChange(next);
+  };
+
+  const addSlide = () => {
+    onChange([
+      ...slides,
+      { image: '', alt: '', headline: '', headlineAr: '', ctaText: '', ctaTextAr: '', ctaHref: '' },
+    ]);
+  };
+
+  return (
+    <div className="mt-4 space-y-4">
+      <div>
+        <h3 className="text-sm font-semibold text-foreground">{t('title')}</h3>
+        <p className="text-xs text-muted-foreground mt-0.5">{t('description')}</p>
+      </div>
+
+      {slides.length === 0 && (
+        <p className="rounded-lg border border-dashed border-border bg-muted/30 p-4 text-center text-xs text-muted-foreground">
+          {t('empty')}
+        </p>
+      )}
+
+      <ul className="space-y-4">
+        {slides.map((slide, index) => (
+          <li key={index} className="rounded-xl border border-border bg-muted/20 p-4">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <span className="text-sm font-semibold text-foreground">
+                {t('slideLabel', { index: index + 1 })}
+              </span>
+              <div className="flex items-center gap-1">
+                <IconButton
+                  label={t('moveUp')}
+                  disabled={index === 0}
+                  onClick={() => moveSlide(index, index - 1)}
+                >
+                  <svg
+                    className="h-4 w-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    aria-hidden
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M5 15l7-7 7 7"
+                    />
+                  </svg>
+                </IconButton>
+                <IconButton
+                  label={t('moveDown')}
+                  disabled={index === slides.length - 1}
+                  onClick={() => moveSlide(index, index + 1)}
+                >
+                  <svg
+                    className="h-4 w-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    aria-hidden
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 9l-7 7-7-7"
+                    />
+                  </svg>
+                </IconButton>
+                <IconButton label={t('remove')} variant="danger" onClick={() => removeSlide(index)}>
+                  <svg
+                    className="h-4 w-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    aria-hidden
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </IconButton>
+              </div>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="space-y-3">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                    {t('image')}
+                  </label>
+                  <ImageUpload
+                    value={slide.image || undefined}
+                    folder={`stores/${storeId}/hero`}
+                    onUpload={url => updateSlide(index, { image: url })}
+                    onRemove={() => updateSlide(index, { image: '' })}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                    {t('imageAr')}
+                  </label>
+                  <ImageUpload
+                    value={slide.imageAr || undefined}
+                    folder={`stores/${storeId}/hero`}
+                    onUpload={url => updateSlide(index, { imageAr: url })}
+                    onRemove={() => updateSlide(index, { imageAr: '' })}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <TextField
+                  label={t('alt')}
+                  placeholder={t('altPlaceholder')}
+                  value={slide.alt ?? ''}
+                  onChange={v => updateSlide(index, { alt: v })}
+                />
+                <TextField
+                  label={t('headline')}
+                  placeholder={t('headlinePlaceholder')}
+                  value={slide.headline ?? ''}
+                  onChange={v => updateSlide(index, { headline: v })}
+                />
+                <TextField
+                  label={t('headlineAr')}
+                  placeholder={t('headlineArPlaceholder')}
+                  value={slide.headlineAr ?? ''}
+                  onChange={v => updateSlide(index, { headlineAr: v })}
+                  dir="rtl"
+                />
+                <TextField
+                  label={t('ctaText')}
+                  placeholder={t('ctaTextPlaceholder')}
+                  value={slide.ctaText ?? ''}
+                  onChange={v => updateSlide(index, { ctaText: v })}
+                />
+                <TextField
+                  label={t('ctaTextAr')}
+                  placeholder={t('ctaTextArPlaceholder')}
+                  value={slide.ctaTextAr ?? ''}
+                  onChange={v => updateSlide(index, { ctaTextAr: v })}
+                  dir="rtl"
+                />
+                <TextField
+                  label={t('ctaHref')}
+                  placeholder={t('ctaHrefPlaceholder')}
+                  value={slide.ctaHref ?? ''}
+                  onChange={v => updateSlide(index, { ctaHref: v })}
+                />
+              </div>
+            </div>
+          </li>
+        ))}
+      </ul>
+
+      <button
+        type="button"
+        onClick={addSlide}
+        className="inline-flex items-center gap-2 rounded-xl border border-dashed border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-muted transition-colors cursor-pointer"
+      >
+        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+        </svg>
+        {t('add')}
+      </button>
+    </div>
+  );
+}
+
+function TextField({
+  label,
+  value,
+  placeholder,
+  dir,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  placeholder?: string;
+  dir?: 'ltr' | 'rtl';
+  onChange: (v: string) => void;
+}) {
+  return (
+    <label className="flex flex-col gap-1 text-sm">
+      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+      <input
+        type="text"
+        value={value}
+        placeholder={placeholder}
+        dir={dir}
+        onChange={e => onChange(e.target.value)}
+        className="rounded-lg border border-border bg-card px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+      />
+    </label>
+  );
+}
+
+function IconButton({
+  label,
+  disabled,
+  variant = 'default',
+  onClick,
+  children,
+}: {
+  label: string;
+  disabled?: boolean;
+  variant?: 'default' | 'danger';
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  const styles =
+    variant === 'danger'
+      ? 'border-destructive/40 text-destructive hover:bg-destructive/10'
+      : 'border-border text-muted-foreground hover:bg-muted hover:text-foreground';
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      disabled={disabled}
+      onClick={onClick}
+      className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${styles}`}
+    >
+      {children}
+    </button>
   );
 }

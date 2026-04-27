@@ -54,7 +54,7 @@ export function ProductCarousel({
             return (
               <li
                 key={product.id}
-                className="snap-start shrink-0 w-[60vw] sm:w-[36vw] lg:w-[18vw] max-w-[260px]"
+                className="snap-start shrink-0 w-[42vw] sm:w-[24vw] lg:w-[16vw] max-w-[260px]"
               >
                 <div className={`overflow-hidden ${styles.card}`}>
                   <Link

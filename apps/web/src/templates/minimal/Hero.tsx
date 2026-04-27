@@ -58,9 +58,12 @@ export default function MinimalHero({
         </Link>
       </div>
 
-      {/* Full-bleed hero image */}
-      <div className="relative aspect-[21/9] overflow-hidden bg-muted">
-        {image ? (
+      {/* Full-bleed hero image — only rendered when configured. Without an
+          image we let the typographic block stand on its own (Pecannbee
+          treatment); a placeholder box would only make the page feel
+          unfinished. */}
+      {image && (
+        <div className="relative aspect-[21/9] overflow-hidden bg-muted">
           <Image
             src={image}
             alt={displayTitle}
@@ -69,14 +72,8 @@ export default function MinimalHero({
             className="object-cover"
             priority
           />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <span className="text-[10px] text-muted-foreground/50 tracking-[0.3em] uppercase">
-              {isRtl ? 'صورة' : 'Image'}
-            </span>
-          </div>
-        )}
-      </div>
+        </div>
+      )}
     </section>
   );
 }

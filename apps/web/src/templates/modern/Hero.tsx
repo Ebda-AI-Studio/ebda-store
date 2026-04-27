@@ -29,6 +29,54 @@ export default function ModernHero({
       : subtitle || (isRtl ? 'منتجات مميزة بأفضل الأسعار' : 'Premium products at the best prices');
   const displayCta = isRtl && ctaTextAr ? ctaTextAr : ctaText || (isRtl ? 'تسوق الآن' : 'Shop Now');
 
+  // When no image is configured, render a single-column centered hero
+  // with a subtle radial gradient. This keeps the hero polished for stores
+  // that haven't uploaded a slide image yet — the broken-looking placeholder
+  // SVG box has been removed in favour of intentional whitespace.
+  if (!image) {
+    return (
+      <section className="relative overflow-hidden bg-gradient-to-b from-primary/5 via-background to-background">
+        <div className="container mx-auto px-4 py-20 sm:py-24 lg:py-32" dir={isRtl ? 'rtl' : 'ltr'}>
+          <div className="mx-auto max-w-3xl text-center motion-safe:[animation:heroFadeIn_0.7s_ease-out_both] motion-reduce:opacity-100">
+            <h1
+              className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold leading-[1.05] tracking-tight"
+              style={{ letterSpacing: '-0.02em' }}
+            >
+              <span className="bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent">
+                {displayTitle}
+              </span>
+            </h1>
+            <p className="mx-auto mt-6 max-w-xl text-lg md:text-xl text-muted-foreground leading-relaxed">
+              {displaySubtitle}
+            </p>
+            <div className="mt-10 flex justify-center">
+              <Link
+                href={ctaLink}
+                className="group inline-flex items-center gap-2.5 px-8 py-4 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 font-semibold text-base shadow-lg shadow-primary/20 transition-all duration-300 hover:shadow-xl hover:shadow-primary/30 hover:-translate-y-0.5"
+              >
+                {displayCta}
+                <svg
+                  className={`w-4 h-4 transition-transform duration-300 group-hover:translate-x-1 ${isRtl ? 'rotate-180 group-hover:-translate-x-1 group-hover:translate-x-0' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2.5}
+                    d="M17 8l4 4m0 0l-4 4m4-4H3"
+                  />
+                </svg>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="relative overflow-hidden bg-background">
       <div className="container mx-auto px-4">
@@ -84,44 +132,15 @@ export default function ModernHero({
             className={`relative ${isRtl ? 'lg:order-1' : 'lg:order-2'} motion-safe:[animation:heroFadeIn_0.7s_ease-out_0.15s_both] motion-reduce:opacity-100`}
           >
             <div className="relative aspect-[4/3] lg:aspect-[5/4] rounded-2xl overflow-hidden shadow-2xl shadow-black/10">
-              {image ? (
-                <>
-                  <Image
-                    src={image}
-                    alt={displayTitle}
-                    fill
-                    sizes="(min-width: 1024px) 50vw, 100vw"
-                    className="object-cover"
-                    priority
-                  />
-                  {/* Gradient overlay on image */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
-                </>
-              ) : (
-                <div className="w-full h-full bg-gradient-to-br from-primary/15 via-primary/8 to-muted flex items-center justify-center">
-                  <div className="text-center p-8 space-y-3">
-                    <div className="w-20 h-20 mx-auto rounded-2xl bg-primary/10 flex items-center justify-center">
-                      <svg
-                        className="w-10 h-10 text-primary/60"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                        aria-hidden="true"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={1.5}
-                          d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                        />
-                      </svg>
-                    </div>
-                    <p className="text-muted-foreground text-sm font-medium">
-                      {isRtl ? 'صورة البانر' : 'Hero Image'}
-                    </p>
-                  </div>
-                </div>
-              )}
+              <Image
+                src={image}
+                alt={displayTitle}
+                fill
+                sizes="(min-width: 1024px) 50vw, 100vw"
+                className="object-cover"
+                priority
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
             </div>
 
             {/* Subtle glow behind image */}
