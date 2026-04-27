@@ -283,11 +283,11 @@ export default function ModernFooter({
               <h4 className="text-sm font-semibold text-white uppercase tracking-wider">
                 {isRtl ? 'النشرة الإخبارية' : 'Newsletter'}
               </h4>
-              <p className="text-sm text-gray-400 leading-relaxed">
-                {isRtl
-                  ? 'اشترك للحصول على آخر العروض والأخبار'
-                  : 'Subscribe for the latest offers and news'}
-              </p>
+              {/* Body line — render store description when set; previously
+                  was hardcoded demo copy. */}
+              {displayDescription && (
+                <p className="text-sm text-gray-400 leading-relaxed">{displayDescription}</p>
+              )}
               {subscribed ? (
                 <p className="text-sm text-primary font-medium">
                   {isRtl ? 'شكراً لاشتراكك!' : 'Thank you for subscribing!'}

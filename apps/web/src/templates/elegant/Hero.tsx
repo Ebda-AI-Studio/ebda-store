@@ -19,12 +19,10 @@ export default function ElegantHero({
 }: HeroProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
-  const displayTitle =
-    isRtl && titleAr ? titleAr : title || (isRtl ? 'مجموعة حصرية' : 'Exclusive Edit');
-  const displaySubtitle =
-    isRtl && subtitleAr
-      ? subtitleAr
-      : subtitle || (isRtl ? 'أناقة استثنائية' : 'Curated for the discerning');
+  // No hardcoded marketing strings — empty values render nothing instead
+  // of competing with merchant copy.
+  const displayTitle = (isRtl && titleAr ? titleAr : title) ?? '';
+  const displaySubtitle = (isRtl && subtitleAr ? subtitleAr : subtitle) ?? '';
   const displayCta = isRtl && ctaTextAr ? ctaTextAr : ctaText || (isRtl ? 'استكشف' : 'Discover');
 
   const resolvedCtaLink = ctaLink.startsWith('/') && urlPrefix ? `${urlPrefix}${ctaLink}` : ctaLink;
@@ -60,10 +58,9 @@ export default function ElegantHero({
             <div
               className={`px-6 sm:px-8 md:px-12 lg:px-16 py-10 sm:py-12 md:py-16 max-w-lg ${isRtl ? 'text-right mr-auto' : 'text-left'}`}
             >
-              <p className="text-[10px] tracking-[0.5em] uppercase text-muted-foreground/60 mb-10">
-                {isRtl ? 'مجموعة جديدة' : 'New Collection'}
-              </p>
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-light text-foreground leading-[1.1] tracking-[-0.02em] mb-8">
+              {/* Eyebrow ("New Collection") removed — was hardcoded
+                  template demo copy. */}
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-light text-foreground leading-[1.1] tracking-[-0.02em] mb-8 mt-10">
                 <span className="italic font-normal">
                   {displayTitle.split(' ').slice(0, 1).join(' ')}
                 </span>
@@ -111,10 +108,8 @@ export default function ElegantHero({
 
           <div className="relative z-10 container mx-auto px-4 py-28 md:py-36 lg:py-44">
             <div className="max-w-2xl mx-auto text-center">
-              <p className="text-[10px] tracking-[0.5em] uppercase text-primary/50 mb-10">
-                {isRtl ? 'مجموعة جديدة' : 'New Collection'}
-              </p>
-              <h1 className="text-5xl md:text-6xl lg:text-7xl font-light text-foreground leading-[1.1] tracking-[-0.02em] mb-8">
+              {/* Eyebrow removed — was hardcoded demo copy. */}
+              <h1 className="text-5xl md:text-6xl lg:text-7xl font-light text-foreground leading-[1.1] tracking-[-0.02em] mb-8 mt-10">
                 <span className="italic font-normal text-primary">
                   {displayTitle.split(' ').slice(0, 1).join(' ')}
                 </span>

@@ -18,10 +18,9 @@ export default function MinimalHero({
 }: HeroProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
-  const displayTitle =
-    isRtl && titleAr ? titleAr : title || (isRtl ? 'البساطة في التصميم' : 'Simply Beautiful');
-  const displaySubtitle =
-    isRtl && subtitleAr ? subtitleAr : subtitle || (isRtl ? 'أقل يعني أكثر' : 'Less is more');
+  // No hardcoded marketing strings; merchant copy or nothing.
+  const displayTitle = (isRtl && titleAr ? titleAr : title) ?? '';
+  const displaySubtitle = (isRtl && subtitleAr ? subtitleAr : subtitle) ?? '';
   const displayCta = isRtl && ctaTextAr ? ctaTextAr : ctaText || (isRtl ? 'تصفح' : 'Browse');
 
   return (

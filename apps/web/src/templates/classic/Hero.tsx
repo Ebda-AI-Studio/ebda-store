@@ -18,10 +18,11 @@ export default function ClassicHero({
 }: HeroProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
-  const displayTitle =
-    isRtl && titleAr ? titleAr : title || (isRtl ? 'تشكيلة فاخرة' : 'Exquisite Collection');
-  const displaySubtitle =
-    isRtl && subtitleAr ? subtitleAr : subtitle || (isRtl ? 'أناقة لا تضاهى' : 'Timeless Elegance');
+  // No hardcoded marketing fallbacks — empty values render nothing so the
+  // merchant's own copy isn't competing with template demo strings.
+  const displayTitle = (isRtl && titleAr ? titleAr : title) ?? '';
+  const displaySubtitle = (isRtl && subtitleAr ? subtitleAr : subtitle) ?? '';
+  // CTA falls back to a generic button label since it's functional UI.
   const displayCta =
     isRtl && ctaTextAr ? ctaTextAr : ctaText || (isRtl ? 'استكشف المجموعة' : 'Explore Collection');
 
@@ -94,14 +95,10 @@ export default function ClassicHero({
               </Link>
             </div>
 
-            {/* Established note */}
-            <div
-              className={`mt-14 ${image ? (isRtl ? 'text-right' : 'text-left') : 'text-center'}`}
-            >
-              <span className="text-xs tracking-[0.3em] text-muted-foreground uppercase">
-                {isRtl ? 'منذ ١٩٩٠' : 'Est. 1990'}
-              </span>
-            </div>
+            {/* "Est. 1990" used to live here — removed because it was a
+                hardcoded demo string that's not true for every tenant. If
+                we want to surface the founding year again later, gate it
+                on a real `store.foundedYear` field. */}
           </div>
 
           {/* Image column — only render when an image is configured. */}

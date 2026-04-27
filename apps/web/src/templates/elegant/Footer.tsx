@@ -72,13 +72,17 @@ export default function ElegantFooter({
           <div className="container mx-auto px-4 py-10 sm:py-12 md:py-16">
             <div className="max-w-xl mx-auto text-center">
               <h3 className="text-xs tracking-[0.3em] uppercase text-muted-foreground/70 mb-4 font-serif">
-                {isRtl ? 'ابق على اطلاع' : 'Stay Informed'}
+                {isRtl ? 'النشرة البريدية' : 'Newsletter'}
               </h3>
-              <p className="text-foreground font-light text-lg sm:text-xl mb-8 tracking-wide leading-relaxed">
-                {isRtl
-                  ? 'اشترك لتصلك آخر الأخبار والعروض الحصرية'
-                  : 'Subscribe for exclusive offers and new arrivals'}
-              </p>
+              {/* Body line — render the merchant's brand description when
+                  set, otherwise nothing. The previous "Subscribe for
+                  exclusive offers and new arrivals" was hardcoded demo
+                  copy that wasn't true for every tenant. */}
+              {displayDescription && (
+                <p className="text-foreground font-light text-lg sm:text-xl mb-8 tracking-wide leading-relaxed">
+                  {displayDescription}
+                </p>
+              )}
               {subscribed ? (
                 <p className="text-sm text-primary font-medium tracking-wide">
                   {isRtl ? 'شكراً لاشتراكك!' : 'Thank you for subscribing!'}

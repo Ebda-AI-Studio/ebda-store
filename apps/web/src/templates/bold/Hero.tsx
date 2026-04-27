@@ -19,11 +19,9 @@ export default function BoldHero({
 }: HeroProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
-  const displayTitle = isRtl && titleAr ? titleAr : title || (isRtl ? 'اكتشف الجديد' : 'GO BOLD');
-  const displaySubtitle =
-    isRtl && subtitleAr
-      ? subtitleAr
-      : subtitle || (isRtl ? 'تميز بأسلوبك' : 'Stand out from the crowd');
+  // No hardcoded "GO BOLD" marketing copy; merchant copy or nothing.
+  const displayTitle = (isRtl && titleAr ? titleAr : title) ?? '';
+  const displaySubtitle = (isRtl && subtitleAr ? subtitleAr : subtitle) ?? '';
   const displayCta = isRtl && ctaTextAr ? ctaTextAr : ctaText || (isRtl ? 'تسوق الآن' : 'Shop Now');
 
   const resolvedCtaLink = ctaLink.startsWith('/') && urlPrefix ? `${urlPrefix}${ctaLink}` : ctaLink;
@@ -74,12 +72,9 @@ export default function BoldHero({
           className={`max-w-3xl motion-reduce:animate-none ${isRtl ? 'mr-auto ml-0 text-right' : 'ml-0 text-left'}`}
           style={{ animation: 'boldSlideIn 0.6s ease-out both' }}
         >
-          {/* Label */}
-          <div className="inline-flex items-center gap-2 mb-6 sm:mb-8 px-4 py-2 border border-white/20 rounded-full">
-            <span className="text-xs font-bold text-white/70 tracking-[0.2em] uppercase">
-              {isRtl ? 'مجموعة جديدة' : 'New Drop'}
-            </span>
-          </div>
+          {/* "New Drop" pill removed — was hardcoded demo copy. If a
+              merchant wants a tag/eyebrow above the headline they can
+              add it via the AnnouncementBar instead. */}
 
           {/* Headline — scales down on mobile so 320–414px viewports don't overflow */}
           <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-black uppercase tracking-tight text-white leading-[0.95] sm:leading-[0.9] mb-6 sm:mb-8 break-words">

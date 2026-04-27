@@ -19,14 +19,12 @@ export default function ModernHero({
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
 
-  const displayTitle =
-    isRtl && titleAr
-      ? titleAr
-      : title || (isRtl ? 'اكتشف مجموعتنا الجديدة' : 'Discover Our New Collection');
-  const displaySubtitle =
-    isRtl && subtitleAr
-      ? subtitleAr
-      : subtitle || (isRtl ? 'منتجات مميزة بأفضل الأسعار' : 'Premium products at the best prices');
+  // No hardcoded marketing copy — fallback is empty so the merchant's own
+  // values render unchanged when set, and nothing renders when not.
+  const displayTitle = (isRtl && titleAr ? titleAr : title) ?? '';
+  const displaySubtitle = (isRtl && subtitleAr ? subtitleAr : subtitle) ?? '';
+  // CTA text falls back to a functional generic ("Shop Now") because it's
+  // a button label, not content; without it the button has no text.
   const displayCta = isRtl && ctaTextAr ? ctaTextAr : ctaText || (isRtl ? 'تسوق الآن' : 'Shop Now');
 
   // When no image is configured, render a single-column centered hero

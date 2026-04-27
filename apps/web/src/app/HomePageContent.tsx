@@ -84,13 +84,17 @@ export function HomePageContent({
   const templateBestSellers = bestSellers.map(toTemplateProduct);
   const templateCategories = categories.map(toTemplateCategory);
 
-  // Hero customization (per-store, with fallbacks). Read from the StoreContext
-  // store value — that's the single source of truth on the client.
-  const heroTitleEn = store.heroTitle || 'Shop the Future of E-Commerce';
-  const heroTitleArVal = store.heroTitleAr || 'اكتشف مجموعتنا';
-  const heroSubtitleEn =
-    store.heroSubtitle || 'Premium products, fast delivery, and secure payments in Kuwait';
-  const heroSubtitleArVal = store.heroSubtitleAr || 'أفضل المنتجات بأفضل الأسعار في الكويت';
+  // Hero customization. Read from the StoreContext store — single source of
+  // truth on the client. The fallback for an empty headline is the store's
+  // own name (per locale), not a marketing demo string. Subtitle stays empty
+  // when the merchant hasn't written one — better to show nothing than a
+  // generic "Premium products, fast delivery..." strapline that's not true
+  // for every tenant. CTA text + link have safe generic defaults because
+  // they're functional UI, not content.
+  const heroTitleEn = store.heroTitle || store.name || '';
+  const heroTitleArVal = store.heroTitleAr || store.nameAr || store.name || '';
+  const heroSubtitleEn = store.heroSubtitle || '';
+  const heroSubtitleArVal = store.heroSubtitleAr || '';
   const heroCtaEn = store.heroCtaText || 'Shop Now';
   const heroCtaArVal = store.heroCtaTextAr || 'تسوق الآن';
   const heroCtaLink = store.heroCtaLink ? storeUrl(store.heroCtaLink) : storeUrl('/products');
@@ -103,6 +107,17 @@ export function HomePageContent({
     layout.hero.mode === 'slider' && layout.hero.slides.length > 0 && !!T.HeroSlider;
   const bannerEligible =
     layout.hero.mode === 'single' && layout.hero.slides.length > 0 && !!T.HeroBanner;
+  // The legacy T.Hero is only useful when the merchant has supplied at
+  // least one piece of content for it (title, subtitle, or image). With
+  // all three empty we'd render a hero with nothing in it, which is
+  // worse than just skipping the section.
+  const legacyHeroHasContent = !!(
+    heroTitleEn ||
+    heroTitleArVal ||
+    heroSubtitleEn ||
+    heroSubtitleArVal ||
+    heroImage
+  );
 
   return (
     <ShopChrome>
@@ -118,7 +133,7 @@ export function HomePageContent({
       {layout.hero.enabled && bannerEligible && T.HeroBanner && (
         <T.HeroBanner {...layout.hero.slides[0]} isRtl={isRtl} pack={templateId} />
       )}
-      {layout.hero.enabled && !sliderEligible && !bannerEligible && (
+      {layout.hero.enabled && !sliderEligible && !bannerEligible && legacyHeroHasContent && (
         <T.Hero
           title={heroTitleEn}
           titleAr={heroTitleArVal}
