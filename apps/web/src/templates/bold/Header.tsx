@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import type { HeaderProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { LanguageSwitcher } from '../../components/LanguageSwitcher';
 
 export default function BoldHeader({
   branding,
@@ -103,6 +104,12 @@ export default function BoldHeader({
                   />
                 </svg>
               </button>
+
+              {/* Language toggle */}
+              <LanguageSwitcher
+                variant="compact"
+                className="text-white/70 hover:text-white hover:bg-white/10"
+              />
 
               {/* Account */}
               <Link

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import type { HeaderProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { LanguageSwitcher } from '../../components/LanguageSwitcher';
 
 export default function MinimalHeader({
   branding,
@@ -127,6 +128,9 @@ export default function MinimalHeader({
                 )}
               </svg>
             </button>
+
+            {/* Language toggle */}
+            <LanguageSwitcher variant="compact" />
 
             {/* Account */}
             <Link

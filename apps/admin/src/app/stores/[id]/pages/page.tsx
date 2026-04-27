@@ -26,24 +26,29 @@ interface StoreSettings {
 }
 
 const DEFAULT_SHOP_LINKS: FooterLink[] = [
-  { name: 'All Products', href: '/products', enabled: true },
-  { name: 'Categories', href: '/categories', enabled: true },
-  { name: 'New Arrivals', href: '/products?sort=newest', enabled: true },
-  { name: 'Best Sellers', href: '/products?sort=popular', enabled: true },
-  { name: 'On Sale', href: '/products?sale=true', enabled: true },
+  { name: 'All Products', nameAr: 'كل المنتجات', href: '/products', enabled: true },
+  { name: 'Categories', nameAr: 'الفئات', href: '/categories', enabled: true },
+  { name: 'New Arrivals', nameAr: 'أحدث المنتجات', href: '/products?sort=newest', enabled: true },
+  {
+    name: 'Best Sellers',
+    nameAr: 'الأكثر مبيعاً',
+    href: '/products?sort=popular',
+    enabled: true,
+  },
+  { name: 'On Sale', nameAr: 'العروض', href: '/products?sale=true', enabled: true },
 ];
 
 const DEFAULT_SUPPORT_LINKS: FooterLink[] = [
-  { name: 'Contact Us', href: '/contact', enabled: true },
-  { name: 'FAQ', href: '/faq', enabled: true },
-  { name: 'Shipping Info', href: '/shipping', enabled: true },
-  { name: 'Returns & Refunds', href: '/returns', enabled: true },
+  { name: 'Contact Us', nameAr: 'تواصل معنا', href: '/contact', enabled: true },
+  { name: 'FAQ', nameAr: 'الأسئلة الشائعة', href: '/faq', enabled: true },
+  { name: 'Shipping Info', nameAr: 'معلومات الشحن', href: '/shipping', enabled: true },
+  { name: 'Returns & Refunds', nameAr: 'الإرجاع والاسترداد', href: '/returns', enabled: true },
 ];
 
 const DEFAULT_COMPANY_LINKS: FooterLink[] = [
-  { name: 'About Us', href: '/about', enabled: true },
-  { name: 'Privacy Policy', href: '/privacy', enabled: true },
-  { name: 'Terms of Service', href: '/terms', enabled: true },
+  { name: 'About Us', nameAr: 'من نحن', href: '/about', enabled: true },
+  { name: 'Privacy Policy', nameAr: 'سياسة الخصوصية', href: '/privacy', enabled: true },
+  { name: 'Terms of Service', nameAr: 'الشروط والأحكام', href: '/terms', enabled: true },
 ];
 
 export default function StorePagesPage() {

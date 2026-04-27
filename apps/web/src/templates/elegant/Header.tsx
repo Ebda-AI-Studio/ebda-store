@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import type { HeaderProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { LanguageSwitcher } from '../../components/LanguageSwitcher';
 
 export default function ElegantHeader({
   branding,
@@ -35,25 +36,22 @@ export default function ElegantHeader({
   return (
     <header className="bg-background border-b border-border" dir={isRtl ? 'rtl' : 'ltr'}>
       <div className="container mx-auto px-4">
-        {/* Top utility bar */}
-        <div className="hidden md:flex items-center justify-between py-2 text-[11px] tracking-[0.15em] uppercase text-muted-foreground border-b border-border/50">
-          <span>
-            {isRtl ? 'شحن مجاني للطلبات فوق 25 د.ك' : 'Complimentary shipping on orders over 25 KD'}
-          </span>
-          <div className="flex items-center gap-6">
-            <Link
-              href={`${urlPrefix}/contact`}
-              className="hover:text-foreground transition-opacity duration-300 cursor-pointer"
-            >
-              {isRtl ? 'تواصل معنا' : 'Contact'}
-            </Link>
-            <Link
-              href={`${urlPrefix}/wishlist`}
-              className="hover:text-foreground transition-opacity duration-300 cursor-pointer"
-            >
-              {isRtl ? 'المفضلة' : 'Wishlist'}
-            </Link>
-          </div>
+        {/* Top utility bar — Contact + Wishlist only. The shipping promo
+            line was a hardcoded demo; tenants who want a promo line should
+            configure the AnnouncementBar (rendered above the header). */}
+        <div className="hidden md:flex items-center justify-end gap-6 py-2 text-xs tracking-[0.15em] uppercase text-muted-foreground border-b border-border/50">
+          <Link
+            href={`${urlPrefix}/contact`}
+            className="hover:text-foreground transition-opacity duration-300 cursor-pointer"
+          >
+            {isRtl ? 'تواصل معنا' : 'Contact'}
+          </Link>
+          <Link
+            href={`${urlPrefix}/wishlist`}
+            className="hover:text-foreground transition-opacity duration-300 cursor-pointer"
+          >
+            {isRtl ? 'المفضلة' : 'Wishlist'}
+          </Link>
         </div>
 
         {/* Main header row */}
@@ -128,6 +126,13 @@ export default function ElegantHeader({
               </svg>
             </button>
 
+            {/* Language toggle — visible on every breakpoint so customers
+                can switch even when the rest of the actions row collapses. */}
+            <LanguageSwitcher
+              variant="compact"
+              className="text-foreground/60 hover:text-foreground"
+            />
+
             {/* Account */}
             <Link
               href={isLoggedIn ? `${urlPrefix}/account` : `${urlPrefix}/auth/login`}
@@ -187,7 +192,7 @@ export default function ElegantHeader({
             <Link
               key={item.href}
               href={item.href}
-              className="text-[11px] tracking-[0.2em] uppercase text-muted-foreground hover:text-foreground transition-opacity duration-300 cursor-pointer"
+              className="text-sm tracking-[0.18em] uppercase text-muted-foreground hover:text-foreground transition-opacity duration-300 cursor-pointer"
             >
               {isRtl && item.labelAr ? item.labelAr : item.label}
             </Link>
@@ -220,7 +225,7 @@ export default function ElegantHeader({
                 <li key={item.href}>
                   <Link
                     href={item.href}
-                    className="text-[11px] tracking-[0.2em] uppercase text-muted-foreground hover:text-foreground transition-opacity duration-300 cursor-pointer"
+                    className="text-sm tracking-[0.18em] uppercase text-muted-foreground hover:text-foreground transition-opacity duration-300 cursor-pointer"
                     onClick={() => setIsMenuOpen(false)}
                   >
                     {isRtl && item.labelAr ? item.labelAr : item.label}

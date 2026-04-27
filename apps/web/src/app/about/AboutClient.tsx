@@ -8,15 +8,22 @@ import { useLanguage, translations } from '../../contexts/LanguageContext';
 export default function AboutClient() {
   const { store } = useStore();
   const storeUrl = useStoreUrl();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
 
-  // Prefer a dedicated about/description field; fall back to a generic message
-  const headingText = store.name || t('Our Store', 'متجرنا');
+  // Tenant brand string — pick the localized store name so the heading and
+  // welcome line read in the active language. Fallback to whichever name
+  // exists when only one localization was filled in.
+  const isRtl = language === 'ar';
+  const brandName =
+    (isRtl ? store.nameAr : store.name) || store.name || store.nameAr || t('our store', 'متجرنا');
+
+  const headingText = brandName || t('Our Store', 'متجرنا');
   const descriptionText =
+    (isRtl ? store.descriptionAr : store.description) ||
     store.description ||
     t(
-      `Welcome to ${store.name || 'our store'}! We are passionate about providing high-quality products and exceptional customer service.`,
-      `مرحباً بكم في ${store.name || 'متجرنا'}! نحن شغوفون بتقديم منتجات عالية الجودة وخدمة عملاء استثنائية.`
+      `Welcome to ${brandName}! We are passionate about providing high-quality products and exceptional customer service.`,
+      `مرحباً بكم في ${brandName}! نحن شغوفون بتقديم منتجات عالية الجودة وخدمة عملاء استثنائية.`
     );
 
   return (

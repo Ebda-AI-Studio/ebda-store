@@ -62,6 +62,37 @@ const FOOTER_SECTION_HEADINGS: Record<ResolvedFooterSection['key'], { en: string
   support: { en: 'Support', ar: 'الدعم' },
 };
 
+/**
+ * Arabic fallback for the platform's seeded footer-link names. Legacy stores
+ * saved their `footerLinks` before we added the `nameAr` field, so their
+ * persisted JSON has English-only labels. We can't migrate existing rows
+ * without losing tenant overrides, but we can map the common platform-default
+ * names to Arabic at render time. Custom labels typed by the merchant fall
+ * through unchanged.
+ */
+const ARABIC_LABEL_FALLBACK: Record<string, string> = {
+  // Shop
+  'All Products': 'كل المنتجات',
+  Categories: 'الفئات',
+  'New Arrivals': 'أحدث المنتجات',
+  'Best Sellers': 'الأكثر مبيعاً',
+  'On Sale': 'العروض',
+  // Support
+  'Contact Us': 'تواصل معنا',
+  FAQ: 'الأسئلة الشائعة',
+  'Shipping Info': 'معلومات الشحن',
+  'Returns & Refunds': 'الإرجاع والاسترداد',
+  // Company
+  'About Us': 'من نحن',
+  'Privacy Policy': 'سياسة الخصوصية',
+  'Terms of Service': 'الشروط والأحكام',
+};
+
+function resolveLinkLabel(name: string, nameAr: string | undefined, isRtl: boolean): string {
+  if (!isRtl) return name;
+  return nameAr ?? ARABIC_LABEL_FALLBACK[name] ?? name;
+}
+
 function resolveFooterSection(
   key: ResolvedFooterSection['key'],
   links: FooterLinkSection[] | undefined,
@@ -71,7 +102,7 @@ function resolveFooterSection(
   const active = links
     .filter(link => link.enabled !== false)
     .map(link => ({
-      label: getDisplayText(link.name, link.nameAr, isRtl),
+      label: resolveLinkLabel(link.name, link.nameAr, isRtl),
       href: link.href,
     }));
   if (active.length === 0) return null;

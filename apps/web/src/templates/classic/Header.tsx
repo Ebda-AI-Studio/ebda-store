@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import type { HeaderProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { LanguageSwitcher } from '../../components/LanguageSwitcher';
 
 export default function ClassicHeader({
   branding,
@@ -164,6 +165,9 @@ export default function ClassicHeader({
                   />
                 </svg>
               </button>
+              {/* Language toggle */}
+              <LanguageSwitcher variant="compact" />
+
               <Link
                 href={isLoggedIn ? `${urlPrefix}/account` : `${urlPrefix}/auth/login`}
                 className="text-foreground/60 hover:text-foreground transition-colors duration-200"
