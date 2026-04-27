@@ -15,6 +15,27 @@ export function PaymentCard({ order, onEdit }: PaymentCardProps) {
   const remain = isPaid ? 0 : order.total;
   const link = order.payments?.find(p => p.paymentLink)?.paymentLink ?? null;
 
+  // Pick the most-recent successful payment for the details row, falling
+  // back to the most recent attempt of any status. Shows the merchant
+  // exactly which provider/method was used and the gateway's transaction
+  // id so they can reconcile against the gateway dashboard.
+  const detailPayment =
+    order.payments?.find(p => p.status === 'completed') ??
+    [...(order.payments ?? [])].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    )[0] ??
+    null;
+  const providerLabel = (() => {
+    if (!detailPayment) return null;
+    const provider = detailPayment.provider?.trim();
+    const method = detailPayment.method?.trim();
+    if (!provider) return null;
+    if (method && method.toLowerCase() !== provider.toLowerCase()) {
+      return `${provider} · ${method}`;
+    }
+    return provider;
+  })();
+
   return (
     <section className="rounded-2xl border border-border bg-card p-5">
       <div className="flex items-center justify-between mb-4">
@@ -79,6 +100,28 @@ export function PaymentCard({ order, onEdit }: PaymentCardProps) {
               {t('remain', { amount: formatMoney(remain, order.currency) })}
             </div>
           )}
+
+          {/* Payment details — provider/method + transaction id from the
+              latest payment attempt. Hidden when no payment record yet so
+              orders that are still waiting on checkout don't show an
+              empty section. */}
+          {providerLabel && (
+            <dl className="mt-4 space-y-2 border-t border-border pt-4 text-sm">
+              <div className="flex items-baseline justify-between gap-3 flex-wrap">
+                <dt className="text-muted-foreground">{t('paymentMethod')}</dt>
+                <dd className="font-medium text-foreground">{providerLabel}</dd>
+              </div>
+              {detailPayment?.transactionId && (
+                <div className="flex items-baseline justify-between gap-3 flex-wrap">
+                  <dt className="text-muted-foreground">{t('paymentTransactionId')}</dt>
+                  <dd className="font-mono text-xs text-foreground break-all text-end">
+                    {detailPayment.transactionId}
+                  </dd>
+                </div>
+              )}
+            </dl>
+          )}
+
           {link && (
             <a
               href={link}

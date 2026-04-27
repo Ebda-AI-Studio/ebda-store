@@ -69,8 +69,11 @@ export class OrderService {
         skip,
         take: limit,
         include: {
+          // `phone` is included so the admin customers page can surface
+          // it without doing a second query. Stays nullable on the User
+          // record itself.
           customer: {
-            select: { id: true, email: true, firstName: true, lastName: true },
+            select: { id: true, email: true, firstName: true, lastName: true, phone: true },
           },
           items: true,
           payments: { select: { provider: true, status: true } },

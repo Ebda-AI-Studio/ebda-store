@@ -38,8 +38,12 @@ export interface OrderItemDetail {
 export interface OrderPaymentDetail {
   id: string;
   provider: string;
+  /** Specific method within the provider (e.g. knet, visa, mastercard). */
+  method?: string | null;
   status: string;
   amount: number;
+  /** Provider-side transaction id, useful for reconciliation. */
+  transactionId?: string | null;
   paymentLink?: string | null;
   createdAt: string;
 }

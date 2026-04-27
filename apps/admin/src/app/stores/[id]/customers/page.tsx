@@ -3,16 +3,23 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { Button } from '@force/ui';
+import { Button, useToast } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
-import { apiGet } from '../../../../lib/api';
+import { apiGet, getApiUrl } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
+
+const API_URL = getApiUrl();
 
 interface OrderCustomer {
   id: string;
   firstName: string;
   lastName: string;
   email: string;
+  phone?: string | null;
+}
+
+interface OrderShippingAddress {
+  phone?: string;
 }
 
 interface Order {
@@ -21,6 +28,7 @@ interface Order {
   customer: OrderCustomer;
   total: number;
   createdAt: string;
+  shippingAddress?: OrderShippingAddress | null;
 }
 
 interface CustomerRow {
@@ -28,6 +36,7 @@ interface CustomerRow {
   firstName: string;
   lastName: string;
   email: string;
+  phone: string;
   totalOrders: number;
   totalSpent: number;
   lastOrderDate: string;
@@ -54,6 +63,8 @@ export default function StoreCustomersPage() {
   const [search, setSearch] = useState('');
   // Track whether we are still fetching additional pages beyond the first
   const [isFetchingAll, setIsFetchingAll] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const { error: toastError } = useToast();
 
   /**
    * Fetch all orders for the store across all pages, then deduplicate by
@@ -106,6 +117,11 @@ export default function StoreCustomersPage() {
       for (const order of allOrders) {
         if (!order.customer?.id) continue;
 
+        // Phone falls back to the shipping address's phone when the User
+        // record itself doesn't have one — that's where most checkout
+        // flows actually capture the customer's number.
+        const orderPhone = order.customer.phone || order.shippingAddress?.phone || '';
+
         const existing = customerMap.get(order.customer.id);
         if (existing) {
           existing.totalOrders += 1;
@@ -115,6 +131,10 @@ export default function StoreCustomersPage() {
             existing.lastOrderDate = order.createdAt;
             existing.lastOrderId = order.id;
             existing.lastOrderNumber = order.orderNumber;
+            // Latest order's phone wins when newer
+            if (orderPhone) existing.phone = orderPhone;
+          } else if (!existing.phone && orderPhone) {
+            existing.phone = orderPhone;
           }
         } else {
           customerMap.set(order.customer.id, {
@@ -122,6 +142,7 @@ export default function StoreCustomersPage() {
             firstName: order.customer.firstName,
             lastName: order.customer.lastName,
             email: order.customer.email,
+            phone: orderPhone,
             totalOrders: 1,
             totalSpent: order.total,
             lastOrderDate: order.createdAt,
@@ -151,20 +172,82 @@ export default function StoreCustomersPage() {
     return (
       customer.firstName.toLowerCase().includes(s) ||
       customer.lastName.toLowerCase().includes(s) ||
-      customer.email.toLowerCase().includes(s)
+      customer.email.toLowerCase().includes(s) ||
+      (customer.phone?.toLowerCase().includes(s) ?? false)
     );
   });
+
+  /**
+   * Trigger the server-side XLSX export. We hit the API via raw fetch
+   * (instead of apiGet) because the response is a binary stream, and we
+   * pull it into a Blob → object URL → anchor click to save the file.
+   */
+  const handleExport = useCallback(async () => {
+    if (!storeId || isExporting) return;
+    setIsExporting(true);
+    try {
+      const res = await fetch(`${API_URL}/api/v1/stores/${storeId}/customers/export.xlsx`, {
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        toastError(t('exportFailed'));
+        return;
+      }
+      const blob = await res.blob();
+      const filename = (() => {
+        const cd = res.headers.get('content-disposition') ?? '';
+        const match = cd.match(/filename="?([^"]+)"?/i);
+        return match?.[1] ?? `customers-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      })();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      toastError(t('exportFailed'));
+    } finally {
+      setIsExporting(false);
+    }
+  }, [storeId, isExporting, t, toastError]);
 
   return (
     <AdminLayout
       title={t('title')}
       subtitle={t('subtitle')}
       actions={
-        <Link href={`/stores/${storeId}`}>
-          <Button type="button" variant="outline">
-            {t('backToStore')}
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleExport}
+            disabled={isLoading || isExporting || customers.length === 0}
+          >
+            <svg
+              className="h-4 w-4 me-2"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              aria-hidden
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+              />
+            </svg>
+            {isExporting ? t('exporting') : t('exportXlsx')}
           </Button>
-        </Link>
+          <Link href={`/stores/${storeId}`}>
+            <Button type="button" variant="outline">
+              {t('backToStore')}
+            </Button>
+          </Link>
+        </div>
       }
     >
       {/* Search bar */}
@@ -270,6 +353,12 @@ export default function StoreCustomersPage() {
                     scope="col"
                     className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider"
                   >
+                    {t('colPhone')}
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                  >
                     {t('colOrders')}
                   </th>
                   <th
@@ -308,6 +397,19 @@ export default function StoreCustomersPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-muted-foreground">{customer.email}</td>
+                    <td className="px-6 py-4 text-sm text-muted-foreground">
+                      {customer.phone ? (
+                        <a
+                          href={`tel:${customer.phone}`}
+                          className="hover:text-foreground transition-colors"
+                          dir="ltr"
+                        >
+                          {customer.phone}
+                        </a>
+                      ) : (
+                        <span className="text-muted-foreground/60">—</span>
+                      )}
+                    </td>
                     <td className="px-6 py-4">
                       <span className="inline-flex items-center rounded-full bg-info/5 px-2.5 py-1 text-xs font-medium text-info">
                         {customer.totalOrders === 1

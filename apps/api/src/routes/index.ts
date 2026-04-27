@@ -4,6 +4,7 @@ import storeRoutes from './store.routes';
 import productRoutes from './product.routes';
 import cartRoutes from './cart.routes';
 import orderRoutes from './order.routes';
+import customersRoutes from './customers.routes';
 import reviewRoutes from './review.routes';
 import analyticsRoutes from './analytics.routes';
 import returnRoutes from './return.routes';
@@ -72,6 +73,9 @@ router.use('/stores/:storeId/products', tenantContext, productRoutes);
 router.use('/stores/:storeId/categories', tenantContext, categoryRoutes);
 router.use('/stores/:storeId/cart', tenantContext, cartRoutes);
 router.use('/stores/:storeId/orders', tenantContext, orderRoutes);
+// Customers export (.xlsx). Mounted at /stores/:storeId so the route
+// has access to storeId via mergeParams.
+router.use('/stores/:storeId', tenantContext, customersRoutes);
 router.use('/stores/:storeId/reviews', tenantContext, reviewRoutes);
 router.use('/stores/:storeId/analytics', tenantContext, analyticsRoutes);
 router.use('/stores/:storeId/returns', tenantContext, returnRoutes);
