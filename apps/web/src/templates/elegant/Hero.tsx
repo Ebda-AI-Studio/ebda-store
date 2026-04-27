@@ -151,20 +151,10 @@ export default function ElegantHero({
             </div>
           </div>
 
-          {/* Bottom perks bar */}
-          <div className="border-t border-primary/8">
-            <div className="container mx-auto px-4 py-5">
-              <div className="flex items-center justify-between text-[10px] tracking-[0.2em] uppercase text-muted-foreground/50">
-                <span>{isRtl ? 'شحن مجاني' : 'Complimentary Shipping'}</span>
-                <span className="text-primary/20">·</span>
-                <span>{isRtl ? 'إرجاع سهل' : 'Easy Returns'}</span>
-                <span className="hidden md:inline text-primary/20">·</span>
-                <span className="hidden md:inline">
-                  {isRtl ? 'خدمة متميزة' : 'White Glove Service'}
-                </span>
-              </div>
-            </div>
-          </div>
+          {/* Bottom perks bar removed — these claims (free shipping, easy
+              returns, white-glove service) aren't true for every tenant.
+              Stores that want to advertise perks should use the configurable
+              AnnouncementBar above the header. */}
         </div>
       )}
 
