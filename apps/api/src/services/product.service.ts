@@ -12,6 +12,8 @@ interface CreateProductData {
   descriptionAr?: string;
   price: number;
   compareAtPrice?: number;
+  /** Cost-of-goods in fils. Used for profit reporting. */
+  costPrice?: number | null;
   sku?: string;
   inventory?: number;
   status?: 'draft' | 'active' | 'archived';
@@ -190,6 +192,7 @@ export class ProductService {
         descriptionAr: data.descriptionAr,
         price: data.price,
         compareAtPrice: data.compareAtPrice,
+        costPrice: data.costPrice ?? null,
         sku: data.sku,
         inventory: data.inventory ?? 0,
         status: data.status ?? 'draft',
@@ -283,6 +286,10 @@ export class ProductService {
           descriptionAr: data.descriptionAr,
           price: data.price,
           compareAtPrice: data.compareAtPrice,
+          // Pass through only when present in the patch — undefined leaves
+          // the existing value, explicit null clears it. Same convention
+          // as the curated flags below.
+          ...(data.costPrice !== undefined ? { costPrice: data.costPrice } : {}),
           sku: data.sku,
           inventory: data.inventory,
           status: data.status,

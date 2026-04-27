@@ -20,6 +20,7 @@ interface Product {
   descriptionAr?: string;
   price: number;
   compareAtPrice?: number;
+  costPrice?: number;
   sku?: string;
   inventory: number;
   status: string;
@@ -61,6 +62,10 @@ export default function EditProductPage() {
     descriptionAr: '',
     price: '',
     compareAtPrice: '',
+    // Cost-of-goods. Used for profit reporting (price - costPrice = margin)
+    // and snapshotted onto OrderItem at sale time. Stored in fils on the
+    // server, displayed/edited as KWD in the form.
+    costPrice: '',
     sku: '',
     inventory: '',
     status: 'draft',
@@ -128,6 +133,7 @@ export default function EditProductPage() {
           descriptionAr: p.descriptionAr || '',
           price: p.price ? (p.price / 1000).toFixed(3) : '',
           compareAtPrice: p.compareAtPrice ? (p.compareAtPrice / 1000).toFixed(3) : '',
+          costPrice: p.costPrice ? (p.costPrice / 1000).toFixed(3) : '',
           sku: p.sku || '',
           inventory: String(p.inventory ?? 0),
           status: p.status || 'draft',
@@ -162,6 +168,9 @@ export default function EditProductPage() {
       const compareAtPriceInFils = formData.compareAtPrice
         ? Math.round(parseFloat(formData.compareAtPrice) * 1000)
         : undefined;
+      const costPriceInFils = formData.costPrice
+        ? Math.round(parseFloat(formData.costPrice) * 1000)
+        : null;
 
       const body: Record<string, unknown> = {
         name: formData.name,
@@ -170,6 +179,7 @@ export default function EditProductPage() {
         descriptionAr: formData.descriptionAr || undefined,
         price: priceInFils,
         compareAtPrice: compareAtPriceInFils,
+        costPrice: costPriceInFils,
         sku: formData.sku || undefined,
         inventory: formData.inventory ? parseInt(formData.inventory, 10) : 0,
         status: formData.status,
@@ -297,7 +307,7 @@ export default function EditProductPage() {
 
             <div className="rounded-xl border bg-card p-6 shadow-sm">
               <h2 className="text-lg font-semibold text-foreground mb-4">{tSections('pricing')}</h2>
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-3">
                 <Input
                   label={tFields('price')}
                   type="number"
@@ -315,7 +325,35 @@ export default function EditProductPage() {
                   onChange={e => updateField('compareAtPrice', e.target.value)}
                   placeholder={tFields('pricePlaceholder')}
                 />
+                <Input
+                  label={tFields('costPrice')}
+                  type="number"
+                  step="0.001"
+                  value={formData.costPrice}
+                  onChange={e => updateField('costPrice', e.target.value)}
+                  placeholder={tFields('pricePlaceholder')}
+                />
               </div>
+              {/* Live profit hint — only renders when both price and cost
+                  are filled. Helps the merchant see margin while pricing
+                  the product instead of guessing afterwards. */}
+              {(() => {
+                const sellPrice = parseFloat(formData.price);
+                const cost = parseFloat(formData.costPrice);
+                if (!Number.isFinite(sellPrice) || !Number.isFinite(cost) || sellPrice <= 0)
+                  return null;
+                const margin = sellPrice - cost;
+                const marginPct = (margin / sellPrice) * 100;
+                const profitable = margin > 0;
+                return (
+                  <p className={`mt-3 text-sm ${profitable ? 'text-success' : 'text-destructive'}`}>
+                    {tFields('profitLabel')}{' '}
+                    <span className="font-semibold">
+                      {margin.toFixed(3)} KWD ({marginPct.toFixed(1)}%)
+                    </span>
+                  </p>
+                );
+              })()}
             </div>
 
             <div className="rounded-xl border bg-card p-6 shadow-sm">

@@ -57,6 +57,14 @@ interface DashboardStats {
   revenueChange: number;
   ordersChange: number;
   customersChange: number;
+  /**
+   * Sum of (price - costPrice) * quantity across all order items in the
+   * window, where the order isn't cancelled/refunded and the item has a
+   * cost snapshot. Items without a cost snapshot are skipped from this
+   * total — they pre-date the cost-tracking feature.
+   */
+  totalProfit: number;
+  profitChange: number;
 }
 
 interface SalesData {
@@ -174,6 +182,13 @@ export class AnalyticsService {
           ? 100
           : 0;
 
+    const profitChange =
+      prevStats.profit > 0
+        ? ((currentStats.profit - prevStats.profit) / prevStats.profit) * 100
+        : currentStats.profit > 0
+          ? 100
+          : 0;
+
     return {
       totalRevenue: currentStats.revenue,
       totalOrders: currentStats.orders,
@@ -184,6 +199,8 @@ export class AnalyticsService {
       revenueChange: Math.round(revenueChange * 10) / 10,
       ordersChange: Math.round(ordersChange * 10) / 10,
       customersChange: Math.round(customersChange * 10) / 10,
+      totalProfit: currentStats.profit,
+      profitChange: Math.round(profitChange * 10) / 10,
     };
   }
 
@@ -195,7 +212,7 @@ export class AnalyticsService {
     };
 
     // Use aggregate for revenue and order count — avoids loading all rows into JS
-    const [aggregate, customerGroups] = await Promise.all([
+    const [aggregate, customerGroups, profitRows] = await Promise.all([
       prisma.order.aggregate({
         where,
         _sum: { total: true },
@@ -206,12 +223,29 @@ export class AnalyticsService {
         by: ['customerId'],
         where,
       }),
+      // Profit per item: (price - costPrice) * quantity. We compute it in
+      // the database for consistency with the order-aggregate above and
+      // to avoid loading every line item into Node memory.
+      prisma.$queryRaw<Array<{ profit: bigint | null }>>`
+        SELECT COALESCE(SUM((oi.price - COALESCE(oi.cost_price, 0)) * oi.quantity), 0)::bigint AS profit
+        FROM order_items oi
+        JOIN orders o ON o.id = oi.order_id
+        WHERE o.store_id = ${storeId}
+          AND o.created_at >= ${startDate}
+          AND o.created_at <= ${endDate}
+          AND o.status NOT IN ('cancelled', 'refunded')
+          AND oi.cost_price IS NOT NULL
+      `,
     ]);
+
+    const profitBig = profitRows[0]?.profit ?? null;
+    const profit = profitBig === null ? 0 : Number(profitBig);
 
     return {
       revenue: aggregate._sum.total ?? 0,
       orders: aggregate._count.id,
       customers: customerGroups.length,
+      profit,
     };
   }
 

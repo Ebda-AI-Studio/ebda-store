@@ -38,6 +38,7 @@ export default function NewProductPage() {
     descriptionAr: '',
     price: '',
     compareAtPrice: '',
+    costPrice: '',
     sku: '',
     inventory: '',
     category: '',
@@ -78,6 +79,9 @@ export default function NewProductPage() {
       const compareAtPriceInFils = formData.compareAtPrice
         ? Math.round(parseFloat(formData.compareAtPrice) * 1000)
         : undefined;
+      const costPriceInFils = formData.costPrice
+        ? Math.round(parseFloat(formData.costPrice) * 1000)
+        : null;
 
       const body: Record<string, unknown> = {
         name: formData.name,
@@ -86,6 +90,7 @@ export default function NewProductPage() {
         descriptionAr: formData.descriptionAr || undefined,
         price: priceInFils,
         compareAtPrice: compareAtPriceInFils,
+        costPrice: costPriceInFils,
         sku: formData.sku || undefined,
         inventory: formData.inventory ? parseInt(formData.inventory, 10) : 0,
         status: formData.status,
@@ -184,7 +189,7 @@ export default function NewProductPage() {
               <h2 className="text-lg font-semibold text-foreground mb-4">
                 {t('sections.pricing')}
               </h2>
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-3">
                 <Input
                   label={t('fields.price')}
                   type="number"
@@ -200,6 +205,14 @@ export default function NewProductPage() {
                   step="0.001"
                   value={formData.compareAtPrice}
                   onChange={e => updateField('compareAtPrice', e.target.value)}
+                  placeholder={t('fields.pricePlaceholder')}
+                />
+                <Input
+                  label={t('fields.costPrice')}
+                  type="number"
+                  step="0.001"
+                  value={formData.costPrice}
+                  onChange={e => updateField('costPrice', e.target.value)}
                   placeholder={t('fields.pricePlaceholder')}
                 />
               </div>

@@ -287,6 +287,9 @@ export class OrderService {
               sku: item.product.sku,
               quantity: item.quantity,
               price: item.product.price,
+              // Snapshot cost-of-goods at sale time so profit reports
+              // stay correct even if the product's cost changes later.
+              costPrice: item.product.costPrice ?? null,
               total: item.product.price * item.quantity,
             })),
           },

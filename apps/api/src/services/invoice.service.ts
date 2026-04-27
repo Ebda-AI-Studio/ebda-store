@@ -330,10 +330,12 @@ export class InvoiceService {
         <div class="store-info">
           ${
             order.store.logo
-              ? `<img src="${escapeHtml(order.store.logo)}" alt="${escapeHtml(order.store.name)}" class="store-logo" />`
-              : ''
+              ? // Logo is the brand mark — when present we don't also render
+                // the store-name text below it; otherwise the name shows up
+                // twice (e.g. logo of "Wady Aljuz" + text "Wady Aljuz").
+                `<img src="${escapeHtml(order.store.logo)}" alt="${escapeHtml(order.store.name)}" class="store-logo" />`
+              : `<div class="store-name">${escapeHtml(order.store.name)}</div>`
           }
-          <div class="store-name">${escapeHtml(order.store.name)}</div>
           ${order.store.email ? `<div class="store-meta">${escapeHtml(order.store.email)}</div>` : ''}
           ${order.store.phone ? `<div class="store-meta">${escapeHtml(order.store.phone)}</div>` : ''}
           ${order.store.address ? `<div class="store-meta">${escapeHtml(order.store.address)}</div>` : ''}
@@ -379,12 +381,23 @@ export class InvoiceService {
 
       ${
         payment
-          ? `
+          ? // Render "Payment: <provider>" or "Payment: <provider> (<method>)"
+            // — drop the parens entirely when provider === method to avoid
+            // the "cod (cod)" duplicate that Cash-on-Delivery used to show.
+            (() => {
+              const provider = (payment.provider || '').trim();
+              const method = (payment.method || '').trim();
+              const showMethod = method && method.toLowerCase() !== provider.toLowerCase();
+              const label = showMethod
+                ? `${escapeHtml(provider)} (${escapeHtml(method)})`
+                : escapeHtml(provider) || 'N/A';
+              return `
       <div class="payment-row">
         <strong>Payment:</strong>
-        ${payment.method ? `${escapeHtml(payment.provider)} (${escapeHtml(payment.method)})` : escapeHtml(payment.provider) || 'N/A'}
+        ${label}
         ${payment.transactionId ? ` &middot; ${escapeHtml(payment.transactionId)}` : ''}
-      </div>`
+      </div>`;
+            })()
           : ''
       }
 

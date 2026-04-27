@@ -704,6 +704,11 @@ model OrderItem {
   sku         String?
   quantity    Int
   price       Int
+  // Cost-of-goods snapshot at sale time. Stored in fils, same scale as
+  // `price`. Snapshotted because the product's cost may change later but
+  // the order's profit must reflect what it cost on the day it shipped.
+  // Nullable for orders placed before this column existed.
+  costPrice   Int?    @map("cost_price")
   total       Int
 
   order       Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)

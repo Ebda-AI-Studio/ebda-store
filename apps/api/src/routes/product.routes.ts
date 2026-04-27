@@ -22,6 +22,9 @@ const createProductSchema = z.object({
   descriptionAr: z.string().optional(),
   price: z.number().int().min(0),
   compareAtPrice: z.number().int().min(0).optional(),
+  // Cost-of-goods in fils, used for profit reporting. Nullable so the
+  // admin form can clear a previously-set value.
+  costPrice: z.number().int().min(0).optional().nullable(),
   sku: z.string().optional(),
   inventory: z.number().int().min(0).optional(),
   status: z.enum(['draft', 'active', 'archived']).optional(),
