@@ -1705,6 +1705,14 @@
     }
   },
   "pwa": {
+    "installHint": {
+      "title": "Install Force Admin to receive push notifications",
+      "description": "iPhone needs the app added to your home screen before push notifications can work.",
+      "step1": "Tap the Share icon in Safari",
+      "step2": "Choose Add to Home Screen",
+      "step3": "Open Force Admin from the home screen and allow notifications",
+      "dismiss": "Dismiss"
+    },
     "page": {
       "title": "Progressive Web App",
       "subtitle": "Enable app-like experience for your customers"

@@ -78,9 +78,14 @@ const nextConfig = {
           },
           { key: 'X-XSS-Protection', value: '1; mode=block' },
           {
+            // OneSignal needs:
+            //   script-src + 'unsafe-eval' → SDK runtime checks
+            //   connect-src https://*.onesignal.com → REST + websocket
+            //   worker-src 'self' blob: → /OneSignalSDKWorker.js can importScripts the OneSignal CDN
+            //   manifest-src 'self' → PWA install
             key: 'Content-Security-Policy',
             value:
-              "default-src 'self'; script-src 'self' 'unsafe-inline' https://vercel.live; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' https://*.up.railway.app wss://*.up.railway.app https://*.supabase.co https://vercel.live wss://vercel.live; frame-src https://vercel.live; frame-ancestors 'none'",
+              "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://vercel.live https://cdn.onesignal.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.onesignal.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' https://*.up.railway.app wss://*.up.railway.app https://*.supabase.co https://vercel.live wss://vercel.live https://onesignal.com https://*.onesignal.com wss://*.onesignal.com; frame-src https://vercel.live https://onesignal.com https://*.onesignal.com; worker-src 'self' blob:; manifest-src 'self'; frame-ancestors 'none'",
           },
         ],
       },

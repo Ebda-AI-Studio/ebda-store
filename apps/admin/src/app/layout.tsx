@@ -28,6 +28,29 @@ export const metadata: Metadata = {
   keywords: ['admin', 'dashboard', 'e-commerce', 'Force Media', 'Kuwait'],
   authors: [{ name: 'Force Media' }],
   creator: 'Force Media Kuwait',
+  // PWA install metadata. apple-* keys exist because iOS Safari requires
+  // an installed PWA before granting Web Push permission, and the install
+  // prompt picks up these tags rather than the manifest.
+  applicationName: 'Force Admin',
+  appleWebApp: {
+    capable: true,
+    title: 'Force Admin',
+    statusBarStyle: 'default',
+  },
+  formatDetection: {
+    telephone: false,
+  },
+  icons: {
+    icon: '/favicon.svg',
+    apple: '/icon-192.png',
+  },
+};
+
+export const viewport = {
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
+    { media: '(prefers-color-scheme: dark)', color: '#0a0a0a' },
+  ],
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
