@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import type { HeaderProps } from '../types';
+import type { HeaderProps, ResolvedUtilityBar } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { LanguageSwitcher } from '../../components/LanguageSwitcher';
 
@@ -15,6 +15,7 @@ export default function ElegantHeader({
   isLoggedIn = false,
   onSearch,
   urlPrefix = '',
+  utilityBar,
 }: HeaderProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -33,26 +34,52 @@ export default function ElegantHeader({
   const displayName = isRtl && branding.nameAr ? branding.nameAr : branding.name;
   const displayLogo = isRtl && branding.logoAr ? branding.logoAr : branding.logo;
 
+  // Resolve the utility bar: when the merchant hasn't saved a config we
+  // fall back to the legacy Contact + Wishlist defaults so existing
+  // Elegant stores keep their bar. When the merchant explicitly disables
+  // the bar (`enabled: false`) we render nothing — and we deliberately
+  // do NOT add compensating padding to the main header row below so the
+  // logo/nav block sits flush against the announcement bar (or the page
+  // top) like the other packs.
+  const defaultUtilityLinks: ResolvedUtilityBar['links'] = [
+    {
+      label: 'Contact',
+      labelAr: 'تواصل معنا',
+      href: `${urlPrefix}/contact`,
+      enabled: true,
+    },
+    {
+      label: 'Wishlist',
+      labelAr: 'المفضلة',
+      href: `${urlPrefix}/wishlist`,
+      enabled: true,
+    },
+  ];
+  const utilityBarEnabled = utilityBar?.enabled !== false;
+  const utilityBarLinks = (utilityBar?.links ?? defaultUtilityLinks).filter(
+    link => link.enabled !== false
+  );
+  const showUtilityBar = utilityBarEnabled && utilityBarLinks.length > 0;
+
   return (
     <header className="bg-background border-b border-border" dir={isRtl ? 'rtl' : 'ltr'}>
       <div className="container mx-auto px-4">
-        {/* Top utility bar — Contact + Wishlist only. The shipping promo
-            line was a hardcoded demo; tenants who want a promo line should
-            configure the AnnouncementBar (rendered above the header). */}
-        <div className="hidden md:flex items-center justify-end gap-6 py-2 text-xs tracking-[0.15em] uppercase text-muted-foreground border-b border-border/50">
-          <Link
-            href={`${urlPrefix}/contact`}
-            className="hover:text-foreground transition-colors duration-500 ease-out cursor-pointer"
-          >
-            {isRtl ? 'تواصل معنا' : 'Contact'}
-          </Link>
-          <Link
-            href={`${urlPrefix}/wishlist`}
-            className="hover:text-foreground transition-colors duration-500 ease-out cursor-pointer"
-          >
-            {isRtl ? 'المفضلة' : 'Wishlist'}
-          </Link>
-        </div>
+        {/* Top utility bar — links sourced from `store.settings.utilityBar`
+            with a Contact + Wishlist fallback so legacy Elegant stores
+            keep theirs. Hidden entirely when the merchant disables it. */}
+        {showUtilityBar && (
+          <div className="hidden md:flex items-center justify-end gap-6 py-2 text-xs tracking-[0.15em] uppercase text-muted-foreground border-b border-border/50">
+            {utilityBarLinks.map(link => (
+              <Link
+                key={`${link.label}-${link.href}`}
+                href={link.href}
+                className="hover:text-foreground transition-colors duration-500 ease-out cursor-pointer"
+              >
+                {isRtl && link.labelAr ? link.labelAr : link.label}
+              </Link>
+            ))}
+          </div>
+        )}
 
         {/* Main header row */}
         <div className="flex items-center justify-between py-6 gap-6">

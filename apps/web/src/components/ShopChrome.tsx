@@ -10,6 +10,7 @@ import type {
   FooterLinkSection,
   FooterLinksConfig,
   NavItem,
+  ResolvedUtilityBar,
 } from '../templates/types';
 import { ReactNode } from 'react';
 
@@ -123,6 +124,44 @@ export function ShopChrome({ children }: { children: ReactNode }) {
         })()
       : undefined;
 
+  // Pre-header utility bar (Elegant + Classic packs render one). Saved at
+  // `store.settings.utilityBar` by the admin's pages settings UI. Mirror the
+  // navMenu / footerLinks treatment: tolerate malformed input, drop links
+  // missing required fields, and rewrite relative hrefs through storeUrl()
+  // so multi-tenant platform URLs get the correct slug prefix. When the
+  // saved value is undefined entirely, leave `utilityBar` undefined so the
+  // packs fall back to their built-in default bar (preserves legacy stores
+  // that never touched the setting). When the merchant explicitly toggles
+  // `enabled: false`, we forward that so the pack hides the bar.
+  const rawUtilityBar = store.settings?.utilityBar;
+  const utilityBar: ResolvedUtilityBar | undefined =
+    rawUtilityBar && typeof rawUtilityBar === 'object' && !Array.isArray(rawUtilityBar)
+      ? (() => {
+          const src = rawUtilityBar as Record<string, unknown>;
+          const enabled = typeof src.enabled === 'boolean' ? src.enabled : true;
+          const rawLinks = src.links;
+          const links = Array.isArray(rawLinks)
+            ? rawLinks
+                .filter(
+                  (
+                    item
+                  ): item is { label: string; href: string; labelAr?: string; enabled?: boolean } =>
+                    !!item &&
+                    typeof item === 'object' &&
+                    typeof (item as { label?: unknown }).label === 'string' &&
+                    typeof (item as { href?: unknown }).href === 'string'
+                )
+                .map(item => ({
+                  label: item.label,
+                  labelAr: typeof item.labelAr === 'string' ? item.labelAr : undefined,
+                  href: item.href.startsWith('http') ? item.href : storeUrl(item.href),
+                  enabled: typeof item.enabled === 'boolean' ? item.enabled : true,
+                }))
+            : [];
+          return { enabled, links };
+        })()
+      : undefined;
+
   // Address-link mode lives at `store.settings.contact.addressLink` so the
   // admin's Settings → Branding can toggle whether the footer address renders
   // as a Google Maps hyperlink. Default 'maps' (link enabled) when missing.
@@ -167,6 +206,7 @@ export function ShopChrome({ children }: { children: ReactNode }) {
         cartItemCount={itemCount}
         onSearch={handleSearch}
         urlPrefix={urlPrefix}
+        utilityBar={utilityBar}
       />
       <main className="flex-1">{children}</main>
       <T.Footer

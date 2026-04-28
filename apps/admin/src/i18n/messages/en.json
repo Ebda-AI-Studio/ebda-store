@@ -2471,7 +2471,12 @@
       "toastSavedBody": "Footer links updated successfully.",
       "toastErrorTitle": "Error",
       "toastFailedSave": "Failed to save.",
-      "toastFailedSaveLinks": "Failed to save footer links."
+      "toastFailedSaveLinks": "Failed to save footer links.",
+      "utilityBar": "Top utility bar",
+      "utilityBarHint": "Pre-header strip shown above the main header on Elegant and Classic packs. Disable to hide it entirely.",
+      "utilityBarLinks": "Utility bar links",
+      "utilityBarLabelPlaceholder": "Link label",
+      "utilityBarLabelArPlaceholder": "Arabic label (optional)"
     }
   },
   "navigation": {

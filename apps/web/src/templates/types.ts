@@ -97,6 +97,14 @@ export interface HeaderProps {
   isLoggedIn?: boolean;
   onSearch?: (query: string) => void;
   urlPrefix?: string;
+  /**
+   * Resolved pre-header utility bar config. Only consumed by packs that
+   * render a utility bar (Elegant + Classic). When undefined, the pack
+   * falls back to its built-in defaults so legacy stores don't lose
+   * their bar; when `enabled === false`, the pack hides the bar entirely
+   * without adding compensating padding to the main header row below.
+   */
+  utilityBar?: ResolvedUtilityBar;
 }
 
 /**
@@ -140,6 +148,48 @@ export interface FooterLinksConfig {
   support?: FooterLinkSection[];
   newsletterEnabled?: boolean;
   bottomBar?: FooterBottomBarConfig;
+}
+
+/**
+ * A single link inside the pre-header utility bar (Elegant + Classic packs).
+ * Saved per-tenant in `store.settings.utilityBar.links` via the admin's
+ * pages settings page. The `enabled` flag lets owners toggle items off
+ * without deleting them; absent or `true` means the link renders.
+ */
+export interface UtilityBarLink {
+  label: string;
+  labelAr?: string;
+  href: string;
+  enabled?: boolean;
+}
+
+/**
+ * Per-store pre-header utility bar config saved at
+ * `store.settings.utilityBar`. Only the Elegant + Classic packs render a
+ * utility bar; the other packs (Modern, Minimal, Bold) ignore this
+ * setting because they don't have a top bar to begin with.
+ *
+ * `enabled` defaults to `true` when undefined so legacy stores that
+ * haven't touched the setting keep showing the bar with their pack's
+ * built-in defaults. When set to `false` the entire bar is hidden and
+ * the main header row sits flush against the announcement bar (or the
+ * top of the page) — no compensating padding is added.
+ */
+export interface UtilityBarConfig {
+  enabled?: boolean;
+  links?: UtilityBarLink[];
+}
+
+/**
+ * Resolved utility bar config forwarded from ShopChrome to each pack's
+ * Header. Same shape as the raw config but with relative `href` values
+ * already rewritten through `storeUrl()` so multi-tenant platform URLs
+ * get the correct slug prefix. Each link's `enabled` flag is normalized
+ * to a boolean (defaulting to `true`).
+ */
+export interface ResolvedUtilityBar {
+  enabled: boolean;
+  links: Array<Required<Pick<UtilityBarLink, 'label' | 'href' | 'enabled'>> & { labelAr?: string }>;
 }
 
 /**

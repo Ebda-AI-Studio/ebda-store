@@ -2471,7 +2471,12 @@
       "toastSavedBody": "تم تحديث روابط التذييل بنجاح.",
       "toastErrorTitle": "خطأ",
       "toastFailedSave": "تعذّر الحفظ.",
-      "toastFailedSaveLinks": "تعذّر حفظ روابط التذييل."
+      "toastFailedSaveLinks": "تعذّر حفظ روابط التذييل.",
+      "utilityBar": "الشريط العلوي",
+      "utilityBarHint": "شريط يظهر فوق ترويسة المتجر في تصميمَي Elegant و Classic. عطّله لإخفائه بالكامل.",
+      "utilityBarLinks": "روابط الشريط العلوي",
+      "utilityBarLabelPlaceholder": "اسم الرابط",
+      "utilityBarLabelArPlaceholder": "الاسم بالعربية (اختياري)"
     }
   },
   "navigation": {

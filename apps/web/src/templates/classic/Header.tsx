@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import type { HeaderProps } from '../types';
+import type { HeaderProps, ResolvedUtilityBar } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { LanguageSwitcher } from '../../components/LanguageSwitcher';
 
@@ -15,6 +15,7 @@ export default function ClassicHeader({
   isLoggedIn = false,
   onSearch,
   urlPrefix = '',
+  utilityBar,
 }: HeaderProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -36,31 +37,43 @@ export default function ClassicHeader({
   const leftNav = navigation.slice(0, mid);
   const rightNav = navigation.slice(mid);
 
+  // Resolve the utility bar: when the merchant hasn't saved a config we
+  // fall back to the legacy Contact + About defaults so existing Classic
+  // stores keep their bar. When the merchant explicitly disables it we
+  // render nothing — no compensating padding is added to the main header
+  // row below.
+  const defaultUtilityLinks: ResolvedUtilityBar['links'] = [
+    { label: 'Contact', labelAr: 'اتصل بنا', href: `${urlPrefix}/contact`, enabled: true },
+    { label: 'About', labelAr: 'من نحن', href: `${urlPrefix}/about`, enabled: true },
+  ];
+  const utilityBarEnabled = utilityBar?.enabled !== false;
+  const utilityBarLinks = (utilityBar?.links ?? defaultUtilityLinks).filter(
+    link => link.enabled !== false
+  );
+  const showUtilityBar = utilityBarEnabled && utilityBarLinks.length > 0;
+
   return (
     <header className="bg-background shadow-sm" dir={isRtl ? 'rtl' : 'ltr'}>
-      {/* Top utility bar — Contact + About only. The "Unmatched Quality
-          Since Establishment" tagline that used to live here was a
-          hardcoded template demo string and didn't apply to every tenant.
-          Stores that want a tagline up top should configure the
-          AnnouncementBar instead. */}
-      <div className="hidden md:block bg-foreground text-background py-2">
-        <div className="container mx-auto px-4 flex items-center justify-end text-xs tracking-wide">
-          <div className={`flex items-center gap-6 ${isRtl ? 'flex-row-reverse' : ''}`}>
-            <Link
-              href={`${urlPrefix}/contact`}
-              className="hover:opacity-70 transition-opacity duration-200"
-            >
-              {isRtl ? 'اتصل بنا' : 'Contact'}
-            </Link>
-            <Link
-              href={`${urlPrefix}/about`}
-              className="hover:opacity-70 transition-opacity duration-200"
-            >
-              {isRtl ? 'من نحن' : 'About'}
-            </Link>
+      {/* Top utility bar — links sourced from `store.settings.utilityBar`
+          with a Contact + About fallback so legacy Classic stores keep
+          theirs. Hidden entirely when the merchant disables it. */}
+      {showUtilityBar && (
+        <div className="hidden md:block bg-foreground text-background py-2">
+          <div className="container mx-auto px-4 flex items-center justify-end text-xs tracking-wide">
+            <div className={`flex items-center gap-6 ${isRtl ? 'flex-row-reverse' : ''}`}>
+              {utilityBarLinks.map(link => (
+                <Link
+                  key={`${link.label}-${link.href}`}
+                  href={link.href}
+                  className="hover:opacity-70 transition-opacity duration-200"
+                >
+                  {isRtl && link.labelAr ? link.labelAr : link.label}
+                </Link>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Main header row */}
       <div className="container mx-auto px-4 py-5">
