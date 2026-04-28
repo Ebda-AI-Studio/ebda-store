@@ -60,13 +60,18 @@ export default function StoreProductsPage() {
       if (statusFilter !== 'all') queryParams.append('status', statusFilter);
       if (debouncedSearch) queryParams.append('search', debouncedSearch);
 
-      const { data } = await apiGet<{ products: Product[]; pagination: Pagination }>(
-        `/api/v1/stores/${storeId}/products?${queryParams}`
-      );
+      // API returns `{ products, meta }`; we used to read `data.pagination`,
+      // which was always undefined and hid the pagination control entirely.
+      // Accept both field names so the catalogue paginates correctly.
+      const { data } = await apiGet<{
+        products: Product[];
+        meta?: Pagination;
+        pagination?: Pagination;
+      }>(`/api/v1/stores/${storeId}/products?${queryParams}`);
 
       if (data) {
         setProducts(data.products || []);
-        setPagination(data.pagination);
+        setPagination(data.meta ?? data.pagination ?? null);
       }
     } catch (error) {
       console.error('Error fetching products:', error);

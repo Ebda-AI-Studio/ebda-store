@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { Button } from '@force/ui';
 import { formatPrice } from '../../../../../lib/format';
 import { useT } from '@/i18n/useT';
+import { useLocale } from 'next-intl';
 import { StatusBadge } from './StatusBadge';
 import { EmptyProductsState } from './EmptyProductsState';
 import type { Product } from './types';
@@ -25,6 +26,12 @@ export function ProductsTable({
   onRequestDelete,
 }: ProductsTableProps) {
   const t = useT('products.list');
+  // Localize the product name + image alt to the active admin locale.
+  // The table used to render `product.name` (English) for both locales,
+  // which left arabic-language merchants seeing english labels they
+  // didn't write.
+  const locale = useLocale();
+  const isRtl = locale === 'ar';
 
   return (
     <div className="rounded-xl border bg-card overflow-hidden overflow-x-auto">
@@ -116,124 +123,128 @@ export function ProductsTable({
               </td>
             </tr>
           ) : (
-            products.map(product => (
-              <tr
-                key={product.id}
-                className="hover:bg-muted/50 transition-colors duration-150 cursor-pointer"
-              >
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-lg bg-muted overflow-hidden">
-                      {product.images?.[0] ? (
-                        <Image
-                          src={product.images[0].url}
-                          alt={product.name}
-                          width={40}
-                          height={40}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <div className="h-full w-full flex items-center justify-center text-muted-foreground">
-                          <svg
-                            className="h-5 w-5"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={1.5}
-                              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                            />
-                          </svg>
-                        </div>
-                      )}
+            products.map(product => {
+              const displayName =
+                (isRtl ? product.nameAr || product.name : product.name || product.nameAr) ?? '';
+              return (
+                <tr
+                  key={product.id}
+                  className="hover:bg-muted/50 transition-colors duration-150 cursor-pointer"
+                >
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-lg bg-muted overflow-hidden">
+                        {product.images?.[0] ? (
+                          <Image
+                            src={product.images[0].url}
+                            alt={displayName}
+                            width={40}
+                            height={40}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="h-full w-full flex items-center justify-center text-muted-foreground">
+                            <svg
+                              className="h-5 w-5"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={1.5}
+                                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                              />
+                            </svg>
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-medium text-foreground">{displayName}</p>
+                        {product.hasVariants && (
+                          <span className="text-xs text-info">{t('table.hasVariants')}</span>
+                        )}
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium text-foreground">{product.name}</p>
-                      {product.hasVariants && (
-                        <span className="text-xs text-info">{t('table.hasVariants')}</span>
-                      )}
-                    </div>
-                  </div>
-                </td>
-                <td className="px-4 py-3 text-sm text-muted-foreground font-mono">
-                  {product.sku || '-'}
-                </td>
-                <td className="px-4 py-3 text-sm font-medium">{formatPrice(product.price)}</td>
-                <td className="px-4 py-3 text-sm">
-                  {/* Per-unit margin = price − costPrice. We render a dash
+                  </td>
+                  <td className="px-4 py-3 text-sm text-muted-foreground font-mono">
+                    {product.sku || '-'}
+                  </td>
+                  <td className="px-4 py-3 text-sm font-medium">{formatPrice(product.price)}</td>
+                  <td className="px-4 py-3 text-sm">
+                    {/* Per-unit margin = price − costPrice. We render a dash
                       with a hint when costPrice isn't set so the merchant
                       knows where to fix it. Loss is highlighted red so
                       cost > price stays visible. */}
-                  {(() => {
-                    if (product.costPrice == null) {
+                    {(() => {
+                      if (product.costPrice == null) {
+                        return (
+                          <span className="text-muted-foreground/70" title={t('table.profitHint')}>
+                            —
+                          </span>
+                        );
+                      }
+                      const margin = product.price - product.costPrice;
+                      const profitable = margin > 0;
                       return (
-                        <span className="text-muted-foreground/70" title={t('table.profitHint')}>
-                          —
+                        <span
+                          className={`font-medium ${
+                            profitable ? 'text-[hsl(var(--success))]' : 'text-destructive'
+                          }`}
+                        >
+                          {formatPrice(margin)}
                         </span>
                       );
-                    }
-                    const margin = product.price - product.costPrice;
-                    const profitable = margin > 0;
-                    return (
-                      <span
-                        className={`font-medium ${
-                          profitable ? 'text-[hsl(var(--success))]' : 'text-destructive'
-                        }`}
-                      >
-                        {formatPrice(margin)}
-                      </span>
-                    );
-                  })()}
-                </td>
-                <td className="px-4 py-3">
-                  <span
-                    className={`text-sm font-medium ${
-                      product.inventory === 0
-                        ? 'text-destructive'
-                        : product.inventory < 10
-                          ? 'text-warning'
-                          : 'text-[hsl(var(--success))]'
-                    }`}
-                  >
-                    {product.inventory}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  <StatusBadge status={product.status} />
-                </td>
-                <td className="px-4 py-3 text-end">
-                  <div className="flex items-center justify-end gap-2">
-                    {product.hasVariants && (
-                      <Link href={`/stores/${storeId}/products/${product.id}/variants`}>
+                    })()}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`text-sm font-medium ${
+                        product.inventory === 0
+                          ? 'text-destructive'
+                          : product.inventory < 10
+                            ? 'text-warning'
+                            : 'text-[hsl(var(--success))]'
+                      }`}
+                    >
+                      {product.inventory}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <StatusBadge status={product.status} />
+                  </td>
+                  <td className="px-4 py-3 text-end">
+                    <div className="flex items-center justify-end gap-2">
+                      {product.hasVariants && (
+                        <Link href={`/stores/${storeId}/products/${product.id}/variants`}>
+                          <Button variant="outline" size="sm">
+                            {t('actions.variants')}
+                          </Button>
+                        </Link>
+                      )}
+                      <Link href={`/stores/${storeId}/products/${product.id}/edit`}>
                         <Button variant="outline" size="sm">
-                          {t('actions.variants')}
+                          {t('actions.edit')}
                         </Button>
                       </Link>
-                    )}
-                    <Link href={`/stores/${storeId}/products/${product.id}/edit`}>
-                      <Button variant="outline" size="sm">
-                        {t('actions.edit')}
+                      <Link href={`/stores/${storeId}/products/${product.id}`}>
+                        <Button variant="outline" size="sm">
+                          {t('actions.view')}
+                        </Button>
+                      </Link>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => onRequestDelete(product)}
+                      >
+                        {t('actions.delete')}
                       </Button>
-                    </Link>
-                    <Link href={`/stores/${storeId}/products/${product.id}`}>
-                      <Button variant="outline" size="sm">
-                        {t('actions.view')}
-                      </Button>
-                    </Link>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => onRequestDelete(product)}
-                    >
-                      {t('actions.delete')}
-                    </Button>
-                  </div>
-                </td>
-              </tr>
-            ))
+                    </div>
+                  </td>
+                </tr>
+              );
+            })
           )}
         </tbody>
       </table>
