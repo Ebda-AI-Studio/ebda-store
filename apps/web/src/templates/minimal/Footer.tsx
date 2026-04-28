@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { resolveFooterSections } from '../shared/display-helpers';
+import { resolveBottomBar, resolveFooterSections } from '../shared/display-helpers';
 
 export default function MinimalFooter({
   branding,
@@ -36,8 +36,21 @@ export default function MinimalFooter({
           ...(contact.phone ? [{ label: contact.phone, href: `tel:${contact.phone}` }] : []),
         ];
 
-  // Collect active socials for a compact display
-  const socialEntries = Object.entries(socials).filter(([, url]) => !!url) as [string, string][];
+  // Collect active socials for a compact display. Synthesise a wa.me entry
+  // when the merchant set `contact.whatsapp` but no full social URL — the
+  // contact phone doubles as a chat link.
+  const trimmedWhatsapp = contact.whatsapp?.trim();
+  const socialEntries: Array<[string, string]> = [
+    ...(Object.entries(socials).filter(([, url]) => !!url) as [string, string][]),
+    ...(!socials.whatsapp && trimmedWhatsapp
+      ? ([['whatsapp', `https://wa.me/${trimmedWhatsapp.replace(/\D/g, '')}`]] as [
+          string,
+          string,
+        ][])
+      : []),
+  ];
+
+  const bottomBar = resolveBottomBar(footerLinks?.bottomBar, displayName, isRtl);
 
   return (
     <footer className="bg-background mt-auto py-12 md:py-16" dir={isRtl ? 'rtl' : 'ltr'}>
@@ -50,7 +63,7 @@ export default function MinimalFooter({
               <img
                 src={displayLogo}
                 alt={displayName}
-                className="h-8 max-h-8 w-auto object-contain"
+                className="h-12 max-h-12 w-auto object-contain"
               />
             ) : (
               <span className="text-xs tracking-[0.25em] uppercase font-light text-foreground">
@@ -94,30 +107,43 @@ export default function MinimalFooter({
           )}
         </div>
 
-        {/* Bottom bar — copyright + legal links */}
-        <div
-          className={`mt-10 pt-6 border-t border-border/20 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground ${
-            isRtl ? 'flex-row-reverse' : ''
-          }`}
-        >
-          <p>
-            © {new Date().getFullYear()} {displayName}
-          </p>
-          <div className={`flex items-center gap-5 ${isRtl ? 'flex-row-reverse' : ''}`}>
-            <Link
-              href={`${urlPrefix}/privacy`}
-              className="hover:text-foreground transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-            >
-              {isRtl ? 'الخصوصية' : 'Privacy'}
-            </Link>
-            <Link
-              href={`${urlPrefix}/terms`}
-              className="hover:text-foreground transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-            >
-              {isRtl ? 'الشروط' : 'Terms'}
-            </Link>
+        {/* Bottom bar — copyright + per-store-toggleable legal links. The
+            entire bar can be hidden via `footerLinks.bottomBar.enabled`. */}
+        {bottomBar.enabled && (
+          <div
+            className={`mt-10 pt-6 border-t border-border/20 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground ${
+              isRtl ? 'flex-row-reverse' : ''
+            }`}
+          >
+            <p>{bottomBar.copyright}</p>
+            <div className={`flex items-center gap-5 ${isRtl ? 'flex-row-reverse' : ''}`}>
+              {bottomBar.privacyEnabled && (
+                <Link
+                  href={`${urlPrefix}/privacy`}
+                  className="hover:text-foreground transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                >
+                  {isRtl ? 'الخصوصية' : 'Privacy'}
+                </Link>
+              )}
+              {bottomBar.termsEnabled && (
+                <Link
+                  href={`${urlPrefix}/terms`}
+                  className="hover:text-foreground transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                >
+                  {isRtl ? 'الشروط' : 'Terms'}
+                </Link>
+              )}
+              {bottomBar.shippingEnabled && (
+                <Link
+                  href={`${urlPrefix}/shipping`}
+                  className="hover:text-foreground transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                >
+                  {isRtl ? 'الشحن' : 'Shipping'}
+                </Link>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </footer>
   );

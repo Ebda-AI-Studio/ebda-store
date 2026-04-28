@@ -5,7 +5,12 @@
  * logic that was previously duplicated in every template.
  */
 
-import type { FooterLinkSection, FooterLinksConfig, StoreBranding } from '../types';
+import type {
+  FooterBottomBarConfig,
+  FooterLinkSection,
+  FooterLinksConfig,
+  StoreBranding,
+} from '../types';
 
 /**
  * A single footer column ready to render: header copy already picked for the
@@ -139,4 +144,70 @@ export function resolveFooterSections(
  */
 export function isNewsletterEnabled(config: FooterLinksConfig | undefined): boolean {
   return config?.newsletterEnabled !== false;
+}
+
+/**
+ * Resolved bottom-bar configuration ready for footer templates. All booleans
+ * default to `true` so stores that haven't visited the new admin section keep
+ * seeing the bar with the legacy Privacy + Terms links. Shipping is part of
+ * the default set — Elegant has always rendered it; the others now match.
+ */
+export interface ResolvedBottomBar {
+  enabled: boolean;
+  copyright: string | null;
+  privacyEnabled: boolean;
+  termsEnabled: boolean;
+  shippingEnabled: boolean;
+}
+
+/**
+ * Resolve the bottom bar config into a render-ready object. `storeName` is
+ * used to build the default copyright string; pass the RTL-aware display
+ * name. `isRtl` selects between English / Arabic copyright suffix. Pass
+ * `bottomBar` from `store.settings.footerLinks.bottomBar` (or omit when
+ * unset — the defaults preserve historic behaviour).
+ */
+export function resolveBottomBar(
+  bottomBar: FooterBottomBarConfig | undefined,
+  storeName: string,
+  isRtl: boolean
+): ResolvedBottomBar {
+  const enabled = bottomBar?.enabled !== false;
+  const overrideRaw = isRtl
+    ? (bottomBar?.copyrightOverrideAr ?? bottomBar?.copyrightOverride)
+    : bottomBar?.copyrightOverride;
+  const override = typeof overrideRaw === 'string' ? overrideRaw.trim() : '';
+  const year = new Date().getFullYear();
+  const fallback = isRtl
+    ? `© ${year} ${storeName}. جميع الحقوق محفوظة.`
+    : `© ${year} ${storeName}. All rights reserved.`;
+  return {
+    enabled,
+    copyright: enabled ? override || fallback : null,
+    privacyEnabled: bottomBar?.privacyEnabled !== false,
+    termsEnabled: bottomBar?.termsEnabled !== false,
+    shippingEnabled: bottomBar?.shippingEnabled !== false,
+  };
+}
+
+/**
+ * Whether the address should render as a Google Maps hyperlink given the
+ * per-store flag. Defaults to `true` (link enabled) when the flag is unset
+ * — historically every footer rendered the address as plain text, so this
+ * change opts every store into clickable maps unless they explicitly disable.
+ */
+export function isAddressMapLinkEnabled(addressLink: 'maps' | 'none' | undefined): boolean {
+  return addressLink !== 'none';
+}
+
+/**
+ * Build a Google Maps "search" URL for an address string. Returns `null`
+ * when the address is empty after trimming so callers can skip rendering
+ * an `<a>` wrapper around an empty string.
+ */
+export function buildMapsHref(address: string | undefined): string | null {
+  if (!address) return null;
+  const trimmed = address.trim();
+  if (!trimmed) return null;
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(trimmed)}`;
 }

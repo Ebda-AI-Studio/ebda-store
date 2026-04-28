@@ -77,6 +77,7 @@ export interface StoreSocialLinks {
   linkedin?: string;
   whatsapp?: string;
   telegram?: string;
+  pinterest?: string;
 }
 
 /**

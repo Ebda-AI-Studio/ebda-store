@@ -3,7 +3,12 @@
 import Link from 'next/link';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { resolveFooterSections } from '../shared/display-helpers';
+import {
+  buildMapsHref,
+  isAddressMapLinkEnabled,
+  resolveBottomBar,
+  resolveFooterSections,
+} from '../shared/display-helpers';
 import { getSocialLinks } from '../shared/icons';
 
 export default function BoldFooter({
@@ -24,11 +29,17 @@ export default function BoldFooter({
   const displayPhone = isRtl && contact.phoneAr ? contact.phoneAr : contact.phone;
   const displayAddress = isRtl && contact.addressAr ? contact.addressAr : contact.address;
 
-  const socialLinks = getSocialLinks(socials);
+  // Pass `contact` so a stored WhatsApp phone produces a wa.me icon in the
+  // social row even when `socials.whatsapp` is empty.
+  const socialLinks = getSocialLinks(socials, contact);
   // Per-store columns replace the single "Quick Links" block; with nothing
   // configured we keep the navigation-driven default below. Bold has no
   // newsletter form so newsletterEnabled does not apply here.
   const footerSections = resolveFooterSections(footerLinks, isRtl);
+  const bottomBar = resolveBottomBar(footerLinks?.bottomBar, displayName, isRtl);
+  const addressMapHref = isAddressMapLinkEnabled(contact.addressLink)
+    ? buildMapsHref(displayAddress)
+    : null;
 
   // Hide the contact column entirely when the store has no contact details
   // configured — empty heading + empty list reads as half-built.
@@ -54,7 +65,7 @@ export default function BoldFooter({
               <img
                 src={displayLogo}
                 alt={displayName}
-                className="h-10 max-h-10 w-auto object-contain mb-6 brightness-0 invert"
+                className="h-14 max-h-14 w-auto object-contain mb-6 brightness-0 invert"
               />
             ) : (
               <h3 className="text-3xl font-black uppercase tracking-wider mb-6 text-white">
@@ -166,32 +177,60 @@ export default function BoldFooter({
                     </a>
                   </li>
                 )}
-                {displayAddress && <li className="text-sm text-gray-300">{displayAddress}</li>}
+                {displayAddress && (
+                  <li className="text-sm text-gray-300">
+                    {addressMapHref ? (
+                      <a
+                        href={addressMapHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:text-primary transition-colors duration-200"
+                      >
+                        {displayAddress}
+                      </a>
+                    ) : (
+                      displayAddress
+                    )}
+                  </li>
+                )}
               </ul>
             </div>
           )}
         </div>
 
-        {/* Bottom bar */}
-        <div className="pt-8 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-xs text-gray-400 font-medium">
-            © {new Date().getFullYear()} {displayName}
-          </p>
-          <div className="flex gap-6">
-            <Link
-              href={`${urlPrefix}/privacy`}
-              className="text-xs text-gray-400 hover:text-primary transition-colors duration-200 font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-            >
-              {isRtl ? 'الخصوصية' : 'Privacy'}
-            </Link>
-            <Link
-              href={`${urlPrefix}/terms`}
-              className="text-xs text-gray-400 hover:text-primary transition-colors duration-200 font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-            >
-              {isRtl ? 'الشروط' : 'Terms'}
-            </Link>
+        {/* Bottom bar — copyright + per-store-toggleable legal links. The
+            entire bar can be hidden via `footerLinks.bottomBar.enabled`. */}
+        {bottomBar.enabled && (
+          <div className="pt-8 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-4">
+            <p className="text-xs text-gray-400 font-medium">{bottomBar.copyright}</p>
+            <div className="flex gap-6">
+              {bottomBar.privacyEnabled && (
+                <Link
+                  href={`${urlPrefix}/privacy`}
+                  className="text-xs text-gray-400 hover:text-primary transition-colors duration-200 font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                >
+                  {isRtl ? 'الخصوصية' : 'Privacy'}
+                </Link>
+              )}
+              {bottomBar.termsEnabled && (
+                <Link
+                  href={`${urlPrefix}/terms`}
+                  className="text-xs text-gray-400 hover:text-primary transition-colors duration-200 font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                >
+                  {isRtl ? 'الشروط' : 'Terms'}
+                </Link>
+              )}
+              {bottomBar.shippingEnabled && (
+                <Link
+                  href={`${urlPrefix}/shipping`}
+                  className="text-xs text-gray-400 hover:text-primary transition-colors duration-200 font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                >
+                  {isRtl ? 'الشحن' : 'Shipping'}
+                </Link>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </footer>
   );

@@ -5,7 +5,13 @@ import { useState } from 'react';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { api } from '../../lib/api';
-import { isNewsletterEnabled, resolveFooterSections } from '../shared/display-helpers';
+import {
+  buildMapsHref,
+  isAddressMapLinkEnabled,
+  isNewsletterEnabled,
+  resolveBottomBar,
+  resolveFooterSections,
+} from '../shared/display-helpers';
 import { getSocialLinks } from '../shared/icons';
 
 export default function ElegantFooter({
@@ -26,7 +32,9 @@ export default function ElegantFooter({
   const displayPhone = isRtl && contact.phoneAr ? contact.phoneAr : contact.phone;
   const displayAddress = isRtl && contact.addressAr ? contact.addressAr : contact.address;
 
-  const socialLinks = getSocialLinks(socials);
+  // Pass `contact` so the merchant's WhatsApp phone shows up in the social
+  // row even when no full URL is saved in `socials.whatsapp`.
+  const socialLinks = getSocialLinks(socials, contact);
   const [email, setEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -63,6 +71,10 @@ export default function ElegantFooter({
   // the pack's classic Explore / Contact / Follow trio.
   const footerSections = resolveFooterSections(footerLinks, isRtl);
   const showNewsletter = isNewsletterEnabled(footerLinks);
+  const bottomBar = resolveBottomBar(footerLinks?.bottomBar, displayName, isRtl);
+  const addressMapHref = isAddressMapLinkEnabled(contact.addressLink)
+    ? buildMapsHref(displayAddress)
+    : null;
 
   return (
     <footer className="bg-muted border-t border-border mt-auto" dir={isRtl ? 'rtl' : 'ltr'}>
@@ -150,10 +162,10 @@ export default function ElegantFooter({
               <img
                 src={displayLogo}
                 alt={displayName}
-                className="h-10 max-h-10 w-auto object-contain mb-6"
+                className="h-12 max-h-12 w-auto object-contain mb-6"
               />
             ) : (
-              <h3 className="text-base font-light tracking-[0.2em] text-foreground mb-6 font-serif">
+              <h3 className="text-base font-medium tracking-[0.2em] text-foreground mb-6 font-serif">
                 {displayName}
               </h3>
             )}
@@ -169,7 +181,7 @@ export default function ElegantFooter({
           {footerSections.length > 0 ? (
             footerSections.map(section => (
               <div key={section.key}>
-                <h4 className="text-xs tracking-[0.25em] uppercase text-foreground/70 mb-6 font-serif">
+                <h4 className="text-xs tracking-[0.25em] uppercase font-medium text-foreground mb-6 font-serif">
                   {section.heading}
                 </h4>
                 <ul className="space-y-4">
@@ -188,7 +200,7 @@ export default function ElegantFooter({
             ))
           ) : (
             <div>
-              <h4 className="text-xs tracking-[0.25em] uppercase text-foreground/70 mb-6 font-serif">
+              <h4 className="text-xs tracking-[0.25em] uppercase font-medium text-foreground mb-6 font-serif">
                 {isRtl ? 'التصفح' : 'Explore'}
               </h4>
               <ul className="space-y-4">
@@ -210,7 +222,7 @@ export default function ElegantFooter({
               configured. Empty heading + empty list looks unfinished. */}
           {(contact.email || displayPhone || displayAddress) && (
             <div>
-              <h4 className="text-xs tracking-[0.25em] uppercase text-foreground/70 mb-6 font-serif">
+              <h4 className="text-xs tracking-[0.25em] uppercase font-medium text-foreground mb-6 font-serif">
                 {isRtl ? 'تواصل' : 'Contact'}
               </h4>
               <ul className="space-y-4 text-sm">
@@ -236,7 +248,20 @@ export default function ElegantFooter({
                   </li>
                 )}
                 {displayAddress && (
-                  <li className="text-foreground/70 leading-loose">{displayAddress}</li>
+                  <li className="leading-loose">
+                    {addressMapHref ? (
+                      <a
+                        href={addressMapHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-foreground/70 hover:text-foreground transition-colors duration-700 ease-out tracking-wide cursor-pointer"
+                      >
+                        {displayAddress}
+                      </a>
+                    ) : (
+                      <span className="text-foreground/70">{displayAddress}</span>
+                    )}
+                  </li>
                 )}
               </ul>
             </div>
@@ -245,7 +270,7 @@ export default function ElegantFooter({
           {/* Social — hidden when there are no social links configured. */}
           {socialLinks.length > 0 && (
             <div>
-              <h4 className="text-xs tracking-[0.25em] uppercase text-foreground/70 mb-6 font-serif">
+              <h4 className="text-xs tracking-[0.25em] uppercase font-medium text-foreground mb-6 font-serif">
                 {isRtl ? 'تابعنا' : 'Follow'}
               </h4>
               <div className="flex flex-wrap gap-3">
@@ -274,37 +299,43 @@ export default function ElegantFooter({
         </div>
       </div>
 
-      {/* Bottom bar */}
-      <div className="border-t border-border/50">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-xs tracking-wide text-muted-foreground/70">
-            <p>
-              © {new Date().getFullYear()} {displayName}.{' '}
-              {isRtl ? 'جميع الحقوق محفوظة.' : 'All rights reserved.'}
-            </p>
-            <div className="flex gap-6">
-              <Link
-                href={`${urlPrefix}/privacy`}
-                className="hover:text-foreground transition-colors duration-700 ease-out cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-              >
-                {isRtl ? 'الخصوصية' : 'Privacy'}
-              </Link>
-              <Link
-                href={`${urlPrefix}/terms`}
-                className="hover:text-foreground transition-colors duration-700 ease-out cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-              >
-                {isRtl ? 'الشروط' : 'Terms'}
-              </Link>
-              <Link
-                href={`${urlPrefix}/shipping`}
-                className="hover:text-foreground transition-colors duration-700 ease-out cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-              >
-                {isRtl ? 'الشحن' : 'Shipping'}
-              </Link>
+      {/* Bottom bar — copyright + per-store-toggleable legal links. The
+          entire bar can be hidden via `footerLinks.bottomBar.enabled`. */}
+      {bottomBar.enabled && (
+        <div className="border-t border-border/50">
+          <div className="container mx-auto px-4 py-6">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-xs tracking-wide text-muted-foreground/70">
+              <p>{bottomBar.copyright}</p>
+              <div className="flex gap-6">
+                {bottomBar.privacyEnabled && (
+                  <Link
+                    href={`${urlPrefix}/privacy`}
+                    className="hover:text-foreground transition-colors duration-700 ease-out cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                  >
+                    {isRtl ? 'الخصوصية' : 'Privacy'}
+                  </Link>
+                )}
+                {bottomBar.termsEnabled && (
+                  <Link
+                    href={`${urlPrefix}/terms`}
+                    className="hover:text-foreground transition-colors duration-700 ease-out cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                  >
+                    {isRtl ? 'الشروط' : 'Terms'}
+                  </Link>
+                )}
+                {bottomBar.shippingEnabled && (
+                  <Link
+                    href={`${urlPrefix}/shipping`}
+                    className="hover:text-foreground transition-colors duration-700 ease-out cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                  >
+                    {isRtl ? 'الشحن' : 'Shipping'}
+                  </Link>
+                )}
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
     </footer>
   );
 }

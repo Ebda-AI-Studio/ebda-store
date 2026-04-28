@@ -4,8 +4,11 @@ import Link from 'next/link';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import {
+  buildMapsHref,
   getDisplayBranding,
   getDisplayText,
+  isAddressMapLinkEnabled,
+  resolveBottomBar,
   resolveFooterSections,
 } from '../shared/display-helpers';
 import { getSocialLinks } from '../shared/icons';
@@ -29,12 +32,18 @@ export default function ClassicFooter({
   const displayPhone = getDisplayText(contact.phone, contact.phoneAr, isRtl);
   const displayAddress = getDisplayText(contact.address, contact.addressAr, isRtl);
 
-  const socialLinks = getSocialLinks(socials);
+  // Pass `contact` so the WhatsApp icon appears in the social row when only
+  // the merchant's WhatsApp phone is set (no full URL in `socials`).
+  const socialLinks = getSocialLinks(socials, contact);
 
   // Per-store footer columns take priority. Fall back to chunking the
   // navigation into up to 3 columns when no footerLinks have been saved so
   // long-standing tenants keep their existing layout.
   const footerSections = resolveFooterSections(footerLinks, isRtl);
+  const bottomBar = resolveBottomBar(footerLinks?.bottomBar, displayName, isRtl);
+  const addressMapHref = isAddressMapLinkEnabled(contact.addressLink)
+    ? buildMapsHref(displayAddress)
+    : null;
   const useDefaultNavChunks = footerSections.length === 0;
   const navChunks: (typeof navigation)[] = [];
   if (useDefaultNavChunks && navigation.length > 0) {
@@ -58,10 +67,10 @@ export default function ClassicFooter({
               <img
                 src={displayLogo}
                 alt={displayName}
-                className="h-10 max-h-10 w-auto object-contain"
+                className="h-14 max-h-14 w-auto object-contain"
               />
             ) : (
-              <h3 className="text-xl font-serif font-normal text-foreground">{displayName}</h3>
+              <h3 className="text-xl font-serif font-bold text-foreground">{displayName}</h3>
             )}
 
             {displayDescription && (
@@ -96,7 +105,22 @@ export default function ClassicFooter({
                     </a>
                   </li>
                 )}
-                {displayAddress && <li>{displayAddress}</li>}
+                {displayAddress && (
+                  <li>
+                    {addressMapHref ? (
+                      <a
+                        href={addressMapHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:text-foreground transition-colors duration-200"
+                      >
+                        {displayAddress}
+                      </a>
+                    ) : (
+                      displayAddress
+                    )}
+                  </li>
+                )}
               </ul>
             )}
 
@@ -131,7 +155,7 @@ export default function ClassicFooter({
           {footerSections.length > 0
             ? footerSections.map(section => (
                 <div key={section.key}>
-                  <h4 className="font-serif text-xs uppercase tracking-[0.2em] text-foreground mb-5">
+                  <h4 className="font-serif font-bold text-xs uppercase tracking-[0.2em] text-foreground mb-5">
                     {section.heading}
                   </h4>
                   <ul className="space-y-3">
@@ -150,7 +174,7 @@ export default function ClassicFooter({
               ))
             : navChunks.map((chunk, ci) => (
                 <div key={ci}>
-                  <h4 className="font-serif text-xs uppercase tracking-[0.2em] text-foreground mb-5">
+                  <h4 className="font-serif font-bold text-xs uppercase tracking-[0.2em] text-foreground mb-5">
                     {ci === 0
                       ? isRtl
                         ? 'روابط'
@@ -183,32 +207,48 @@ export default function ClassicFooter({
               ))}
         </div>
 
-        {/* Divider */}
-        <div className="h-px bg-border mb-6" />
-
-        {/* Copyright bar */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
-          <p>
-            {isRtl
-              ? `© ${new Date().getFullYear()} ${displayName}. جميع الحقوق محفوظة.`
-              : `© ${new Date().getFullYear()} ${displayName}. All rights reserved.`}
-          </p>
-          <div className="flex items-center gap-5">
-            <Link
-              href={`${urlPrefix}/privacy`}
-              className="hover:text-foreground transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-            >
-              {isRtl ? 'سياسة الخصوصية' : 'Privacy Policy'}
-            </Link>
-            <span aria-hidden="true">·</span>
-            <Link
-              href={`${urlPrefix}/terms`}
-              className="hover:text-foreground transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-            >
-              {isRtl ? 'الشروط والأحكام' : 'Terms & Conditions'}
-            </Link>
-          </div>
-        </div>
+        {/* Bottom bar — copyright + per-store-toggleable legal links. The
+            entire bar can be hidden via `footerLinks.bottomBar.enabled`. */}
+        {bottomBar.enabled && (
+          <>
+            <div className="h-px bg-border mb-6" />
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
+              <p>{bottomBar.copyright}</p>
+              <div className="flex items-center gap-5">
+                {bottomBar.privacyEnabled && (
+                  <Link
+                    href={`${urlPrefix}/privacy`}
+                    className="hover:text-foreground transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                  >
+                    {isRtl ? 'سياسة الخصوصية' : 'Privacy Policy'}
+                  </Link>
+                )}
+                {bottomBar.privacyEnabled && bottomBar.termsEnabled && (
+                  <span aria-hidden="true">·</span>
+                )}
+                {bottomBar.termsEnabled && (
+                  <Link
+                    href={`${urlPrefix}/terms`}
+                    className="hover:text-foreground transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                  >
+                    {isRtl ? 'الشروط والأحكام' : 'Terms & Conditions'}
+                  </Link>
+                )}
+                {bottomBar.termsEnabled && bottomBar.shippingEnabled && (
+                  <span aria-hidden="true">·</span>
+                )}
+                {bottomBar.shippingEnabled && (
+                  <Link
+                    href={`${urlPrefix}/shipping`}
+                    className="hover:text-foreground transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                  >
+                    {isRtl ? 'الشحن' : 'Shipping'}
+                  </Link>
+                )}
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </footer>
   );

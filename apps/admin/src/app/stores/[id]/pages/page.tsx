@@ -15,15 +15,45 @@ interface FooterLink {
   enabled: boolean;
 }
 
+/**
+ * Bottom-bar config persisted at `store.settings.footerLinks.bottomBar`.
+ * `enabled` hides the whole copyright row when false; `copyrightOverride`
+ * (and the Arabic variant) replaces the default
+ * `© YEAR <store name>. All rights reserved.` string. Per-link booleans
+ * default to true so stores that haven't visited this section keep seeing
+ * the legacy Privacy + Terms links.
+ */
+interface BottomBarSettings {
+  enabled?: boolean;
+  copyrightOverride?: string;
+  copyrightOverrideAr?: string;
+  privacyEnabled?: boolean;
+  termsEnabled?: boolean;
+  shippingEnabled?: boolean;
+}
+
 interface StoreSettings {
   footerLinks?: {
     shop?: FooterLink[];
     support: FooterLink[];
     company: FooterLink[];
     newsletterEnabled?: boolean;
+    bottomBar?: BottomBarSettings;
   };
   [key: string]: unknown;
 }
+
+const DEFAULT_BOTTOM_BAR: Required<
+  Pick<BottomBarSettings, 'enabled' | 'privacyEnabled' | 'termsEnabled' | 'shippingEnabled'>
+> &
+  Pick<BottomBarSettings, 'copyrightOverride' | 'copyrightOverrideAr'> = {
+  enabled: true,
+  privacyEnabled: true,
+  termsEnabled: true,
+  shippingEnabled: true,
+  copyrightOverride: '',
+  copyrightOverrideAr: '',
+};
 
 const DEFAULT_SHOP_LINKS: FooterLink[] = [
   { name: 'All Products', nameAr: 'كل المنتجات', href: '/products', enabled: true },
@@ -62,6 +92,7 @@ export default function StorePagesPage() {
   const [supportLinks, setSupportLinks] = useState<FooterLink[]>(DEFAULT_SUPPORT_LINKS);
   const [companyLinks, setCompanyLinks] = useState<FooterLink[]>(DEFAULT_COMPANY_LINKS);
   const [newsletterEnabled, setNewsletterEnabled] = useState(true);
+  const [bottomBar, setBottomBar] = useState<typeof DEFAULT_BOTTOM_BAR>(DEFAULT_BOTTOM_BAR);
 
   // loadSettings was previously a sibling function referenced in the effect
   // below; inlining it here keeps the dependency list honest (only storeId)
@@ -88,6 +119,24 @@ export default function StorePagesPage() {
             }
             if (typeof settings.footerLinks.newsletterEnabled === 'boolean') {
               setNewsletterEnabled(settings.footerLinks.newsletterEnabled);
+            }
+            if (settings.footerLinks.bottomBar) {
+              const bb = settings.footerLinks.bottomBar;
+              setBottomBar(prev => ({
+                enabled: typeof bb.enabled === 'boolean' ? bb.enabled : prev.enabled,
+                privacyEnabled:
+                  typeof bb.privacyEnabled === 'boolean' ? bb.privacyEnabled : prev.privacyEnabled,
+                termsEnabled:
+                  typeof bb.termsEnabled === 'boolean' ? bb.termsEnabled : prev.termsEnabled,
+                shippingEnabled:
+                  typeof bb.shippingEnabled === 'boolean'
+                    ? bb.shippingEnabled
+                    : prev.shippingEnabled,
+                copyrightOverride:
+                  typeof bb.copyrightOverride === 'string' ? bb.copyrightOverride : '',
+                copyrightOverrideAr:
+                  typeof bb.copyrightOverrideAr === 'string' ? bb.copyrightOverrideAr : '',
+              }));
             }
           }
         }
@@ -119,6 +168,17 @@ export default function StorePagesPage() {
           support: supportLinks,
           company: companyLinks,
           newsletterEnabled,
+          // Persist the bottom bar config — copyright override fields are
+          // trimmed so an accidental whitespace string doesn't beat the
+          // computed default at render time.
+          bottomBar: {
+            enabled: bottomBar.enabled,
+            privacyEnabled: bottomBar.privacyEnabled,
+            termsEnabled: bottomBar.termsEnabled,
+            shippingEnabled: bottomBar.shippingEnabled,
+            copyrightOverride: (bottomBar.copyrightOverride || '').trim() || undefined,
+            copyrightOverrideAr: (bottomBar.copyrightOverrideAr || '').trim() || undefined,
+          },
         },
       };
 
@@ -312,6 +372,94 @@ export default function StorePagesPage() {
               <div className="w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary" />
             </label>
           </div>
+        </div>
+
+        {/* Bottom bar — controls the copyright row at the bottom of every
+            footer pack. Each toggle is independent so a store can hide e.g.
+            the shipping link without affecting privacy / terms. The copyright
+            override fields beat the default `© YEAR <store>. All rights
+            reserved.` string when non-empty. */}
+        <div className="rounded-xl border bg-card p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">{t('bottomBar')}</h2>
+              <p className="text-sm text-muted-foreground mt-1">{t('bottomBarHint')}</p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={bottomBar.enabled}
+                onChange={e => setBottomBar(prev => ({ ...prev, enabled: e.target.checked }))}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary" />
+            </label>
+          </div>
+
+          {bottomBar.enabled && (
+            <div className="space-y-4">
+              {/* Copyright override — empty falls back to the computed default. */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    {t('copyrightOverride')}
+                  </label>
+                  <input
+                    type="text"
+                    value={bottomBar.copyrightOverride || ''}
+                    onChange={e =>
+                      setBottomBar(prev => ({ ...prev, copyrightOverride: e.target.value }))
+                    }
+                    placeholder={t('copyrightOverridePlaceholder')}
+                    className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    {t('copyrightOverrideAr')}
+                  </label>
+                  <input
+                    type="text"
+                    value={bottomBar.copyrightOverrideAr || ''}
+                    onChange={e =>
+                      setBottomBar(prev => ({ ...prev, copyrightOverrideAr: e.target.value }))
+                    }
+                    placeholder={t('copyrightOverrideArPlaceholder')}
+                    lang="ar"
+                    dir="rtl"
+                    className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                </div>
+              </div>
+
+              {/* Per-link toggles. */}
+              <div className="space-y-2 pt-2 border-t">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  {t('legalLinks')}
+                </p>
+                {(
+                  [
+                    ['privacyEnabled', 'privacyToggle'],
+                    ['termsEnabled', 'termsToggle'],
+                    ['shippingEnabled', 'shippingToggle'],
+                  ] as const
+                ).map(([field, labelKey]) => (
+                  <label
+                    key={field}
+                    className="flex items-center justify-between rounded-lg border p-3"
+                  >
+                    <span className="text-sm text-foreground">{t(labelKey)}</span>
+                    <input
+                      type="checkbox"
+                      checked={bottomBar[field]}
+                      onChange={e => setBottomBar(prev => ({ ...prev, [field]: e.target.checked }))}
+                      className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                    />
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </AdminLayout>

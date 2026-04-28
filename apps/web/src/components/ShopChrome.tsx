@@ -5,7 +5,12 @@ import { useStore, useStoreBranding, useStoreContact, useStoreUrl } from '../con
 import { useLanguage } from '../contexts/LanguageContext';
 import { useCart } from '../contexts/CartContext';
 import { useTemplateComponents } from '../hooks/useTemplateComponents';
-import type { FooterLinkSection, FooterLinksConfig, NavItem } from '../templates/types';
+import type {
+  FooterBottomBarConfig,
+  FooterLinkSection,
+  FooterLinksConfig,
+  NavItem,
+} from '../templates/types';
 import { ReactNode } from 'react';
 
 /**
@@ -87,14 +92,42 @@ export function ShopChrome({ children }: { children: ReactNode }) {
           };
           const newsletter =
             typeof src.newsletterEnabled === 'boolean' ? src.newsletterEnabled : undefined;
+          // Bottom-bar config (toggles + copyright override). Drop fields
+          // that aren't the right type so a corrupted JSON value can't crash
+          // the storefront — the resolver in display-helpers picks defaults
+          // for any missing key.
+          const rawBottomBar = src.bottomBar;
+          let bottomBar: FooterBottomBarConfig | undefined;
+          if (rawBottomBar && typeof rawBottomBar === 'object' && !Array.isArray(rawBottomBar)) {
+            const bb = rawBottomBar as Record<string, unknown>;
+            bottomBar = {
+              enabled: typeof bb.enabled === 'boolean' ? bb.enabled : undefined,
+              copyrightOverride:
+                typeof bb.copyrightOverride === 'string' ? bb.copyrightOverride : undefined,
+              copyrightOverrideAr:
+                typeof bb.copyrightOverrideAr === 'string' ? bb.copyrightOverrideAr : undefined,
+              privacyEnabled:
+                typeof bb.privacyEnabled === 'boolean' ? bb.privacyEnabled : undefined,
+              termsEnabled: typeof bb.termsEnabled === 'boolean' ? bb.termsEnabled : undefined,
+              shippingEnabled:
+                typeof bb.shippingEnabled === 'boolean' ? bb.shippingEnabled : undefined,
+            };
+          }
           return {
             shop: normalizeSection(src.shop),
             company: normalizeSection(src.company),
             support: normalizeSection(src.support),
             newsletterEnabled: newsletter,
+            bottomBar,
           };
         })()
       : undefined;
+
+  // Address-link mode lives at `store.settings.contact.addressLink` so the
+  // admin's Settings → Branding can toggle whether the footer address renders
+  // as a Google Maps hyperlink. Default 'maps' (link enabled) when missing.
+  const rawContactSettings = (store.settings?.contact as Record<string, unknown> | undefined) ?? {};
+  const addressLink: 'maps' | 'none' = rawContactSettings.addressLink === 'none' ? 'none' : 'maps';
 
   const handleSearch = (query: string) => {
     router.push(storeUrl(`/search?q=${encodeURIComponent(query)}`));
@@ -145,6 +178,7 @@ export function ShopChrome({ children }: { children: ReactNode }) {
           whatsapp: contact.whatsapp,
           address: contact.address,
           addressAr: contact.addressAr,
+          addressLink,
         }}
         socials={contact.socialLinks}
         navigation={navigation}

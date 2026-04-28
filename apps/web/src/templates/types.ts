@@ -52,6 +52,12 @@ export interface StoreContact {
   whatsapp?: string;
   address?: string;
   addressAr?: string;
+  /**
+   * Whether the address renders as a Google Maps hyperlink. `'maps'` (default
+   * when undefined) wraps the address in `<a href="...maps...">`; `'none'`
+   * keeps it as plain text. Saved at `store.settings.contact.addressLink`.
+   */
+  addressLink?: 'maps' | 'none';
 }
 
 /**
@@ -67,6 +73,7 @@ export interface StoreSocials {
   linkedin?: string;
   whatsapp?: string;
   telegram?: string;
+  pinterest?: string;
 }
 
 /**
@@ -106,6 +113,21 @@ export interface FooterLinkSection {
 }
 
 /**
+ * Per-store bottom-bar configuration. Saved at
+ * `store.settings.footerLinks.bottomBar`. Lets owners hide the entire bar,
+ * override the copyright string, or toggle individual legal links off
+ * without rewriting paths in code.
+ */
+export interface FooterBottomBarConfig {
+  enabled?: boolean;
+  copyrightOverride?: string;
+  copyrightOverrideAr?: string;
+  privacyEnabled?: boolean;
+  termsEnabled?: boolean;
+  shippingEnabled?: boolean;
+}
+
+/**
  * Per-store footer configuration sourced from `store.settings.footerLinks`.
  * Each section is independently optional — the template falls back to its
  * own default column layout when the whole config (or every section) is
@@ -117,6 +139,7 @@ export interface FooterLinksConfig {
   company?: FooterLinkSection[];
   support?: FooterLinkSection[];
   newsletterEnabled?: boolean;
+  bottomBar?: FooterBottomBarConfig;
 }
 
 /**
