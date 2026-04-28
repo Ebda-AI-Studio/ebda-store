@@ -19,13 +19,13 @@ export default function BoldCategoryCard({
       className="group block relative outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
     >
       {/* Card with dynamic hover */}
-      <div className="relative aspect-[3/4] rounded-3xl overflow-hidden bg-primary shadow-xl transition-transform duration-300 group-hover:scale-[1.02] group-hover:-rotate-1">
+      <div className="relative aspect-[3/4] rounded-3xl overflow-hidden bg-primary shadow-[0_18px_44px_-18px_hsl(var(--foreground)/0.30)] transition-transform duration-300 ease-out group-hover:scale-[1.015] group-hover:-rotate-[0.5deg]">
         {/* Image */}
         {category.image ? (
           <img
             src={category.image}
             alt={displayName}
-            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+            className="w-full h-full object-cover group-hover:scale-[1.06] transition-transform duration-700 ease-out"
             loading="lazy"
           />
         ) : (
@@ -39,15 +39,15 @@ export default function BoldCategoryCard({
         )}
 
         {/* Gradient Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/15 to-transparent" />
 
         {/* Content */}
         <div className="absolute inset-x-0 bottom-0 p-6">
-          <h3 className="text-2xl font-black text-white mb-2 group-hover:text-primary transition-colors">
+          <h3 className="text-2xl font-black uppercase text-white mb-2 tracking-tight group-hover:text-primary transition-colors duration-200">
             {displayName}
           </h3>
           {category.productCount !== undefined && (
-            <p className="text-white/70 font-bold">
+            <p className="text-white/75 font-bold uppercase tracking-[0.05em] text-sm">
               {category.productCount} {isRtl ? 'منتج' : 'items'}
             </p>
           )}
@@ -55,7 +55,7 @@ export default function BoldCategoryCard({
 
         {/* Arrow */}
         <div
-          className={`absolute top-4 ${isRtl ? 'left-4' : 'right-4'} w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-lg group-hover:bg-primary group-hover:text-white transition-all duration-300`}
+          className={`absolute top-5 ${isRtl ? 'left-5' : 'right-5'} w-12 h-12 bg-white text-foreground rounded-2xl flex items-center justify-center shadow-[0_8px_22px_-8px_hsl(var(--foreground)/0.45)] group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-200`}
         >
           <svg
             className={`w-6 h-6 ${isRtl ? 'rotate-180' : ''}`}

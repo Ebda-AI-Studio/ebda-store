@@ -24,7 +24,7 @@ export function SectionHeading({ title, titleAr, isRtl, seeAllHref, pack }: Sect
   const styles = getPackStyles(pack);
 
   return (
-    <div className="mb-8 flex items-end justify-between gap-4 sm:mb-10">
+    <div className="mb-10 flex items-end justify-between gap-4 sm:mb-14">
       {text && <h2 className={styles.sectionHeading}>{text}</h2>}
       {seeAllHref && (
         <Link href={seeAllHref} className={`shrink-0 ${styles.sectionSeeAll}`}>

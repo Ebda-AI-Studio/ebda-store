@@ -19,12 +19,12 @@ export default function ClassicCategoryCard({
       className="group block text-center outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 cursor-pointer"
     >
       {/* Image with elegant border */}
-      <div className="relative aspect-[3/4] mb-6 overflow-hidden border border-border/50 bg-muted">
+      <div className="relative aspect-[3/4] mb-6 overflow-hidden border border-border/60 bg-muted group-hover:border-foreground/35 transition-colors duration-700 ease-out">
         {category.image ? (
           <img
             src={category.image}
             alt={displayName}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
+            className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-700 ease-out"
             loading="lazy"
           />
         ) : (
@@ -42,13 +42,13 @@ export default function ClassicCategoryCard({
       </div>
 
       {/* Title - Serif typography */}
-      <h3 className="text-lg font-serif text-foreground group-hover:text-primary transition-colors duration-300 mb-2">
+      <h3 className="text-lg font-serif text-foreground group-hover:text-primary transition-colors duration-500 mb-2 tracking-tight">
         {displayName}
       </h3>
 
       {/* Product count */}
       {category.productCount !== undefined && (
-        <p className="text-sm text-muted-foreground">
+        <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
           {isRtl ? `${category.productCount} قطعة` : `${category.productCount} pieces`}
         </p>
       )}

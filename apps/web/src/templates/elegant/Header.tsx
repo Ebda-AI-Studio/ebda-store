@@ -42,13 +42,13 @@ export default function ElegantHeader({
         <div className="hidden md:flex items-center justify-end gap-6 py-2 text-xs tracking-[0.15em] uppercase text-muted-foreground border-b border-border/50">
           <Link
             href={`${urlPrefix}/contact`}
-            className="hover:text-foreground transition-opacity duration-300 cursor-pointer"
+            className="hover:text-foreground transition-colors duration-500 ease-out cursor-pointer"
           >
             {isRtl ? 'تواصل معنا' : 'Contact'}
           </Link>
           <Link
             href={`${urlPrefix}/wishlist`}
-            className="hover:text-foreground transition-opacity duration-300 cursor-pointer"
+            className="hover:text-foreground transition-colors duration-500 ease-out cursor-pointer"
           >
             {isRtl ? 'المفضلة' : 'Wishlist'}
           </Link>
@@ -60,7 +60,7 @@ export default function ElegantHeader({
           <button
             type="button"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="md:hidden inline-flex h-11 w-11 items-center justify-center text-foreground/60 hover:text-foreground transition-opacity duration-300 cursor-pointer"
+            className="md:hidden inline-flex h-11 w-11 items-center justify-center text-foreground/60 hover:text-foreground transition-colors duration-500 ease-out cursor-pointer"
             aria-label={isRtl ? 'القائمة' : 'Menu'}
             aria-expanded={isMenuOpen}
           >
@@ -107,7 +107,7 @@ export default function ElegantHeader({
             <button
               type="button"
               onClick={() => setIsSearchOpen(!isSearchOpen)}
-              className="hidden md:inline-flex h-11 w-11 items-center justify-center text-foreground/50 hover:text-foreground transition-opacity duration-300 cursor-pointer"
+              className="hidden md:inline-flex h-11 w-11 items-center justify-center text-foreground/50 hover:text-foreground transition-colors duration-500 ease-out cursor-pointer"
               aria-label={isRtl ? 'بحث' : 'Search'}
             >
               <svg
@@ -136,7 +136,7 @@ export default function ElegantHeader({
             {/* Account */}
             <Link
               href={isLoggedIn ? `${urlPrefix}/account` : `${urlPrefix}/auth/login`}
-              className="hidden md:inline-flex h-11 w-11 items-center justify-center text-foreground/50 hover:text-foreground transition-opacity duration-300 cursor-pointer"
+              className="hidden md:inline-flex h-11 w-11 items-center justify-center text-foreground/50 hover:text-foreground transition-colors duration-500 ease-out cursor-pointer"
               aria-label={isRtl ? 'الحساب' : 'Account'}
             >
               <svg
@@ -158,7 +158,7 @@ export default function ElegantHeader({
             {/* Cart */}
             <Link
               href={`${urlPrefix}/cart`}
-              className="relative inline-flex h-11 w-11 items-center justify-center text-foreground/50 hover:text-foreground transition-opacity duration-300 cursor-pointer"
+              className="relative inline-flex h-11 w-11 items-center justify-center text-foreground/50 hover:text-foreground transition-colors duration-500 ease-out cursor-pointer"
               aria-label={isRtl ? `السلة (${cartItemCount})` : `Cart (${cartItemCount})`}
             >
               <svg
@@ -192,7 +192,7 @@ export default function ElegantHeader({
             <Link
               key={item.href}
               href={item.href}
-              className="text-sm tracking-[0.18em] uppercase text-muted-foreground hover:text-foreground transition-opacity duration-300 cursor-pointer"
+              className="text-sm tracking-[0.18em] uppercase text-muted-foreground hover:text-foreground transition-colors duration-500 ease-out cursor-pointer"
             >
               {isRtl && item.labelAr ? item.labelAr : item.label}
             </Link>
@@ -225,7 +225,7 @@ export default function ElegantHeader({
                 <li key={item.href}>
                   <Link
                     href={item.href}
-                    className="text-sm tracking-[0.18em] uppercase text-muted-foreground hover:text-foreground transition-opacity duration-300 cursor-pointer"
+                    className="text-sm tracking-[0.18em] uppercase text-muted-foreground hover:text-foreground transition-colors duration-500 ease-out cursor-pointer"
                     onClick={() => setIsMenuOpen(false)}
                   >
                     {isRtl && item.labelAr ? item.labelAr : item.label}

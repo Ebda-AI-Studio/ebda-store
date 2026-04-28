@@ -89,7 +89,7 @@ export default function BoldHero({
           {/* CTA */}
           <Link
             href={resolvedCtaLink}
-            className="inline-flex items-center gap-3 px-8 sm:px-10 py-4 sm:py-5 min-h-[44px] bg-primary text-primary-foreground rounded-none font-black text-sm sm:text-base uppercase tracking-wider hover:bg-primary/90 hover:scale-[1.02] transition-all duration-200 shadow-2xl shadow-primary/30 cursor-pointer"
+            className="inline-flex items-center gap-3 px-8 sm:px-10 py-4 sm:py-5 min-h-[44px] bg-primary text-primary-foreground rounded-none font-black text-sm sm:text-base uppercase tracking-[0.18em] hover:bg-primary/90 hover:scale-[1.02] transition-all duration-200 ease-out shadow-[0_18px_44px_-12px_hsl(var(--primary)/0.55)] cursor-pointer"
           >
             {displayCta}
             <svg

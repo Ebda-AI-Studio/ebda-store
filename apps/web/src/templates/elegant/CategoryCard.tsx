@@ -24,7 +24,7 @@ export default function ElegantCategoryCard({
           <img
             src={category.image}
             alt={displayName}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
+            className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-700 ease-out"
             loading="lazy"
           />
         ) : (
@@ -41,8 +41,8 @@ export default function ElegantCategoryCard({
         <div className="absolute inset-0 bg-foreground/0 group-hover:bg-foreground/10 transition-colors duration-500" />
 
         {/* View button that appears on hover */}
-        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-          <span className="px-6 py-3 bg-background text-foreground text-xs tracking-[0.2em] uppercase">
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-700">
+          <span className="px-7 py-3 bg-background/95 backdrop-blur-sm text-foreground text-[11px] tracking-[0.32em] uppercase font-medium">
             {isRtl ? 'عرض' : 'View'}
           </span>
         </div>
@@ -50,11 +50,11 @@ export default function ElegantCategoryCard({
 
       {/* Title - Refined typography */}
       <div className={`text-center ${isRtl ? 'text-right' : 'text-left'}`}>
-        <h3 className="text-base font-light text-foreground tracking-wide group-hover:text-primary transition-colors">
+        <h3 className="text-base font-light text-foreground tracking-[-0.005em] group-hover:text-foreground/70 transition-colors duration-700">
           {displayName}
         </h3>
         {category.productCount !== undefined && (
-          <p className="text-xs text-muted-foreground mt-2 tracking-wider">
+          <p className="text-[11px] text-muted-foreground/80 mt-2 tracking-[0.22em] uppercase">
             {category.productCount} {isRtl ? 'قطعة' : 'pieces'}
           </p>
         )}

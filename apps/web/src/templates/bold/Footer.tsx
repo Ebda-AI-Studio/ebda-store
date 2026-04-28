@@ -43,7 +43,7 @@ export default function BoldFooter({
 
   return (
     <footer className="bg-gray-950 text-white mt-auto" dir={isRtl ? 'rtl' : 'ltr'}>
-      <div className="container mx-auto px-4 py-10 sm:py-12 md:py-16">
+      <div className="container mx-auto px-4 py-12 sm:py-16 md:py-20">
         {/* Main grid */}
         <div
           className={`grid md:grid-cols-2 ${lgColsClass} gap-8 sm:gap-10 md:gap-12 mb-10 sm:mb-12 md:mb-16`}

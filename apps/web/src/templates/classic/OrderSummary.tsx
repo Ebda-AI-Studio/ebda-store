@@ -75,7 +75,7 @@ export default function ClassicOrderSummary({
         (ctaHref ? (
           <Link
             href={ctaHref}
-            className="mt-6 flex h-12 w-full items-center justify-center border border-foreground bg-foreground px-4 text-xs font-semibold uppercase tracking-widest text-background hover:bg-foreground/90 focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
+            className="mt-6 flex h-12 w-full items-center justify-center border border-foreground bg-foreground px-4 text-xs font-serif font-semibold uppercase tracking-[0.22em] text-background hover:bg-foreground/85 transition-colors duration-500 ease-out focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
             aria-disabled={ctaDisabled}
           >
             {ctaText}
@@ -85,7 +85,7 @@ export default function ClassicOrderSummary({
             type="button"
             onClick={onCtaClick}
             disabled={ctaDisabled || ctaLoading}
-            className="mt-6 flex h-12 w-full items-center justify-center border border-foreground bg-foreground px-4 text-xs font-semibold uppercase tracking-widest text-background hover:bg-foreground/90 disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
+            className="mt-6 flex h-12 w-full items-center justify-center border border-foreground bg-foreground px-4 text-xs font-serif font-semibold uppercase tracking-[0.22em] text-background hover:bg-foreground/85 disabled:opacity-50 transition-colors duration-500 ease-out focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
           >
             {ctaLoading ? (isRtl ? 'جارٍ...' : 'Processing...') : ctaText}
           </button>

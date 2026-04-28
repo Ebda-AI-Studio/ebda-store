@@ -54,7 +54,7 @@ export function CategoryStrip({
                   className="group block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-4 rounded-2xl"
                 >
                   <div
-                    className={`relative aspect-square overflow-hidden transition-transform duration-500 ease-out group-hover:scale-[1.02] ${styles.categoryFrame}`}
+                    className={`relative aspect-square overflow-hidden transition-transform duration-700 ease-out group-hover:scale-[1.015] ${styles.categoryFrame}`}
                   >
                     {cat.image ? (
                       <Image
@@ -62,7 +62,7 @@ export function CategoryStrip({
                         alt={name ?? ''}
                         fill
                         sizes="(max-width: 640px) 60vw, (max-width: 768px) 36vw, (max-width: 1024px) 30vw, (max-width: 1280px) 26vw, 400px"
-                        className="object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+                        className="object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]"
                       />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center text-muted-foreground">

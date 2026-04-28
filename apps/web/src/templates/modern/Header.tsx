@@ -81,7 +81,7 @@ export default function ModernHeader({
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="px-3 py-2 text-sm font-medium text-foreground/70 hover:text-foreground hover:bg-muted rounded-lg transition-colors duration-200"
+                  className="px-4 py-2.5 text-sm font-medium tracking-tight text-foreground/75 hover:text-foreground hover:bg-muted rounded-lg transition-colors duration-300 ease-out"
                 >
                   {isRtl && item.labelAr ? item.labelAr : item.label}
                 </Link>
@@ -94,7 +94,7 @@ export default function ModernHeader({
               <button
                 type="button"
                 onClick={() => setIsSearchOpen(!isSearchOpen)}
-                className="inline-flex h-11 w-11 items-center justify-center rounded-lg hover:bg-muted transition-colors duration-200 cursor-pointer"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-lg hover:bg-muted transition-colors duration-300 ease-out cursor-pointer"
                 aria-label={isRtl ? 'بحث' : 'Search'}
                 aria-expanded={isSearchOpen}
               >
@@ -137,7 +137,7 @@ export default function ModernHeader({
               {/* Account */}
               <Link
                 href={isLoggedIn ? `${urlPrefix}/account` : `${urlPrefix}/auth/login`}
-                className="inline-flex h-11 w-11 items-center justify-center rounded-lg hover:bg-muted transition-colors duration-200"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-lg hover:bg-muted transition-colors duration-300 ease-out"
                 aria-label={isRtl ? 'الحساب' : 'Account'}
               >
                 <svg
@@ -159,7 +159,7 @@ export default function ModernHeader({
               {/* Cart */}
               <Link
                 href={`${urlPrefix}/cart`}
-                className="relative inline-flex h-11 w-11 items-center justify-center rounded-lg hover:bg-muted transition-colors duration-200"
+                className="relative inline-flex h-11 w-11 items-center justify-center rounded-lg hover:bg-muted transition-colors duration-300 ease-out"
                 aria-label={
                   isRtl ? `سلة التسوق (${cartItemCount})` : `Cart (${cartItemCount} items)`
                 }
@@ -191,7 +191,7 @@ export default function ModernHeader({
               <button
                 type="button"
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
-                className="md:hidden inline-flex h-11 w-11 items-center justify-center rounded-lg hover:bg-muted transition-colors duration-200 cursor-pointer"
+                className="md:hidden inline-flex h-11 w-11 items-center justify-center rounded-lg hover:bg-muted transition-colors duration-300 ease-out cursor-pointer"
                 aria-label={isRtl ? 'القائمة' : 'Menu'}
                 aria-expanded={isMenuOpen}
               >
@@ -223,14 +223,14 @@ export default function ModernHeader({
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder={isRtl ? 'ابحث عن المنتجات...' : 'Search products...'}
-                className="flex-1 px-4 py-2.5 bg-muted rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm transition-colors duration-200"
+                className="flex-1 px-4 py-2.5 bg-muted rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm transition-colors duration-300 ease-out"
                 dir={isRtl ? 'rtl' : 'ltr'}
                 autoFocus={isSearchOpen}
                 aria-label={isRtl ? 'بحث عن المنتجات' : 'Search products'}
               />
               <button
                 type="submit"
-                className="px-4 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors duration-200 font-medium text-sm cursor-pointer"
+                className="px-4 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors duration-300 ease-out font-medium text-sm cursor-pointer"
               >
                 {isRtl ? 'بحث' : 'Search'}
               </button>
@@ -259,7 +259,7 @@ export default function ModernHeader({
           <button
             type="button"
             onClick={() => setIsMenuOpen(false)}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-lg hover:bg-muted transition-colors duration-200 cursor-pointer"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-lg hover:bg-muted transition-colors duration-300 ease-out cursor-pointer"
             aria-label={isRtl ? 'إغلاق' : 'Close menu'}
           >
             <svg
@@ -283,7 +283,7 @@ export default function ModernHeader({
             <Link
               key={item.href}
               href={item.href}
-              className="px-4 py-3 text-sm font-medium text-foreground/80 hover:text-foreground hover:bg-muted rounded-lg transition-colors duration-200"
+              className="px-4 py-3 text-sm font-medium text-foreground/80 hover:text-foreground hover:bg-muted rounded-lg transition-colors duration-300 ease-out"
               onClick={() => setIsMenuOpen(false)}
             >
               {isRtl && item.labelAr ? item.labelAr : item.label}

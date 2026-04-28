@@ -21,22 +21,22 @@ export function TestimonialRow({ testimonials, title, titleAr, isRtl, pack }: Te
     <section className="px-4 sm:px-6 lg:px-8" dir={isRtl ? 'rtl' : 'ltr'}>
       <div className="mx-auto max-w-7xl">
         <SectionHeading title={heading} isRtl={isRtl} pack={pack} />
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 lg:gap-8">
+        <div className="grid gap-7 sm:grid-cols-2 lg:grid-cols-3 lg:gap-9">
           {testimonials.slice(0, 6).map(t => (
             <article key={t.id} className={styles.testimonialCard}>
               <Stars rating={t.rating} />
               {t.title && (
-                <h3 className="mt-4 text-lg font-semibold text-foreground line-clamp-1">
+                <h3 className="mt-5 text-lg font-semibold text-foreground line-clamp-1 tracking-tight">
                   {t.title}
                 </h3>
               )}
-              <p className="mt-3 text-base text-foreground/80 leading-relaxed line-clamp-5">
+              <p className="mt-3 text-base text-foreground/85 leading-relaxed line-clamp-5">
                 {t.comment}
               </p>
-              <footer className="mt-6 border-t border-border pt-4">
+              <footer className="mt-7 border-t border-foreground/10 pt-5">
                 <p className={styles.testimonialAuthor}>{t.authorName}</p>
                 {t.authorCity && (
-                  <p className="text-sm text-muted-foreground mt-1">{t.authorCity}</p>
+                  <p className="text-sm text-muted-foreground mt-1.5">{t.authorCity}</p>
                 )}
               </footer>
             </article>

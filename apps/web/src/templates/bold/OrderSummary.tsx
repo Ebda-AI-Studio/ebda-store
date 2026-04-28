@@ -84,7 +84,7 @@ export default function BoldOrderSummary({
           {ctaHref ? (
             <Link
               href={ctaHref}
-              className="flex h-14 w-full items-center justify-center bg-primary px-5 text-sm font-black uppercase tracking-widest text-primary-foreground hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
+              className="flex h-14 w-full items-center justify-center bg-primary px-5 text-sm font-black uppercase tracking-[0.18em] text-primary-foreground hover:bg-primary/90 transition-colors duration-200 ease-out focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
               aria-disabled={ctaDisabled}
             >
               {ctaText} →
@@ -94,7 +94,7 @@ export default function BoldOrderSummary({
               type="button"
               onClick={onCtaClick}
               disabled={ctaDisabled || ctaLoading}
-              className="flex h-14 w-full items-center justify-center bg-primary px-5 text-sm font-black uppercase tracking-widest text-primary-foreground hover:bg-primary/90 disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
+              className="flex h-14 w-full items-center justify-center bg-primary px-5 text-sm font-black uppercase tracking-[0.18em] text-primary-foreground hover:bg-primary/90 transition-colors duration-200 ease-out disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
             >
               {ctaLoading ? '···' : `${ctaText} →`}
             </button>

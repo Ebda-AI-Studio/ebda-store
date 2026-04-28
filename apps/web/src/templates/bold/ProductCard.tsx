@@ -45,7 +45,7 @@ function BoldProductCard({
   return (
     <Link
       href={`${urlPrefix}/products/${product.slug}`}
-      className="group block relative overflow-hidden rounded-2xl bg-background border-2 border-gray-950/10 hover:border-primary hover:scale-[1.03] transition-all duration-200 cursor-pointer"
+      className="group block relative overflow-hidden rounded-2xl bg-background border-2 border-foreground/15 hover:border-foreground hover:translate-x-1 hover:-translate-y-1 hover:shadow-[6px_6px_0_0_hsl(var(--foreground)/0.92)] transition-all duration-200 ease-out cursor-pointer"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -71,8 +71,8 @@ function BoldProductCard({
             src={product.images[0].url}
             alt={isRtl && product.nameAr ? product.nameAr : product.name}
             className={cn(
-              'object-cover transition-transform duration-200',
-              isHovered && 'scale-110'
+              'object-cover transition-transform duration-300 ease-out',
+              isHovered && 'scale-[1.05]'
             )}
             fill
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
@@ -139,7 +139,7 @@ function BoldProductCard({
       </div>
 
       {/* Content */}
-      <div className="p-4">
+      <div className="p-5">
         <h3 className="font-black text-base uppercase tracking-tight line-clamp-1 group-hover:text-primary transition-colors duration-200">
           {isRtl && product.nameAr ? product.nameAr : product.name}
         </h3>
@@ -150,9 +150,9 @@ function BoldProductCard({
           isRtl={isRtl}
           size="lg"
           showDiscount={false}
-          className="mt-2 font-black"
+          className="mt-2.5 font-black"
         />
-        <TaxInclusiveLabel className="mt-1 block text-xs uppercase tracking-wide text-muted-foreground" />
+        <TaxInclusiveLabel className="mt-1.5 block text-xs uppercase tracking-wide text-muted-foreground" />
       </div>
     </Link>
   );

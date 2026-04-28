@@ -41,7 +41,7 @@ function ClassicProductCard({
   return (
     <Link href={`${urlPrefix}/products/${product.slug}`} className="group block cursor-pointer">
       {/* Image container — aspect-square, clean border */}
-      <div className="relative aspect-square overflow-hidden bg-muted border border-border group-hover:border-foreground/30 group-hover:shadow-md transition-all duration-300 mb-4">
+      <div className="relative aspect-square overflow-hidden bg-muted border border-border group-hover:border-foreground/35 group-hover:shadow-[0_18px_36px_-22px_hsl(var(--foreground)/0.20)] transition-all duration-500 ease-out mb-5">
         {onToggleCompare && (
           <CompareButton
             productId={product.id}
@@ -61,7 +61,7 @@ function ClassicProductCard({
           <Image
             src={product.images[0].url}
             alt={isRtl && product.nameAr ? product.nameAr : product.name}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
+            className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-700 ease-out"
             fill
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
             loading="lazy"
@@ -139,7 +139,7 @@ function ClassicProductCard({
 
       {/* Product info */}
       <div className={`text-center ${isRtl ? 'direction-rtl' : ''}`}>
-        <h3 className="font-serif text-sm md:text-base text-foreground mb-1.5 group-hover:text-primary transition-colors duration-200 leading-snug">
+        <h3 className="font-serif text-sm md:text-base text-foreground mb-2 group-hover:text-primary transition-colors duration-500 leading-snug tracking-tight">
           {isRtl && product.nameAr ? product.nameAr : product.name}
         </h3>
 

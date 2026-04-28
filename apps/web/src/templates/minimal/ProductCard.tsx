@@ -34,7 +34,7 @@ function MinimalProductCard({
   return (
     <Link href={`${urlPrefix}/products/${product.slug}`} className="group block cursor-pointer">
       {/* Image — no border, no shadow, subtle opacity on hover */}
-      <div className="relative aspect-[3/4] overflow-hidden bg-muted/30 mb-5">
+      <div className="relative aspect-[3/4] overflow-hidden bg-muted/30 mb-6">
         {onToggleCompare && (
           <CompareButton
             productId={product.id}
@@ -54,7 +54,7 @@ function MinimalProductCard({
           <Image
             src={product.images[0].url}
             alt={isRtl && product.nameAr ? product.nameAr : product.name}
-            className="w-full h-full object-cover group-hover:opacity-80 transition-opacity duration-300 ease-out"
+            className="w-full h-full object-cover group-hover:opacity-85 transition-opacity duration-700 ease-out"
             fill
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
             loading="lazy"
@@ -80,8 +80,8 @@ function MinimalProductCard({
       </div>
 
       {/* Text — name + price, ultra-minimal */}
-      <div className={`space-y-1 ${isRtl ? 'text-right' : 'text-left'}`}>
-        <h3 className="text-xs tracking-wide uppercase font-light text-muted-foreground group-hover:text-foreground transition-colors duration-200 leading-snug">
+      <div className={`space-y-1.5 ${isRtl ? 'text-right' : 'text-left'}`}>
+        <h3 className="text-xs tracking-[0.18em] uppercase font-light text-muted-foreground group-hover:text-foreground transition-colors duration-500 ease-out leading-snug">
           {isRtl && product.nameAr ? product.nameAr : product.name}
         </h3>
         <Price

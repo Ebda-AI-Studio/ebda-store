@@ -30,10 +30,10 @@ export default function ModernOrderSummary({
   return (
     <aside
       dir={isRtl ? 'rtl' : 'ltr'}
-      className="rounded-2xl border border-border/60 bg-card p-6 shadow-sm"
+      className="rounded-2xl border border-border/60 bg-card p-7 shadow-[0_18px_36px_-22px_hsl(var(--foreground)/0.10)]"
       aria-label={isRtl ? 'ملخص الطلب' : 'Order summary'}
     >
-      <h2 className="text-lg font-semibold text-foreground">
+      <h2 className="text-lg font-semibold text-foreground tracking-tight">
         {isRtl ? 'ملخص الطلب' : 'Order Summary'}
       </h2>
       <dl className="mt-5 space-y-3 text-sm" aria-live="polite">
@@ -75,7 +75,7 @@ export default function ModernOrderSummary({
         (ctaHref ? (
           <Link
             href={ctaHref}
-            className="mt-6 flex h-12 w-full items-center justify-center rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+            className="mt-6 flex h-12 w-full items-center justify-center rounded-xl bg-primary px-4 text-sm font-semibold tracking-tight text-primary-foreground transition-all duration-300 ease-out hover:bg-primary/90 hover:shadow-[0_18px_40px_-18px_hsl(var(--primary)/0.45)] focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
             aria-disabled={ctaDisabled}
           >
             {ctaText}
@@ -85,7 +85,7 @@ export default function ModernOrderSummary({
             type="button"
             onClick={onCtaClick}
             disabled={ctaDisabled || ctaLoading}
-            className="mt-6 flex h-12 w-full items-center justify-center rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+            className="mt-6 flex h-12 w-full items-center justify-center rounded-xl bg-primary px-4 text-sm font-semibold tracking-tight text-primary-foreground transition-all duration-300 ease-out hover:bg-primary/90 hover:shadow-[0_18px_40px_-18px_hsl(var(--primary)/0.45)] disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
           >
             {ctaLoading ? (
               <span

@@ -135,7 +135,7 @@ function PecannbeeProductCardImpl({
             onClick={handleWishlist}
             aria-label={isRtl ? 'إضافة للمفضلة' : 'Add to wishlist'}
             aria-pressed={isWishlisted}
-            className={`absolute top-3 start-3 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-md transition-all hover:scale-110 cursor-pointer ${
+            className={`absolute top-3 start-3 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/95 backdrop-blur-sm shadow-[0_8px_20px_-8px_hsl(var(--foreground)/0.30)] transition-all duration-300 ease-out hover:scale-[1.05] hover:bg-white cursor-pointer ${
               isWishlisted ? 'text-destructive' : 'text-foreground/70 hover:text-foreground'
             }`}
           >
@@ -157,20 +157,20 @@ function PecannbeeProductCardImpl({
 
           {/* Sold-out ribbon top-END (RTL left, LTR right) */}
           {!inStock && (
-            <span className="absolute top-3 end-3 rounded-full bg-destructive px-3 py-1 text-xs font-bold uppercase tracking-wide text-destructive-foreground shadow-md">
+            <span className="absolute top-3 end-3 rounded-full bg-foreground/90 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-background shadow-[0_8px_20px_-8px_hsl(var(--foreground)/0.35)]">
               {isRtl ? 'نفدت الكمية' : 'Sold out'}
             </span>
           )}
           {/* Sale chip top-END when in stock */}
           {inStock && onSale && (
-            <span className="absolute top-3 end-3 rounded-full bg-foreground px-2.5 py-1 text-xs font-bold text-background shadow-md">
+            <span className="absolute top-3 end-3 rounded-full bg-foreground/90 px-2.5 py-1 text-[11px] font-semibold tracking-wide text-background shadow-[0_8px_20px_-8px_hsl(var(--foreground)/0.35)]">
               -{discountPct}%
             </span>
           )}
         </div>
       </Link>
 
-      <div className={`flex flex-1 flex-col gap-3 p-4 sm:p-5 ${styles.productCardBody ?? ''}`}>
+      <div className={`flex flex-1 flex-col gap-3 p-5 sm:p-6 ${styles.productCardBody ?? ''}`}>
         <Link href={href} className="focus:outline-none focus-visible:underline">
           <p
             className={`line-clamp-2 min-h-[3em] ${styles.productCardName}`}

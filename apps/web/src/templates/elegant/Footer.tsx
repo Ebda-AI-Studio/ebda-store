@@ -69,7 +69,7 @@ export default function ElegantFooter({
       {/* Newsletter — hidden when the store explicitly opts out. */}
       {showNewsletter && (
         <div className="border-b border-border/50">
-          <div className="container mx-auto px-4 py-10 sm:py-12 md:py-16">
+          <div className="container mx-auto px-4 py-14 sm:py-16 md:py-20">
             <div className="max-w-xl mx-auto text-center">
               <h3 className="text-xs tracking-[0.3em] uppercase text-muted-foreground/70 mb-4 font-serif">
                 {isRtl ? 'النشرة البريدية' : 'Newsletter'}
@@ -132,7 +132,7 @@ export default function ElegantFooter({
       )}
 
       {/* Main footer */}
-      <div className="container mx-auto px-4 py-10 sm:py-12 md:py-16">
+      <div className="container mx-auto px-4 py-14 sm:py-16 md:py-20 lg:py-24">
         {/* Brand + (sections|explore) + Contact + Follow. Grow the grid so
             extra sections don't crowd the contact / follow columns. */}
         <div
@@ -177,7 +177,7 @@ export default function ElegantFooter({
                     <li key={link.href}>
                       <Link
                         href={link.href}
-                        className="text-sm text-foreground/70 hover:text-foreground transition-opacity duration-300 tracking-wide cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                        className="text-sm text-foreground/70 hover:text-foreground transition-colors duration-700 ease-out tracking-wide cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                       >
                         {link.label}
                       </Link>
@@ -196,7 +196,7 @@ export default function ElegantFooter({
                   <li key={item.href}>
                     <Link
                       href={item.href}
-                      className="text-sm text-foreground/70 hover:text-foreground transition-opacity duration-300 tracking-wide cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                      className="text-sm text-foreground/70 hover:text-foreground transition-colors duration-700 ease-out tracking-wide cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                     >
                       {isRtl && item.labelAr ? item.labelAr : item.label}
                     </Link>
@@ -218,7 +218,7 @@ export default function ElegantFooter({
                   <li>
                     <a
                       href={`mailto:${contact.email}`}
-                      className="text-foreground/70 hover:text-foreground transition-opacity duration-300 tracking-wide cursor-pointer"
+                      className="text-foreground/70 hover:text-foreground transition-colors duration-700 ease-out tracking-wide cursor-pointer"
                     >
                       {contact.email}
                     </a>
@@ -228,7 +228,7 @@ export default function ElegantFooter({
                   <li>
                     <a
                       href={`tel:${contact.phone}`}
-                      className="text-foreground/70 hover:text-foreground transition-opacity duration-300 tracking-wide cursor-pointer"
+                      className="text-foreground/70 hover:text-foreground transition-colors duration-700 ease-out tracking-wide cursor-pointer"
                       dir="ltr"
                     >
                       {displayPhone}
@@ -255,7 +255,7 @@ export default function ElegantFooter({
                     href={url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-8 h-8 border border-border flex items-center justify-center text-foreground/40 hover:text-foreground hover:border-foreground transition-all duration-300 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                    className="w-8 h-8 border border-border flex items-center justify-center text-foreground/40 hover:text-foreground hover:border-foreground transition-all duration-700 ease-out cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                     aria-label={key}
                   >
                     <svg
@@ -285,19 +285,19 @@ export default function ElegantFooter({
             <div className="flex gap-6">
               <Link
                 href={`${urlPrefix}/privacy`}
-                className="hover:text-foreground transition-opacity duration-300 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                className="hover:text-foreground transition-colors duration-700 ease-out cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
               >
                 {isRtl ? 'الخصوصية' : 'Privacy'}
               </Link>
               <Link
                 href={`${urlPrefix}/terms`}
-                className="hover:text-foreground transition-opacity duration-300 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                className="hover:text-foreground transition-colors duration-700 ease-out cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
               >
                 {isRtl ? 'الشروط' : 'Terms'}
               </Link>
               <Link
                 href={`${urlPrefix}/shipping`}
-                className="hover:text-foreground transition-opacity duration-300 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                className="hover:text-foreground transition-colors duration-700 ease-out cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
               >
                 {isRtl ? 'الشحن' : 'Shipping'}
               </Link>

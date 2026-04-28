@@ -26,7 +26,7 @@ export default function MinimalHero({
   return (
     <section className="bg-background" dir={isRtl ? 'rtl' : 'ltr'}>
       {/* Enormous headline block — maximum whitespace */}
-      <div className="container mx-auto px-6 pt-12 pb-10 sm:pt-16 sm:pb-12 md:pt-20 md:pb-14 text-center">
+      <div className="container mx-auto px-6 pt-16 pb-12 sm:pt-20 sm:pb-14 md:pt-28 md:pb-16 lg:pt-32 lg:pb-20 text-center">
         <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-light text-foreground tracking-tight leading-[1.05] mb-6 sm:mb-8 break-words">
           {displayTitle}
         </h1>
@@ -39,12 +39,12 @@ export default function MinimalHero({
             touch-friendly without violating the typographic minimalism. */}
         <Link
           href={ctaLink}
-          className="group inline-flex min-h-11 items-center gap-2 px-3 py-3 text-[11px] tracking-[0.2em] uppercase text-foreground hover:text-primary transition-colors duration-200 cursor-pointer"
+          className="group inline-flex min-h-[44px] items-center gap-2.5 px-3 py-3 text-[11px] tracking-[0.22em] uppercase text-foreground hover:text-foreground/60 transition-colors duration-500 ease-out cursor-pointer"
         >
           <span>{displayCta}</span>
           <svg
-            className={`w-4 h-4 transition-transform duration-200 ${
-              isRtl ? 'rotate-180 group-hover:-translate-x-0.5' : 'group-hover:translate-x-0.5'
+            className={`w-4 h-4 transition-transform duration-500 ease-out ${
+              isRtl ? 'rotate-180 group-hover:-translate-x-1' : 'group-hover:translate-x-1'
             }`}
             fill="none"
             stroke="currentColor"

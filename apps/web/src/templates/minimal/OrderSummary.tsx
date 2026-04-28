@@ -66,7 +66,7 @@ export default function MinimalOrderSummary({
         (ctaHref ? (
           <Link
             href={ctaHref}
-            className="mt-8 block border-b border-foreground pb-1 text-sm text-foreground hover:border-primary hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-foreground"
+            className="mt-8 block border-b border-foreground pb-1 text-sm text-foreground hover:border-foreground/40 hover:text-foreground/70 transition-colors duration-500 ease-out focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-foreground"
             aria-disabled={ctaDisabled}
           >
             {ctaText} →
@@ -76,7 +76,7 @@ export default function MinimalOrderSummary({
             type="button"
             onClick={onCtaClick}
             disabled={ctaDisabled || ctaLoading}
-            className="mt-8 block w-fit border-b border-foreground pb-1 text-sm text-foreground hover:border-primary hover:text-primary disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-foreground"
+            className="mt-8 block w-fit border-b border-foreground pb-1 text-sm text-foreground hover:border-foreground/40 hover:text-foreground/70 transition-colors duration-500 ease-out disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-foreground"
           >
             {ctaLoading ? '···' : `${ctaText} →`}
           </button>

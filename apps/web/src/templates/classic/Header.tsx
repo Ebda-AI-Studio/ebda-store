@@ -68,7 +68,7 @@ export default function ClassicHeader({
           {/* Mobile menu toggle */}
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="md:hidden inline-flex h-11 w-11 items-center justify-center cursor-pointer text-foreground hover:text-primary transition-colors duration-200"
+            className="md:hidden inline-flex h-11 w-11 items-center justify-center cursor-pointer text-foreground hover:text-primary transition-colors duration-500"
             aria-label={isRtl ? 'القائمة' : 'Menu'}
             aria-expanded={isMenuOpen}
           >
@@ -105,7 +105,7 @@ export default function ClassicHeader({
               <Link
                 key={item.href}
                 href={item.href}
-                className="relative text-sm font-serif tracking-widest uppercase text-foreground/70 hover:text-foreground transition-colors duration-200 after:absolute after:bottom-0 after:left-0 after:w-0 after:h-px after:bg-foreground after:transition-all after:duration-300 hover:after:w-full"
+                className="relative text-sm font-serif tracking-widest uppercase text-foreground/70 hover:text-foreground transition-colors duration-500 after:absolute after:bottom-0 after:left-0 after:w-0 after:h-px after:bg-foreground after:transition-all after:duration-300 hover:after:w-full"
               >
                 {isRtl && item.labelAr ? item.labelAr : item.label}
               </Link>
@@ -138,7 +138,7 @@ export default function ClassicHeader({
               <Link
                 key={item.href}
                 href={item.href}
-                className="relative text-sm font-serif tracking-widest uppercase text-foreground/70 hover:text-foreground transition-colors duration-200 after:absolute after:bottom-0 after:left-0 after:w-0 after:h-px after:bg-foreground after:transition-all after:duration-300 hover:after:w-full"
+                className="relative text-sm font-serif tracking-widest uppercase text-foreground/70 hover:text-foreground transition-colors duration-500 after:absolute after:bottom-0 after:left-0 after:w-0 after:h-px after:bg-foreground after:transition-all after:duration-300 hover:after:w-full"
               >
                 {isRtl && item.labelAr ? item.labelAr : item.label}
               </Link>
@@ -148,7 +148,7 @@ export default function ClassicHeader({
             <div className={`flex items-center gap-4 ${isRtl ? 'flex-row-reverse' : ''}`}>
               <button
                 onClick={() => document.getElementById('classic-search-input')?.focus()}
-                className="cursor-pointer text-foreground/60 hover:text-foreground transition-colors duration-200"
+                className="cursor-pointer text-foreground/60 hover:text-foreground transition-colors duration-500"
                 aria-label={isRtl ? 'بحث' : 'Search'}
               >
                 <svg
@@ -171,7 +171,7 @@ export default function ClassicHeader({
 
               <Link
                 href={isLoggedIn ? `${urlPrefix}/account` : `${urlPrefix}/auth/login`}
-                className="text-foreground/60 hover:text-foreground transition-colors duration-200"
+                className="text-foreground/60 hover:text-foreground transition-colors duration-500"
                 aria-label={isRtl ? 'الحساب' : 'Account'}
               >
                 <svg
@@ -191,7 +191,7 @@ export default function ClassicHeader({
               </Link>
               <Link
                 href={`${urlPrefix}/cart`}
-                className="relative text-foreground/60 hover:text-foreground transition-colors duration-200 cursor-pointer"
+                className="relative text-foreground/60 hover:text-foreground transition-colors duration-500 cursor-pointer"
                 aria-label={
                   isRtl ? `سلة التسوق (${cartItemCount})` : `Cart (${cartItemCount} items)`
                 }
@@ -225,7 +225,7 @@ export default function ClassicHeader({
           <div className={`flex md:hidden items-center gap-1 ${isRtl ? 'flex-row-reverse' : ''}`}>
             <Link
               href={isLoggedIn ? `${urlPrefix}/account` : `${urlPrefix}/auth/login`}
-              className="inline-flex h-11 w-11 items-center justify-center text-foreground/60 hover:text-foreground transition-colors duration-200"
+              className="inline-flex h-11 w-11 items-center justify-center text-foreground/60 hover:text-foreground transition-colors duration-500"
               aria-label={isRtl ? 'الحساب' : 'Account'}
             >
               <svg
@@ -245,7 +245,7 @@ export default function ClassicHeader({
             </Link>
             <Link
               href={`${urlPrefix}/cart`}
-              className="relative inline-flex h-11 w-11 items-center justify-center text-foreground/60 hover:text-foreground transition-colors duration-200 cursor-pointer"
+              className="relative inline-flex h-11 w-11 items-center justify-center text-foreground/60 hover:text-foreground transition-colors duration-500 cursor-pointer"
               aria-label={isRtl ? 'السلة' : 'Cart'}
             >
               <svg
@@ -283,7 +283,7 @@ export default function ClassicHeader({
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder={isRtl ? 'ابحث في مجموعتنا...' : 'Search our collection...'}
-            className="w-full py-1.5 px-0 border-b border-border bg-transparent font-serif text-sm text-center text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors duration-200"
+            className="w-full py-1.5 px-0 border-b border-border bg-transparent font-serif text-sm text-center text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors duration-500"
             dir={isRtl ? 'rtl' : 'ltr'}
             aria-label={isRtl ? 'بحث عن المنتجات' : 'Search products'}
           />
@@ -299,7 +299,7 @@ export default function ClassicHeader({
                 <li key={item.href}>
                   <Link
                     href={item.href}
-                    className="block font-serif tracking-wider uppercase text-sm py-2.5 border-b border-border/20 text-foreground/70 hover:text-foreground transition-colors duration-200"
+                    className="block font-serif tracking-wider uppercase text-sm py-2.5 border-b border-border/20 text-foreground/70 hover:text-foreground transition-colors duration-500"
                     onClick={() => setIsMenuOpen(false)}
                   >
                     {isRtl && item.labelAr ? item.labelAr : item.label}
@@ -314,7 +314,7 @@ export default function ClassicHeader({
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder={isRtl ? 'بحث...' : 'Search...'}
-                className="w-full py-2 px-0 border-b border-border bg-transparent text-sm font-serif text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors duration-200"
+                className="w-full py-2 px-0 border-b border-border bg-transparent text-sm font-serif text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors duration-500"
                 dir={isRtl ? 'rtl' : 'ltr'}
                 aria-label={isRtl ? 'بحث عن المنتجات' : 'Search products'}
               />

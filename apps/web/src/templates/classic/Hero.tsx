@@ -36,7 +36,7 @@ export default function ClassicHero({
         >
           {/* Text column */}
           <div
-            className={`flex flex-col justify-center py-16 lg:py-24 ${
+            className={`flex flex-col justify-center py-16 sm:py-20 lg:py-28 ${
               image
                 ? isRtl
                   ? 'lg:order-2 lg:pe-12'
@@ -73,7 +73,7 @@ export default function ClassicHero({
             <div className={image ? (isRtl ? 'text-right' : 'text-left') : 'text-center'}>
               <Link
                 href={ctaLink}
-                className="group inline-flex items-center gap-3 border border-foreground px-8 py-3 font-serif text-sm tracking-widest uppercase text-foreground hover:bg-foreground hover:text-background transition-colors duration-300 cursor-pointer"
+                className="group inline-flex min-h-[44px] items-center gap-3 border border-foreground px-9 py-3.5 font-serif text-sm tracking-[0.22em] uppercase text-foreground hover:bg-foreground hover:text-background transition-colors duration-500 ease-out cursor-pointer"
               >
                 <span>{displayCta}</span>
                 <svg

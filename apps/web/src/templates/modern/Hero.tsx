@@ -34,7 +34,10 @@ export default function ModernHero({
   if (!image) {
     return (
       <section className="relative overflow-hidden bg-gradient-to-b from-primary/5 via-background to-background">
-        <div className="container mx-auto px-4 py-20 sm:py-24 lg:py-32" dir={isRtl ? 'rtl' : 'ltr'}>
+        <div
+          className="container mx-auto px-4 py-20 sm:py-24 lg:py-32 xl:py-36"
+          dir={isRtl ? 'rtl' : 'ltr'}
+        >
           <div className="mx-auto max-w-3xl text-center motion-safe:[animation:heroFadeIn_0.7s_ease-out_both] motion-reduce:opacity-100">
             <h1
               className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold leading-[1.05] tracking-tight"
@@ -50,7 +53,7 @@ export default function ModernHero({
             <div className="mt-10 flex justify-center">
               <Link
                 href={ctaLink}
-                className="group inline-flex items-center gap-2.5 px-8 py-4 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 font-semibold text-base shadow-lg shadow-primary/20 transition-all duration-300 hover:shadow-xl hover:shadow-primary/30 hover:-translate-y-0.5"
+                className="group inline-flex min-h-[44px] items-center gap-2.5 px-8 py-4 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 font-semibold text-base shadow-[0_18px_40px_-18px_hsl(var(--primary)/0.45)] transition-all duration-500 ease-out hover:shadow-[0_22px_48px_-18px_hsl(var(--primary)/0.55)] hover:-translate-y-0.5"
               >
                 {displayCta}
                 <svg
@@ -79,7 +82,7 @@ export default function ModernHero({
     <section className="relative overflow-hidden bg-background">
       <div className="container mx-auto px-4">
         <div
-          className={`grid lg:grid-cols-2 gap-8 lg:gap-12 items-center min-h-[540px] py-14 lg:py-24 ${isRtl ? 'direction-rtl' : ''}`}
+          className={`grid lg:grid-cols-2 gap-8 lg:gap-14 items-center min-h-[560px] py-16 sm:py-20 lg:py-28 ${isRtl ? 'direction-rtl' : ''}`}
         >
           {/* Content */}
           <div

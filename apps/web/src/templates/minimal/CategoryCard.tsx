@@ -19,18 +19,18 @@ export default function MinimalCategoryCard({
       className="group block outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 cursor-pointer"
     >
       {/* Image - Clean square */}
-      <div className="aspect-square bg-gradient-to-br from-primary/10 to-primary/5 overflow-hidden mb-4">
+      <div className="aspect-square bg-muted/30 overflow-hidden mb-5">
         {category.image ? (
           <img
             src={category.image}
             alt={displayName}
-            className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-500"
+            className="w-full h-full object-cover group-hover:opacity-85 transition-opacity duration-700 ease-out"
             loading="lazy"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center bg-muted">
-            <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center">
-              <span className="text-2xl font-light text-primary">
+          <div className="w-full h-full flex items-center justify-center bg-muted/40">
+            <div className="w-16 h-16 rounded-full bg-foreground/5 flex items-center justify-center">
+              <span className="text-2xl font-light text-foreground/60 tracking-wide">
                 {displayName.charAt(0).toUpperCase()}
               </span>
             </div>
@@ -39,7 +39,7 @@ export default function MinimalCategoryCard({
       </div>
 
       {/* Title - Simple */}
-      <h3 className="text-sm font-normal text-foreground group-hover:text-primary transition-colors">
+      <h3 className="text-xs tracking-[0.22em] uppercase font-light text-muted-foreground group-hover:text-foreground transition-colors duration-500 ease-out">
         {displayName}
       </h3>
     </Link>

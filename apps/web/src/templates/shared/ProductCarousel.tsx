@@ -126,7 +126,7 @@ export function ProductCarousel({
               type="button"
               aria-label={isRtl ? 'التالي' : 'Previous'}
               onClick={() => scrollByOneCard('prev')}
-              className="absolute top-1/2 -translate-y-1/2 z-10 hidden sm:flex h-11 w-11 items-center justify-center rounded-full bg-card border border-border shadow-md hover:bg-muted text-foreground transition-colors cursor-pointer start-2"
+              className="absolute top-1/2 -translate-y-1/2 z-10 hidden sm:flex h-11 w-11 items-center justify-center rounded-full bg-card border border-foreground/10 shadow-[0_10px_24px_-12px_hsl(var(--foreground)/0.18)] hover:bg-muted text-foreground transition-all duration-300 ease-out cursor-pointer start-2"
             >
               <svg
                 className="h-5 w-5"
@@ -150,7 +150,7 @@ export function ProductCarousel({
               type="button"
               aria-label={isRtl ? 'السابق' : 'Next'}
               onClick={() => scrollByOneCard('next')}
-              className="absolute top-1/2 -translate-y-1/2 z-10 hidden sm:flex h-11 w-11 items-center justify-center rounded-full bg-card border border-border shadow-md hover:bg-muted text-foreground transition-colors cursor-pointer end-2"
+              className="absolute top-1/2 -translate-y-1/2 z-10 hidden sm:flex h-11 w-11 items-center justify-center rounded-full bg-card border border-foreground/10 shadow-[0_10px_24px_-12px_hsl(var(--foreground)/0.18)] hover:bg-muted text-foreground transition-all duration-300 ease-out cursor-pointer end-2"
             >
               <svg
                 className="h-5 w-5"
@@ -230,7 +230,7 @@ export function ProductCarousel({
                           </div>
                         )}
                         {onSale && (
-                          <span className="absolute end-3 top-3 rounded-full bg-destructive px-2.5 py-1 text-xs font-bold text-destructive-foreground shadow-md">
+                          <span className="absolute end-3 top-3 rounded-full bg-foreground/85 px-2.5 py-1 text-[11px] font-semibold tracking-wide text-background shadow-[0_6px_16px_-6px_hsl(var(--foreground)/0.35)]">
                             -
                             {Math.round(
                               (1 - product.price / (product.compareAtPrice ?? product.price)) * 100
@@ -239,11 +239,13 @@ export function ProductCarousel({
                           </span>
                         )}
                       </div>
-                      <div className={`px-5 py-5 space-y-2.5 ${styles.productCardBody ?? ''}`}>
+                      <div className={`p-5 sm:p-6 space-y-3 ${styles.productCardBody ?? ''}`}>
                         <p className={`line-clamp-2 min-h-[3em] ${styles.productCardName}`}>
                           {name}
                         </p>
-                        <div className="flex items-baseline gap-2">
+                        <div
+                          className={`flex items-baseline gap-2 ${styles.productCardBody ? 'justify-center' : ''}`}
+                        >
                           <span className={styles.productCardPrice}>
                             {(product.price / 1000).toFixed(3)} {currency}
                           </span>

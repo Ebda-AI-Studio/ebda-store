@@ -59,7 +59,7 @@ function ModernProductCard({
   return (
     <Link
       href={`${urlPrefix}/products/${product.slug}`}
-      className="group relative bg-background rounded-xl overflow-hidden border border-border/60 hover:border-primary/20 hover:shadow-xl hover:shadow-black/5 hover:-translate-y-0.5 transition-all duration-300 flex flex-col cursor-pointer"
+      className="group relative bg-background rounded-xl overflow-hidden border border-border/60 hover:border-foreground/15 hover:shadow-[0_24px_48px_-20px_hsl(var(--foreground)/0.12)] hover:-translate-y-0.5 transition-all duration-500 ease-out flex flex-col cursor-pointer"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -70,7 +70,7 @@ function ModernProductCard({
             <Image
               src={product.images[0].url}
               alt={product.images[0].alt || product.name}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
+              className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-700 ease-out"
               fill
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
               loading="lazy"
@@ -136,10 +136,10 @@ function ModernProductCard({
             <button
               onClick={handleWishlist}
               className={cn(
-                'w-9 h-9 rounded-full flex items-center justify-center shadow-md transition-all duration-200 cursor-pointer',
+                'w-9 h-9 rounded-full flex items-center justify-center shadow-[0_8px_20px_-8px_hsl(var(--foreground)/0.30)] transition-all duration-300 ease-out cursor-pointer backdrop-blur-sm',
                 isWishlisted
-                  ? 'bg-destructive text-destructive-foreground scale-110'
-                  : 'bg-background/95 text-foreground hover:bg-background hover:scale-110'
+                  ? 'bg-destructive text-destructive-foreground scale-[1.05]'
+                  : 'bg-white/95 text-foreground hover:bg-white hover:scale-[1.05]'
               )}
               aria-label={isRtl ? 'إضافة للمفضلة' : 'Add to wishlist'}
               aria-pressed={isWishlisted}
@@ -187,7 +187,7 @@ function ModernProductCard({
       </div>
 
       {/* Content */}
-      <div className="p-4 flex flex-col gap-2 flex-1">
+      <div className="p-5 flex flex-col gap-2.5 flex-1">
         {product.rating !== undefined && (
           <Rating
             value={product.rating}
@@ -199,7 +199,7 @@ function ModernProductCard({
         )}
 
         <h3
-          className={`font-semibold text-sm text-foreground group-hover:text-primary transition-colors duration-200 line-clamp-2 leading-snug ${isRtl ? 'text-right' : ''}`}
+          className={`font-semibold text-sm text-foreground group-hover:text-primary transition-colors duration-300 ease-out line-clamp-2 leading-snug tracking-tight ${isRtl ? 'text-right' : ''}`}
         >
           {isRtl && product.nameAr ? product.nameAr : product.name}
         </h3>
