@@ -309,12 +309,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                     | undefined
                 }
               >
-                <CartProvider>
-                  <ToastProvider>
+                <ToastProvider>
+                  <CartProvider>
                     <div id="main-content">{children}</div>
                     <PushNotificationPrompt />
-                  </ToastProvider>
-                </CartProvider>
+                  </CartProvider>
+                </ToastProvider>
               </LanguageProvider>
             </AuthProvider>
             {store.marketingPixels && Object.keys(store.marketingPixels).length > 0 && (

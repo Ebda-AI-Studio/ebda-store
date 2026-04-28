@@ -1,7 +1,9 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { useToast } from '@force/ui';
 import { api } from '@/lib/api';
+import { useLanguage } from './LanguageContext';
 
 export interface CartItem {
   // Server cart_item row id once the item is synced. Before the first
@@ -71,6 +73,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [isReady, setIsReady] = useState(false);
   const migratedRef = useRef(false);
+  const toast = useToast();
+  const { t, language } = useLanguage();
 
   // Fast first paint: load cached items from localStorage before the server
   // round-trip. These are overwritten once the authoritative cart arrives.
@@ -200,12 +204,19 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           await refetchCart();
           throw new Error(res.error?.message || 'Failed to add item to cart');
         }
+        // Toast feedback for user-initiated adds. The guest auto-merge path
+        // calls `api.addToCart` directly (see hydrate()) and bypasses this
+        // function entirely, so it stays silent. The cart page only uses
+        // updateQuantity/removeItem, never addItem, so quantity bumps from
+        // the cart drawer/page never reach this branch.
+        const localizedName = language === 'ar' && item.nameAr ? item.nameAr : item.name;
+        toast.success(t('Added to cart', 'تمت الإضافة للسلة'), localizedName);
       } catch (err) {
         await refetchCart().catch(() => {});
         throw err;
       }
     },
-    [refetchCart]
+    [refetchCart, toast, t, language]
   );
 
   const removeItem = useCallback(

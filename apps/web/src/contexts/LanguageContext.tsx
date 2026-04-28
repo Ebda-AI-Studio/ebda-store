@@ -107,6 +107,8 @@ export const translations = {
   Reviews: 'التقييمات',
 
   // Cart
+  'Added to cart': 'تمت الإضافة للسلة',
+  'View cart': 'عرض السلة',
   'Shopping Cart': 'سلة التسوق',
   'Your cart is empty': 'سلة التسوق فارغة',
   'Continue Shopping': 'متابعة التسوق',
