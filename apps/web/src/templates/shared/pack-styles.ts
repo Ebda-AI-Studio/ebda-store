@@ -19,6 +19,10 @@ export interface PackStyles {
   categoryCaption: string;
   /** Class for product carousel card name. */
   productCardName: string;
+  /** Class for product carousel card price. */
+  productCardPrice: string;
+  /** Optional class applied to the product carousel text block (under image). */
+  productCardBody?: string;
   /** Class for product carousel CTA button (the bottom pill). */
   productCardCta: string;
   /** Class for the section heading H2. */
@@ -39,10 +43,12 @@ export interface PackStyles {
 
 export const PACK_STYLES: Record<TemplateId, PackStyles> = {
   modern: {
-    card: 'rounded-2xl border border-border/60 bg-card hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300',
-    categoryFrame: 'rounded-2xl bg-muted shadow-sm',
-    categoryCaption: 'text-base font-semibold text-foreground tracking-tight',
-    productCardName: 'text-base font-semibold text-foreground tracking-tight',
+    card: 'rounded-2xl border border-border/60 bg-card hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.08)] hover:border-primary/20 hover:-translate-y-0.5 transition-all duration-300',
+    categoryFrame:
+      'rounded-2xl bg-muted shadow-[0_10px_30px_-15px_rgba(0,0,0,0.08)] group-hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.12)] transition-shadow duration-500',
+    categoryCaption: 'text-base sm:text-lg font-semibold text-foreground tracking-tight',
+    productCardName: 'text-sm font-semibold text-foreground tracking-tight leading-snug',
+    productCardPrice: 'text-base font-bold text-foreground tracking-tight',
     productCardCta:
       'rounded-full bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors',
     sectionHeading: 'text-3xl sm:text-4xl font-bold tracking-tight text-foreground leading-tight',
@@ -58,11 +64,14 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
   },
   classic: {
     card: 'border border-border bg-card hover:border-foreground/40 hover:shadow-md transition-all duration-300',
-    categoryFrame: 'border border-border bg-muted',
-    categoryCaption: 'text-base font-serif font-bold text-foreground tracking-tight',
-    productCardName: 'text-base font-serif font-medium text-foreground tracking-tight',
+    categoryFrame:
+      'border border-border bg-muted group-hover:border-foreground/30 transition-colors duration-500',
+    categoryCaption: 'text-base sm:text-lg font-serif font-normal text-foreground tracking-tight',
+    productCardName: 'text-sm font-serif font-normal text-foreground tracking-tight leading-snug',
+    productCardPrice: 'text-base font-serif font-medium text-foreground tracking-tight',
+    productCardBody: 'text-center',
     productCardCta:
-      'border-y border-foreground bg-foreground px-4 py-3 text-sm font-serif uppercase tracking-[0.2em] text-background hover:bg-foreground/90 transition-colors',
+      'border-y border-foreground bg-foreground px-4 py-3 text-xs font-serif uppercase tracking-[0.2em] text-background hover:bg-foreground/90 transition-colors',
     sectionHeading:
       'text-3xl sm:text-4xl font-serif font-normal tracking-tight text-foreground leading-tight',
     sectionSeeAll:
@@ -77,11 +86,15 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
   },
   minimal: {
     card: 'bg-transparent',
-    categoryFrame: 'bg-muted',
-    categoryCaption: 'text-base font-light text-foreground tracking-wide',
-    productCardName: 'text-base font-light text-foreground tracking-wide',
+    categoryFrame: 'bg-muted/40',
+    categoryCaption:
+      'text-xs sm:text-sm font-light tracking-[0.2em] uppercase text-muted-foreground group-hover:text-foreground transition-colors duration-300',
+    productCardName:
+      'text-xs tracking-[0.15em] uppercase font-light text-muted-foreground group-hover:text-foreground transition-colors',
+    productCardPrice: 'text-[11px] tracking-wide font-light text-muted-foreground',
+    productCardBody: 'text-center',
     productCardCta:
-      'mx-auto inline-block border-b-2 border-foreground pb-1 text-sm font-medium uppercase tracking-[0.2em] text-foreground hover:text-primary hover:border-primary bg-transparent transition-colors',
+      'mx-auto inline-block border-b border-foreground pb-1 text-xs font-medium uppercase tracking-[0.25em] text-foreground hover:text-primary hover:border-primary bg-transparent transition-colors duration-300',
     sectionHeading: 'text-3xl sm:text-4xl font-light tracking-tight text-foreground leading-tight',
     sectionSeeAll:
       'text-sm font-light uppercase tracking-[0.2em] text-muted-foreground hover:text-foreground',
@@ -95,9 +108,11 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
   },
   bold: {
     card: 'border-2 border-foreground bg-card hover:translate-x-1 hover:-translate-y-1 hover:shadow-[6px_6px_0_0_hsl(var(--foreground))] transition-all duration-200',
-    categoryFrame: 'border-2 border-foreground bg-muted',
-    categoryCaption: 'text-base font-black uppercase tracking-wider text-foreground',
-    productCardName: 'text-base font-black uppercase tracking-wide text-foreground',
+    categoryFrame:
+      'border-2 border-foreground bg-muted group-hover:shadow-[6px_6px_0_0_hsl(var(--foreground))] transition-shadow duration-200',
+    categoryCaption: 'text-sm sm:text-base font-black uppercase tracking-wider text-foreground',
+    productCardName: 'text-sm font-black uppercase tracking-wide text-foreground leading-tight',
+    productCardPrice: 'text-base font-black text-foreground tracking-tight',
     productCardCta:
       'border-t-2 border-foreground bg-foreground px-4 py-3 text-sm font-black uppercase tracking-[0.15em] text-background hover:bg-primary hover:text-primary-foreground transition-colors',
     sectionHeading:
@@ -114,9 +129,14 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
   },
   elegant: {
     card: 'border border-border/50 bg-card hover:border-foreground/30 transition-colors duration-500',
-    categoryFrame: 'border border-border/50 bg-muted',
-    categoryCaption: 'text-sm font-light uppercase tracking-[0.2em] text-foreground/80',
-    productCardName: 'text-sm font-light uppercase tracking-[0.2em] text-foreground/80',
+    categoryFrame:
+      'border border-border/50 bg-muted group-hover:border-foreground/30 transition-colors duration-500',
+    categoryCaption:
+      'text-xs sm:text-sm font-extralight uppercase tracking-[0.25em] text-foreground/80 group-hover:text-foreground transition-colors duration-500',
+    productCardName:
+      'text-xs font-light uppercase tracking-[0.2em] text-foreground/80 group-hover:text-foreground transition-colors duration-500',
+    productCardPrice: 'text-sm font-light tracking-wide text-foreground',
+    productCardBody: 'text-center',
     productCardCta:
       'border-t border-foreground/30 bg-transparent px-4 py-3 text-xs font-medium uppercase tracking-[0.3em] text-foreground hover:bg-foreground hover:text-background transition-all duration-500',
     sectionHeading:

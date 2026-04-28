@@ -170,7 +170,7 @@ function PecannbeeProductCardImpl({
         </div>
       </Link>
 
-      <div className="flex flex-1 flex-col gap-3 p-4 sm:p-5">
+      <div className={`flex flex-1 flex-col gap-3 p-4 sm:p-5 ${styles.productCardBody ?? ''}`}>
         <Link href={href} className="focus:outline-none focus-visible:underline">
           <p
             className={`line-clamp-2 min-h-[3em] ${styles.productCardName}`}
@@ -179,8 +179,10 @@ function PecannbeeProductCardImpl({
             {name}
           </p>
         </Link>
-        <div className="flex items-baseline gap-2">
-          <span className="text-lg font-bold text-foreground">
+        <div
+          className={`flex items-baseline gap-2 ${styles.productCardBody ? 'justify-center' : ''}`}
+        >
+          <span className={styles.productCardPrice}>
             {(product.price / 1000).toFixed(3)} {currency}
           </span>
           {onSale && product.compareAtPrice && (

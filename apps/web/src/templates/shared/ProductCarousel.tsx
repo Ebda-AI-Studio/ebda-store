@@ -183,7 +183,7 @@ export function ProductCarousel({
               return (
                 <li
                   key={product.id}
-                  className="snap-start shrink-0 w-[42vw] sm:w-[24vw] lg:w-[16vw] max-w-[260px]"
+                  className="snap-start shrink-0 w-[60vw] sm:w-[30vw] md:w-[24vw] lg:w-[20vw] xl:w-[18vw] max-w-[300px]"
                 >
                   <div className={`overflow-hidden ${styles.card}`}>
                     <Link
@@ -197,7 +197,7 @@ export function ProductCarousel({
                               src={img}
                               alt={name}
                               fill
-                              sizes="(max-width: 640px) 60vw, (max-width: 1024px) 36vw, 260px"
+                              sizes="(max-width: 640px) 60vw, (max-width: 1024px) 30vw, 300px"
                               className="object-cover transition-opacity duration-500 group-hover/img:opacity-0"
                             />
                             {product.images?.[1]?.url && (
@@ -205,7 +205,7 @@ export function ProductCarousel({
                                 src={product.images[1].url}
                                 alt={name}
                                 fill
-                                sizes="(max-width: 640px) 60vw, (max-width: 1024px) 36vw, 260px"
+                                sizes="(max-width: 640px) 60vw, (max-width: 1024px) 30vw, 300px"
                                 loading="lazy"
                                 className="absolute inset-0 object-cover opacity-0 transition-opacity duration-500 group-hover/img:opacity-100"
                               />
@@ -239,12 +239,12 @@ export function ProductCarousel({
                           </span>
                         )}
                       </div>
-                      <div className="px-4 py-4 space-y-2">
+                      <div className={`px-5 py-5 space-y-2.5 ${styles.productCardBody ?? ''}`}>
                         <p className={`line-clamp-2 min-h-[3em] ${styles.productCardName}`}>
                           {name}
                         </p>
                         <div className="flex items-baseline gap-2">
-                          <span className="text-base font-bold text-foreground">
+                          <span className={styles.productCardPrice}>
                             {(product.price / 1000).toFixed(3)} {currency}
                           </span>
                           {onSale && product.compareAtPrice && (
