@@ -72,10 +72,10 @@ export function CouponsTable({
   if (coupons.length === 0) {
     return (
       <div className="bg-card rounded-xl border overflow-hidden">
-        <div className="text-center py-12">
-          <div className="mx-auto w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
+        <div className="force-empty-state px-6">
+          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
             <svg
-              className="w-8 h-8 text-muted-foreground"
+              className="h-8 w-8 text-muted-foreground"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -88,11 +88,12 @@ export function CouponsTable({
               />
             </svg>
           </div>
-          <p className="text-muted-foreground">{tEmpty('title')}</p>
+          <p className="font-semibold text-foreground">{tEmpty('title')}</p>
+          <p className="mt-1 max-w-md text-sm text-muted-foreground">{tEmpty('description')}</p>
           <button
             type="button"
             onClick={onCreateFirst}
-            className="mt-4 text-primary hover:underline"
+            className="mt-4 inline-flex items-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
           >
             {tEmpty('createFirst')}
           </button>

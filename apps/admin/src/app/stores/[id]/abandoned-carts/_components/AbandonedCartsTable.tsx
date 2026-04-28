@@ -70,10 +70,10 @@ export function AbandonedCartsTable({
       </div>
 
       {records.length === 0 ? (
-        <div className="p-12 text-center">
-          <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center mx-auto mb-3">
+        <div className="force-empty-state px-6">
+          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
             <svg
-              className="w-6 h-6 text-muted-foreground"
+              className="h-8 w-8 text-muted-foreground"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -86,7 +86,8 @@ export function AbandonedCartsTable({
               />
             </svg>
           </div>
-          <p className="text-muted-foreground text-sm">{t('empty')}</p>
+          <p className="font-semibold text-foreground">{t('empty')}</p>
+          <p className="mt-1 max-w-md text-sm text-muted-foreground">{t('emptyDescription')}</p>
         </div>
       ) : (
         <>

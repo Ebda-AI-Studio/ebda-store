@@ -3,6 +3,10 @@ export interface Store {
   name: string;
   slug: string;
   domain: string | null;
+  /** Storefront logo URL — used by the onboarding checklist to detect upload step. */
+  logo?: string | null;
+  /** Legacy single hero image URL — fallback signal when layoutSettings.hero.slides is empty. */
+  heroImage?: string | null;
   status: 'active' | 'inactive' | 'suspended';
   plan: 'free' | 'starter' | 'professional' | 'enterprise';
   createdAt: string;

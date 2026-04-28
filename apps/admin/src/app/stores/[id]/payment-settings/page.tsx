@@ -228,6 +228,11 @@ export default function StorePaymentSettingsPage() {
         </div>
       )}
 
+      <div className="mb-6 rounded-xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
+        <p className="font-medium text-foreground">{t('page.intro')}</p>
+        <p className="mt-1.5 text-xs">{t('page.testModeNote')}</p>
+      </div>
+
       <div className="space-y-4">
         {PROVIDERS.map(provider => {
           const form = forms[provider.id] ?? emptyConfig(provider.id);

@@ -55,25 +55,28 @@ export function CategoryTable({
 
   if (categories.length === 0) {
     return (
-      <div className="py-16 text-center">
-        <svg
-          className="mx-auto h-12 w-12 text-muted-foreground/60"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={1}
-            d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
-          />
-        </svg>
-        <p className="mt-4 text-muted-foreground">{t('empty')}</p>
+      <div className="force-empty-state px-6">
+        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
+          <svg
+            className="h-8 w-8 text-muted-foreground"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.5}
+              d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
+            />
+          </svg>
+        </div>
+        <p className="font-semibold text-foreground">{t('empty')}</p>
+        <p className="mt-1 max-w-md text-sm text-muted-foreground">{t('emptyDescription')}</p>
         <button
           type="button"
           onClick={onAddFirst}
-          className="mt-4 text-sm text-primary hover:underline"
+          className="mt-4 inline-flex items-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
         >
           {t('addFirst')}
         </button>

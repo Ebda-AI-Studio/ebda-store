@@ -102,6 +102,52 @@
       "errorSubtitle": "A network error occurred while loading this store",
       "retry": "Retry",
       "backToStores": "Back to Stores",
+      "onboarding": {
+        "title": "Get your store ready to launch",
+        "subtitle": "A few quick steps to set up the essentials before you start selling.",
+        "progress": "{done} of {total} done",
+        "doneBadge": "Done",
+        "dismiss": "Dismiss",
+        "completeTitle": "Setup complete",
+        "completeSummary": "All {total} setup steps finished. You're ready to take orders.",
+        "activation": {
+          "activating": "Activating…",
+          "adminOnly": "Pending platform admin",
+          "failed": "Failed to activate the store. Try again."
+        },
+        "steps": {
+          "addProduct": {
+            "title": "Add your first product",
+            "subtitle": "Customers can't shop until your catalogue has at least one product.",
+            "cta": "Add product"
+          },
+          "uploadLogo": {
+            "title": "Upload your store logo",
+            "subtitle": "Your logo shows in the storefront header, emails, and invoices.",
+            "cta": "Upload logo"
+          },
+          "configureLayout": {
+            "title": "Configure your storefront layout",
+            "subtitle": "Add at least one hero slide so the home page doesn't feel empty.",
+            "cta": "Open layout"
+          },
+          "paymentMethod": {
+            "title": "Set up at least one payment method",
+            "subtitle": "Enable Tap, MyFatoorah, Hesabe, UPayments, or Cash on Delivery.",
+            "cta": "Configure payments"
+          },
+          "shipping": {
+            "title": "Configure shipping",
+            "subtitle": "Add at least one delivery zone with a fee so checkout can quote shipping.",
+            "cta": "Add zone"
+          },
+          "activate": {
+            "title": "Activate your store",
+            "subtitle": "Switch the store from inactive to active so customers can place orders.",
+            "cta": "Activate"
+          }
+        }
+      },
       "stats": {
         "products": "Products",
         "orders": "Orders",
@@ -735,9 +781,10 @@
       },
       "empty": {
         "title": "No orders yet",
-        "description": "Orders will appear here when customers make purchases",
+        "description": "Orders appear here as soon as a customer completes checkout. Add products and share your storefront to get started.",
         "filteredTitle": "No matching orders",
-        "filteredDescription": "Try adjusting your search or filters"
+        "filteredDescription": "Try adjusting your search or filters",
+        "addProduct": "Add product"
       },
       "pagination": {
         "showing": "Showing {from} to {to} of {total} orders",
@@ -987,7 +1034,10 @@
       "loading": "Loading customers...",
       "searchPlaceholder": "Search by name, email, or phone...",
       "noMatch": "No customers match your search",
-      "empty": "No customers yet for this store",
+      "empty": "No customers yet",
+      "emptyDescription": "Customers appear here automatically once they place their first order. Share your storefront to attract your first shopper.",
+      "emptyShareCta": "Open storefront",
+      "emptyAddProduct": "Add product",
       "retry": "Retry",
       "fetchFailed": "Failed to fetch customers",
       "connectionError": "Unable to connect to the server. Please check your connection and try again.",
@@ -1301,7 +1351,8 @@
       "freeShipping": "Free Shipping"
     },
     "empty": {
-      "title": "No coupons found",
+      "title": "No coupons yet",
+      "description": "Coupons let you offer percentage or fixed-amount discounts at checkout. Create one to run a promotion or reward repeat customers.",
       "createFirst": "Create your first coupon"
     },
     "modal": {
@@ -1462,7 +1513,8 @@
     },
     "page": {
       "title": "Shipping Zones",
-      "subtitle": "Configure delivery areas and shipping rates"
+      "subtitle": "Configure delivery areas and shipping rates",
+      "intro": "A shipping zone is a group of areas you charge a single rate to deliver to. Define a zone for each region you ship to so checkout can quote the right delivery fee."
     },
     "toolbar": {
       "addZone": "Add Zone"
@@ -1667,7 +1719,8 @@
     "levels": {
       "searchPlaceholder": "Search products...",
       "tableLabel": "Product inventory",
-      "empty": "No products found",
+      "empty": "No products tracked",
+      "emptyDescription": "Inventory rows appear here for each product with stock tracking enabled. Add a product to start managing stock levels.",
       "adjustAction": "Adjust",
       "kwdValue": "{value} KWD",
       "filters": {
@@ -2138,7 +2191,8 @@
       "filterAriaLabel": "Filter by status",
       "allStatuses": "All statuses",
       "totalRecords": "{count, plural, =0 {No records} one {# total record} other {# total records}}",
-      "empty": "No abandoned carts found",
+      "empty": "No abandoned carts yet",
+      "emptyDescription": "Carts are recorded here when a shopper adds items but doesn't finish checkout. The recovery campaign above sends reminders to bring them back.",
       "previous": "Previous",
       "next": "Next",
       "pagination": "Page {page} of {totalPages} ({total} total)",
@@ -2650,7 +2704,9 @@
   "paymentSettings": {
     "page": {
       "title": "Payment Settings",
-      "subtitle": "Configure payment providers for this store"
+      "subtitle": "Configure payment providers for this store",
+      "intro": "Toggle a provider on to accept that payment method at checkout. Each gateway needs its own API credentials from the provider's dashboard. Cash on Delivery has no integration to set up — just enable it.",
+      "testModeNote": "Use test mode while you verify the integration. Switch to live mode before launch so real customer payments go through."
     },
     "actions": {
       "backToSettings": "Back to Settings"
@@ -2977,6 +3033,7 @@
     "table": {
       "label": "Categories",
       "empty": "No categories yet",
+      "emptyDescription": "Categories help shoppers browse your catalogue. Group products like \"Skincare\" or \"Bestsellers\" so the storefront shows a structured menu.",
       "addFirst": "Add your first category",
       "category": "Category",
       "slug": "Slug",
@@ -2998,7 +3055,8 @@
       "filterPending": "Pending Approval",
       "filterApproved": "Approved",
       "loading": "Loading reviews...",
-      "empty": "No reviews found",
+      "empty": "No reviews yet",
+      "emptyDescription": "Customer reviews appear here after they leave feedback on a product page. Encourage shoppers to rate their purchase to build trust.",
       "approved": "Approved",
       "pending": "Pending",
       "verifiedPurchase": "Verified Purchase",

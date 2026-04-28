@@ -199,6 +199,10 @@ export default function ShippingSettingsPage() {
       }
     >
       <div className="space-y-6">
+        <div className="rounded-xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
+          {tPage('intro')}
+        </div>
+
         <div className="flex gap-2 mb-6">
           {(['all', 'active', 'inactive'] as const).map(f => (
             <button

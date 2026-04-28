@@ -1,5 +1,8 @@
 'use client';
 
+import Link from 'next/link';
+import { useParams } from 'next/navigation';
+import { Button } from '@force/ui';
 import { useT } from '@/i18n/useT';
 
 interface EmptyOrdersStateProps {
@@ -8,6 +11,8 @@ interface EmptyOrdersStateProps {
 
 export function EmptyOrdersState({ hasActiveFilters }: EmptyOrdersStateProps) {
   const t = useT('orders.list.empty');
+  const params = useParams();
+  const storeId = params?.id as string;
 
   return (
     <div className="force-empty-state">
@@ -29,9 +34,14 @@ export function EmptyOrdersState({ hasActiveFilters }: EmptyOrdersStateProps) {
       <p className="font-semibold text-foreground">
         {hasActiveFilters ? t('filteredTitle') : t('title')}
       </p>
-      <p className="mt-1 text-sm text-muted-foreground">
+      <p className="mt-1 max-w-md text-sm text-muted-foreground">
         {hasActiveFilters ? t('filteredDescription') : t('description')}
       </p>
+      {!hasActiveFilters && storeId && (
+        <Link href={`/stores/${storeId}/products/new`} className="mt-4 inline-block">
+          <Button size="sm">{t('addProduct')}</Button>
+        </Link>
+      )}
     </div>
   );
 }

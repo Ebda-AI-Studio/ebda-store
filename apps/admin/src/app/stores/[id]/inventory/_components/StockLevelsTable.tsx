@@ -60,8 +60,24 @@ export function StockLevelsTable({
       </div>
 
       {products.length === 0 ? (
-        <div className="p-12 text-center">
-          <p className="text-muted-foreground">{t('empty')}</p>
+        <div className="force-empty-state px-6">
+          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
+            <svg
+              className="h-8 w-8 text-muted-foreground"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+              />
+            </svg>
+          </div>
+          <p className="font-semibold text-foreground">{t('empty')}</p>
+          <p className="mt-1 max-w-md text-sm text-muted-foreground">{t('emptyDescription')}</p>
         </div>
       ) : (
         <div className="overflow-x-auto">

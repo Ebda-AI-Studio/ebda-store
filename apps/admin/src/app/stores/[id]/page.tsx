@@ -7,6 +7,7 @@ import { AdminLayout } from '../../../components/AdminLayout';
 import { useAuth } from '../../../lib/auth';
 import { useT } from '@/i18n/useT';
 import { useDashboardData } from './_hooks/useDashboardData';
+import { OnboardingChecklist } from './_components/OnboardingChecklist';
 import { StatsGrid } from './_components/StatsGrid';
 import { StoreDetailsCard } from './_components/StoreDetailsCard';
 import { StoreOwnerCard } from './_components/StoreOwnerCard';
@@ -88,6 +89,8 @@ export default function StoreDetailPage() {
         </div>
       }
     >
+      <OnboardingChecklist store={store} onStoreActivated={fetchStore} />
+
       <StatsGrid store={store} />
 
       <div className="mt-8 grid gap-6 lg:grid-cols-3">
