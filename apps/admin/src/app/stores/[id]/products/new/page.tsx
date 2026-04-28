@@ -183,6 +183,7 @@ export default function NewProductPage() {
                 values={images}
                 onChange={setImages}
                 folder="products"
+                storeId={storeId}
                 label={t('fields.mediaHint')}
                 max={10}
               />

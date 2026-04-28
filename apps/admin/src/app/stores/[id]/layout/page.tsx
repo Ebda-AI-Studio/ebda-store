@@ -749,7 +749,8 @@ function SlidesEditor({ slides, storeId, onChange }: SlidesEditorProps) {
                   </div>
                   <ImageUpload
                     value={slide.image || undefined}
-                    folder={`stores/${storeId}/hero`}
+                    folder="hero"
+                    storeId={storeId}
                     onUpload={url => updateSlide(index, { image: url })}
                     onRemove={() => updateSlide(index, { image: '' })}
                   />
@@ -759,7 +760,8 @@ function SlidesEditor({ slides, storeId, onChange }: SlidesEditorProps) {
                     </label>
                     <ImageUpload
                       value={slide.imageAr || undefined}
-                      folder={`stores/${storeId}/hero`}
+                      folder="hero"
+                      storeId={storeId}
                       onUpload={url => updateSlide(index, { imageAr: url })}
                       onRemove={() => updateSlide(index, { imageAr: '' })}
                     />
@@ -778,7 +780,8 @@ function SlidesEditor({ slides, storeId, onChange }: SlidesEditorProps) {
                   </div>
                   <ImageUpload
                     value={slide.imageMobile || undefined}
-                    folder={`stores/${storeId}/hero`}
+                    folder="hero"
+                    storeId={storeId}
                     onUpload={url => updateSlide(index, { imageMobile: url })}
                     onRemove={() => updateSlide(index, { imageMobile: '' })}
                   />
@@ -788,7 +791,8 @@ function SlidesEditor({ slides, storeId, onChange }: SlidesEditorProps) {
                     </label>
                     <ImageUpload
                       value={slide.imageMobileAr || undefined}
-                      folder={`stores/${storeId}/hero`}
+                      folder="hero"
+                      storeId={storeId}
                       onUpload={url => updateSlide(index, { imageMobileAr: url })}
                       onRemove={() => updateSlide(index, { imageMobileAr: '' })}
                     />

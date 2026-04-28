@@ -46,6 +46,55 @@ router.get('/status', authenticate, (_req: Request, res: Response) => {
 });
 
 /**
+ * Per-store upload folder whitelist. Mirrors the set in storage.service.ts —
+ * we validate here too so a bad folder hint fails fast before we touch the
+ * uploaded buffer or hit R2. `misc` is the default when callers don't pass
+ * a folder hint at all.
+ */
+const ALLOWED_FOLDERS = new Set([
+  'logos',
+  'products',
+  'categories',
+  'pages',
+  'branding',
+  'hero',
+  'misc',
+]);
+
+/**
+ * Resolve the folder hint + tenant scope for an upload request.
+ *
+ * - `folder` comes from the query string. Defaults to `misc`.
+ *   Disallowed values produce a 400 INVALID_FOLDER.
+ * - `storeId` comes from either an explicit query param or the JWT
+ *   payload (customer tokens carry it). When neither is present we
+ *   return null and the storage service falls back to the legacy flat
+ *   key shape — that's the platform/super_admin upload path.
+ */
+function resolveFolderAndStore(
+  req: Request
+):
+  | { ok: true; folder: string; storeId: string | null }
+  | { ok: false; error: { code: string; message: string } } {
+  const rawFolder = (req.query.folder as string | undefined) || 'misc';
+  const folder = rawFolder.replace(/[^a-zA-Z0-9_-]/g, '');
+  if (!ALLOWED_FOLDERS.has(folder)) {
+    return {
+      ok: false,
+      error: {
+        code: 'INVALID_FOLDER',
+        message: `Folder '${folder}' is not allowed. Allowed: ${Array.from(ALLOWED_FOLDERS).join(', ')}`,
+      },
+    };
+  }
+  const queryStoreId = (req.query.storeId as string | undefined) || undefined;
+  const headerStoreId = (req.headers['x-store-id'] as string | undefined) || undefined;
+  const userStoreId = req.user?.storeId || undefined;
+  const storeId = queryStoreId || headerStoreId || userStoreId || null;
+  return { ok: true, folder, storeId };
+}
+
+/**
  * POST /uploads/image
  * Upload a single image
  */
@@ -66,10 +115,15 @@ router.post(
         return;
       }
 
-      const folder = ((req.query.folder as string) || 'products').replace(/[^a-zA-Z0-9_-]/g, '');
+      const resolved = resolveFolderAndStore(req);
+      if (!resolved.ok) {
+        res.status(400).json({ success: false, error: resolved.error });
+        return;
+      }
 
       const result = await StorageService.upload(req.file.buffer, req.file.originalname, {
-        folder,
+        folder: resolved.folder,
+        storeId: resolved.storeId,
       });
 
       await auditLog({
@@ -119,11 +173,15 @@ router.post(
         return;
       }
 
-      const folder = ((req.query.folder as string) || 'products').replace(/[^a-zA-Z0-9_-]/g, '');
+      const resolved = resolveFolderAndStore(req);
+      if (!resolved.ok) {
+        res.status(400).json({ success: false, error: resolved.error });
+        return;
+      }
 
       const results = await StorageService.uploadMultiple(
         files.map(f => ({ buffer: f.buffer, filename: f.originalname })),
-        { folder }
+        { folder: resolved.folder, storeId: resolved.storeId }
       );
 
       await auditLog({
@@ -188,8 +246,29 @@ router.post(
         return;
       }
 
-      const sanitizedFolder = (folder || 'products').replace(/[^a-zA-Z0-9_-]/g, '');
-      const result = await StorageService.getUploadUrl(filename, contentType, sanitizedFolder);
+      const sanitizedFolder = (folder || 'misc').replace(/[^a-zA-Z0-9_-]/g, '');
+      if (!ALLOWED_FOLDERS.has(sanitizedFolder)) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'INVALID_FOLDER',
+            message: `Folder '${sanitizedFolder}' is not allowed. Allowed: ${Array.from(ALLOWED_FOLDERS).join(', ')}`,
+          },
+        });
+        return;
+      }
+      const queryStoreId = (req.query.storeId as string | undefined) || undefined;
+      const bodyStoreId = (req.body?.storeId as string | undefined) || undefined;
+      const headerStoreId = (req.headers['x-store-id'] as string | undefined) || undefined;
+      const presignedStoreId =
+        queryStoreId || bodyStoreId || headerStoreId || req.user?.storeId || null;
+      const result = await StorageService.getUploadUrl(
+        filename,
+        contentType,
+        sanitizedFolder,
+        3600,
+        presignedStoreId
+      );
 
       res.json({
         success: true,

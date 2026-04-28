@@ -23,6 +23,8 @@ interface CategoryFormProps {
   onSubmit: (e: React.FormEvent) => void;
   onClose: () => void;
   slugify: (text: string) => string;
+  /** Tenant scope so the category cover lands under `stores/<storeId>/categories/...`. */
+  storeId: string;
 }
 
 export type { CategoryFormData };
@@ -38,6 +40,7 @@ export function CategoryForm({
   onSubmit,
   onClose,
   slugify,
+  storeId,
 }: CategoryFormProps) {
   const t = useT('categories.form');
   return (
@@ -158,6 +161,7 @@ export function CategoryForm({
             onUpload={url => onFormChange(prev => ({ ...prev, image: url }))}
             onRemove={() => onFormChange(prev => ({ ...prev, image: '' }))}
             folder="categories"
+            storeId={storeId}
             label={t('uploadCategoryImage')}
           />
         </div>

@@ -338,6 +338,7 @@ export default function EditProductPage() {
                 values={images}
                 onChange={setImages}
                 folder="products"
+                storeId={storeId}
                 label={tFields('mediaHint')}
                 max={10}
               />

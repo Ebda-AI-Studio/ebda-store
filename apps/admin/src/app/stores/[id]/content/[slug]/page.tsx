@@ -228,7 +228,8 @@ export default function ContentEditorPage() {
                   value={data.coverImage ?? ''}
                   onUpload={url => setData(d => ({ ...d, coverImage: url }))}
                   onRemove={() => setData(d => ({ ...d, coverImage: '' }))}
-                  folder={`stores/${storeId}/pages`}
+                  folder="pages"
+                  storeId={storeId}
                 />
               </div>
             </SectionCard>

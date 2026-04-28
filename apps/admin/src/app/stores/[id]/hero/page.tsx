@@ -263,6 +263,7 @@ export default function StoreHeroPage() {
               onUpload={url => setHero({ ...hero, heroImage: url })}
               onRemove={() => setHero({ ...hero, heroImage: '' })}
               folder="hero"
+              storeId={storeId}
               label={t('uploadHeroImage')}
               accept="image/jpeg,image/png,image/webp"
             />

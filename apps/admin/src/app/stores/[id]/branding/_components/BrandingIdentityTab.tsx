@@ -7,12 +7,14 @@ import type { StoreBranding } from './types';
 interface BrandingIdentityTabProps {
   branding: StoreBranding;
   onChange: (branding: StoreBranding) => void;
+  /** Tenant scope, threaded into the logo uploader for per-store R2 keys. */
+  storeId: string;
 }
 
 /**
  * Store identity tab: name (EN/AR), logos + favicon, and description (EN/AR).
  */
-export function BrandingIdentityTab({ branding, onChange }: BrandingIdentityTabProps) {
+export function BrandingIdentityTab({ branding, onChange, storeId }: BrandingIdentityTabProps) {
   const t = useT('branding.identity');
 
   return (
@@ -42,7 +44,7 @@ export function BrandingIdentityTab({ branding, onChange }: BrandingIdentityTabP
         </div>
       </div>
 
-      <LogoUploader branding={branding} onChange={onChange} />
+      <LogoUploader branding={branding} onChange={onChange} storeId={storeId} />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>

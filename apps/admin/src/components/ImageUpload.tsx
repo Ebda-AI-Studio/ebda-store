@@ -12,7 +12,21 @@ interface ImageUploadProps {
   value?: string;
   onUpload: (url: string) => void;
   onRemove?: () => void;
+  /**
+   * Asset folder hint. Must be one of the API's whitelisted folders:
+   * `logos`, `products`, `categories`, `pages`, `branding`, `hero`, `misc`.
+   * The API composes the final R2 key as `stores/<storeId>/<folder>/...`
+   * when `storeId` is also supplied — do NOT bake `stores/...` into this
+   * value, that double-prefixes.
+   */
   folder?: string;
+  /**
+   * Tenant scope. When provided, uploads land under
+   * `stores/<storeId>/<folder>/...` in R2. When omitted, the API falls
+   * back to the legacy flat key shape (used for platform/super_admin
+   * uploads).
+   */
+  storeId?: string;
   label?: string;
   accept?: string;
   className?: string;
@@ -21,7 +35,10 @@ interface ImageUploadProps {
 interface MultiImageUploadProps {
   values: string[];
   onChange: (urls: string[]) => void;
+  /** See {@link ImageUploadProps.folder}. */
   folder?: string;
+  /** See {@link ImageUploadProps.storeId}. */
+  storeId?: string;
   label?: string;
   max?: number;
   className?: string;
@@ -34,6 +51,7 @@ export function ImageUpload({
   onUpload,
   onRemove,
   folder = 'products',
+  storeId,
   label,
   accept = 'image/jpeg,image/png,image/webp,image/gif',
   className = '',
@@ -63,10 +81,10 @@ export function ImageUpload({
 
       setLocalError(null);
       setError(null);
-      const url = await uploadSingle(file, folder);
+      const url = await uploadSingle(file, folder, storeId);
       if (url) onUpload(url);
     },
-    [accept, folder, onUpload, setError, t, uploadSingle]
+    [accept, folder, onUpload, setError, storeId, t, uploadSingle]
   );
 
   if (value) {
@@ -116,6 +134,7 @@ export function MultiImageUpload({
   values,
   onChange,
   folder = 'products',
+  storeId,
   label,
   max = 10,
   className = '',
@@ -143,10 +162,10 @@ export function MultiImageUpload({
 
       setLocalError(null);
       setError(null);
-      const newUrls = await uploadMulti(files, folder);
+      const newUrls = await uploadMulti(files, folder, storeId);
       if (newUrls) onChange([...values, ...newUrls]);
     },
-    [folder, max, onChange, setError, t, uploadMulti, values]
+    [folder, max, onChange, setError, storeId, t, uploadMulti, values]
   );
 
   const removeImage = useCallback(

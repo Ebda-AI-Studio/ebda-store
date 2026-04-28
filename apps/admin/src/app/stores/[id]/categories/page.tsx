@@ -228,6 +228,7 @@ export default function StoreCategoriesPage() {
           onSubmit={handleSubmit}
           onClose={closeForm}
           slugify={slugify}
+          storeId={storeId}
         />
       )}
 

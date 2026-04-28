@@ -21,6 +21,13 @@ export interface UploadOptions {
   contentType?: string;
   maxSize?: number; // in bytes
   allowedTypes?: string[];
+  /**
+   * Optional tenant scope. When set together with a whitelisted `folder`,
+   * the resulting R2 key is namespaced as `stores/<storeId>/<folder>/...`.
+   * When omitted (e.g. platform/super_admin uploads), the legacy flat key
+   * shape is preserved so platform assets aren't accidentally tenant-scoped.
+   */
+  storeId?: string | null;
 }
 
 export interface UploadResult {
@@ -35,6 +42,40 @@ const DEFAULT_ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/we
 
 // Max file size: 10MB
 const DEFAULT_MAX_SIZE = 10 * 1024 * 1024;
+
+/**
+ * Per-store folders allowed under the `stores/<storeId>/...` namespace.
+ * Anything not on this list is rejected with INVALID_FOLDER (400).
+ *
+ * - logos       → store + brand logos
+ * - products    → product + variant images
+ * - categories  → category covers
+ * - pages       → CMS page covers
+ * - branding    → theme assets
+ * - hero        → homepage hero slides
+ * - misc        → fallback when no folder hint is supplied
+ */
+const ALLOWED_TENANT_FOLDERS = new Set<string>([
+  'logos',
+  'products',
+  'categories',
+  'pages',
+  'branding',
+  'hero',
+  'misc',
+]);
+
+/**
+ * Sanitize a user-supplied filename so it can safely become part of an
+ * R2 object key. Strips path separators, collapses whitespace, drops
+ * anything outside [A-Za-z0-9._-], and caps length.
+ */
+function sanitizeFilename(name: string): string {
+  const base = path.basename(name).replace(/\s+/g, '-');
+  const safe = base.replace(/[^a-zA-Z0-9._-]/g, '').replace(/-+/g, '-');
+  // Cap to keep keys readable; uuid prefix already disambiguates collisions.
+  return safe.slice(0, 64) || 'file';
+}
 
 export class StorageService {
   private static client: S3Client | null = null;
@@ -82,6 +123,7 @@ export class StorageService {
       contentType,
       maxSize = DEFAULT_MAX_SIZE,
       allowedTypes = DEFAULT_ALLOWED_TYPES,
+      storeId,
     } = options;
 
     // Determine content type
@@ -105,9 +147,15 @@ export class StorageService {
       );
     }
 
-    // Generate unique filename
+    // Generate unique filename and resolve the final R2 key.
     const ext = path.extname(originalFilename).toLowerCase();
-    const key = `${folder}/${filename || uuidv4()}${ext}`;
+    const key = this.composeKey({
+      folder,
+      storeId: storeId ?? null,
+      filename,
+      originalFilename,
+      ext,
+    });
 
     const client = this.getClient();
 
@@ -181,10 +229,17 @@ export class StorageService {
     filename: string,
     contentType: string,
     folder = 'uploads',
-    expiresIn = 3600
+    expiresIn = 3600,
+    storeId: string | null = null
   ): Promise<{ uploadUrl: string; key: string; publicUrl: string }> {
     const ext = path.extname(filename).toLowerCase();
-    const key = `${folder}/${uuidv4()}${ext}`;
+    const key = this.composeKey({
+      folder,
+      storeId,
+      filename: undefined,
+      originalFilename: filename,
+      ext,
+    });
 
     const client = this.getClient();
 
@@ -223,6 +278,48 @@ export class StorageService {
       return url.replace(`${publicUrl}/`, '');
     }
     return null;
+  }
+
+  /**
+   * Compose the final R2 object key for a new upload.
+   *
+   * Two shapes:
+   * - Tenant-scoped: when `storeId` is provided AND `folder` is in the
+   *   whitelist, the key is `stores/<storeId>/<folder>/<uuid>-<safeName>`.
+   * - Legacy/platform: when `storeId` is null (e.g. super_admin uploading
+   *   a platform asset), the key is `<folder>/<uuid>-<safeName>` so platform
+   *   assets aren't accidentally tenant-scoped.
+   *
+   * Disallowed `folder` values when tenant-scoping is requested are
+   * rejected with INVALID_FOLDER. Callers should already pass a clean
+   * folder hint, but we double-check here so the constraint lives next
+   * to the key composition.
+   */
+  private static composeKey(args: {
+    folder: string;
+    storeId: string | null;
+    filename?: string;
+    originalFilename: string;
+    ext: string;
+  }): string {
+    const { folder, storeId, filename, originalFilename, ext } = args;
+    const safeFolder = folder.replace(/[^a-zA-Z0-9_-]/g, '');
+    const id = filename || uuidv4();
+    const safeName = sanitizeFilename(path.basename(originalFilename, ext));
+
+    if (storeId) {
+      if (!ALLOWED_TENANT_FOLDERS.has(safeFolder)) {
+        throw new AppError(
+          400,
+          'INVALID_FOLDER',
+          `Folder '${safeFolder}' is not allowed. Allowed: ${Array.from(ALLOWED_TENANT_FOLDERS).join(', ')}`
+        );
+      }
+      return `stores/${storeId}/${safeFolder}/${id}-${safeName}${ext}`;
+    }
+
+    // Legacy / platform key shape (no rename of existing keys).
+    return `${safeFolder || 'uploads'}/${id}${ext}`;
   }
 
   /**

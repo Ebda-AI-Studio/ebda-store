@@ -16,8 +16,21 @@ export function useImageUpload() {
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
+  /**
+   * Build the upload URL with the folder hint and (optional) tenant scope.
+   * The API composes the final R2 key as `stores/<storeId>/<folder>/...`
+   * when a `storeId` is supplied, otherwise it falls back to the legacy
+   * flat key shape. Callers should NOT bake `stores/<id>/...` into the
+   * `folder` value — that would double-prefix.
+   */
+  const buildUploadUrl = (path: 'image' | 'images', folder: string, storeId?: string) => {
+    const params = new URLSearchParams({ folder });
+    if (storeId) params.set('storeId', storeId);
+    return `${getApiUrl()}/api/v1/uploads/${path}?${params.toString()}`;
+  };
+
   const uploadSingle = useCallback(
-    async (file: File, folder: string): Promise<string | null> => {
+    async (file: File, folder: string, storeId?: string): Promise<string | null> => {
       setError(null);
       setUploading(true);
       setProgress(0);
@@ -28,7 +41,7 @@ export function useImageUpload() {
       try {
         const url = await runXhr<string>({
           t,
-          url: `${getApiUrl()}/api/v1/uploads/image?folder=${encodeURIComponent(folder)}`,
+          url: buildUploadUrl('image', folder, storeId),
           formData,
           onProgress: setProgress,
           parse: data => {
@@ -49,7 +62,7 @@ export function useImageUpload() {
   );
 
   const uploadMulti = useCallback(
-    async (files: File[], folder: string): Promise<string[] | null> => {
+    async (files: File[], folder: string, storeId?: string): Promise<string[] | null> => {
       setError(null);
       setUploading(true);
       setProgress(0);
@@ -60,7 +73,7 @@ export function useImageUpload() {
       try {
         const urls = await runXhr<string[]>({
           t,
-          url: `${getApiUrl()}/api/v1/uploads/images?folder=${encodeURIComponent(folder)}`,
+          url: buildUploadUrl('images', folder, storeId),
           formData,
           onProgress: setProgress,
           parse: data => {

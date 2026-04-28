@@ -91,7 +91,7 @@ export default function StoreBrandingPage() {
         <BrandingTabs activeTab={activeTab} onTabChange={setActiveTab} />
 
         {activeTab === 'branding' && (
-          <BrandingIdentityTab branding={branding} onChange={setBranding} />
+          <BrandingIdentityTab branding={branding} onChange={setBranding} storeId={storeId} />
         )}
 
         {activeTab === 'theme' && <ThemeTab branding={branding} onChange={setBranding} />}

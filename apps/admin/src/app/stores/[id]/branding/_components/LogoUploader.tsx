@@ -7,6 +7,8 @@ import type { StoreBranding } from './types';
 interface LogoUploaderProps {
   branding: StoreBranding;
   onChange: (branding: StoreBranding) => void;
+  /** Tenant scope so uploads land under `stores/<storeId>/logos/...` in R2. */
+  storeId: string;
 }
 
 const LOGO_ACCEPT = 'image/jpeg,image/png,image/webp,image/gif,image/svg+xml';
@@ -17,7 +19,7 @@ const FAVICON_ACCEPT =
  * Logo, Arabic logo, and favicon uploaders. Grouped together because they
  * share a layout row and all persist on the same branding PUT.
  */
-export function LogoUploader({ branding, onChange }: LogoUploaderProps) {
+export function LogoUploader({ branding, onChange, storeId }: LogoUploaderProps) {
   const t = useT('branding.identity');
 
   return (
@@ -28,7 +30,8 @@ export function LogoUploader({ branding, onChange }: LogoUploaderProps) {
           value={branding.logo}
           onUpload={url => onChange({ ...branding, logo: url })}
           onRemove={() => onChange({ ...branding, logo: '' })}
-          folder="branding"
+          folder="logos"
+          storeId={storeId}
           label={t('logoUpload')}
           accept={LOGO_ACCEPT}
         />
@@ -39,7 +42,8 @@ export function LogoUploader({ branding, onChange }: LogoUploaderProps) {
           value={branding.logoAr}
           onUpload={url => onChange({ ...branding, logoAr: url })}
           onRemove={() => onChange({ ...branding, logoAr: '' })}
-          folder="branding"
+          folder="logos"
+          storeId={storeId}
           label={t('logoArUpload')}
           accept={LOGO_ACCEPT}
         />
@@ -50,7 +54,8 @@ export function LogoUploader({ branding, onChange }: LogoUploaderProps) {
           value={branding.favicon}
           onUpload={url => onChange({ ...branding, favicon: url })}
           onRemove={() => onChange({ ...branding, favicon: '' })}
-          folder="branding"
+          folder="logos"
+          storeId={storeId}
           label={t('faviconUpload')}
           accept={FAVICON_ACCEPT}
         />
