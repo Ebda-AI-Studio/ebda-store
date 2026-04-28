@@ -1,213 +1,226 @@
 'use client';
 
-import { ShopChrome } from '../../components';
+import { CmsPageContent, ShopChrome } from '../../components';
 import { useStore, useStoreContact } from '../../contexts/StoreContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { formatDate } from '../../lib/format-date';
 
-export default function PrivacyClient() {
+/**
+ * Legacy hardcoded Privacy Policy. Used as a fallback when the merchant
+ * hasn't authored a `privacy` row in the Pages CMS — preserves the
+ * boutique-grade copy that shipped pre-CMS so existing stores don't
+ * regress overnight while merchants migrate.
+ */
+function PrivacyFallback() {
   const { email } = useStoreContact();
   const { t, language } = useLanguage();
   const { store } = useStore();
   const privacyEmail = email || t('our support team', 'فريق الدعم');
   return (
-    <ShopChrome>
-      <div className="mx-auto w-full max-w-3xl flex-1 px-4 py-12 sm:px-6 lg:px-8">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-foreground">
-            {t('Privacy Policy', 'سياسة الخصوصية')}
-          </h1>
-          <p className="mt-2 text-muted-foreground">
-            {t('Last updated:', 'آخر تحديث:')}{' '}
-            {formatDate(new Date(), {
-              timezone: store.timezone,
-              language,
-              style: 'long',
-            })}
-          </p>
-        </div>
+    <div className="mx-auto w-full max-w-3xl flex-1 px-4 py-12 sm:px-6 lg:px-8">
+      <div className="text-center">
+        <h1 className="text-3xl font-bold text-foreground">
+          {t('Privacy Policy', 'سياسة الخصوصية')}
+        </h1>
+        <p className="mt-2 text-muted-foreground">
+          {t('Last updated:', 'آخر تحديث:')}{' '}
+          {formatDate(new Date(), {
+            timezone: store.timezone,
+            language,
+            style: 'long',
+          })}
+        </p>
+      </div>
 
-        <div className="mt-12 rounded-xl border bg-card p-6 shadow-sm sm:p-8">
-          <div className="prose prose-gray max-w-none">
-            <section className="mb-8">
-              <h2 className="text-xl font-semibold text-foreground">
-                {t('1. Information We Collect', '1. المعلومات التي نجمعها')}
-              </h2>
-              <p className="mt-2 text-muted-foreground">
+      <div className="mt-12 rounded-xl border bg-card p-6 shadow-sm sm:p-8">
+        <div className="prose prose-gray max-w-none">
+          <section className="mb-8">
+            <h2 className="text-xl font-semibold text-foreground">
+              {t('1. Information We Collect', '1. المعلومات التي نجمعها')}
+            </h2>
+            <p className="mt-2 text-muted-foreground">
+              {t(
+                'We collect information you provide directly to us, including:',
+                'نجمع المعلومات التي تقدمها لنا مباشرة، بما في ذلك:'
+              )}
+            </p>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
+              <li>
                 {t(
-                  'We collect information you provide directly to us, including:',
-                  'نجمع المعلومات التي تقدمها لنا مباشرة، بما في ذلك:'
+                  'Name, email address, and contact information',
+                  'الاسم والبريد الإلكتروني ومعلومات الاتصال'
                 )}
-              </p>
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
-                <li>
-                  {t(
-                    'Name, email address, and contact information',
-                    'الاسم والبريد الإلكتروني ومعلومات الاتصال'
-                  )}
-                </li>
-                <li>{t('Billing and shipping addresses', 'عناوين الفواتير والشحن')}</li>
-                <li>
-                  {t(
-                    'Payment information (processed securely via our payment gateway)',
-                    'معلومات الدفع (تتم معالجتها بأمان عبر بوابة الدفع)'
-                  )}
-                </li>
-                <li>{t('Order history and preferences', 'سجل الطلبات والتفضيلات')}</li>
-                <li>{t('Communications with our support team', 'التواصل مع فريق الدعم')}</li>
-              </ul>
-            </section>
-
-            <section className="mb-8">
-              <h2 className="text-xl font-semibold text-foreground">
-                {t('2. How We Use Your Information', '2. كيف نستخدم معلوماتك')}
-              </h2>
-              <p className="mt-2 text-muted-foreground">
-                {t('We use the information we collect to:', 'نستخدم المعلومات التي نجمعها من أجل:')}
-              </p>
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
-                <li>{t('Process and fulfill your orders', 'معالجة وتنفيذ طلباتك')}</li>
-                <li>
-                  {t(
-                    'Send order confirmations and shipping updates',
-                    'إرسال تأكيدات الطلب وتحديثات الشحن'
-                  )}
-                </li>
-                <li>{t('Respond to your questions and requests', 'الرد على أسئلتك وطلباتك')}</li>
-                <li>{t('Improve our products and services', 'تحسين منتجاتنا وخدماتنا')}</li>
-                <li>
-                  {t(
-                    'Send promotional communications (with your consent)',
-                    'إرسال اتصالات ترويجية (بموافقتك)'
-                  )}
-                </li>
-              </ul>
-            </section>
-
-            <section className="mb-8">
-              <h2 className="text-xl font-semibold text-foreground">
-                {t('3. Information Sharing', '3. مشاركة المعلومات')}
-              </h2>
-              <p className="mt-2 text-muted-foreground">
+              </li>
+              <li>{t('Billing and shipping addresses', 'عناوين الفواتير والشحن')}</li>
+              <li>
                 {t(
-                  'We do not sell your personal information. We may share your information with:',
-                  'لا نبيع معلوماتك الشخصية. قد نشارك معلوماتك مع:'
+                  'Payment information (processed securely via our payment gateway)',
+                  'معلومات الدفع (تتم معالجتها بأمان عبر بوابة الدفع)'
                 )}
-              </p>
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
-                <li>
-                  {t(
-                    'Service providers who assist in our operations (payment processing, shipping)',
-                    'مقدمي الخدمات الذين يساعدون في عملياتنا (معالجة الدفع، الشحن)'
-                  )}
-                </li>
-                <li>
-                  {t('Law enforcement when required by law', 'جهات إنفاذ القانون عند الاقتضاء')}
-                </li>
-                <li>
-                  {t(
-                    'Business partners with your explicit consent',
-                    'شركاء الأعمال بموافقتك الصريحة'
-                  )}
-                </li>
-              </ul>
-            </section>
+              </li>
+              <li>{t('Order history and preferences', 'سجل الطلبات والتفضيلات')}</li>
+              <li>{t('Communications with our support team', 'التواصل مع فريق الدعم')}</li>
+            </ul>
+          </section>
 
-            <section className="mb-8">
-              <h2 className="text-xl font-semibold text-foreground">
-                {t('4. Data Security', '4. أمان البيانات')}
-              </h2>
-              <p className="mt-2 text-muted-foreground">
+          <section className="mb-8">
+            <h2 className="text-xl font-semibold text-foreground">
+              {t('2. How We Use Your Information', '2. كيف نستخدم معلوماتك')}
+            </h2>
+            <p className="mt-2 text-muted-foreground">
+              {t('We use the information we collect to:', 'نستخدم المعلومات التي نجمعها من أجل:')}
+            </p>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
+              <li>{t('Process and fulfill your orders', 'معالجة وتنفيذ طلباتك')}</li>
+              <li>
                 {t(
-                  'We implement appropriate security measures to protect your personal information, including:',
-                  'نطبق إجراءات أمنية مناسبة لحماية معلوماتك الشخصية، بما في ذلك:'
+                  'Send order confirmations and shipping updates',
+                  'إرسال تأكيدات الطلب وتحديثات الشحن'
                 )}
-              </p>
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
-                <li>
-                  {t(
-                    'SSL encryption for all data transmission',
-                    'تشفير SSL لجميع عمليات نقل البيانات'
-                  )}
-                </li>
-                <li>
-                  {t(
-                    'Secure payment processing through our payment providers',
-                    'معالجة دفع آمنة من خلال مزودي الدفع لدينا'
-                  )}
-                </li>
-                <li>
-                  {t('Regular security audits and updates', 'عمليات تدقيق وتحديثات أمنية منتظمة')}
-                </li>
-                <li>
-                  {t(
-                    'Limited access to personal information by employees',
-                    'وصول محدود للموظفين إلى المعلومات الشخصية'
-                  )}
-                </li>
-              </ul>
-            </section>
-
-            <section className="mb-8">
-              <h2 className="text-xl font-semibold text-foreground">
-                {t('5. Cookies', '5. ملفات تعريف الارتباط')}
-              </h2>
-              <p className="mt-2 text-muted-foreground">
+              </li>
+              <li>{t('Respond to your questions and requests', 'الرد على أسئلتك وطلباتك')}</li>
+              <li>{t('Improve our products and services', 'تحسين منتجاتنا وخدماتنا')}</li>
+              <li>
                 {t(
-                  'We use cookies and similar technologies to:',
-                  'نستخدم ملفات تعريف الارتباط والتقنيات المماثلة من أجل:'
+                  'Send promotional communications (with your consent)',
+                  'إرسال اتصالات ترويجية (بموافقتك)'
                 )}
-              </p>
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
-                <li>{t('Keep you logged in to your account', 'إبقائك مسجلاً في حسابك')}</li>
-                <li>{t('Remember your cart contents', 'تذكر محتويات سلتك')}</li>
-                <li>{t('Analyze site traffic and usage', 'تحليل حركة المرور واستخدام الموقع')}</li>
-                <li>{t('Personalize your shopping experience', 'تخصيص تجربة التسوق الخاصة بك')}</li>
-              </ul>
-            </section>
+              </li>
+            </ul>
+          </section>
 
-            <section className="mb-8">
-              <h2 className="text-xl font-semibold text-foreground">
-                {t('6. Your Rights', '6. حقوقك')}
-              </h2>
-              <p className="mt-2 text-muted-foreground">
-                {t('You have the right to:', 'لديك الحق في:')}
-              </p>
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
-                <li>{t('Access your personal information', 'الوصول إلى معلوماتك الشخصية')}</li>
-                <li>{t('Correct inaccurate information', 'تصحيح المعلومات غير الدقيقة')}</li>
-                <li>{t('Request deletion of your data', 'طلب حذف بياناتك')}</li>
-                <li>
-                  {t(
-                    'Opt out of marketing communications',
-                    'إلغاء الاشتراك في الاتصالات التسويقية'
-                  )}
-                </li>
-                <li>
-                  {t('Export your data in a portable format', 'تصدير بياناتك بتنسيق قابل للنقل')}
-                </li>
-              </ul>
-            </section>
-
-            <section className="mb-8">
-              <h2 className="text-xl font-semibold text-foreground">
-                {t('7. Contact Us', '7. تواصل معنا')}
-              </h2>
-              <p className="mt-2 text-muted-foreground">
+          <section className="mb-8">
+            <h2 className="text-xl font-semibold text-foreground">
+              {t('3. Information Sharing', '3. مشاركة المعلومات')}
+            </h2>
+            <p className="mt-2 text-muted-foreground">
+              {t(
+                'We do not sell your personal information. We may share your information with:',
+                'لا نبيع معلوماتك الشخصية. قد نشارك معلوماتك مع:'
+              )}
+            </p>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
+              <li>
                 {t(
-                  'If you have any questions about this Privacy Policy, please contact us at:',
-                  'إذا كان لديك أي أسئلة حول سياسة الخصوصية هذه، يرجى التواصل معنا على:'
+                  'Service providers who assist in our operations (payment processing, shipping)',
+                  'مقدمي الخدمات الذين يساعدون في عملياتنا (معالجة الدفع، الشحن)'
                 )}
-              </p>
-              <p className="mt-2 text-muted-foreground">
-                {t('Email:', 'البريد الإلكتروني:')} {privacyEmail}
-                <br />
-                {t('Address: Kuwait City, Kuwait', 'العنوان: مدينة الكويت، الكويت')}
-              </p>
-            </section>
-          </div>
+              </li>
+              <li>
+                {t('Law enforcement when required by law', 'جهات إنفاذ القانون عند الاقتضاء')}
+              </li>
+              <li>
+                {t(
+                  'Business partners with your explicit consent',
+                  'شركاء الأعمال بموافقتك الصريحة'
+                )}
+              </li>
+            </ul>
+          </section>
+
+          <section className="mb-8">
+            <h2 className="text-xl font-semibold text-foreground">
+              {t('4. Data Security', '4. أمان البيانات')}
+            </h2>
+            <p className="mt-2 text-muted-foreground">
+              {t(
+                'We implement appropriate security measures to protect your personal information, including:',
+                'نطبق إجراءات أمنية مناسبة لحماية معلوماتك الشخصية، بما في ذلك:'
+              )}
+            </p>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
+              <li>
+                {t(
+                  'SSL encryption for all data transmission',
+                  'تشفير SSL لجميع عمليات نقل البيانات'
+                )}
+              </li>
+              <li>
+                {t(
+                  'Secure payment processing through our payment providers',
+                  'معالجة دفع آمنة من خلال مزودي الدفع لدينا'
+                )}
+              </li>
+              <li>
+                {t('Regular security audits and updates', 'عمليات تدقيق وتحديثات أمنية منتظمة')}
+              </li>
+              <li>
+                {t(
+                  'Limited access to personal information by employees',
+                  'وصول محدود للموظفين إلى المعلومات الشخصية'
+                )}
+              </li>
+            </ul>
+          </section>
+
+          <section className="mb-8">
+            <h2 className="text-xl font-semibold text-foreground">
+              {t('5. Cookies', '5. ملفات تعريف الارتباط')}
+            </h2>
+            <p className="mt-2 text-muted-foreground">
+              {t(
+                'We use cookies and similar technologies to:',
+                'نستخدم ملفات تعريف الارتباط والتقنيات المماثلة من أجل:'
+              )}
+            </p>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
+              <li>{t('Keep you logged in to your account', 'إبقائك مسجلاً في حسابك')}</li>
+              <li>{t('Remember your cart contents', 'تذكر محتويات سلتك')}</li>
+              <li>{t('Analyze site traffic and usage', 'تحليل حركة المرور واستخدام الموقع')}</li>
+              <li>{t('Personalize your shopping experience', 'تخصيص تجربة التسوق الخاصة بك')}</li>
+            </ul>
+          </section>
+
+          <section className="mb-8">
+            <h2 className="text-xl font-semibold text-foreground">
+              {t('6. Your Rights', '6. حقوقك')}
+            </h2>
+            <p className="mt-2 text-muted-foreground">
+              {t('You have the right to:', 'لديك الحق في:')}
+            </p>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
+              <li>{t('Access your personal information', 'الوصول إلى معلوماتك الشخصية')}</li>
+              <li>{t('Correct inaccurate information', 'تصحيح المعلومات غير الدقيقة')}</li>
+              <li>{t('Request deletion of your data', 'طلب حذف بياناتك')}</li>
+              <li>
+                {t('Opt out of marketing communications', 'إلغاء الاشتراك في الاتصالات التسويقية')}
+              </li>
+              <li>
+                {t('Export your data in a portable format', 'تصدير بياناتك بتنسيق قابل للنقل')}
+              </li>
+            </ul>
+          </section>
+
+          <section className="mb-8">
+            <h2 className="text-xl font-semibold text-foreground">
+              {t('7. Contact Us', '7. تواصل معنا')}
+            </h2>
+            <p className="mt-2 text-muted-foreground">
+              {t(
+                'If you have any questions about this Privacy Policy, please contact us at:',
+                'إذا كان لديك أي أسئلة حول سياسة الخصوصية هذه، يرجى التواصل معنا على:'
+              )}
+            </p>
+            <p className="mt-2 text-muted-foreground">
+              {t('Email:', 'البريد الإلكتروني:')} {privacyEmail}
+              <br />
+              {t('Address: Kuwait City, Kuwait', 'العنوان: مدينة الكويت، الكويت')}
+            </p>
+          </section>
         </div>
       </div>
+    </div>
+  );
+}
+
+export default function PrivacyClient() {
+  return (
+    <ShopChrome>
+      <CmsPageContent
+        slug="privacy"
+        defaultTitle={{ en: 'Privacy Policy', ar: 'سياسة الخصوصية' }}
+        fallback={() => <PrivacyFallback />}
+      />
     </ShopChrome>
   );
 }

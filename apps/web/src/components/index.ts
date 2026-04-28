@@ -1,5 +1,6 @@
 export { ShopChrome } from './ShopChrome';
 export { MinimalChrome } from './MinimalChrome';
+export { CmsPageContent } from './CmsPageContent';
 export { SearchAutocomplete } from './SearchAutocomplete';
 export { LanguageSwitcher } from './LanguageSwitcher';
 export { VariantSelector } from './VariantSelector';

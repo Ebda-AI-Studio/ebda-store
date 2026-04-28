@@ -34,6 +34,7 @@ import newsletterRoutes from './newsletter.routes';
 import onesignalRoutes from './onesignal.routes';
 import storeLayoutRoutes from './store-layout.routes';
 import publicStoreLayoutRoutes from './public-store-layout.routes';
+import pagesRoutes from './pages.routes';
 import { tenantContext } from '../middleware/tenant-context';
 
 const router = Router();
@@ -89,6 +90,12 @@ router.use('/stores', tenantContext, pwaRoutes);
 router.use('/stores', tenantContext, inventoryRoutes);
 router.use('/stores', tenantContext, bulkRoutes);
 router.use('/stores', tenantContext, variantRoutes);
+
+// Pages CMS — admin CRUD under /stores/:storeId/pages and public read
+// under /public/:storeId/pages/:slug. The shared router internally
+// declares both surfaces; mounting at the API root preserves the full
+// path prefixes (`/stores/...` + `/public/...`).
+router.use('/', tenantContext, pagesRoutes);
 
 // Notification routes (admin + public push)
 router.use('/stores', tenantContext, notificationRoutes);

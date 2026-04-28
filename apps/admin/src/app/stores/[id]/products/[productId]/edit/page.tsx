@@ -175,9 +175,13 @@ export default function EditProductPage() {
 
     try {
       const priceInFils = Math.round(parseFloat(formData.price) * 1000);
+      // Use `null` to explicitly clear an existing compare-at-price.
+      // `undefined` would be dropped from JSON and the API would leave
+      // the previous value untouched — the merchant could never remove
+      // a strike-through price once set.
       const compareAtPriceInFils = formData.compareAtPrice
         ? Math.round(parseFloat(formData.compareAtPrice) * 1000)
-        : undefined;
+        : null;
       const costPriceInFils = formData.costPrice
         ? Math.round(parseFloat(formData.costPrice) * 1000)
         : null;
@@ -358,6 +362,19 @@ export default function EditProductPage() {
                   value={formData.compareAtPrice}
                   onChange={e => updateField('compareAtPrice', e.target.value)}
                   placeholder={tFields('pricePlaceholder')}
+                  error={(() => {
+                    const sale = parseFloat(formData.price);
+                    const original = parseFloat(formData.compareAtPrice);
+                    if (
+                      formData.compareAtPrice &&
+                      Number.isFinite(sale) &&
+                      Number.isFinite(original) &&
+                      original <= sale
+                    ) {
+                      return tFields('compareAtPriceWarn');
+                    }
+                    return undefined;
+                  })()}
                 />
                 <Input
                   label={tFields('costPrice')}

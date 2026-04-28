@@ -21,7 +21,9 @@ const createProductSchema = z.object({
   description: z.string().optional(),
   descriptionAr: z.string().optional(),
   price: z.number().int().min(0),
-  compareAtPrice: z.number().int().min(0).optional(),
+  // Nullable so the admin form can explicitly clear an existing value
+  // (Prisma treats `undefined` as "leave alone"; we need `null` to clear).
+  compareAtPrice: z.number().int().min(0).optional().nullable(),
   // Cost-of-goods in fils, used for profit reporting. Nullable so the
   // admin form can clear a previously-set value.
   costPrice: z.number().int().min(0).optional().nullable(),

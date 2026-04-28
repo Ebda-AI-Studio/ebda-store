@@ -255,12 +255,45 @@ model Store {
   affiliateReferrals       AffiliateReferral[]
   affiliatePayouts         AffiliatePayout[]
   affiliateConfig          AffiliateConfig?
+  pages                    StorePage[]
 
   @@index([ownerId])
   @@index([status])
   @@index([plan])
   @@index([createdAt])
   @@map("stores")
+}
+
+// ==========================================
+// Store Pages CMS (about / privacy / terms / shipping / faq / custom)
+// ==========================================
+//
+// Per-store editable long-form content. Each row is one page identified by
+// a slug. The storefront reads `contentMd` (or `contentMdAr` for ar locale)
+// and renders it through a hand-rolled markdown renderer (no rich-text dep).
+// When a row is missing or `isPublished` is false, the storefront falls
+// through to the legacy hardcoded copy so existing stores don't lose their
+// pages overnight while merchants migrate content to the new CMS.
+
+model StorePage {
+  id          String   @id @default(uuid())
+  storeId     String   @map("store_id")
+  slug        String // about | privacy | terms | shipping | faq | <custom>
+  title       String?
+  titleAr     String?  @map("title_ar")
+  contentMd   String?  @map("content_md") // markdown
+  contentMdAr String?  @map("content_md_ar")
+  coverImage  String?  @map("cover_image") // optional R2 URL for header image
+  isPublished Boolean  @default(true) @map("is_published")
+  position    Int      @default(0)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, slug])
+  @@index([storeId])
+  @@map("store_pages")
 }
 
 model Customer {

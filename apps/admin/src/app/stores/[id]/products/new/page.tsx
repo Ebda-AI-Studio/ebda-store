@@ -209,6 +209,19 @@ export default function NewProductPage() {
                   value={formData.compareAtPrice}
                   onChange={e => updateField('compareAtPrice', e.target.value)}
                   placeholder={t('fields.pricePlaceholder')}
+                  error={(() => {
+                    const sale = parseFloat(formData.price);
+                    const original = parseFloat(formData.compareAtPrice);
+                    if (
+                      formData.compareAtPrice &&
+                      Number.isFinite(sale) &&
+                      Number.isFinite(original) &&
+                      original <= sale
+                    ) {
+                      return t('fields.compareAtPriceWarn');
+                    }
+                    return undefined;
+                  })()}
                 />
                 <Input
                   label={t('fields.costPrice')}
