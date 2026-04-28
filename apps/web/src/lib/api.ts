@@ -63,8 +63,15 @@ interface ProductCategory {
 interface Product {
   id: string;
   name: string;
+  /**
+   * Arabic-localized name. Templates render this when the storefront
+   * language is `ar` (falling back to `name` when missing). Without it
+   * Arabic shoppers see English-only product cards on every surface.
+   */
+  nameAr?: string;
   slug: string;
   description?: string;
+  descriptionAr?: string;
   price: number;
   compareAtPrice?: number;
   sku?: string;

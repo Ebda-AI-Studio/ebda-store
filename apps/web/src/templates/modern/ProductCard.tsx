@@ -39,6 +39,9 @@ function ModernProductCard({
   const [isWishlisted, setIsWishlisted] = useState(false);
 
   const discount = calculateDiscount(product.price, product.compareAtPrice);
+  // Localized name for alt text + display. Falls through to English when
+  // the merchant hasn't supplied an Arabic translation.
+  const displayName = isRtl && product.nameAr ? product.nameAr : product.name;
 
   if (process.env.NODE_ENV !== 'production' && !product.images?.[0]?.url) {
     // eslint-disable-next-line no-console
@@ -69,7 +72,7 @@ function ModernProductCard({
           <>
             <Image
               src={product.images[0].url}
-              alt={product.images[0].alt || product.name}
+              alt={product.images[0].alt || displayName}
               className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-700 ease-out"
               fill
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
@@ -79,7 +82,7 @@ function ModernProductCard({
             {product.images[1]?.url && (
               <Image
                 src={product.images[1].url}
-                alt={product.images[1].alt || product.name}
+                alt={product.images[1].alt || displayName}
                 className={cn(
                   'object-cover transition-opacity duration-500',
                   isHovered ? 'opacity-100' : 'opacity-0'

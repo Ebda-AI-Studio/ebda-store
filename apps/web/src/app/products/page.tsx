@@ -10,7 +10,10 @@ export const metadata: Metadata = {
     'Browse our full catalog of products. Find the best deals with fast delivery in Kuwait.',
 };
 
-async function fetchInitialData(store: { id: string; domain?: string }) {
+async function fetchInitialData(
+  store: { id: string; domain?: string },
+  filters: { category?: string }
+) {
   // Always send X-Store-ID so the API doesn't fall back to some other store.
   // x-store-domain is kept as a backup for logging/debugging.
   const storeHeaders: Record<string, string> = {
@@ -24,6 +27,18 @@ async function fetchInitialData(store: { id: string; domain?: string }) {
     return { categories: [], products: [], meta: null };
   }
 
+  // Honour the `category` query param on the SSR fetch. Without this the
+  // initial paint shows ALL products before the client-side refetch swaps
+  // them out — which the merchant reads as "the filter is broken". Slugs
+  // can be Arabic strings (e.g. "أدوات") so encode each value individually
+  // via URLSearchParams.
+  const productsQuery = new URLSearchParams({
+    page: '1',
+    limit: '12',
+    sort: 'newest',
+  });
+  if (filters.category) productsQuery.set('category', filters.category);
+
   // Fetch categories and first page of products in parallel
   const [categoriesResult, productsResult] = await Promise.all([
     fetch(`${API_URL}/public/categories`, {
@@ -32,7 +47,7 @@ async function fetchInitialData(store: { id: string; domain?: string }) {
     })
       .then(r => (r.ok ? r.json() : null))
       .catch(() => null),
-    fetch(`${API_URL}/public/products?page=1&limit=12&sort=newest`, {
+    fetch(`${API_URL}/public/products?${productsQuery.toString()}`, {
       next: { revalidate: 60 },
       headers: storeHeaders,
     })
@@ -47,9 +62,16 @@ async function fetchInitialData(store: { id: string; domain?: string }) {
   };
 }
 
-export default async function ProductsPage() {
+export default async function ProductsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const store = await getStore();
-  const initialData = await fetchInitialData(store);
+  const params = await searchParams;
+  const rawCategory = params.category;
+  const category = Array.isArray(rawCategory) ? rawCategory[0] : rawCategory;
+  const initialData = await fetchInitialData(store, { category });
 
   return (
     <Suspense

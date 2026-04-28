@@ -10,6 +10,10 @@ export function toTemplateProduct(p: Product): TemplateProduct {
   return {
     id: p.id,
     name: p.name,
+    // Preserve nameAr so RTL templates render Arabic product names instead
+    // of falling through to the English `name`. The API consistently returns
+    // `nameAr` for tenants that have entered it (e.g. Wady Aljuz).
+    nameAr: p.nameAr,
     slug: p.slug,
     price: p.price,
     compareAtPrice: p.compareAtPrice ?? undefined,

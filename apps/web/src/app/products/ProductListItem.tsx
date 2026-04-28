@@ -19,7 +19,13 @@ export function ProductListItem({
   onToggleCompare,
   onAddToCart,
 }: ProductListItemProps) {
-  const { t } = useLanguage();
+  const { t, isRtl } = useLanguage();
+  // Localized name for alt text + heading. Falls through to English when
+  // the merchant hasn't supplied an Arabic translation.
+  const displayName = isRtl && product.nameAr ? product.nameAr : product.name;
+  const displayCategory = isRtl
+    ? (product.categories?.[0]?.category?.nameAr ?? product.categories?.[0]?.category?.name)
+    : product.categories?.[0]?.category?.name;
 
   return (
     <Link
@@ -30,13 +36,13 @@ export function ProductListItem({
       <div className="relative h-32 w-32 flex-shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-primary/5 to-primary/10">
         {product.compareAtPrice && product.compareAtPrice > product.price && (
           <span className="absolute left-2 top-2 rounded-full bg-destructive px-2 py-0.5 text-[10px] font-bold uppercase text-white">
-            Sale
+            {t('Sale', 'تخفيض')}
           </span>
         )}
         {product.images?.[0]?.url ? (
           <Image
             src={product.images[0].url}
-            alt={product.images[0].alt || product.name}
+            alt={product.images[0].alt || displayName}
             width={128}
             height={128}
             className="h-full w-full object-cover"
@@ -68,10 +74,10 @@ export function ProductListItem({
         <div>
           {product.categories?.[0] && (
             <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              {product.categories[0].category?.name}
+              {displayCategory}
             </p>
           )}
-          <h3 className="mt-1 text-lg font-semibold text-foreground">{product.name}</h3>
+          <h3 className="mt-1 text-lg font-semibold text-foreground">{displayName}</h3>
         </div>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">

@@ -898,11 +898,14 @@
       "loadError": "Failed to load layout",
       "sections": {
         "hero": {
-          "title": "Hero banner",
-          "description": "Top-of-page banner. Single image or autoplay slider — same size either way.",
-          "modeSingle": "Single banner",
-          "modeSlider": "Slider",
-          "autoplay": "Autoplay (ms)",
+          "title": "Hero banner / slider",
+          "description": "Top-of-page banner. Pick one big static image or rotate through several — both share the same slide list and image size.",
+          "modeLabel": "Display mode",
+          "modeSingle": "Static (single image)",
+          "modeSlider": "Slider (rotating images)",
+          "modeSingleHint": "Shows the first slide only. Best when you have one strong campaign image.",
+          "modeSliderHint": "Cycles through every slide automatically. Best for showcasing multiple campaigns or collections.",
+          "autoplay": "Autoplay interval (ms)",
           "slides": {
             "title": "Slides",
             "description": "Add at least one slide. Single mode shows the first slide only.",
@@ -2770,8 +2773,11 @@
   },
   "hero": {
     "page": {
-      "title": "Hero Section",
-      "subtitle": "Customize your storefront homepage hero",
+      "title": "Hero Section (legacy fallback)",
+      "subtitle": "Text-only hero shown when no Layout slides are uploaded",
+      "fallbackNoticeTitle": "These fields are a fallback.",
+      "fallbackNoticeBody": "Once you add a slide to the Layout page, the storefront uses that image instead and the fields below stop appearing. To set up the new hero banner / slider go to",
+      "fallbackNoticeCta": "Storefront layout",
       "storeNotFound": "Store not found",
       "backToStores": "Back to stores",
       "saving": "Saving...",

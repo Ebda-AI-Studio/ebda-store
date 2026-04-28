@@ -123,6 +123,44 @@
   [dir="rtl"] {
     font-family: 'IBM Plex Sans Arabic', 'Plus Jakarta Sans', system-ui, sans-serif;
   }
+
+  /*
+   * Per-locale font-size adjustment.
+   *
+   * IBM Plex Sans Arabic and Plus Jakarta Sans have different x-heights, so
+   * the same `font-size: 16px` reads visibly larger in Arabic than in
+   * English. We don't want to change the font picks (both are correct), so
+   * we normalize the visual size in two layered ways:
+   *
+   *   1. `font-size-adjust` matches the x-height of the Arabic font to the
+   *      Latin reference (≈0.5 for Plus Jakarta Sans). Modern browsers honour
+   *      this and recompute the rendered size automatically.
+   *   2. As a fallback for older browsers, we also scale the body baseline
+   *      down by ~5% on RTL pages — close enough that headlines, product
+   *      names, prices, and footer text read at the same visual size as
+   *      their English counterparts.
+   */
+  html[lang="ar"],
+  html[dir="rtl"],
+  [dir="rtl"] {
+    font-size-adjust: 0.5;
+  }
+}
+
+@layer base {
+  html[lang="ar"] body,
+  html[dir="rtl"] body {
+    /* ~5% smaller body baseline keeps Arabic text visually matched to the
+       English version without changing line-heights or spacing. The 1024px
+       breakpoint mirrors the EN body bump above (16 → 17px). */
+    font-size: 15.2px;
+  }
+  @media (min-width: 1024px) {
+    html[lang="ar"] body,
+    html[dir="rtl"] body {
+      font-size: 16.15px;
+    }
+  }
 }
 
 @layer base {

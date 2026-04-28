@@ -136,6 +136,24 @@ export default function StoreHeroPage() {
       }
     >
       <div className="space-y-6">
+        {/* Fallback-only notice. Once the merchant adds a slide via the
+            Layout page, the storefront renders that slide as the hero and
+            the fields on this page are no longer shown. Surface that here
+            so merchants don't keep editing copy that never appears. */}
+        <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm text-foreground">
+          <p className="font-medium">{t('fallbackNoticeTitle')}</p>
+          <p className="mt-1 text-muted-foreground">
+            {t('fallbackNoticeBody')}{' '}
+            <Link
+              href={`/stores/${storeId}/layout`}
+              className="font-medium text-primary underline underline-offset-2 hover:no-underline"
+            >
+              {t('fallbackNoticeCta')}
+            </Link>
+            .
+          </p>
+        </div>
+
         <div className="bg-card rounded-xl border p-6 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>

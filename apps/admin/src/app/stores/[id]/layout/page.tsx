@@ -118,14 +118,19 @@ export default function StoreLayoutPage() {
 
           {!isLoading && layout && (
             <>
-              {/* Hero */}
+              {/* Hero — single image OR autoplay slider. The two modes share
+                  the same slide list; "Static" pins to the first slide and
+                  hides the autoplay control. */}
               <SectionCard
                 title={t('sections.hero.title')}
                 description={t('sections.hero.description')}
                 enabled={layout.hero.enabled}
                 onToggle={v => updateSection('hero', s => ({ ...s, enabled: v }))}
               >
-                <div className="grid grid-cols-2 gap-2 mb-4">
+                <div className="mb-2 text-xs font-medium text-muted-foreground">
+                  {t('sections.hero.modeLabel')}
+                </div>
+                <div className="grid grid-cols-2 gap-2 mb-2">
                   <ModeButton
                     active={layout.hero.mode === 'single'}
                     onClick={() => updateSection('hero', s => ({ ...s, mode: 'single' }))}
@@ -137,6 +142,14 @@ export default function StoreLayoutPage() {
                     label={t('sections.hero.modeSlider')}
                   />
                 </div>
+                <p className="mb-4 text-xs text-muted-foreground">
+                  {layout.hero.mode === 'single'
+                    ? t('sections.hero.modeSingleHint')
+                    : t('sections.hero.modeSliderHint')}
+                </p>
+                {/* Autoplay only matters in slider mode — hide it entirely
+                    when the merchant has picked the static single banner so
+                    the form doesn't expose an irrelevant control. */}
                 {layout.hero.mode === 'slider' && (
                   <NumberField
                     label={t('sections.hero.autoplay')}

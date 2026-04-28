@@ -252,6 +252,9 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
   const categoryNameEn = cat0?.category?.name;
   const categoryNameAr = cat0?.category?.nameAr;
   const categoryName = language === 'ar' && categoryNameAr ? categoryNameAr : categoryNameEn;
+  // Localized product name for breadcrumb / heading / image alt. Falls
+  // through to English when nameAr isn't supplied for this SKU.
+  const displayName = language === 'ar' && product.nameAr ? product.nameAr : product.name;
 
   // Derived price values (variant-aware)
   const displayPrice = selectedVariant ? selectedVariant.price : product.price;
@@ -296,7 +299,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
             {t('Products', translations['Products'])}
           </Link>
           <span>/</span>
-          <span className="text-foreground">{product.name}</span>
+          <span className="text-foreground">{displayName}</span>
         </nav>
 
         {/* Product Details */}
@@ -307,7 +310,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
               {images[selectedImage]?.url ? (
                 <Image
                   src={images[selectedImage].url}
-                  alt={images[selectedImage].alt || product.name}
+                  alt={images[selectedImage].alt || displayName}
                   width={800}
                   height={800}
                   className="h-full w-full object-cover"
@@ -351,7 +354,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                   >
                     <Image
                       src={img.url}
-                      alt={img.alt || `${product.name} ${index + 1}`}
+                      alt={img.alt || `${displayName} ${index + 1}`}
                       width={200}
                       height={200}
                       className="h-full w-full object-cover"
@@ -375,7 +378,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
               {product.status === 'draft' && <Badge variant="outline">{t('Draft', 'مسودة')}</Badge>}
             </div>
 
-            <h1 className="text-3xl font-bold text-foreground">{product.name}</h1>
+            <h1 className="text-3xl font-bold text-foreground">{displayName}</h1>
 
             {/* Price -- shows variant price when a variant is selected */}
             <div className="mt-4 flex items-baseline gap-3">
