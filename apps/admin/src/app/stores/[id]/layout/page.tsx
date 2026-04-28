@@ -723,28 +723,63 @@ function SlidesEditor({ slides, storeId, onChange }: SlidesEditorProps) {
             </div>
 
             <div className="grid gap-4 lg:grid-cols-2">
-              <div className="space-y-3">
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-muted-foreground">
-                    {t('image')}
-                  </label>
+              <div className="space-y-4">
+                {/* Desktop image — wide cinematic crop */}
+                <div className="rounded-xl border border-border bg-card p-3">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-foreground">
+                      {t('imageDesktop')}
+                    </label>
+                    <span className="text-[10px] text-muted-foreground">
+                      {t('imageDesktopHint')}
+                    </span>
+                  </div>
                   <ImageUpload
                     value={slide.image || undefined}
                     folder={`stores/${storeId}/hero`}
                     onUpload={url => updateSlide(index, { image: url })}
                     onRemove={() => updateSlide(index, { image: '' })}
                   />
+                  <div className="mt-3">
+                    <label className="mb-1 block text-[10px] uppercase tracking-wider text-muted-foreground">
+                      {t('imageDesktopAr')}
+                    </label>
+                    <ImageUpload
+                      value={slide.imageAr || undefined}
+                      folder={`stores/${storeId}/hero`}
+                      onUpload={url => updateSlide(index, { imageAr: url })}
+                      onRemove={() => updateSlide(index, { imageAr: '' })}
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-muted-foreground">
-                    {t('imageAr')}
-                  </label>
+
+                {/* Mobile image — taller crop, optional but recommended */}
+                <div className="rounded-xl border border-border bg-card p-3">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-foreground">
+                      {t('imageMobile')}
+                    </label>
+                    <span className="text-[10px] text-muted-foreground">
+                      {t('imageMobileHint')}
+                    </span>
+                  </div>
                   <ImageUpload
-                    value={slide.imageAr || undefined}
+                    value={slide.imageMobile || undefined}
                     folder={`stores/${storeId}/hero`}
-                    onUpload={url => updateSlide(index, { imageAr: url })}
-                    onRemove={() => updateSlide(index, { imageAr: '' })}
+                    onUpload={url => updateSlide(index, { imageMobile: url })}
+                    onRemove={() => updateSlide(index, { imageMobile: '' })}
                   />
+                  <div className="mt-3">
+                    <label className="mb-1 block text-[10px] uppercase tracking-wider text-muted-foreground">
+                      {t('imageMobileAr')}
+                    </label>
+                    <ImageUpload
+                      value={slide.imageMobileAr || undefined}
+                      folder={`stores/${storeId}/hero`}
+                      onUpload={url => updateSlide(index, { imageMobileAr: url })}
+                      onRemove={() => updateSlide(index, { imageMobileAr: '' })}
+                    />
+                  </div>
                 </div>
               </div>
 

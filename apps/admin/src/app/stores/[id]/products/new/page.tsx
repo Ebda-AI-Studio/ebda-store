@@ -175,7 +175,10 @@ export default function NewProductPage() {
             </div>
 
             <div className="rounded-xl border bg-card p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-foreground mb-4">{t('sections.media')}</h2>
+              <div className="mb-4 flex items-baseline justify-between gap-3 flex-wrap">
+                <h2 className="text-lg font-semibold text-foreground">{t('sections.media')}</h2>
+                <p className="text-xs text-muted-foreground">{t('fields.mediaSizeHint')}</p>
+              </div>
               <MultiImageUpload
                 values={images}
                 onChange={setImages}

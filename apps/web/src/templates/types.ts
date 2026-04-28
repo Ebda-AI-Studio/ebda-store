@@ -161,6 +161,13 @@ export interface HeroProps {
 export interface HeroBannerProps {
   image: string;
   imageAr?: string;
+  /**
+   * Optional mobile-specific image. Recommended 1080×1440 (3:4 aspect)
+   * so the hero stays subject-prominent on phones. Falls back to `image`
+   * with a center-crop when unset.
+   */
+  imageMobile?: string;
+  imageMobileAr?: string;
   alt?: string;
   headline?: string;
   headlineAr?: string;

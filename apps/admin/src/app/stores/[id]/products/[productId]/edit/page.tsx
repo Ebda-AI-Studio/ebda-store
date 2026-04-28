@@ -295,7 +295,10 @@ export default function EditProductPage() {
             </div>
 
             <div className="rounded-xl border bg-card p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-foreground mb-4">{tSections('media')}</h2>
+              <div className="mb-4 flex items-baseline justify-between gap-3 flex-wrap">
+                <h2 className="text-lg font-semibold text-foreground">{tSections('media')}</h2>
+                <p className="text-xs text-muted-foreground">{tFields('mediaSizeHint')}</p>
+              </div>
               <MultiImageUpload
                 values={images}
                 onChange={setImages}

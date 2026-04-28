@@ -15,6 +15,8 @@ import { getPackStyles } from './pack-styles';
 export function HeroBanner({
   image,
   imageAr,
+  imageMobile,
+  imageMobileAr,
   alt = '',
   headline,
   headlineAr,
@@ -27,7 +29,11 @@ export function HeroBanner({
   pack,
   priority = true,
 }: HeroBannerProps) {
-  const src = (isRtl && imageAr) || image;
+  const desktopSrc = (isRtl && imageAr) || image;
+  // Mobile-specific source falls back to the desktop image when not set.
+  // The aspect ratio also flips (3:4 mobile vs 2.4:1 desktop) so the
+  // section reserves the right vertical space at each breakpoint.
+  const mobileSrc = (isRtl && imageMobileAr) || imageMobile || desktopSrc;
   const text = isRtl ? (headlineAr ?? headline) : (headline ?? headlineAr);
   const subtitleText = isRtl ? (subtitleAr ?? subtitle) : (subtitle ?? subtitleAr);
   const cta = isRtl ? (ctaTextAr ?? ctaText) : (ctaText ?? ctaTextAr);
@@ -36,20 +42,22 @@ export function HeroBanner({
 
   return (
     <section
-      className="relative w-full overflow-hidden bg-muted"
-      style={{ aspectRatio: '2.45 / 1' }}
+      className="relative w-full overflow-hidden bg-muted aspect-[3/4] sm:aspect-[2.4/1]"
       dir={isRtl ? 'rtl' : 'ltr'}
     >
-      {src && (
-        <Image
-          src={src}
-          alt={alt}
-          fill
-          priority={priority}
-          loading={priority ? undefined : 'lazy'}
-          sizes="100vw"
-          className="object-cover"
-        />
+      {desktopSrc && (
+        <picture>
+          <source media="(max-width: 639px)" srcSet={mobileSrc} />
+          <Image
+            src={desktopSrc}
+            alt={alt}
+            fill
+            priority={priority}
+            loading={priority ? undefined : 'lazy'}
+            sizes="100vw"
+            className="object-cover"
+          />
+        </picture>
       )}
 
       {showOverlay && (

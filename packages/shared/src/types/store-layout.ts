@@ -16,9 +16,22 @@
 export type HeroMode = 'single' | 'slider';
 
 export interface HeroSlide {
-  /** R2 image URL — required */
+  /**
+   * Desktop image — R2 URL. Recommended 1920×800 (aspect 2.4:1) so the
+   * full-bleed hero looks cinematic on widescreens without croppingthe
+   * subject too tightly.
+   */
   image: string;
   imageAr?: string;
+  /**
+   * Mobile image — R2 URL. Optional but strongly recommended; recommended
+   * 1080×1440 (aspect 3:4) so the hero stays subject-prominent on
+   * phone screens. When unset we fall back to `image` and crop, which
+   * usually works for landscape product shots but rarely for ones with
+   * tall subjects (people, packaging).
+   */
+  imageMobile?: string;
+  imageMobileAr?: string;
   alt?: string;
   /** Optional headline rendered as overlay — pack styles vary */
   headline?: string;
