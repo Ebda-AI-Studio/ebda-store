@@ -97,7 +97,9 @@ function PecannbeeProductCardImpl({
                 alt={product.images?.[0]?.alt ?? name}
                 fill
                 sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 200px"
-                className="object-cover transition-opacity duration-500 group-hover/img:opacity-0"
+                className={`object-cover transition-opacity duration-500 ${
+                  product.images?.[1]?.url ? 'group-hover/img:opacity-0' : ''
+                }`}
               />
               {product.images?.[1]?.url && (
                 <Image

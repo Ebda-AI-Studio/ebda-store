@@ -198,7 +198,13 @@ export function ProductCarousel({
                               alt={name}
                               fill
                               sizes="(max-width: 640px) 60vw, (max-width: 1024px) 30vw, 300px"
-                              className="object-cover transition-opacity duration-500 group-hover/img:opacity-0"
+                              // Only fade out on hover when there's a second
+                              // image to crossfade IN. Without this guard,
+                              // single-image products go transparent on
+                              // hover and reveal the empty bg-muted box.
+                              className={`object-cover transition-opacity duration-500 ${
+                                product.images?.[1]?.url ? 'group-hover/img:opacity-0' : ''
+                              }`}
                             />
                             {product.images?.[1]?.url && (
                               <Image
