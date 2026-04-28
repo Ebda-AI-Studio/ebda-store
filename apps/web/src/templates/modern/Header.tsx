@@ -6,6 +6,7 @@ import Image from 'next/image';
 import type { HeaderProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { LanguageSwitcher } from '../../components/LanguageSwitcher';
+import { SearchAutocomplete } from '../../components/SearchAutocomplete';
 
 export default function ModernHeader({
   branding,
@@ -215,9 +216,9 @@ export default function ModernHeader({
 
           {/* Search Bar (Expandable) */}
           <div
-            className={`overflow-hidden transition-all duration-300 ${isSearchOpen ? 'max-h-20 opacity-100 py-3 border-t border-border/60' : 'max-h-0 opacity-0 py-0'}`}
+            className={`overflow-visible transition-all duration-300 ${isSearchOpen ? 'max-h-20 opacity-100 py-3 border-t border-border/60' : 'max-h-0 opacity-0 py-0 pointer-events-none'}`}
           >
-            <form onSubmit={handleSearch} className="flex gap-2">
+            <form onSubmit={handleSearch} className="relative flex gap-2">
               <input
                 type="text"
                 value={searchQuery}
@@ -234,6 +235,13 @@ export default function ModernHeader({
               >
                 {isRtl ? 'بحث' : 'Search'}
               </button>
+              <SearchAutocomplete
+                query={searchQuery}
+                onSelect={() => {
+                  setSearchQuery('');
+                  setIsSearchOpen(false);
+                }}
+              />
             </form>
           </div>
         </div>

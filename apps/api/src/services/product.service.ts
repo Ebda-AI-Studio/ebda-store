@@ -83,9 +83,14 @@ export class ProductService {
     }
 
     if (search) {
+      // Match against both English and Arabic name/description so admins
+      // searching in Arabic find their localized products. SKU stays
+      // English-only because SKUs are merchant codes, not localized text.
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
+        { nameAr: { contains: search, mode: 'insensitive' } },
         { description: { contains: search, mode: 'insensitive' } },
+        { descriptionAr: { contains: search, mode: 'insensitive' } },
         { sku: { contains: search, mode: 'insensitive' } },
       ];
     }
@@ -382,9 +387,13 @@ export class ProductService {
     }
 
     if (search) {
+      // Mirror admin list(): match both English + Arabic so storefront
+      // shoppers searching in either language find the right products.
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
+        { nameAr: { contains: search, mode: 'insensitive' } },
         { description: { contains: search, mode: 'insensitive' } },
+        { descriptionAr: { contains: search, mode: 'insensitive' } },
       ];
     }
 
@@ -696,6 +705,57 @@ export class ProductService {
           max: priceRange._max.price || 0,
         },
       },
+    };
+  }
+
+  /**
+   * Lightweight typeahead suggestions for the storefront header search.
+   * Returns at most `limit` (≤8) products as a flat array, sorted by
+   * `featured` desc + `name` asc so curated picks bubble up first.
+   * Matches both English and Arabic names so RTL shoppers see results
+   * for their query immediately.
+   */
+  static async getSuggestSuggestions(storeId: string, query: string, limit = 8) {
+    const trimmed = (query ?? '').trim();
+    if (trimmed.length < 2) return { suggestions: [] as Array<unknown> };
+
+    const take = Math.min(8, Math.max(1, limit));
+
+    const products = await prisma.product.findMany({
+      where: {
+        storeId,
+        status: 'active',
+        deletedAt: null,
+        OR: [
+          { name: { contains: trimmed, mode: 'insensitive' } },
+          { nameAr: { contains: trimmed, mode: 'insensitive' } },
+        ],
+      },
+      select: {
+        id: true,
+        slug: true,
+        name: true,
+        nameAr: true,
+        price: true,
+        images: {
+          select: { url: true },
+          orderBy: { position: 'asc' },
+          take: 1,
+        },
+      },
+      orderBy: [{ featured: 'desc' }, { name: 'asc' }],
+      take,
+    });
+
+    return {
+      suggestions: products.map(p => ({
+        id: p.id,
+        slug: p.slug,
+        name: p.name,
+        nameAr: p.nameAr,
+        price: p.price,
+        image: p.images[0]?.url ?? null,
+      })),
     };
   }
 

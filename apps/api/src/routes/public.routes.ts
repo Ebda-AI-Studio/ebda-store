@@ -443,6 +443,45 @@ router.get(
   }
 );
 
+// GET /public/:storeId/search/suggest - Storefront typeahead suggestions
+//
+// Returns up to 8 active products matching `q` against name OR nameAr,
+// with image[0] flattened to a single URL so the header dropdown can
+// render thumbnails without further joins. 30s edge cache + 60s memory
+// cache keep cold-start hits cheap on busy stores.
+router.get('/:storeId/search/suggest', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { storeId } = req.params;
+
+    // Validate UUID to prevent enumeration / cache-key bloat
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(storeId)) {
+      res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_ID', message: 'Invalid store ID' },
+      });
+      return;
+    }
+
+    const q = typeof req.query.q === 'string' ? req.query.q : '';
+    const trimmed = q.trim();
+    if (trimmed.length < 2) {
+      res.json({ success: true, data: { suggestions: [] } });
+      return;
+    }
+
+    const cacheKey = `public:suggest:${storeId}:${trimmed.toLowerCase()}`;
+    const result = await getCached(cacheKey, 30, () =>
+      ProductService.getSuggestSuggestions(storeId, trimmed, 8)
+    );
+
+    res.setHeader('Cache-Control', 'private, max-age=30');
+    res.json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // GET /public/:storeId/wishlist/:userId - Get a user's public wishlist (no auth required)
 router.get(
   '/:storeId/wishlist/:userId',

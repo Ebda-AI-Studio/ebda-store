@@ -94,6 +94,21 @@ interface Category {
   productCount?: number;
 }
 
+/**
+ * Lightweight product suggestion returned by the storefront header
+ * typeahead. Flat shape (single image URL, no relations) keeps the
+ * payload small enough that the dropdown stays responsive even on
+ * slow connections.
+ */
+interface SearchSuggestion {
+  id: string;
+  slug: string;
+  name: string;
+  nameAr?: string | null;
+  price: number;
+  image: string | null;
+}
+
 interface CartItem {
   id: string;
   productId: string;
@@ -550,6 +565,35 @@ class ApiClient {
     return this.request<{ store: Store }>('/public/store');
   }
 
+  /**
+   * Storefront search typeahead. Returns up to 8 active products matching
+   * `q` against either English or Arabic name. Empty / sub-2-char queries
+   * resolve to an empty list without a network round-trip — callers can
+   * still fire the call and get `[]` cheaply, but skipping is preferred.
+   *
+   * Requires the active storefront store id to be set via `setStoreId()`
+   * (StoreContext does this on mount). Returns an error response if no
+   * store is bound, mirroring how getCart() fails without a session.
+   */
+  async searchSuggest(q: string) {
+    const trimmed = (q ?? '').trim();
+    if (!this.storeId) {
+      return {
+        success: false,
+        error: { code: 'NO_STORE', message: 'Store context not set' },
+      } as ApiResponse<{ suggestions: SearchSuggestion[] }>;
+    }
+    if (trimmed.length < 2) {
+      return {
+        success: true,
+        data: { suggestions: [] as SearchSuggestion[] },
+      } as ApiResponse<{ suggestions: SearchSuggestion[] }>;
+    }
+    return this.request<{ suggestions: SearchSuggestion[] }>(
+      `/public/${this.storeId}/search/suggest?q=${encodeURIComponent(trimmed)}`
+    );
+  }
+
   // Generic methods for other endpoints
   async get<T>(endpoint: string) {
     return this.request<T>(endpoint);
@@ -578,4 +622,13 @@ class ApiClient {
 
 export const api = new ApiClient(API_URL);
 export { API_URL };
-export type { User, Product, ProductVariant, ProductOption, Category, Order, PaginationMeta };
+export type {
+  User,
+  Product,
+  ProductVariant,
+  ProductOption,
+  Category,
+  Order,
+  PaginationMeta,
+  SearchSuggestion,
+};

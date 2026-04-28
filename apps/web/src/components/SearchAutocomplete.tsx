@@ -9,117 +9,110 @@ import {
 } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useStore, useStoreUrl } from '../contexts/StoreContext';
+import { useStoreUrl } from '../contexts/StoreContext';
 import { useLanguage } from '../contexts/LanguageContext';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface ProductSuggestion {
-  id: string;
-  name: string;
-  nameAr?: string | null;
-  slug: string;
-  price: number;
-  images: Array<{ id: string; url: string; alt?: string }>;
-}
-
-interface CategorySuggestion {
-  id: string;
-  name: string;
-  nameAr?: string | null;
-  slug: string;
-}
-
-interface Suggestions {
-  products: ProductSuggestion[];
-  categories: CategorySuggestion[];
-}
-
-type SuggestionItem =
-  | { kind: 'product'; data: ProductSuggestion }
-  | { kind: 'category'; data: CategorySuggestion };
+import { api, type SearchSuggestion } from '../lib/api';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface SearchAutocompleteProps {
+  /** Live query string from the parent input. Component owns nothing else. */
   query: string;
+  /** Called when the user picks a suggestion (so the parent can close the
+   *  expanded search row, clear focus, etc.). Optional. */
   onSelect?: () => void;
+}
+
+// ─── Module-level cache ──────────────────────────────────────────────────────
+//
+// Cache suggestion results per query string for the lifetime of the page
+// session so revisiting the same query doesn't trigger another round-trip.
+// Keyed by lowercased trimmed query; bounded to 50 entries so a long
+// session can't grow this without limit.
+const SUGGEST_CACHE = new Map<string, SearchSuggestion[]>();
+const SUGGEST_CACHE_LIMIT = 50;
+
+function cacheGet(key: string): SearchSuggestion[] | undefined {
+  return SUGGEST_CACHE.get(key);
+}
+
+function cacheSet(key: string, value: SearchSuggestion[]) {
+  if (SUGGEST_CACHE.size >= SUGGEST_CACHE_LIMIT) {
+    // Simple FIFO eviction — Map iteration order is insertion order
+    const firstKey = SUGGEST_CACHE.keys().next().value;
+    if (firstKey !== undefined) SUGGEST_CACHE.delete(firstKey);
+  }
+  SUGGEST_CACHE.set(key, value);
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function SearchAutocomplete({ query, onSelect }: SearchAutocompleteProps) {
-  const { store } = useStore();
   const storeUrl = useStoreUrl();
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
+  const isAr = language === 'ar';
 
-  const [suggestions, setSuggestions] = useState<Suggestions | null>(null);
+  const [suggestions, setSuggestions] = useState<SearchSuggestion[] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Track the latest query the user typed so a slow earlier response
+  // can't overwrite a faster later one. Same-stale-request guard pattern.
+  const latestQueryRef = useRef('');
 
-  // Build flat list of all items for keyboard navigation
-  const items: SuggestionItem[] = suggestions
-    ? [
-        ...suggestions.products.map(p => ({ kind: 'product' as const, data: p })),
-        ...suggestions.categories.map(c => ({ kind: 'category' as const, data: c })),
-      ]
-    : [];
+  // ── Fetch suggestions ──────────────────────────────────────────────────────
 
-  const totalItems = items.length;
+  const fetchSuggestions = useCallback(async (q: string) => {
+    const key = q.toLowerCase();
 
-  // ── Fetch suggestions with debounce ────────────────────────────────────────
-
-  const fetchSuggestions = useCallback(
-    async (q: string) => {
-      if (!store.id || store.id === 'demo') return;
-
-      setIsLoading(true);
-      try {
-        const sessionId =
-          typeof window !== 'undefined' ? (localStorage.getItem('sessionId') ?? 'anon') : 'anon';
-
-        const url = `${API_URL}/stores/${store.id}/products/suggestions?q=${encodeURIComponent(q)}&limit=5`;
-        const res = await fetch(url, {
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Session-ID': sessionId,
-            'X-Store-ID': store.id,
-          },
-        });
-
-        if (!res.ok) {
-          setSuggestions(null);
-          return;
-        }
-
-        const json = await res.json();
-        if (json.success && json.data?.suggestions) {
-          setSuggestions(json.data.suggestions);
-          setIsOpen(true);
-          setActiveIndex(-1);
-        } else {
-          setSuggestions(null);
-        }
-      } catch {
-        setSuggestions(null);
-      } finally {
-        setIsLoading(false);
+    // Cache hit — render immediately, no network call.
+    const cached = cacheGet(key);
+    if (cached) {
+      if (latestQueryRef.current === q) {
+        setSuggestions(cached);
+        setIsOpen(true);
+        setActiveIndex(-1);
       }
-    },
-    [store.id]
-  );
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const res = await api.searchSuggest(q);
+      // If the user typed something else while we were waiting, drop
+      // this response on the floor.
+      if (latestQueryRef.current !== q) return;
+
+      if (res.success && res.data) {
+        const list = res.data.suggestions ?? [];
+        cacheSet(key, list);
+        setSuggestions(list);
+        setIsOpen(true);
+        setActiveIndex(-1);
+      } else {
+        setSuggestions([]);
+        setIsOpen(true);
+      }
+    } catch {
+      if (latestQueryRef.current === q) {
+        setSuggestions([]);
+        setIsOpen(true);
+      }
+    } finally {
+      if (latestQueryRef.current === q) setIsLoading(false);
+    }
+  }, []);
+
+  // ── Debounced query → fetch ────────────────────────────────────────────────
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
     const trimmed = query.trim();
+    latestQueryRef.current = trimmed;
 
     if (trimmed.length < 2) {
       setSuggestions(null);
@@ -128,9 +121,11 @@ export function SearchAutocomplete({ query, onSelect }: SearchAutocompleteProps)
       return;
     }
 
+    // 200ms debounce — short enough that the dropdown feels live, long
+    // enough that we don't fire a request per keystroke on a fast typer.
     debounceRef.current = setTimeout(() => {
       fetchSuggestions(trimmed);
-    }, 300);
+    }, 200);
 
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -149,8 +144,11 @@ export function SearchAutocomplete({ query, onSelect }: SearchAutocompleteProps)
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // ── Keyboard navigation ────────────────────────────────────────────────────
-
+  // ── Keyboard navigation (consumer must forward keydown via onKeyDown
+  //    on the parent input/form for arrow-key navigation to work). The
+  //    listener is attached to the dropdown container as a fallback for
+  //    when the dropdown itself has focus. ─────────────────────────────────
+  const totalItems = suggestions?.length ?? 0;
   const handleKeyDown = useCallback(
     (e: ReactKeyboardEvent<HTMLElement>) => {
       if (!isOpen) return;
@@ -163,7 +161,7 @@ export function SearchAutocomplete({ query, onSelect }: SearchAutocompleteProps)
 
       if (e.key === 'ArrowDown') {
         e.preventDefault();
-        setActiveIndex(prev => (prev + 1) % totalItems);
+        setActiveIndex(prev => (prev + 1) % Math.max(1, totalItems));
         return;
       }
 
@@ -173,33 +171,28 @@ export function SearchAutocomplete({ query, onSelect }: SearchAutocompleteProps)
         return;
       }
 
-      if (e.key === 'Enter' && activeIndex >= 0 && activeIndex < totalItems) {
+      if (e.key === 'Enter' && activeIndex >= 0 && activeIndex < totalItems && suggestions) {
         e.preventDefault();
-        const item = items[activeIndex];
-        if (item.kind === 'product') {
-          window.location.href = storeUrl(`/products/${item.data.slug}`);
-        } else {
-          window.location.href = storeUrl(`/products?category=${item.data.slug}`);
-        }
+        const item = suggestions[activeIndex];
+        window.location.href = storeUrl(`/products/${item.slug}`);
         setIsOpen(false);
         onSelect?.();
       }
     },
-    [isOpen, totalItems, activeIndex, items, storeUrl, onSelect]
+    [isOpen, totalItems, activeIndex, suggestions, storeUrl, onSelect]
   );
 
   // ── Nothing to render ──────────────────────────────────────────────────────
 
   if (!isOpen && !isLoading) return null;
 
-  const hasResults =
-    suggestions && (suggestions.products.length > 0 || suggestions.categories.length > 0);
-  const isEmpty = suggestions && !hasResults;
+  const hasResults = suggestions && suggestions.length > 0;
+  const isEmpty = suggestions !== null && !hasResults && !isLoading;
 
   return (
     <div
       ref={containerRef}
-      className="absolute top-full left-0 right-0 z-50 mt-1 overflow-hidden rounded-xl border border-border bg-background shadow-xl"
+      className="absolute top-full left-0 right-0 z-50 mt-1 max-h-[70vh] overflow-y-auto rounded-xl border border-border bg-background shadow-xl"
       role="listbox"
       aria-label={t('Search suggestions', 'اقتراحات البحث')}
       onKeyDown={handleKeyDown}
@@ -226,108 +219,48 @@ export function SearchAutocomplete({ query, onSelect }: SearchAutocompleteProps)
         </div>
       )}
 
-      {/* Empty state */}
-      {!isLoading && isEmpty && (
+      {/* Empty state — "No products found" per spec */}
+      {isEmpty && (
         <div className="px-4 py-3 text-sm text-muted-foreground">
-          {t(`No results for "${query.trim()}"`, `لا نتائج لـ "${query.trim()}"`)}
+          {t('No products found', 'لا توجد منتجات')}
         </div>
       )}
 
       {/* Results */}
-      {!isLoading && hasResults && (
-        <>
-          {/* Product suggestions */}
-          {suggestions.products.length > 0 && (
-            <div>
-              <p className="px-4 pt-3 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                {t('Products', 'المنتجات')}
-              </p>
-              {suggestions.products.map((product, idx) => {
-                const itemIndex = idx;
-                const isActive = activeIndex === itemIndex;
-                const displayName = t(product.name, product.nameAr || product.name);
-                const priceKwd = (product.price / 1000).toFixed(3);
+      {!isLoading && hasResults && suggestions && (
+        <div>
+          {suggestions.map((product, idx) => {
+            const isActive = activeIndex === idx;
+            const displayName = isAr && product.nameAr ? product.nameAr : product.name;
+            // Prices stored in fils — divide by 1000 for KWD.
+            const priceKwd = (product.price / 1000).toFixed(3);
 
-                return (
-                  <Link
-                    key={product.id}
-                    href={storeUrl(`/products/${product.slug}`)}
-                    role="option"
-                    aria-selected={isActive}
-                    className={`flex items-center gap-3 px-4 py-2 text-sm transition-colors hover:bg-muted ${
-                      isActive ? 'bg-muted' : ''
-                    }`}
-                    onClick={() => {
-                      setIsOpen(false);
-                      onSelect?.();
-                    }}
-                  >
-                    {/* Thumbnail */}
-                    <div className="h-10 w-10 flex-shrink-0 overflow-hidden rounded-lg bg-muted">
-                      {product.images?.[0]?.url ? (
-                        <Image
-                          src={product.images[0].url}
-                          alt={product.images[0].alt || displayName}
-                          width={40}
-                          height={40}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-                          <svg
-                            className="h-5 w-5"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={1.5}
-                              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                            />
-                          </svg>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Name + price */}
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium text-foreground">{displayName}</p>
-                      <p className="text-xs text-muted-foreground">{priceKwd} KWD</p>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Category suggestions */}
-          {suggestions.categories.length > 0 && (
-            <div className="border-t border-border">
-              <p className="px-4 pt-3 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                {t('Categories', 'الفئات')}
-              </p>
-              {suggestions.categories.map((category, idx) => {
-                const itemIndex = suggestions.products.length + idx;
-                const isActive = activeIndex === itemIndex;
-                const displayName = t(category.name, category.nameAr || category.name);
-
-                return (
-                  <Link
-                    key={category.id}
-                    href={storeUrl(`/products?category=${category.slug}`)}
-                    role="option"
-                    aria-selected={isActive}
-                    className={`flex items-center gap-3 px-4 py-2 text-sm transition-colors hover:bg-muted ${
-                      isActive ? 'bg-muted' : ''
-                    }`}
-                    onClick={() => {
-                      setIsOpen(false);
-                      onSelect?.();
-                    }}
-                  >
-                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            return (
+              <Link
+                key={product.id}
+                href={storeUrl(`/products/${product.slug}`)}
+                role="option"
+                aria-selected={isActive}
+                className={`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-muted ${
+                  isActive ? 'bg-muted' : ''
+                }`}
+                onClick={() => {
+                  setIsOpen(false);
+                  onSelect?.();
+                }}
+              >
+                {/* Thumbnail */}
+                <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded-lg bg-muted">
+                  {product.image ? (
+                    <Image
+                      src={product.image}
+                      alt={displayName}
+                      width={48}
+                      height={48}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-muted-foreground">
                       <svg
                         className="h-5 w-5"
                         fill="none"
@@ -337,18 +270,23 @@ export function SearchAutocomplete({ query, onSelect }: SearchAutocompleteProps)
                         <path
                           strokeLinecap="round"
                           strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                          strokeWidth={1.5}
+                          d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
                         />
                       </svg>
                     </div>
-                    <span className="font-medium text-foreground">{displayName}</span>
-                  </Link>
-                );
-              })}
-            </div>
-          )}
-        </>
+                  )}
+                </div>
+
+                {/* Name + price */}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium text-foreground">{displayName}</p>
+                  <p className="text-xs text-muted-foreground">{priceKwd} KWD</p>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
       )}
     </div>
   );

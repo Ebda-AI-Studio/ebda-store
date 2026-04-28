@@ -6,6 +6,7 @@ import Image from 'next/image';
 import type { HeaderProps, ResolvedUtilityBar } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { LanguageSwitcher } from '../../components/LanguageSwitcher';
+import { SearchAutocomplete } from '../../components/SearchAutocomplete';
 
 export default function ClassicHeader({
   branding,
@@ -289,7 +290,7 @@ export default function ClassicHeader({
 
       {/* Search bar */}
       <div className="hidden md:block border-t border-border/40 py-3">
-        <form onSubmit={handleSearch} className="container mx-auto px-4 max-w-md">
+        <form onSubmit={handleSearch} className="relative container mx-auto px-4 max-w-md">
           <input
             id="classic-search-input"
             type="text"
@@ -300,6 +301,7 @@ export default function ClassicHeader({
             dir={isRtl ? 'rtl' : 'ltr'}
             aria-label={isRtl ? 'بحث عن المنتجات' : 'Search products'}
           />
+          <SearchAutocomplete query={searchQuery} onSelect={() => setSearchQuery('')} />
         </form>
       </div>
 
@@ -321,7 +323,7 @@ export default function ClassicHeader({
               ))}
             </ul>
             {/* Mobile search */}
-            <form onSubmit={handleSearch} className="mt-5">
+            <form onSubmit={handleSearch} className="relative mt-5">
               <input
                 type="text"
                 value={searchQuery}
@@ -330,6 +332,13 @@ export default function ClassicHeader({
                 className="w-full py-2 px-0 border-b border-border bg-transparent text-sm font-serif text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors duration-500"
                 dir={isRtl ? 'rtl' : 'ltr'}
                 aria-label={isRtl ? 'بحث عن المنتجات' : 'Search products'}
+              />
+              <SearchAutocomplete
+                query={searchQuery}
+                onSelect={() => {
+                  setSearchQuery('');
+                  setIsMenuOpen(false);
+                }}
               />
             </form>
           </nav>

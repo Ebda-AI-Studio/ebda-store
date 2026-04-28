@@ -6,6 +6,7 @@ import Image from 'next/image';
 import type { HeaderProps, ResolvedUtilityBar } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { LanguageSwitcher } from '../../components/LanguageSwitcher';
+import { SearchAutocomplete } from '../../components/SearchAutocomplete';
 
 export default function ElegantHeader({
   branding,
@@ -228,9 +229,9 @@ export default function ElegantHeader({
 
         {/* Search field — expands below nav */}
         <div
-          className={`overflow-hidden transition-all duration-500 ${isSearchOpen ? 'max-h-24 opacity-100 py-6 border-t border-border/50' : 'max-h-0 opacity-0 py-0'}`}
+          className={`overflow-visible transition-all duration-500 ${isSearchOpen ? 'max-h-24 opacity-100 py-6 border-t border-border/50' : 'max-h-0 opacity-0 py-0 pointer-events-none'}`}
         >
-          <form onSubmit={handleSearch} className="max-w-lg mx-auto">
+          <form onSubmit={handleSearch} className="relative max-w-lg mx-auto">
             <input
               type="text"
               value={searchQuery}
@@ -240,6 +241,13 @@ export default function ElegantHeader({
               dir={isRtl ? 'rtl' : 'ltr'}
               autoFocus={isSearchOpen}
               aria-label={isRtl ? 'بحث عن المنتجات' : 'Search products'}
+            />
+            <SearchAutocomplete
+              query={searchQuery}
+              onSelect={() => {
+                setSearchQuery('');
+                setIsSearchOpen(false);
+              }}
             />
           </form>
         </div>

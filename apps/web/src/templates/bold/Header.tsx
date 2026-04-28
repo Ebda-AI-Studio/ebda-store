@@ -5,6 +5,7 @@ import Link from 'next/link';
 import type { HeaderProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { LanguageSwitcher } from '../../components/LanguageSwitcher';
+import { SearchAutocomplete } from '../../components/SearchAutocomplete';
 
 export default function BoldHeader({
   branding,
@@ -189,9 +190,9 @@ export default function BoldHeader({
 
           {/* Search Bar */}
           <div
-            className={`overflow-hidden transition-all duration-200 ${isSearchOpen ? 'max-h-20 opacity-100 py-3 border-t border-white/10' : 'max-h-0 opacity-0 py-0'}`}
+            className={`overflow-visible transition-all duration-200 ${isSearchOpen ? 'max-h-20 opacity-100 py-3 border-t border-white/10' : 'max-h-0 opacity-0 py-0 pointer-events-none'}`}
           >
-            <form onSubmit={handleSearch} className="flex gap-2">
+            <form onSubmit={handleSearch} className="relative flex gap-2">
               <input
                 type="text"
                 value={searchQuery}
@@ -208,6 +209,13 @@ export default function BoldHeader({
               >
                 {isRtl ? 'بحث' : 'Go'}
               </button>
+              <SearchAutocomplete
+                query={searchQuery}
+                onSelect={() => {
+                  setSearchQuery('');
+                  setIsSearchOpen(false);
+                }}
+              />
             </form>
           </div>
         </div>

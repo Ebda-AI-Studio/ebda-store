@@ -6,6 +6,7 @@ import Image from 'next/image';
 import type { HeaderProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { LanguageSwitcher } from '../../components/LanguageSwitcher';
+import { SearchAutocomplete } from '../../components/SearchAutocomplete';
 
 export default function MinimalHeader({
   branding,
@@ -211,11 +212,11 @@ export default function MinimalHeader({
 
         {/* Search field — smooth expand */}
         <div
-          className={`overflow-hidden transition-all duration-300 ${
-            isSearchOpen ? 'max-h-16 opacity-100 pb-4' : 'max-h-0 opacity-0'
+          className={`overflow-visible transition-all duration-300 ${
+            isSearchOpen ? 'max-h-16 opacity-100 pb-4' : 'max-h-0 opacity-0 pointer-events-none'
           }`}
         >
-          <form onSubmit={handleSearch} className="max-w-xs mx-auto">
+          <form onSubmit={handleSearch} className="relative max-w-xs mx-auto">
             <input
               type="text"
               value={searchQuery}
@@ -225,6 +226,13 @@ export default function MinimalHeader({
               dir={isRtl ? 'rtl' : 'ltr'}
               autoFocus={isSearchOpen}
               aria-label={isRtl ? 'بحث عن المنتجات' : 'Search products'}
+            />
+            <SearchAutocomplete
+              query={searchQuery}
+              onSelect={() => {
+                setSearchQuery('');
+                setIsSearchOpen(false);
+              }}
             />
           </form>
         </div>
