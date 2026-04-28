@@ -12,6 +12,7 @@ import { NotificationsEmptyState } from './_components/NotificationsEmptyState';
 import { WhatsAppChannelCard } from './_components/WhatsAppChannelCard';
 import { SmsChannelCard } from './_components/SmsChannelCard';
 import { PushChannelCard } from './_components/PushChannelCard';
+import { BroadcastComposerCard } from './_components/BroadcastComposerCard';
 import { EventConfigTable } from './_components/EventConfigTable';
 import { NotificationsLog } from './_components/NotificationsLog';
 import {
@@ -276,6 +277,8 @@ export default function NotificationsPage() {
               onTest={() => handleTestConnection('push_notifications')}
             />
           )}
+
+          {pushEnabled && <BroadcastComposerCard storeId={storeId} />}
 
           <EventConfigTable
             events={events}

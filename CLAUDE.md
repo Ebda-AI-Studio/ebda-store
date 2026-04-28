@@ -146,6 +146,12 @@ Required in production (app crashes without these):
 - `PORT` — set automatically by Railway
 - `NODE_ENV=production`
 
+Optional (feature degrades gracefully if missing):
+
+- `ONESIGNAL_APP_ID` — OneSignal app ID for push notifications (admin order alerts + storefront broadcasts)
+- `ONESIGNAL_REST_API_KEY` — OneSignal REST API key (matches the pattern `Authorization: Key <REST_API_KEY>`)
+  - When either is missing the broadcast endpoint returns `503 PUSH_NOT_CONFIGURED` and the admin notifications page surfaces a config note instead of crashing.
+
 ### Admin (Vercel)
 
 - `NEXT_PUBLIC_API_URL` — Railway API URL (e.g., `https://api-production-c058.up.railway.app`)
@@ -153,6 +159,7 @@ Required in production (app crashes without these):
 ### Web (Vercel)
 
 - `NEXT_PUBLIC_API_URL` — Railway API URL
+- `NEXT_PUBLIC_ONESIGNAL_APP_ID` — OneSignal app ID for storefront push subscription. Required for the v16 SDK to mount + tag devices with `storeId` so admin broadcasts reach this store's subscribers. Storefront silently no-ops when missing.
 
 ## Commands
 

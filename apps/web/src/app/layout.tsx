@@ -12,6 +12,7 @@ import { organizationJsonLd, getSiteUrl } from '../lib/structured-data';
 import { MarketingPixelsProvider } from '../components/MarketingPixels';
 import { ServiceWorkerRegistration } from '../components/ServiceWorkerRegistration';
 import { PushNotificationPrompt } from '../components/PushNotificationPrompt';
+import { OneSignalStorefrontInit } from '../components/OneSignalStorefrontInit';
 import { AffiliateTracker } from '../components/AffiliateTracker';
 import { type MarketingPixels, themeToCssVars } from '@force/shared';
 import '../styles/globals.css';
@@ -313,6 +314,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   <CartProvider>
                     <div id="main-content">{children}</div>
                     <PushNotificationPrompt />
+                    <OneSignalStorefrontInit />
                   </CartProvider>
                 </ToastProvider>
               </LanguageProvider>

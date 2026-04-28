@@ -9,8 +9,13 @@
 
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { authenticate } from '../middleware/auth';
-import { OneSignalService } from '../services/onesignal.service';
+import { authenticate, authorize } from '../middleware/auth';
+import { requireStoreAccess } from '../middleware/store-access';
+import {
+  OneSignalService,
+  OneSignalNotConfiguredError,
+  OneSignalRequestError,
+} from '../services/onesignal.service';
 import { config } from '../config';
 
 const router = Router();
@@ -18,6 +23,21 @@ const router = Router();
 const subscribeSchema = z.object({
   playerId: z.string().min(1),
   deviceLabel: z.string().max(120).optional(),
+});
+
+const broadcastSchema = z.object({
+  titleEn: z.string().trim().min(1).max(200),
+  titleAr: z.string().trim().min(1).max(200),
+  bodyEn: z.string().trim().min(1).max(2000),
+  bodyAr: z.string().trim().min(1).max(2000),
+  // OneSignal accepts any URL but we validate to keep typos out and surface
+  // a clean 422 rather than a downstream OneSignal error.
+  url: z
+    .string()
+    .url()
+    .max(2000)
+    .optional()
+    .or(z.literal('').transform(() => undefined)),
 });
 
 /**
@@ -99,6 +119,112 @@ router.delete(
       await OneSignalService.deleteSubscription(userId, req.params.playerId);
       res.json({ success: true });
     } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// ──────────────────────────────────────────────────────────────────────────
+// Storefront broadcast endpoints
+//
+// These let a store admin push a one-off notification to every storefront
+// device that consented to push for THIS store. The per-store filter is
+// applied server-side in OneSignalService.broadcastToStore — never trust a
+// `storeId` in the body, always read it from req.params + requireStoreAccess.
+// ──────────────────────────────────────────────────────────────────────────
+
+const adminStoreMiddleware = [
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+];
+
+/**
+ * POST /admin/stores/:storeId/push/broadcast
+ * Send a tenant-scoped push to every storefront subscriber tagged with
+ * `storeId = :storeId`.
+ */
+router.post(
+  '/stores/:storeId/push/broadcast',
+  ...adminStoreMiddleware,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const parsed = broadcastSchema.parse(req.body);
+
+      const result = await OneSignalService.broadcastToStore({
+        storeId,
+        titleEn: parsed.titleEn,
+        titleAr: parsed.titleAr,
+        bodyEn: parsed.bodyEn,
+        bodyAr: parsed.bodyAr,
+        url: parsed.url,
+      });
+
+      res.json({ success: true, data: result });
+    } catch (error) {
+      if (error instanceof OneSignalNotConfiguredError) {
+        res.status(503).json({
+          success: false,
+          error: {
+            code: 'PUSH_NOT_CONFIGURED',
+            message:
+              'OneSignal is not configured on the server. Set ONESIGNAL_APP_ID and ONESIGNAL_REST_API_KEY in the API environment.',
+          },
+        });
+        return;
+      }
+      if (error instanceof OneSignalRequestError) {
+        res.status(502).json({
+          success: false,
+          error: {
+            code: 'PUSH_PROVIDER_ERROR',
+            message: `OneSignal returned ${error.status}: ${error.body || 'unknown error'}`,
+          },
+        });
+        return;
+      }
+      next(error);
+    }
+  }
+);
+
+/**
+ * GET /admin/stores/:storeId/push/broadcasts
+ * Last 10 broadcasts that targeted this store, with delivery + click counts
+ * pulled from OneSignal. Used by the admin notifications page to render an
+ * audit-style list.
+ */
+router.get(
+  '/stores/:storeId/push/broadcasts',
+  ...adminStoreMiddleware,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const broadcasts = await OneSignalService.listRecentBroadcasts(storeId, 10);
+      res.json({ success: true, data: { broadcasts } });
+    } catch (error) {
+      if (error instanceof OneSignalNotConfiguredError) {
+        res.status(503).json({
+          success: false,
+          error: {
+            code: 'PUSH_NOT_CONFIGURED',
+            message:
+              'OneSignal is not configured on the server. Set ONESIGNAL_APP_ID and ONESIGNAL_REST_API_KEY in the API environment.',
+          },
+        });
+        return;
+      }
+      if (error instanceof OneSignalRequestError) {
+        res.status(502).json({
+          success: false,
+          error: {
+            code: 'PUSH_PROVIDER_ERROR',
+            message: `OneSignal returned ${error.status}: ${error.body || 'unknown error'}`,
+          },
+        });
+        return;
+      }
       next(error);
     }
   }
