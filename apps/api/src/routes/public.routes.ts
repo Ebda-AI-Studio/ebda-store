@@ -108,16 +108,22 @@ const updateCartItemSchema = z.object({
   quantity: z.number().int().min(1),
 });
 
+// Kuwait-friendly address schema: see notes in order.routes.ts. State and
+// postalCode are optional (Kuwait has no postal codes for delivery and the
+// "state" field is repurposed to hold the selected delivery area). We trim
+// whitespace on required fields so a stray space doesn't trip min(1), and we
+// add generous max lengths to bound abuse without rejecting normal Arabic or
+// English input.
 const shippingAddressSchema = z.object({
-  firstName: z.string().min(1),
-  lastName: z.string().min(1),
-  address1: z.string().min(1),
-  address2: z.string().optional(),
-  city: z.string().min(1),
-  state: z.string().min(1),
-  postalCode: z.string().optional().default(''),
-  country: z.string().min(1),
-  phone: z.string().optional(),
+  firstName: z.string().trim().min(1).max(100),
+  lastName: z.string().trim().min(1).max(100),
+  address1: z.string().trim().min(1).max(500),
+  address2: z.string().max(500).optional(),
+  city: z.string().trim().min(1).max(150),
+  state: z.string().max(150).optional().default(''),
+  postalCode: z.string().max(30).optional().default(''),
+  country: z.string().trim().min(2).max(60),
+  phone: z.string().max(40).optional(),
   email: z.string().email().optional(),
 });
 
@@ -125,7 +131,7 @@ const createOrderSchema = z.object({
   shippingAddress: shippingAddressSchema,
   billingAddress: shippingAddressSchema.optional(),
   paymentMethod: z.string().min(1),
-  notes: z.string().optional(),
+  notes: z.string().max(2000).optional(),
   couponCode: z.string().trim().min(1).max(50).optional(),
 });
 

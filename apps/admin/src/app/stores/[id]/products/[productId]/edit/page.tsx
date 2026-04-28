@@ -54,6 +54,10 @@ export default function EditProductPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Distinguish a 404 from a transient load failure so the empty-state below
+  // can show a "this product no longer exists" copy + back CTA instead of a
+  // generic error.
+  const [notFound, setNotFound] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -90,6 +94,7 @@ export default function EditProductPage() {
 
       try {
         setLoading(true);
+        setNotFound(false);
 
         const [productResult, categoriesResult] = await Promise.all([
           apiGet<{ product?: Product } & Product>(
@@ -107,7 +112,12 @@ export default function EditProductPage() {
         const { data, error: apiError } = productResult;
 
         if (apiError) {
-          setError(apiError.status === 404 ? t('notFound') : t('loadFailed'));
+          if (apiError.status === 404) {
+            setNotFound(true);
+            setError(t('notFound'));
+          } else {
+            setError(t('loadFailed'));
+          }
           return;
         }
 
@@ -232,7 +242,28 @@ export default function EditProductPage() {
     return (
       <AdminLayout title={t('notFoundTitle')} subtitle="">
         <div className="rounded-xl border bg-card p-8 text-center">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+            <svg
+              className="h-6 w-6 text-muted-foreground"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d={
+                  notFound
+                    ? 'M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'
+                    : 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z'
+                }
+              />
+            </svg>
+          </div>
           <h3 className="mt-4 text-lg font-medium text-foreground">{error}</h3>
+          {notFound && <p className="mt-2 text-sm text-muted-foreground">{t('notFoundBody')}</p>}
           <Button className="mt-6" onClick={() => router.push(`/stores/${storeId}/products`)}>
             {t('backToProducts')}
           </Button>

@@ -441,10 +441,10 @@
     },
     "detail": {
       "loading": "Loading...",
-      "notFoundTitle": "Product Not Found",
+      "notFoundTitle": "This product no longer exists",
       "notFound": "Product not found",
       "loadFailed": "Failed to load product",
-      "notFoundBody": "The product you're looking for doesn't exist or has been removed.",
+      "notFoundBody": "It may have been deleted or moved to another store. Use the button below to return to your catalogue.",
       "subtitle": "SKU: {sku} • Store: {storeName}",
       "fallbackSku": "N/A",
       "fallbackStore": "Unknown",
@@ -453,7 +453,8 @@
         "manageVariants": "Manage Variants",
         "recommendations": "Recommendations",
         "delete": "Delete",
-        "backToProducts": "Back to Products"
+        "backToProducts": "Back to Products",
+        "retry": "Retry"
       },
       "status": {
         "active": "Active",
@@ -510,8 +511,9 @@
     },
     "edit": {
       "loading": "Loading...",
-      "notFoundTitle": "Product Not Found",
+      "notFoundTitle": "This product no longer exists",
       "notFound": "Product not found",
+      "notFoundBody": "It may have been deleted or moved to another store. Use the button below to return to your catalogue.",
       "loadFailed": "Failed to load product",
       "updateFailed": "Failed to update product. Please try again.",
       "title": "Edit: {name}",

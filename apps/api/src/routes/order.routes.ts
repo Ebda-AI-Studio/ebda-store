@@ -14,17 +14,26 @@ import logger from '../lib/logger';
 const router = Router({ mergeParams: true });
 
 // Validation schemas
+//
+// Kuwait-friendly address validation: state and postalCode are not universally
+// applicable (Kuwait uses governorate names but no postal codes for delivery).
+// We accept loose strings, allow Arabic + Latin characters via the generous
+// `min(1)` only on the truly-required fields (firstName, lastName, address1,
+// city, country), and make state/postalCode optional with empty defaults so a
+// missing value does not block checkout. Country accepts ISO-2 (e.g. "KW") or
+// a longer name; the web sends "KW" but addresses created via the API for
+// older accounts may use full country names.
 const addressSchema = z.object({
-  firstName: z.string().min(1),
-  lastName: z.string().min(1),
-  company: z.string().optional(),
-  address1: z.string().min(1),
-  address2: z.string().optional(),
-  city: z.string().min(1),
-  state: z.string().min(1),
-  postalCode: z.string().optional().default(''),
-  country: z.string().min(2).max(2),
-  phone: z.string().optional(),
+  firstName: z.string().trim().min(1).max(100),
+  lastName: z.string().trim().min(1).max(100),
+  company: z.string().max(150).optional(),
+  address1: z.string().trim().min(1).max(500),
+  address2: z.string().max(500).optional(),
+  city: z.string().trim().min(1).max(150),
+  state: z.string().max(150).optional().default(''),
+  postalCode: z.string().max(30).optional().default(''),
+  country: z.string().trim().min(2).max(60),
+  phone: z.string().max(40).optional(),
   email: z.string().email().optional(),
 });
 
@@ -32,7 +41,8 @@ const createOrderSchema = z.object({
   shippingAddress: addressSchema,
   billingAddress: addressSchema.optional(),
   paymentMethod: z.string(),
-  notes: z.string().optional(),
+  notes: z.string().max(2000).optional(),
+  couponCode: z.string().trim().min(1).max(50).optional(),
 });
 
 const updateStatusSchema = z.object({

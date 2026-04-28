@@ -495,9 +495,14 @@ export default function CheckoutClient() {
 
       if (!orderResult.success || !orderResult.data?.order) {
         // Throw the API error CODE (not message) so the catch maps it to
-        // customer-friendly copy. Raw message goes to console only.
+        // customer-friendly copy. Raw message goes to console only. We also
+        // attach the API's field-level `details` (Zod -> {field: [msg]}) so
+        // the catch block can surface a meaningful inline message instead of
+        // a generic "Something went wrong" toast when validation fails.
         const err = new Error(orderResult.error?.code || 'ORDER_CREATE_FAILED');
         (err as Error & { rawMessage?: string }).rawMessage = orderResult.error?.message || '';
+        (err as Error & { details?: Record<string, string[]> }).details =
+          orderResult.error?.details;
         throw err;
       }
 
@@ -556,6 +561,64 @@ export default function CheckoutClient() {
       // customers never see internal terminology like "provider not
       // configured" or "schema validation".
       const code = error instanceof Error ? error.message : '';
+      const details =
+        error instanceof Error
+          ? (error as Error & { details?: Record<string, string[]> }).details
+          : undefined;
+
+      // Map server-side field paths (e.g. "shippingAddress.email") to our
+      // checkout form fields and route the user back to step 1 with the
+      // offending field highlighted. This handles the case where a customer
+      // somehow gets past client-side validation (corrupted sessionStorage,
+      // pasted text with control chars, etc.) and the API rejects the order.
+      if (code === 'VALIDATION_ERROR' && details) {
+        const fieldMap: Record<string, keyof typeof formErrors> = {
+          'shippingAddress.email': 'email',
+          'shippingAddress.firstName': 'firstName',
+          'shippingAddress.lastName': 'lastName',
+          'shippingAddress.phone': 'phone',
+          'shippingAddress.address1': 'address',
+          'shippingAddress.city': 'city',
+          'shippingAddress.state': 'area',
+        };
+        const inlineErrors: typeof formErrors = {};
+        for (const [path, msgs] of Object.entries(details)) {
+          const localField = fieldMap[path];
+          if (localField && msgs?.[0]) {
+            // Translate common Zod messages to user-facing Arabic when needed.
+            // Anything we don't recognize falls through to the raw message —
+            // better than the generic "Something went wrong" toast.
+            const rawMsg = msgs[0];
+            let translated = rawMsg;
+            if (/email/i.test(rawMsg)) {
+              translated = t('Please enter a valid email address', 'يرجى إدخال بريد إلكتروني صحيح');
+            } else if (/required|min|too small|expected/i.test(rawMsg)) {
+              translated = t('This field is required', 'هذا الحقل مطلوب');
+            } else if (/too big|max|too large/i.test(rawMsg)) {
+              translated = t('This value is too long', 'القيمة المُدخلة طويلة جداً');
+            }
+            inlineErrors[localField] = translated;
+          }
+        }
+        if (Object.keys(inlineErrors).length > 0) {
+          setFormErrors(prev => ({ ...prev, ...inlineErrors }));
+          setStep(1);
+          // Scroll the first inline error into view on the shipping step.
+          setTimeout(() => {
+            const firstError = document.querySelector('[data-error="true"]');
+            firstError?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }, 50);
+          setCheckoutError(
+            t(
+              'Please fix the highlighted fields and try again.',
+              'يرجى تصحيح الحقول المميّزة والمحاولة مرة أخرى.'
+            )
+          );
+          setIsProcessing(false);
+          return;
+        }
+      }
+
       let friendly: string;
       switch (code) {
         case 'COD_NOT_AVAILABLE':
@@ -600,6 +663,16 @@ export default function CheckoutClient() {
             'The server took too long to respond. Please try again.',
             'استغرق الخادم وقتاً طويلاً للاستجابة. يرجى المحاولة مرة أخرى.'
           );
+          break;
+        case 'VALIDATION_ERROR':
+          // Reached when the API rejects the payload but didn't include
+          // `details` — point the customer back to the shipping step so they
+          // can review what they typed.
+          friendly = t(
+            'Some of the information you entered looks invalid. Please review your shipping details and try again.',
+            'بعض المعلومات التي أدخلتها غير صحيحة. يرجى مراجعة بيانات الشحن والمحاولة مرة أخرى.'
+          );
+          setStep(1);
           break;
         default:
           friendly = t(

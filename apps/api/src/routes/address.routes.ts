@@ -5,18 +5,24 @@ import { authenticate } from '../middleware/auth';
 
 const router = Router();
 
-// Validation schema for creating/updating an address
+// Validation schema for creating/updating an address.
+//
+// Kuwait-friendly: state is optional (Kuwait has no states; the storefront
+// repurposes this to hold the delivery area, but a saved address may pre-date
+// that change), and postalCode is optional (Kuwait does not use postal codes
+// for delivery). Generous max lengths bound abuse without rejecting normal
+// Arabic or English input.
 const addressSchema = z.object({
-  firstName: z.string().min(1, 'First name is required'),
-  lastName: z.string().min(1, 'Last name is required'),
-  address1: z.string().min(1, 'Street address is required'),
-  address2: z.string().optional(),
-  city: z.string().min(1, 'City is required'),
-  state: z.string().min(1, 'State is required'),
-  area: z.string().optional(),
-  postalCode: z.string().optional(),
-  country: z.string().min(1, 'Country is required'),
-  phone: z.string().optional(),
+  firstName: z.string().trim().min(1, 'First name is required').max(100),
+  lastName: z.string().trim().min(1, 'Last name is required').max(100),
+  address1: z.string().trim().min(1, 'Street address is required').max(500),
+  address2: z.string().max(500).optional(),
+  city: z.string().trim().min(1, 'City is required').max(150),
+  state: z.string().max(150).optional(),
+  area: z.string().max(150).optional(),
+  postalCode: z.string().max(30).optional(),
+  country: z.string().trim().min(2, 'Country is required').max(60),
+  phone: z.string().max(40).optional(),
   isDefault: z.boolean().optional(),
 });
 
@@ -79,7 +85,9 @@ router.post('/', authenticate, async (req: Request, res: Response, next: NextFun
         address1: data.address1,
         address2: data.address2,
         city: data.city,
-        state: data.state,
+        // `state` is required by the DB but optional in the API since Kuwait
+        // doesn't really use it. Persist an empty string when omitted.
+        state: data.state ?? '',
         area: data.area,
         postalCode: data.postalCode,
         country: data.country,
