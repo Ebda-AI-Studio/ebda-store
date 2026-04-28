@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { formatPrice } from '@/lib/format';
 import type { ProductVariant, ProductOption } from '@/lib/api';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -55,6 +56,18 @@ export function VariantSelector({ variants, options, onVariantSelect }: VariantS
     });
   }
 
+  /**
+   * Return the imageUrl to preview next to a given option value pill, if
+   * any. Picks the first variant matching `[optionName] = value` that has
+   * an `imageUrl` set so the customer can see "200g" looks different from
+   * "50g" before committing to a full selection. Returns undefined when
+   * no matching variant has an image — caller hides the thumbnail.
+   */
+  function getThumbnailForValue(optionName: string, value: string): string | undefined {
+    const match = variants.find(v => v.options[optionName] === value && v.imageUrl);
+    return match?.imageUrl;
+  }
+
   // Find the currently matched variant for live price/stock display
   const optionNames = options.map(o => o.name);
   const allPicked = optionNames.every(name => selected[name] !== undefined);
@@ -76,6 +89,7 @@ export function VariantSelector({ variants, options, onVariantSelect }: VariantS
             {option.values.map(value => {
               const isSelected = selected[option.name] === value;
               const available = isValueAvailable(option.name, value);
+              const thumbnail = getThumbnailForValue(option.name, value);
               return (
                 <button
                   key={value}
@@ -85,6 +99,7 @@ export function VariantSelector({ variants, options, onVariantSelect }: VariantS
                   title={!available ? t('Out of Stock', 'غير متوفر') : undefined}
                   className={[
                     'relative min-w-[2.75rem] rounded-lg border px-3 py-2 text-sm font-medium transition-all',
+                    thumbnail ? 'inline-flex items-center gap-2' : '',
                     isSelected
                       ? 'border-primary bg-primary text-white shadow-md shadow-primary/25'
                       : available
@@ -92,6 +107,20 @@ export function VariantSelector({ variants, options, onVariantSelect }: VariantS
                         : 'cursor-not-allowed border-border bg-muted text-muted-foreground opacity-50',
                   ].join(' ')}
                 >
+                  {thumbnail && (
+                    <span
+                      aria-hidden="true"
+                      className="inline-block h-6 w-6 overflow-hidden rounded bg-muted shrink-0"
+                    >
+                      <Image
+                        src={thumbnail}
+                        alt=""
+                        width={24}
+                        height={24}
+                        className="h-full w-full object-cover"
+                      />
+                    </span>
+                  )}
                   {value}
                   {/* Strikethrough diagonal line for unavailable values */}
                   {!available && (

@@ -670,6 +670,8 @@
         "title": "Edit Variant: {title}",
         "skuLabel": "SKU",
         "barcodeLabel": "Barcode",
+        "imageLabel": "Variant image",
+        "imageTip": "Upload only when this variant looks visibly different from the main product images.",
         "priceLabel": "Price (fils)",
         "pricePlaceholder": "Base price",
         "compareAtLabel": "Compare At",
@@ -1305,7 +1307,11 @@
       "address": "Address",
       "addressAr": "Address (Arabic)",
       "addressPlaceholder": "123 Street, City, Kuwait",
-      "addressArPlaceholder": "١٢٣ شارع، المدينة، الكويت"
+      "addressArPlaceholder": "١٢٣ شارع، المدينة، الكويت",
+      "addressUrl": "Map link",
+      "addressUrlPlaceholder": "https://maps.app.goo.gl/...",
+      "addressUrlHint": "Paste a Google or Apple Maps link to your storefront's pin. The footer address will become clickable and open this URL in a new tab.",
+      "addressClickable": "Make address clickable on storefront"
     },
     "social": {
       "instagram": "Instagram",
@@ -2613,6 +2619,40 @@
       "subtitle": "Standards-based Web Push (W3C Push API)",
       "subscribers": "{count, number} subscribers",
       "platformNote": "Push notifications use the platform VAPID configuration. No per-store setup needed — just toggle Enabled."
+    },
+    "broadcast": {
+      "title": "Send a broadcast",
+      "subtitle": "Push a notification to every storefront subscriber for this store.",
+      "fields": {
+        "titleEn": "Title (English)",
+        "titleAr": "Title (Arabic)",
+        "bodyEn": "Message (English)",
+        "bodyAr": "Message (Arabic)",
+        "url": "Link (optional)"
+      },
+      "placeholders": {
+        "titleEn": "e.g. Flash sale today",
+        "titleAr": "مثال: تخفيضات اليوم",
+        "bodyEn": "e.g. 30% off everything until midnight",
+        "bodyAr": "مثال: خصم 30% على كل شيء حتى منتصف الليل",
+        "url": "https://yourstore.com/products/promo"
+      },
+      "urlHelp": "When tapped, the notification opens this URL. Leave blank to just open your storefront.",
+      "send": "Send broadcast",
+      "sending": "Sending…",
+      "sentTitle": "Broadcast sent",
+      "sentDescription": "Targeted {count, number} subscriber(s).",
+      "sendFailed": "Failed to send broadcast.",
+      "notConfiguredTitle": "Push provider not configured",
+      "notConfiguredDescription": "OneSignal credentials are missing on the API server. Set the env vars below on Railway and redeploy:",
+      "and": "and",
+      "recentTitle": "Recent broadcasts",
+      "recentEmpty": "No broadcasts sent yet.",
+      "refresh": "Refresh",
+      "refreshing": "Refreshing…",
+      "untitled": "(untitled)",
+      "deliveredCount": "{count, number} delivered",
+      "clickedCount": "{count, number} clicked"
     },
     "events": {
       "title": "Event Configuration",

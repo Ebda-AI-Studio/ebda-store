@@ -53,4 +53,11 @@ export interface VariantFormState {
   costPrice: string;
   inventory: string;
   weight: string;
+  /**
+   * Per-variant image URL. Empty string ⇒ no image set; the API treats
+   * an explicit `null` as "clear". Saved into `ProductVariant.imageUrl`
+   * so the storefront can swap the gallery's main image when this
+   * variant is selected.
+   */
+  imageUrl: string;
 }

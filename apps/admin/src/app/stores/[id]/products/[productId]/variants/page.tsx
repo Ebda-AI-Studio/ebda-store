@@ -22,6 +22,7 @@ const EMPTY_VARIANT_FORM: VariantFormState = {
   costPrice: '',
   inventory: '',
   weight: '',
+  imageUrl: '',
 };
 
 export default function ProductVariantsPage() {
@@ -172,6 +173,10 @@ export default function ProductVariantsPage() {
           costPrice: variantForm.costPrice ? parseInt(variantForm.costPrice) : null,
           inventory: parseInt(variantForm.inventory) || 0,
           weight: variantForm.weight ? parseFloat(variantForm.weight) : null,
+          // Empty string ⇒ explicit clear (null). A populated string is the
+          // R2 URL returned from ImageUpload — passed through as-is so the
+          // storefront can preview it when this variant is selected.
+          imageUrl: variantForm.imageUrl || null,
         }
       );
 
@@ -203,6 +208,7 @@ export default function ProductVariantsPage() {
       costPrice: variant.costPrice?.toString() || '',
       inventory: variant.inventory.toString(),
       weight: variant.weight?.toString() || '',
+      imageUrl: variant.imageUrl || '',
     });
   }
 

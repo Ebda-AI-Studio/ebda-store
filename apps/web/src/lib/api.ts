@@ -41,6 +41,13 @@ interface ProductVariant {
   price: number;
   compareAtPrice?: number;
   inventory?: number;
+  /**
+   * Optional per-variant image. When set, the product detail gallery swaps
+   * its main image to this URL while the variant is selected, and reverts
+   * to the product's images on deselection. Useful when a variant looks
+   * visibly different from the parent (e.g. a 200g jar vs. a 50g jar).
+   */
+  imageUrl?: string;
   options: Record<string, string>;
 }
 

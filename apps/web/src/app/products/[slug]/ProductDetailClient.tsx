@@ -71,6 +71,16 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
   const [isTogglingWishlist, setIsTogglingWishlist] = useState(false);
   // Selected variant from VariantSelector (null = no variant chosen or invalid combo)
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
+
+  // When the selected variant changes to one with its own imageUrl, jump the
+  // gallery to index 0 so the variant image is the active hero immediately.
+  // Reverting to no variant (or one without imageUrl) leaves the user on
+  // whichever product image they were already browsing.
+  useEffect(() => {
+    if (selectedVariant?.imageUrl) {
+      setSelectedImage(0);
+    }
+  }, [selectedVariant?.imageUrl]);
   const { success: toastSuccess, error: toastError } = useToast();
   const { addItem } = useCart();
   const { store } = useStore();
@@ -247,7 +257,22 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
     );
   }
 
-  const images = product.images || [];
+  const productImages = product.images || [];
+  // When the shopper picks a variant that has its own `imageUrl`, swap the
+  // gallery's main image to that URL by prepending a synthetic image entry.
+  // Deselecting the variant (selectedVariant === null) reverts to the
+  // product's original image set with no extra cleanup needed — we never
+  // mutate productImages, only derive `images`.
+  const images = selectedVariant?.imageUrl
+    ? [
+        {
+          id: `variant-${selectedVariant.id}`,
+          url: selectedVariant.imageUrl,
+          alt: selectedVariant.name,
+        },
+        ...productImages.filter(img => img.url !== selectedVariant.imageUrl),
+      ]
+    : productImages;
   const cat0 = product.categories?.[0];
   const categoryNameEn = cat0?.category?.name;
   const categoryNameAr = cat0?.category?.nameAr;

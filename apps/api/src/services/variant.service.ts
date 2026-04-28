@@ -15,7 +15,11 @@ interface CreateVariantInput {
   costPrice?: number;
   inventory?: number;
   weight?: number;
-  imageUrl?: string;
+  // Optional + nullable: the admin form posts `null` to clear an existing
+  // image (the create call doesn't really hit that branch since variants
+  // are created from the generate-all flow, but Zod is parsed as
+  // `nullable().optional()` so the type must accept null too).
+  imageUrl?: string | null;
   optionValueIds: string[];
 }
 

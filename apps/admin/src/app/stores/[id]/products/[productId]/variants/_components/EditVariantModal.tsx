@@ -2,6 +2,7 @@
 
 import { Button, Input, Label } from '@force/ui';
 import { useT } from '@/i18n/useT';
+import { ImageUpload } from '@/components/ImageUpload';
 import type { Variant, VariantFormState } from './types';
 
 interface EditVariantModalProps {
@@ -48,6 +49,22 @@ export function EditVariantModal({
                 className="mt-1"
               />
             </div>
+          </div>
+
+          {/* Per-variant image. Sits above the price grid because merchants
+              eyeball "is this the right pack?" via the picture before they
+              touch any numbers. Folder hint `products` keeps R2 organized
+              alongside the rest of the product media. */}
+          <div>
+            <Label>{t('imageLabel')}</Label>
+            <ImageUpload
+              value={form.imageUrl || undefined}
+              onUpload={url => onChange({ ...form, imageUrl: url })}
+              onRemove={() => onChange({ ...form, imageUrl: '' })}
+              folder="products"
+              className="mt-1"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">{t('imageTip')}</p>
           </div>
 
           <div className="grid grid-cols-3 gap-4">

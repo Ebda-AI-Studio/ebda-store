@@ -464,38 +464,126 @@ export class ProductService {
     return result;
   }
 
+  /**
+   * Shared include shape for the public product detail endpoints. Pulls the
+   * options + variants graph alongside the base product so the storefront's
+   * VariantSelector + per-variant image swap have everything they need in
+   * one round trip. Variants/options are ordered by their stored `position`
+   * so admin reordering is preserved on the storefront.
+   */
+  private static readonly PUBLIC_PRODUCT_DETAIL_INCLUDE = {
+    images: { orderBy: { position: 'asc' } },
+    categories: { include: { category: true } },
+    store: { select: { id: true, name: true, slug: true } },
+    options: {
+      orderBy: { position: 'asc' },
+      include: {
+        values: { orderBy: { position: 'asc' } },
+      },
+    },
+    variants: {
+      orderBy: { position: 'asc' },
+      where: { isActive: true },
+      include: {
+        options: {
+          include: {
+            value: {
+              include: { option: true },
+            },
+          },
+        },
+      },
+    },
+  } as const satisfies Prisma.ProductInclude;
+
+  /**
+   * Reshape a Prisma product (with the include above) into the storefront
+   * payload shape: variants get a flat `options: { [optionName]: value }`
+   * map (what `VariantSelector` matches against) and options get a flat
+   * `values: string[]` array. Image URL is surfaced as-is so the gallery
+   * can swap when a variant with `imageUrl` is selected.
+   */
+  private static reshapePublicProductDetail<
+    T extends {
+      options?: Array<{
+        id: string;
+        name: string;
+        nameAr: string | null;
+        values: Array<{ value: string; valueAr: string | null }>;
+      }>;
+      variants?: Array<{
+        id: string;
+        title: string;
+        sku: string | null;
+        price: number | null;
+        compareAtPrice: number | null;
+        inventory: number;
+        imageUrl: string | null;
+        options: Array<{
+          value: { value: string; option: { name: string } };
+        }>;
+      }>;
+      price: number;
+    },
+  >(product: T) {
+    const reshapedOptions = (product.options ?? []).map(o => ({
+      id: o.id,
+      name: o.name,
+      nameAr: o.nameAr,
+      values: o.values.map(v => v.value),
+    }));
+
+    const reshapedVariants = (product.variants ?? []).map(v => {
+      const options: Record<string, string> = {};
+      for (const vo of v.options) {
+        options[vo.value.option.name] = vo.value.value;
+      }
+      return {
+        id: v.id,
+        name: v.title,
+        sku: v.sku ?? undefined,
+        // Variants without their own price fall back to the parent product
+        // price so the storefront never displays "0" for a variant that
+        // shares the base price.
+        price: v.price ?? product.price,
+        compareAtPrice: v.compareAtPrice ?? undefined,
+        inventory: v.inventory,
+        imageUrl: v.imageUrl ?? undefined,
+        options,
+      };
+    });
+
+    return {
+      ...product,
+      options: reshapedOptions,
+      variants: reshapedVariants,
+    };
+  }
+
   static async getPublicBySlug(storeId: string, slug: string) {
     const product = await prisma.product.findFirst({
       where: { storeId, slug, status: 'active', deletedAt: null },
-      include: {
-        images: { orderBy: { position: 'asc' } },
-        categories: { include: { category: true } },
-        store: { select: { id: true, name: true, slug: true } },
-      },
+      include: this.PUBLIC_PRODUCT_DETAIL_INCLUDE,
     });
 
     if (!product) {
       throw new AppError(404, 'NOT_FOUND', 'Product not found');
     }
 
-    return product;
+    return this.reshapePublicProductDetail(product);
   }
 
   static async getPublicById(storeId: string, productId: string) {
     const product = await prisma.product.findFirst({
       where: { storeId, id: productId, status: 'active', deletedAt: null },
-      include: {
-        images: { orderBy: { position: 'asc' } },
-        categories: { include: { category: true } },
-        store: { select: { id: true, name: true, slug: true } },
-      },
+      include: this.PUBLIC_PRODUCT_DETAIL_INCLUDE,
     });
 
     if (!product) {
       throw new AppError(404, 'NOT_FOUND', 'Product not found');
     }
 
-    return product;
+    return this.reshapePublicProductDetail(product);
   }
 
   static async getCategories(storeId: string) {

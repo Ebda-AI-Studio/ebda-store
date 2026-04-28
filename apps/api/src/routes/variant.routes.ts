@@ -44,7 +44,10 @@ const createVariantSchema = z.object({
   costPrice: z.number().int().min(0).optional(),
   inventory: z.number().int().min(0).optional(),
   weight: z.number().min(0).optional(),
-  imageUrl: z.string().url().optional(),
+  // Per-variant image. Nullable so the admin form can post explicit null
+  // (e.g. when the merchant clears a previously-uploaded image before
+  // submitting); undefined = leave alone, mirroring the costPrice pattern.
+  imageUrl: z.string().url().nullable().optional(),
   optionValueIds: z.array(z.string().uuid()).min(1).max(3),
 });
 
@@ -56,7 +59,7 @@ const updateVariantSchema = z.object({
   costPrice: z.number().int().min(0).optional().nullable(),
   inventory: z.number().int().min(0).optional(),
   weight: z.number().min(0).optional().nullable(),
-  imageUrl: z.string().url().optional().nullable(),
+  imageUrl: z.string().url().nullable().optional(),
   isActive: z.boolean().optional(),
 });
 

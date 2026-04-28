@@ -670,6 +670,8 @@
         "title": "تعديل المتغير: {title}",
         "skuLabel": "SKU",
         "barcodeLabel": "الباركود",
+        "imageLabel": "صورة المتغير",
+        "imageTip": "قم بالرفع فقط عندما يبدو هذا المتغير مختلفًا بصريًا عن صور المنتج الرئيسية.",
         "priceLabel": "السعر (فلس)",
         "pricePlaceholder": "السعر الأساسي",
         "compareAtLabel": "السعر قبل الخصم",
@@ -1305,7 +1307,11 @@
       "address": "العنوان",
       "addressAr": "العنوان (بالعربية)",
       "addressPlaceholder": "123 Street, City, Kuwait",
-      "addressArPlaceholder": "١٢٣ شارع، المدينة، الكويت"
+      "addressArPlaceholder": "١٢٣ شارع، المدينة، الكويت",
+      "addressUrl": "رابط الخريطة",
+      "addressUrlPlaceholder": "https://maps.app.goo.gl/...",
+      "addressUrlHint": "ألصق رابط Google Maps أو Apple Maps لموقع المتجر. سيصبح العنوان في تذييل المتجر قابلاً للنقر ويفتح هذا الرابط في تبويب جديد.",
+      "addressClickable": "اجعل العنوان قابلاً للنقر في تذييل المتجر"
     },
     "social": {
       "instagram": "Instagram",
@@ -2613,6 +2619,40 @@
       "subtitle": "Web Push قياسي (W3C Push API)",
       "subscribers": "{count, number} مشترك",
       "platformNote": "تستخدم الإشعارات الفورية إعداد VAPID الخاص بالمنصة. لا يلزم إعداد لكل متجر — فقط فعّل الخيار."
+    },
+    "broadcast": {
+      "title": "إرسال إشعار جماعي",
+      "subtitle": "أرسل إشعارًا فوريًا لكل مشترك في واجهة هذا المتجر.",
+      "fields": {
+        "titleEn": "العنوان (إنجليزي)",
+        "titleAr": "العنوان (عربي)",
+        "bodyEn": "الرسالة (إنجليزي)",
+        "bodyAr": "الرسالة (عربي)",
+        "url": "الرابط (اختياري)"
+      },
+      "placeholders": {
+        "titleEn": "e.g. Flash sale today",
+        "titleAr": "مثال: تخفيضات اليوم",
+        "bodyEn": "e.g. 30% off everything until midnight",
+        "bodyAr": "مثال: خصم 30% على كل شيء حتى منتصف الليل",
+        "url": "https://yourstore.com/products/promo"
+      },
+      "urlHelp": "عند الضغط، يفتح الإشعار هذا الرابط. اتركه فارغًا لفتح واجهة المتجر فقط.",
+      "send": "إرسال الإشعار",
+      "sending": "جارٍ الإرسال…",
+      "sentTitle": "تم إرسال الإشعار",
+      "sentDescription": "تم استهداف {count, number} مشترك.",
+      "sendFailed": "تعذّر إرسال الإشعار.",
+      "notConfiguredTitle": "مزوّد الإشعارات غير مُعَدّ",
+      "notConfiguredDescription": "بيانات اعتماد OneSignal غير مضبوطة على خادم الـ API. اضبط متغيرات البيئة التالية على Railway ثم أعد النشر:",
+      "and": "و",
+      "recentTitle": "آخر الإشعارات المُرسَلة",
+      "recentEmpty": "لم يتم إرسال أي إشعار بعد.",
+      "refresh": "تحديث",
+      "refreshing": "جارٍ التحديث…",
+      "untitled": "(بدون عنوان)",
+      "deliveredCount": "تم تسليم {count, number}",
+      "clickedCount": "{count, number} نقرة"
     },
     "events": {
       "title": "إعدادات الأحداث",
