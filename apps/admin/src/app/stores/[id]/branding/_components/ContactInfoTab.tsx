@@ -88,6 +88,40 @@ export function ContactInfoTab({ branding, onChange }: ContactInfoTabProps) {
           />
         </div>
       </div>
+
+      {/*
+        Map link: paste a Google / Apple Maps URL the storefront footer
+        should hyperlink the address to. Paired with a "Make address
+        clickable" toggle so a tenant can opt out of the link entirely
+        without clearing their pasted URL. When the URL is empty and the
+        toggle is on, the storefront still falls back to a Google-Maps
+        search built from the address text — preserving long-standing
+        behaviour for stores that haven't pasted a custom pin yet.
+      */}
+      <div className="border-t border-border/60 pt-6 space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1">
+            {t('addressUrl')}
+          </label>
+          <input
+            type="url"
+            value={branding.addressUrl || ''}
+            onChange={e => onChange({ ...branding, addressUrl: e.target.value })}
+            placeholder={t('addressUrlPlaceholder')}
+            className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+          />
+          <p className="mt-1 text-xs text-muted-foreground">{t('addressUrlHint')}</p>
+        </div>
+        <label className="flex items-center gap-3 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={branding.addressLink !== false}
+            onChange={e => onChange({ ...branding, addressLink: e.target.checked })}
+            className="h-4 w-4 rounded border-border text-primary focus:ring-primary/40"
+          />
+          <span className="text-sm text-foreground">{t('addressClickable')}</span>
+        </label>
+      </div>
     </div>
   );
 }

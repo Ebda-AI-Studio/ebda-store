@@ -4,6 +4,7 @@ import Link from 'next/link';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { resolveBottomBar, resolveFooterSections } from '../shared/display-helpers';
+import { getSocialLinks } from '../shared/icons';
 
 export default function MinimalFooter({
   branding,
@@ -36,19 +37,11 @@ export default function MinimalFooter({
           ...(contact.phone ? [{ label: contact.phone, href: `tel:${contact.phone}` }] : []),
         ];
 
-  // Collect active socials for a compact display. Synthesise a wa.me entry
-  // when the merchant set `contact.whatsapp` but no full social URL — the
-  // contact phone doubles as a chat link.
-  const trimmedWhatsapp = contact.whatsapp?.trim();
-  const socialEntries: Array<[string, string]> = [
-    ...(Object.entries(socials).filter(([, url]) => !!url) as [string, string][]),
-    ...(!socials.whatsapp && trimmedWhatsapp
-      ? ([['whatsapp', `https://wa.me/${trimmedWhatsapp.replace(/\D/g, '')}`]] as [
-          string,
-          string,
-        ][])
-      : []),
-  ];
+  // Collect active socials with brand-correct SVG icons. The shared helper
+  // also synthesises a wa.me entry from `contact.whatsapp` when no full
+  // social URL is set, so the merchant's contact phone doubles as a chat
+  // link without manual configuration.
+  const socialLinks = getSocialLinks(socials, contact);
 
   const bottomBar = resolveBottomBar(footerLinks?.bottomBar, displayName, isRtl);
 
@@ -63,7 +56,7 @@ export default function MinimalFooter({
               <img
                 src={displayLogo}
                 alt={displayName}
-                className="h-12 max-h-12 w-auto object-contain"
+                className="h-16 sm:h-20 w-auto object-contain"
               />
             ) : (
               <span className="text-xs tracking-[0.25em] uppercase font-light text-foreground">
@@ -88,19 +81,28 @@ export default function MinimalFooter({
           )}
 
           {/* Social — only render the row when at least one social link is
-              configured, so empty stores don't show a hollow column. */}
-          {socialEntries.length > 0 && (
-            <div className={`flex items-center gap-5 ${isRtl ? 'flex-row-reverse' : ''}`}>
-              {socialEntries.map(([key, url]) => (
+              configured, so empty stores don't show a hollow column. Uses the
+              shared brand-correct SVG icons rather than text labels so the
+              footer doesn't read as half-finished placeholder copy. */}
+          {socialLinks.length > 0 && (
+            <div className={`flex items-center gap-4 ${isRtl ? 'flex-row-reverse' : ''}`}>
+              {socialLinks.map(({ key, icon, url }) => (
                 <a
                   key={key}
                   href={url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-xs tracking-widest uppercase text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer"
+                  className="text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer"
                   aria-label={key}
                 >
-                  {key}
+                  <svg
+                    className="w-4 h-4"
+                    fill="currentColor"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
+                    <path d={icon} />
+                  </svg>
                 </a>
               ))}
             </div>

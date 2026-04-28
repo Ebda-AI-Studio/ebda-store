@@ -22,6 +22,13 @@ interface StoreResponse {
   address?: string;
   addressAr?: string;
   socialLinks?: StoreBranding['socialLinks'];
+  /**
+   * `addressUrl` + `addressLink` live inside `settings.contact` (the JSONB
+   * column) because they're storefront-display flags rather than columns
+   * on the Store table. The store route returns the entire settings blob
+   * so we read these out here.
+   */
+  settings?: Record<string, unknown>;
 }
 
 interface ToastMessages {
@@ -70,6 +77,22 @@ export function useBranding(storeId: string, messages: ToastMessages) {
 
       if (data?.store) {
         const store = data.store;
+        // Pull addressUrl + addressLink out of `settings.contact`. Tolerate
+        // legacy values (`'maps' | 'none'`) by normalising to a boolean — a
+        // tenant that hadn't been migrated yet shouldn't see their toggle
+        // appear in the wrong state on first load.
+        const settingsContact =
+          (store.settings?.contact as Record<string, unknown> | undefined) ?? {};
+        const rawAddressLink = settingsContact.addressLink;
+        const addressLink: boolean | undefined =
+          rawAddressLink === false || rawAddressLink === 'none'
+            ? false
+            : rawAddressLink === true || rawAddressLink === 'maps'
+              ? true
+              : undefined;
+        const addressUrl =
+          typeof settingsContact.addressUrl === 'string' ? settingsContact.addressUrl : undefined;
+
         setBranding({
           id: store.id,
           name: store.name,
@@ -86,6 +109,8 @@ export function useBranding(storeId: string, messages: ToastMessages) {
           whatsapp: store.whatsapp,
           address: store.address,
           addressAr: store.addressAr,
+          addressUrl,
+          addressLink,
           socialLinks: store.socialLinks || {},
         });
       }
@@ -109,33 +134,61 @@ export function useBranding(storeId: string, messages: ToastMessages) {
     try {
       const basePath = `/api/v1/stores/${storeId}`;
 
-      const [brandingResult, themeResult, contactResult, socialResult] = await Promise.all([
-        apiPut(`${basePath}/branding`, {
-          name: branding.name,
-          nameAr: branding.nameAr,
-          logo: branding.logo,
-          logoAr: branding.logoAr,
-          favicon: branding.favicon,
-          description: branding.description,
-          descriptionAr: branding.descriptionAr,
-        }),
-        apiPut(`${basePath}/theme`, branding.theme),
-        apiPut(`${basePath}/contact`, {
-          email: branding.email,
-          phone: branding.phone,
-          phoneAr: branding.phoneAr,
-          whatsapp: branding.whatsapp,
-          address: branding.address,
-          addressAr: branding.addressAr,
-        }),
-        apiPut(`${basePath}/social`, branding.socialLinks),
-      ]);
+      // Persist the new addressUrl / addressLink flags inside the JSONB
+      // `settings.contact` blob. We have to merge with the rest of
+      // `settings` so we don't blow away unrelated keys (footerLinks,
+      // utilityBar, navMenu, etc.). Empty/whitespace URL collapses to
+      // undefined so a stray space doesn't produce an `<a href=" ">`.
+      const trimmedAddressUrl = branding.addressUrl?.trim();
+      const settingsResultPromise = (async () => {
+        const { data: getData, error: getErr } = await apiGet<{
+          store: { settings?: Record<string, unknown> };
+        }>(basePath);
+        if (getErr) return { error: getErr };
+        const currentSettings: Record<string, unknown> = { ...(getData?.store?.settings ?? {}) };
+        const currentContact: Record<string, unknown> = {
+          ...((currentSettings.contact as Record<string, unknown> | undefined) ?? {}),
+        };
+        if (trimmedAddressUrl) currentContact.addressUrl = trimmedAddressUrl;
+        else delete currentContact.addressUrl;
+        // Persist the boolean explicitly so legacy `'maps' | 'none'` values
+        // get rewritten cleanly. Default `true` matches the storefront
+        // resolver's default.
+        currentContact.addressLink = branding.addressLink !== false;
+        currentSettings.contact = currentContact;
+        return apiPut(basePath, { settings: currentSettings });
+      })();
+
+      const [brandingResult, themeResult, contactResult, socialResult, settingsResult] =
+        await Promise.all([
+          apiPut(`${basePath}/branding`, {
+            name: branding.name,
+            nameAr: branding.nameAr,
+            logo: branding.logo,
+            logoAr: branding.logoAr,
+            favicon: branding.favicon,
+            description: branding.description,
+            descriptionAr: branding.descriptionAr,
+          }),
+          apiPut(`${basePath}/theme`, branding.theme),
+          apiPut(`${basePath}/contact`, {
+            email: branding.email,
+            phone: branding.phone,
+            phoneAr: branding.phoneAr,
+            whatsapp: branding.whatsapp,
+            address: branding.address,
+            addressAr: branding.addressAr,
+          }),
+          apiPut(`${basePath}/social`, branding.socialLinks),
+          settingsResultPromise,
+        ]);
 
       const failed = [
         { name: messages.sectionBranding, result: brandingResult },
         { name: messages.sectionTheme, result: themeResult },
         { name: messages.sectionContact, result: contactResult },
         { name: messages.sectionSocial, result: socialResult },
+        { name: messages.sectionContact, result: settingsResult },
       ].filter(r => r.result.error !== null);
 
       if (failed.length > 0) {

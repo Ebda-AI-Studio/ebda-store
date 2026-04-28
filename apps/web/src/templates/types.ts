@@ -53,11 +53,21 @@ export interface StoreContact {
   address?: string;
   addressAr?: string;
   /**
-   * Whether the address renders as a Google Maps hyperlink. `'maps'` (default
-   * when undefined) wraps the address in `<a href="...maps...">`; `'none'`
-   * keeps it as plain text. Saved at `store.settings.contact.addressLink`.
+   * Optional explicit map URL the merchant pastes from Google Maps / Apple
+   * Maps / etc. When present (and `addressLink !== false`) the footer wraps
+   * the address text in `<a href={addressUrl}>` instead of synthesising a
+   * Google Maps search URL from the address string. Saved at
+   * `store.settings.contact.addressUrl`.
    */
-  addressLink?: 'maps' | 'none';
+  addressUrl?: string;
+  /**
+   * Whether the address should render as a clickable hyperlink. `true`
+   * (default when undefined) means the footer renders an `<a>` either to
+   * `addressUrl` (when set) or a synthesised Google Maps search URL. `false`
+   * keeps the address as plain text. Saved at
+   * `store.settings.contact.addressLink`.
+   */
+  addressLink?: boolean;
 }
 
 /**

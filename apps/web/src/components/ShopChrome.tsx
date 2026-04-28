@@ -162,11 +162,23 @@ export function ShopChrome({ children }: { children: ReactNode }) {
         })()
       : undefined;
 
-  // Address-link mode lives at `store.settings.contact.addressLink` so the
-  // admin's Settings → Branding can toggle whether the footer address renders
-  // as a Google Maps hyperlink. Default 'maps' (link enabled) when missing.
+  // Address link config lives at `store.settings.contact.{addressUrl,
+  // addressLink}` so the admin's Settings → Branding → Contact tab can both
+  // (a) supply an explicit map URL the merchant pasted from Google/Apple
+  // Maps and (b) toggle whether the address renders as a clickable link.
+  // Defaults preserve historic behaviour: link enabled, falls back to a
+  // synthesised Google Maps search URL when no explicit URL is set.
+  //
+  // Legacy stores may still have the prior `addressLink: 'maps' | 'none'`
+  // value persisted; we normalise that to a boolean here so the storefront
+  // doesn't need to know about the migration.
   const rawContactSettings = (store.settings?.contact as Record<string, unknown> | undefined) ?? {};
-  const addressLink: 'maps' | 'none' = rawContactSettings.addressLink === 'none' ? 'none' : 'maps';
+  const rawAddressLink = rawContactSettings.addressLink;
+  const addressLink: boolean = rawAddressLink === false || rawAddressLink === 'none' ? false : true;
+  const addressUrl: string | undefined =
+    typeof rawContactSettings.addressUrl === 'string' && rawContactSettings.addressUrl.trim()
+      ? rawContactSettings.addressUrl.trim()
+      : undefined;
 
   const handleSearch = (query: string) => {
     router.push(storeUrl(`/search?q=${encodeURIComponent(query)}`));
@@ -218,6 +230,7 @@ export function ShopChrome({ children }: { children: ReactNode }) {
           whatsapp: contact.whatsapp,
           address: contact.address,
           addressAr: contact.addressAr,
+          addressUrl,
           addressLink,
         }}
         socials={contact.socialLinks}

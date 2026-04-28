@@ -24,6 +24,20 @@ export interface StoreBranding {
   whatsapp?: string;
   address?: string;
   addressAr?: string;
+  /**
+   * Optional explicit map URL (e.g. a Google / Apple Maps pin) the merchant
+   * wants the storefront footer to link to. When present + `addressLink` is
+   * true (or unset), the address text is wrapped in `<a href={addressUrl}>`.
+   * Persisted at `store.settings.contact.addressUrl`.
+   */
+  addressUrl?: string;
+  /**
+   * Whether the storefront footer renders the address as a clickable link.
+   * Defaults to `true` when undefined (matches the long-standing behaviour).
+   * `false` keeps the address as plain text. Persisted at
+   * `store.settings.contact.addressLink`.
+   */
+  addressLink?: boolean;
   socialLinks: {
     instagram?: string;
     facebook?: string;

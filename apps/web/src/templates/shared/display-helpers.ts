@@ -191,13 +191,38 @@ export function resolveBottomBar(
 }
 
 /**
- * Whether the address should render as a Google Maps hyperlink given the
- * per-store flag. Defaults to `true` (link enabled) when the flag is unset
- * — historically every footer rendered the address as plain text, so this
- * change opts every store into clickable maps unless they explicitly disable.
+ * Whether the address should render as a clickable hyperlink given the
+ * per-store flag. Defaults to `true` when the flag is unset so existing
+ * stores keep their current behaviour. The flag is normalised to a boolean
+ * — legacy values ('maps' / 'none' from the prior implementation) are also
+ * accepted so we don't break stored settings while a tenant migrates.
  */
-export function isAddressMapLinkEnabled(addressLink: 'maps' | 'none' | undefined): boolean {
-  return addressLink !== 'none';
+export function isAddressMapLinkEnabled(addressLink: boolean | undefined): boolean {
+  return addressLink !== false;
+}
+
+/**
+ * Resolve which URL the footer's address `<a>` should point at, if any.
+ *
+ * Rules (in order):
+ *   1. Tenant disabled the link entirely (`addressLink === false`) → null.
+ *   2. Tenant pasted an explicit map URL → use that verbatim.
+ *   3. Otherwise fall back to a Google-Maps "search" link built from the
+ *      address text (preserves the long-standing default).
+ *   4. Empty / whitespace-only address with no explicit URL → null.
+ *
+ * Returns `null` when the caller should render plain text instead of an
+ * anchor.
+ */
+export function resolveAddressHref(
+  address: string | undefined,
+  addressUrl: string | undefined,
+  addressLink: boolean | undefined
+): string | null {
+  if (addressLink === false) return null;
+  const trimmedUrl = addressUrl?.trim();
+  if (trimmedUrl) return trimmedUrl;
+  return buildMapsHref(address);
 }
 
 /**

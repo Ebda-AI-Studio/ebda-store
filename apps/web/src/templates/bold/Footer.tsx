@@ -4,8 +4,7 @@ import Link from 'next/link';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import {
-  buildMapsHref,
-  isAddressMapLinkEnabled,
+  resolveAddressHref,
   resolveBottomBar,
   resolveFooterSections,
 } from '../shared/display-helpers';
@@ -37,9 +36,11 @@ export default function BoldFooter({
   // newsletter form so newsletterEnabled does not apply here.
   const footerSections = resolveFooterSections(footerLinks, isRtl);
   const bottomBar = resolveBottomBar(footerLinks?.bottomBar, displayName, isRtl);
-  const addressMapHref = isAddressMapLinkEnabled(contact.addressLink)
-    ? buildMapsHref(displayAddress)
-    : null;
+  const addressMapHref = resolveAddressHref(
+    displayAddress,
+    contact.addressUrl,
+    contact.addressLink
+  );
 
   // Hide the contact column entirely when the store has no contact details
   // configured — empty heading + empty list reads as half-built.
@@ -65,7 +66,7 @@ export default function BoldFooter({
               <img
                 src={displayLogo}
                 alt={displayName}
-                className="h-14 max-h-14 w-auto object-contain mb-6 brightness-0 invert"
+                className="h-16 sm:h-20 w-auto object-contain mb-6 brightness-0 invert"
               />
             ) : (
               <h3 className="text-3xl font-black uppercase tracking-wider mb-6 text-white">

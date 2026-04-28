@@ -6,11 +6,10 @@ import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { api } from '../../lib/api';
 import {
-  buildMapsHref,
   getDisplayBranding,
   getDisplayText,
-  isAddressMapLinkEnabled,
   isNewsletterEnabled,
+  resolveAddressHref,
   resolveBottomBar,
   resolveFooterSections,
 } from '../shared/display-helpers';
@@ -49,9 +48,11 @@ export default function ModernFooter({
   const footerSections = resolveFooterSections(footerLinks, isRtl);
   const showNewsletter = isNewsletterEnabled(footerLinks);
   const bottomBar = resolveBottomBar(footerLinks?.bottomBar, displayName, isRtl);
-  const addressMapHref = isAddressMapLinkEnabled(contact.addressLink)
-    ? buildMapsHref(displayAddress)
-    : null;
+  const addressMapHref = resolveAddressHref(
+    displayAddress,
+    contact.addressUrl,
+    contact.addressLink
+  );
 
   // Real signup wired to /public/newsletter/subscribe. We tag the source
   // so admin analytics can tell apart footer signups from any future popup.
@@ -106,7 +107,7 @@ export default function ModernFooter({
               <img
                 src={displayLogo}
                 alt={displayName}
-                className="h-14 max-h-14 w-auto object-contain brightness-0 invert"
+                className="h-16 sm:h-20 w-auto object-contain brightness-0 invert"
               />
             ) : (
               <h3 className="text-xl font-bold text-white">{displayName}</h3>

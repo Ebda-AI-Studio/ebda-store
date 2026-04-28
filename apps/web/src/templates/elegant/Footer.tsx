@@ -6,9 +6,8 @@ import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { api } from '../../lib/api';
 import {
-  buildMapsHref,
-  isAddressMapLinkEnabled,
   isNewsletterEnabled,
+  resolveAddressHref,
   resolveBottomBar,
   resolveFooterSections,
 } from '../shared/display-helpers';
@@ -72,9 +71,11 @@ export default function ElegantFooter({
   const footerSections = resolveFooterSections(footerLinks, isRtl);
   const showNewsletter = isNewsletterEnabled(footerLinks);
   const bottomBar = resolveBottomBar(footerLinks?.bottomBar, displayName, isRtl);
-  const addressMapHref = isAddressMapLinkEnabled(contact.addressLink)
-    ? buildMapsHref(displayAddress)
-    : null;
+  const addressMapHref = resolveAddressHref(
+    displayAddress,
+    contact.addressUrl,
+    contact.addressLink
+  );
 
   return (
     <footer className="bg-muted border-t border-border mt-auto" dir={isRtl ? 'rtl' : 'ltr'}>
@@ -162,7 +163,7 @@ export default function ElegantFooter({
               <img
                 src={displayLogo}
                 alt={displayName}
-                className="h-12 max-h-12 w-auto object-contain mb-6"
+                className="h-16 sm:h-20 w-auto object-contain mb-6"
               />
             ) : (
               <h3 className="text-base font-medium tracking-[0.2em] text-foreground mb-6 font-serif">
@@ -181,7 +182,7 @@ export default function ElegantFooter({
           {footerSections.length > 0 ? (
             footerSections.map(section => (
               <div key={section.key}>
-                <h4 className="text-xs tracking-[0.25em] uppercase font-medium text-foreground mb-6 font-serif">
+                <h4 className="text-xs tracking-[0.25em] uppercase font-semibold text-foreground mb-6 font-serif">
                   {section.heading}
                 </h4>
                 <ul className="space-y-4">
@@ -200,7 +201,7 @@ export default function ElegantFooter({
             ))
           ) : (
             <div>
-              <h4 className="text-xs tracking-[0.25em] uppercase font-medium text-foreground mb-6 font-serif">
+              <h4 className="text-xs tracking-[0.25em] uppercase font-semibold text-foreground mb-6 font-serif">
                 {isRtl ? 'التصفح' : 'Explore'}
               </h4>
               <ul className="space-y-4">
@@ -222,7 +223,7 @@ export default function ElegantFooter({
               configured. Empty heading + empty list looks unfinished. */}
           {(contact.email || displayPhone || displayAddress) && (
             <div>
-              <h4 className="text-xs tracking-[0.25em] uppercase font-medium text-foreground mb-6 font-serif">
+              <h4 className="text-xs tracking-[0.25em] uppercase font-semibold text-foreground mb-6 font-serif">
                 {isRtl ? 'تواصل' : 'Contact'}
               </h4>
               <ul className="space-y-4 text-sm">
@@ -270,7 +271,7 @@ export default function ElegantFooter({
           {/* Social — hidden when there are no social links configured. */}
           {socialLinks.length > 0 && (
             <div>
-              <h4 className="text-xs tracking-[0.25em] uppercase font-medium text-foreground mb-6 font-serif">
+              <h4 className="text-xs tracking-[0.25em] uppercase font-semibold text-foreground mb-6 font-serif">
                 {isRtl ? 'تابعنا' : 'Follow'}
               </h4>
               <div className="flex flex-wrap gap-3">

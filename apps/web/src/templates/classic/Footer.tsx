@@ -4,10 +4,9 @@ import Link from 'next/link';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import {
-  buildMapsHref,
   getDisplayBranding,
   getDisplayText,
-  isAddressMapLinkEnabled,
+  resolveAddressHref,
   resolveBottomBar,
   resolveFooterSections,
 } from '../shared/display-helpers';
@@ -41,9 +40,11 @@ export default function ClassicFooter({
   // long-standing tenants keep their existing layout.
   const footerSections = resolveFooterSections(footerLinks, isRtl);
   const bottomBar = resolveBottomBar(footerLinks?.bottomBar, displayName, isRtl);
-  const addressMapHref = isAddressMapLinkEnabled(contact.addressLink)
-    ? buildMapsHref(displayAddress)
-    : null;
+  const addressMapHref = resolveAddressHref(
+    displayAddress,
+    contact.addressUrl,
+    contact.addressLink
+  );
   const useDefaultNavChunks = footerSections.length === 0;
   const navChunks: (typeof navigation)[] = [];
   if (useDefaultNavChunks && navigation.length > 0) {
@@ -67,7 +68,7 @@ export default function ClassicFooter({
               <img
                 src={displayLogo}
                 alt={displayName}
-                className="h-14 max-h-14 w-auto object-contain"
+                className="h-16 sm:h-20 w-auto object-contain"
               />
             ) : (
               <h3 className="text-xl font-serif font-bold text-foreground">{displayName}</h3>
