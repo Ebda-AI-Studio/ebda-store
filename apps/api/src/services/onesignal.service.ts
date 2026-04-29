@@ -105,8 +105,22 @@ export class OneSignalRequestError extends Error {
   }
 }
 
-function isConfigured(): boolean {
+/** Storefront app — used by `broadcastToStore` (customer-facing pushes
+ *  from merchants). Origin: https://store.forcemediakw.com. */
+function isStorefrontConfigured(): boolean {
   return !!(config.onesignalAppId && config.onesignalRestApiKey);
+}
+
+/** Admin app — used by `notifyAdminsOfOrder` (new-order pings to store
+ *  owners). Origin: https://app.forcemediakw.com. Distinct from the
+ *  storefront app because OneSignal locks each app to a single origin. */
+function isAdminConfigured(): boolean {
+  return !!(config.onesignalAdminAppId && config.onesignalAdminRestApiKey);
+}
+
+// Backwards-compat alias for code paths not yet split into admin vs storefront.
+function isConfigured(): boolean {
+  return isStorefrontConfigured();
 }
 
 function adminOrderUrl(storeId: string, orderId: string): string {
@@ -124,8 +138,13 @@ export class OneSignalService {
    * because order creation must not roll back over a notification glitch.
    */
   static async notifyAdminsOfOrder(input: NotifyOrderInput): Promise<void> {
-    if (!isConfigured()) {
-      logger.debug('OneSignal not configured — skipping notification');
+    // Admin pushes go through the admin OneSignal app (origin
+    // app.forcemediakw.com), NOT the storefront app. OneSignal locks each
+    // app to a single chrome_web_origin so we can't reuse the storefront
+    // app for admin devices — they'd fail subscription with an origin
+    // mismatch error.
+    if (!isAdminConfigured()) {
+      logger.debug('Admin OneSignal not configured — skipping order notification');
       return;
     }
 
@@ -137,7 +156,7 @@ export class OneSignalService {
       storeName: input.storeName,
     };
     const sharedFields = {
-      app_id: config.onesignalAppId,
+      app_id: config.onesignalAdminAppId,
       url,
       web_buttons: [{ id: 'view-order', text: 'View order', url }],
       data: dataPayload,
@@ -187,10 +206,10 @@ export class OneSignalService {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            // OneSignal v2 accepts both `Basic <REST_API_KEY>` (legacy)
-            // and `Key <REST_API_KEY>` (current). Match Beethoven's
-            // existing convention.
-            Authorization: `Key ${config.onesignalRestApiKey}`,
+            // Admin REST key — pairs with onesignalAdminAppId in the
+            // request body. OneSignal v2 accepts both `Basic` (legacy)
+            // and `Key` (current); we use `Key`.
+            Authorization: `Key ${config.onesignalAdminRestApiKey}`,
           },
           body: JSON.stringify(body),
         });

@@ -111,8 +111,23 @@ export const config = {
   // OneSignal — admin-side push notifications. Tags are scoped per-user with
   // (role, store_id) so notifyAdminsOfOrder() can filter to the order's store
   // admins plus all super_admins, never bleeding to other tenants' admins.
+  // Storefront OneSignal app — push notifications to shoppers. The app's
+  // `chrome_web_origin` is locked to https://store.forcemediakw.com and
+  // OneSignal does not allow multiple origins per app, so the admin uses
+  // a SEPARATE app (variables below) when configured. When the admin
+  // variables are unset we fall back to the storefront app id so legacy
+  // single-app setups keep working — they just won't subscribe new admin
+  // devices because the origin won't match.
   onesignalAppId: process.env.ONESIGNAL_APP_ID || '',
   onesignalRestApiKey: process.env.ONESIGNAL_REST_API_KEY || '',
+  // Admin OneSignal app — push notifications to store admins about new
+  // orders, etc. Origin must match https://app.forcemediakw.com. When
+  // unset, falls back to the storefront app (admin pushes won't actually
+  // deliver because the origin won't match — operator should create a
+  // dedicated admin OneSignal app and set these).
+  onesignalAdminAppId: process.env.ONESIGNAL_ADMIN_APP_ID || process.env.ONESIGNAL_APP_ID || '',
+  onesignalAdminRestApiKey:
+    process.env.ONESIGNAL_ADMIN_REST_API_KEY || process.env.ONESIGNAL_REST_API_KEY || '',
 
   // Email
   smtpHost: process.env.SMTP_HOST || 'localhost',
