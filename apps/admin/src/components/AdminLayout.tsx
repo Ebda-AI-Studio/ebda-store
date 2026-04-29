@@ -53,6 +53,20 @@ export function AdminLayout({
   const { selectedStoreId: globalStoreId } = useStore();
   const { isEnabled: isFeatureEnabled } = useFeatures();
 
+  // When a super_admin is browsing inside a specific store
+  // (`/stores/<id>/...`), they need the store-admin nav (Layout, Content,
+  // Settings, Products, Orders, etc.) so they can edit that store the
+  // same way its owner would. Without this, the platform nav stays
+  // visible across every store page and the super_admin loses access to
+  // the per-store editors.
+  //
+  // The match deliberately excludes `/stores` (the list), `/stores/new`
+  // (creation flow), and the literal `/stores/[id]` dynamic-route token
+  // that Next.js normalises in some edge cases.
+  const storeScopeMatch = pathname.match(/^\/stores\/([^/]+)/);
+  const isStoreScopedPath =
+    !!storeScopeMatch && storeScopeMatch[1] !== 'new' && storeScopeMatch[1] !== '[id]';
+
   // Derive the mode from the authenticated user's role unless the page
   // explicitly opts out. A store_admin can never see super_admin chrome
   // (security + UX), so even if a page passes mode="super_admin" we coerce
@@ -60,7 +74,7 @@ export function AdminLayout({
   const mode: 'super_admin' | 'store_admin' =
     user?.role === 'store_admin'
       ? 'store_admin'
-      : (explicitMode ?? (user?.role === 'super_admin' ? 'super_admin' : 'super_admin'));
+      : (explicitMode ?? (isStoreScopedPath ? 'store_admin' : 'super_admin'));
 
   const navLabels: NavLabels = {
     dashboard: t('navDashboard'),
