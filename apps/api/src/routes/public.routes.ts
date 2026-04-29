@@ -451,10 +451,12 @@ router.get(
 
 // GET /public/:storeId/search/suggest - Storefront typeahead suggestions
 //
-// Returns up to 8 active products matching `q` against name OR nameAr,
+// Returns up to 25 active products matching `q` against name OR nameAr,
 // with image[0] flattened to a single URL so the header dropdown can
 // render thumbnails without further joins. 30s edge cache + 60s memory
-// cache keep cold-start hits cheap on busy stores.
+// cache keep cold-start hits cheap on busy stores. The dropdown's
+// max-h-[70vh] + overscroll-contain takes care of the scroll inside
+// the typeahead.
 router.get('/:storeId/search/suggest', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { storeId } = req.params;
@@ -478,7 +480,7 @@ router.get('/:storeId/search/suggest', async (req: Request, res: Response, next:
 
     const cacheKey = `public:suggest:${storeId}:${trimmed.toLowerCase()}`;
     const result = await getCached(cacheKey, 30, () =>
-      ProductService.getSuggestSuggestions(storeId, trimmed, 8)
+      ProductService.getSuggestSuggestions(storeId, trimmed, 25)
     );
 
     res.setHeader('Cache-Control', 'private, max-age=30');

@@ -40,7 +40,7 @@ export function ProductSearch({ storeId, onSelect, excludeIds, disabled }: Produ
       setSearching(true);
       try {
         const { data } = await apiGet<{ products: ProductSummary[] }>(
-          `/api/v1/stores/${storeId}/products?search=${encodeURIComponent(q)}&limit=10`
+          `/api/v1/stores/${storeId}/products?search=${encodeURIComponent(q)}&limit=25`
         );
         const filtered = (data?.products ?? []).filter(p => !excludeIds.includes(p.id));
         setResults(filtered);

@@ -804,11 +804,16 @@ export class ProductService {
    * Matches both English and Arabic names so RTL shoppers see results
    * for their query immediately.
    */
-  static async getSuggestSuggestions(storeId: string, query: string, limit = 8) {
+  static async getSuggestSuggestions(storeId: string, query: string, limit = 25) {
     const trimmed = (query ?? '').trim();
     if (trimmed.length < 2) return { suggestions: [] as Array<unknown> };
 
-    const take = Math.min(8, Math.max(1, limit));
+    // 25 is enough to actually scroll inside the typeahead's
+    // max-h-[70vh] container — the previous cap of 8 made the
+    // dropdown so short the scroll never engaged. 25 also stays
+    // well under what's painful to render and is gated by the
+    // service limit param so an attacker can't request more.
+    const take = Math.min(25, Math.max(1, limit));
 
     const products = await prisma.product.findMany({
       where: {
