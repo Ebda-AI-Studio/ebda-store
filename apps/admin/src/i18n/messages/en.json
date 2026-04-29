@@ -686,6 +686,18 @@
         "cancel": "Cancel",
         "submit": "Add Value"
       },
+      "weightScale": {
+        "title": "Auto-scale price by weight",
+        "description": "When all variants share a per-gram price (e.g. 250g = 1 KWD, 500g = 2 KWD), pick one variant + its price and we compute the rest proportionally.",
+        "referenceVariant": "Reference variant",
+        "referenceVariantPlaceholder": "Pick a variant…",
+        "referencePrice": "Reference price (KWD)",
+        "preview": "Preview",
+        "apply": "Apply prices",
+        "applying": "Applying…",
+        "appliedTitle": "Variant prices scaled",
+        "appliedDescription": "{count} variants priced from {ref}."
+      },
       "variantModal": {
         "title": "Edit Variant: {title}",
         "skuLabel": "SKU",
@@ -696,6 +708,7 @@
         "pricePlaceholder": "Base price",
         "compareAtLabel": "Compare At",
         "costLabel": "Cost",
+        "applyToAll": "Apply to all {count} other variants",
         "inventoryLabel": "Inventory",
         "weightLabel": "Weight (kg)",
         "cancel": "Cancel",

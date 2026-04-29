@@ -11,6 +11,13 @@ interface EditVariantModalProps {
   onChange: (next: VariantFormState) => void;
   onCancel: () => void;
   onSubmit: () => void;
+  /** Number of OTHER variants on this product. The "Apply to all" buttons
+   *  only render when there are siblings to apply the value to (>= 1). */
+  siblingCount?: number;
+  /** Optional broadcast hook. Called when the merchant clicks "Apply to all"
+   *  next to one of the three numeric fields. Implementation lives in the
+   *  parent so it has access to the full variants list + the API client. */
+  onApplyToAll?: (field: 'price' | 'compareAtPrice' | 'costPrice', value: string) => void;
 }
 
 export function EditVariantModal({
@@ -19,8 +26,26 @@ export function EditVariantModal({
   onChange,
   onCancel,
   onSubmit,
+  siblingCount = 0,
+  onApplyToAll,
 }: EditVariantModalProps) {
   const t = useT('products.variants.variantModal');
+  const showApplyAll = siblingCount > 0 && !!onApplyToAll;
+
+  function applyAllButton(field: 'price' | 'compareAtPrice' | 'costPrice', value: string) {
+    if (!showApplyAll) return null;
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    return (
+      <button
+        type="button"
+        onClick={() => onApplyToAll!(field, trimmed)}
+        className="mt-1 text-[11px] font-medium text-primary hover:underline cursor-pointer text-start"
+      >
+        {t('applyToAll', { count: siblingCount })}
+      </button>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -78,6 +103,7 @@ export function EditVariantModal({
                 placeholder={t('pricePlaceholder')}
                 className="mt-1"
               />
+              {applyAllButton('price', form.price)}
             </div>
             <div>
               <Label htmlFor="variantCompareAt">{t('compareAtLabel')}</Label>
@@ -88,6 +114,7 @@ export function EditVariantModal({
                 onChange={e => onChange({ ...form, compareAtPrice: e.target.value })}
                 className="mt-1"
               />
+              {applyAllButton('compareAtPrice', form.compareAtPrice)}
             </div>
             <div>
               <Label htmlFor="variantCost">{t('costLabel')}</Label>
@@ -98,6 +125,7 @@ export function EditVariantModal({
                 onChange={e => onChange({ ...form, costPrice: e.target.value })}
                 className="mt-1"
               />
+              {applyAllButton('costPrice', form.costPrice)}
             </div>
           </div>
 

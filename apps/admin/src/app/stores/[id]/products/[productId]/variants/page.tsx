@@ -12,6 +12,7 @@ import { VariantsTable } from './_components/VariantsTable';
 import { AddOptionModal } from './_components/AddOptionModal';
 import { AddValueModal } from './_components/AddValueModal';
 import { EditVariantModal } from './_components/EditVariantModal';
+import { WeightScaleCard } from './_components/WeightScaleCard';
 import type { Option, Variant, ProductInfo, VariantFormState } from './_components/types';
 
 const EMPTY_VARIANT_FORM: VariantFormState = {
@@ -32,7 +33,7 @@ export default function ProductVariantsPage() {
   const productId = params?.productId as string;
   const t = useT('products.variants');
   const tSummary = useT('products.variants.summary');
-  const { error: toastError } = useToast();
+  const { success: toastSuccess, error: toastError } = useToast();
 
   /**
    * Best-effort SKU auto-generator for new variants. Builds
@@ -215,6 +216,82 @@ export default function ProductVariantsPage() {
     }
   }
 
+  /**
+   * Broadcast a single field's value to every other variant on this
+   * product. Triggered from the EditVariantModal "Apply to all" link
+   * next to price / compareAtPrice / costPrice. Used when every variant
+   * has the same compare-at price (one discount across the line) or the
+   * same cost — saves the merchant from editing each variant by hand.
+   *
+   * Confirms first because this overwrites any per-variant values.
+   */
+  async function applyFieldToAllVariants(
+    field: 'price' | 'compareAtPrice' | 'costPrice',
+    value: string
+  ) {
+    if (!editingVariant) return;
+    const fils = parseInt(value);
+    if (!Number.isFinite(fils)) return;
+    const others = variants.filter(v => v.id !== editingVariant.id);
+    if (others.length === 0) return;
+
+    const fieldLabel =
+      field === 'price' ? 'Price' : field === 'compareAtPrice' ? 'Compare-at price' : 'Cost';
+    const ok = window.confirm(
+      `Apply ${fieldLabel} = ${(fils / 1000).toFixed(3)} KWD to all ${others.length} other variants? This will overwrite their current ${fieldLabel.toLowerCase()}.`
+    );
+    if (!ok) return;
+
+    let failed = 0;
+    await Promise.all(
+      others.map(async v => {
+        const { error } = await apiPut(
+          `/api/v1/stores/${storeId}/products/${productId}/variants/${v.id}`,
+          { [field]: fils }
+        );
+        if (error) failed++;
+      })
+    );
+
+    if (failed === 0) {
+      toastSuccess?.(`${fieldLabel} applied`, `Updated ${others.length} variant(s).`);
+    } else {
+      toastError(
+        'Bulk update partially failed',
+        `${others.length - failed} of ${others.length} updated. Refresh to see current state.`
+      );
+    }
+    fetchVariants();
+  }
+
+  /**
+   * Bulk-set the `price` on each variant in `updates` (fired by the
+   * weight-scaling card). One PUT per variant in parallel; toast at
+   * the end with success / partial-failure summary.
+   */
+  async function handleApplyWeightScale(updates: Array<{ variantId: string; price: number }>) {
+    if (updates.length === 0) return;
+    let failed = 0;
+    await Promise.all(
+      updates.map(async u => {
+        const { error } = await apiPut(
+          `/api/v1/stores/${storeId}/products/${productId}/variants/${u.variantId}`,
+          { price: u.price }
+        );
+        if (error) failed++;
+      })
+    );
+    if (failed === 0) {
+      toastSuccess('Variant prices scaled', `Updated ${updates.length} variants.`);
+    } else {
+      toastError(
+        'Bulk update partially failed',
+        `${updates.length - failed} of ${updates.length} updated.`
+      );
+    }
+    fetchVariants();
+  }
+
   async function handleDeleteVariant(variantId: string) {
     try {
       await apiDelete(`/api/v1/stores/${storeId}/products/${productId}/variants/${variantId}`);
@@ -320,6 +397,8 @@ export default function ProductVariantsPage() {
           onGenerateVariants={handleGenerateVariants}
         />
 
+        <WeightScaleCard options={options} variants={variants} onApply={handleApplyWeightScale} />
+
         <VariantsTable
           variants={variants}
           onEdit={openEditVariant}
@@ -358,6 +437,8 @@ export default function ProductVariantsPage() {
           onChange={setVariantForm}
           onCancel={() => setEditingVariant(null)}
           onSubmit={handleUpdateVariant}
+          siblingCount={Math.max(0, variants.length - 1)}
+          onApplyToAll={applyFieldToAllVariants}
         />
       )}
     </AdminLayout>

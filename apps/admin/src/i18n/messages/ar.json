@@ -686,6 +686,18 @@
         "cancel": "إلغاء",
         "submit": "إضافة قيمة"
       },
+      "weightScale": {
+        "title": "تسعير تلقائي حسب الوزن",
+        "description": "عندما تتشارك جميع المتغيرات في سعر الجرام (مثلاً 250غ = 1 د.ك، 500غ = 2 د.ك)، اختر متغيراً مرجعياً وسعره وسنحسب الباقي تناسبياً.",
+        "referenceVariant": "المتغير المرجعي",
+        "referenceVariantPlaceholder": "اختر متغيراً…",
+        "referencePrice": "السعر المرجعي (د.ك)",
+        "preview": "معاينة",
+        "apply": "تطبيق الأسعار",
+        "applying": "جاري التطبيق…",
+        "appliedTitle": "تم تطبيق الأسعار",
+        "appliedDescription": "تم تسعير {count} متغير(ات) من المرجع."
+      },
       "variantModal": {
         "title": "تعديل المتغير: {title}",
         "skuLabel": "SKU",
@@ -696,6 +708,7 @@
         "pricePlaceholder": "السعر الأساسي",
         "compareAtLabel": "السعر قبل الخصم",
         "costLabel": "التكلفة",
+        "applyToAll": "تطبيق على جميع المتغيرات ({count})",
         "inventoryLabel": "المخزون",
         "weightLabel": "الوزن (كجم)",
         "cancel": "إلغاء",
