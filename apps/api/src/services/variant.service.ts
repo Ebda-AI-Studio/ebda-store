@@ -77,6 +77,11 @@ export class VariantService {
         id: product.id,
         name: product.name,
         nameAr: product.nameAr,
+        // Parent SKU surfaced so the admin variant editor can auto-fill
+        // a per-variant SKU as `<parentSku>-<variant identifier>` when
+        // the merchant doesn't set one explicitly. Cuts down the number
+        // of fields the merchant has to type per variant from 7 → 6.
+        sku: product.sku,
         price: product.price,
         hasVariants: product.hasVariants,
         inventory: product.inventory,

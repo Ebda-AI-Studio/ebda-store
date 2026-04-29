@@ -40,6 +40,10 @@ export interface ProductInfo {
   id: string;
   name: string;
   nameAr: string | null;
+  /** Parent product SKU. Used to auto-fill per-variant SKUs when the
+   *  merchant opens a variant in the editor with no SKU set —
+   *  `<parentSku>-<slug(variant.title)>`. */
+  sku: string | null;
   price: number;
   hasVariants: boolean;
   inventory: number;

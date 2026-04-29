@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Button } from '@force/ui';
+import { Button, useToast } from '@force/ui';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../../../components/AdminLayout';
 import { apiGet, apiPost, apiPut, apiDelete } from '../../../../../../lib/api';
@@ -32,6 +32,25 @@ export default function ProductVariantsPage() {
   const productId = params?.productId as string;
   const t = useT('products.variants');
   const tSummary = useT('products.variants.summary');
+  const { error: toastError } = useToast();
+
+  /**
+   * Best-effort SKU auto-generator for new variants. Builds
+   * `<parentSku>-<slug(variant.title)>` so a merchant who already
+   * has a parent SKU like `WJ-12` and a variant titled "Medium" gets
+   * `WJ-12-MEDIUM` for free. Returns the existing SKU when the
+   * merchant has already typed one — never overrides explicit input.
+   */
+  function autoSkuFor(variant: Variant): string {
+    if (variant.sku && variant.sku.trim()) return variant.sku;
+    const parent = product?.sku?.trim();
+    const slug = variant.title
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    if (!slug) return parent ?? '';
+    return parent ? `${parent}-${slug}` : slug;
+  }
 
   const [product, setProduct] = useState<ProductInfo | null>(null);
   const [options, setOptions] = useState<Option[]>([]);
@@ -92,15 +111,22 @@ export default function ProductVariantsPage() {
         }
       );
 
-      if (!apiError) {
-        setShowAddOption(false);
-        setNewOptionName('');
-        setNewOptionNameAr('');
-        setNewOptionValues('');
-        fetchVariants();
+      if (apiError) {
+        // Surface the API's error so the merchant sees what's wrong.
+        // Most common case: DUPLICATE_OPTION (the option name already
+        // exists on this product) — silently swallowing the 400 left
+        // the merchant retrying the same name with no feedback.
+        toastError('Could not add option', apiError.message);
+        return;
       }
+      setShowAddOption(false);
+      setNewOptionName('');
+      setNewOptionNameAr('');
+      setNewOptionValues('');
+      fetchVariants();
     } catch (error) {
       console.error('Failed to add option:', error);
+      toastError('Could not add option', 'Please try again.');
     }
   }
 
@@ -201,7 +227,9 @@ export default function ProductVariantsPage() {
   function openEditVariant(variant: Variant) {
     setEditingVariant(variant);
     setVariantForm({
-      sku: variant.sku || '',
+      // Auto-fill SKU from parent + variant title when the merchant
+      // hasn't set one. They can still override before saving.
+      sku: autoSkuFor(variant),
       barcode: variant.barcode || '',
       price: variant.price?.toString() || '',
       compareAtPrice: variant.compareAtPrice?.toString() || '',
@@ -246,7 +274,10 @@ export default function ProductVariantsPage() {
       title={t('title', { productName: product.name })}
       subtitle={t('subtitle')}
       actions={
-        <Button variant="outline" onClick={() => router.push(`/stores/${storeId}/products`)}>
+        <Button
+          variant="outline"
+          onClick={() => router.push(`/stores/${storeId}/products/${productId}`)}
+        >
           <svg className="me-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path
               strokeLinecap="round"
@@ -255,7 +286,7 @@ export default function ProductVariantsPage() {
               d="M10 19l-7-7m0 0l7-7m-7 7h18"
             />
           </svg>
-          {t('backToProducts')}
+          {t('backToProduct')}
         </Button>
       }
     >

@@ -538,6 +538,7 @@
       "subtitle": "المتجر: {storeName}",
       "fallbackStore": "غير معروف",
       "backToProducts": "العودة إلى المنتجات",
+      "manageVariants": "إدارة المتغيرات",
       "sections": {
         "basicInformation": "المعلومات الأساسية",
         "media": "الوسائط",
@@ -630,6 +631,7 @@
       "notFoundTitle": "المنتج غير موجود",
       "notFoundSubtitle": "تعذّر العثور على المنتج المطلوب",
       "backToProducts": "العودة إلى المنتجات",
+      "backToProduct": "العودة إلى المنتج",
       "title": "المتغيرات: {productName}",
       "subtitle": "إدارة خيارات المنتج والمتغيرات",
       "summary": {
@@ -666,6 +668,7 @@
       },
       "optionModal": {
         "title": "إضافة خيار",
+        "priceHint": "الخيارات تصف الفروقات بين المتغيرات (المقاس، اللون، الوزن). تُحدَّد الأسعار والمخزون والصور لكل متغير بعد توليد المتغيرات أدناه.",
         "nameLabel": "اسم الخيار",
         "namePlaceholder": "مثال: المقاس، اللون",
         "nameArLabel": "اسم الخيار (بالعربية)",

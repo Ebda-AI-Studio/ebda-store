@@ -538,6 +538,7 @@
       "subtitle": "Store: {storeName}",
       "fallbackStore": "Unknown",
       "backToProducts": "Back to Products",
+      "manageVariants": "Manage Variants",
       "sections": {
         "basicInformation": "Basic Information",
         "media": "Media",
@@ -630,6 +631,7 @@
       "notFoundTitle": "Product Not Found",
       "notFoundSubtitle": "The requested product could not be found",
       "backToProducts": "Back to Products",
+      "backToProduct": "Back to Product",
       "title": "Variants: {productName}",
       "subtitle": "Manage product options and variants",
       "summary": {
@@ -666,6 +668,7 @@
       },
       "optionModal": {
         "title": "Add Option",
+        "priceHint": "Options describe how variants differ (Size, Color, Weight). Per-variant prices, inventory, and images are set after the variants are generated below.",
         "nameLabel": "Option Name",
         "namePlaceholder": "e.g., Size, Color",
         "nameArLabel": "Option Name (Arabic)",

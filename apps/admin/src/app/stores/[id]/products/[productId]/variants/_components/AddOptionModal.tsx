@@ -29,7 +29,8 @@ export function AddOptionModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div className="w-full max-w-md rounded-xl bg-card p-6 shadow-xl">
-        <h3 className="text-lg font-semibold text-foreground mb-4">{t('title')}</h3>
+        <h3 className="text-lg font-semibold text-foreground mb-2">{t('title')}</h3>
+        <p className="mb-4 text-xs text-muted-foreground">{t('priceHint')}</p>
 
         <div className="space-y-4">
           <div>
