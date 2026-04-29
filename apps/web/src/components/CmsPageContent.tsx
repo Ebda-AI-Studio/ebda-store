@@ -5,25 +5,29 @@ import Image from 'next/image';
 import { useStore } from '../contexts/StoreContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { API_URL } from '../lib/api';
-import { renderMarkdown } from '../lib/markdown';
 
 /**
- * Shape of a StorePage row as returned by the public read endpoint.
- * Fields mirror the Prisma model — the server already filters out
- * unpublished rows (returns 404), so client code can assume any row
- * received here is meant to be visible.
+ * Shape of a public StorePage row as returned by the API. The API
+ * pre-renders the block array to HTML server-side so the storefront
+ * does not need a renderer or sanitizer dependency.
  */
-interface StorePage {
+interface PublicStorePage {
   id: string;
   storeId: string;
   slug: string;
   title?: string | null;
   titleAr?: string | null;
-  contentMd?: string | null;
-  contentMdAr?: string | null;
   coverImage?: string | null;
   isPublished: boolean;
+  contentHtml?: string | null;
+  contentHtmlAr?: string | null;
 }
+
+type FetchState =
+  | { kind: 'loading' }
+  | { kind: 'ok'; page: PublicStorePage }
+  | { kind: 'fallback' } // missing row OR empty content -> show legacy hardcoded copy
+  | { kind: 'disabled' }; // explicit hard-off; do NOT show fallback
 
 interface CmsPageContentProps {
   slug: string;
@@ -34,50 +38,68 @@ interface CmsPageContentProps {
 /**
  * Storefront renderer for a CMS-managed page.
  *
- * Fetches /public/:storeId/pages/:slug from the API. When the row exists
- * and has content, renders title + cover + markdown HTML. When missing
- * OR contentMd is empty, falls through to the `fallback` render-prop so
- * existing stores keep their hardcoded copy until they write content.
+ * Three response paths from /public/:storeId/pages/:slug:
+ *   - 200 with non-empty contentHtml  -> render the merchant's content
+ *   - 200 with empty contentHtml      -> treat like missing row, fall back
+ *   - 404 NOT_FOUND                   -> fall back to legacy hardcoded copy
+ *   - 410 PAGE_DISABLED               -> render "Page unavailable" (no fallback)
  *
- * The markdown renderer (`renderMarkdown`) escapes all user input and
- * restricts URL protocols, so the dangerouslySetInnerHTML below only
- * receives HTML built from known-safe wrappers — no third-party
- * sanitizer dep needed.
+ * The 410 path is the merchant's "hard off" toggle: when they turn the
+ * "Show on storefront" switch off, the page is unavailable and the
+ * platform's default copy must NOT silently appear.
+ *
+ * The HTML is rendered by the API and every text input is HTML-escaped
+ * before reaching this component, so the inserted markup is safe.
  */
 export function CmsPageContent({ slug, defaultTitle, fallback }: CmsPageContentProps) {
   const { store } = useStore();
-  const { language } = useLanguage();
-  const [page, setPage] = useState<StorePage | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasError, setHasError] = useState(false);
+  const { language, t } = useLanguage();
+  const [state, setState] = useState<FetchState>({ kind: 'loading' });
 
   useEffect(() => {
     if (!store.id || store.id === 'demo') {
-      setIsLoading(false);
+      setState({ kind: 'fallback' });
       return;
     }
 
     let cancelled = false;
-    setIsLoading(true);
-    setHasError(false);
+    setState({ kind: 'loading' });
 
     fetch(`${API_URL}/public/${store.id}/pages/${slug}`)
       .then(async res => {
+        if (cancelled) return;
+        if (res.status === 410) {
+          setState({ kind: 'disabled' });
+          return;
+        }
+        if (res.status === 404) {
+          setState({ kind: 'fallback' });
+          return;
+        }
         if (!res.ok) {
-          if (res.status === 404) return null;
-          throw new Error(`HTTP ${res.status}`);
+          // Network or 5xx - prefer fallback so legacy copy still shows.
+          setState({ kind: 'fallback' });
+          return;
         }
         const json = await res.json();
-        return json?.data?.page ?? null;
-      })
-      .then(p => {
-        if (!cancelled) setPage(p);
+        const page = json?.data?.page as PublicStorePage | undefined;
+        if (!page) {
+          setState({ kind: 'fallback' });
+          return;
+        }
+        // Empty content (both locales blank) is treated like a missing
+        // row so a half-configured page still falls back gracefully.
+        const hasAny =
+          (page.contentHtml && page.contentHtml.trim()) ||
+          (page.contentHtmlAr && page.contentHtmlAr.trim());
+        if (!hasAny) {
+          setState({ kind: 'fallback' });
+          return;
+        }
+        setState({ kind: 'ok', page });
       })
       .catch(() => {
-        if (!cancelled) setHasError(true);
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoading(false);
+        if (!cancelled) setState({ kind: 'fallback' });
       });
 
     return () => {
@@ -85,7 +107,7 @@ export function CmsPageContent({ slug, defaultTitle, fallback }: CmsPageContentP
     };
   }, [store.id, slug]);
 
-  if (isLoading) {
+  if (state.kind === 'loading') {
     return (
       <div className="mx-auto w-full max-w-3xl flex-1 px-4 py-12 sm:px-6 lg:px-8">
         <div className="flex items-center justify-center py-16">
@@ -95,11 +117,38 @@ export function CmsPageContent({ slug, defaultTitle, fallback }: CmsPageContentP
     );
   }
 
-  const localizedContent =
-    language === 'ar' ? page?.contentMdAr || page?.contentMd : page?.contentMd || page?.contentMdAr;
-  const hasUsableContent = !!(localizedContent && localizedContent.trim());
+  if (state.kind === 'disabled') {
+    // Hard off - do NOT call fallback. Merchant explicitly disabled this page.
+    return (
+      <div className="mx-auto w-full max-w-3xl flex-1 px-4 py-16 text-center sm:px-6 lg:px-8">
+        <div className="rounded-2xl border bg-card p-10 shadow-sm">
+          <h1 className="text-2xl font-semibold text-foreground">
+            {t('Page unavailable', 'الصفحة غير متاحة')}
+          </h1>
+          <p className="mt-3 text-sm text-muted-foreground">
+            {t(
+              'This page is currently turned off by the store.',
+              'تم إيقاف هذه الصفحة حاليًا من قبل المتجر.'
+            )}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
-  if (hasError || !page || !hasUsableContent) {
+  if (state.kind === 'fallback') {
+    return <>{fallback()}</>;
+  }
+
+  const page = state.page;
+  const localizedHtml =
+    language === 'ar'
+      ? page.contentHtmlAr || page.contentHtml || ''
+      : page.contentHtml || page.contentHtmlAr || '';
+
+  // Defensive: the empty case is already handled above, but guard again
+  // in case both locales got cleared between fetch and render.
+  if (!localizedHtml.trim()) {
     return <>{fallback()}</>;
   }
 
@@ -129,7 +178,7 @@ export function CmsPageContent({ slug, defaultTitle, fallback }: CmsPageContentP
       <div className="mt-12 rounded-xl border bg-card p-6 shadow-sm sm:p-8">
         <div
           className="cms-markdown prose prose-gray max-w-none text-muted-foreground"
-          dangerouslySetInnerHTML={{ __html: renderMarkdown(localizedContent) }}
+          dangerouslySetInnerHTML={{ __html: localizedHtml }}
         />
       </div>
     </div>

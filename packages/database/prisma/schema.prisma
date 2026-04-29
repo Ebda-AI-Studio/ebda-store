@@ -269,25 +269,33 @@ model Store {
 // ==========================================
 //
 // Per-store editable long-form content. Each row is one page identified by
-// a slug. The storefront reads `contentMd` (or `contentMdAr` for ar locale)
-// and renders it through a hand-rolled markdown renderer (no rich-text dep).
-// When a row is missing or `isPublished` is false, the storefront falls
-// through to the legacy hardcoded copy so existing stores don't lose their
-// pages overnight while merchants migrate content to the new CMS.
+// a slug. Content is stored as a structured block array (JSONB) — one
+// array per locale — and the API renders it to XSS-safe HTML for the
+// storefront. The storefront uses pre-rendered HTML directly (no
+// client-side renderer).
+//
+// Visibility model:
+//   - row missing            → storefront falls back to legacy hardcoded copy
+//   - row present, off       → storefront renders "Page unavailable" (NO fallback)
+//   - row present, on, empty → storefront falls back to legacy hardcoded copy
+//   - row present, on, full  → storefront renders the page
+//
+// The hard-off case means merchants can take a page completely offline
+// without it silently reverting to the platform's default text.
 
 model StorePage {
-  id          String   @id @default(uuid())
-  storeId     String   @map("store_id")
-  slug        String // about | privacy | terms | shipping | faq | <custom>
-  title       String?
-  titleAr     String?  @map("title_ar")
-  contentMd   String?  @map("content_md") // markdown
-  contentMdAr String?  @map("content_md_ar")
-  coverImage  String?  @map("cover_image") // optional R2 URL for header image
-  isPublished Boolean  @default(true) @map("is_published")
-  position    Int      @default(0)
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id              String   @id @default(uuid())
+  storeId         String   @map("store_id")
+  slug            String // about | privacy | terms | shipping | faq | <custom>
+  title           String?
+  titleAr         String?  @map("title_ar")
+  contentBlocks   Json?    @map("content_blocks") // Block[] (English) — see pages.service.ts
+  contentBlocksAr Json?    @map("content_blocks_ar") // Block[] (Arabic)
+  coverImage      String?  @map("cover_image") // optional R2 URL for header image
+  isPublished     Boolean  @default(true) @map("is_published")
+  position        Int      @default(0)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
 
   store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
 

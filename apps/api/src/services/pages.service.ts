@@ -4,14 +4,18 @@ import { AppError } from '../middleware/error-handler';
 /**
  * Per-store Pages CMS service.
  *
- * Backs the StorePage table — long-form merchant-editable content for
+ * Backs the StorePage table - long-form merchant-editable content for
  * About / Privacy / Terms / Shipping / FAQ + custom pages. Content is
- * markdown; the storefront renders it via a tiny hand-rolled renderer
- * (no rich-text dependency).
+ * stored as a typed Block[] per locale (JSONB) so the admin UI can
+ * present labeled fields per block type instead of a markdown textarea
+ * (merchants reported "normal people don't know markdown"). The
+ * storefront receives HTML pre-rendered by `renderBlocksToHtml`, which
+ * escapes every text input and restricts URL schemes - no client-side
+ * sanitizer dependency required.
  *
  * Slugs are normalized to lowercase + dash to keep URL paths predictable
  * across the storefront. Reserved built-in slugs (`about`, `privacy`,
- * `terms`, `shipping`, `faq`) are not gated here — merchants may freely
+ * `terms`, `shipping`, `faq`) are not gated here - merchants may freely
  * add custom slugs alongside the built-ins.
  */
 
@@ -31,15 +35,150 @@ function assertValidSlug(slug: string): void {
   }
 }
 
+// ---------- Block schema (mirrored in admin editor + Zod validator) ----------
+
+export type HeadingBlock = { type: 'heading'; level: 2 | 3; text: string };
+export type ParagraphBlock = { type: 'paragraph'; text: string };
+export type BulletsBlock = { type: 'bullets'; items: string[] };
+export type NumberedBlock = { type: 'numbered'; items: string[] };
+export type ImageBlock = { type: 'image'; url: string; alt: string };
+export type ButtonBlock = { type: 'button'; label: string; url: string };
+
+export type Block =
+  | HeadingBlock
+  | ParagraphBlock
+  | BulletsBlock
+  | NumberedBlock
+  | ImageBlock
+  | ButtonBlock;
+
+// ---------- Renderer (XSS-safe; output goes to the storefront verbatim) ----------
+
+const HTML_ESCAPE: Record<string, string> = {
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#39;',
+};
+
+function escapeHtml(input: string): string {
+  return input.replace(/[&<>"']/g, ch => HTML_ESCAPE[ch] || ch);
+}
+
+/**
+ * Allow only the URL schemes we control. Reject `javascript:`, `data:`,
+ * `vbscript:`, etc. Returned value is HTML-escaped so the caller can
+ * drop it straight into an attribute.
+ */
+function safeUrl(url: string): string {
+  const trimmed = (url ?? '').trim();
+  if (!trimmed) return '#';
+  if (/^(\/|#|\?|\.\/|\.\.\/)/.test(trimmed)) return escapeHtml(trimmed);
+  if (/^(https?:|mailto:|tel:)/i.test(trimmed)) return escapeHtml(trimmed);
+  return '#';
+}
+
+/**
+ * Render a typed block array to HTML. Every string input is HTML-escaped
+ * before interpolation, every URL passes through `safeUrl`, and only a
+ * fixed set of wrapper tags is emitted. The result is safe for the
+ * storefront to insert directly.
+ *
+ * Unknown block shapes are skipped silently - the upsert layer rejects
+ * them with Zod, but a defensive fallback keeps a malformed row from
+ * breaking the storefront.
+ */
+export function renderBlocksToHtml(blocks: unknown): string {
+  if (!Array.isArray(blocks)) return '';
+  const out: string[] = [];
+
+  for (const raw of blocks) {
+    if (!raw || typeof raw !== 'object') continue;
+    const b = raw as Partial<Block> & { type?: string };
+    switch (b.type) {
+      case 'heading': {
+        const level = b.level === 3 ? 3 : 2;
+        const text = escapeHtml(typeof b.text === 'string' ? b.text : '');
+        if (text) out.push(`<h${level}>${text}</h${level}>`);
+        break;
+      }
+      case 'paragraph': {
+        const raw = typeof b.text === 'string' ? b.text : '';
+        if (!raw.trim()) break;
+        // Preserve intentional line breaks within a paragraph.
+        const lines = raw.replace(/\r\n/g, '\n').split('\n').map(escapeHtml);
+        out.push(`<p>${lines.join('<br />')}</p>`);
+        break;
+      }
+      case 'bullets':
+      case 'numbered': {
+        const tag = b.type === 'bullets' ? 'ul' : 'ol';
+        const items = Array.isArray(b.items) ? b.items : [];
+        const li = items
+          .filter((it): it is string => typeof it === 'string' && it.trim().length > 0)
+          .map(it => `<li>${escapeHtml(it)}</li>`)
+          .join('');
+        if (li) out.push(`<${tag}>${li}</${tag}>`);
+        break;
+      }
+      case 'image': {
+        const url = typeof b.url === 'string' ? b.url : '';
+        if (!url.trim()) break;
+        const alt = escapeHtml(typeof b.alt === 'string' ? b.alt : '');
+        out.push(
+          `<figure class="cms-image"><img src="${safeUrl(url)}" alt="${alt}" loading="lazy" /></figure>`
+        );
+        break;
+      }
+      case 'button': {
+        const url = typeof b.url === 'string' ? b.url : '';
+        const label = escapeHtml(typeof b.label === 'string' ? b.label : '');
+        if (!url.trim() || !label) break;
+        // External links open in a new tab; relative links stay in-app.
+        const isExternal = /^https?:/i.test(url.trim());
+        const target = isExternal ? ' target="_blank" rel="noopener noreferrer"' : '';
+        out.push(
+          `<p class="cms-button-row"><a class="cms-button" href="${safeUrl(url)}"${target}>${label}</a></p>`
+        );
+        break;
+      }
+      default:
+        // Unknown block type - drop it silently.
+        break;
+    }
+  }
+
+  return out.join('\n');
+}
+
 export interface StorePagePayload {
   title?: string | null;
   titleAr?: string | null;
-  contentMd?: string | null;
-  contentMdAr?: string | null;
+  contentBlocks?: Block[] | null;
+  contentBlocksAr?: Block[] | null;
   coverImage?: string | null;
   isPublished?: boolean;
   position?: number;
 }
+
+export type PublicPageResult =
+  | { status: 'not_found' }
+  | { status: 'disabled' }
+  | {
+      status: 'ok';
+      page: {
+        id: string;
+        storeId: string;
+        slug: string;
+        title: string | null;
+        titleAr: string | null;
+        coverImage: string | null;
+        isPublished: boolean;
+        contentHtml: string;
+        contentHtmlAr: string;
+      };
+    };
 
 export class PagesService {
   /** List all pages for a store, ordered by position then slug. */
@@ -59,17 +198,40 @@ export class PagesService {
   }
 
   /**
-   * Public-facing fetch. Returns null when the page is missing OR
-   * unpublished — the storefront treats both cases the same and falls
-   * through to legacy hardcoded copy.
+   * Public-facing fetch with three-state semantics:
+   *
+   *   - `not_found` -> no row exists. Storefront should fall back to its
+   *     legacy hardcoded copy so stores that haven't migrated keep
+   *     working.
+   *   - `disabled`  -> row exists but `isPublished` is false. Storefront
+   *     should render a "Page unavailable" message and MUST NOT show
+   *     the legacy fallback. This is the explicit "hard-off" toggle
+   *     merchants asked for.
+   *   - `ok`        -> row exists and is enabled. The returned `page`
+   *     carries pre-rendered HTML (`contentHtml` / `contentHtmlAr`) so
+   *     the storefront doesn't need its own renderer.
    */
-  static async getPublic(storeId: string, slugRaw: string) {
+  static async getPublic(storeId: string, slugRaw: string): Promise<PublicPageResult> {
     const slug = normalizeSlug(slugRaw);
     const page = await prisma.storePage.findUnique({
       where: { storeId_slug: { storeId, slug } },
     });
-    if (!page || !page.isPublished) return null;
-    return page;
+    if (!page) return { status: 'not_found' };
+    if (!page.isPublished) return { status: 'disabled' };
+    return {
+      status: 'ok',
+      page: {
+        id: page.id,
+        storeId: page.storeId,
+        slug: page.slug,
+        title: page.title,
+        titleAr: page.titleAr,
+        coverImage: page.coverImage,
+        isPublished: page.isPublished,
+        contentHtml: renderBlocksToHtml(page.contentBlocks),
+        contentHtmlAr: renderBlocksToHtml(page.contentBlocksAr),
+      },
+    };
   }
 
   /**
@@ -82,13 +244,15 @@ export class PagesService {
     const slug = normalizeSlug(slugRaw);
     assertValidSlug(slug);
 
-    // Build the create vs update payloads separately so PATCH semantics
-    // (undefined = keep existing) line up with Prisma's behaviour.
     const updateData: Record<string, unknown> = {};
     if (payload.title !== undefined) updateData.title = payload.title;
     if (payload.titleAr !== undefined) updateData.titleAr = payload.titleAr;
-    if (payload.contentMd !== undefined) updateData.contentMd = payload.contentMd;
-    if (payload.contentMdAr !== undefined) updateData.contentMdAr = payload.contentMdAr;
+    if (payload.contentBlocks !== undefined) {
+      updateData.contentBlocks = payload.contentBlocks ?? null;
+    }
+    if (payload.contentBlocksAr !== undefined) {
+      updateData.contentBlocksAr = payload.contentBlocksAr ?? null;
+    }
     if (payload.coverImage !== undefined) updateData.coverImage = payload.coverImage;
     if (payload.isPublished !== undefined) updateData.isPublished = payload.isPublished;
     if (payload.position !== undefined) updateData.position = payload.position;
@@ -98,8 +262,8 @@ export class PagesService {
       slug,
       title: payload.title ?? null,
       titleAr: payload.titleAr ?? null,
-      contentMd: payload.contentMd ?? null,
-      contentMdAr: payload.contentMdAr ?? null,
+      contentBlocks: (payload.contentBlocks ?? null) as never,
+      contentBlocksAr: (payload.contentBlocksAr ?? null) as never,
       coverImage: payload.coverImage ?? null,
       isPublished: payload.isPublished ?? true,
       position: payload.position ?? 0,
@@ -113,7 +277,7 @@ export class PagesService {
   }
 
   /**
-   * Delete a page. Reserved for super_admin per the route layer — we
+   * Delete a page. Reserved for super_admin per the route layer - we
    * don't want a store_admin nuking a critical legal page by accident.
    */
   static async remove(storeId: string, slugRaw: string) {

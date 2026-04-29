@@ -14,8 +14,8 @@ interface StorePageRow {
   slug: string;
   title?: string | null;
   titleAr?: string | null;
-  contentMd?: string | null;
-  contentMdAr?: string | null;
+  contentBlocks?: unknown;
+  contentBlocksAr?: unknown;
   isPublished: boolean;
   position: number;
   updatedAt?: string;
@@ -31,8 +31,13 @@ const BUILT_IN_SLUGS: Array<{ slug: string; en: string; ar: string }> = [
 
 const SLUG_REGEX = /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/;
 
+// A page is considered "authored" when at least one block array has any
+// item. Blocks are arrays of typed objects so the truthiness check is
+// "non-empty array" rather than "non-empty string".
 function hasContent(p: StorePageRow): boolean {
-  return !!((p.contentMd && p.contentMd.trim()) || (p.contentMdAr && p.contentMdAr.trim()));
+  const en = Array.isArray(p.contentBlocks) ? p.contentBlocks.length > 0 : false;
+  const ar = Array.isArray(p.contentBlocksAr) ? p.contentBlocksAr.length > 0 : false;
+  return en || ar;
 }
 
 export default function ContentListPage() {
