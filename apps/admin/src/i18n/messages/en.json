@@ -2574,7 +2574,8 @@
     },
     "empty": {
       "title": "No notification channels enabled",
-      "description": "Enable notification channels (WhatsApp, SMS, or Push Notifications) in your store features to configure them here."
+      "description": "Enable notification channels (WhatsApp, SMS, or Push Notifications) in your store features to configure them here.",
+      "ctaEnable": "Enable channels"
     },
     "shared": {
       "save": "Save",

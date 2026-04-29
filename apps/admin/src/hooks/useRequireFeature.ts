@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFeatures } from './useFeatures';
+import { useAuth } from '../lib/auth';
 
 /**
  * Page-level guard for feature-gated store-admin routes.
@@ -30,6 +31,7 @@ export function useRequireFeature(featureKey: string): {
   const storeId = params?.id as string | undefined;
   const router = useRouter();
   const { isEnabled, isLoading } = useFeatures();
+  const { user } = useAuth();
 
   const enabled = isEnabled(featureKey);
 
@@ -37,8 +39,13 @@ export function useRequireFeature(featureKey: string): {
     if (isLoading) return;
     if (enabled) return;
     if (!storeId) return;
+    // Super admin always gets through — they're the one who flips the
+    // feature on, so redirecting them away from a disabled feature
+    // editor would prevent them from ever enabling it. Store admins
+    // still get bounced back to the dashboard.
+    if (user?.role === 'super_admin') return;
     router.replace(`/stores/${storeId}`);
-  }, [enabled, isLoading, storeId, router]);
+  }, [enabled, isLoading, storeId, router, user?.role]);
 
   return { enabled, isLoading };
 }

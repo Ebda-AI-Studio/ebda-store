@@ -1,13 +1,20 @@
 'use client';
 
+import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import { useT } from '@/i18n/useT';
 
 /**
  * Rendered when none of whatsapp / sms / push_notifications features are
- * enabled for the store. Prompts the admin to enable them elsewhere.
+ * enabled for the store. Includes a direct CTA to the per-store features
+ * editor so super admins (the only role that gets this far without being
+ * redirected to the dashboard) can flip a channel on without hunting
+ * through the nav.
  */
 export function NotificationsEmptyState() {
   const t = useT('notifications.empty');
+  const params = useParams();
+  const storeId = params?.id as string | undefined;
 
   return (
     <div className="flex flex-col items-center justify-center py-24 text-center">
@@ -23,6 +30,14 @@ export function NotificationsEmptyState() {
       </div>
       <h2 className="text-xl font-semibold text-foreground mb-2">{t('title')}</h2>
       <p className="text-muted-foreground max-w-md">{t('description')}</p>
+      {storeId && (
+        <Link
+          href={`/stores/${storeId}/features`}
+          className="mt-6 inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer"
+        >
+          {t('ctaEnable')} →
+        </Link>
+      )}
     </div>
   );
 }
