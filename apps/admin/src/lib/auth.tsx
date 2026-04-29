@@ -68,19 +68,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const checkAuth = useCallback(async () => {
     try {
-      // The HTTP-only cookie is sent automatically with credentials: 'include'.
-      // No need to check localStorage for a token first.
+      // Send the Bearer token from localStorage when available — required
+      // for the iOS PWA path where Safari/WebKit purges the cross-origin
+      // cookie. The cookie is still sent via credentials:'include' as a
+      // fallback for browsers that can rely on it (Mac Chrome, etc.).
+      const accessToken =
+        typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+      const headers: Record<string, string> = {};
+      if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+
       const response = await fetch(`${API_URL}/auth/me`, {
         credentials: 'include',
+        headers,
       });
 
       if (response.ok) {
         const data = await response.json();
         setUser(data.data.user);
       } else if (response.status === 401) {
-        // Try to refresh token
+        // Access token is dead (expired or never set on this device).
+        // Try the refresh flow, which uses the long-lived refresh token
+        // from localStorage and is independent of cookie state.
         const refreshed = await refreshToken();
         if (!refreshed) {
+          localStorage.removeItem('accessToken');
           localStorage.removeItem('refreshToken');
         }
       }
