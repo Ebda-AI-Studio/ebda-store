@@ -27,6 +27,35 @@ interface NotifyOrderInput {
   customerName: string;
   total: number; // fils
   currency: string;
+  /** Payment method the customer chose at checkout (e.g. 'cod', 'knet',
+   *  'visa'). Surfaced in the super_admin push body so platform staff can
+   *  triage at a glance — COD orders need active warehouse handling
+   *  whereas card-paid orders can wait. */
+  paymentMethod?: string;
+}
+
+/** Human-readable payment method for the push body. Falls back to a
+ *  title-cased version of the raw value so unknown providers still
+ *  render readably without us having to hardcode every one. */
+function formatPaymentMethod(method: string | undefined): string {
+  if (!method) return '—';
+  const normalized = method.toLowerCase().trim();
+  const labels: Record<string, string> = {
+    cod: 'Cash on Delivery',
+    cash: 'Cash on Delivery',
+    cash_on_delivery: 'Cash on Delivery',
+    knet: 'KNET',
+    visa: 'Visa',
+    mastercard: 'Mastercard',
+    apple_pay: 'Apple Pay',
+    google_pay: 'Google Pay',
+    benefit: 'Benefit',
+    mada: 'Mada',
+    stc_pay: 'STC Pay',
+  };
+  if (labels[normalized]) return labels[normalized];
+  // Title-case fallback for unknown methods.
+  return normalized.replace(/[_-]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
 export interface BroadcastInput {
@@ -101,51 +130,82 @@ export class OneSignalService {
     }
 
     const url = adminOrderUrl(input.storeId, input.orderId);
-    const body = {
+    const dataPayload = {
+      type: 'order.created',
+      orderId: input.orderId,
+      storeId: input.storeId,
+      storeName: input.storeName,
+    };
+    const sharedFields = {
       app_id: config.onesignalAppId,
-      headings: { en: 'New order', ar: 'طلب جديد' },
-      contents: {
-        en: `${input.orderNumber} from ${input.customerName} — ${formatMoney(input.total, input.currency)}`,
-        ar: `${input.orderNumber} من ${input.customerName} — ${formatMoney(input.total, input.currency)}`,
-      },
-      // store_id-scoped admins OR super_admin role.
-      // OneSignal `filters` are evaluated left-to-right with explicit OR/AND
-      // operator entries. The shape below means:
-      //   (tag:store_id = X) OR (tag:role = super_admin)
-      filters: [
-        { field: 'tag', key: 'store_id', relation: '=', value: input.storeId },
-        { operator: 'OR' },
-        { field: 'tag', key: 'role', relation: '=', value: 'super_admin' },
-      ],
       url,
       web_buttons: [{ id: 'view-order', text: 'View order', url }],
-      data: {
-        type: 'order.created',
-        orderId: input.orderId,
-        storeId: input.storeId,
-        storeName: input.storeName,
-      },
+      data: dataPayload,
     };
 
-    try {
-      const res = await fetch(ENDPOINT, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          // OneSignal v2 accepts both `Basic <REST_API_KEY>` (legacy) and
-          // `Key <REST_API_KEY>` (current). Using `Key` matches Beethoven's
-          // existing helper so credentials shipped from there work as-is.
-          Authorization: `Key ${config.onesignalRestApiKey}`,
-        },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) {
-        const errBody = await res.text().catch(() => '');
-        logger.error({ status: res.status, body: errBody }, 'OneSignal push failed');
+    const moneyText = formatMoney(input.total, input.currency);
+    const paymentLabel = formatPaymentMethod(input.paymentMethod);
+
+    // Two distinct pushes so each audience gets the body that's most
+    // useful to them. OneSignal sends one body per API call, so we split.
+    //
+    //  - store_admins for THIS store want operational detail: which order,
+    //    which customer, how much.
+    //  - super_admins manage every store and need triage info: WHICH
+    //    store the order came from + amount + payment method (so they
+    //    can spot a COD spike on tenant X without opening the dashboard).
+    //
+    // Tag layout (set in apps/admin/src/components/OneSignalInit.tsx):
+    //   store_admin devices  -> tag store_id = <their store>, role = store_admin
+    //   super_admin devices  -> tag role = super_admin (NO store_id tag)
+    // So `tag:store_id = X` matches store_admins for store X exclusively
+    // and `tag:role = super_admin` matches super_admins exclusively.
+
+    const storeAdminBody = {
+      ...sharedFields,
+      headings: { en: 'New order', ar: 'طلب جديد' },
+      contents: {
+        en: `${input.orderNumber} from ${input.customerName} — ${moneyText}`,
+        ar: `${input.orderNumber} من ${input.customerName} — ${moneyText}`,
+      },
+      filters: [{ field: 'tag', key: 'store_id', relation: '=', value: input.storeId }],
+    };
+
+    const superAdminBody = {
+      ...sharedFields,
+      headings: { en: 'New order', ar: 'طلب جديد' },
+      contents: {
+        en: `${input.storeName} — ${moneyText} · ${paymentLabel}`,
+        ar: `${input.storeName} — ${moneyText} · ${paymentLabel}`,
+      },
+      filters: [{ field: 'tag', key: 'role', relation: '=', value: 'super_admin' }],
+    };
+
+    const send = async (body: unknown, audience: 'store_admin' | 'super_admin') => {
+      try {
+        const res = await fetch(ENDPOINT, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            // OneSignal v2 accepts both `Basic <REST_API_KEY>` (legacy)
+            // and `Key <REST_API_KEY>` (current). Match Beethoven's
+            // existing convention.
+            Authorization: `Key ${config.onesignalRestApiKey}`,
+          },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+          const errBody = await res.text().catch(() => '');
+          logger.error({ status: res.status, body: errBody, audience }, 'OneSignal push failed');
+        }
+      } catch (err) {
+        logger.error({ err, audience }, 'OneSignal push threw');
       }
-    } catch (err) {
-      logger.error({ err }, 'OneSignal push threw');
-    }
+    };
+
+    // Fire both in parallel — a slow OneSignal response shouldn't block
+    // the other audience's push.
+    await Promise.all([send(storeAdminBody, 'store_admin'), send(superAdminBody, 'super_admin')]);
   }
 
   /**

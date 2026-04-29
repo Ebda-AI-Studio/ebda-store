@@ -467,6 +467,10 @@ export class OrderService {
             'Customer',
           total: order.total,
           currency: order.currency,
+          // Surfaced in the super_admin push body. Whatever the customer
+          // selected at checkout (cod / knet / visa / etc.) gets a
+          // human-readable label inside notifyAdminsOfOrder.
+          paymentMethod: data.paymentMethod,
         }).catch(err => logger.error({ err }, 'OneSignal admin push failed'))
       );
 
