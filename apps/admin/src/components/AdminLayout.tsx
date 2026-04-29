@@ -180,6 +180,7 @@ export function AdminLayout({
         mode={mode}
         storeBranding={resolvedStoreBranding}
         isStoreAdminWithBranding={isStoreAdminWithBranding}
+        userRole={user?.role as 'super_admin' | 'store_admin' | 'customer' | undefined}
       />
       <SidebarNav
         navItems={navItems}

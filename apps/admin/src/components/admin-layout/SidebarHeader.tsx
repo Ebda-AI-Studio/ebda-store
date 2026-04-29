@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import Link from 'next/link';
 import { useT } from '@/i18n/useT';
 import type { StoreBranding } from './buildStoreAdminNav';
 
@@ -8,15 +9,26 @@ interface SidebarHeaderProps {
   mode: 'super_admin' | 'store_admin';
   storeBranding?: StoreBranding;
   isStoreAdminWithBranding: boolean;
+  /** Authenticated user role — distinct from `mode`. A super_admin viewing a
+   *  store renders mode='store_admin' chrome but should still surface their
+   *  actual role + a way back to the platform store list. */
+  userRole?: 'super_admin' | 'store_admin' | 'customer';
 }
 
 export function SidebarHeader({
   mode,
   storeBranding,
   isStoreAdminWithBranding,
+  userRole,
 }: SidebarHeaderProps) {
   const t = useT('components.adminLayout');
   const tb = useT('components.brand');
+
+  // True when the platform admin is browsing a specific store. We swap the
+  // blue "Store Admin / Managing your store" badge for an indigo
+  // "Super Admin / Viewing this store" badge + a "← All stores" link so
+  // the super_admin always has a one-click escape back to the platform.
+  const isSuperAdminViewingStore = userRole === 'super_admin' && mode === 'store_admin';
 
   return (
     <>
@@ -86,8 +98,8 @@ export function SidebarHeader({
         </div>
       )}
 
-      {/* Store Admin Badge */}
-      {isStoreAdminWithBranding && (
+      {/* Store Admin Badge — actual store_admin role only */}
+      {isStoreAdminWithBranding && !isSuperAdminViewingStore && (
         <div className="border-b border-border/50 px-4 py-3">
           <div className="flex items-center gap-2.5 rounded-xl bg-gradient-to-r from-blue-500/10 to-indigo-500/10 px-3 py-2.5">
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 text-[10px] font-bold text-white shadow-sm">
@@ -105,6 +117,45 @@ export function SidebarHeader({
               <p className="text-[10px] text-muted-foreground truncate">{t('storeAdminHint')}</p>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Super Admin viewing a store — distinct badge + escape link */}
+      {isSuperAdminViewingStore && (
+        <div className="border-b border-border/50 px-4 py-3">
+          <div className="flex items-center gap-2.5 rounded-xl bg-gradient-to-r from-primary/10 to-primary/10 px-3 py-2.5">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/90 text-[10px] font-bold text-white shadow-sm">
+              SA
+            </div>
+            <div className="flex-1 min-w-0">
+              <span className="text-xs font-semibold text-foreground">
+                {t('superAdminViewingStore')}
+              </span>
+              <p className="text-[10px] text-muted-foreground truncate">
+                {t('superAdminViewingStoreHint')}
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/stores"
+            className="mt-2 flex items-center justify-center gap-1.5 rounded-lg border border-border/60 bg-muted/40 px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <svg
+              className="h-3.5 w-3.5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M10 19l-7-7m0 0l7-7m-7 7h18"
+              />
+            </svg>
+            {t('backToAllStores')}
+          </Link>
         </div>
       )}
     </>
