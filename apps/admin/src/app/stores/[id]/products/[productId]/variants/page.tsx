@@ -265,18 +265,33 @@ export default function ProductVariantsPage() {
   }
 
   /**
-   * Bulk-set the `price` on each variant in `updates` (fired by the
-   * weight-scaling card). One PUT per variant in parallel; toast at
-   * the end with success / partial-failure summary.
+   * Bulk-set price / compareAtPrice / costPrice on each variant
+   * (fired by the weight-scaling card). Each update only carries the
+   * fields the merchant chose to scale — empty inputs are skipped, so
+   * a merchant can scale price-only OR price+compareAt OR all three
+   * without overwriting fields they didn't touch. One PUT per variant
+   * in parallel; toast on completion.
    */
-  async function handleApplyWeightScale(updates: Array<{ variantId: string; price: number }>) {
+  async function handleApplyWeightScale(
+    updates: Array<{
+      variantId: string;
+      price?: number;
+      compareAtPrice?: number;
+      costPrice?: number;
+    }>
+  ) {
     if (updates.length === 0) return;
     let failed = 0;
     await Promise.all(
       updates.map(async u => {
+        const body: Record<string, number> = {};
+        if (typeof u.price === 'number') body.price = u.price;
+        if (typeof u.compareAtPrice === 'number') body.compareAtPrice = u.compareAtPrice;
+        if (typeof u.costPrice === 'number') body.costPrice = u.costPrice;
+        if (Object.keys(body).length === 0) return;
         const { error } = await apiPut(
           `/api/v1/stores/${storeId}/products/${productId}/variants/${u.variantId}`,
-          { price: u.price }
+          body
         );
         if (error) failed++;
       })

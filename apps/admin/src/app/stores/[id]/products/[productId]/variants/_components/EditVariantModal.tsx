@@ -64,6 +64,7 @@ export function EditVariantModal({
                 onChange={e => onChange({ ...form, sku: e.target.value })}
                 className="mt-1"
               />
+              <p className="mt-1 text-[11px] text-muted-foreground">{t('skuHint')}</p>
             </div>
             <div>
               <Label htmlFor="variantBarcode">{t('barcodeLabel')}</Label>
@@ -73,6 +74,7 @@ export function EditVariantModal({
                 onChange={e => onChange({ ...form, barcode: e.target.value })}
                 className="mt-1"
               />
+              <p className="mt-1 text-[11px] text-muted-foreground">{t('barcodeHint')}</p>
             </div>
           </div>
 
@@ -103,6 +105,7 @@ export function EditVariantModal({
                 placeholder={t('pricePlaceholder')}
                 className="mt-1"
               />
+              <p className="mt-1 text-[11px] text-muted-foreground">{t('priceHint')}</p>
               {applyAllButton('price', form.price)}
             </div>
             <div>
@@ -114,6 +117,7 @@ export function EditVariantModal({
                 onChange={e => onChange({ ...form, compareAtPrice: e.target.value })}
                 className="mt-1"
               />
+              <p className="mt-1 text-[11px] text-muted-foreground">{t('compareAtHint')}</p>
               {applyAllButton('compareAtPrice', form.compareAtPrice)}
             </div>
             <div>
@@ -125,6 +129,7 @@ export function EditVariantModal({
                 onChange={e => onChange({ ...form, costPrice: e.target.value })}
                 className="mt-1"
               />
+              <p className="mt-1 text-[11px] text-muted-foreground">{t('costHint')}</p>
               {applyAllButton('costPrice', form.costPrice)}
             </div>
           </div>
@@ -139,6 +144,7 @@ export function EditVariantModal({
                 onChange={e => onChange({ ...form, inventory: e.target.value })}
                 className="mt-1"
               />
+              <p className="mt-1 text-[11px] text-muted-foreground">{t('inventoryHint')}</p>
             </div>
             <div>
               <Label htmlFor="variantWeight">{t('weightLabel')}</Label>
@@ -150,6 +156,7 @@ export function EditVariantModal({
                 onChange={e => onChange({ ...form, weight: e.target.value })}
                 className="mt-1"
               />
+              <p className="mt-1 text-[11px] text-muted-foreground">{t('weightHint')}</p>
             </div>
           </div>
         </div>
