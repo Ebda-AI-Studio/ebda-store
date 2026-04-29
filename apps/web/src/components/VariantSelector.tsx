@@ -34,7 +34,18 @@ export function VariantSelector({ variants, options, onVariantSelect }: VariantS
   if (!options || options.length === 0) return null;
 
   function handleSelect(optionName: string, value: string) {
-    setSelected(prev => ({ ...prev, [optionName]: value }));
+    // Toggle: clicking an already-selected pill clears it. Customer
+    // feedback was that a single-axis product (e.g. "4 liters / 6 liters")
+    // looked like a forced choice with no escape — they expected to be
+    // able to deselect and see the base product again.
+    setSelected(prev => {
+      if (prev[optionName] === value) {
+        const next = { ...prev };
+        delete next[optionName];
+        return next;
+      }
+      return { ...prev, [optionName]: value };
+    });
   }
 
   /**
@@ -167,19 +178,14 @@ export function VariantSelector({ variants, options, onVariantSelect }: VariantS
                     </span>
                   )}
               </div>
-              <span
-                className={`font-medium ${
-                  (currentVariant.inventory ?? 1) > 0
-                    ? 'text-[hsl(var(--success))]'
-                    : 'text-destructive'
-                }`}
-              >
-                {(currentVariant.inventory ?? 1) > 0
-                  ? currentVariant.inventory !== undefined
-                    ? `${currentVariant.inventory} ${t('in stock', 'متوفر')}`
-                    : t('In Stock', 'متوفر')
-                  : t('Out of Stock', 'غير متوفر')}
-              </span>
+              {/* Stock count is rendered next to the qty stepper in
+                  ProductDetailClient — surface the out-of-stock state
+                  here only, otherwise it duplicated the count. */}
+              {(currentVariant.inventory ?? 1) <= 0 && (
+                <span className="font-medium text-destructive">
+                  {t('Out of Stock', 'غير متوفر')}
+                </span>
+              )}
             </div>
           ) : (
             <p className="text-muted-foreground">

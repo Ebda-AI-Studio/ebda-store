@@ -48,20 +48,3 @@ export interface ProductInfo {
   hasVariants: boolean;
   inventory: number;
 }
-
-export interface VariantFormState {
-  sku: string;
-  barcode: string;
-  price: string;
-  compareAtPrice: string;
-  costPrice: string;
-  inventory: string;
-  weight: string;
-  /**
-   * Per-variant image URL. Empty string ⇒ no image set; the API treats
-   * an explicit `null` as "clear". Saved into `ProductVariant.imageUrl`
-   * so the storefront can swap the gallery's main image when this
-   * variant is selected.
-   */
-  imageUrl: string;
-}
