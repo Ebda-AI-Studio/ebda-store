@@ -98,7 +98,7 @@ export function ProductSearch({ storeId, onSelect, excludeIds, disabled }: Produ
       </div>
 
       {open && results.length > 0 && (
-        <div className="absolute z-10 mt-1 w-full rounded-lg border bg-card shadow-lg max-h-60 overflow-y-auto">
+        <div className="absolute z-10 mt-1 w-full rounded-lg border bg-card shadow-lg max-h-60 overflow-y-auto overscroll-contain">
           {results.map(product => (
             <button
               key={product.id}

@@ -192,7 +192,7 @@ export function SearchAutocomplete({ query, onSelect }: SearchAutocompleteProps)
   return (
     <div
       ref={containerRef}
-      className="absolute top-full left-0 right-0 z-50 mt-1 max-h-[70vh] overflow-y-auto rounded-xl border border-border bg-background shadow-xl"
+      className="absolute top-full left-0 right-0 z-50 mt-1 max-h-[70vh] overflow-y-auto overscroll-contain rounded-xl border border-border bg-background shadow-xl"
       role="listbox"
       aria-label={t('Search suggestions', 'اقتراحات البحث')}
       onKeyDown={handleKeyDown}
