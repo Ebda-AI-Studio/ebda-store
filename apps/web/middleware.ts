@@ -14,7 +14,20 @@ const PLATFORM_HOSTS = new Set([
   'www.forcemediakw.com',
   'admin.forcemediakw.com',
   'app.forcemediakw.com',
+  'store.forcemediakw.com',
 ]);
+
+/**
+ * Platform hosts where a bare-root request (path `/`) should redirect to the
+ * marketing site instead of rendering the storefront's no-store fallback.
+ * This is what kills the "Force Demo Store" UX on the storefront platform
+ * domain — customers landing on `https://store.forcemediakw.com` are sent
+ * straight to the marketing site rather than seeing a placeholder store.
+ *
+ * Localhost is intentionally excluded so dev still works with the fallback.
+ */
+const PLATFORM_ROOT_REDIRECT_HOSTS = new Set(['store.forcemediakw.com']);
+const PLATFORM_ROOT_REDIRECT_TARGET = 'https://forcemediakw.com';
 
 /**
  * Hosting provider suffixes — any subdomain is platform (preview deploys, tunnels).
@@ -107,7 +120,15 @@ function extractStoreSlug(pathname: string): { slug: string; rewrittenPath: stri
 
 export function middleware(request: NextRequest) {
   const hostname = request.headers.get('host') || '';
+  const host = hostname.split(':')[0].toLowerCase();
   const storeIdentifier = getStoreIdentifier(hostname);
+
+  // Bare root on the production storefront platform domain — redirect to
+  // the marketing site so customers never land on a placeholder store. The
+  // redirect runs before any header munging so cookies/headers don't leak.
+  if (PLATFORM_ROOT_REDIRECT_HOSTS.has(host) && request.nextUrl.pathname === '/') {
+    return NextResponse.redirect(PLATFORM_ROOT_REDIRECT_TARGET, 302);
+  }
 
   // Clone the request headers
   const requestHeaders = new Headers(request.headers);

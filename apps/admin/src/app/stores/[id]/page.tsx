@@ -79,7 +79,7 @@ export default function StoreDetailPage() {
   return (
     <AdminLayout
       title={store.name}
-      subtitle={store.domain || `force-web-sigma.vercel.app/${store.slug}`}
+      subtitle={store.domain || `store.forcemediakw.com/${store.slug}`}
       actions={
         <div className="flex gap-2">
           {!isEditing && (

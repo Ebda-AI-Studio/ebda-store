@@ -111,8 +111,8 @@ const StoreContext = createContext<StoreContextValue | null>(null);
  */
 const DEFAULT_STORE: StoreData = {
   id: 'demo',
-  name: 'Force Demo Store',
-  nameAr: 'متجر فورس التجريبي',
+  name: 'Force',
+  nameAr: 'فورس',
   slug: 'demo',
   currency: 'KWD',
   timezone: 'Asia/Kuwait',

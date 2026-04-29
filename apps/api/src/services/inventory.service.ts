@@ -780,7 +780,7 @@ export class InventoryService {
 
       const storeBase = store.domain
         ? `https://${store.domain}`
-        : `https://force-web-sigma.vercel.app/${store.slug}`;
+        : `${process.env.WEB_URL ?? 'https://store.forcemediakw.com'}/${store.slug}`;
 
       // Dispatch notifications for each user — fire-and-forget per user
       for (const item of wishlistItems) {

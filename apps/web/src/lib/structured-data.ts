@@ -110,5 +110,5 @@ export function getSiteUrl(store?: ResolvedStore): string {
   if (store?.domain) {
     return `https://${store.domain}`;
   }
-  return 'https://force-web-sigma.vercel.app';
+  return 'https://store.forcemediakw.com';
 }

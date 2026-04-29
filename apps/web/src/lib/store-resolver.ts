@@ -86,12 +86,17 @@ export interface ResolvedStore {
 }
 
 /**
- * Default store for platform/demo mode
+ * Default store used as a last-resort fallback when no real store can be
+ * resolved (dev environment, edge-case paths). Production traffic on
+ * `store.forcemediakw.com/` is redirected to the marketing site by the
+ * middleware before this fallback is ever rendered, so customers never
+ * see it. The neutral copy below is intentional — if it does slip through
+ * somewhere, "Force" is harmless; "Force Demo Store" looked broken.
  */
 const DEFAULT_STORE: ResolvedStore = {
   id: 'demo',
-  name: 'Force Demo Store',
-  nameAr: 'متجر فورس التجريبي',
+  name: 'Force',
+  nameAr: 'فورس',
   slug: 'demo',
   currency: 'KWD',
   timezone: 'Asia/Kuwait',

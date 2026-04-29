@@ -88,7 +88,7 @@ export default function StoreLayoutPage() {
     storeInfo?.domain && storeInfo.domain.length > 0
       ? `https://${storeInfo.domain}`
       : storeInfo?.slug
-        ? `${process.env.NEXT_PUBLIC_WEB_URL ?? 'https://force-web-sigma.vercel.app'}/${storeInfo.slug}`
+        ? `${process.env.NEXT_PUBLIC_WEB_URL ?? 'https://store.forcemediakw.com'}/${storeInfo.slug}`
         : null;
 
   return (

@@ -115,8 +115,16 @@ app.use(
       // is set, which does not block non-browser clients.
       if (!origin) return callback(null, false);
 
-      // Always allow platform URLs
-      const platformOrigins = [config.webUrl, config.adminUrl].filter(Boolean);
+      // Always allow platform URLs. The hardcoded forcemediakw.com origins
+      // are a defensive layer so a missing/forgotten WEB_URL or ADMIN_URL
+      // env var on Railway can't lock the production frontends out of the
+      // API. config.webUrl/adminUrl take precedence when set.
+      const platformOrigins = [
+        config.webUrl,
+        config.adminUrl,
+        'https://store.forcemediakw.com',
+        'https://app.forcemediakw.com',
+      ].filter(Boolean);
       if (platformOrigins.includes(origin)) return callback(null, true);
 
       // Allow Vercel preview/production deployments for the project (strict prefix match)
