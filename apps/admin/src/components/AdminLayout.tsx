@@ -17,6 +17,7 @@ import { SidebarHeader } from './admin-layout/SidebarHeader';
 import { SidebarNav } from './admin-layout/SidebarNav';
 import { SidebarFooter } from './admin-layout/SidebarFooter';
 import { TopBar } from './admin-layout/TopBar';
+import { MobileBottomNav } from './mobile/MobileBottomNav';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -262,9 +263,20 @@ export function AdminLayout({
           viewStoreUrl={viewStoreUrl}
         />
 
-        {/* Page Content */}
-        <div className="p-4 lg:p-6">{children}</div>
+        {/* Page Content. `pb-20` on mobile reserves room for the
+            fixed bottom-nav so primary actions / save buttons aren't
+            hidden behind it; the sidebar shell already absorbs that
+            on desktop so the padding is mobile-scoped. */}
+        <div className="p-4 pb-20 lg:p-6 lg:pb-6">{children}</div>
       </main>
+
+      {/* Mobile Bottom Nav — store-scoped only. Renders nothing at
+          md+ widths (its own internal `md:hidden`). When the merchant
+          taps "More", we open the existing hamburger drawer rather
+          than maintaining a parallel IA. */}
+      {navStoreId && (
+        <MobileBottomNav storeId={navStoreId} onOpenMore={() => setIsSidebarOpen(true)} />
+      )}
     </div>
   );
 }

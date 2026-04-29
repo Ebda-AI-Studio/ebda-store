@@ -55,7 +55,11 @@
     "signOut": "Sign out",
     "language": "Language",
     "english": "English",
-    "arabic": "العربية"
+    "arabic": "العربية",
+    "orders": "Orders",
+    "products": "Products",
+    "more": "More",
+    "mobileBottomNav": "Quick navigation"
   },
   "dashboard": {
     "super": {

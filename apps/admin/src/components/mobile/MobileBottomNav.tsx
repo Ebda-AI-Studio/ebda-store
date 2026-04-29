@@ -1,0 +1,111 @@
+'use client';
+
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { useT } from '@/i18n/useT';
+
+interface MobileBottomNavProps {
+  storeId: string;
+  /** When true, the "More" tab opens the existing hamburger drawer
+   *  instead of routing — caller passes its own open handler. */
+  onOpenMore: () => void;
+}
+
+interface Tab {
+  key: string;
+  href: string;
+  /** SVG path d= attribute; reuse the icons already used in the
+   *  sidebar so there's no visual mismatch when the merchant flips
+   *  between the drawer and the bottom bar. */
+  icon: string;
+}
+
+/**
+ * Fixed bottom tab bar shown only at `< md` AND only on store-scoped
+ * pages. The same nav item set is in the hamburger drawer
+ * (`buildStoreAdminNav.ts`); this just surfaces the four most-used
+ * destinations (Home / Orders / Products / More) with thumb-reach so
+ * a merchant on their phone can run their day without the full
+ * sidebar in the way.
+ *
+ * The "More" tab routes back to the existing drawer rather than
+ * re-implementing every page link — keeps the IA in one place.
+ */
+export function MobileBottomNav({ storeId, onOpenMore }: MobileBottomNavProps) {
+  const pathname = usePathname();
+  const t = useT('nav');
+
+  const tabs: Tab[] = [
+    {
+      key: 'dashboard',
+      href: `/stores/${storeId}`,
+      icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6',
+    },
+    {
+      key: 'orders',
+      href: `/stores/${storeId}/orders`,
+      icon: 'M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z',
+    },
+    {
+      key: 'products',
+      href: `/stores/${storeId}/products`,
+      icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4',
+    },
+  ];
+
+  function isActive(href: string): boolean {
+    if (!pathname) return false;
+    if (href === `/stores/${storeId}`) return pathname === href;
+    return pathname === href || pathname.startsWith(`${href}/`);
+  }
+
+  return (
+    <nav
+      // pb env-safe-area-inset so the bar clears the iPhone home indicator.
+      // Only ever rendered at < md — desktop shell remains the sidebar.
+      className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t border-border bg-card pb-[env(safe-area-inset-bottom)] shadow-[0_-2px_10px_-4px_rgba(0,0,0,0.08)] md:hidden"
+      role="navigation"
+      aria-label={t('mobileBottomNav')}
+    >
+      {tabs.map(tab => {
+        const active = isActive(tab.href);
+        return (
+          <Link
+            key={tab.key}
+            href={tab.href}
+            className={`flex h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition-colors ${
+              active ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <svg
+              className="h-5 w-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              aria-hidden
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={tab.icon} />
+            </svg>
+            <span>{t(tab.key as 'dashboard' | 'orders' | 'products')}</span>
+          </Link>
+        );
+      })}
+      <button
+        type="button"
+        onClick={onOpenMore}
+        aria-label={t('more')}
+        className="flex h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M4 6h16M4 12h16M4 18h16"
+          />
+        </svg>
+        <span>{t('more')}</span>
+      </button>
+    </nav>
+  );
+}

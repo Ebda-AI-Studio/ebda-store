@@ -1,6 +1,7 @@
 'use client';
 
 import { useT } from '@/i18n/useT';
+import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import type { Coupon } from './types';
 
 interface CouponsTableProps {
@@ -47,8 +48,10 @@ function getCouponStatus(coupon: Coupon): CouponStatus {
 }
 
 /**
- * Table listing of coupons with per-row actions (toggle, edit, delete).
- * Renders an empty-state CTA when there are no coupons.
+ * Coupons listing — desktop table, mobile cards. Uses the shared
+ * `<DataTable>` so the responsive behaviour matches every other admin
+ * list (orders, products, customers, etc.) and a phone-first merchant
+ * sees a tappable card stack instead of a horizontally-scrolling table.
  */
 export function CouponsTable({
   coupons,
@@ -69,227 +72,173 @@ export function CouponsTable({
     return tType('freeShipping');
   }
 
-  if (coupons.length === 0) {
-    return (
-      <div className="bg-card rounded-xl border overflow-hidden">
-        <div className="force-empty-state px-6">
-          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
-            <svg
-              className="h-8 w-8 text-muted-foreground"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
+  function typeLabel(coupon: Coupon): string {
+    if (coupon.type === 'percentage') return tType('percentage');
+    if (coupon.type === 'fixed') return tType('fixed');
+    return tType('freeShipping');
+  }
+
+  const columns: DataTableColumn<Coupon>[] = [
+    {
+      header: tTable('code'),
+      primaryOnMobile: true,
+      cell: coupon => (
+        <span className="font-mono text-sm bg-muted px-2 py-1 rounded">{coupon.code}</span>
+      ),
+    },
+    {
+      header: tTable('name'),
+      cell: coupon => (
+        <div>
+          <p className="font-medium text-foreground">{coupon.name}</p>
+          {coupon.nameAr && (
+            <p className="text-sm text-muted-foreground" lang="ar" dir="rtl">
+              {coupon.nameAr}
+            </p>
+          )}
+        </div>
+      ),
+    },
+    {
+      header: tTable('type'),
+      cell: coupon => <span className="text-sm text-muted-foreground">{typeLabel(coupon)}</span>,
+    },
+    {
+      header: tTable('value'),
+      cell: coupon => <span className="font-medium text-primary">{formatValue(coupon)}</span>,
+    },
+    {
+      header: tTable('usage'),
+      cell: coupon => (
+        <span className="text-sm text-muted-foreground">
+          {coupon.usageCount}
+          {coupon.usageLimit ? ` / ${coupon.usageLimit}` : ''}
+        </span>
+      ),
+    },
+    {
+      header: tTable('status'),
+      cell: coupon => {
+        const status = getCouponStatus(coupon);
+        return (
+          <span
+            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${status.color}`}
+          >
+            {tStatus(status.labelKey)}
+          </span>
+        );
+      },
+    },
+    {
+      header: tTable('actions'),
+      alignEnd: true,
+      cell: coupon => (
+        <div className="flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => onToggleActive(coupon.id)}
+            className={`inline-flex h-9 w-9 items-center justify-center rounded-lg transition-colors ${
+              coupon.isActive
+                ? 'text-warning hover:bg-warning/10'
+                : 'text-success hover:bg-success/5'
+            }`}
+            title={coupon.isActive ? tActions('deactivate') : tActions('activate')}
+            aria-label={coupon.isActive ? tActions('deactivate') : tActions('activate')}
+          >
+            {coupon.isActive ? (
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
+                />
+              </svg>
+            ) : (
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => onEdit(coupon)}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted"
+            title={tActions('edit')}
+            aria-label={tActions('edit')}
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                strokeWidth={1.5}
-                d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"
+                strokeWidth={2}
+                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
               />
             </svg>
-          </div>
-          <p className="font-semibold text-foreground">{tEmpty('title')}</p>
-          <p className="mt-1 max-w-md text-sm text-muted-foreground">{tEmpty('description')}</p>
+          </button>
           <button
             type="button"
-            onClick={onCreateFirst}
-            className="mt-4 inline-flex items-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+            onClick={() => onDelete(coupon.id)}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-destructive hover:bg-destructive/5"
+            title={tActions('delete')}
+            aria-label={tActions('delete')}
           >
-            {tEmpty('createFirst')}
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+              />
+            </svg>
           </button>
         </div>
-      </div>
-    );
-  }
+      ),
+    },
+  ];
 
-  return (
+  const emptyState = (
     <div className="bg-card rounded-xl border overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full" aria-label={tTable('ariaLabel')}>
-          <thead className="bg-muted border-b">
-            <tr>
-              <th
-                scope="col"
-                className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider"
-              >
-                {tTable('code')}
-              </th>
-              <th
-                scope="col"
-                className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider"
-              >
-                {tTable('name')}
-              </th>
-              <th
-                scope="col"
-                className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider"
-              >
-                {tTable('type')}
-              </th>
-              <th
-                scope="col"
-                className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider"
-              >
-                {tTable('value')}
-              </th>
-              <th
-                scope="col"
-                className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider"
-              >
-                {tTable('usage')}
-              </th>
-              <th
-                scope="col"
-                className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider"
-              >
-                {tTable('status')}
-              </th>
-              <th
-                scope="col"
-                className="px-6 py-3 text-end text-xs font-medium text-muted-foreground uppercase tracking-wider"
-              >
-                {tTable('actions')}
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {coupons.map(coupon => {
-              const status = getCouponStatus(coupon);
-              const typeLabel =
-                coupon.type === 'percentage'
-                  ? tType('percentage')
-                  : coupon.type === 'fixed'
-                    ? tType('fixed')
-                    : tType('freeShipping');
-              return (
-                <tr key={coupon.id} className="hover:bg-muted">
-                  <td className="px-6 py-4">
-                    <span className="font-mono text-sm bg-muted px-2 py-1 rounded">
-                      {coupon.code}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div>
-                      <p className="font-medium text-foreground">{coupon.name}</p>
-                      {coupon.nameAr && (
-                        <p className="text-sm text-muted-foreground" lang="ar" dir="rtl">
-                          {coupon.nameAr}
-                        </p>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="text-sm text-muted-foreground">{typeLabel}</span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="font-medium text-primary">{formatValue(coupon)}</span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="text-sm text-muted-foreground">
-                      {coupon.usageCount}
-                      {coupon.usageLimit && ` / ${coupon.usageLimit}`}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${status.color}`}
-                    >
-                      {tStatus(status.labelKey)}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-end">
-                    <div className="flex items-center justify-end gap-2">
-                      <button
-                        type="button"
-                        onClick={() => onToggleActive(coupon.id)}
-                        className={`p-2 rounded-lg transition-colors ${
-                          coupon.isActive
-                            ? 'text-warning hover:bg-warning/10'
-                            : 'text-success hover:bg-success/5'
-                        }`}
-                        title={coupon.isActive ? tActions('deactivate') : tActions('activate')}
-                        aria-label={coupon.isActive ? tActions('deactivate') : tActions('activate')}
-                      >
-                        {coupon.isActive ? (
-                          <svg
-                            className="w-5 h-5"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
-                            />
-                          </svg>
-                        ) : (
-                          <svg
-                            className="w-5 h-5"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                            />
-                          </svg>
-                        )}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onEdit(coupon)}
-                        className="p-2 text-muted-foreground hover:bg-muted rounded-lg"
-                        title={tActions('edit')}
-                        aria-label={tActions('edit')}
-                      >
-                        <svg
-                          className="w-5 h-5"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                          />
-                        </svg>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onDelete(coupon.id)}
-                        className="p-2 text-destructive hover:bg-destructive/5 rounded-lg"
-                        title={tActions('delete')}
-                        aria-label={tActions('delete')}
-                      >
-                        <svg
-                          className="w-5 h-5"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                          />
-                        </svg>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      <div className="force-empty-state px-6">
+        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
+          <svg
+            className="h-8 w-8 text-muted-foreground"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.5}
+              d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"
+            />
+          </svg>
+        </div>
+        <p className="font-semibold text-foreground">{tEmpty('title')}</p>
+        <p className="mt-1 max-w-md text-sm text-muted-foreground">{tEmpty('description')}</p>
+        <button
+          type="button"
+          onClick={onCreateFirst}
+          className="mt-4 inline-flex items-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+        >
+          {tEmpty('createFirst')}
+        </button>
       </div>
     </div>
+  );
+
+  return (
+    <DataTable<Coupon>
+      columns={columns}
+      rows={coupons}
+      rowKey={c => c.id}
+      emptyState={emptyState}
+    />
   );
 }

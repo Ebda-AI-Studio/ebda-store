@@ -17,11 +17,15 @@ const buttonVariants = cva(
         ghost: 'hover:bg-accent hover:text-accent-foreground',
         link: 'text-primary underline-offset-4 hover:underline hover:translate-y-0',
       },
+      // Sizes target iOS HIG / Material 44×44px minimum tap targets so
+      // touch interaction on the admin PWA stops feeling cramped.
+      // `sm` stays compact for inline / dense table-row affordances —
+      // callers opt in explicitly when they have the space budget.
       size: {
-        default: 'h-10 px-4 py-2',
+        default: 'h-11 px-4 py-2',
         sm: 'h-9 rounded-md px-3',
-        lg: 'h-11 rounded-md px-8',
-        icon: 'h-10 w-10',
+        lg: 'h-12 rounded-md px-8',
+        icon: 'h-11 w-11',
       },
     },
     defaultVariants: {
