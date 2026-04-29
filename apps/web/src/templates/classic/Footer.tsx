@@ -18,6 +18,7 @@ export default function ClassicFooter({
   socials,
   navigation = [],
   footerLinks,
+  disabledCmsSlugs,
   isRtl: isRtlProp,
   urlPrefix = '',
 }: FooterProps) {
@@ -39,7 +40,7 @@ export default function ClassicFooter({
   // navigation into up to 3 columns when no footerLinks have been saved so
   // long-standing tenants keep their existing layout.
   const footerSections = resolveFooterSections(footerLinks, isRtl);
-  const bottomBar = resolveBottomBar(footerLinks?.bottomBar, displayName, isRtl);
+  const bottomBar = resolveBottomBar(footerLinks?.bottomBar, displayName, isRtl, disabledCmsSlugs);
   const addressMapHref = resolveAddressHref(
     displayAddress,
     contact.addressUrl,

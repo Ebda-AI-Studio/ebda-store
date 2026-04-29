@@ -236,6 +236,10 @@ export function ShopChrome({ children }: { children: ReactNode }) {
         socials={contact.socialLinks}
         navigation={navigation}
         footerLinks={footerLinks}
+        // Pages the merchant explicitly disabled in /content/<slug>.
+        // The footer hides matching legal links so a disabled Privacy
+        // page doesn't leave a dead "Privacy" link in the bottom bar.
+        disabledCmsSlugs={store.disabledCmsSlugs}
         isRtl={isRtl}
         urlPrefix={urlPrefix}
       />

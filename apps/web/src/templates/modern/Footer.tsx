@@ -21,6 +21,7 @@ export default function ModernFooter({
   socials,
   navigation = [],
   footerLinks,
+  disabledCmsSlugs,
   isRtl: isRtlProp,
   urlPrefix = '',
 }: FooterProps) {
@@ -47,7 +48,7 @@ export default function ModernFooter({
   // an empty config we fall back to the navigation-driven default below.
   const footerSections = resolveFooterSections(footerLinks, isRtl);
   const showNewsletter = isNewsletterEnabled(footerLinks);
-  const bottomBar = resolveBottomBar(footerLinks?.bottomBar, displayName, isRtl);
+  const bottomBar = resolveBottomBar(footerLinks?.bottomBar, displayName, isRtl, disabledCmsSlugs);
   const addressMapHref = resolveAddressHref(
     displayAddress,
     contact.addressUrl,

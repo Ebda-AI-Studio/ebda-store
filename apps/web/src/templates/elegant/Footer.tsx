@@ -19,6 +19,7 @@ export default function ElegantFooter({
   socials,
   navigation = [],
   footerLinks,
+  disabledCmsSlugs,
   isRtl: isRtlProp,
   urlPrefix = '',
 }: FooterProps) {
@@ -70,7 +71,7 @@ export default function ElegantFooter({
   // the pack's classic Explore / Contact / Follow trio.
   const footerSections = resolveFooterSections(footerLinks, isRtl);
   const showNewsletter = isNewsletterEnabled(footerLinks);
-  const bottomBar = resolveBottomBar(footerLinks?.bottomBar, displayName, isRtl);
+  const bottomBar = resolveBottomBar(footerLinks?.bottomBar, displayName, isRtl, disabledCmsSlugs);
   const addressMapHref = resolveAddressHref(
     displayAddress,
     contact.addressUrl,

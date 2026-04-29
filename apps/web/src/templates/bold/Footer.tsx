@@ -16,6 +16,7 @@ export default function BoldFooter({
   socials,
   navigation = [],
   footerLinks,
+  disabledCmsSlugs,
   isRtl: isRtlProp,
   urlPrefix = '',
 }: FooterProps) {
@@ -35,7 +36,7 @@ export default function BoldFooter({
   // configured we keep the navigation-driven default below. Bold has no
   // newsletter form so newsletterEnabled does not apply here.
   const footerSections = resolveFooterSections(footerLinks, isRtl);
-  const bottomBar = resolveBottomBar(footerLinks?.bottomBar, displayName, isRtl);
+  const bottomBar = resolveBottomBar(footerLinks?.bottomBar, displayName, isRtl, disabledCmsSlugs);
   const addressMapHref = resolveAddressHref(
     displayAddress,
     contact.addressUrl,

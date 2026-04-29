@@ -92,6 +92,13 @@ export interface StoreData {
   taxEnabled?: boolean;
   taxIncludedInPrice?: boolean;
   enabledFeatures?: string[];
+  /**
+   * Slugs of CMS pages the merchant has explicitly disabled
+   * (`isPublished=false`). Forwarded from the public store endpoint so
+   * the footer can hide bottom-bar legal links pointing to disabled
+   * pages without a dedicated round-trip.
+   */
+  disabledCmsSlugs?: string[];
   heroTitle?: string | null;
   heroTitleAr?: string | null;
   heroSubtitle?: string | null;

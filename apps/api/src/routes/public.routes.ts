@@ -699,7 +699,15 @@ router.get('/stores/:slugOrId', async (req: Request, res: Response, next: NextFu
       if (!store) return null;
 
       const enabledFeatures = await featureService.getEnabledFeatureKeys(store.id);
-      return { store, enabledFeatures };
+      // Mirror the /store/resolve endpoint: surface explicitly-disabled
+      // CMS pages so the storefront footer can hide their links rather
+      // than rendering a "Page unavailable" landing on click.
+      const disabledPages = await prisma.storePage.findMany({
+        where: { storeId: store.id, isPublished: false },
+        select: { slug: true },
+      });
+      const disabledCmsSlugs = disabledPages.map(p => p.slug);
+      return { store, enabledFeatures, disabledCmsSlugs };
     });
 
     if (!result) {
@@ -869,10 +877,24 @@ router.get(
 
       const enabledFeatures = await featureService.getEnabledFeatureKeys(store.id);
 
+      // Surface CMS pages that the merchant has explicitly turned off
+      // ("Show on storefront" toggle in /content). The storefront uses
+      // this to hide footer links pointing at those slugs — without it,
+      // a customer would click "Privacy" in the footer and land on a
+      // "Page unavailable" message, which is a worse UX than the link
+      // simply not being there. Only rows that exist AND are unpublished
+      // need to be reported; if the row is missing the storefront falls
+      // back to its built-in copy and the link should still work.
+      const disabledPages = await prisma.storePage.findMany({
+        where: { storeId: store.id, isPublished: false },
+        select: { slug: true },
+      });
+      const disabledCmsSlugs = disabledPages.map(p => p.slug);
+
       res.setHeader('Cache-Control', 'private, max-age=60');
       res.json({
         success: true,
-        data: { store, enabledFeatures },
+        data: { store, enabledFeatures, disabledCmsSlugs },
       });
     } catch (error) {
       next(error);

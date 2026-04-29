@@ -83,6 +83,14 @@ export interface ResolvedStore {
   // Feature flags
   enabledFeatures?: string[];
 
+  // CMS pages where the merchant has explicitly turned the storefront
+  // toggle off (`isPublished=false` on the StorePage row). Footer link
+  // resolution AND-merges this with the merchant's per-link toggles so a
+  // disabled Privacy page automatically removes the "Privacy" link from
+  // the bottom bar without the merchant having to flip both controls.
+  // Slugs are bare ("privacy", "terms", "shipping", or any custom slug).
+  disabledCmsSlugs?: string[];
+
   // Hero customization
   heroTitle?: string | null;
   heroTitleAr?: string | null;
@@ -179,6 +187,9 @@ async function fetchStoreByDomain(domain: string): Promise<ResolvedStore | null>
     const enabledFeatures: string[] | undefined = Array.isArray(data.data.enabledFeatures)
       ? data.data.enabledFeatures
       : undefined;
+    const disabledCmsSlugs: string[] | undefined = Array.isArray(data.data.disabledCmsSlugs)
+      ? data.data.disabledCmsSlugs.filter((s: unknown): s is string => typeof s === 'string')
+      : undefined;
 
     // Merge theme with template defaults
     const templateTheme = getTemplateTheme(storeData.template || 'modern');
@@ -232,6 +243,7 @@ async function fetchStoreByDomain(domain: string): Promise<ResolvedStore | null>
           ? storeData.taxIncludedInPrice
           : undefined,
       enabledFeatures,
+      disabledCmsSlugs,
       heroTitle: storeData.heroTitle ?? null,
       heroTitleAr: storeData.heroTitleAr ?? null,
       heroSubtitle: storeData.heroSubtitle ?? null,
@@ -296,6 +308,9 @@ async function fetchStoreBySlug(slug: string): Promise<ResolvedStore | null> {
     const enabledFeatures: string[] | undefined = Array.isArray(data.data.enabledFeatures)
       ? data.data.enabledFeatures
       : undefined;
+    const disabledCmsSlugs: string[] | undefined = Array.isArray(data.data.disabledCmsSlugs)
+      ? data.data.disabledCmsSlugs.filter((s: unknown): s is string => typeof s === 'string')
+      : undefined;
     const templateTheme = getTemplateTheme(storeData.template || 'modern');
     const customTheme = typeof storeData.theme === 'object' ? storeData.theme : {};
 
@@ -347,6 +362,7 @@ async function fetchStoreBySlug(slug: string): Promise<ResolvedStore | null> {
           ? storeData.taxIncludedInPrice
           : undefined,
       enabledFeatures,
+      disabledCmsSlugs,
       heroTitle: storeData.heroTitle ?? null,
       heroTitleAr: storeData.heroTitleAr ?? null,
       heroSubtitle: storeData.heroSubtitle ?? null,

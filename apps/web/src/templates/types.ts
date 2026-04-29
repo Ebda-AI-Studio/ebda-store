@@ -216,6 +216,14 @@ export interface FooterProps {
    * its built-in default layout instead.
    */
   footerLinks?: FooterLinksConfig;
+  /**
+   * CMS pages the merchant explicitly disabled in `/content/<slug>`
+   * (`isPublished=false`). The bottom-bar legal links automatically
+   * hide for any slug listed here so the merchant doesn't have to flip
+   * both the page-level toggle AND the per-link toggle. Slugs are
+   * bare ("privacy", "terms", "shipping").
+   */
+  disabledCmsSlugs?: string[];
   isRtl?: boolean;
   urlPrefix?: string;
 }

@@ -12,6 +12,7 @@ export default function MinimalFooter({
   socials,
   navigation = [],
   footerLinks,
+  disabledCmsSlugs,
   isRtl: isRtlProp,
   urlPrefix = '',
 }: FooterProps) {
@@ -43,7 +44,7 @@ export default function MinimalFooter({
   // link without manual configuration.
   const socialLinks = getSocialLinks(socials, contact);
 
-  const bottomBar = resolveBottomBar(footerLinks?.bottomBar, displayName, isRtl);
+  const bottomBar = resolveBottomBar(footerLinks?.bottomBar, displayName, isRtl, disabledCmsSlugs);
 
   return (
     <footer className="bg-background mt-auto py-12 md:py-16" dir={isRtl ? 'rtl' : 'ltr'}>

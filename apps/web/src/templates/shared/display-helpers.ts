@@ -166,11 +166,19 @@ export interface ResolvedBottomBar {
  * name. `isRtl` selects between English / Arabic copyright suffix. Pass
  * `bottomBar` from `store.settings.footerLinks.bottomBar` (or omit when
  * unset — the defaults preserve historic behaviour).
+ *
+ * `disabledCmsSlugs` is the list of CMS pages the merchant has explicitly
+ * turned off (`isPublished=false`). When a slug appears here we hide the
+ * matching legal link in the bottom bar, even if the merchant's per-link
+ * toggle is on. This way a merchant disabling the Privacy CMS page in
+ * `/content/privacy` automatically removes the dead "Privacy" link from
+ * every pack's footer without them having to flip both controls.
  */
 export function resolveBottomBar(
   bottomBar: FooterBottomBarConfig | undefined,
   storeName: string,
-  isRtl: boolean
+  isRtl: boolean,
+  disabledCmsSlugs?: string[]
 ): ResolvedBottomBar {
   const enabled = bottomBar?.enabled !== false;
   const overrideRaw = isRtl
@@ -181,12 +189,15 @@ export function resolveBottomBar(
   const fallback = isRtl
     ? `© ${year} ${storeName}. جميع الحقوق محفوظة.`
     : `© ${year} ${storeName}. All rights reserved.`;
+  const disabled = new Set(disabledCmsSlugs ?? []);
   return {
     enabled,
     copyright: enabled ? override || fallback : null,
-    privacyEnabled: bottomBar?.privacyEnabled !== false,
-    termsEnabled: bottomBar?.termsEnabled !== false,
-    shippingEnabled: bottomBar?.shippingEnabled !== false,
+    // Per-link state is the AND of (merchant toggled ON) AND (CMS page
+    // not explicitly turned off). Either gate flips the link off.
+    privacyEnabled: bottomBar?.privacyEnabled !== false && !disabled.has('privacy'),
+    termsEnabled: bottomBar?.termsEnabled !== false && !disabled.has('terms'),
+    shippingEnabled: bottomBar?.shippingEnabled !== false && !disabled.has('shipping'),
   };
 }
 
