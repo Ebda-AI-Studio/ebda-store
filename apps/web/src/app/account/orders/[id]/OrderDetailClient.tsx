@@ -727,11 +727,50 @@ export default function OrderDetailClient() {
         })()}
 
         {successfulPayment && (
-          <a
-            href={`${API_URL}/stores/${order.storeId}/orders/${order.id}/invoice`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
+          <button
+            type="button"
+            onClick={async () => {
+              // Admin's /stores/:storeId/orders/:id/invoice route requires
+              // store_admin/super_admin and rejects browser navigations (no
+              // auth header). The storefront has a customer-scoped route at
+              // /public/orders/:id/invoice that authenticates via cookie OR
+              // Bearer token and verifies order ownership. Fetch as text,
+              // surface the html in a new tab via blob URL — gives the
+              // customer the same printable invoice without the 401.
+              try {
+                const headers: Record<string, string> = {};
+                if (typeof window !== 'undefined') {
+                  const token = localStorage.getItem('accessToken');
+                  if (token) headers.Authorization = `Bearer ${token}`;
+                }
+                const res = await fetch(`${API_URL}/public/orders/${order.id}/invoice`, {
+                  credentials: 'include',
+                  headers,
+                });
+                if (!res.ok) {
+                  alert(
+                    t(
+                      'Could not load invoice. Please log in again and retry.',
+                      '\u062a\u0639\u0630\u0631 \u062a\u062d\u0645\u064a\u0644 \u0627\u0644\u0641\u0627\u062a\u0648\u0631\u0629. \u0633\u062c\u0651\u0644 \u0627\u0644\u062f\u062e\u0648\u0644 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649 \u062b\u0645 \u062d\u0627\u0648\u0644 \u0645\u062c\u062f\u062f\u0627\u064b.'
+                    )
+                  );
+                  return;
+                }
+                const html = await res.text();
+                const blob = new Blob([html], { type: 'text/html' });
+                const url = URL.createObjectURL(blob);
+                window.open(url, '_blank', 'noopener,noreferrer');
+                setTimeout(() => URL.revokeObjectURL(url), 60_000);
+              } catch {
+                alert(
+                  t(
+                    'Could not load invoice. Please try again.',
+                    '\u062a\u0639\u0630\u0631 \u062a\u062d\u0645\u064a\u0644 \u0627\u0644\u0641\u0627\u062a\u0648\u0631\u0629. \u062d\u0627\u0648\u0644 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649.'
+                  )
+                );
+              }
+            }}
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors cursor-pointer"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
@@ -745,7 +784,7 @@ export default function OrderDetailClient() {
               'Download Invoice',
               '\u062a\u062d\u0645\u064a\u0644 \u0627\u0644\u0641\u0627\u062a\u0648\u0631\u0629'
             )}
-          </a>
+          </button>
         )}
       </div>
 
