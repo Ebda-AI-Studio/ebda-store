@@ -162,7 +162,12 @@ export async function generateMetadata(): Promise<Metadata> {
       : typeof pwa?.appName === 'string' && pwa.appName
         ? (pwa.appName as string)
         : localizedStoreName;
-  const pwaActive = store.pwaEnabled === true;
+  // PWA is "active" only when BOTH the store-level toggle AND the
+  // platform feature flag are on. Without the platform-flag gate the
+  // service worker registered + apple-touch-icon was emitted even when
+  // super_admin had disabled the pwa feature for the store, so the
+  // flag was effectively cosmetic.
+  const pwaActive = store.pwaEnabled === true && (store.enabledFeatures?.includes('pwa') ?? true);
 
   // Build the icons block: regular favicon + (when pwa is on) apple-touch-icon
   // so installing-to-home-screen on iOS uses the store's branding rather than
@@ -346,7 +351,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 {store.marketingPixels && Object.keys(store.marketingPixels).length > 0 && (
                   <MarketingPixelsProvider pixels={store.marketingPixels as MarketingPixels} />
                 )}
-                <ServiceWorkerRegistration />
+                {/* PWA is active only when BOTH the store toggle AND the
+                    platform feature flag are on. Without this gate, flipping
+                    the per-store feature off had no observable effect. */}
+                {store.pwaEnabled === true && (store.enabledFeatures?.includes('pwa') ?? true) && (
+                  <ServiceWorkerRegistration />
+                )}
                 <Suspense fallback={null}>
                   <AffiliateTracker />
                 </Suspense>

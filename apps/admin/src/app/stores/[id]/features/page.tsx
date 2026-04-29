@@ -163,7 +163,14 @@ export default function StoreFeaturesPage() {
     operations: [],
     storefront: [],
   };
+  // Hide features marked as such in the registry — these are either not
+  // implemented (customer_wallet / email_campaigns / staff_accounts) or
+  // are platform-level and have no per-store impact (seo /
+  // search_autocomplete). Showing them as toggleable was misleading
+  // because flipping them did nothing or promised features that don't
+  // ship yet. Audit on 2026-04-29 documented the gaps.
   for (const def of Object.values(registry)) {
+    if (def.hidden) continue;
     grouped[def.category].push(def);
   }
 

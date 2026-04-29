@@ -37,6 +37,27 @@ export interface FeatureDefinition {
   description: string;
   descriptionAr: string;
   category: FeatureCategory;
+  /**
+   * Hide this feature from the admin features list. The key remains
+   * valid in the API/DB so existing rows aren't broken, but merchants
+   * can no longer toggle it. Used for:
+   *   1. Features that aren't actually implemented yet (customer_wallet,
+   *      email_campaigns, staff_accounts) — flag them hidden until the
+   *      backing code lands.
+   *   2. Platform-level features that are universal and have no
+   *      per-store impact (seo, search_autocomplete) — toggling them
+   *      did nothing, which was misleading.
+   * Audit trail: see the features-implementation audit performed
+   * 2026-04-29.
+   */
+  hidden?: boolean;
+}
+
+/** Filtered view of the registry: only features that are actually
+ *  toggleable from the admin UI. Use this when rendering the features
+ *  page or the "Coming soon" gates so dead toggles don't appear. */
+export function getVisibleFeatures(): FeatureDefinition[] {
+  return Object.values(FEATURE_REGISTRY).filter(f => !f.hidden);
 }
 
 export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
@@ -103,6 +124,7 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     description: 'Enable store credit wallets for customers to store and spend funds.',
     descriptionAr: 'تمكين محافظ رصيد المتجر للعملاء لتخزين الأموال وإنفاقها.',
     category: 'commerce',
+    hidden: true, // No backing model/service/UI yet — un-hide when shipped.
   },
   upsell_crosssell: {
     key: 'upsell_crosssell',
@@ -143,6 +165,7 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     description: 'Create and send marketing email campaigns to customer segments.',
     descriptionAr: 'إنشاء وإرسال حملات البريد الإلكتروني التسويقية لشرائح العملاء.',
     category: 'marketing',
+    hidden: true, // No campaign builder yet — transactional email is separate.
   },
   abandoned_cart: {
     key: 'abandoned_cart',
@@ -183,6 +206,7 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     description: 'Add team members with role-based permissions to manage the store.',
     descriptionAr: 'إضافة أعضاء الفريق بأذونات قائمة على الأدوار لإدارة المتجر.',
     category: 'operations',
+    hidden: true, // No Staff/team-membership model or admin invite UI yet.
   },
   pwa: {
     key: 'pwa',
@@ -200,6 +224,7 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     descriptionAr:
       'إعدادات SEO المتقدمة بما في ذلك العلامات الوصفية وخرائط الموقع والبيانات المنظمة.',
     category: 'storefront',
+    hidden: true, // Platform-level — every storefront emits SEO metadata regardless of this toggle.
   },
   search_autocomplete: {
     key: 'search_autocomplete',
@@ -208,6 +233,7 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     description: 'Provide real-time search suggestions as customers type in the search bar.',
     descriptionAr: 'توفير اقتراحات بحث فورية أثناء كتابة العملاء في شريط البحث.',
     category: 'storefront',
+    hidden: true, // Platform-level — typeahead is built into every storefront search input.
   },
 };
 
