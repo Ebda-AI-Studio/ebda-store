@@ -550,19 +550,27 @@ export class AuthService {
       subject: payload.userId,
     });
 
-    // Generate refresh token (30 days)
+    // Generate refresh token. Long-lived (1 year) so the admin PWA on
+    // a phone keeps the user signed in between order pings — they can
+    // tap a push notification weeks later and still land authenticated.
+    // The token is single-use server-side: each refresh issues a new
+    // hash and invalidates the old one (see auth.service rotation).
     const refreshToken = jwt.sign({ ...payload, type: 'refresh' }, config.jwtSecret, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expiresIn: config.refreshTokenExpiresIn as any,
       algorithm: 'HS256',
-      expiresIn: '30d',
       issuer: 'force-api',
       audience: 'force-app',
       subject: payload.userId,
     });
 
-    // Store hashed refresh token in database
+    // Store hashed refresh token in database. The DB row expiry must
+    // match the JWT's own `exp` claim or rotation breaks early — 1 year
+    // mirrors the JWT lifetime above. Cleanup of expired rows happens
+    // via the periodic refresh-token cleanup job.
     const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 30); // 30 days
+    expiresAt.setDate(expiresAt.getDate() + 365);
 
     await prisma.refreshToken.create({
       data: {

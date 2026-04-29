@@ -50,10 +50,14 @@ export const config = {
   // Redis
   redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
 
-  // JWT - No fallback in production
+  // JWT - No fallback in production. Long lifetimes are intentional: the
+  // admin PWA on a phone is expected to "stay logged in" between visits
+  // so a store admin can tap a push notification about a new order and
+  // land directly on the order page without re-authenticating. The
+  // refresh token (1 year) is the practical re-login window.
   jwtSecret: getRequiredSecret('JWT_SECRET', 'JWT Secret'),
-  jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
-  refreshTokenExpiresIn: process.env.REFRESH_TOKEN_EXPIRES_IN || '30d',
+  jwtExpiresIn: process.env.JWT_EXPIRES_IN || '30d',
+  refreshTokenExpiresIn: process.env.REFRESH_TOKEN_EXPIRES_IN || '365d',
 
   // Encryption
   encryptionKey: getRequiredSecret('ENCRYPTION_KEY', 'Encryption Key'),

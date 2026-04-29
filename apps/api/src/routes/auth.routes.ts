@@ -8,12 +8,15 @@ import { authLimiter, auditLog, generateCsrfToken } from '../middleware/security
 
 const router = Router();
 
-/** Shared cookie options for the HTTP-only auth token cookie */
+/** Shared cookie options for the HTTP-only auth token cookie. The 30-day
+ *  maxAge mirrors the access-token JWT lifetime in config.ts — a phone
+ *  PWA user opening the admin once a month stays signed in seamlessly,
+ *  and refresh-token rotation (1 year) covers longer gaps. */
 const AUTH_COOKIE_OPTIONS: CookieOptions = {
   httpOnly: true,
   secure: config.nodeEnv === 'production',
   sameSite: config.nodeEnv === 'production' ? 'none' : 'lax', // 'none' required for cross-origin cookies
-  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days — matches jwtExpiresIn
   path: '/',
 };
 
