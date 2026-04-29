@@ -45,10 +45,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (response.ok) {
         const data = await response.json();
-        // The new access token is set as an HTTP-only cookie by the API.
-        // Store the new refresh token in localStorage (not sensitive the
-        // same way since it can only be used once and is paired with the
-        // server-side record).
+        // The new access token is set as an HTTP-only cookie by the API
+        // for browser-cookie clients, AND returned in the body so we can
+        // mirror it into localStorage for the iOS PWA path (where WebKit
+        // purges third-party cookies). lib/api.ts reads `accessToken`
+        // from localStorage and sends it as `Authorization: Bearer`.
+        if (data.data.accessToken) {
+          localStorage.setItem('accessToken', data.data.accessToken);
+        }
         if (data.data.refreshToken) {
           localStorage.setItem('refreshToken', data.data.refreshToken);
         }
@@ -127,15 +131,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error('Access denied. Admin privileges required.');
     }
 
-    // The access token is set as an HTTP-only cookie by the API response.
-    // Only store the refresh token in localStorage.
+    // Mirror the access token into localStorage for the iOS PWA path —
+    // Safari/WebKit purges third-party cookies (the API is on a
+    // different parent domain than the admin) so cookie-only auth
+    // doesn't survive PWA backgrounding. lib/api.ts sends this token
+    // as `Authorization: Bearer` on every request.
+    if (data.data.accessToken) {
+      localStorage.setItem('accessToken', data.data.accessToken);
+    }
     localStorage.setItem('refreshToken', data.data.refreshToken);
     // Store CSRF token for state-changing requests
     if (data.data.csrfToken) {
       localStorage.setItem('csrfToken', data.data.csrfToken);
     }
-    // Set session indicator cookie so middleware can gate admin pages
-    document.cookie = 'force-session=1; path=/; max-age=' + 7 * 24 * 60 * 60 + '; SameSite=Lax';
+    // Set session indicator cookie so middleware can gate admin pages.
+    // 30 days matches the API access-token JWT lifetime.
+    document.cookie = 'force-session=1; path=/; max-age=' + 30 * 24 * 60 * 60 + '; SameSite=Lax';
     setUser(data.data.user);
     router.push('/');
   }
@@ -156,6 +167,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Best-effort: if the server is unreachable we still clear local state
     });
 
+    localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('csrfToken');
     // Clear session indicator cookie

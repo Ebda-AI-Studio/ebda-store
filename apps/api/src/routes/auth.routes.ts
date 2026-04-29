@@ -137,11 +137,14 @@ router.post('/register', authLimiter, async (req: Request, res: Response, next: 
     // Set access token as HTTP-only cookie for cookie-based auth
     setTokenCookie(res, result.accessToken);
 
-    // Don't expose accessToken in body — it's set as HTTP-only cookie
-    const { accessToken: _at, ...safeResult } = result;
+    // ALSO return the access token in the body so Bearer-token clients
+    // (notably the iOS admin PWA, where third-party cookies get purged
+    // by WebKit) can store it in localStorage and send it via the
+    // Authorization header. Cookie + Bearer are both supported by the
+    // API's auth middleware; the header takes precedence.
     res.status(201).json({
       success: true,
-      data: safeResult,
+      data: result,
     });
   } catch (error) {
     next(error);
@@ -214,15 +217,18 @@ router.post('/login', authLimiter, async (req: Request, res: Response, next: Nex
       userAgent: req.headers['user-agent'],
     });
 
-    // Set access token as HTTP-only cookie for cookie-based auth
+    // Set access token as HTTP-only cookie for cookie-based auth.
     setTokenCookie(res, result.accessToken);
 
-    // Don't expose accessToken in body — it's set as HTTP-only cookie
-    const { accessToken: _at, ...safeLoginResult } = result;
+    // ALSO return the access token in the body so Bearer-token clients
+    // (the iOS admin PWA — Safari/WebKit purges third-party cookies) can
+    // store it in localStorage and send it via the Authorization header
+    // on every request. The cookie path is preserved for browsers that
+    // can rely on it; the API's auth middleware accepts either.
     res.json({
       success: true,
       data: {
-        ...safeLoginResult,
+        ...result,
         csrfToken,
       },
     });
@@ -254,14 +260,15 @@ router.post('/refresh', authLimiter, async (req: Request, res: Response, next: N
 
     const tokens = await AuthService.refreshTokens(refreshToken);
 
-    // Update the HTTP-only cookie with the new access token
+    // Update the HTTP-only cookie with the new access token (browser path).
     setTokenCookie(res, tokens.accessToken);
 
-    // Don't expose accessToken in body — it's set as HTTP-only cookie (matches login/register pattern)
-    const { accessToken: _at, ...safeTokens } = tokens;
+    // ALSO return it in the body for Bearer-token clients (iOS admin PWA)
+    // so they can replace their localStorage token. Same reasoning as
+    // login/register — the API supports both auth modes.
     res.json({
       success: true,
-      data: safeTokens,
+      data: tokens,
     });
   } catch (error) {
     next(error);

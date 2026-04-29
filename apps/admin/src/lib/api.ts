@@ -64,11 +64,28 @@ export async function apiRequest<T = unknown>(
       }
     }
 
+    // Bearer token from localStorage. The HTTP-only cookie is the primary
+    // auth path for browsers, but iOS Safari/WebKit purges third-party
+    // cookies aggressively for installed PWAs (the admin is at
+    // app.forcemediakw.com, the API at api-production-c058.up.railway.app —
+    // a third-party cookie from WebKit's perspective). Sending the token
+    // explicitly in the Authorization header keeps the iOS admin PWA
+    // signed in even after WebKit drops the cookie. The API's auth
+    // middleware (apps/api/src/middleware/auth.ts) accepts either.
+    const authHeaders: Record<string, string> = {};
+    if (typeof window !== 'undefined') {
+      const accessToken = localStorage.getItem('accessToken');
+      if (accessToken) {
+        authHeaders.Authorization = `Bearer ${accessToken}`;
+      }
+    }
+
     const response = await fetch(url, {
       ...options,
       credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
+        ...authHeaders,
         ...csrfHeaders,
         ...options.headers,
       },
