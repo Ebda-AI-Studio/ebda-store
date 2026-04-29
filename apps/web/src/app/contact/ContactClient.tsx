@@ -5,6 +5,7 @@ import { Button, Input, Textarea, useToast } from '@force/ui';
 import { ShopChrome } from '../../components';
 import { useStore } from '../../contexts/StoreContext';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
+import { resolveAddressHref } from '../../templates/shared/display-helpers';
 import { api } from '@/lib/api';
 
 export default function ContactClient() {
@@ -18,6 +19,25 @@ export default function ContactClient() {
     subject: '',
     message: '',
   });
+
+  // Match the same address-link resolution the storefront footer uses, so
+  // the contact page tiles open the merchant's pasted Google/Apple Maps URL
+  // when set, fall back to a Maps search of the address text otherwise, and
+  // render plain text when the merchant has explicitly disabled the link.
+  const rawContact = (store.settings?.contact as Record<string, unknown> | undefined) ?? {};
+  const addressLink: boolean =
+    rawContact.addressLink === false || rawContact.addressLink === 'none' ? false : true;
+  const addressUrl: string | undefined =
+    typeof rawContact.addressUrl === 'string' && rawContact.addressUrl.trim()
+      ? (rawContact.addressUrl as string).trim()
+      : undefined;
+  const addressHref = resolveAddressHref(store.address, addressUrl, addressLink);
+
+  // Build mailto / tel hrefs — strip whitespace from the phone number so
+  // dialers don't choke on the spaces merchants type into the input.
+  const emailHref = store.email ? `mailto:${store.email}` : null;
+  const phoneHref = store.phone ? `tel:${store.phone.replace(/\s+/g, '')}` : null;
+  const linkClass = 'underline-offset-4 hover:underline hover:text-foreground transition-colors';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -114,8 +134,13 @@ export default function ContactClient() {
               {t('Email', translations['Email'])}
             </h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              {store.email ||
-                t('Not available', '\u063a\u064a\u0631 \u0645\u062a\u0648\u0641\u0631')}
+              {emailHref ? (
+                <a href={emailHref} className={linkClass}>
+                  {store.email}
+                </a>
+              ) : (
+                t('Not available', '\u063a\u064a\u0631 \u0645\u062a\u0648\u0641\u0631')
+              )}
             </p>
           </div>
           <div className="text-center">
@@ -138,8 +163,13 @@ export default function ContactClient() {
               {t('Phone', translations['Phone'])}
             </h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              {store.phone ||
-                t('Not available', '\u063a\u064a\u0631 \u0645\u062a\u0648\u0641\u0631')}
+              {phoneHref ? (
+                <a href={phoneHref} className={linkClass} dir="ltr">
+                  {store.phone}
+                </a>
+              ) : (
+                t('Not available', '\u063a\u064a\u0631 \u0645\u062a\u0648\u0641\u0631')
+              )}
             </p>
           </div>
           <div className="text-center">
@@ -168,8 +198,22 @@ export default function ContactClient() {
               {t('Location', '\u0627\u0644\u0645\u0648\u0642\u0639')}
             </h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              {store.address ||
-                t('Not available', '\u063a\u064a\u0631 \u0645\u062a\u0648\u0641\u0631')}
+              {store.address ? (
+                addressHref ? (
+                  <a
+                    href={addressHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={linkClass}
+                  >
+                    {store.address}
+                  </a>
+                ) : (
+                  store.address
+                )
+              ) : (
+                t('Not available', '\u063a\u064a\u0631 \u0645\u062a\u0648\u0641\u0631')
+              )}
             </p>
           </div>
         </div>
