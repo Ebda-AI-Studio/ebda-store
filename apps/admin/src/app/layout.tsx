@@ -47,6 +47,14 @@ export const metadata: Metadata = {
 };
 
 export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  // viewport-fit=cover lets the page extend into the iPhone safe-area
+  // (notch / home indicator regions) so the fixed mobile bottom-nav can
+  // sit flush with the screen edge while still padding itself with
+  // env(safe-area-inset-bottom). Without this iOS treats the safe-area
+  // env vars as 0 and the nav bar overlaps the home indicator.
+  viewportFit: 'cover' as const,
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#ffffff' },
     { media: '(prefers-color-scheme: dark)', color: '#0a0a0a' },

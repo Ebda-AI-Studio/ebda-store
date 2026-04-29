@@ -94,6 +94,10 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 5,
+  // viewport-fit=cover so iPhone safe-area-inset env vars resolve to
+  // real pixel values; lets a future bottom utility / floating add-to-cart
+  // bar sit above the home indicator instead of overlapping it.
+  viewportFit: 'cover',
   themeColor: '#ff6e00',
 };
 
