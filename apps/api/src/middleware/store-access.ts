@@ -17,7 +17,15 @@ export async function requireStoreAccess(
   next: NextFunction
 ): Promise<void> {
   try {
-    const storeId = req.params.id || req.params.storeId;
+    // Param precedence MATTERS. Nested routers (e.g. productRoutes mounted
+    // at `/stores/:storeId/products`) propagate the parent `:storeId` AND
+    // expose the nested `:id` as the productId. Reading `req.params.id`
+    // first looks up `Store.findUnique({ id: <productId> })`, which always
+    // returns null and throws "Store not found" 404 — masking real product
+    // updates as a phantom storefront 404. Always prefer the unambiguous
+    // `:storeId` param; fall back to `:id` only for top-level
+    // `/stores/:id/...` routes that don't have a nested entity.
+    const storeId = req.params.storeId || req.params.id;
     const user = req.user;
 
     if (!user) {
@@ -124,8 +132,10 @@ export async function requireActiveStore(
     const store = req.store;
 
     if (!store) {
-      // If store not attached, fetch it
-      const storeId = req.params.id || req.params.storeId;
+      // If store not attached, fetch it. Same param precedence rule as
+      // requireStoreAccess: prefer the unambiguous `:storeId` over `:id`,
+      // because nested routers leak a nested entity's `:id` here.
+      const storeId = req.params.storeId || req.params.id;
       if (!storeId) {
         throw new AppError(400, 'MISSING_STORE_ID', 'Store ID is required');
       }
