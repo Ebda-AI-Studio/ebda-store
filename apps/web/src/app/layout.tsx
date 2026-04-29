@@ -14,6 +14,7 @@ import { ServiceWorkerRegistration } from '../components/ServiceWorkerRegistrati
 import { PushNotificationPrompt } from '../components/PushNotificationPrompt';
 import { OneSignalStorefrontInit } from '../components/OneSignalStorefrontInit';
 import { AffiliateTracker } from '../components/AffiliateTracker';
+import { StoreMaintenance } from '../components/StoreMaintenance';
 import { type MarketingPixels, themeToCssVars } from '@force/shared';
 import '../styles/globals.css';
 
@@ -211,10 +212,20 @@ export async function generateMetadata(): Promise<Metadata> {
       ...(ogImageUrl ? { images: [ogImageUrl] } : {}),
       ...(twitterHandle ? { site: twitterHandle, creator: twitterHandle } : {}),
     },
-    robots: {
-      index: true,
-      follow: true,
-    },
+    robots:
+      store.status === 'suspended'
+        ? {
+            // Suspended stores render the branded maintenance page on every
+            // route — explicitly tell crawlers not to index that as the
+            // store's canonical content so the merchant doesn't lose SEO
+            // when they come back online.
+            index: false,
+            follow: false,
+          }
+        : {
+            index: true,
+            follow: true,
+          },
     icons: iconsBlock,
     ...(pwaActive
       ? {
@@ -300,33 +311,48 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           Skip to main content
         </a>
         <StoreProvider initialStore={store}>
-          <FeatureProvider>
-            <AuthProvider>
-              <LanguageProvider
-                defaultLanguage={
-                  (store.settings as Record<string, unknown>)?.defaultLanguage as
-                    | 'en'
-                    | 'ar'
-                    | undefined
-                }
-              >
-                <ToastProvider>
-                  <CartProvider>
-                    <div id="main-content">{children}</div>
-                    <PushNotificationPrompt />
-                    <OneSignalStorefrontInit />
-                  </CartProvider>
-                </ToastProvider>
-              </LanguageProvider>
-            </AuthProvider>
-            {store.marketingPixels && Object.keys(store.marketingPixels).length > 0 && (
-              <MarketingPixelsProvider pixels={store.marketingPixels as MarketingPixels} />
+          <LanguageProvider
+            defaultLanguage={
+              (store.settings as Record<string, unknown>)?.defaultLanguage as
+                | 'en'
+                | 'ar'
+                | undefined
+            }
+          >
+            {store.status === 'suspended' ? (
+              // Suspended store — render the branded maintenance page in
+              // place of the entire normal storefront. We deliberately
+              // skip Cart/Auth/Feature providers, marketing pixels, the
+              // service worker, OneSignal, the affiliate tracker, etc.
+              // because they all make API calls (cart sync, /auth/me,
+              // pixel events) that would either 403 against a suspended
+              // store or pollute analytics. The maintenance screen only
+              // needs the store's branding + theme + language, all of
+              // which already live above this guard.
+              <div id="main-content">
+                <StoreMaintenance />
+              </div>
+            ) : (
+              <FeatureProvider>
+                <AuthProvider>
+                  <ToastProvider>
+                    <CartProvider>
+                      <div id="main-content">{children}</div>
+                      <PushNotificationPrompt />
+                      <OneSignalStorefrontInit />
+                    </CartProvider>
+                  </ToastProvider>
+                </AuthProvider>
+                {store.marketingPixels && Object.keys(store.marketingPixels).length > 0 && (
+                  <MarketingPixelsProvider pixels={store.marketingPixels as MarketingPixels} />
+                )}
+                <ServiceWorkerRegistration />
+                <Suspense fallback={null}>
+                  <AffiliateTracker />
+                </Suspense>
+              </FeatureProvider>
             )}
-            <ServiceWorkerRegistration />
-            <Suspense fallback={null}>
-              <AffiliateTracker />
-            </Suspense>
-          </FeatureProvider>
+          </LanguageProvider>
         </StoreProvider>
       </body>
     </html>

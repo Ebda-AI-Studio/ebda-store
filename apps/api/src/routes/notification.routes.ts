@@ -19,11 +19,32 @@ const upsertConfigSchema = z.object({
   enabled: z.boolean(),
 });
 
-const upsertEventConfigSchema = z.object({
-  event: z.string().min(1),
-  whatsapp: z.boolean(),
-  sms: z.boolean(),
-  push: z.boolean(),
+// Accepts either `push` (canonical) or `push_notifications` (the channel
+// key the admin UI uses internally) so the contract is forgiving — drift
+// between admin and API field names is what produced the 400s the
+// merchant saw on every save before this fix.
+const eventConfigShape = z
+  .object({
+    event: z.string().min(1),
+    whatsapp: z.boolean(),
+    sms: z.boolean(),
+    push: z.boolean().optional(),
+    push_notifications: z.boolean().optional(),
+  })
+  .transform(v => ({
+    event: v.event,
+    whatsapp: v.whatsapp,
+    sms: v.sms,
+    // `push` wins when both are sent; defaults to false so a missing
+    // field doesn't accidentally enable a channel.
+    push: typeof v.push === 'boolean' ? v.push : (v.push_notifications ?? false),
+  }));
+
+// Single-event payload (legacy). Bulk payload `{ events: [...] }` is
+// preferred — see the route below — and is what the admin actually sends.
+const upsertEventConfigSchema = eventConfigShape;
+const bulkEventConfigSchema = z.object({
+  events: z.array(eventConfigShape).min(1).max(50),
 });
 
 const logsQuerySchema = z.object({
@@ -213,14 +234,37 @@ router.put(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
-      const { event, whatsapp, sms, push } = upsertEventConfigSchema.parse(req.body);
 
+      // Accept BOTH shapes:
+      //   1. Bulk:   `{ events: [{event, whatsapp, sms, push|push_notifications}, ...] }`
+      //              (what the admin actually sends from the events table)
+      //   2. Single: `{ event, whatsapp, sms, push|push_notifications }`
+      //              (kept so older clients keep working)
+      const body = req.body as Record<string, unknown> | undefined;
+      const isBulk = body && Array.isArray((body as Record<string, unknown>).events);
+
+      if (isBulk) {
+        const { events } = bulkEventConfigSchema.parse(req.body);
+        const results: Array<{ event: string; whatsapp: boolean; sms: boolean; push: boolean }> =
+          [];
+        for (const e of events) {
+          const updated = await notificationConfigService.upsertEventConfig(storeId, e.event, {
+            whatsapp: e.whatsapp,
+            sms: e.sms,
+            push: e.push,
+          });
+          results.push({ event: e.event, ...updated });
+        }
+        res.json({ success: true, data: { events: results } });
+        return;
+      }
+
+      const { event, whatsapp, sms, push } = upsertEventConfigSchema.parse(req.body);
       const updated = await notificationConfigService.upsertEventConfig(storeId, event, {
         whatsapp,
         sms,
         push,
       });
-
       res.json({ success: true, data: { event, ...updated } });
     } catch (error) {
       next(error);

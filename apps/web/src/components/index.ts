@@ -1,5 +1,6 @@
 export { ShopChrome } from './ShopChrome';
 export { MinimalChrome } from './MinimalChrome';
+export { StoreMaintenance, StoreMaintenanceGate } from './StoreMaintenance';
 export { CmsPageContent } from './CmsPageContent';
 export { SearchAutocomplete } from './SearchAutocomplete';
 export { LanguageSwitcher } from './LanguageSwitcher';

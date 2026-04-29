@@ -145,10 +145,31 @@ export default function NotificationsPage() {
   const handleSaveChannel = async (channel: ChannelKey) => {
     setSavingChannel(channel);
     try {
-      const { error } = await apiPut(
-        `/api/v1/stores/${storeId}/notifications/configs/${channel}`,
-        configs[channel]
-      );
+      // The API expects `{ provider, credentials, enabled }`. The admin
+      // form holds credentials as flat fields per channel; flatten them
+      // back into a credentials object here so the PUT body matches the
+      // server-side Zod schema. Without this, every save returned 400
+      // because the form's flat `{ enabled, phoneNumberId, ... }` shape
+      // was missing the required `provider` and `credentials` keys.
+      const cfg = configs[channel];
+      const { enabled } = cfg;
+      const credentials: Record<string, unknown> = {};
+      if (channel === 'whatsapp') {
+        if (cfg.phoneNumberId) credentials.phoneNumberId = cfg.phoneNumberId;
+        if (cfg.wabaId) credentials.wabaId = cfg.wabaId;
+        if (cfg.accessToken) credentials.accessToken = cfg.accessToken;
+      } else if (channel === 'sms') {
+        if (cfg.appSid) credentials.appSid = cfg.appSid;
+        if (cfg.senderId) credentials.senderId = cfg.senderId;
+      }
+      // push_notifications has no per-store credentials (VAPID is
+      // platform-wide) — credentials stays empty.
+
+      const { error } = await apiPut(`/api/v1/stores/${storeId}/notifications/configs/${channel}`, {
+        provider: channel,
+        credentials,
+        enabled,
+      });
       if (!error) {
         toastSuccess(
           tToast('savedTitle'),
@@ -196,7 +217,19 @@ export default function NotificationsPage() {
   const handleSaveEvents = async () => {
     setSavingEvents(true);
     try {
-      const { error } = await apiPut(`/api/v1/stores/${storeId}/notifications/events`, { events });
+      // The events table stores the push toggle under `push_notifications`
+      // (matches the channel key the rest of the admin uses) but the API
+      // schema canonicalises it to `push`. Map here on save so a fresh
+      // save round-trips cleanly.
+      const payload = events.map(e => ({
+        event: e.event,
+        whatsapp: e.whatsapp,
+        sms: e.sms,
+        push: e.push_notifications,
+      }));
+      const { error } = await apiPut(`/api/v1/stores/${storeId}/notifications/events`, {
+        events: payload,
+      });
       if (!error) {
         toastSuccess(tToast('savedTitle'), tToast('eventsSavedDescription'));
       } else {

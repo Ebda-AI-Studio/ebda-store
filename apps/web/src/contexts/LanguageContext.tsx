@@ -176,6 +176,17 @@ export const translations = {
   'Confirm Password': 'تأكيد كلمة المرور',
   'Full Name': 'الاسم الكامل',
   Phone: 'الهاتف',
+
+  // Maintenance / suspended store branded page. Surfaced by
+  // `StoreMaintenance` when the resolved store has `status === 'suspended'`.
+  // Keep copy short — this is the merchant's last impression on a customer
+  // when their store is offline, so the page must read as intentional rather
+  // than broken.
+  "We'll be back soon": 'سنعود قريباً',
+  'is currently undergoing maintenance. Please check back later.':
+    'يخضع حالياً لأعمال الصيانة. يرجى المحاولة مرة أخرى لاحقاً.',
+  'Need to reach us?': 'تحتاج للتواصل معنا؟',
+  'Powered by Force': 'مدعوم من Force',
 } as const;
 
 export type TranslationKey = keyof typeof translations;

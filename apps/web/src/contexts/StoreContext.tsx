@@ -55,6 +55,10 @@ export interface StoreData {
   nameAr?: string;
   slug: string;
   domain?: string;
+  /** Lifecycle status. `suspended` triggers the branded maintenance page on
+   *  the storefront — every page wraps in `StoreMaintenanceGate` which
+   *  swaps out the normal chrome for the maintenance screen. */
+  status: 'active' | 'suspended';
   logo?: string;
   logoAr?: string;
   favicon?: string;
@@ -114,6 +118,7 @@ const DEFAULT_STORE: StoreData = {
   name: 'Force',
   nameAr: 'فورس',
   slug: 'demo',
+  status: 'active',
   currency: 'KWD',
   timezone: 'Asia/Kuwait',
   template: 'modern',

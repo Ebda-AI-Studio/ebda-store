@@ -636,10 +636,16 @@ router.get('/stores/:slugOrId', async (req: Request, res: Response, next: NextFu
         slugOrId
       );
 
+      // Return active OR suspended stores (so the storefront can render a
+      // branded "we'll be back soon" page for suspended stores instead of
+      // 404'ing). Inactive stores stay hidden — `inactive` is reserved for
+      // archived/draft stores merchants haven't published. Soft-deleted
+      // stores (`deletedAt` set) are also excluded.
       const store = await prisma.store.findFirst({
         where: {
           ...(isUuid ? { id: slugOrId } : { slug: slugOrId }),
-          status: 'active',
+          status: { in: ['active', 'suspended'] },
+          deletedAt: null,
         },
         select: {
           id: true,
@@ -647,6 +653,7 @@ router.get('/stores/:slugOrId', async (req: Request, res: Response, next: NextFu
           nameAr: true,
           slug: true,
           domain: true,
+          status: true,
           logo: true,
           logoAr: true,
           favicon: true,
@@ -794,11 +801,15 @@ router.get(
       // are stored in the DB and how the storefront middleware normalizes them.
       const domain = rawDomain.toLowerCase().replace(/^www\./, '');
 
-      // Find store by domain
+      // Find store by domain. Suspended stores are returned with their
+      // `status` so the storefront can render the branded maintenance page
+      // for that store. Inactive (archived/draft) and soft-deleted stores
+      // stay hidden — those should still 404.
       const store = await prisma.store.findFirst({
         where: {
           domain,
-          status: 'active',
+          status: { in: ['active', 'suspended'] },
+          deletedAt: null,
         },
         select: {
           id: true,
@@ -806,6 +817,7 @@ router.get(
           nameAr: true,
           slug: true,
           domain: true,
+          status: true,
           logo: true,
           logoAr: true,
           favicon: true,

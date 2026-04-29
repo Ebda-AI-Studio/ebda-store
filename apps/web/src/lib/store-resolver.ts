@@ -10,6 +10,14 @@ import {
 import { API_URL } from './api';
 
 /**
+ * Lifecycle status of a resolved store. Mirrors the `StoreStatus` enum on
+ * the API side. Customer-facing surfaces only ever see `active` or
+ * `suspended`; `inactive` (archived/draft) stores are filtered out by the
+ * public store endpoint and never make it to the storefront.
+ */
+export type ResolvedStoreStatus = 'active' | 'suspended';
+
+/**
  * Resolved store configuration
  */
 export interface ResolvedStore {
@@ -18,6 +26,7 @@ export interface ResolvedStore {
   nameAr?: string;
   slug: string;
   domain?: string;
+  status: ResolvedStoreStatus;
   logo?: string;
   logoAr?: string;
   favicon?: string;
@@ -98,6 +107,7 @@ const DEFAULT_STORE: ResolvedStore = {
   name: 'Force',
   nameAr: 'فورس',
   slug: 'demo',
+  status: 'active',
   currency: 'KWD',
   timezone: 'Asia/Kuwait',
   template: 'modern',
@@ -180,6 +190,7 @@ async function fetchStoreByDomain(domain: string): Promise<ResolvedStore | null>
       nameAr: storeData.nameAr,
       slug: storeData.slug,
       domain: storeData.domain,
+      status: storeData.status === 'suspended' ? 'suspended' : 'active',
       logo: storeData.logo,
       logoAr: storeData.logoAr,
       favicon: storeData.favicon,
@@ -294,6 +305,7 @@ async function fetchStoreBySlug(slug: string): Promise<ResolvedStore | null> {
       nameAr: storeData.nameAr,
       slug: storeData.slug,
       domain: storeData.domain,
+      status: storeData.status === 'suspended' ? 'suspended' : 'active',
       logo: storeData.logo,
       logoAr: storeData.logoAr,
       favicon: storeData.favicon,
@@ -434,6 +446,7 @@ export async function getStoreById(storeId: string): Promise<ResolvedStore | nul
       nameAr: storeData.nameAr,
       slug: storeData.slug,
       domain: storeData.domain,
+      status: storeData.status === 'suspended' ? 'suspended' : 'active',
       logo: storeData.logo,
       logoAr: storeData.logoAr,
       favicon: storeData.favicon,
