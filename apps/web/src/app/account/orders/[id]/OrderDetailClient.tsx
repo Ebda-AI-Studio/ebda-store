@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useParams } from 'next/navigation';
-import { api } from '@/lib/api';
+import { api, API_URL } from '@/lib/api';
 import { useStore, useStoreUrl } from '../../../../contexts/StoreContext';
 import { useLanguage } from '../../../../contexts/LanguageContext';
 import { formatPrice } from '@/lib/format';
@@ -728,7 +728,7 @@ export default function OrderDetailClient() {
 
         {successfulPayment && (
           <a
-            href={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/stores/${order.storeId}/orders/${order.id}/invoice`}
+            href={`${API_URL}/stores/${order.storeId}/orders/${order.id}/invoice`}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
