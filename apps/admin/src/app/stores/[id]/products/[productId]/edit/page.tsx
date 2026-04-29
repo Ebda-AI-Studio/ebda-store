@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button, Input, Textarea } from '@force/ui';
 import { useT } from '@/i18n/useT';
+import Link from 'next/link';
 import { AdminLayout } from '../../../../../../components/AdminLayout';
 import { MultiImageUpload } from '../../../../../../components/ImageUpload';
 import { useAuth } from '../../../../../../lib/auth';
@@ -280,6 +281,30 @@ export default function EditProductPage() {
     <AdminLayout
       title={t('title', { name: product?.name || t('fallbackTitle') })}
       subtitle={t('subtitle', { storeName: product?.store?.name || t('fallbackStore') })}
+      actions={
+        product ? (
+          <Link
+            href={`/stores/${storeId}/products/${product.id}/variants`}
+            className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-accent transition-colors"
+          >
+            {t('manageVariants')}
+            <svg
+              className="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M13 7l5 5m0 0l-5 5m5-5H6"
+              />
+            </svg>
+          </Link>
+        ) : undefined
+      }
     >
       <form onSubmit={handleSubmit}>
         {error && (
