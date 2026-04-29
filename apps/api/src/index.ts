@@ -297,6 +297,30 @@ const server = httpServer.listen(config.port, () => {
     { docs: `http://${config.host}:${config.port}/docs` },
     'WebSocket enabled, API docs available'
   );
+
+  // Surface auth-token TTLs at boot. A stale `JWT_EXPIRES_IN="3h"` env
+  // var on Railway once silently broke the iOS PWA — the cookie's
+  // `maxAge` was 30 days but the JWT inside it expired every 3 hours,
+  // logging merchants out mid-day. Logging the resolved values means a
+  // future short override is obvious in deployment logs instead of
+  // buried under support reports.
+  logger.info(
+    {
+      jwtExpiresIn: config.jwtExpiresIn,
+      refreshTokenExpiresIn: config.refreshTokenExpiresIn,
+    },
+    'Auth token lifetimes resolved'
+  );
+  if (
+    typeof config.jwtExpiresIn === 'string' &&
+    /^\d+\s*[hms]$/i.test(config.jwtExpiresIn.trim())
+  ) {
+    logger.warn(
+      { jwtExpiresIn: config.jwtExpiresIn },
+      'Short JWT_EXPIRES_IN detected — iOS admin PWA will log out at this interval. ' +
+        'Defaults are 30d access + 1y refresh; unset the env var to restore.'
+    );
+  }
 });
 
 // Graceful shutdown handler
