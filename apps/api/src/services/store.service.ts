@@ -255,15 +255,40 @@ export class StoreService {
     return updatedStore;
   }
 
+  /**
+   * Hard-delete a store and ALL of its data.
+   *
+   * Most Store->X relations have `onDelete: Cascade` so the database removes
+   * them automatically. A few relations don't, so we clean them up explicitly
+   * inside a transaction:
+   *   - `Order.store` is `Restrict` (prevents accidental deletes from app
+   *     code). We delete orders manually here; the order's children
+   *     (OrderItem, Payment, Shipment) cascade from Order.
+   *   - `Return.order` has no onDelete (defaults to NoAction), so we delete
+   *     returns BEFORE orders to avoid an FK violation.
+   *   - `AuditLog.store` has no onDelete and we want to preserve the trail
+   *     post-deletion, so we null its storeId for this store before delete.
+   *
+   * Caller is responsible for super_admin authorization (route enforces it)
+   * and for writing the STORE_DELETED audit log AFTER this returns successfully.
+   */
   static async delete(storeId: string) {
     const store = await this.getById(storeId);
 
-    await prisma.store.update({
-      where: { id: storeId },
-      data: { deletedAt: new Date() },
+    await prisma.$transaction(async tx => {
+      // Returns reference orders with no cascade — clear them first.
+      await tx.return.deleteMany({ where: { storeId } });
+      // Orders are Restrict-on-delete from Store; remove them explicitly.
+      // OrderItem / Payment / Shipment cascade from Order.
+      await tx.order.deleteMany({ where: { storeId } });
+      // Preserve historical audit logs by detaching them from the store.
+      await tx.auditLog.updateMany({ where: { storeId }, data: { storeId: null } });
+      // Now the store delete cascades through everything else
+      // (products, categories, customers, pages, carts, coupons, etc.).
+      await tx.store.delete({ where: { id: storeId } });
     });
 
-    // Invalidate store cache (best-effort)
+    // Invalidate store cache (best-effort, post-commit)
     try {
       await redis.delete(`store:slug:${store.slug}`);
       if (store.domain) await redis.delete(`store:domain:${store.domain}`);
@@ -273,6 +298,8 @@ export class StoreService {
         '[STORE] Redis cache invalidation failed on delete'
       );
     }
+
+    return { id: storeId, name: store.name, slug: store.slug };
   }
 
   static async getStoreStats(storeId: string) {

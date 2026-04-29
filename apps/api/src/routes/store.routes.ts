@@ -10,6 +10,7 @@ import logger from '../lib/logger';
 import { getAuthUser } from '../utils/store-helpers';
 import { requireFeature } from '../middleware/feature-gate';
 import { bustCorsCache } from '../lib/cors-cache';
+import { auditLog } from '../middleware/security';
 
 const router = Router();
 
@@ -355,21 +356,34 @@ router.put(
   }
 );
 
-// DELETE /stores/:id - Delete store
+// DELETE /stores/:id - Hard-delete a store and ALL its data (super_admin only).
+// Cascade rules in the Prisma schema clean up most relations; the service
+// transaction handles the few non-cascading ones (orders, returns, audit logs).
 router.delete(
   '/:id',
   authenticate,
   authorize('super_admin'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
+      const user = getAuthUser(req);
 
-      await StoreService.delete(id);
+      const deleted = await StoreService.delete(id);
 
-      res.json({
-        success: true,
-        data: { message: 'Store deleted successfully' },
+      await auditLog({
+        action: 'STORE_DELETED',
+        userId: user.userId,
+        resourceType: 'store',
+        resourceId: id,
+        details: { storeName: deleted.name, storeSlug: deleted.slug },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
       });
+
+      logger.info({ storeId: id, deletedBy: user.userId }, '[STORE] Hard-deleted store');
+
+      res.json({ success: true });
     } catch (error) {
       next(error);
     }

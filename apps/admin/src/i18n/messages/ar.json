@@ -243,6 +243,23 @@
         "cancel": "إلغاء",
         "confirm": "تعليق المتجر",
         "confirming": "جارٍ التعليق..."
+      },
+      "dangerZone": {
+        "title": "منطقة الخطر",
+        "description": "حذف هذا المتجر وكل ما يحتويه.",
+        "bulletData": "يحذف المتجر وكل ما بداخله — المنتجات والطلبات والعملاء والمحتوى والإعدادات.",
+        "bulletIrreversible": "لا يمكن التراجع عن هذا الإجراء.",
+        "deleteButton": "حذف المتجر",
+        "modalTitle": "حذف المتجر",
+        "modalBody": "سيتم حذف {name} نهائيًا مع جميع منتجاته وطلباته وعملائه ومحتواه. لا يمكن التراجع عن هذا الإجراء.",
+        "typeNameLabel": "اكتب {name} للتأكيد",
+        "typeNamePlaceholder": "اسم المتجر",
+        "confirmButton": "حذف المتجر",
+        "cancelButton": "إلغاء",
+        "deleting": "جارٍ الحذف…",
+        "deleteFailed": "فشل حذف المتجر",
+        "deletedToastTitle": "تم حذف المتجر",
+        "deletedToastDescription": "تم حذف {name} وجميع بياناته."
       }
     },
     "list": {

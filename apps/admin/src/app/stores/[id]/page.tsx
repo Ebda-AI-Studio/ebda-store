@@ -1,10 +1,11 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { useParams } from 'next/navigation';
-import { Button } from '@force/ui';
+import { useParams, useRouter } from 'next/navigation';
+import { Button, useToast } from '@force/ui';
 import { AdminLayout } from '../../../components/AdminLayout';
 import { useAuth } from '../../../lib/auth';
+import { apiDelete } from '../../../lib/api';
 import { useT } from '@/i18n/useT';
 import { useDashboardData } from './_hooks/useDashboardData';
 // OnboardingChecklist removed per merchant feedback — the file lives in
@@ -16,16 +17,21 @@ import { DomainSection } from './_components/DomainSection';
 import { QuickActions } from './_components/QuickActions';
 import { SettingsLink } from './_components/SettingsLink';
 import { SuspendStoreModal } from './_components/SuspendStoreModal';
+import { DangerZone } from './_components/DangerZone';
+import { DeleteStoreModal } from './_components/DeleteStoreModal';
 import { StoreLoadingSkeleton } from './_components/StoreLoadingSkeleton';
 import { StoreErrorState } from './_components/StoreErrorState';
 import type { StoreFormErrors } from './_components/types';
 
 export default function StoreDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const storeId = params?.id as string;
   const { user } = useAuth();
   const isSuperAdmin = user?.role === 'super_admin';
   const t = useT('stores.dashboard');
+  const tDanger = useT('stores.dashboard.dangerZone');
+  const { success: toastSuccess, error: toastError } = useToast();
   const tErrors = useT('stores.dashboard.details.errors');
   const translateError = useCallback(
     (key: string) => tErrors(key as Parameters<typeof tErrors>[0]),
@@ -52,6 +58,33 @@ export default function StoreDetailPage() {
   } = useDashboardData(storeId);
 
   const [showSuspendModal, setShowSuspendModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!store) return;
+    setIsDeleting(true);
+    try {
+      const { error: apiError } = await apiDelete(`/api/v1/stores/${store.id}`);
+      if (apiError) {
+        toastError(tDanger('deleteFailed'), apiError.message ?? '');
+        setIsDeleting(false);
+        return;
+      }
+      toastSuccess(
+        tDanger('deletedToastTitle'),
+        tDanger('deletedToastDescription', { name: store.name })
+      );
+      // Close the modal so the closing animation runs before we navigate;
+      // the redirect itself unmounts the page so isDeleting state cleanup
+      // is implicit.
+      setShowDeleteModal(false);
+      router.push('/stores');
+    } catch (err) {
+      toastError(tDanger('deleteFailed'), err instanceof Error ? err.message : '');
+      setIsDeleting(false);
+    }
+  }, [store, tDanger, toastError, toastSuccess, router]);
 
   const clearFieldError = useCallback(
     (field: keyof StoreFormErrors) => {
@@ -122,6 +155,13 @@ export default function StoreDetailPage() {
 
       <SettingsLink storeId={store.id} />
 
+      {/* Danger zone: hard-delete the entire store. Super_admin only —
+          store admins must NOT see this. Rendered last so it's clearly
+          separated from the rest of the dashboard. */}
+      {isSuperAdmin && (
+        <DangerZone isDeleting={isDeleting} onRequestDelete={() => setShowDeleteModal(true)} />
+      )}
+
       <SuspendStoreModal
         isOpen={showSuspendModal}
         storeName={store.name}
@@ -131,6 +171,14 @@ export default function StoreDetailPage() {
           setShowSuspendModal(false);
           handleStatusChange('suspended');
         }}
+      />
+
+      <DeleteStoreModal
+        isOpen={showDeleteModal}
+        storeName={store.name}
+        isDeleting={isDeleting}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleDeleteConfirm}
       />
     </AdminLayout>
   );

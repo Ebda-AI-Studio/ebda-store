@@ -243,6 +243,23 @@
         "cancel": "Cancel",
         "confirm": "Suspend Store",
         "confirming": "Suspending..."
+      },
+      "dangerZone": {
+        "title": "Danger zone",
+        "description": "Delete this store and everything it contains.",
+        "bulletData": "Removes the store and everything in it — products, orders, customers, content, settings.",
+        "bulletIrreversible": "This action cannot be undone.",
+        "deleteButton": "Delete store",
+        "modalTitle": "Delete store",
+        "modalBody": "This will permanently delete {name} along with all of its products, orders, customers, and content. This cannot be undone.",
+        "typeNameLabel": "Type {name} to confirm",
+        "typeNamePlaceholder": "Store name",
+        "confirmButton": "Delete store",
+        "cancelButton": "Cancel",
+        "deleting": "Deleting…",
+        "deleteFailed": "Failed to delete store",
+        "deletedToastTitle": "Store deleted",
+        "deletedToastDescription": "{name} and all of its data have been removed."
       }
     },
     "list": {
