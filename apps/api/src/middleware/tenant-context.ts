@@ -24,11 +24,30 @@ import logger from '../lib/logger';
  * - Super_admin cross-tenant routes don't pass through this middleware
  * - 30-second transaction timeout prevents long-lived transactions
  */
+// Mirrors `runInTenantContext`'s guard so we can skip cleanly instead
+// of letting it throw. Without this, a request like
+// `/stores/public/<uuid>/shipping` first matches the `/stores/:storeId`
+// mount with `:storeId="public"`, tenantContext then calls
+// `runInTenantContext("public")`, which rejects with "Invalid store ID
+// format" → every `/stores/public/...` endpoint surfaced 500. Treating
+// non-UUIDs as "no tenant context" lets the request fall through to
+// the matching downstream router (which interprets the path itself).
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export function tenantContext(req: Request, res: Response, next: NextFunction): void {
   const storeId = req.params.storeId || req.params.id;
 
   // No store context — skip (global routes, super_admin cross-tenant, etc.)
   if (!storeId) {
+    next();
+    return;
+  }
+
+  // Param matched something that isn't a UUID — most commonly the
+  // literal `public` from `/stores/public/:storeId/...` URLs that get
+  // captured by an earlier `/stores/:storeId` mount. Defer the real
+  // tenant scoping to a downstream router.
+  if (!UUID_RE.test(storeId)) {
     next();
     return;
   }

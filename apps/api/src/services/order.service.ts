@@ -147,7 +147,7 @@ export class OrderService {
 
   static async create(
     storeId: string,
-    customerId: string,
+    customerId: string | undefined,
     sessionId: string,
     data: CreateOrderData,
     referralCode?: string
@@ -386,13 +386,23 @@ export class OrderService {
     // Emails + notifications fan out fire-and-forget so a slow / unreachable
     // SMTP host or notification provider can't block the checkout response
     // (this previously caused 45s+ "Processing…" hangs on the storefront).
+    // Guest checkout: there is no `order.customer` record. Fall back to
+    // the shipping address fields the visitor provided so the email
+    // confirmation still reaches them and shows their name.
+    const guestFirstName =
+      typeof data.shippingAddress.firstName === 'string' ? data.shippingAddress.firstName : '';
+    const guestLastName =
+      typeof data.shippingAddress.lastName === 'string' ? data.shippingAddress.lastName : '';
+    const guestEmail =
+      typeof data.shippingAddress.email === 'string' ? data.shippingAddress.email : '';
     const emailData: OrderEmailData = {
       orderNumber: order.orderNumber,
       customerName:
-        `${order.customer?.firstName || ''} ${order.customer?.lastName || ''}`.trim() ||
+        `${order.customer?.firstName || guestFirstName} ${order.customer?.lastName || guestLastName}`.trim() ||
         order.customer?.email ||
+        guestEmail ||
         'Customer',
-      customerEmail: order.customer?.email || '',
+      customerEmail: order.customer?.email || guestEmail,
       items: order.items.map(item => ({
         name: item.productName,
         quantity: item.quantity,

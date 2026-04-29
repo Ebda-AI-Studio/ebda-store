@@ -93,7 +93,11 @@ const nextConfig = {
               // Required so /OneSignalSDKWorker.js can register as a service
               // worker — Push API mandates same-origin worker scripts.
               "worker-src 'self' blob:",
-              'frame-src https://vercel.live',
+              // Meta Pixel renders an invisible iframe to www.facebook.com
+              // for cross-domain attribution — without this directive Chrome
+              // blocks it and the pixel still fires the event API but loses
+              // the cookie-bridge piece.
+              'frame-src https://vercel.live https://www.facebook.com https://td.doubleclick.net',
               "frame-ancestors 'none'",
             ].join('; '),
           },

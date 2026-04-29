@@ -6,7 +6,7 @@ import { OrderService } from '../services/order.service';
 import { InvoiceService } from '../services/invoice.service';
 import { EmailService } from '../services/email.service';
 import { prisma } from '@force/database';
-import { authenticate } from '../middleware/auth';
+import { authenticate, optionalAuthenticate } from '../middleware/auth';
 import {
   publicLimiter,
   storeResolveLimiter,
@@ -347,10 +347,15 @@ router.delete('/cart', cartLimiter, async (req: Request, res: Response, next: Ne
 });
 
 // Order endpoints
-// POST /orders - Create order (requires auth)
+// POST /orders - Create order. Guest checkout supported: customerId is
+// nullable in the schema, the cart service already handles a missing
+// customerId by keying off sessionId, and the order's shippingAddress
+// captures the contact info we need to fulfil the order. Visitors on
+// a friend's laptop don't have an account; forcing them to register
+// before checkout was the cause of "خطأ في الدفع".
 router.post(
   '/orders',
-  authenticate,
+  optionalAuthenticate,
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -365,7 +370,7 @@ router.post(
 
       const storeId = await getStoreIdFromRequest(req);
       const orderData = createOrderSchema.parse(req.body);
-      const order = await OrderService.create(storeId, req.user!.userId, sessionId, orderData);
+      const order = await OrderService.create(storeId, req.user?.userId, sessionId, orderData);
 
       res.status(201).json({
         success: true,
