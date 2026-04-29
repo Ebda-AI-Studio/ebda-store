@@ -8,7 +8,12 @@ import { ReviewService } from '../services/review.service';
 import { LoyaltyService } from '../services/loyalty.service';
 import logger from '../lib/logger';
 
-const router = Router();
+// `mergeParams: true` so the child router's handlers see `:storeId` from
+// the parent mount path (`/stores/:storeId/reviews` in routes/index.ts).
+// Without this, `req.params.storeId` is undefined inside every handler and
+// `requireStore` returns 400 VALIDATION_ERROR — which is what the merchant
+// saw when the storefront fetched /reviews/product/:productId.
+const router = Router({ mergeParams: true });
 
 // Validation schemas
 const createReviewSchema = z.object({

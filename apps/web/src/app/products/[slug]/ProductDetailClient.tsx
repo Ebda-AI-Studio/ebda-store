@@ -223,7 +223,8 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
     });
 
     setIsAdding(false);
-    toastSuccess('Added to cart!', `${quantity}x ${product.name} added to your cart`);
+    // Add-to-cart toast is fired centrally by CartContext.addItem so we
+    // don't double-toast on the PDP. Same elsewhere — see Group E.
   };
 
   if (isLoading) {

@@ -668,7 +668,7 @@
       },
       "optionModal": {
         "title": "Add Option",
-        "priceHint": "Options describe how variants differ (Size, Color, Weight). Per-variant prices, inventory, and images are set after the variants are generated below.",
+        "priceHint": "An option is one property (Size, Color, Weight). Add MULTIPLE values to it to create variants — e.g. one Size option with values 'Small, Medium, Large' generates 3 variants. Two separate options with one value each just generate one combined variant.",
         "nameLabel": "Option Name",
         "namePlaceholder": "e.g., Size, Color",
         "nameArLabel": "Option Name (Arabic)",
@@ -725,6 +725,7 @@
         "costLabel": "Cost",
         "costHint": "What you pay for the unit (cost-of-goods). Used for margin/profit reports — never shown to customers.",
         "applyToAll": "Apply to all {count} other variants",
+        "applyToAllDisabledHint": "Type a value first, then click to broadcast it to every other variant.",
         "inventoryLabel": "Inventory",
         "inventoryHint": "Units in stock for this specific variant. The customer can't add more than this to their cart.",
         "weightLabel": "Weight (kg)",

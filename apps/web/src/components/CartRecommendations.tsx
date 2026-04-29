@@ -5,7 +5,6 @@ import { useCart } from '../contexts/CartContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useStore, useStoreUrl } from '../contexts/StoreContext';
 import { useTemplateComponents } from '../hooks/useTemplateComponents';
-import { useToast } from '@force/ui';
 import { API_URL } from '@/lib/api';
 import type { TemplateProduct } from '../templates/types';
 
@@ -45,7 +44,6 @@ export function CartRecommendations({ storeId, productIds }: CartRecommendations
   const { store } = useStore();
   const storeUrl = useStoreUrl();
   const { components: T, isLoading: templateLoading } = useTemplateComponents();
-  const { success: toastSuccess } = useToast();
   const isRtl = language === 'ar';
 
   useEffect(() => {
@@ -94,7 +92,6 @@ export function CartRecommendations({ storeId, productIds }: CartRecommendations
   const handleAdd = async (productId: string) => {
     const p = products.find(x => x.id === productId);
     if (!p) return;
-    const displayName = language === 'ar' && p.nameAr ? p.nameAr : p.name;
     await addItem({
       id: p.id,
       name: p.name,
@@ -103,10 +100,8 @@ export function CartRecommendations({ storeId, productIds }: CartRecommendations
       slug: p.slug,
       image: p.images?.[0]?.url,
     });
-    toastSuccess(
-      t('Added to cart!', 'أضيف إلى السلة!'),
-      `${displayName} ${t('added to your cart', 'أضيف إلى سلتك')}`
-    );
+    // Add-to-cart toast is centralized in CartContext.addItem
+    // (Group E) — don't double-toast from per-component callers.
   };
 
   return (

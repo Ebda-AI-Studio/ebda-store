@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useToast } from '@force/ui';
 import { ShopChrome } from '../../components';
 import { useCart } from '../../contexts/CartContext';
 import { useStoreUrl } from '../../contexts/StoreContext';
@@ -39,7 +38,6 @@ export default function CompareClient() {
   const [isLoading] = useState(false);
   const { addItem } = useCart();
   const storeUrl = useStoreUrl();
-  const { success: toastSuccess } = useToast();
   const { t } = useLanguage();
 
   function handleAddToCart(product: CompareProduct) {
@@ -50,13 +48,8 @@ export default function CompareClient() {
       slug: product.slug,
       image: product.images?.[0],
     });
-    toastSuccess(
-      t(
-        'Added to cart!',
-        '\u062a\u0645\u062a \u0627\u0644\u0625\u0636\u0627\u0641\u0629 \u0625\u0644\u0649 \u0627\u0644\u0633\u0644\u0629!'
-      ),
-      `${product.name} ${t('added to your cart', '\u062a\u0645\u062a \u0625\u0636\u0627\u0641\u062a\u0647 \u0625\u0644\u0649 \u0633\u0644\u062a\u0643')}`
-    );
+    // Add-to-cart toast is centralized in CartContext.addItem (Group E) —
+    // don't double-toast from per-component callers.
   }
 
   function removeProduct(productId: string) {

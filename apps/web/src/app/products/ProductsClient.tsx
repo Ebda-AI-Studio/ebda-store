@@ -80,7 +80,17 @@ export default function ProductsClient({
   const searchParams = useSearchParams();
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState(searchParams.get('category') || '');
-  const [sortBy, setSortBy] = useState('newest');
+  // Honour the `?sort=` URL parameter on initial render so deep links from
+  // the homepage carousels ("Newest" → /products?sort=newest, "Best
+  // Sellers" → /products?sort=best_seller) actually filter the list.
+  // Without this both links landed on the unsorted default and looked
+  // identical to "see all products". Allow-list the supported values so
+  // a junk param can't corrupt state.
+  const [sortBy, setSortBy] = useState<string>(() => {
+    const fromUrl = searchParams.get('sort');
+    const allowed = new Set(['newest', 'price-asc', 'price-desc', 'featured', 'best_seller']);
+    return fromUrl && allowed.has(fromUrl) ? fromUrl : 'newest';
+  });
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [page, setPage] = useState(1);
   // How many products to load per page. The user can pick from a small

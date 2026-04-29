@@ -262,13 +262,26 @@ export function useStoreContact() {
 export function useStoreUrl() {
   const { store } = useStore();
 
-  // Compute platform check in state to avoid hydration mismatch
+  // Compute platform check in state to avoid hydration mismatch.
+  //
+  // Treat the current hostname as a "platform" host (where store URLs need
+  // to be slug-prefixed) when:
+  //   1. it's a Vercel preview / production deploy (`*.vercel.app`)
+  //   2. it's local dev (`localhost`, `127.0.0.1`)
+  //   3. it's the production storefront platform domain
+  //      (`store.forcemediakw.com`) — this used to be missed, so links from
+  //      stores on the new domain returned bare `/products` instead of
+  //      `/<slug>/products` and the bare-root redirect kicked in.
+  // Otherwise it's a custom merchant domain — store routes resolve at the
+  // root path so no prefix is needed.
   const [isPlatform, setIsPlatform] = useState(false);
   useEffect(() => {
+    const host = window.location.hostname;
     setIsPlatform(
-      window.location.hostname.includes('vercel.app') ||
-        window.location.hostname.includes('localhost') ||
-        window.location.hostname.includes('127.0.0.1')
+      host.endsWith('.vercel.app') ||
+        host === 'localhost' ||
+        host === '127.0.0.1' ||
+        host === 'store.forcemediakw.com'
     );
   }, []);
 

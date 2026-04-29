@@ -35,12 +35,21 @@ export function EditVariantModal({
   function applyAllButton(field: 'price' | 'compareAtPrice' | 'costPrice', value: string) {
     if (!showApplyAll) return null;
     const trimmed = value.trim();
-    if (!trimmed) return null;
+    const enabled = trimmed.length > 0;
+    // Render always (disabled state when empty) so the merchant
+    // discovers the broadcast affordance without having to type
+    // first. The disabled link looks muted and ignores clicks.
     return (
       <button
         type="button"
-        onClick={() => onApplyToAll!(field, trimmed)}
-        className="mt-1 text-[11px] font-medium text-primary hover:underline cursor-pointer text-start"
+        onClick={() => enabled && onApplyToAll!(field, trimmed)}
+        disabled={!enabled}
+        title={enabled ? '' : t('applyToAllDisabledHint')}
+        className={
+          enabled
+            ? 'mt-1 text-[11px] font-medium text-primary hover:underline cursor-pointer text-start block'
+            : 'mt-1 text-[11px] font-medium text-muted-foreground/60 cursor-not-allowed text-start block'
+        }
       >
         {t('applyToAll', { count: siblingCount })}
       </button>
