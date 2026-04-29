@@ -174,8 +174,8 @@ function SuccessContent() {
               <div className="py-4">
                 <p className="text-sm text-muted-foreground">
                   {t(
-                    "We'll send you a confirmation email with your order details and tracking information once your order ships.",
-                    '\u0633\u0646\u0631\u0633\u0644 \u0644\u0643 \u0628\u0631\u064a\u062f\u0627\u064b \u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a\u0627\u064b \u0644\u0644\u062a\u0623\u0643\u064a\u062f \u064a\u062a\u0636\u0645\u0646 \u062a\u0641\u0627\u0635\u064a\u0644 \u0637\u0644\u0628\u0643 \u0648\u0645\u0639\u0644\u0648\u0645\u0627\u062a \u0627\u0644\u062a\u062a\u0628\u0639 \u0628\u0645\u062c\u0631\u062f \u0634\u062d\u0646 \u0637\u0644\u0628\u0643.'
+                    'Your order has been received. You can track its status anytime from your account.',
+                    'تم استلام طلبك. يمكنك متابعة حالته في أي وقت من حسابك.'
                   )}
                 </p>
               </div>
@@ -200,10 +200,7 @@ function SuccessContent() {
                       d="M5 13l4 4L19 7"
                     />
                   </svg>
-                  {t(
-                    'Order confirmation email sent',
-                    '\u062a\u0645 \u0625\u0631\u0633\u0627\u0644 \u0628\u0631\u064a\u062f \u062a\u0623\u0643\u064a\u062f \u0627\u0644\u0637\u0644\u0628'
-                  )}
+                  {t('Order received', 'تم استلام الطلب')}
                 </li>
                 <li className="flex items-center gap-2">
                   <svg
@@ -238,10 +235,7 @@ function SuccessContent() {
                       d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"
                     />
                   </svg>
-                  {t(
-                    'Order shipped (tracking sent via email)',
-                    '\u062a\u0645 \u0634\u062d\u0646 \u0627\u0644\u0637\u0644\u0628 (\u062a\u0645 \u0625\u0631\u0633\u0627\u0644 \u0627\u0644\u062a\u062a\u0628\u0639 \u0639\u0628\u0631 \u0627\u0644\u0628\u0631\u064a\u062f)'
-                  )}
+                  {t('Order shipped', 'تم شحن الطلب')}
                 </li>
                 <li className="flex items-center gap-2">
                   <svg

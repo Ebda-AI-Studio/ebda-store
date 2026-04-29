@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { apiPost, getApiUrl } from '../../../../../lib/api';
+import { apiPost, apiFetch } from '../../../../../lib/api';
 import type { ExportFilters, FileKind, ImportOptions, ImportResult } from '../_components/types';
 
 interface UseBulkOperationsArgs {
@@ -25,9 +25,7 @@ export function useBulkOperations({
 
   const downloadTemplate = useCallback(async () => {
     try {
-      const response = await fetch(`${getApiUrl()}/api/v1/stores/${storeId}/bulk/template`, {
-        credentials: 'include',
-      });
+      const response = await apiFetch(`/api/v1/stores/${storeId}/bulk/template`);
 
       if (response.ok) {
         const blob = await response.blob();
@@ -114,10 +112,7 @@ export function useBulkOperations({
         if (filters.search) queryParams.append('search', filters.search);
         if (filters.includeDeleted) queryParams.append('includeDeleted', 'true');
 
-        const response = await fetch(
-          `${getApiUrl()}/api/v1/stores/${storeId}/bulk/export?${queryParams}`,
-          { credentials: 'include' }
-        );
+        const response = await apiFetch(`/api/v1/stores/${storeId}/bulk/export?${queryParams}`);
 
         if (response.ok) {
           const blob = await response.blob();

@@ -6,9 +6,7 @@ import { useT } from '@/i18n/useT';
 import { useLocale } from 'next-intl';
 import { useToast } from '@force/ui';
 import { AdminLayout } from '../../../../../../components/AdminLayout';
-import { getApiUrl } from '../../../../../../lib/api';
-
-const API_URL = getApiUrl();
+import { apiFetch } from '../../../../../../lib/api';
 
 export default function OrderInvoicePage() {
   const params = useParams();
@@ -28,9 +26,7 @@ export default function OrderInvoicePage() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`${API_URL}/api/v1/stores/${storeId}/orders/${orderId}/invoice`, {
-          credentials: 'include',
-        });
+        const res = await apiFetch(`/api/v1/stores/${storeId}/orders/${orderId}/invoice`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const text = await res.text();
         if (!cancelled) setHtml(text);
@@ -61,10 +57,9 @@ export default function OrderInvoicePage() {
 
   const handleEmail = useCallback(async () => {
     try {
-      const res = await fetch(
-        `${API_URL}/api/v1/stores/${storeId}/orders/${orderId}/invoice/email`,
-        { method: 'POST', credentials: 'include' }
-      );
+      const res = await apiFetch(`/api/v1/stores/${storeId}/orders/${orderId}/invoice/email`, {
+        method: 'POST',
+      });
       if (!res.ok) throw new Error();
       toastSuccess(t('toast.emailSent'));
     } catch {

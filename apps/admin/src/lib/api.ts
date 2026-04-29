@@ -134,6 +134,45 @@ export async function apiRequest<T = unknown>(
 }
 
 /**
+ * Raw fetch with the same auth headers `apiRequest` adds, but returns
+ * the unparsed Response so callers can stream HTML, blobs, or anything
+ * non-JSON. Use this for invoice HTML, file downloads, and exports —
+ * never for normal JSON endpoints (use `apiGet` etc. instead, which
+ * also unwraps the API's `{ success, data, error }` envelope).
+ *
+ * The reason this exists at all: iOS Safari/WebKit purges third-party
+ * cookies aggressively, so the iOS admin PWA depends on the Bearer
+ * token in localStorage. A bare `fetch(url, { credentials: 'include' })`
+ * misses the Bearer header and gets 401 on every authenticated request.
+ */
+export async function apiFetch(endpoint: string, options: RequestInit = {}): Promise<Response> {
+  const url = endpoint.startsWith('http') ? endpoint : `${getApiUrl()}${endpoint}`;
+  const method = (options.method || 'GET').toUpperCase();
+
+  const csrfHeaders: Record<string, string> = {};
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+    const csrfToken = typeof window !== 'undefined' ? localStorage.getItem('csrfToken') : null;
+    if (csrfToken) csrfHeaders['X-CSRF-Token'] = csrfToken;
+  }
+
+  const authHeaders: Record<string, string> = {};
+  if (typeof window !== 'undefined') {
+    const accessToken = localStorage.getItem('accessToken');
+    if (accessToken) authHeaders.Authorization = `Bearer ${accessToken}`;
+  }
+
+  return fetch(url, {
+    ...options,
+    credentials: 'include',
+    headers: {
+      ...authHeaders,
+      ...csrfHeaders,
+      ...options.headers,
+    },
+  });
+}
+
+/**
  * GET request helper
  */
 export async function apiGet<T = unknown>(endpoint: string) {

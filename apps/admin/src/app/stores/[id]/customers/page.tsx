@@ -5,10 +5,8 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button, useToast } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
-import { apiGet, getApiUrl } from '../../../../lib/api';
+import { apiGet, apiFetch } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
-
-const API_URL = getApiUrl();
 
 interface OrderCustomer {
   id: string;
@@ -186,9 +184,7 @@ export default function StoreCustomersPage() {
     if (!storeId || isExporting) return;
     setIsExporting(true);
     try {
-      const res = await fetch(`${API_URL}/api/v1/stores/${storeId}/customers/export.xlsx`, {
-        credentials: 'include',
-      });
+      const res = await apiFetch(`/api/v1/stores/${storeId}/customers/export.xlsx`);
       if (!res.ok) {
         toastError(t('exportFailed'));
         return;

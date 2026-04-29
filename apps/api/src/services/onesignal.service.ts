@@ -144,7 +144,13 @@ export class OneSignalService {
     // app for admin devices — they'd fail subscription with an origin
     // mismatch error.
     if (!isAdminConfigured()) {
-      logger.debug('Admin OneSignal not configured — skipping order notification');
+      logger.warn(
+        {
+          hasAppId: !!config.onesignalAdminAppId,
+          hasRestKey: !!config.onesignalAdminRestApiKey,
+        },
+        'Admin OneSignal not configured — skipping order notification (set ONESIGNAL_ADMIN_APP_ID and ONESIGNAL_ADMIN_REST_API_KEY)'
+      );
       return;
     }
 
@@ -213,9 +219,39 @@ export class OneSignalService {
           },
           body: JSON.stringify(body),
         });
+        const responseText = await res.text().catch(() => '');
         if (!res.ok) {
-          const errBody = await res.text().catch(() => '');
-          logger.error({ status: res.status, body: errBody, audience }, 'OneSignal push failed');
+          logger.error(
+            { status: res.status, body: responseText, audience },
+            'OneSignal push failed'
+          );
+          return;
+        }
+        // 2xx ≠ delivered. OneSignal returns 200 with `recipients: 0`
+        // when the filter matches no devices — the most common silent
+        // failure when admin tags weren't set on the user's PWA. Log
+        // the recipient count + any returned `errors` so the merchant
+        // (or we) can see at a glance why a push didn't show up.
+        let parsed: { id?: string; recipients?: number; errors?: unknown } = {};
+        try {
+          parsed = JSON.parse(responseText);
+        } catch {
+          // unparseable body is fine — fall through to the generic log
+        }
+        const recipients = typeof parsed.recipients === 'number' ? parsed.recipients : -1;
+        const meta = {
+          audience,
+          notificationId: parsed.id,
+          recipients,
+          errors: parsed.errors,
+        };
+        if (recipients === 0) {
+          logger.warn(
+            meta,
+            'OneSignal push delivered to 0 devices — check that admin tags (role, store_id) are set on subscribed devices'
+          );
+        } else {
+          logger.info(meta, 'OneSignal admin push sent');
         }
       } catch (err) {
         logger.error({ err, audience }, 'OneSignal push threw');
