@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate, authorize, optionalAuthenticate } from '../middleware/auth';
 import { requireStore } from '../middleware/store';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
@@ -35,10 +35,15 @@ const updateReviewSchema = z.object({
 // Public Routes
 // ==========================================
 
-// GET /reviews/product/:productId - Get reviews for a product
+// GET /reviews/product/:productId - Get reviews for a product.
+// `optionalAuthenticate` lets us identify the viewer without requiring
+// auth — when set, the service includes the viewer's own pending
+// reviews so a freshly-submitted review is visible to its author with
+// a "pending approval" indicator instead of silently disappearing.
 router.get(
   '/product/:productId',
   requireStore,
+  optionalAuthenticate,
   requireFeature('reviews'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -49,6 +54,7 @@ router.get(
         page: page ? parseInt(page as string) : undefined,
         limit: limit ? parseInt(limit as string) : undefined,
         sortBy: sortBy as 'newest' | 'highest' | 'lowest' | 'helpful',
+        viewerCustomerId: req.user?.userId,
       });
 
       res.json({

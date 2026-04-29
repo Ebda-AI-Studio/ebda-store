@@ -48,22 +48,28 @@ export default function ProductRecommendationsPage() {
       setLoading(true);
       setError(null);
 
-      const { data: productData } = await apiGet<{ product?: { name: string }; name?: string }>(
-        `/api/v1/stores/${storeId}/products/${productId}`
-      );
-      if (!cancelled) {
-        const name =
-          productData?.product?.name ??
-          (productData as { name?: string })?.name ??
-          t('fallbackProductName');
-        setProductName(name);
-      }
-
-      const { data: relData, error: relError } = await apiGet<{
-        relations?: ProductRelation[];
-      }>(`/api/v1/stores/${storeId}/products/${productId}/relations`);
+      // Fetch product + relations in parallel — sequential ones meant
+      // a slow /products call delayed the relations render, and any
+      // shared cancellation race left the relations state empty.
+      const [productResult, relationsResult] = await Promise.all([
+        apiGet<{ product?: { name: string }; name?: string }>(
+          `/api/v1/stores/${storeId}/products/${productId}`
+        ),
+        apiGet<{ relations?: ProductRelation[] }>(
+          `/api/v1/stores/${storeId}/products/${productId}/relations`
+        ),
+      ]);
 
       if (cancelled) return;
+
+      const productData = productResult.data;
+      const name =
+        productData?.product?.name ??
+        (productData as { name?: string } | null)?.name ??
+        t('fallbackProductName');
+      setProductName(name);
+
+      const { data: relData, error: relError } = relationsResult;
 
       if (relError) {
         if (relError.status !== 404) {
@@ -97,7 +103,12 @@ export default function ProductRecommendationsPage() {
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated, storeId, productId, t]);
+    // `t` is stable across renders (next-intl memoizes by namespace) but
+    // listing it as a dep would re-run this effect on every render in
+    // dev mode where its identity isn't preserved. We deliberately omit
+    // it — the load only depends on auth/store/product identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, storeId, productId]);
 
   const handleSave = async () => {
     setSaving(true);

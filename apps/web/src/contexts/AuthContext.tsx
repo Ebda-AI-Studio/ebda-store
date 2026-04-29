@@ -31,10 +31,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshUser = useCallback(async () => {
     // Auth is handled via HTTP-only cookies sent automatically with
-    // credentials: 'include'. No need to check localStorage for tokens.
+    // credentials: 'include'. The cookie is scoped to the API domain
+    // (api-production-c058.up.railway.app), so an admin signed in at
+    // app.forcemediakw.com sends the SAME cookie to /auth/me when the
+    // storefront calls it — making the storefront think the admin is
+    // a logged-in customer.
+    //
+    // Guard: only treat the response as a customer if the role is
+    // explicitly 'customer'. Admin/super_admin tokens are rejected here
+    // so the storefront UI never accidentally shows merchant info as
+    // the customer's profile.
     try {
       const result = await api.getProfile();
-      if (result.success && result.data) {
+      if (result.success && result.data && result.data.user.role === 'customer') {
         setUser(result.data.user);
       } else {
         setUser(null);

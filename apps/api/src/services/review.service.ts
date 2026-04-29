@@ -29,9 +29,17 @@ export class ReviewService {
       page?: number;
       limit?: number;
       sortBy?: 'newest' | 'highest' | 'lowest' | 'helpful';
+      /**
+       * When set, the viewer's own un-approved reviews are included
+       * alongside the public approved set. Lets the author see their
+       * just-submitted review with a "pending approval" indicator
+       * instead of an empty list ("لا توجد مراجعات بعد") that makes
+       * them think their submission was lost.
+       */
+      viewerCustomerId?: string;
     } = {}
   ) {
-    const { page = 1, limit = 10, sortBy = 'newest' } = options;
+    const { page = 1, limit = 10, sortBy = 'newest', viewerCustomerId } = options;
     const skip = (page - 1) * limit;
 
     const orderBy: Prisma.ReviewOrderByWithRelationInput = {
@@ -41,11 +49,17 @@ export class ReviewService {
       helpful: { helpfulCount: 'desc' as const },
     }[sortBy];
 
-    const where: Prisma.ReviewWhereInput = {
-      storeId,
-      productId,
-      isApproved: true,
-    };
+    const where: Prisma.ReviewWhereInput = viewerCustomerId
+      ? {
+          storeId,
+          productId,
+          OR: [{ isApproved: true }, { customerId: viewerCustomerId }],
+        }
+      : {
+          storeId,
+          productId,
+          isApproved: true,
+        };
 
     const [reviews, total, stats] = await Promise.all([
       prisma.review.findMany({
@@ -59,6 +73,7 @@ export class ReviewService {
           title: true,
           comment: true,
           isVerified: true,
+          isApproved: true,
           helpfulCount: true,
           createdAt: true,
           customerId: true,
@@ -68,10 +83,13 @@ export class ReviewService {
       this.getProductReviewStats(storeId, productId),
     ]);
 
-    // Anonymize customer names for public display
+    // Anonymize customer names for public display. `isMine` flags the
+    // viewer's own review so the storefront can show a "pending approval"
+    // badge on it without exposing other customers' identities.
     const anonymizedReviews = reviews.map(review => ({
       ...review,
       customerName: review.customerId ? 'Verified Buyer' : 'Anonymous',
+      isMine: viewerCustomerId ? review.customerId === viewerCustomerId : false,
       customerId: undefined,
     }));
 

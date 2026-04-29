@@ -19,6 +19,13 @@ interface Review {
   };
   // Some APIs return name directly on the review object
   reviewerName?: string;
+  /** False when the merchant hasn't approved the review yet. The
+   *  storefront only ever receives un-approved reviews when the viewer
+   *  is the author (see review.service.ts viewerCustomerId branch). */
+  isApproved?: boolean;
+  /** True when this review was authored by the current viewer. Surfaced
+   *  so we can badge their own pending review instead of hiding it. */
+  isMine?: boolean;
 }
 
 interface ReviewsResponse {
@@ -187,7 +194,10 @@ export default function ReviewSection({ storeId, productId }: Props) {
       if (res.ok && json.success) {
         setSubmitMessage({
           type: 'success',
-          text: t('Your review has been submitted. Thank you!', 'تم إرسال مراجعتك. شكراً لك!'),
+          text: t(
+            'Thanks! Your review is awaiting approval — you can see it on this page until the merchant publishes it.',
+            'شكراً! مراجعتك بانتظار الموافقة — تستطيع رؤيتها هنا إلى أن يقوم التاجر بنشرها.'
+          ),
         });
         setRating(0);
         setComment('');
@@ -253,22 +263,38 @@ export default function ReviewSection({ storeId, productId }: Props) {
       {/* Reviews list */}
       {!isLoading && reviews.length > 0 && (
         <div className="mt-8 space-y-6">
-          {reviews.map(review => (
-            <div key={review.id} className="rounded-xl border border-border bg-card p-6 shadow-sm">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="font-medium text-foreground">{getReviewerName(review)}</p>
-                  <StarDisplay rating={review.rating} />
+          {reviews.map(review => {
+            const isPending = review.isMine && review.isApproved === false;
+            return (
+              <div
+                key={review.id}
+                className={`rounded-xl border p-6 shadow-sm ${
+                  isPending ? 'border-warning/40 bg-warning/5' : 'border-border bg-card'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="font-medium text-foreground">{getReviewerName(review)}</p>
+                    <StarDisplay rating={review.rating} />
+                  </div>
+                  <time className="text-sm text-muted-foreground whitespace-nowrap">
+                    {formatDate(review.createdAt)}
+                  </time>
                 </div>
-                <time className="text-sm text-muted-foreground whitespace-nowrap">
-                  {formatDate(review.createdAt)}
-                </time>
+                {isPending && (
+                  <p className="mt-2 text-xs font-medium text-warning">
+                    {t(
+                      'Your review · pending approval. Only you can see it for now.',
+                      'مراجعتك · بانتظار الموافقة. أنت فقط من يستطيع رؤيتها الآن.'
+                    )}
+                  </p>
+                )}
+                {review.comment && (
+                  <p className="mt-3 text-muted-foreground leading-relaxed">{review.comment}</p>
+                )}
               </div>
-              {review.comment && (
-                <p className="mt-3 text-muted-foreground leading-relaxed">{review.comment}</p>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

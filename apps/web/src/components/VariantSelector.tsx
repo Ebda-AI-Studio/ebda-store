@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { formatPrice } from '@/lib/format';
 import type { ProductVariant, ProductOption } from '@/lib/api';
 import { useLanguage } from '../contexts/LanguageContext';
 
@@ -162,39 +161,24 @@ export function VariantSelector({ variants, options, onVariantSelect }: VariantS
         </div>
       ))}
 
-      {/* Live variant feedback */}
-      {allPicked && (
+      {/* Feedback panel only shows when something is wrong: variant
+          out of stock, or no variant matches the picked combo. The
+          price/inventory of a valid variant is reflected in the main
+          product price + qty stepper area on ProductDetailClient, so a
+          duplicate display here was just visual noise. */}
+      {allPicked && currentVariant && (currentVariant.inventory ?? 1) <= 0 && (
+        <div className="rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm">
+          <span className="font-medium text-destructive">{t('Out of Stock', 'غير متوفر')}</span>
+        </div>
+      )}
+      {allPicked && !currentVariant && (
         <div className="rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm">
-          {currentVariant ? (
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-baseline gap-2">
-                <span className="text-lg font-bold text-primary">
-                  {formatPrice(currentVariant.price)}
-                </span>
-                {currentVariant.compareAtPrice &&
-                  currentVariant.compareAtPrice > currentVariant.price && (
-                    <span className="text-muted-foreground line-through text-sm">
-                      {formatPrice(currentVariant.compareAtPrice)}
-                    </span>
-                  )}
-              </div>
-              {/* Stock count is rendered next to the qty stepper in
-                  ProductDetailClient — surface the out-of-stock state
-                  here only, otherwise it duplicated the count. */}
-              {(currentVariant.inventory ?? 1) <= 0 && (
-                <span className="font-medium text-destructive">
-                  {t('Out of Stock', 'غير متوفر')}
-                </span>
-              )}
-            </div>
-          ) : (
-            <p className="text-muted-foreground">
-              {t(
-                'This combination is not available. Please choose a different option.',
-                'هذه التركيبة غير متوفرة. يرجى اختيار خيار آخر.'
-              )}
-            </p>
-          )}
+          <p className="text-muted-foreground">
+            {t(
+              'This combination is not available. Please choose a different option.',
+              'هذه التركيبة غير متوفرة. يرجى اختيار خيار آخر.'
+            )}
+          </p>
         </div>
       )}
     </div>
