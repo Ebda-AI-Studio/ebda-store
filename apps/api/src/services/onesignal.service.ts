@@ -13,7 +13,7 @@
  * at consent time so `broadcastToStore` can target only that tenant.
  */
 
-import { prisma } from '@force/database';
+import { prisma, Prisma } from '@force/database';
 import { config } from '../config';
 import logger from '../lib/logger';
 
@@ -171,20 +171,27 @@ export class OneSignalService {
     const moneyText = formatMoney(input.total, input.currency);
     const paymentLabel = formatPaymentMethod(input.paymentMethod);
 
-    // Two distinct pushes so each audience gets the body that's most
-    // useful to them. OneSignal sends one body per API call, so we split.
+    // Targeting strategy: prefer `include_player_ids` over tag filters.
     //
-    //  - store_admins for THIS store want operational detail: which order,
-    //    which customer, how much.
-    //  - super_admins manage every store and need triage info: WHICH
-    //    store the order came from + amount + payment method (so they
-    //    can spot a COD spike on tenant X without opening the dashboard).
+    // Tag-filter delivery is fragile — tags are written client-side AFTER
+    // OneSignal.init resolves, so a slow connection / race / opted-out
+    // browser can leave a device subscribed but un-tagged. Then
+    // `recipients: 0` with no clear cause. Beethoven (the bathroom queue
+    // app, same OneSignal v16 SDK) skips tags entirely and tracks
+    // `playerId` server-side at subscribe-time — that's been rock-solid.
     //
-    // Tag layout (set in apps/admin/src/components/OneSignalInit.tsx):
-    //   store_admin devices  -> tag store_id = <their store>, role = store_admin
-    //   super_admin devices  -> tag role = super_admin (NO store_id tag)
-    // So `tag:store_id = X` matches store_admins for store X exclusively
-    // and `tag:role = super_admin` matches super_admins exclusively.
+    // We do the same here: look up admins (store_admins of this store +
+    // every super_admin) by role, join with `OneSignalSubscription` to
+    // resolve to player_ids, send to those player_ids directly. The
+    // tag-based filter still ships as a fallback for devices that
+    // subscribed via OneSignal but never POSTed their player_id to
+    // `/admin/notifications/onesignal/subscribe` (e.g. the registration
+    // call failed once and the subscription record was never written).
+
+    const [storeAdminPlayerIds, superAdminPlayerIds] = await Promise.all([
+      this.getAdminPlayerIds({ role: 'store_admin', ownsStoreId: input.storeId }),
+      this.getAdminPlayerIds({ role: 'super_admin' }),
+    ]);
 
     const storeAdminBody = {
       ...sharedFields,
@@ -193,7 +200,12 @@ export class OneSignalService {
         en: `${input.orderNumber} from ${input.customerName} — ${moneyText}`,
         ar: `${input.orderNumber} من ${input.customerName} — ${moneyText}`,
       },
-      filters: [{ field: 'tag', key: 'store_id', relation: '=', value: input.storeId }],
+      // Prefer DB-backed targeting; fall back to tag filter when no
+      // subscription rows exist (e.g. older devices). One Promise per
+      // strategy — never both at once or OneSignal double-sends.
+      ...(storeAdminPlayerIds.length > 0
+        ? { include_player_ids: storeAdminPlayerIds }
+        : { filters: [{ field: 'tag', key: 'store_id', relation: '=', value: input.storeId }] }),
     };
 
     const superAdminBody = {
@@ -203,7 +215,9 @@ export class OneSignalService {
         en: `${input.storeName} — ${moneyText} · ${paymentLabel}`,
         ar: `${input.storeName} — ${moneyText} · ${paymentLabel}`,
       },
-      filters: [{ field: 'tag', key: 'role', relation: '=', value: 'super_admin' }],
+      ...(superAdminPlayerIds.length > 0
+        ? { include_player_ids: superAdminPlayerIds }
+        : { filters: [{ field: 'tag', key: 'role', relation: '=', value: 'super_admin' }] }),
     };
 
     const send = async (body: unknown, audience: 'store_admin' | 'super_admin') => {
@@ -261,6 +275,45 @@ export class OneSignalService {
     // Fire both in parallel — a slow OneSignal response shouldn't block
     // the other audience's push.
     await Promise.all([send(storeAdminBody, 'store_admin'), send(superAdminBody, 'super_admin')]);
+  }
+
+  /**
+   * Resolve the OneSignal player_ids for a given admin audience by
+   * joining `User` (filtered by role / store ownership) against
+   * `OneSignalSubscription`. Used by `notifyAdminsOfOrder` to target
+   * pushes by stored player_id instead of fragile client-side tags.
+   *
+   * Returns a deduplicated, non-empty list. Empty result means no
+   * subscribed devices match — the caller falls back to tag filtering.
+   */
+  private static async getAdminPlayerIds(criteria: {
+    role: 'super_admin' | 'store_admin';
+    ownsStoreId?: string;
+  }): Promise<string[]> {
+    // `stores` is the User → Store[] back-relation in schema.prisma —
+    // the inverse of `Store.ownerId`. store_admins are scoped to the
+    // stores they own; super_admins are unscoped (they manage the
+    // platform across tenants).
+    const userWhere: Prisma.UserWhereInput = {
+      role: criteria.role,
+      deletedAt: null,
+    };
+    if (criteria.role === 'store_admin' && criteria.ownsStoreId) {
+      userWhere.stores = { some: { id: criteria.ownsStoreId } };
+    }
+
+    const users = await prisma.user.findMany({
+      where: userWhere,
+      select: { id: true },
+    });
+    const userIds = users.map(u => u.id);
+    if (userIds.length === 0) return [];
+
+    const subs = await prisma.oneSignalSubscription.findMany({
+      where: { userId: { in: userIds } },
+      select: { playerId: true },
+    });
+    return Array.from(new Set(subs.map(s => s.playerId).filter(Boolean)));
   }
 
   /**

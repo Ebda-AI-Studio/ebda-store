@@ -465,8 +465,12 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                 </div>
                 {effectiveInventory !== undefined && effectiveInventory !== null && (
                   <span className="text-sm text-muted-foreground">
+                    {/* Customers don't need to see exact stock counts —
+                        "99 متوفر" reads like a low-stock urgency cue at
+                        glance and felt off to the merchant. Just say
+                        "in stock" / "out of stock". */}
                     {effectiveInventory > 0
-                      ? `${effectiveInventory} ${t('in stock', 'متوفر')}`
+                      ? t('In Stock', 'متوفر')
                       : t('Out of Stock', 'غير متوفر')}
                   </span>
                 )}
