@@ -8,7 +8,6 @@ import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPut } from '../../../../lib/api';
 import type { FeatureKey, FeatureDefinition, FeatureCategory } from '@force/shared';
 import { CategoryCard } from './_components/CategoryCard';
-import { UnsavedChangesBar } from './_components/UnsavedChangesBar';
 
 interface FeatureMetadata {
   featureKey: string;
@@ -32,21 +31,23 @@ export default function StoreFeaturesPage() {
   const t = useT('features');
 
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [registry, setRegistry] = useState<Record<FeatureKey, FeatureDefinition> | null>(null);
   const [serverState, setServerState] = useState<Record<string, boolean>>({});
   const [metadata, setMetadata] = useState<FeatureMetadata[]>([]);
 
-  const [localState, setLocalState] = useState<Record<string, boolean>>({});
+  // Per-feature in-flight tracking. The UI shows the optimistic value
+  // immediately and a spinner on the in-flight row; on failure we revert
+  // and toast. No "Save" button — auto-save on toggle. Merchants kept
+  // forgetting to click Save, so toggling push off in admin felt
+  // working but the storefront kept showing the prompt.
+  const [pending, setPending] = useState<Record<string, boolean>>({});
 
-  const { success: toastSuccess, error: toastError } = useToast();
+  const { error: toastError } = useToast();
 
-  const displayState: Record<string, boolean> = { ...serverState, ...localState };
-
-  const dirtyKeys = Object.keys(localState).filter(k => localState[k] !== serverState[k]);
-  const hasDirty = dirtyKeys.length > 0;
+  // Display state = server truth + any optimistic value still in flight.
+  const displayState: Record<string, boolean> = { ...serverState, ...pending };
 
   const metadataMap = new Map<string, FeatureMetadata>(metadata.map(m => [m.featureKey, m]));
 
@@ -63,7 +64,7 @@ export default function StoreFeaturesPage() {
         setRegistry(data.registry);
         setServerState(data.features);
         setMetadata(data.metadata);
-        setLocalState({});
+        setPending({});
       }
     } catch {
       setError(t('errors.loadFailed'));
@@ -76,42 +77,46 @@ export default function StoreFeaturesPage() {
     fetchFeatures();
   }, [fetchFeatures]);
 
-  function handleToggle(key: string, next: boolean) {
-    setLocalState(prev => {
-      const updated = { ...prev, [key]: next };
-      if (next === serverState[key]) {
-        const copy = { ...updated };
-        delete copy[key];
-        return copy;
-      }
-      return updated;
-    });
-  }
+  // Auto-save on toggle. PUTs the single change immediately, shows the
+  // optimistic value while the request is in flight, reverts on failure.
+  // The previous batched-save UX confused merchants — they'd flip a
+  // toggle, leave the page, and the change never persisted. Toasts only
+  // fire for errors so a routine flip stays quiet.
+  async function handleToggle(key: string, next: boolean) {
+    // Already in flight for this key — ignore the second tap.
+    if (key in pending) return;
 
-  async function handleSave() {
-    if (!hasDirty) return;
-
-    const updates: Record<string, boolean> = {};
-    for (const key of dirtyKeys) {
-      updates[key] = localState[key];
-    }
-
-    setSaving(true);
+    setPending(prev => ({ ...prev, [key]: next }));
     try {
-      const { error: apiErr } = await apiPut(`/api/v1/admin/stores/${storeId}/features`, updates);
+      const { error: apiErr } = await apiPut(`/api/v1/admin/stores/${storeId}/features`, {
+        [key]: next,
+      });
       if (apiErr) {
         toastError(t('toasts.errorTitle'), apiErr.message || t('errors.saveFailed'));
-      } else {
-        toastSuccess(
-          t('toasts.savedTitle'),
-          t('toasts.savedDescription', { count: dirtyKeys.length })
-        );
-        await fetchFeatures();
+        // Drop the optimistic value so the row reverts to server truth.
+        setPending(prev => {
+          const copy = { ...prev };
+          delete copy[key];
+          return copy;
+        });
+        return;
       }
+      // Success: promote the optimistic value to server state, clear
+      // pending. We don't toast on every flip — too noisy for a row of
+      // toggles. The visible state change is its own confirmation.
+      setServerState(prev => ({ ...prev, [key]: next }));
+      setPending(prev => {
+        const copy = { ...prev };
+        delete copy[key];
+        return copy;
+      });
     } catch {
       toastError(t('toasts.errorTitle'), t('errors.saveFailed'));
-    } finally {
-      setSaving(false);
+      setPending(prev => {
+        const copy = { ...prev };
+        delete copy[key];
+        return copy;
+      });
     }
   }
 
@@ -174,39 +179,12 @@ export default function StoreFeaturesPage() {
     grouped[def.category].push(def);
   }
 
+  // `localState` was the batched-edit map; with auto-save it's empty
+  // every render, but CategoryCard still wants to know which row is
+  // mid-flight so it can show a spinner. We pass `pending` through that
+  // prop slot — same idea, different lifecycle.
   return (
-    <AdminLayout
-      title={t('page.title')}
-      subtitle={t('page.subtitle')}
-      actions={
-        hasDirty ? (
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-muted-foreground">
-              {t('actions.unsavedChanges', { count: dirtyKeys.length })}
-            </span>
-            <button
-              type="button"
-              onClick={() => setLocalState({})}
-              disabled={saving}
-              className="px-4 py-2 text-sm font-medium text-foreground border border-border rounded-lg hover:bg-muted transition-colors disabled:opacity-50"
-            >
-              {t('actions.discard')}
-            </button>
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving}
-              className="px-4 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-2"
-            >
-              {saving && (
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-              )}
-              {t('actions.saveChanges')}
-            </button>
-          </div>
-        ) : undefined
-      }
-    >
+    <AdminLayout title={t('page.title')} subtitle={t('page.subtitle')}>
       <div className="space-y-6">
         {CATEGORY_ORDER.map(category => {
           const features = grouped[category];
@@ -218,22 +196,13 @@ export default function StoreFeaturesPage() {
               category={category}
               features={features}
               displayState={displayState}
-              localState={localState}
+              localState={pending}
               metadataMap={metadataMap}
-              saving={saving}
+              saving={Object.keys(pending).length > 0}
               onToggle={handleToggle}
             />
           );
         })}
-
-        {hasDirty && (
-          <UnsavedChangesBar
-            dirtyCount={dirtyKeys.length}
-            saving={saving}
-            onDiscard={() => setLocalState({})}
-            onSave={handleSave}
-          />
-        )}
       </div>
     </AdminLayout>
   );
