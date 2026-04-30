@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { authenticate } from '../middleware/auth';
+import { authenticate, authorize } from '../middleware/auth';
 import { requirePermission } from '../middleware/rbac';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { requireStoreAccess } from '../middleware/store-access';
@@ -36,27 +36,36 @@ const updateCategorySchema = z.object({
   image: z.string().url().optional().nullable(),
 });
 
-// GET /stores/:storeId/categories
-router.get('/', authenticate, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { storeId } = req.params;
+// GET /stores/:storeId/categories — admin list. Used to be
+// `authenticate` only; any store_admin token could read another
+// tenant's categories by changing :storeId. Storefront category
+// listing goes through /public/stores/:storeId/categories.
+router.get(
+  '/',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
 
-    const categories = await prisma.category.findMany({
-      where: { storeId, deletedAt: null },
-      orderBy: { name: 'asc' },
-      include: {
-        _count: { select: { products: true } },
-      },
-    });
+      const categories = await prisma.category.findMany({
+        where: { storeId, deletedAt: null },
+        orderBy: { name: 'asc' },
+        include: {
+          _count: { select: { products: true } },
+        },
+      });
 
-    res.json({
-      success: true,
-      data: { categories },
-    });
-  } catch (error) {
-    next(error);
+      res.json({
+        success: true,
+        data: { categories },
+      });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 // POST /stores/:storeId/categories
 router.post(

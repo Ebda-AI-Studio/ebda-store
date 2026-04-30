@@ -354,35 +354,119 @@ export class AuthService {
       throw new AppError(401, 'TOKEN_INVALID', 'Invalid refresh token');
     }
 
+    // Reuse detection (OWASP refresh-token rotation guidance): once a
+    // refresh token has been rotated or revoked, any subsequent
+    // presentation is treated as evidence the family is compromised.
+    // Revoke every token for that user — the legitimate session(s) get
+    // a 401 on their next refresh and re-login, which is preferable to
+    // letting an attacker keep refreshing in parallel.
+    if (storedToken.revokedAt) {
+      logger.warn(
+        {
+          userId: storedToken.userId,
+          tokenId: storedToken.id,
+          revokedAt: storedToken.revokedAt,
+          revokedReason: storedToken.revokedReason,
+        },
+        'Refresh-token reuse detected — revoking all tokens for user'
+      );
+      await prisma.refreshToken.updateMany({
+        where: { userId: storedToken.userId, revokedAt: null },
+        data: { revokedAt: new Date(), revokedReason: 'reuse_detected' },
+      });
+      throw new AppError(401, 'TOKEN_REUSED', 'Token reuse detected — please sign in again');
+    }
+
     if (storedToken.expiresAt < new Date()) {
-      await prisma.refreshToken.delete({ where: { id: storedToken.id } });
+      await prisma.refreshToken.update({
+        where: { id: storedToken.id },
+        data: { revokedAt: new Date(), revokedReason: 'expired' },
+      });
       throw new AppError(401, 'TOKEN_EXPIRED', 'Refresh token expired');
     }
 
     // Reject refresh if user has been soft-deleted
     if (storedToken.user.deletedAt) {
-      await prisma.refreshToken.delete({ where: { id: storedToken.id } });
+      await prisma.refreshToken.update({
+        where: { id: storedToken.id },
+        data: { revokedAt: new Date(), revokedReason: 'account_deleted' },
+      });
       throw new AppError(401, 'ACCOUNT_DELETED', 'Account has been deleted');
     }
 
-    // Delete old refresh token
-    await prisma.refreshToken.delete({ where: { id: storedToken.id } });
-
-    // Generate new tokens — preserve the original tenant scope from the
-    // user record so the new access token still authenticates against the
-    // same store.
-    return this.generateTokens({
+    // Generate new tokens FIRST so we have the new id available for the
+    // back-link. Then mark the old token as rotated. Order matters: if
+    // generateTokens fails after we've already revoked the old token,
+    // the user is logged out without a replacement.
+    const newTokens = await this.generateTokens({
       userId: storedToken.user.id,
       email: storedToken.user.email,
       role: storedToken.user.role,
       storeId: storedToken.user.storeId,
     });
+
+    const newHash = crypto.createHash('sha256').update(newTokens.refreshToken).digest('hex');
+    const newRow = await prisma.refreshToken.findUnique({
+      where: { token: newHash },
+      select: { id: true },
+    });
+
+    await prisma.refreshToken.update({
+      where: { id: storedToken.id },
+      data: {
+        revokedAt: new Date(),
+        revokedReason: 'rotated',
+        replacedById: newRow?.id ?? null,
+      },
+    });
+
+    return newTokens;
+  }
+
+  /**
+   * Periodic cleanup of refresh-token rows we no longer need. Two
+   * categories are removed:
+   *
+   *   - Expired rows (`expiresAt < now`). The JWT itself is already
+   *     dead; keeping the row only matters for reuse detection, and
+   *     a 1-year-old expired token offers nothing actionable.
+   *   - Revoked rows older than 30 days (`revokedAt < now - 30d`).
+   *     Reuse detection only needs to fire while an attacker could
+   *     plausibly still be holding a stolen token; a 30-day window
+   *     is the same TTL most production OWASP-style implementations
+   *     use, and bounds the table size in steady state.
+   *
+   * Returns the number of rows deleted (sum of both branches).
+   */
+  static async cleanupRefreshTokens(): Promise<number> {
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    const expired = await prisma.refreshToken.deleteMany({
+      where: { expiresAt: { lt: now } },
+    });
+    const revoked = await prisma.refreshToken.deleteMany({
+      where: { revokedAt: { lt: thirtyDaysAgo } },
+    });
+
+    const total = expired.count + revoked.count;
+    if (total > 0) {
+      logger.info(
+        { expired: expired.count, revoked: revoked.count },
+        'Refresh-token cleanup removed stale rows'
+      );
+    }
+    return total;
   }
 
   static async logout(refreshToken: string): Promise<void> {
     const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
-    await prisma.refreshToken.deleteMany({
-      where: { token: tokenHash },
+    // Mark instead of delete so a stolen copy of the same token replayed
+    // after logout still triggers the reuse-detection path in
+    // refreshTokens() instead of returning a generic TOKEN_INVALID.
+    await prisma.refreshToken.updateMany({
+      where: { token: tokenHash, revokedAt: null },
+      data: { revokedAt: new Date(), revokedReason: 'logout' },
     });
   }
 
@@ -460,9 +544,13 @@ export class AuthService {
       data: { passwordHash },
     });
 
-    // Invalidate all refresh tokens to force re-login on other devices
-    await prisma.refreshToken.deleteMany({
-      where: { userId },
+    // Revoke (don't delete) so a replay of any of these tokens still
+    // hits the reuse-detection branch in refreshTokens(). Limit to
+    // session tokens — the special `reset:` rows used by password-reset
+    // are short-lived and live in the same table.
+    await prisma.refreshToken.updateMany({
+      where: { userId, revokedAt: null, NOT: { token: { startsWith: 'reset:' } } },
+      data: { revokedAt: new Date(), revokedReason: 'password_changed' },
     });
   }
 
@@ -528,14 +616,20 @@ export class AuthService {
       data: { passwordHash },
     });
 
-    // Delete the reset token
+    // Delete the reset token (single-use, no reuse-detection value).
     await prisma.refreshToken.delete({
       where: { id: storedToken.id },
     });
 
-    // Invalidate all other refresh tokens for this user
-    await prisma.refreshToken.deleteMany({
-      where: { userId: storedToken.userId },
+    // Revoke all session refresh tokens — same rationale as
+    // changePassword. The reset-token row was already deleted above.
+    await prisma.refreshToken.updateMany({
+      where: {
+        userId: storedToken.userId,
+        revokedAt: null,
+        NOT: { token: { startsWith: 'reset:' } },
+      },
+      data: { revokedAt: new Date(), revokedReason: 'password_reset' },
     });
   }
 

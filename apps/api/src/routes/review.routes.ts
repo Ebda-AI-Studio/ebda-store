@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { authenticate, authorize, optionalAuthenticate } from '../middleware/auth';
+import { authenticate, authorize, optionalAuthenticate, customerUserId } from '../middleware/auth';
 import { requireStore } from '../middleware/store';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
@@ -54,7 +54,11 @@ router.get(
         page: page ? parseInt(page as string) : undefined,
         limit: limit ? parseInt(limit as string) : undefined,
         sortBy: sortBy as 'newest' | 'highest' | 'lowest' | 'helpful',
-        viewerCustomerId: req.user?.userId,
+        // customerUserId() ensures we only attach a viewer ID for actual
+        // customer sessions. An admin browsing the storefront would
+        // otherwise see "your pending review" markers keyed on their
+        // own userId, which is misleading.
+        viewerCustomerId: customerUserId(req),
       });
 
       res.json({
@@ -96,7 +100,14 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const data = createReviewSchema.parse(req.body);
-      const customerId = req.user!.userId;
+      const customerId = customerUserId(req);
+      if (!customerId) {
+        res.status(403).json({
+          success: false,
+          error: { code: 'FORBIDDEN', message: 'Customer account required' },
+        });
+        return;
+      }
 
       const review = await ReviewService.create(req.storeId!, customerId, data);
 
@@ -140,7 +151,15 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { productId } = req.params;
-      const result = await ReviewService.canReview(req.storeId!, productId, req.user!.userId);
+      const customerId = customerUserId(req);
+      if (!customerId) {
+        res.status(403).json({
+          success: false,
+          error: { code: 'FORBIDDEN', message: 'Customer account required' },
+        });
+        return;
+      }
+      const result = await ReviewService.canReview(req.storeId!, productId, customerId);
 
       res.json({
         success: true,
@@ -160,7 +179,15 @@ router.get(
   requireFeature('reviews'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const reviews = await ReviewService.getCustomerReviews(req.storeId!, req.user!.userId);
+      const customerId = customerUserId(req);
+      if (!customerId) {
+        res.status(403).json({
+          success: false,
+          error: { code: 'FORBIDDEN', message: 'Customer account required' },
+        });
+        return;
+      }
+      const reviews = await ReviewService.getCustomerReviews(req.storeId!, customerId);
 
       res.json({
         success: true,

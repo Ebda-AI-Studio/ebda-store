@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { authenticate } from '../middleware/auth';
+import { authenticate, customerUserId } from '../middleware/auth';
 import { requirePermission } from '../middleware/rbac';
 import { ReturnService } from '../services/return.service';
 import { auditLog, writeLimiter } from '../middleware/security';
@@ -41,8 +41,21 @@ router.get(
     try {
       const { storeId } = req.params;
       const { page, limit, status } = req.query;
+      // The shared API cookie space means this customer-facing list could
+      // otherwise be hit with an admin token and return rows keyed on the
+      // admin's userId (usually empty, but exposes the existence of a
+      // matching userId/customer record). customerUserId() rejects
+      // non-customer roles so the leak path is closed.
+      const customerId = customerUserId(req);
+      if (!customerId) {
+        res.status(403).json({
+          success: false,
+          error: { code: 'FORBIDDEN', message: 'Customer account required' },
+        });
+        return;
+      }
 
-      const result = await ReturnService.getCustomerReturns(storeId, req.user!.userId, {
+      const result = await ReturnService.getCustomerReturns(storeId, customerId, {
         page: page ? parseInt(page as string) : undefined,
         limit: limit ? parseInt(limit as string) : undefined,
         status: status as string,
@@ -68,16 +81,24 @@ router.post(
     try {
       const { storeId } = req.params;
       const data = createReturnSchema.parse(req.body);
+      const customerId = customerUserId(req);
+      if (!customerId) {
+        res.status(403).json({
+          success: false,
+          error: { code: 'FORBIDDEN', message: 'Customer account required' },
+        });
+        return;
+      }
 
       const returnRequest = await ReturnService.create(storeId, {
         ...data,
-        customerId: req.user!.userId,
+        customerId,
       });
 
       // Audit log
       await auditLog({
         action: 'return.created',
-        userId: req.user!.userId,
+        userId: customerId,
         resourceType: 'return',
         resourceId: returnRequest.id,
         details: { returnNumber: returnRequest.returnNumber, type: data.type },

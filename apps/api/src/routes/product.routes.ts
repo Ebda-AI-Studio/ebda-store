@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { authenticate } from '../middleware/auth';
+import { authenticate, authorize } from '../middleware/auth';
 import { ProductService } from '../services/product.service';
 import { requirePermission } from '../middleware/rbac';
 import { auditLog, writeLimiter } from '../middleware/security';
@@ -108,131 +108,172 @@ const updateProductSchema = createProductSchema.partial();
  *                     meta:
  *                       $ref: '#/components/schemas/Pagination'
  */
-router.get('/', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { storeId } = req.params;
-    const { page, limit, status, category, search, featured } = req.query;
+// Admin product list. Used to be unauthenticated and returned drafts +
+// archived rows for any storeId — anyone could enumerate unpublished
+// inventory by sequencing storeId UUIDs. The storefront uses
+// /public/products which has its own active-only filter; this admin
+// path now requires merchant auth + store ownership and trusts the
+// caller's `status` query param.
+router.get(
+  '/',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const { page, limit, status, category, search, featured } = req.query;
 
-    const result = await ProductService.list(storeId, {
-      page: page ? parseInt(page as string) : undefined,
-      limit: limit ? parseInt(limit as string) : undefined,
-      status: status as string,
-      category: category as string,
-      search: search as string,
-      featured: featured === 'true',
-    });
+      const result = await ProductService.list(storeId, {
+        page: page ? parseInt(page as string) : undefined,
+        limit: limit ? parseInt(limit as string) : undefined,
+        status: status as string,
+        category: category as string,
+        search: search as string,
+        featured: featured === 'true',
+      });
 
-    res.json({
-      success: true,
-      data: result,
-    });
-  } catch (error) {
-    next(error);
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
-// GET /stores/:storeId/products/search - Advanced search with filters
-router.get('/search', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { storeId } = req.params;
-    const {
-      q,
-      page,
-      limit,
-      categories,
-      tags,
-      minPrice,
-      maxPrice,
-      inStock,
-      onSale,
-      isNew,
-      featured,
-      sortBy,
-    } = req.query;
+// GET /stores/:storeId/products/search - Advanced search with filters.
+// Admin-only — same reasoning as the list endpoint above. Public search
+// goes through /public/products/search which filters status='active'.
+router.get(
+  '/search',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const {
+        q,
+        page,
+        limit,
+        categories,
+        tags,
+        minPrice,
+        maxPrice,
+        inStock,
+        onSale,
+        isNew,
+        featured,
+        sortBy,
+      } = req.query;
 
-    const result = await ProductService.advancedSearch(storeId, {
-      query: q as string,
-      page: page ? parseInt(page as string) : undefined,
-      limit: limit ? parseInt(limit as string) : undefined,
-      categories: categories ? (categories as string).split(',') : undefined,
-      tags: tags ? (tags as string).split(',') : undefined,
-      minPrice: minPrice ? parseInt(minPrice as string) : undefined,
-      maxPrice: maxPrice ? parseInt(maxPrice as string) : undefined,
-      inStock: inStock === 'true',
-      onSale: onSale === 'true',
-      isNew: isNew === 'true',
-      featured: featured === 'true',
-      sortBy: sortBy as
-        | 'newest'
-        | 'oldest'
-        | 'price_asc'
-        | 'price_desc'
-        | 'name_asc'
-        | 'name_desc'
-        | 'popular'
-        | 'rating',
-    });
+      const result = await ProductService.advancedSearch(storeId, {
+        query: q as string,
+        page: page ? parseInt(page as string) : undefined,
+        limit: limit ? parseInt(limit as string) : undefined,
+        categories: categories ? (categories as string).split(',') : undefined,
+        tags: tags ? (tags as string).split(',') : undefined,
+        minPrice: minPrice ? parseInt(minPrice as string) : undefined,
+        maxPrice: maxPrice ? parseInt(maxPrice as string) : undefined,
+        inStock: inStock === 'true',
+        onSale: onSale === 'true',
+        isNew: isNew === 'true',
+        featured: featured === 'true',
+        sortBy: sortBy as
+          | 'newest'
+          | 'oldest'
+          | 'price_asc'
+          | 'price_desc'
+          | 'name_asc'
+          | 'name_desc'
+          | 'popular'
+          | 'rating',
+      });
 
-    res.json({
-      success: true,
-      data: result,
-    });
-  } catch (error) {
-    next(error);
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
-// GET /stores/:storeId/products/suggestions - Search suggestions
-router.get('/suggestions', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { storeId } = req.params;
-    const { q, limit } = req.query;
+// GET /stores/:storeId/products/suggestions - admin typeahead. Public
+// version is the storefront search-suggest endpoint.
+router.get(
+  '/suggestions',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const { q, limit } = req.query;
 
-    const result = await ProductService.getSearchSuggestions(
-      storeId,
-      q as string,
-      limit ? parseInt(limit as string) : undefined
-    );
+      const result = await ProductService.getSearchSuggestions(
+        storeId,
+        q as string,
+        limit ? parseInt(limit as string) : undefined
+      );
 
-    res.json({
-      success: true,
-      data: result,
-    });
-  } catch (error) {
-    next(error);
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
-// GET /stores/:storeId/products/filters - Get available filter options
-router.get('/filters', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { storeId } = req.params;
-    const filters = await ProductService.getFilterOptions(storeId);
+// GET /stores/:storeId/products/filters - admin filter options.
+router.get(
+  '/filters',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const filters = await ProductService.getFilterOptions(storeId);
 
-    res.json({
-      success: true,
-      data: { filters },
-    });
-  } catch (error) {
-    next(error);
+      res.json({
+        success: true,
+        data: { filters },
+      });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
-// GET /stores/:storeId/products/:id - Get product
-router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { storeId, id } = req.params;
+// GET /stores/:storeId/products/:id - admin product detail. Returns
+// drafts + archived. Storefront uses /public/products/:slug which
+// filters status='active' + deletedAt:null.
+router.get(
+  '/:id',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, id } = req.params;
 
-    const product = await ProductService.getById(storeId, id);
+      const product = await ProductService.getById(storeId, id);
 
-    res.json({
-      success: true,
-      data: { product },
-    });
-  } catch (error) {
-    next(error);
+      res.json({
+        success: true,
+        data: { product },
+      });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 // POST /stores/:storeId/products - Create product
 router.post(

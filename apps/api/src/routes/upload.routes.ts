@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import { authenticate } from '../middleware/auth';
+import { checkStoreAccess } from '../middleware/store-access';
 import { requirePermission } from '../middleware/rbac';
 import { StorageService } from '../services/storage.service';
 import { uploadLimiter, dailyUploadLimiter, auditLog } from '../middleware/security';
@@ -66,21 +67,32 @@ const ALLOWED_FOLDERS = new Set([
  *
  * - `folder` comes from the query string. Defaults to `misc`.
  *   Disallowed values produce a 400 INVALID_FOLDER.
- * - `storeId` comes from either an explicit query param or the JWT
- *   payload (customer tokens carry it). When neither is present we
- *   return null and the storage service falls back to the legacy flat
- *   key shape — that's the platform/super_admin upload path.
+ * - `storeId` comes from query / header / JWT, in that order.
+ *   ANY value picked from those sources is then verified against
+ *   `Store.ownerId` for the caller — without this check, a merchant
+ *   of store A could pass `storeId=<other-store>` in the header and
+ *   write into another tenant's R2 prefix (the storage service uses
+ *   the storeId verbatim to compose `stores/<id>/...` keys). We need
+ *   the same ownership guard `requireStoreAccess` provides on the
+ *   middleware layer, but applied INSIDE the handler since multi-form
+ *   uploads include the storeId in body fields, not the URL.
+ *
+ * super_admin bypasses the ownership check (cross-tenant uploads are
+ * an intentional platform-staff capability — same semantics as the
+ * existing `requireStoreAccess` middleware).
  */
-function resolveFolderAndStore(
+async function resolveFolderAndStore(
   req: Request
-):
+): Promise<
   | { ok: true; folder: string; storeId: string | null }
-  | { ok: false; error: { code: string; message: string } } {
+  | { ok: false; status: number; error: { code: string; message: string } }
+> {
   const rawFolder = (req.query.folder as string | undefined) || 'misc';
   const folder = rawFolder.replace(/[^a-zA-Z0-9_-]/g, '');
   if (!ALLOWED_FOLDERS.has(folder)) {
     return {
       ok: false,
+      status: 400,
       error: {
         code: 'INVALID_FOLDER',
         message: `Folder '${folder}' is not allowed. Allowed: ${Array.from(ALLOWED_FOLDERS).join(', ')}`,
@@ -91,6 +103,29 @@ function resolveFolderAndStore(
   const headerStoreId = (req.headers['x-store-id'] as string | undefined) || undefined;
   const userStoreId = req.user?.storeId || undefined;
   const storeId = queryStoreId || headerStoreId || userStoreId || null;
+
+  // No storeId at all → legacy/platform upload path (super_admin only).
+  if (!storeId) {
+    if (req.user?.role !== 'super_admin') {
+      return {
+        ok: false,
+        status: 403,
+        error: { code: 'FORBIDDEN', message: 'storeId is required for non-super-admin uploads' },
+      };
+    }
+    return { ok: true, folder, storeId: null };
+  }
+
+  // Verify the caller owns this storeId before we trust it as the R2
+  // key prefix. super_admin always passes; store_admin must own it.
+  const access = await checkStoreAccess(storeId, req.user!);
+  if (!access.ok) {
+    return {
+      ok: false,
+      status: access.status,
+      error: { code: access.code, message: access.message },
+    };
+  }
   return { ok: true, folder, storeId };
 }
 
@@ -115,9 +150,9 @@ router.post(
         return;
       }
 
-      const resolved = resolveFolderAndStore(req);
+      const resolved = await resolveFolderAndStore(req);
       if (!resolved.ok) {
-        res.status(400).json({ success: false, error: resolved.error });
+        res.status(resolved.status).json({ success: false, error: resolved.error });
         return;
       }
 
@@ -173,9 +208,9 @@ router.post(
         return;
       }
 
-      const resolved = resolveFolderAndStore(req);
+      const resolved = await resolveFolderAndStore(req);
       if (!resolved.ok) {
-        res.status(400).json({ success: false, error: resolved.error });
+        res.status(resolved.status).json({ success: false, error: resolved.error });
         return;
       }
 
@@ -262,6 +297,25 @@ router.post(
       const headerStoreId = (req.headers['x-store-id'] as string | undefined) || undefined;
       const presignedStoreId =
         queryStoreId || bodyStoreId || headerStoreId || req.user?.storeId || null;
+      // Same ownership guard as POST /uploads/image — the storeId
+      // becomes the R2 key prefix verbatim, so we can't trust whatever
+      // the caller passes. super_admin bypasses (no storeId, legacy
+      // platform path); store_admin must own the resolved storeId.
+      if (presignedStoreId) {
+        const access = await checkStoreAccess(presignedStoreId, req.user!);
+        if (!access.ok) {
+          res
+            .status(access.status)
+            .json({ success: false, error: { code: access.code, message: access.message } });
+          return;
+        }
+      } else if (req.user?.role !== 'super_admin') {
+        res.status(403).json({
+          success: false,
+          error: { code: 'FORBIDDEN', message: 'storeId is required for non-super-admin uploads' },
+        });
+        return;
+      }
       const result = await StorageService.getUploadUrl(
         filename,
         contentType,
@@ -301,13 +355,27 @@ router.delete(
         return;
       }
 
-      // Validate key belongs to the requesting store to prevent cross-store deletion
+      // Verify the caller owns the storeId in the header BEFORE the
+      // prefix check. The previous version trusted the header value
+      // verbatim — a forged `x-store-id: <victim-store>` paired with a
+      // forged key under that prefix would pass the prefix check, and
+      // the only thing standing between the request and a cross-tenant
+      // delete was the multer/permission middleware (which doesn't
+      // bind the header to the user's actual store ownership).
       const storeId = req.headers['x-store-id'] as string;
       if (!storeId) {
         res.status(400).json({
           success: false,
           error: { code: 'MISSING_STORE', message: 'Store ID is required' },
         });
+        return;
+      }
+
+      const access = await checkStoreAccess(storeId, req.user!);
+      if (!access.ok) {
+        res
+          .status(access.status)
+          .json({ success: false, error: { code: access.code, message: access.message } });
         return;
       }
 

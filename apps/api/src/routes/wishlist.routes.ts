@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '@force/database';
-import { authenticate } from '../middleware/auth';
+import { authenticate, customerUserId } from '../middleware/auth';
 
 const router = Router();
 
@@ -10,9 +10,16 @@ function getStoreIdFromHeader(req: Request): string | null {
 }
 
 // Get user's wishlist items
+//
+// All handlers in this file use customerUserId(req) instead of req.user?.userId
+// because the API cookie space is shared between admin and storefront. Reading
+// req.user?.userId verbatim would let a logged-in merchant write into a
+// wishlist row keyed on their userId — the next customer who happens to share
+// that userId on the storefront would then see the merchant's wishlist. The
+// helper returns undefined for any non-customer role, which we 401 here.
 router.get('/', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user?.userId;
+    const userId = customerUserId(req);
     if (!userId) {
       res.status(401).json({
         success: false,
@@ -96,7 +103,7 @@ router.get('/', authenticate, async (req: Request, res: Response, next: NextFunc
 // Add item to wishlist
 router.post('/', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user?.userId;
+    const userId = customerUserId(req);
     if (!userId) {
       res.status(401).json({
         success: false,
@@ -208,7 +215,7 @@ router.post('/', authenticate, async (req: Request, res: Response, next: NextFun
 // Remove item from wishlist
 router.delete('/:itemId', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user?.userId;
+    const userId = customerUserId(req);
     if (!userId) {
       res.status(401).json({
         success: false,
@@ -260,7 +267,7 @@ router.delete('/:itemId', authenticate, async (req: Request, res: Response, next
 // Toggle wishlist visibility (public/private)
 router.put('/visibility', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user?.userId;
+    const userId = customerUserId(req);
     if (!userId) {
       res.status(401).json({
         success: false,
@@ -315,7 +322,7 @@ router.put('/visibility', authenticate, async (req: Request, res: Response, next
 // Clear all items from wishlist
 router.delete('/', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user?.userId;
+    const userId = customerUserId(req);
     if (!userId) {
       res.status(401).json({
         success: false,

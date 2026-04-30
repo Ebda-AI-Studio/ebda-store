@@ -94,16 +94,25 @@ enum UserStatus {
 }
 
 model RefreshToken {
-  id        String   @id @default(uuid())
-  token     String   @unique
-  userId    String   @map("user_id")
-  expiresAt DateTime @map("expires_at")
-  createdAt DateTime @default(now()) @map("created_at")
+  id            String    @id @default(uuid())
+  token         String    @unique
+  userId        String    @map("user_id")
+  expiresAt     DateTime  @map("expires_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  // Reuse-detection fields. On rotate we keep the old row (with
+  // replacedById set) instead of deleting it so a replay of the same
+  // refresh token is recognisable as a stolen-token signal. See
+  // AuthService.refreshTokens — any lookup hitting a row with
+  // revokedAt!=NULL revokes every token for that user.
+  replacedById  String?   @map("replaced_by_id")
+  revokedAt     DateTime? @map("revoked_at")
+  revokedReason String?   @map("revoked_reason")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([expiresAt])
+  @@index([revokedAt])
   @@map("refresh_tokens")
 }
 

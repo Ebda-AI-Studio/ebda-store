@@ -6,7 +6,7 @@ import { OrderService } from '../services/order.service';
 import { InvoiceService } from '../services/invoice.service';
 import { EmailService } from '../services/email.service';
 import { prisma } from '@force/database';
-import { authenticate, optionalAuthenticate } from '../middleware/auth';
+import { authenticate, optionalAuthenticate, customerUserId } from '../middleware/auth';
 import {
   publicLimiter,
   storeResolveLimiter,
@@ -398,7 +398,19 @@ router.get('/orders', authenticate, async (req: Request, res: Response, next: Ne
   try {
     const { page, limit } = req.query;
     const storeId = await getStoreIdFromRequest(req);
-    const result = await OrderService.getCustomerOrders(storeId, req.user!.userId, {
+    // customerUserId() rejects admin tokens here. Without this guard, an
+    // admin's userId (which is never a customerId) would be passed to
+    // OrderService.getCustomerOrders — usually empty, but it leaks the
+    // existence of any user record matching the admin's id.
+    const customerId = customerUserId(req);
+    if (!customerId) {
+      res.status(403).json({
+        success: false,
+        error: { code: 'FORBIDDEN', message: 'Customer account required' },
+      });
+      return;
+    }
+    const result = await OrderService.getCustomerOrders(storeId, customerId, {
       page: page ? parseInt(page as string) : undefined,
       limit: limit ? parseInt(limit as string) : undefined,
     });
@@ -475,8 +487,11 @@ router.get(
       const storeId = await getStoreIdFromRequest(req);
       const order = await OrderService.getById(storeId, id);
 
-      // Ensure user owns this order
-      if (order.customerId !== req.user!.userId) {
+      // Ensure the request comes from the customer who placed the order.
+      // customerUserId() returns undefined for admin tokens — admins must
+      // use the /stores/:storeId/orders/:id/invoice route instead.
+      const customerId = customerUserId(req);
+      if (!customerId || order.customerId !== customerId) {
         res.status(403).json({
           success: false,
           error: { code: 'FORBIDDEN', message: 'Not authorized to view this invoice' },

@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate, authorize, customerUserId } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { LoyaltyService } from '../services/loyalty.service';
@@ -244,7 +244,18 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
-      const customerId = req.user!.userId;
+      // Customer-only endpoint reachable from a shared API cookie space.
+      // customerUserId() rejects admin/super_admin tokens here so a merchant
+      // browsing their dashboard can't accidentally read or join a customer's
+      // loyalty record under their own userId.
+      const customerId = customerUserId(req);
+      if (!customerId) {
+        res.status(403).json({
+          success: false,
+          error: { code: 'FORBIDDEN', message: 'Customer account required' },
+        });
+        return;
+      }
 
       const points = await LoyaltyService.getCustomerPoints(storeId, customerId);
 
@@ -265,7 +276,14 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
-      const customerId = req.user!.userId;
+      const customerId = customerUserId(req);
+      if (!customerId) {
+        res.status(403).json({
+          success: false,
+          error: { code: 'FORBIDDEN', message: 'Customer account required' },
+        });
+        return;
+      }
       const { page, limit } = req.query;
 
       const result = await LoyaltyService.getTransactionHistory(storeId, customerId, {
@@ -290,7 +308,14 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
-      const customerId = req.user!.userId;
+      const customerId = customerUserId(req);
+      if (!customerId) {
+        res.status(403).json({
+          success: false,
+          error: { code: 'FORBIDDEN', message: 'Customer account required' },
+        });
+        return;
+      }
 
       const points = await LoyaltyService.initializeCustomerPoints(storeId, customerId, true);
 

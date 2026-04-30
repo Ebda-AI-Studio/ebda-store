@@ -25,6 +25,7 @@ import { abandonedCartService } from './services/abandoned-cart.service';
 import { recommendationService } from './services/recommendation.service';
 import { shippingCarrierService } from './services/shipping-carrier.service';
 import { loyaltyAutomationService } from './services/loyalty-automation.service';
+import { AuthService } from './services/auth.service';
 import { SentryService } from './services/sentry.service';
 import logger from './lib/logger';
 
@@ -62,6 +63,21 @@ socketService.initialize(httpServer);
   recommendationService.startFBTCron(86400000, []); // daily; storeIds populated per-trigger
   shippingCarrierService.startTrackingCron(1800000); // every 30 minutes
   loyaltyAutomationService.startCron(86400000); // daily: birthday bonuses + point expiration
+
+  // Refresh-token cleanup. Reuse detection requires keeping revoked
+  // rows for ~30 days; without periodic deletion the table grows
+  // unbounded. Run once at startup, then every 12 hours.
+  AuthService.cleanupRefreshTokens().catch(err =>
+    logger.error({ err }, 'Refresh-token cleanup failed at startup')
+  );
+  setInterval(
+    () => {
+      AuthService.cleanupRefreshTokens().catch(err =>
+        logger.error({ err }, 'Refresh-token cleanup failed')
+      );
+    },
+    12 * 60 * 60 * 1000
+  );
 })();
 
 // Request ID for tracing

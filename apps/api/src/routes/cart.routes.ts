@@ -1,8 +1,16 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { CartService } from '../services/cart.service';
+import { customerUserId } from '../middleware/auth';
 
 const router = Router({ mergeParams: true });
+
+// Cart routes are mixed-audience: guests post with `x-session-id` only, while
+// signed-in customers also have `req.user`. Pulling `req.user?.userId`
+// directly would let an admin token (admin/storefront share API cookie space)
+// claim a cart on behalf of an unrelated customerId. customerUserId() returns
+// undefined for any non-customer role, downgrading those requests to the
+// session-only path instead of attaching a stale userId to the cart.
 
 // Validation schemas
 const addToCartSchema = z.object({
@@ -28,7 +36,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { storeId } = req.params;
     const sessionId = getSessionId(req);
-    const customerId = req.user?.userId;
+    const customerId = customerUserId(req);
 
     const cart = await CartService.getOrCreate(storeId, sessionId, customerId);
 
@@ -46,7 +54,7 @@ router.post('/items', async (req: Request, res: Response, next: NextFunction) =>
   try {
     const { storeId } = req.params;
     const sessionId = getSessionId(req);
-    const customerId = req.user?.userId;
+    const customerId = customerUserId(req);
     const data = addToCartSchema.parse(req.body);
 
     const cart = await CartService.addItem(
@@ -71,7 +79,7 @@ router.put('/items/:itemId', async (req: Request, res: Response, next: NextFunct
   try {
     const { storeId, itemId } = req.params;
     const sessionId = getSessionId(req);
-    const customerId = req.user?.userId;
+    const customerId = customerUserId(req);
     const data = updateCartItemSchema.parse(req.body);
 
     const cart = await CartService.updateItem(
@@ -96,7 +104,7 @@ router.delete('/items/:itemId', async (req: Request, res: Response, next: NextFu
   try {
     const { storeId, itemId } = req.params;
     const sessionId = getSessionId(req);
-    const customerId = req.user?.userId;
+    const customerId = customerUserId(req);
 
     const cart = await CartService.removeItem(storeId, sessionId, itemId, customerId);
 
@@ -114,7 +122,7 @@ router.delete('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { storeId } = req.params;
     const sessionId = getSessionId(req);
-    const customerId = req.user?.userId;
+    const customerId = customerUserId(req);
 
     const cart = await CartService.clear(storeId, sessionId, customerId);
 
