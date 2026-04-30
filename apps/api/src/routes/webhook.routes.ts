@@ -87,28 +87,53 @@ async function markWebhookProcessed(orderId: string, idempotencyKey: string): Pr
 }
 
 /**
- * Generate idempotency key from webhook payload
+ * Generate idempotency key from webhook payload.
+ *
+ * Returns null when the payload doesn't carry a provider-specific
+ * transaction ID we can hash on. The previous implementation fell
+ * through to `${prefix}_undefined` in that case — every malformed
+ * webhook from the same provider then collided on a single
+ * idempotency row, so the SECOND such delivery was silently dropped
+ * as "already processed". Returning null forces the handler to 400
+ * the request and Sentry instead of swallowing it.
+ *
+ * The unknown-provider branch still produces a unique random key —
+ * we WANT to record those so manual investigation can find the row,
+ * but they should never collide with a real provider's namespace.
  */
 function generateIdempotencyKey(
   provider: PaymentProvider,
   payload: Record<string, unknown>
-): string {
-  // Use provider-specific transaction ID for idempotency
+): string | null {
   const charge = payload.charge as Record<string, unknown> | undefined;
   const reference = payload.reference as Record<string, unknown> | undefined;
   const data = payload.Data as Record<string, unknown> | undefined;
 
+  const stringify = (v: unknown): string | null => {
+    if (typeof v === 'string' && v.length > 0) return v;
+    if (typeof v === 'number') return String(v);
+    return null;
+  };
+
   switch (provider) {
-    case 'tap':
-      return `tap_${payload.id || charge?.id || reference?.id}`;
-    case 'myfatoorah':
-      return `mf_${payload.InvoiceId || data?.InvoiceId}`;
-    case 'hesabe':
-      return `hesabe_${payload.paymentId || payload.transaction_id}`;
-    case 'upayments':
-      return `up_${payload.invoice_id || payload.transaction_id}`;
+    case 'tap': {
+      const id = stringify(payload.id) ?? stringify(charge?.id) ?? stringify(reference?.id);
+      return id ? `tap_${id}` : null;
+    }
+    case 'myfatoorah': {
+      const id = stringify(payload.InvoiceId) ?? stringify(data?.InvoiceId);
+      return id ? `mf_${id}` : null;
+    }
+    case 'hesabe': {
+      const id = stringify(payload.paymentId) ?? stringify(payload.transaction_id);
+      return id ? `hesabe_${id}` : null;
+    }
+    case 'upayments': {
+      const id = stringify(payload.invoice_id) ?? stringify(payload.transaction_id);
+      return id ? `up_${id}` : null;
+    }
     default:
-      return `unknown_${Date.now()}_${crypto.randomBytes(5).toString('hex')}`;
+      return `unknown_${provider}_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`;
   }
 }
 
@@ -145,8 +170,26 @@ router.post(
         return;
       }
 
-      // Generate idempotency key from parsed payload
+      // Generate idempotency key from parsed payload. null means the
+      // payload didn't carry a provider transaction ID we recognise —
+      // refuse to process rather than collide on a `${prefix}_undefined`
+      // row. Sentry picks up the 400 so we can fix the parser when a
+      // provider rolls a new payload schema.
       const idempotencyKey = generateIdempotencyKey(provider, payload);
+      if (!idempotencyKey) {
+        logger.warn(
+          { provider, payloadKeys: Object.keys(payload) },
+          '[WEBHOOK] Could not derive idempotency key — payload missing transaction ID'
+        );
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'MISSING_TRANSACTION_ID',
+            message: 'Webhook payload missing transaction ID',
+          },
+        });
+        return;
+      }
 
       // Check for duplicate webhook
       const { alreadyProcessed, orderId } = await checkIdempotency(idempotencyKey);
@@ -258,8 +301,24 @@ router.post('/payment', async (req: Request, res: Response, next: NextFunction) 
       return;
     }
 
-    // Idempotency check - same pattern as provider-specific handler
+    // Idempotency check - same pattern as provider-specific handler.
+    // null means we couldn't derive a transaction ID — refuse to
+    // process rather than collide on a poison key.
     const idempotencyKey = generateIdempotencyKey(provider, payload);
+    if (!idempotencyKey) {
+      logger.warn(
+        { provider, payloadKeys: Object.keys(payload) },
+        '[WEBHOOK] Auto-detected webhook missing transaction ID'
+      );
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'MISSING_TRANSACTION_ID',
+          message: 'Webhook payload missing transaction ID',
+        },
+      });
+      return;
+    }
     const { alreadyProcessed, orderId } = await checkIdempotency(idempotencyKey);
 
     if (alreadyProcessed) {

@@ -479,9 +479,52 @@ export function securityHeaders(_req: Request, res: Response, next: NextFunction
   // Additional security headers beyond helmet
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
-  res.setHeader('X-XSS-Protection', '1; mode=block');
+  // X-XSS-Protection is deprecated and harmful in modern browsers
+  // (Chrome's XSS auditor caused side-channel info leaks before being
+  // removed in Chrome 78). MDN recommends explicitly disabling it
+  // rather than enabling — `0` tells legacy browsers not to engage
+  // the auditor either. Modern XSS defense is CSP (set below) plus
+  // the HTML escaping in transactional emails.
+  res.setHeader('X-XSS-Protection', '0');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=(), payment=()');
+  // Permissions-Policy: lock down every feature the API has no business
+  // exposing. Was previously a 4-feature subset which left the door
+  // open for accelerometer / fullscreen / autoplay etc. to be granted
+  // to the platform origin if a future error page rendered HTML. The
+  // exhaustive list is harder to drift on review; if a future feature
+  // legitimately needs one, drop it from this list explicitly.
+  res.setHeader(
+    'Permissions-Policy',
+    [
+      'accelerometer=()',
+      'ambient-light-sensor=()',
+      'autoplay=()',
+      'battery=()',
+      'camera=()',
+      'cross-origin-isolated=()',
+      'display-capture=()',
+      'document-domain=()',
+      'encrypted-media=()',
+      'execution-while-not-rendered=()',
+      'execution-while-out-of-viewport=()',
+      'fullscreen=()',
+      'geolocation=()',
+      'gyroscope=()',
+      'keyboard-map=()',
+      'magnetometer=()',
+      'microphone=()',
+      'midi=()',
+      'navigation-override=()',
+      'payment=()',
+      'picture-in-picture=()',
+      'publickey-credentials-get=()',
+      'screen-wake-lock=()',
+      'sync-xhr=()',
+      'usb=()',
+      'web-share=()',
+      'xr-spatial-tracking=()',
+    ].join(', ')
+  );
 
   // Content Security Policy — API serves JSON, not HTML, so this is a
   // defense-in-depth measure in case an error page or redirect is rendered.
