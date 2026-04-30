@@ -366,6 +366,13 @@ router.post(
  * Delete a file
  */
 router.delete(
+  // path-to-regexp v6 syntax: `:key(*)` makes `key` capture the rest
+  // of the URL (so `/uploads/stores/<id>/products/abc.jpg` resolves
+  // to `key = "stores/<id>/products/abc.jpg"`). The migration to
+  // Express 5 / path-to-regexp v8 (which renames this to `/*key`)
+  // is deferred — the v5 type changes propagate `string | string[]`
+  // through every `req.params.X` read in the codebase, which is a
+  // bigger refactor than this hardening pass should take on.
   '/:key(*)',
   authenticate,
   requirePermission('products:delete'),
