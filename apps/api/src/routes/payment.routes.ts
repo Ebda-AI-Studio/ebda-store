@@ -4,7 +4,7 @@ import { PaymentService } from '../services/payment-providers/payment.factory';
 import { PaymentProvider, Currency } from '../services/payment-providers/types';
 import { authenticate, optionalAuthenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/rbac';
-import { prisma } from '@force/database';
+import { prisma, runInTenantContext } from '@force/database';
 import { paymentLimiter, auditLog } from '../middleware/security';
 import { config } from '../config';
 import { getAuthUser } from '../utils/store-helpers';
@@ -216,79 +216,179 @@ router.post(
         };
       }
 
-      // ==========================================
-      // COD (Cash on Delivery) — skip payment gateway
-      // ==========================================
-      if (data.provider === 'cod') {
-        // Look up COD config for fee
-        const codConfig = await prisma.paymentConfig.findFirst({
-          where: {
-            OR: [
-              { storeId: order.storeId, provider: 'cod', isEnabled: true },
-              { storeId: null, provider: 'cod', isEnabled: true },
-            ],
-          },
-          orderBy: { storeId: 'desc' }, // Store-specific first, then global
-        });
+      // From here on every Prisma write touches tenant-scoped tables
+      // (Order, Payment, AuditLog with storeId). Wrap in a single
+      // runInTenantContext so RLS policies enforce isolation under the
+      // force_app role — without this the SELECTs the provider call
+      // makes (e.g. PaymentConfig lookup, store row) silently fall
+      // through to the "current_store_id() IS NULL → see all rows"
+      // branch of the policies, which works but defeats the purpose
+      // of RLS. Bootstrap order lookup above stays OUTSIDE the wrap
+      // because we don't yet know the storeId at that point.
+      await runInTenantContext(order.storeId, async () => {
+        // ==========================================
+        // COD (Cash on Delivery) — skip payment gateway
+        // ==========================================
+        if (data.provider === 'cod') {
+          // Look up COD config for fee
+          const codConfig = await prisma.paymentConfig.findFirst({
+            where: {
+              OR: [
+                { storeId: order.storeId, provider: 'cod', isEnabled: true },
+                { storeId: null, provider: 'cod', isEnabled: true },
+              ],
+            },
+            orderBy: { storeId: 'desc' }, // Store-specific first, then global
+          });
 
-        if (!codConfig) {
-          if (rollbackContext) {
-            await OrderService.rollbackForPaymentFailure(
-              rollbackContext.storeId,
-              rollbackContext.orderId,
-              rollbackContext.sessionId
-            ).catch(err =>
-              logger.error({ err, ...rollbackContext }, 'Order rollback failed (cod-not-available)')
-            );
+          if (!codConfig) {
+            if (rollbackContext) {
+              await OrderService.rollbackForPaymentFailure(
+                rollbackContext.storeId,
+                rollbackContext.orderId,
+                rollbackContext.sessionId
+              ).catch(err =>
+                logger.error(
+                  { err, ...rollbackContext },
+                  'Order rollback failed (cod-not-available)'
+                )
+              );
+            }
+            res.status(400).json({
+              success: false,
+              error: {
+                code: 'COD_NOT_AVAILABLE',
+                message: 'Cash on Delivery is not available for this store',
+              },
+            });
+            return;
           }
-          res.status(400).json({
-            success: false,
-            error: {
-              code: 'COD_NOT_AVAILABLE',
-              message: 'Cash on Delivery is not available for this store',
+
+          const codFee = codConfig.fixedFee ? Number(codConfig.fixedFee) : 0;
+
+          // Add COD fee to order total if configured
+          if (codFee > 0) {
+            await prisma.order.update({
+              where: { id: order.id },
+              data: { total: order.total + codFee },
+            });
+          }
+
+          // Create payment record with cod_pending status
+          const payment = await prisma.payment.create({
+            data: {
+              orderId: order.id,
+              provider: 'cod',
+              method: 'cod',
+              status: 'cod_pending',
+              amount: order.total + codFee,
+              currency: order.currency,
+              metadata: { codFee, originalTotal: order.total },
+            },
+          });
+
+          // Payment record created — clear rollback context so we never undo a
+          // successfully-initiated payment, even if a downstream step throws.
+          rollbackContext = null;
+
+          await auditLog({
+            action: 'payment.created',
+            // Guest checkout: req.user is undefined, audit log accepts that.
+            userId: req.user?.userId,
+            resourceType: 'payment',
+            resourceId: payment.id,
+            details: {
+              orderId: order.id,
+              amount: order.total + codFee,
+              codFee,
+              provider: 'cod',
+            },
+            ip: req.ip,
+            userAgent: req.headers['user-agent'],
+          });
+
+          res.json({
+            success: true,
+            data: {
+              transactionId: payment.id,
+              provider: 'cod',
+              cod: true,
+              codFee,
             },
           });
           return;
         }
 
-        const codFee = codConfig.fixedFee ? Number(codConfig.fixedFee) : 0;
+        // ==========================================
+        // Online payment providers (Tap, MyFatoorah, etc.)
+        // ==========================================
 
-        // Add COD fee to order total if configured
-        if (codFee > 0) {
-          await prisma.order.update({
-            where: { id: order.id },
-            data: { total: order.total + codFee },
-          });
-        }
+        // Resolve the correct storefront URL for payment callbacks
+        const storefrontBaseUrl = order.store?.domain
+          ? `https://${order.store.domain}`
+          : order.store?.slug
+            ? `${config.webUrl}/${order.store.slug}`
+            : config.webUrl;
 
-        // Create payment record with cod_pending status
-        const payment = await prisma.payment.create({
-          data: {
+        // Create payment. PaymentService.createPayment throws on provider-not-
+        // configured / provider-error / validation-failure — the catch block at
+        // the end of this handler runs the rollback so the customer's cart is
+        // restored and inventory isn't drained by a failed attempt.
+        const result = await PaymentService.createPayment(
+          {
             orderId: order.id,
-            provider: 'cod',
-            method: 'cod',
-            status: 'cod_pending',
-            amount: order.total + codFee,
-            currency: order.currency,
-            metadata: { codFee, originalTotal: order.total },
+            orderNumber: order.orderNumber,
+            amount: order.total,
+            currency: order.currency as Currency,
+            customer: {
+              // Guest checkout: synthesize a stable id from the order's
+              // own id so payment providers that hash the customer for
+              // 3D-Secure / fraud scoring still see a consistent value.
+              id: req.user?.userId ?? `guest-${order.id}`,
+              name:
+                `${order.customer?.firstName || ''} ${order.customer?.lastName || ''}`.trim() ||
+                'Customer',
+              email: order.customer?.email || '',
+            },
+            items: order.items.map(item => ({
+              name: item.productName,
+              quantity: item.quantity,
+              unitPrice: item.price,
+              sku: item.sku || undefined,
+            })),
+            // Resolve relative paths against the order's storefront base URL so
+            // payment providers always receive an absolute URL that points back
+            // at the correct tenant domain (custom domain or platform slug).
+            callbackUrl: data.successUrl
+              ? data.successUrl.startsWith('/')
+                ? `${storefrontBaseUrl}${data.successUrl}`
+                : data.successUrl
+              : `${storefrontBaseUrl}/checkout/success`,
+            errorUrl: data.errorUrl
+              ? data.errorUrl.startsWith('/')
+                ? `${storefrontBaseUrl}${data.errorUrl}`
+                : data.errorUrl
+              : `${storefrontBaseUrl}/checkout/error`,
+            webhookUrl: `${config.apiUrl}/webhooks/payment`,
           },
-        });
+          data.provider
+        );
 
-        // Payment record created — clear rollback context so we never undo a
-        // successfully-initiated payment, even if a downstream step throws.
+        // Payment provider accepted the request — clear rollback context so we
+        // never undo a successfully-initiated payment, even if audit-log writing
+        // throws below.
         rollbackContext = null;
 
+        // Audit log
         await auditLog({
           action: 'payment.created',
-          // Guest checkout: req.user is undefined, audit log accepts that.
           userId: req.user?.userId,
           resourceType: 'payment',
-          resourceId: payment.id,
+          resourceId: result.transactionId,
           details: {
             orderId: order.id,
-            amount: order.total + codFee,
-            codFee,
-            provider: 'cod',
+            amount: order.total,
+            provider: result.provider,
           },
           ip: req.ip,
           userAgent: req.headers['user-agent'],
@@ -297,98 +397,12 @@ router.post(
         res.json({
           success: true,
           data: {
-            transactionId: payment.id,
-            provider: 'cod',
-            cod: true,
-            codFee,
+            transactionId: result.transactionId,
+            paymentUrl: result.paymentUrl,
+            provider: result.provider,
+            paymentMethods: result.paymentMethods,
           },
         });
-        return;
-      }
-
-      // ==========================================
-      // Online payment providers (Tap, MyFatoorah, etc.)
-      // ==========================================
-
-      // Resolve the correct storefront URL for payment callbacks
-      const storefrontBaseUrl = order.store?.domain
-        ? `https://${order.store.domain}`
-        : order.store?.slug
-          ? `${config.webUrl}/${order.store.slug}`
-          : config.webUrl;
-
-      // Create payment. PaymentService.createPayment throws on provider-not-
-      // configured / provider-error / validation-failure — the catch block at
-      // the end of this handler runs the rollback so the customer's cart is
-      // restored and inventory isn't drained by a failed attempt.
-      const result = await PaymentService.createPayment(
-        {
-          orderId: order.id,
-          orderNumber: order.orderNumber,
-          amount: order.total,
-          currency: order.currency as Currency,
-          customer: {
-            // Guest checkout: synthesize a stable id from the order's
-            // own id so payment providers that hash the customer for
-            // 3D-Secure / fraud scoring still see a consistent value.
-            id: req.user?.userId ?? `guest-${order.id}`,
-            name:
-              `${order.customer?.firstName || ''} ${order.customer?.lastName || ''}`.trim() ||
-              'Customer',
-            email: order.customer?.email || '',
-          },
-          items: order.items.map(item => ({
-            name: item.productName,
-            quantity: item.quantity,
-            unitPrice: item.price,
-            sku: item.sku || undefined,
-          })),
-          // Resolve relative paths against the order's storefront base URL so
-          // payment providers always receive an absolute URL that points back
-          // at the correct tenant domain (custom domain or platform slug).
-          callbackUrl: data.successUrl
-            ? data.successUrl.startsWith('/')
-              ? `${storefrontBaseUrl}${data.successUrl}`
-              : data.successUrl
-            : `${storefrontBaseUrl}/checkout/success`,
-          errorUrl: data.errorUrl
-            ? data.errorUrl.startsWith('/')
-              ? `${storefrontBaseUrl}${data.errorUrl}`
-              : data.errorUrl
-            : `${storefrontBaseUrl}/checkout/error`,
-          webhookUrl: `${config.apiUrl}/webhooks/payment`,
-        },
-        data.provider
-      );
-
-      // Payment provider accepted the request — clear rollback context so we
-      // never undo a successfully-initiated payment, even if audit-log writing
-      // throws below.
-      rollbackContext = null;
-
-      // Audit log
-      await auditLog({
-        action: 'payment.created',
-        userId: req.user?.userId,
-        resourceType: 'payment',
-        resourceId: result.transactionId,
-        details: {
-          orderId: order.id,
-          amount: order.total,
-          provider: result.provider,
-        },
-        ip: req.ip,
-        userAgent: req.headers['user-agent'],
-      });
-
-      res.json({
-        success: true,
-        data: {
-          transactionId: result.transactionId,
-          paymentUrl: result.paymentUrl,
-          provider: result.provider,
-          paymentMethods: result.paymentMethods,
-        },
       });
     } catch (error) {
       // Compensating rollback: if the order was committed (cart cleared,
@@ -483,40 +497,53 @@ router.post(
       const data = refundSchema.parse(req.body);
       const user = getAuthUser(req);
 
-      // Verify store ownership for store_admin — prevent refunding other stores' payments
-      if (user.role === 'store_admin') {
-        const payment = await prisma.payment.findFirst({
-          where: { transactionId: data.transactionId },
-          include: { order: { include: { store: { select: { ownerId: true } } } } },
+      // Bootstrap lookup OUTSIDE runInTenantContext — we don't yet
+      // know the storeId. Same query whether the caller is super_admin
+      // or store_admin so we can derive storeId either way; ownership
+      // check follows below.
+      const paymentRow = await prisma.payment.findFirst({
+        where: { transactionId: data.transactionId },
+        include: { order: { include: { store: { select: { id: true, ownerId: true } } } } },
+      });
+      if (!paymentRow) {
+        res.status(404).json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'Payment not found' },
         });
-        if (!payment || payment.order.store.ownerId !== user.userId) {
-          res.status(404).json({
-            success: false,
-            error: { code: 'NOT_FOUND', message: 'Payment not found' },
-          });
-          return;
-        }
+        return;
+      }
+      if (user.role === 'store_admin' && paymentRow.order.store.ownerId !== user.userId) {
+        res.status(404).json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'Payment not found' },
+        });
+        return;
       }
 
-      const refund = await PaymentService.refund({
-        transactionId: data.transactionId,
-        amount: data.amount,
-        reason: data.reason,
-      });
+      const refundStoreId = paymentRow.order.store.id;
 
-      // Audit log
-      await auditLog({
-        action: 'payment.refunded',
-        userId: user.userId,
-        resourceType: 'payment',
-        resourceId: refund.transactionId,
-        details: {
-          refundId: refund.refundId,
-          amount: refund.amount,
-          reason: data.reason || null,
-        },
-        ip: req.ip,
-        userAgent: req.headers['user-agent'],
+      const refund = await runInTenantContext(refundStoreId, async () => {
+        const r = await PaymentService.refund({
+          transactionId: data.transactionId,
+          amount: data.amount,
+          reason: data.reason,
+        });
+
+        await auditLog({
+          action: 'payment.refunded',
+          userId: user.userId,
+          resourceType: 'payment',
+          resourceId: r.transactionId,
+          details: {
+            refundId: r.refundId,
+            amount: r.amount,
+            reason: data.reason || null,
+          },
+          ip: req.ip,
+          userAgent: req.headers['user-agent'],
+        });
+
+        return r;
       });
 
       res.json({
@@ -557,7 +584,9 @@ router.post(
         return;
       }
 
-      const result = await PaymentService.retryPayment(paymentId, provider);
+      const result = await runInTenantContext(payment.order.storeId, () =>
+        PaymentService.retryPayment(paymentId, provider)
+      );
 
       res.json({
         success: true,

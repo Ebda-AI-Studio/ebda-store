@@ -74,6 +74,15 @@ model User {
   // store. Admins (storeId NULL) are not subject to this constraint thanks
   // to Postgres treating NULLs as distinct, so we add a partial unique
   // index in the migration to keep admin emails globally unique.
+  //
+  // ⚠️ MIGRATION GUARD: the partial unique `users_admin_email_key`
+  // (`UNIQUE ON users(email) WHERE store_id IS NULL`) is NOT
+  // representable in Prisma's `@@unique` syntax, so `prisma migrate dev`
+  // will offer to drop it on every diff against this schema. NEVER
+  // accept that drop — duplicate global admin emails break login
+  // (AuthService.login uses findFirst, gets non-deterministic row).
+  // The reassert migration `20260430030000_reassert_admin_email_unique`
+  // re-creates it idempotently on every `migrate deploy`.
   @@unique([storeId, email])
   @@index([role])
   @@index([status])
@@ -452,6 +461,11 @@ model Product {
   @@index([price])
   @@index([createdAt])
   @@index([storeId, status]) // Composite: products by store and status
+  // Composite for the storefront "best seller" strip — created in
+  // 20260426010000_add_product_is_best_seller. Without this entry the
+  // schema doesn't know about the index and `prisma migrate dev` will
+  // try to drop it on every diff.
+  @@index([storeId, isBestSeller])
   @@map("products")
 }
 

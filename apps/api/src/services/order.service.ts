@@ -61,7 +61,12 @@ export class OrderService {
     const limit = Math.min(100, Math.max(1, options.limit || 20));
     const skip = (page - 1) * limit;
 
-    const where: Prisma.OrderWhereInput = { storeId };
+    // Defensive deletedAt filter. The schema marks Order as soft-deletable
+    // but no code path currently sets `deletedAt`, so this is a no-op
+    // today — kept here so a future "archive order" feature doesn't
+    // accidentally surface archived rows in the admin list (which would
+    // also pollute analytics aggregates that count off this query).
+    const where: Prisma.OrderWhereInput = { storeId, deletedAt: null };
     if (status) where.status = status as OrderStatus;
     if (customerId) where.customerId = customerId;
 
@@ -99,7 +104,7 @@ export class OrderService {
 
   static async getById(storeId: string, orderId: string) {
     const order = await prisma.order.findFirst({
-      where: { id: orderId, storeId },
+      where: { id: orderId, storeId, deletedAt: null },
       include: {
         customer: {
           select: { id: true, email: true, firstName: true, lastName: true },
@@ -124,7 +129,7 @@ export class OrderService {
 
   static async getByOrderNumber(storeId: string, orderNumber: string) {
     const order = await prisma.order.findFirst({
-      where: { orderNumber, storeId },
+      where: { orderNumber, storeId, deletedAt: null },
       include: {
         customer: {
           select: { id: true, email: true, firstName: true, lastName: true },
@@ -958,7 +963,7 @@ export class OrderService {
     const limit = Math.min(50, Math.max(1, options.limit || 20));
     const skip = (page - 1) * limit;
 
-    const where: Prisma.OrderWhereInput = { storeId, customerId };
+    const where: Prisma.OrderWhereInput = { storeId, customerId, deletedAt: null };
 
     const [orders, total] = await Promise.all([
       prisma.order.findMany({

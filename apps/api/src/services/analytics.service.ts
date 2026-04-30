@@ -205,8 +205,13 @@ export class AnalyticsService {
   }
 
   private static async getPeriodStats(storeId: string, startDate: Date, endDate: Date) {
+    // deletedAt: null defends against soft-deleted orders inflating
+    // analytics. Schema marks Order soft-deletable but no caller sets
+    // deletedAt today; future archive-order workflows would otherwise
+    // double-count revenue here.
     const where: Prisma.OrderWhereInput = {
       storeId,
+      deletedAt: null,
       createdAt: { gte: startDate, lte: endDate },
       status: { notIn: ['cancelled', 'refunded'] },
     };
@@ -490,6 +495,7 @@ export class AnalyticsService {
       by: ['status'],
       where: {
         storeId,
+        deletedAt: null,
         createdAt: { gte: startDate, lte: endDate },
       },
       _count: { id: true },
@@ -552,6 +558,7 @@ export class AnalyticsService {
         by: ['customerId'],
         where: {
           storeId,
+          deletedAt: null,
           status: { notIn: ['cancelled', 'refunded'] },
         },
         _sum: { total: true },
@@ -598,7 +605,7 @@ export class AnalyticsService {
    */
   static async getRecentOrders(storeId: string, limit = 10) {
     return prisma.order.findMany({
-      where: { storeId },
+      where: { storeId, deletedAt: null },
       orderBy: { createdAt: 'desc' },
       take: limit,
       include: {
@@ -657,6 +664,7 @@ export class AnalyticsService {
       by: ['paymentStatus'],
       where: {
         storeId,
+        deletedAt: null,
         createdAt: { gte: startDate, lte: endDate },
         status: { notIn: ['cancelled', 'refunded'] },
       },

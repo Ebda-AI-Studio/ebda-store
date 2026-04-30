@@ -7,6 +7,30 @@ import logger from '../lib/logger';
 // Transactional email handling
 // ==========================================
 
+/**
+ * Escape user-supplied strings before they land in transactional HTML
+ * email bodies. Customer-controlled values (firstName, address1, item
+ * names, coupon codes, etc.) used to be templated directly into HTML —
+ * a hostile customer could register with a name like
+ * `<script>fetch('//evil')</script>` and have it rendered inside the
+ * merchant's order-confirmation inbox view, or worse, put a clickable
+ * phishing link into a "Refund Processed" email that the merchant
+ * forwards to support. Always pipe untrusted text through this before
+ * interpolating into `${...}` blocks in the templates below.
+ *
+ * `&` must come first so we don't double-encode the `&amp;` we just
+ * produced for `<` / `>` / `"`.
+ */
+function escapeHtml(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export interface EmailOptions {
   to: string | string[];
   subject: string;
@@ -413,7 +437,7 @@ export class EmailService {
       .map(
         item => `
       <tr>
-        <td>${item.name}</td>
+        <td>${escapeHtml(item.name)}</td>
         <td style="text-align: center;">${item.quantity}</td>
         <td style="text-align: right;">${(item.price / 1000).toFixed(3)} KWD</td>
       </tr>
@@ -423,10 +447,10 @@ export class EmailService {
 
     return EmailService.baseTemplate(`
       <h2>Thank you for your order!</h2>
-      <p>Hi ${d.customerName},</p>
+      <p>Hi ${escapeHtml(d.customerName)},</p>
       <p>We've received your order and are getting it ready. We'll notify you when it ships.</p>
 
-      <h3>Order #${d.orderNumber}</h3>
+      <h3>Order #${escapeHtml(d.orderNumber)}</h3>
 
       <table class="order-table">
         <thead>
@@ -455,7 +479,7 @@ export class EmailService {
           ${
             d.discount && d.discount > 0
               ? `<tr>
-            <td colspan="2">Discount${d.couponCode ? ` (${d.couponCode})` : ''}</td>
+            <td colspan="2">Discount${d.couponCode ? ` (${escapeHtml(d.couponCode)})` : ''}</td>
             <td style="text-align: right;">-${(d.discount / 1000).toFixed(3)} KWD</td>
           </tr>`
               : ''
@@ -469,11 +493,11 @@ export class EmailService {
 
       <div class="address-box">
         <strong>Shipping Address</strong><br>
-        ${d.shippingAddress.firstName} ${d.shippingAddress.lastName}<br>
-        ${d.shippingAddress.address1}<br>
-        ${d.shippingAddress.address2 ? d.shippingAddress.address2 + '<br>' : ''}
-        ${d.shippingAddress.city}, ${d.shippingAddress.state} ${d.shippingAddress.postalCode}<br>
-        ${d.shippingAddress.country}
+        ${escapeHtml(d.shippingAddress.firstName)} ${escapeHtml(d.shippingAddress.lastName)}<br>
+        ${escapeHtml(d.shippingAddress.address1)}<br>
+        ${d.shippingAddress.address2 ? escapeHtml(d.shippingAddress.address2) + '<br>' : ''}
+        ${escapeHtml(d.shippingAddress.city)}, ${escapeHtml(d.shippingAddress.state)} ${escapeHtml(d.shippingAddress.postalCode)}<br>
+        ${escapeHtml(d.shippingAddress.country)}
       </div>
 
       <p>If you have any questions, please reply to this email.</p>
@@ -486,8 +510,8 @@ export class EmailService {
   private static paymentSuccessTemplate(d: OrderEmailData): string {
     return EmailService.baseTemplate(`
       <h2>Payment Received</h2>
-      <p>Hi ${d.customerName},</p>
-      <p>We've successfully processed your payment of <strong>${(d.total / 1000).toFixed(3)} KWD</strong> for order #${d.orderNumber}.</p>
+      <p>Hi ${escapeHtml(d.customerName)},</p>
+      <p>We've successfully processed your payment of <strong>${(d.total / 1000).toFixed(3)} KWD</strong> for order #${escapeHtml(d.orderNumber)}.</p>
       <p>Your order is now being prepared for shipment.</p>
       <p>Thank you for shopping with us!</p>
     `);
@@ -504,9 +528,9 @@ export class EmailService {
   }): string {
     return EmailService.baseTemplate(`
       <h2>Payment Failed</h2>
-      <p>Hi ${d.customerName},</p>
-      <p>Unfortunately, we were unable to process your payment for order #${d.orderNumber}.</p>
-      ${d.reason ? `<p><strong>Reason:</strong> ${d.reason}</p>` : ''}
+      <p>Hi ${escapeHtml(d.customerName)},</p>
+      <p>Unfortunately, we were unable to process your payment for order #${escapeHtml(d.orderNumber)}.</p>
+      ${d.reason ? `<p><strong>Reason:</strong> ${escapeHtml(d.reason)}</p>` : ''}
       <p>Please update your payment information or try a different payment method.</p>
       <p style="text-align: center; margin: 24px 0;">
         <a href="${config.webUrl}/checkout" class="button">Retry Payment</a>
@@ -525,17 +549,22 @@ export class EmailService {
     trackingUrl?: string;
     carrier?: string;
   }): string {
+    // trackingUrl is escaped through the same pipe — providers like
+    // Aramex / DHL emit clean URLs but a malicious admin could put
+    // `"><script>` into a custom carrier name and own the customer's
+    // mail client. Escape the href value too (escapeHtml turns `"`
+    // into `&quot;` which renders correctly inside an href attribute).
     return EmailService.baseTemplate(`
       <h2>Your Order Has Shipped!</h2>
-      <p>Hi ${d.customerName},</p>
-      <p>Great news! Your order #${d.orderNumber} is on its way.</p>
-      ${d.carrier ? `<p><strong>Carrier:</strong> ${d.carrier}</p>` : ''}
-      ${d.trackingNumber ? `<p><strong>Tracking Number:</strong> ${d.trackingNumber}</p>` : ''}
+      <p>Hi ${escapeHtml(d.customerName)},</p>
+      <p>Great news! Your order #${escapeHtml(d.orderNumber)} is on its way.</p>
+      ${d.carrier ? `<p><strong>Carrier:</strong> ${escapeHtml(d.carrier)}</p>` : ''}
+      ${d.trackingNumber ? `<p><strong>Tracking Number:</strong> ${escapeHtml(d.trackingNumber)}</p>` : ''}
       ${
         d.trackingUrl
           ? `
         <p style="text-align: center; margin: 24px 0;">
-          <a href="${d.trackingUrl}" class="button">Track Your Order</a>
+          <a href="${escapeHtml(d.trackingUrl)}" class="button">Track Your Order</a>
         </p>
       `
           : ''
@@ -555,12 +584,12 @@ export class EmailService {
   }): string {
     return EmailService.baseTemplate(`
       <h2>Reset Your Password</h2>
-      <p>Hi ${d.name},</p>
+      <p>Hi ${escapeHtml(d.name)},</p>
       <p>We received a request to reset your password. Click the button below to create a new password:</p>
       <p style="text-align: center; margin: 24px 0;">
-        <a href="${d.resetUrl}" class="button">Reset Password</a>
+        <a href="${escapeHtml(d.resetUrl)}" class="button">Reset Password</a>
       </p>
-      <p>This link will expire in ${d.expiresIn}.</p>
+      <p>This link will expire in ${escapeHtml(d.expiresIn)}.</p>
       <p>If you didn't request this, you can safely ignore this email.</p>
     `);
   }
@@ -571,7 +600,7 @@ export class EmailService {
   private static welcomeTemplate(d: { email: string; name: string }): string {
     return EmailService.baseTemplate(`
       <h2>Welcome to Force Media!</h2>
-      <p>Hi ${d.name},</p>
+      <p>Hi ${escapeHtml(d.name)},</p>
       <p>Thank you for creating an account with us. We're excited to have you!</p>
       <p>You can now:</p>
       <ul>
@@ -595,18 +624,19 @@ export class EmailService {
     verificationUrl: string;
     expiresIn: string;
   }): string {
+    const verificationUrlEsc = escapeHtml(d.verificationUrl);
     return EmailService.baseTemplate(`
       <h2>Verify Your Email Address</h2>
-      <p>Hi ${d.name},</p>
+      <p>Hi ${escapeHtml(d.name)},</p>
       <p>Thank you for registering! Please verify your email address to complete your account setup.</p>
       <p style="text-align: center; margin: 24px 0;">
-        <a href="${d.verificationUrl}" class="button">Verify Email</a>
+        <a href="${verificationUrlEsc}" class="button">Verify Email</a>
       </p>
-      <p>This link will expire in ${d.expiresIn}.</p>
+      <p>This link will expire in ${escapeHtml(d.expiresIn)}.</p>
       <p style="font-size: 14px; color: #666;">If you didn't create an account, you can safely ignore this email.</p>
       <p style="font-size: 12px; color: #999; margin-top: 24px;">
         If the button above doesn't work, copy and paste this link into your browser:<br>
-        <a href="${d.verificationUrl}" style="color: #ff6e00; word-break: break-all;">${d.verificationUrl}</a>
+        <a href="${verificationUrlEsc}" style="color: #ff6e00; word-break: break-all;">${verificationUrlEsc}</a>
       </p>
     `);
   }
@@ -620,18 +650,19 @@ export class EmailService {
     verificationUrl: string;
     expiresIn: string;
   }): string {
+    const verificationUrlEsc = escapeHtml(d.verificationUrl);
     return EmailService.baseTemplate(`
       <h2>New Verification Link</h2>
-      <p>Hi ${d.name},</p>
+      <p>Hi ${escapeHtml(d.name)},</p>
       <p>Here's your new email verification link as requested.</p>
       <p style="text-align: center; margin: 24px 0;">
-        <a href="${d.verificationUrl}" class="button">Verify Email</a>
+        <a href="${verificationUrlEsc}" class="button">Verify Email</a>
       </p>
-      <p>This link will expire in ${d.expiresIn}.</p>
+      <p>This link will expire in ${escapeHtml(d.expiresIn)}.</p>
       <p style="font-size: 14px; color: #666;">If you didn't request this, please contact support.</p>
       <p style="font-size: 12px; color: #999; margin-top: 24px;">
         If the button above doesn't work, copy and paste this link into your browser:<br>
-        <a href="${d.verificationUrl}" style="color: #ff6e00; word-break: break-all;">${d.verificationUrl}</a>
+        <a href="${verificationUrlEsc}" style="color: #ff6e00; word-break: break-all;">${verificationUrlEsc}</a>
       </p>
     `);
   }
@@ -642,8 +673,8 @@ export class EmailService {
   private static adminNewOrderTemplate(d: OrderEmailData): string {
     return EmailService.baseTemplate(`
       <h2>New Order Received</h2>
-      <p><strong>Order #${d.orderNumber}</strong></p>
-      <p><strong>Customer:</strong> ${d.customerName} (${d.customerEmail})</p>
+      <p><strong>Order #${escapeHtml(d.orderNumber)}</strong></p>
+      <p><strong>Customer:</strong> ${escapeHtml(d.customerName)} (${escapeHtml(d.customerEmail)})</p>
       <p><strong>Total:</strong> ${(d.total / 1000).toFixed(3)} KWD</p>
       <p><strong>Items:</strong> ${d.items.length}</p>
       <p style="text-align: center; margin: 24px 0;">
@@ -662,9 +693,9 @@ export class EmailService {
   }): string {
     return EmailService.baseTemplate(`
       <h2>Refund Processed</h2>
-      <p><strong>Order #${d.orderNumber}</strong></p>
+      <p><strong>Order #${escapeHtml(d.orderNumber)}</strong></p>
       <p><strong>Amount:</strong> ${(d.amount / 1000).toFixed(3)} KWD</p>
-      ${d.reason ? `<p><strong>Reason:</strong> ${d.reason}</p>` : ''}
+      ${d.reason ? `<p><strong>Reason:</strong> ${escapeHtml(d.reason)}</p>` : ''}
       <p style="text-align: center; margin: 24px 0;">
         <a href="${config.adminUrl}/orders" class="button">View Details</a>
       </p>
@@ -685,15 +716,15 @@ export class EmailService {
       d.type === 'exchange' ? 'Exchange' : d.type === 'refund' ? 'Refund' : 'Return';
     return EmailService.baseTemplate(`
       <h2>${typeLabel} Request Received</h2>
-      <p>Hi ${d.customerName},</p>
-      <p>We have received your ${typeLabel.toLowerCase()} request for order #${d.orderNumber}.</p>
-      <p><strong>${typeLabel} Number:</strong> ${d.returnNumber}</p>
+      <p>Hi ${escapeHtml(d.customerName)},</p>
+      <p>We have received your ${typeLabel.toLowerCase()} request for order #${escapeHtml(d.orderNumber)}.</p>
+      <p><strong>${typeLabel} Number:</strong> ${escapeHtml(d.returnNumber)}</p>
       <p>Our team will review your request and get back to you within 1-2 business days.</p>
       <p style="font-size: 14px; color: #666; margin-top: 24px;">
         If you have any questions, please don't hesitate to contact our support team.
       </p>
       <p style="margin-top: 24px;">Thank you for your patience!</p>
-      <p>Best regards,<br>${d.storeName} Team</p>
+      <p>Best regards,<br>${escapeHtml(d.storeName)} Team</p>
     `);
   }
 
@@ -719,18 +750,19 @@ export class EmailService {
     };
 
     const message =
-      statusMessages[d.status] || `Your return request status has been updated to: ${d.status}`;
+      statusMessages[d.status] ||
+      `Your return request status has been updated to: ${escapeHtml(d.status)}`;
 
     return EmailService.baseTemplate(`
       <h2>Return Status Update</h2>
-      <p>Hi ${d.customerName},</p>
-      <p><strong>Return Number:</strong> ${d.returnNumber}</p>
+      <p>Hi ${escapeHtml(d.customerName)},</p>
+      <p><strong>Return Number:</strong> ${escapeHtml(d.returnNumber)}</p>
       <p>${message}</p>
-      ${d.notes ? `<p><strong>Note from our team:</strong> ${d.notes}</p>` : ''}
+      ${d.notes ? `<p><strong>Note from our team:</strong> ${escapeHtml(d.notes)}</p>` : ''}
       <p style="font-size: 14px; color: #666; margin-top: 24px;">
         If you have any questions, please contact our support team.
       </p>
-      <p>Best regards,<br>${d.storeName} Team</p>
+      <p>Best regards,<br>${escapeHtml(d.storeName)} Team</p>
     `);
   }
 
@@ -745,9 +777,9 @@ export class EmailService {
   }): string {
     return EmailService.baseTemplate(`
       <h2>New Contact Form Submission</h2>
-      <p><strong>From:</strong> ${d.name} (${d.email})</p>
-      <p><strong>Subject:</strong> ${d.subject}</p>
-      <div style="background: #f9f9f9; padding: 16px; border-radius: 4px; margin: 16px 0; white-space: pre-wrap;">${d.message}</div>
+      <p><strong>From:</strong> ${escapeHtml(d.name)} (${escapeHtml(d.email)})</p>
+      <p><strong>Subject:</strong> ${escapeHtml(d.subject)}</p>
+      <div style="background: #f9f9f9; padding: 16px; border-radius: 4px; margin: 16px 0; white-space: pre-wrap;">${escapeHtml(d.message)}</div>
       <p style="font-size: 14px; color: #666;">You can reply directly to this email to respond to the sender.</p>
     `);
   }

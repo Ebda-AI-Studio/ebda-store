@@ -5,6 +5,21 @@ import { checkStoreAccess } from '../middleware/store-access';
 import { requirePermission } from '../middleware/rbac';
 import { StorageService } from '../services/storage.service';
 import { uploadLimiter, dailyUploadLimiter, auditLog } from '../middleware/security';
+import { runInTenantContext } from '@force/database';
+
+/**
+ * Run a function under the tenant RLS context if a storeId is known,
+ * or pass through unchanged otherwise. Upload routes accept a `storeId`
+ * via query / header / body — when present we want every downstream
+ * Prisma call (audit log inserts) to run with `current_store_id()` set
+ * so RLS policies enforce tenant isolation. The legacy super_admin
+ * "no storeId" path still needs to write platform-scoped rows, so we
+ * fall through to the bare prisma client there.
+ */
+function withOptionalTenantContext<T>(storeId: string | null, fn: () => Promise<T>): Promise<T> {
+  if (!storeId) return fn();
+  return runInTenantContext(storeId, fn);
+}
 
 const router = Router();
 
@@ -156,23 +171,31 @@ router.post(
         return;
       }
 
-      const result = await StorageService.upload(req.file.buffer, req.file.originalname, {
-        folder: resolved.folder,
-        storeId: resolved.storeId,
-      });
+      const result = await withOptionalTenantContext(resolved.storeId, async () => {
+        // R2 upload itself doesn't touch Postgres so the tenant
+        // context is mostly there for the audit log, but wrapping the
+        // whole block keeps the boundary obvious — every per-tenant
+        // side-effect of an upload happens under the SET LOCAL.
+        const uploaded = await StorageService.upload(req.file!.buffer, req.file!.originalname, {
+          folder: resolved.folder,
+          storeId: resolved.storeId,
+        });
 
-      await auditLog({
-        action: 'file.uploaded',
-        userId: req.user!.userId,
-        resourceType: 'file',
-        resourceId: result.key,
-        details: {
-          filename: req.file.originalname,
-          size: result.size,
-          contentType: result.contentType,
-        },
-        ip: req.ip,
-        userAgent: req.headers['user-agent'],
+        await auditLog({
+          action: 'file.uploaded',
+          userId: req.user!.userId,
+          resourceType: 'file',
+          resourceId: uploaded.key,
+          details: {
+            filename: req.file!.originalname,
+            size: uploaded.size,
+            contentType: uploaded.contentType,
+          },
+          ip: req.ip,
+          userAgent: req.headers['user-agent'],
+        });
+
+        return uploaded;
       });
 
       res.json({
@@ -214,21 +237,25 @@ router.post(
         return;
       }
 
-      const results = await StorageService.uploadMultiple(
-        files.map(f => ({ buffer: f.buffer, filename: f.originalname })),
-        { folder: resolved.folder, storeId: resolved.storeId }
-      );
+      const results = await withOptionalTenantContext(resolved.storeId, async () => {
+        const uploaded = await StorageService.uploadMultiple(
+          files.map(f => ({ buffer: f.buffer, filename: f.originalname })),
+          { folder: resolved.folder, storeId: resolved.storeId }
+        );
 
-      await auditLog({
-        action: 'files.uploaded',
-        userId: req.user!.userId,
-        resourceType: 'file',
-        details: {
-          count: results.length,
-          totalSize: results.reduce((sum, r) => sum + r.size, 0),
-        },
-        ip: req.ip,
-        userAgent: req.headers['user-agent'],
+        await auditLog({
+          action: 'files.uploaded',
+          userId: req.user!.userId,
+          resourceType: 'file',
+          details: {
+            count: uploaded.length,
+            totalSize: uploaded.reduce((sum, r) => sum + r.size, 0),
+          },
+          ip: req.ip,
+          userAgent: req.headers['user-agent'],
+        });
+
+        return uploaded;
       });
 
       res.json({
@@ -387,15 +414,17 @@ router.delete(
         return;
       }
 
-      await StorageService.delete(key);
+      await withOptionalTenantContext(storeId, async () => {
+        await StorageService.delete(key);
 
-      await auditLog({
-        action: 'file.deleted',
-        userId: req.user!.userId,
-        resourceType: 'file',
-        resourceId: key,
-        ip: req.ip,
-        userAgent: req.headers['user-agent'],
+        await auditLog({
+          action: 'file.deleted',
+          userId: req.user!.userId,
+          resourceType: 'file',
+          resourceId: key,
+          ip: req.ip,
+          userAgent: req.headers['user-agent'],
+        });
       });
 
       res.json({
