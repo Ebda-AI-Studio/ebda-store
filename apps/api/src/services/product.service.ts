@@ -646,19 +646,73 @@ export class ProductService {
       );
     }
 
-    const categories = await prisma.category.findMany({
-      where: { storeId, deletedAt: null, isActive: true },
-      orderBy: { name: 'asc' },
-      take: 100, // Guard against stores with unbounded category growth
-      include: {
-        _count: { select: { products: true } },
-      },
-    });
-    const result = categories.map(c => ({
+    // Two queries in parallel: real categories + the count of products
+    // flagged as best-sellers. We expose Best Sellers as a VIRTUAL
+    // category alongside the real ones so the storefront's nav, grid,
+    // and listing pages all treat it identically to a real category —
+    // but the underlying product membership is the per-product
+    // `isBestSeller` flag, NOT a ProductCategory link. This lets a
+    // product live in its real bucket (Palestinian / Spices / etc.)
+    // AND simultaneously appear in Best Sellers without the merchant
+    // having to double-tag.
+    //
+    // The virtual entry uses `slug: 'best-sellers'`; the storefront
+    // ProductsClient special-cases that slug into `sort=best_seller`
+    // when fetching products.
+    const [categories, bestSellerCount] = await Promise.all([
+      prisma.category.findMany({
+        where: {
+          storeId,
+          deletedAt: null,
+          isActive: true,
+          // Hide any pre-existing physical "best-sellers" category — the
+          // virtual entry below replaces it. Older stores that had a
+          // real category by this slug get its products treated as
+          // regular tagged products (no fold required); the slug just
+          // resolves to the virtual page now.
+          slug: { not: 'best-sellers' },
+        },
+        orderBy: { name: 'asc' },
+        take: 100, // Guard against stores with unbounded category growth
+        include: {
+          _count: { select: { products: true } },
+        },
+      }),
+      prisma.product.count({
+        where: { storeId, isBestSeller: true, deletedAt: null, status: 'active' },
+      }),
+    ]);
+
+    const realCategories = categories.map(c => ({
       ...c,
       productCount: c._count.products,
       _count: undefined,
     }));
+
+    // Virtual Best Sellers entry. Always first in the list — that's the
+    // merchant's flagship surface and where shoppers expect to land
+    // first. Hidden when the merchant hasn't flagged any product yet
+    // so an empty section doesn't clutter the nav.
+    const result =
+      bestSellerCount > 0
+        ? [
+            {
+              id: 'virtual:best-sellers',
+              storeId,
+              slug: 'best-sellers',
+              name: 'Best Sellers',
+              nameAr: 'الأكثر مبيعاً',
+              description: null,
+              descriptionAr: null,
+              image: null,
+              isActive: true,
+              position: -1,
+              isVirtual: true as const,
+              productCount: bestSellerCount,
+            },
+            ...realCategories,
+          ]
+        : realCategories;
 
     // Write to cache (best-effort, 60s TTL)
     try {

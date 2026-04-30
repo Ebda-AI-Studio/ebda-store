@@ -164,12 +164,21 @@ export default function ProductsClient({
           limit: String(perPage),
         };
         if (search) params.search = search;
-        if (categoryFilter) params.category = categoryFilter;
+        // `best-sellers` is a VIRTUAL category surfaced by the API
+        // alongside the real categories — its membership is driven by
+        // `Product.isBestSeller`, not by a ProductCategory link. So
+        // when the URL says `?category=best-sellers`, translate that
+        // into the API's `sort=best_seller` filter (which already
+        // applies `where.isBestSeller=true` server-side) instead of
+        // sending it as a category slug that the API would fail to
+        // resolve.
+        const isVirtualBestSellers = categoryFilter === 'best-sellers';
+        if (categoryFilter && !isVirtualBestSellers) params.category = categoryFilter;
         if (sortBy === 'newest') params.sort = 'newest';
         if (sortBy === 'price-asc') params.sort = 'price_asc';
         if (sortBy === 'price-desc') params.sort = 'price_desc';
         if (sortBy === 'featured') params.featured = 'true';
-        if (sortBy === 'best_seller') params.sort = 'best_seller';
+        if (sortBy === 'best_seller' || isVirtualBestSellers) params.sort = 'best_seller';
         // API stores prices as integer fils — multiply major units by 1000.
         // Skip the bound when it equals the slider's natural rest position so
         // we don't restrict the result set unnecessarily.
