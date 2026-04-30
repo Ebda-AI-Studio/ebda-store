@@ -12,7 +12,7 @@ interface VariantSelectorProps {
 }
 
 export function VariantSelector({ variants, options, onVariantSelect }: VariantSelectorProps) {
-  const { t } = useLanguage();
+  const { t, isRtl } = useLanguage();
   // Track selected value per option name
   const [selected, setSelected] = useState<Record<string, string>>({});
 
@@ -87,79 +87,95 @@ export function VariantSelector({ variants, options, onVariantSelect }: VariantS
 
   return (
     <div className="mt-6 space-y-5">
-      {options.map(option => (
-        <div key={option.name}>
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-sm font-medium text-foreground">{option.name}:</span>
-            {selected[option.name] && (
-              <span className="text-sm text-muted-foreground">{selected[option.name]}</span>
-            )}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {option.values.map(value => {
-              const isSelected = selected[option.name] === value;
-              const available = isValueAvailable(option.name, value);
-              const thumbnail = getThumbnailForValue(option.name, value);
-              return (
-                <button
-                  key={value}
-                  onClick={() => handleSelect(option.name, value)}
-                  disabled={!available}
-                  aria-pressed={isSelected}
-                  title={!available ? t('Out of Stock', 'غير متوفر') : undefined}
-                  className={[
-                    'relative min-w-[2.75rem] rounded-lg border px-3 py-2 text-sm font-medium transition-all',
-                    thumbnail ? 'inline-flex items-center gap-2' : '',
-                    isSelected
-                      ? 'border-primary bg-primary text-white shadow-md shadow-primary/25'
-                      : available
-                        ? 'border-border bg-background text-foreground hover:border-primary/50 hover:bg-muted'
-                        : 'cursor-not-allowed border-border bg-muted text-muted-foreground opacity-50',
-                  ].join(' ')}
-                >
-                  {thumbnail && (
-                    <span
-                      aria-hidden="true"
-                      className="inline-block h-6 w-6 overflow-hidden rounded bg-muted shrink-0"
-                    >
-                      <Image
-                        src={thumbnail}
-                        alt=""
-                        width={24}
-                        height={24}
-                        className="h-full w-full object-cover"
-                      />
-                    </span>
-                  )}
-                  {value}
-                  {/* Strikethrough diagonal line for unavailable values */}
-                  {!available && (
-                    <span
-                      aria-hidden="true"
-                      className="absolute inset-0 flex items-center justify-center pointer-events-none"
-                    >
-                      <svg
-                        className="w-full h-full absolute inset-0 text-muted-foreground/40"
-                        viewBox="0 0 100 100"
-                        preserveAspectRatio="none"
+      {options.map(option => {
+        // Localise the axis label (الحجم vs Size). Falls back to English
+        // when the merchant didn't enter Arabic.
+        const axisLabel = isRtl && option.nameAr ? option.nameAr : option.name;
+        // Display label for the currently-selected value.
+        const selectedValue = selected[option.name];
+        const selectedDisplay = selectedValue
+          ? (() => {
+              const found = option.values.find(v => v.value === selectedValue);
+              return isRtl && found?.valueAr ? found.valueAr : selectedValue;
+            })()
+          : null;
+        return (
+          <div key={option.name}>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-sm font-medium text-foreground">{axisLabel}:</span>
+              {selectedDisplay && (
+                <span className="text-sm text-muted-foreground">{selectedDisplay}</span>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {option.values.map(({ value, valueAr }) => {
+                const isSelected = selected[option.name] === value;
+                const available = isValueAvailable(option.name, value);
+                const thumbnail = getThumbnailForValue(option.name, value);
+                // Pill text: Arabic when isRtl AND the merchant supplied
+                // a translation, otherwise the canonical English value.
+                const pillLabel = isRtl && valueAr ? valueAr : value;
+                return (
+                  <button
+                    key={value}
+                    onClick={() => handleSelect(option.name, value)}
+                    disabled={!available}
+                    aria-pressed={isSelected}
+                    title={!available ? t('Out of Stock', 'غير متوفر') : undefined}
+                    className={[
+                      'relative min-w-[2.75rem] rounded-lg border px-3 py-2 text-sm font-medium transition-all',
+                      thumbnail ? 'inline-flex items-center gap-2' : '',
+                      isSelected
+                        ? 'border-primary bg-primary text-white shadow-md shadow-primary/25'
+                        : available
+                          ? 'border-border bg-background text-foreground hover:border-primary/50 hover:bg-muted'
+                          : 'cursor-not-allowed border-border bg-muted text-muted-foreground opacity-50',
+                    ].join(' ')}
+                  >
+                    {thumbnail && (
+                      <span
+                        aria-hidden="true"
+                        className="inline-block h-6 w-6 overflow-hidden rounded bg-muted shrink-0"
                       >
-                        <line
-                          x1="0"
-                          y1="100"
-                          x2="100"
-                          y2="0"
-                          stroke="currentColor"
-                          strokeWidth="2"
+                        <Image
+                          src={thumbnail}
+                          alt=""
+                          width={24}
+                          height={24}
+                          className="h-full w-full object-cover"
                         />
-                      </svg>
-                    </span>
-                  )}
-                </button>
-              );
-            })}
+                      </span>
+                    )}
+                    {pillLabel}
+                    {/* Strikethrough diagonal line for unavailable values */}
+                    {!available && (
+                      <span
+                        aria-hidden="true"
+                        className="absolute inset-0 flex items-center justify-center pointer-events-none"
+                      >
+                        <svg
+                          className="w-full h-full absolute inset-0 text-muted-foreground/40"
+                          viewBox="0 0 100 100"
+                          preserveAspectRatio="none"
+                        >
+                          <line
+                            x1="0"
+                            y1="100"
+                            x2="100"
+                            y2="0"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                          />
+                        </svg>
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
 
       {/* Feedback panel only shows when something is wrong: variant
           out of stock, or no variant matches the picked combo. The

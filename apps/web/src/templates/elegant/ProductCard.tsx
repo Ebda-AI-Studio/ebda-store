@@ -10,6 +10,7 @@ import { Price, ProductBadge, ProductBadgeGroup, AddToCartButton, cn } from '@fo
 import { PlaceholderImageIcon } from '../shared/icons';
 import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
 import { productCardPropsEqual } from '../shared/product-card-memo';
+import { getProductPricing } from '../../lib/product-pricing';
 
 /**
  * Elegant Template - Product Card
@@ -48,7 +49,11 @@ function ElegantProductCard({
     onAddToWishlist?.(product.id);
   };
 
-  const hasSale = product.compareAtPrice && product.compareAtPrice > product.price;
+  // Variant-aware pricing — for multi-variant products the headline
+  // becomes "From <cheapest>" and the parent's stale compareAtPrice is
+  // ignored. See lib/product-pricing.ts.
+  const pricing = getProductPricing(product, undefined, 'card');
+  const hasSale = !!pricing.displayCompare || pricing.hasVariantDiscount;
 
   return (
     <Link
@@ -200,8 +205,9 @@ function ElegantProductCard({
           {isRtl && product.nameAr ? product.nameAr : product.name}
         </h3>
         <Price
-          price={product.price}
-          compareAtPrice={product.compareAtPrice}
+          price={pricing.displayPrice}
+          compareAtPrice={pricing.displayCompare ?? undefined}
+          fromPrefix={pricing.mode === 'fromMin'}
           currency={currency}
           isRtl={isRtl}
           size="sm"

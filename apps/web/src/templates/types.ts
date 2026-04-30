@@ -16,6 +16,14 @@ export interface TemplateProduct {
   isNew?: boolean;
   isFeatured?: boolean;
   inStock?: boolean;
+  /**
+   * Variant pricing snapshot — propagated from the API so listing
+   * cards can render `From <min>` instead of the parent's stale
+   * standalone price. Each entry is just enough to compute min/max +
+   * detect a per-variant discount; the full ProductVariant shape
+   * lives behind the detail page.
+   */
+  variants?: Array<{ price?: number | null; compareAtPrice?: number | null }>;
 }
 
 /**

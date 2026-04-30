@@ -7,6 +7,7 @@ import Image from 'next/image';
 import dynamic from 'next/dynamic';
 import { Button, Badge, useToast } from '@force/ui';
 import { api, type Product, type ProductVariant } from '@/lib/api';
+import { getProductPricing } from '@/lib/product-pricing';
 import { useCart } from '../../../contexts/CartContext';
 import { useStore, useStoreUrl } from '../../../contexts/StoreContext';
 import { useFeatures } from '../../../contexts/FeatureContext';
@@ -282,15 +283,19 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
   // through to English when nameAr isn't supplied for this SKU.
   const displayName = language === 'ar' && product.nameAr ? product.nameAr : product.name;
 
-  // Derived price values (variant-aware)
-  const displayPrice = selectedVariant ? selectedVariant.price : product.price;
-  const displayCompare = selectedVariant ? selectedVariant.compareAtPrice : product.compareAtPrice;
-
   // Derived variant/option availability
   const productVariants = product.variants ?? [];
   const productOptions = product.options ?? [];
   const hasVariants = productVariants.length > 0;
   const hasOptions = productOptions.length > 0;
+
+  // Variant-aware pricing — see lib/product-pricing.ts for the rules.
+  // The shared helper guarantees the same behaviour across the detail
+  // page, list view, and the three template-grid cards. Detail-page
+  // surface uses `range` for un-selected variant products (the customer
+  // is already on the page; show the full spread before they pick).
+  const pricing = getProductPricing(product, selectedVariant, 'detail');
+  const { displayPrice, displayCompare, minVariantPrice, maxVariantPrice } = pricing;
 
   // Derived inventory (variant-aware)
   const effectiveInventory = selectedVariant ? selectedVariant.inventory : product.inventory;
@@ -396,9 +401,15 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
           <div>
             <div className="mb-4 flex items-center gap-2">
               {categoryName && <Badge variant="secondary">{categoryName}</Badge>}
-              {product.compareAtPrice && product.compareAtPrice > product.price && (
+              {/* Discount badge only when there's a CONCRETE compare-at to
+                  compare against. For products with variants we wait for
+                  the customer to pick one before deciding whether to flag
+                  a discount — the parent's own compareAtPrice is usually
+                  stale data from before the variant fold and would
+                  produce a fake "X% OFF" badge. */}
+              {displayCompare && displayCompare > displayPrice && (
                 <Badge variant="destructive">
-                  {Math.round((1 - product.price / product.compareAtPrice) * 100)}% OFF
+                  {Math.round((1 - displayPrice / displayCompare) * 100)}% OFF
                 </Badge>
               )}
               {product.status === 'draft' && <Badge variant="outline">{t('Draft', 'مسودة')}</Badge>}
@@ -406,10 +417,18 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
 
             <h1 className="text-3xl font-bold text-foreground">{displayName}</h1>
 
-            {/* Price -- shows variant price when a variant is selected */}
+            {/* Price — see lib/product-pricing.ts:
+                  - selected variant: that variant's price + compareAt
+                  - hasVariants no-selection on detail page: "min – max"
+                  - all-variant prices identical: single number
+                  - no variants: parent's price + compareAt */}
             <div className="mt-4 flex items-baseline gap-3">
-              <span className="text-3xl font-bold text-primary">{formatPrice(displayPrice)}</span>
-              {displayCompare && displayCompare > displayPrice && (
+              <span className="text-3xl font-bold text-primary">
+                {pricing.mode === 'range' && minVariantPrice !== null && maxVariantPrice !== null
+                  ? `${formatPrice(minVariantPrice)} – ${formatPrice(maxVariantPrice)}`
+                  : formatPrice(displayPrice)}
+              </span>
+              {pricing.mode === 'single' && displayCompare && displayCompare > displayPrice && (
                 <span className="text-xl text-muted-foreground line-through">
                   {formatPrice(displayCompare)}
                 </span>

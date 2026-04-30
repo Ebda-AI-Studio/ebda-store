@@ -37,6 +37,8 @@ interface User {
 interface ProductVariant {
   id: string;
   name?: string;
+  /** Arabic title — rendered on the Arabic storefront in place of `name`. */
+  nameAr?: string;
   sku?: string;
   price: number;
   compareAtPrice?: number;
@@ -48,13 +50,23 @@ interface ProductVariant {
    * visibly different from the parent (e.g. a 200g jar vs. a 50g jar).
    */
   imageUrl?: string;
+  /** Variant axis values keyed by the English option name (for matching). */
   options: Record<string, string>;
+  /** Same keys as `options` but values are the Arabic translations.
+   *  Storefront uses these when isRtl so the picker reads `4 لتر` not
+   *  `4-liter`. Per-key fallback to English when Arabic is missing. */
+  optionsAr?: Record<string, string | undefined>;
 }
 
 interface ProductOption {
   id: string;
   name: string;
-  values: string[];
+  /** Arabic axis label, e.g. `الحجم` for `Size`. */
+  nameAr?: string;
+  /** Each value carries both the canonical English string and the Arabic
+   *  translation. Storefront reads `valueAr` in isRtl mode and falls
+   *  back to `value`; the matching logic always uses `value`. */
+  values: Array<{ value: string; valueAr?: string }>;
 }
 
 interface ProductCategory {

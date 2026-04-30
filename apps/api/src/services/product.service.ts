@@ -538,21 +538,53 @@ export class ProductService {
       price: number;
     },
   >(product: T) {
+    // Each option value now ships both its English `value` and the
+    // Arabic `valueAr` (when set) so the storefront can render the
+    // size/color/etc picker in the merchant's chosen language. Without
+    // valueAr the picker always shows the English label even on the
+    // Arabic storefront — the issue Wady Aljuz hit on its olive-oil
+    // page where size pills read "2-liter / 4-liter / 16-liter" in
+    // Arabic mode.
     const reshapedOptions = (product.options ?? []).map(o => ({
       id: o.id,
       name: o.name,
       nameAr: o.nameAr,
-      values: o.values.map(v => v.value),
+      values: o.values.map(v => ({ value: v.value, valueAr: v.valueAr ?? undefined })),
     }));
 
-    const reshapedVariants = (product.variants ?? []).map(v => {
+    const reshapedVariants = (
+      product.variants as Array<{
+        id: string;
+        title: string;
+        titleAr: string | null;
+        sku: string | null;
+        price: number | null;
+        compareAtPrice: number | null;
+        inventory: number;
+        imageUrl: string | null;
+        options: Array<{
+          value: {
+            value: string;
+            valueAr: string | null;
+            option: { name: string; nameAr: string | null };
+          };
+        }>;
+      }>
+    ).map(v => {
+      // Two parallel maps — `options` keys variants by the English
+      // axis name (so the existing matching logic keeps working), and
+      // `optionsAr` keys by the Arabic axis name with Arabic values
+      // for the customer-visible label resolution in VariantSelector.
       const options: Record<string, string> = {};
+      const optionsAr: Record<string, string | undefined> = {};
       for (const vo of v.options) {
         options[vo.value.option.name] = vo.value.value;
+        optionsAr[vo.value.option.name] = vo.value.valueAr ?? undefined;
       }
       return {
         id: v.id,
         name: v.title,
+        nameAr: v.titleAr ?? undefined,
         sku: v.sku ?? undefined,
         // Variants without their own price fall back to the parent product
         // price so the storefront never displays "0" for a variant that
@@ -562,6 +594,7 @@ export class ProductService {
         inventory: v.inventory,
         imageUrl: v.imageUrl ?? undefined,
         options,
+        optionsAr,
       };
     });
 

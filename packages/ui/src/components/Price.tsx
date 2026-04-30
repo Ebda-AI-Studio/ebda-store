@@ -5,9 +5,13 @@ import { cn } from '../utils/cn';
 import { formatPrice } from '@force/shared';
 
 export interface PriceProps extends React.HTMLAttributes<HTMLDivElement> {
-  /** Price in fils (1 KWD = 1000 fils) */
+  /** Price in fils (1 KWD = 1000 fils). For products with variants
+   *  this is the cheapest variant's price (the caller resolves which
+   *  number to pass via product-pricing.ts). */
   price: number;
-  /** Original price for showing discount (in fils) */
+  /** Original price for showing discount (in fils). Pass `null` for
+   *  variant-parent cards where the parent's compareAtPrice is stale
+   *  pre-fold data; the helper already filters those out. */
   compareAtPrice?: number;
   /** Currency code (default: KWD) */
   currency?: string;
@@ -19,6 +23,11 @@ export interface PriceProps extends React.HTMLAttributes<HTMLDivElement> {
   showDiscount?: boolean;
   /** Custom discount label */
   discountLabel?: string;
+  /** Prefix the price with "From" / "ابتداءً من". Use on listing cards
+   *  for multi-variant products where the headline is the cheapest
+   *  variant — without the prefix the customer thinks it's a fixed
+   *  price and feels misled when they pick a bigger size. */
+  fromPrefix?: boolean;
 }
 
 const sizeStyles = {
@@ -49,6 +58,7 @@ export const Price = forwardRef<HTMLDivElement, PriceProps>(
       size = 'md',
       showDiscount = true,
       discountLabel,
+      fromPrefix = false,
       className,
       ...props
     },
@@ -74,6 +84,9 @@ export const Price = forwardRef<HTMLDivElement, PriceProps>(
         dir={isRtl ? 'rtl' : 'ltr'}
         {...props}
       >
+        {fromPrefix && (
+          <span className="text-xs text-muted-foreground">{isRtl ? 'ابتداءً من' : 'From'}</span>
+        )}
         {/* Current Price */}
         <span className={cn('font-bold text-primary', sizeStyles[size])}>{fmtPrice(price)}</span>
 

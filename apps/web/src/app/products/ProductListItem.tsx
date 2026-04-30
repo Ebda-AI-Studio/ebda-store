@@ -5,6 +5,7 @@ import Image from 'next/image';
 import type { Product } from '@/lib/api';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { formatPrice } from '@/lib/format';
+import { getProductPricing } from '@/lib/product-pricing';
 
 interface ProductListItemProps {
   product: Product;
@@ -26,6 +27,10 @@ export function ProductListItem({
   const displayCategory = isRtl
     ? (product.categories?.[0]?.category?.nameAr ?? product.categories?.[0]?.category?.name)
     : product.categories?.[0]?.category?.name;
+  // Variant-aware pricing. Listing cards use the `card` surface so
+  // multi-variant products render "From <min>" instead of the parent's
+  // (often stale) standalone price.
+  const pricing = getProductPricing(product, undefined, 'card');
 
   return (
     <Link
@@ -34,7 +39,12 @@ export function ProductListItem({
     >
       {/* Image */}
       <div className="relative h-32 w-32 flex-shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-primary/5 to-primary/10">
-        {product.compareAtPrice && product.compareAtPrice > product.price && (
+        {/* Sale badge fires on EITHER a parent-level discount (no variants)
+            OR a variant-level discount (so a multi-size product still
+            shows the badge if any size is on sale). The parent's stale
+            compareAtPrice is filtered out by getProductPricing for
+            variant products. */}
+        {(pricing.displayCompare || pricing.hasVariantDiscount) && (
           <span className="absolute left-2 top-2 rounded-full bg-destructive px-2 py-0.5 text-[10px] font-bold uppercase text-white">
             {t('Sale', 'تخفيض')}
           </span>
@@ -81,10 +91,15 @@ export function ProductListItem({
         </div>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-xl font-bold text-primary">{formatPrice(product.price)}</span>
-            {product.compareAtPrice && product.compareAtPrice > product.price && (
+            {pricing.mode === 'fromMin' && (
+              <span className="text-xs text-muted-foreground">{t('From', 'ابتداءً من')}</span>
+            )}
+            <span className="text-xl font-bold text-primary">
+              {formatPrice(pricing.displayPrice)}
+            </span>
+            {pricing.displayCompare && pricing.displayCompare > pricing.displayPrice && (
               <span className="text-sm text-muted-foreground line-through">
-                {formatPrice(product.compareAtPrice)}
+                {formatPrice(pricing.displayCompare)}
               </span>
             )}
           </div>

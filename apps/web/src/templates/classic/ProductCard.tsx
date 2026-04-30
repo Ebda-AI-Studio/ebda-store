@@ -10,6 +10,7 @@ import { Price, ProductBadge, AddToCartButton, cn } from '@force/ui';
 import { PlaceholderImageIcon } from '../shared/icons';
 import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
 import { productCardPropsEqual } from '../shared/product-card-memo';
+import { getProductPricing } from '../../lib/product-pricing';
 
 /**
  * Classic Template - Product Card
@@ -37,6 +38,10 @@ function ClassicProductCard({
   const handleAddToCart = async (productId: string) => {
     await onAddToCart?.(productId);
   };
+
+  // Variant-aware pricing — see lib/product-pricing.ts.
+  const pricing = getProductPricing(product, undefined, 'card');
+  const hasSale = !!pricing.displayCompare || pricing.hasVariantDiscount;
 
   return (
     <Link href={`${urlPrefix}/products/${product.slug}`} className="group block cursor-pointer">
@@ -102,7 +107,7 @@ function ClassicProductCard({
 
         {/* Badges — top corner. Sale badge wins over "new" when both apply
             because shoppers care about price more than recency. */}
-        {product.compareAtPrice && product.compareAtPrice > product.price ? (
+        {hasSale ? (
           <ProductBadge
             variant="sale"
             isRtl={isRtl}
@@ -144,8 +149,9 @@ function ClassicProductCard({
         </h3>
 
         <Price
-          price={product.price}
-          compareAtPrice={product.compareAtPrice}
+          price={pricing.displayPrice}
+          compareAtPrice={pricing.displayCompare ?? undefined}
+          fromPrefix={pricing.mode === 'fromMin'}
           currency={currency}
           isRtl={isRtl}
           size="sm"

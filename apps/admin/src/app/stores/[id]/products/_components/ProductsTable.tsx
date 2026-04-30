@@ -111,7 +111,19 @@ export function ProductsTable({
     },
     {
       header: t('table.price'),
-      cell: product => <span className="text-sm font-medium">{formatPrice(product.price)}</span>,
+      // For variant products the listed price is the cheapest variant
+      // (set by scripts/backfill-variant-parent-prices.mjs). Surface
+      // a "from" prefix so the merchant doesn't read a single price
+      // and assume that's THE price across every size — clicking
+      // through to the product takes them to the per-variant table.
+      cell: product => (
+        <span className="text-sm font-medium">
+          {product.hasVariants && (
+            <span className="text-xs text-muted-foreground me-1">{isRtl ? 'من' : 'From'}</span>
+          )}
+          {formatPrice(product.price)}
+        </span>
+      ),
     },
     {
       header: t('table.profit'),

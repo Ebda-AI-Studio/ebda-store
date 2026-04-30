@@ -23,6 +23,14 @@ export function toTemplateProduct(p: Product): TemplateProduct {
       alt: img.alt,
     })),
     inStock: p.inventory === undefined || p.inventory === null || p.inventory > 0,
+    // Pass variant prices through so the cards can derive
+    // "From <min>" headlines for multi-variant products.
+    variants: p.variants
+      ? p.variants.map(v => ({
+          price: typeof v.price === 'number' ? v.price : undefined,
+          compareAtPrice: typeof v.compareAtPrice === 'number' ? v.compareAtPrice : undefined,
+        }))
+      : undefined,
   };
 }
 
