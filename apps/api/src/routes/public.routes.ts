@@ -370,7 +370,18 @@ router.post(
 
       const storeId = await getStoreIdFromRequest(req);
       const orderData = createOrderSchema.parse(req.body);
-      const order = await OrderService.create(storeId, req.user?.userId, sessionId, orderData);
+      // Customer-leak guard: only treat req.user as the order owner when
+      // the role is `customer`. The API cookie is shared between admin
+      // and storefront origins (api-production-c058 host), so a merchant
+      // signed into app.forcemediakw.com sends the SAME cookie to
+      // /public/orders on store.forcemediakw.com. Without this guard
+      // we'd attach the merchant's super_admin/store_admin userId as
+      // `Order.customerId` — downstream loyalty / abandoned-cart /
+      // analytics code assumes that ID points to a customer record and
+      // throws when it points at an admin instead. Mirror is in
+      // apps/web/src/contexts/AuthContext.tsx (refreshUser).
+      const orderCustomerId = req.user?.role === 'customer' ? req.user.userId : undefined;
+      const order = await OrderService.create(storeId, orderCustomerId, sessionId, orderData);
 
       res.status(201).json({
         success: true,
