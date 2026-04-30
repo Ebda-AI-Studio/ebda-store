@@ -116,23 +116,29 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
     return next();
   }
 
-  // Skip for cookie-based JWT auth when the request includes a header that
-  // triggers a CORS preflight. Non-simple headers/content-types cause the
-  // browser to send an OPTIONS request first, and the server's CORS config
-  // only allows specific origins. An attacker's page on a different origin
-  // would fail the preflight check, so the request never reaches this
-  // point. This is the OWASP "custom request header" defense.
+  // OWASP "custom request header" defense — applies REGARDLESS of auth.
   //
-  // Covered cases:
-  //   - JSON requests (Content-Type: application/json) — all apiPost/apiPut/etc.
-  //   - File uploads with X-Requested-With header — ImageUpload.tsx XHR calls
-  const tokenCookie = req.cookies?.token;
-  if (tokenCookie) {
-    const contentType = req.headers['content-type'] || '';
-    const xRequestedWith = req.headers['x-requested-with'];
-    if (contentType.includes('application/json') || xRequestedWith) {
-      return next();
-    }
+  // A simple HTML form attack can only forge POSTs with
+  // `application/x-www-form-urlencoded` / `multipart/form-data` /
+  // `text/plain`. The moment a request uses `Content-Type:
+  // application/json` (or sends an `X-Requested-With` header), the
+  // browser issues a CORS preflight first. Our CORS config only echoes
+  // an Allow-Origin for our own storefront/admin domains, so an
+  // attacker's page can't pass preflight — the actual POST never fires.
+  // That makes JSON / XHR requests inherently CSRF-immune even without
+  // a session cookie or auth token.
+  //
+  // Previously this skip required a valid auth cookie to apply, which
+  // broke guest checkout: a logged-out shopper hitting /payments/create
+  // with a JSON body had no token cookie, so the middleware fell
+  // through to the session+CSRF-token verifier and rejected with
+  // `Invalid CSRF token`. The cookie predicate added nothing — a JSON
+  // POST is preflight-protected whether the request is authenticated
+  // or not.
+  const contentType = req.headers['content-type'] || '';
+  const xRequestedWith = req.headers['x-requested-with'];
+  if (contentType.includes('application/json') || xRequestedWith) {
+    return next();
   }
 
   const sessionId = req.headers['x-session-id'] as string;

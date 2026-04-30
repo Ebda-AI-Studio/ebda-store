@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { PaymentService } from '../services/payment-providers/payment.factory';
 import { PaymentProvider, Currency } from '../services/payment-providers/types';
-import { authenticate } from '../middleware/auth';
+import { authenticate, optionalAuthenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/rbac';
 import { prisma } from '@force/database';
 import { paymentLimiter, auditLog } from '../middleware/security';
@@ -162,19 +162,34 @@ router.get('/methods', async (req: Request, res: Response, next: NextFunction) =
  */
 router.post(
   '/create',
-  authenticate,
+  optionalAuthenticate,
   paymentLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     let rollbackContext: { orderId: string; storeId: string; sessionId: string } | null = null;
 
     try {
       const data = createPaymentSchema.parse(req.body);
-      const user = getAuthUser(req);
 
-      // Derive storeId from the order itself — never rely on header fallback
-      // for payment operations. The order already has the correct storeId.
+      // Order ownership check supporting both signed-in customers and
+      // guest checkout:
+      //
+      //   - Signed-in customer (req.user.role === 'customer'): the
+      //     order's customerId must match req.user.userId.
+      //   - Guest (no auth, or admin token leaking through): the order
+      //     has customerId=null. We require the orderId itself, which
+      //     is a v4 UUID — practically unguessable, and the storefront
+      //     just got it back from /public/orders so any legitimate
+      //     payer has it.
+      //
+      // Admin/super_admin cookies that bleed through from the same
+      // browser fall into the guest branch because the customer-leak
+      // guard on /public/orders already wrote customerId=null on the
+      // order they're now paying for.
+      const isCustomer = req.user?.role === 'customer';
       const order = await prisma.order.findFirst({
-        where: { id: data.orderId, customerId: user.userId },
+        where: isCustomer
+          ? { id: data.orderId, customerId: req.user!.userId }
+          : { id: data.orderId, customerId: null },
         include: {
           items: { include: { product: true } },
           customer: true,
@@ -265,7 +280,8 @@ router.post(
 
         await auditLog({
           action: 'payment.created',
-          userId: user.userId,
+          // Guest checkout: req.user is undefined, audit log accepts that.
+          userId: req.user?.userId,
           resourceType: 'payment',
           resourceId: payment.id,
           details: {
@@ -312,7 +328,10 @@ router.post(
           amount: order.total,
           currency: order.currency as Currency,
           customer: {
-            id: user.userId,
+            // Guest checkout: synthesize a stable id from the order's
+            // own id so payment providers that hash the customer for
+            // 3D-Secure / fraud scoring still see a consistent value.
+            id: req.user?.userId ?? `guest-${order.id}`,
             name:
               `${order.customer?.firstName || ''} ${order.customer?.lastName || ''}`.trim() ||
               'Customer',
@@ -350,7 +369,7 @@ router.post(
       // Audit log
       await auditLog({
         action: 'payment.created',
-        userId: user.userId,
+        userId: req.user?.userId,
         resourceType: 'payment',
         resourceId: result.transactionId,
         details: {

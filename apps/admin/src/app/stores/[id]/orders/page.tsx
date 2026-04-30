@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button, useToast } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
-import { apiGet, apiPut, apiPost, getApiUrl } from '../../../../lib/api';
+import { apiGet, apiPut, apiPost, apiFetch } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
 import { OrdersFilters } from './_components/OrdersFilters';
 import { OrdersBulkBar } from './_components/OrdersBulkBar';
@@ -22,8 +22,6 @@ interface ConfirmState {
   orderId?: string;
   ids?: string[];
 }
-
-const API_URL = getApiUrl();
 
 export default function StoreOrdersPage() {
   const params = useParams();
@@ -122,8 +120,27 @@ export default function StoreOrdersPage() {
     }
   };
 
-  const openInvoice = (orderId: string) => {
-    window.open(`${API_URL}/api/v1/stores/${storeId}/orders/${orderId}/invoice`, '_blank');
+  const openInvoice = async (orderId: string) => {
+    // Direct window.open() to the API host bypasses our auth helpers,
+    // so on iPhone PWA (where webkit purges the third-party cookie)
+    // the merchant landed on a raw 401 json blob. Fetch the html via
+    // apiFetch — which forwards the Authorization: Bearer header from
+    // localStorage — then surface it as a blob: url in a new tab.
+    try {
+      const res = await apiFetch(`/api/v1/stores/${storeId}/orders/${orderId}/invoice`);
+      if (!res.ok) {
+        showError('Could not load invoice', `HTTP ${res.status}`);
+        return;
+      }
+      const html = await res.text();
+      const blob = new Blob([html], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank', 'noopener,noreferrer');
+      // Revoke after a delay so the new tab has time to consume the URL.
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (err) {
+      showError('Could not load invoice', err instanceof Error ? err.message : 'Unknown error');
+    }
   };
 
   // Open the confirm modal for a single order. Actual API work runs in
