@@ -121,6 +121,12 @@ export function SimpleVariantsForm({
     return variants.map(v => rowFromVariant(v, primaryOption?.id ?? null, multiAxis));
   });
   const [saving, setSaving] = useState(false);
+  // Per-row delete in-flight set. Without this a rapid double-click on
+  // the row's delete button fires two DELETE requests against the same
+  // variantId — the first succeeds, the second returns 404 ("Variant
+  // not found") and surfaces an error toast for what was actually a
+  // successful operation.
+  const [deletingRows, setDeletingRows] = useState<Set<string>>(new Set());
 
   // Re-hydrate when the upstream variant list changes (after a save
   // round-trip). Preserves in-flight edits via row id matching.
@@ -145,18 +151,37 @@ export function SimpleVariantsForm({
   async function removeRow(rowId: string) {
     const target = rows.find(r => r.rowId === rowId);
     if (!target) return;
+    // Re-entrancy guard. The user can mash the delete button before
+    // the server has acknowledged the first DELETE; the second call
+    // would 404 because the variant is already gone. Skip silently.
+    if (deletingRows.has(rowId)) return;
+
     // Existing variant: delete on the server immediately so the row
     // doesn't reappear after a save round-trip.
     if (target.variantId) {
       const ok = window.confirm(t('confirmDelete', { name: target.value || target.variantId }));
       if (!ok) return;
+      setDeletingRows(prev => new Set(prev).add(rowId));
+      // Optimistically remove the row from the visible list so a
+      // double-click can't re-target it.
+      setRows(prev => (prev.length > 1 ? prev.filter(r => r.rowId !== rowId) : prev));
       const { error } = await apiDelete(
         `/api/v1/stores/${storeId}/products/${productId}/variants/${target.variantId}`
       );
-      if (error) {
+      // 404 here means the variant was already deleted (concurrent
+      // tab, prior click that finished after we showed the row, …).
+      // Treat as success — the desired end state is reached.
+      const treatAsSuccess = !error || error.code === 'NOT_FOUND' || error.status === 404;
+      if (!treatAsSuccess) {
         toastError(t('saveFailedTitle'), error.message);
-        return;
+        // Roll back the optimistic removal so the merchant can retry.
+        setRows(prev => [...prev, target]);
       }
+      setDeletingRows(prev => {
+        const next = new Set(prev);
+        next.delete(rowId);
+        return next;
+      });
       onSaved();
       return;
     }
