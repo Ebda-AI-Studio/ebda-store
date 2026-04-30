@@ -34,8 +34,15 @@ export default function CartClient() {
   const [promoType, setPromoType] = useState('');
   const [promoValue, setPromoValue] = useState(0);
   const [isValidating, setIsValidating] = useState(false);
-  const [shippingFee, setShippingFee] = useState(2500); // default 2.5 KWD in fils
-  const [freeShippingThreshold, setFreeShippingThreshold] = useState(20000); // default 20 KWD in fils
+  // Default to 0 fils. A merchant who hasn't set up shipping zones yet
+  // shouldn't have a phantom 2.5 KWD fee shown to customers — the
+  // backend's calculateShipping returns 0 when no zones exist, but the
+  // cart used to show 2.5 KWD on its own UI breakdown until the
+  // checkout step corrected it. Same for the free-shipping threshold:
+  // 0 means "no threshold configured" so the gate just resolves to
+  // free.
+  const [shippingFee, setShippingFee] = useState(0);
+  const [freeShippingThreshold, setFreeShippingThreshold] = useState(0);
   const [shippingLoaded, setShippingLoaded] = useState(false);
   const { info, success, error: errorToast } = useToast();
 
@@ -170,15 +177,22 @@ export default function CartClient() {
             isActive?: boolean;
           }>;
         }>(`/stores/public/${store.id}/shipping`);
-        if (result.success && result.data?.zones?.length) {
-          const activeZone =
-            result.data.zones.find(z => z.isActive !== false) || result.data.zones[0];
-          setShippingFee(activeZone.deliveryFee);
-          setFreeShippingThreshold(activeZone.freeShippingThreshold);
+        // Always flip shippingLoaded once the call resolves, even when
+        // the merchant has zero zones configured. Otherwise the
+        // breakdown stays in "loading" mode forever and the (0)
+        // default never reaches the user.
+        if (result.success) {
+          if (result.data?.zones?.length) {
+            const activeZone =
+              result.data.zones.find(z => z.isActive !== false) || result.data.zones[0];
+            setShippingFee(activeZone.deliveryFee);
+            setFreeShippingThreshold(activeZone.freeShippingThreshold);
+          }
           setShippingLoaded(true);
         }
       } catch {
-        // Fall back to default shipping values
+        // Network error — leave shippingLoaded false so we don't lock
+        // in a 0 fee that might be wrong; user can retry from checkout.
       }
     }
     if (store.id) {
@@ -189,13 +203,15 @@ export default function CartClient() {
   // All amounts are in fils (1 KWD = 1000 fils) so they can be passed directly to formatPrice
   const subtotal = cartTotal;
   const discount = promoApplied ? promoDiscount : 0;
+  // shippingLoaded guards against showing a phantom fee while the zones
+  // fetch is in flight. Once loaded, `freeShippingThreshold === 0` is
+  // treated as "no threshold set" and shipping just resolves to the
+  // configured fee (which is also 0 when no zones exist).
   const shipping = shippingLoaded
-    ? cartTotal >= freeShippingThreshold
+    ? freeShippingThreshold > 0 && cartTotal >= freeShippingThreshold
       ? 0
       : shippingFee
-    : cartTotal >= 20000
-      ? 0
-      : 2500;
+    : 0;
   const total = subtotal - discount + shipping;
   const cartCount = itemCount;
   const { components: T } = useTemplateComponents();

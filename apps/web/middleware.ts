@@ -124,24 +124,35 @@ export function middleware(request: NextRequest) {
   const storeIdentifier = getStoreIdentifier(hostname);
 
   // Bare root on the production storefront platform domain — redirect to
-  // the marketing site so customers never land on a placeholder store. The
-  // redirect runs before any header munging so cookies/headers don't leak.
+  // the marketing site so customers never land on a placeholder store.
   //
-  // CRITICAL: skip RSC navigation requests. When a customer is on a store
-  // page (e.g. /<slug>/products) and Next's client router prefetches data
-  // for `/`, it issues a same-origin RSC fetch like
-  // `store.forcemediakw.com/?_rsc=xxx`. CORS preflight refuses to follow a
-  // 302 to a different origin, so the redirect surfaced as
-  // "Redirect is not allowed for a preflight request" and broke product /
-  // checkout navigations on the user's friend's laptop. RSC payloads are
-  // identifiable by the `_rsc` query string OR the `RSC: 1` request
-  // header — either signal means we let the page render normally.
+  // CRITICAL: only redirect on a real top-level navigation, not on
+  // fetches. When a customer is on a deep page (e.g. /<slug>/products)
+  // and Next's client router prefetches data for `/`, it issues an RSC
+  // fetch like `store.forcemediakw.com/?_rsc=xxx`. CORS refuses to
+  // follow a 302 to a different origin, so the redirect surfaced as
+  // "Redirect is not allowed for a preflight request" and broke
+  // every client-side product / checkout navigation.
+  //
+  // We use `Sec-Fetch-Mode` + `Sec-Fetch-Dest` because they're set by
+  // the browser, can't be spoofed, and reliably distinguish a real
+  // address-bar / link navigation from any kind of background fetch.
+  // Defensive fallback: also bail on the legacy `_rsc` query / `rsc:1`
+  // / `next-router-prefetch:1` indicators, in case a browser ever
+  // omits Sec-Fetch-* headers.
   if (PLATFORM_ROOT_REDIRECT_HOSTS.has(host) && request.nextUrl.pathname === '/') {
-    const isRscRequest =
+    const fetchMode = request.headers.get('sec-fetch-mode');
+    const fetchDest = request.headers.get('sec-fetch-dest');
+    const looksLikeFetch =
+      // Any non-navigate fetch mode: cors, no-cors, same-origin, websocket
+      (fetchMode && fetchMode !== 'navigate') ||
+      // Any non-document destination: empty (fetch), script, style, image, etc.
+      (fetchDest && fetchDest !== 'document') ||
+      // Legacy / Next-specific signals
       request.nextUrl.searchParams.has('_rsc') ||
       request.headers.get('rsc') === '1' ||
       request.headers.get('next-router-prefetch') === '1';
-    if (!isRscRequest) {
+    if (!looksLikeFetch) {
       return NextResponse.redirect(PLATFORM_ROOT_REDIRECT_TARGET, 302);
     }
   }

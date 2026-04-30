@@ -412,30 +412,58 @@ router.get('/orders', authenticate, async (req: Request, res: Response, next: Ne
   }
 });
 
-// GET /orders/:id - Get order by ID (requires auth)
-router.get('/orders/:id', authenticate, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { id } = req.params;
-    const storeId = await getStoreIdFromRequest(req);
-    const order = await OrderService.getById(storeId, id);
+// GET /orders/:id - Get order by ID. Used by the storefront's checkout
+// success page to render the just-completed order. Supports both
+// signed-in customers and guests:
+//
+//   - signed-in customer: order must match their userId.
+//   - guest: order must have customerId = null. The orderId is a v4
+//     uuid handed back from /public/orders moments ago, so anyone in
+//     possession of it is the legitimate viewer. Same trust model as
+//     /payments/create — see the comment there for the rationale.
+//
+// We use optionalAuthenticate so a stale admin cookie bleeding through
+// from app.forcemediakw.com doesn't reject a guest's success page; the
+// role-guard below handles that case.
+router.get(
+  '/orders/:id',
+  optionalAuthenticate,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const storeId = await getStoreIdFromRequest(req);
+      const order = await OrderService.getById(storeId, id);
 
-    // Ensure user owns this order
-    if (order.customerId !== req.user!.userId) {
-      res.status(403).json({
-        success: false,
-        error: { code: 'FORBIDDEN', message: 'Not authorized to view this order' },
+      const isCustomer = req.user?.role === 'customer';
+      if (isCustomer) {
+        if (order.customerId !== req.user!.userId) {
+          res.status(403).json({
+            success: false,
+            error: { code: 'FORBIDDEN', message: 'Not authorized to view this order' },
+          });
+          return;
+        }
+      } else if (order.customerId !== null) {
+        // Order belongs to a customer but the viewer isn't signed in
+        // as that customer (or as anyone). Reject — admins viewing
+        // customer orders go through the /stores/:storeId/orders
+        // admin route, not this public path.
+        res.status(403).json({
+          success: false,
+          error: { code: 'FORBIDDEN', message: 'Not authorized to view this order' },
+        });
+        return;
+      }
+
+      res.json({
+        success: true,
+        data: { order },
       });
-      return;
+    } catch (error) {
+      next(error);
     }
-
-    res.json({
-      success: true,
-      data: { order },
-    });
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 // GET /orders/:id/invoice - Get invoice for customer's own order (requires auth)
 router.get(
