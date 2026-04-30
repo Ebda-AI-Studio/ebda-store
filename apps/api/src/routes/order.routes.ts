@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
-import { requireStoreAccess } from '../middleware/store-access';
+import { requireStoreAccess, checkStoreAccess } from '../middleware/store-access';
 import { OrderService } from '../services/order.service';
 import { InvoiceService } from '../services/invoice.service';
 import { EmailService } from '../services/email.service';
@@ -66,14 +66,32 @@ const getSessionId = (req: Request): string => {
   return sessionId;
 };
 
-// GET /stores/:storeId/orders - List orders
+// GET /stores/:storeId/orders - List orders.
+//
+// Mixed-audience route: admins paginate every order in the store;
+// customers see only their own. We can't blanket-apply
+// `requireStoreAccess` because that rejects customers (they don't own
+// the store). Instead, branch by role:
+//   - admin → require ownership of this store via inline check
+//   - customer → constrain the query to their own customerId
+// Without this branch, ANY store_admin token used to be able to read
+// any other tenant's orders by changing :storeId in the URL.
 router.get('/', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { storeId } = req.params;
     const { page, limit, status } = req.query;
+    const role = req.user?.role;
+    const isAdmin = role === 'store_admin' || role === 'super_admin';
 
-    // Check if admin or getting own orders
-    const isAdmin = ['store_admin', 'super_admin'].includes(req.user?.role || '');
+    if (isAdmin) {
+      const access = await checkStoreAccess(storeId, req.user!);
+      if (!access.ok) {
+        res
+          .status(access.status)
+          .json({ success: false, error: { code: access.code, message: access.message } });
+        return;
+      }
+    }
 
     const result = await OrderService.list(storeId, {
       page: page ? parseInt(page as string) : undefined,
@@ -91,15 +109,28 @@ router.get('/', authenticate, async (req: Request, res: Response, next: NextFunc
   }
 });
 
-// GET /stores/:storeId/orders/:id - Get order
+// GET /stores/:storeId/orders/:id - Get order. Mixed-audience like the
+// list above: admin needs store ownership; customer needs to own the
+// order. Without the admin-side check, ANY store_admin token used to
+// read any other tenant's individual orders.
 router.get('/:id', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { storeId, id } = req.params;
+    const role = req.user?.role;
+    const isAdmin = role === 'store_admin' || role === 'super_admin';
+
+    if (isAdmin) {
+      const access = await checkStoreAccess(storeId, req.user!);
+      if (!access.ok) {
+        res
+          .status(access.status)
+          .json({ success: false, error: { code: access.code, message: access.message } });
+        return;
+      }
+    }
 
     const order = await OrderService.getById(storeId, id);
 
-    // Check authorization
-    const isAdmin = ['store_admin', 'super_admin'].includes(req.user?.role || '');
     if (!isAdmin && order.customerId !== req.user?.userId) {
       res.status(403).json({
         success: false,
@@ -151,6 +182,8 @@ router.post('/', authenticate, async (req: Request, res: Response, next: NextFun
 router.put(
   '/:id/status',
   authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
   requirePermission('orders:manage'),
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -189,7 +222,8 @@ router.put(
 router.get(
   '/:orderId/invoice',
   authenticate,
-  requireRole(['store_admin', 'super_admin']),
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, orderId } = req.params;
@@ -209,7 +243,8 @@ router.get(
 router.post(
   '/:orderId/invoice/email',
   authenticate,
-  requireRole(['store_admin', 'super_admin']),
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {

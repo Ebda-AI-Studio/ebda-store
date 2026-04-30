@@ -110,3 +110,21 @@ export function authorize(...roles: string[]) {
     next();
   };
 }
+
+/**
+ * "Is this request a real customer?" guard. The api host's auth cookie is
+ * shared between admin (app.forcemediakw.com) and storefront
+ * (store.forcemediakw.com) origins, so a merchant signed into admin sends
+ * the SAME cookie to public/customer-facing endpoints — and naively reading
+ * `req.user?.userId` as a customerId attaches the merchant's user record to
+ * carts / wishlists / reviews / loyalty rows.
+ *
+ * Returns the authenticated customer's userId, or `undefined` for guests
+ * AND for any token whose role isn't `customer`. Use this in every
+ * customer-scoped route that previously did `req.user?.userId`. The
+ * AuthContext.refreshUser on the storefront has the matching client-side
+ * guard.
+ */
+export function customerUserId(req: Request): string | undefined {
+  return req.user?.role === 'customer' ? req.user.userId : undefined;
+}

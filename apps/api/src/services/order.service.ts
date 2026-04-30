@@ -286,6 +286,13 @@ export class OrderService {
           items: {
             create: cart.items.map(item => ({
               productId: item.productId,
+              // Persist the variant link onto OrderItem. Without this,
+              // `updateStatus(cancel/refund)`, `rollbackForPaymentFailure`,
+              // and `ReturnService.complete` all read OrderItem.variantId
+              // to restore variant inventory — and always saw null.
+              // Variant stock drifted every cancel/refund. CartItem
+              // already carries variantId; we just have to copy it.
+              variantId: (item as { variantId?: string | null }).variantId ?? null,
               productName: item.product.name,
               sku: item.product.sku,
               quantity: item.quantity,

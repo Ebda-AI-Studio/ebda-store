@@ -100,6 +100,48 @@ export async function requireStoreAccess(
 }
 
 /**
+ * Programmatic ownership check usable inside a handler — same logic as
+ * `requireStoreAccess` middleware but returns a result instead of
+ * mutating Express flow. Use it on mixed-audience routes (admin OR
+ * customer) where we can't apply the middleware blanket because it
+ * rejects customers.
+ *
+ * Returns `{ ok: true, store }` when access is granted, or
+ * `{ ok: false, status, code, message }` when denied. Caller writes
+ * the response.
+ *
+ * super_admin always passes (call site is responsible for audit-log
+ * if cross-tenant access matters in that context).
+ */
+export async function checkStoreAccess(
+  storeId: string,
+  user: { userId: string; role: string }
+): Promise<
+  | { ok: true; store: { id: string; ownerId: string; status: string } }
+  | { ok: false; status: number; code: string; message: string }
+> {
+  const store = await prisma.store.findUnique({
+    where: { id: storeId },
+    select: { id: true, ownerId: true, status: true },
+  });
+  if (!store) {
+    return { ok: false, status: 404, code: 'STORE_NOT_FOUND', message: 'Store not found' };
+  }
+  if (user.role === 'super_admin') {
+    return { ok: true, store };
+  }
+  if (user.role === 'store_admin' && store.ownerId === user.userId) {
+    return { ok: true, store };
+  }
+  return {
+    ok: false,
+    status: 403,
+    code: 'FORBIDDEN',
+    message: 'You do not have access to this store',
+  };
+}
+
+/**
  * Lightweight store access check (no database lookup)
  * Use when store ownership was already verified in the route
  */

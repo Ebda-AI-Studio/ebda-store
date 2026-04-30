@@ -32,6 +32,16 @@ import logger from './lib/logger';
 SentryService.init();
 
 const app = express();
+
+// Railway terminates TLS at its proxy and forwards X-Forwarded-For. Without
+// this setting, `req.ip` resolves to the proxy's address — which means every
+// IP-keyed rate limiter (authLimiter, paymentLimiter, writeLimiter, etc.) is
+// effectively a single global counter, and brute-force protection is off.
+// `1` = trust the immediate hop only; do NOT raise to `true` (allows clients
+// to spoof X-Forwarded-For). Same value used in production by Vercel /
+// Cloudflare reference docs for single-proxy hops.
+app.set('trust proxy', 1);
+
 const httpServer = createServer(app);
 
 // Track server state for graceful shutdown
