@@ -162,39 +162,61 @@ class RecommendationService {
     if (!productIds.length) return [];
 
     const scoreMap = new Map<string, number>();
+    const productIdSet = new Set(productIds);
+
+    // Batch the manual cross-sell + FBT lookups instead of running
+    // two queries per cart item. Storefront cart pages with 4 items
+    // used to issue 8 queries to render the "you might also like"
+    // strip; now it's two queries regardless of cart size.
+    const [manualRows, fbtRows] = await Promise.all([
+      prisma.productRelation.findMany({
+        where: {
+          storeId,
+          sourceProductId: { in: productIds },
+          type: 'cross_sell',
+        },
+        orderBy: { position: 'asc' },
+        select: { sourceProductId: true, targetProductId: true },
+      }),
+      prisma.frequentlyBoughtTogether.findMany({
+        where: {
+          storeId,
+          OR: [{ productId1: { in: productIds } }, { productId2: { in: productIds } }],
+        },
+        orderBy: { coOccurrenceCount: 'desc' },
+        select: { productId1: true, productId2: true },
+      }),
+    ]);
+
+    const manualBySource = new Map<string, string[]>();
+    for (const r of manualRows) {
+      const arr = manualBySource.get(r.sourceProductId);
+      if (arr) arr.push(r.targetProductId);
+      else manualBySource.set(r.sourceProductId, [r.targetProductId]);
+    }
 
     for (const productId of productIds) {
-      // Manual cross-sell first
-      const manual = await prisma.productRelation.findMany({
-        where: { storeId, sourceProductId: productId, type: 'cross_sell' },
-        orderBy: { position: 'asc' },
-        take: 8,
-        select: { targetProductId: true },
-      });
-
+      // Manual cross-sell first; per-product cap of 8 mirrors the
+      // pre-batched query that used `take: 8`.
+      const manual = (manualBySource.get(productId) ?? []).slice(0, 8);
       if (manual.length > 0) {
-        for (const r of manual) {
-          if (!productIds.includes(r.targetProductId)) {
-            scoreMap.set(r.targetProductId, (scoreMap.get(r.targetProductId) ?? 0) + 1);
+        for (const targetId of manual) {
+          if (!productIdSet.has(targetId)) {
+            scoreMap.set(targetId, (scoreMap.get(targetId) ?? 0) + 1);
           }
         }
       } else {
-        // FBT fallback
-        const fbtRows = await prisma.frequentlyBoughtTogether.findMany({
-          where: {
-            storeId,
-            OR: [{ productId1: productId }, { productId2: productId }],
-          },
-          orderBy: { coOccurrenceCount: 'desc' },
-          take: 8,
-          select: { productId1: true, productId2: true },
-        });
-
+        // FBT fallback for products without manual cross-sells
+        let added = 0;
         for (const row of fbtRows) {
-          const targetId = row.productId1 === productId ? row.productId2 : row.productId1;
-          if (!productIds.includes(targetId)) {
-            scoreMap.set(targetId, (scoreMap.get(targetId) ?? 0) + 1);
-          }
+          if (added >= 8) break;
+          const isLeftMatch = row.productId1 === productId;
+          const isRightMatch = row.productId2 === productId;
+          if (!isLeftMatch && !isRightMatch) continue;
+          const targetId = isLeftMatch ? row.productId2 : row.productId1;
+          if (productIdSet.has(targetId)) continue;
+          scoreMap.set(targetId, (scoreMap.get(targetId) ?? 0) + 1);
+          added++;
         }
       }
     }

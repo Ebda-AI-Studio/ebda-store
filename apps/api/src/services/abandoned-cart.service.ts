@@ -181,6 +181,15 @@ class AbandonedCartService {
         },
       });
 
+      // Hoist the per-store config lookup out of the per-cart loop. It's
+      // identical for every iteration of this sweep and previously cost
+      // one query per detected abandoned cart — N+1 against
+      // `abandoned_cart_configs` for no semantic benefit.
+      const storeConfig = await this.getConfig(storeId);
+      const nextStepAtFromConfig = storeConfig.step1Enabled
+        ? () => new Date(Date.now() + storeConfig.step1DelayMinutes * 60 * 1000)
+        : () => null;
+
       for (const cart of carts) {
         try {
           // Build a snapshot of cart items at abandonment time
@@ -197,11 +206,7 @@ class AbandonedCartService {
             0
           );
 
-          // Get step1 delay to compute nextStepAt
-          const storeConfig = await this.getConfig(storeId);
-          const nextStepAt = storeConfig.step1Enabled
-            ? new Date(Date.now() + storeConfig.step1DelayMinutes * 60 * 1000)
-            : null;
+          const nextStepAt = nextStepAtFromConfig();
 
           const customerEmail = cart.customer?.email ?? null;
           const customerPhone = cart.customer?.phone ?? null;

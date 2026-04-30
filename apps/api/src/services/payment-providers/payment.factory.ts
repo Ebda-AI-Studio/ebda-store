@@ -3,6 +3,7 @@ import { config } from '../../config';
 import { AppError } from '../../middleware/error-handler';
 import logger from '../../lib/logger';
 import { encryption } from '../encryption.service';
+import { OrderService } from '../order.service';
 import {
   IPaymentProvider,
   PaymentProvider,
@@ -638,6 +639,36 @@ export class PaymentService {
         '[PAYMENT] DB transaction failed AFTER provider refund succeeded — manual reconciliation required (refund already executed at provider, cannot undo)'
       );
       throw txError;
+    }
+
+    // Refund effects: inventory restore, coupon usage decrement, affiliate
+    // commission reversal. Only for full refunds — partial refunds keep
+    // the inventory deducted and the commission earned, since the
+    // customer kept (most of) the items. Idempotent at the OrderService
+    // level so a same-order full-refund-after-partial-refund won't
+    // double-up the restore.
+    if (isFullRefund) {
+      const order = await prisma.order.findUnique({
+        where: { id: payment.orderId },
+        select: { storeId: true },
+      });
+      if (order) {
+        try {
+          await OrderService.applyRefundEffects(order.storeId, payment.orderId);
+        } catch (effectsError) {
+          // Non-fatal: provider refund already succeeded and the order
+          // is marked refunded. Log loud so finance can reconcile any
+          // inventory / commission drift manually.
+          logger.error(
+            {
+              err: effectsError,
+              orderId: payment.orderId,
+              refundId: response.refundId,
+            },
+            '[PAYMENT] applyRefundEffects failed after refund — inventory/coupon/commission may be inconsistent'
+          );
+        }
+      }
     }
 
     return response;

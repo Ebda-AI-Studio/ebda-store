@@ -684,53 +684,12 @@ export class OrderService {
       },
     });
 
-    // DB-003: restore inventory atomically so that all stock increments and
-    // history records either all succeed or all roll back together.
+    // Refund / cancellation side-effects: inventory restore + coupon
+    // decrement + affiliate-commission reversal. Centralised in
+    // applyRefundEffects so gateway-driven refunds (which bypass this
+    // method) get the exact same treatment.
     if (status === 'cancelled' || status === 'refunded') {
-      await prisma.$transaction(async tx => {
-        for (const item of order.items) {
-          // Lock the product row to get an accurate previous-stock value
-          const [lockedProduct] = await tx.$queryRaw<
-            Array<{ id: string; inventory: number; track_inventory: boolean }>
-          >`
-            SELECT id, inventory, track_inventory FROM "products"
-            WHERE id = ${item.productId}
-            FOR UPDATE
-          `;
-
-          if (!lockedProduct?.track_inventory) continue;
-
-          const prevStock = lockedProduct.inventory;
-
-          await tx.product.update({
-            where: { id: item.productId },
-            data: { inventory: { increment: item.quantity } },
-          });
-
-          // Restore variant stock if the order item was for a specific variant
-          if ((item as { variantId?: string }).variantId) {
-            await tx.productVariant.update({
-              where: { id: (item as { variantId: string }).variantId },
-              data: { inventory: { increment: item.quantity } },
-            });
-          }
-
-          // Record inventory history inside the same transaction so the audit
-          // record is guaranteed to exist if and only if the stock was restored
-          await tx.inventoryHistory.create({
-            data: {
-              productId: item.productId,
-              storeId,
-              type: 'return_stock',
-              quantity: item.quantity,
-              previousStock: prevStock,
-              newStock: prevStock + item.quantity,
-              reason: `Order ${status}`,
-              reference: orderId,
-            },
-          });
-        }
-      });
+      await this.applyRefundEffects(storeId, orderId);
     }
 
     // Process affiliate commission on delivery (fire-and-forget)
@@ -904,6 +863,90 @@ export class OrderService {
     }
 
     return updatedOrder;
+  }
+
+  /**
+   * Side-effects of a refund that are NOT captured by `updateStatus()`:
+   * inventory restore, coupon usage decrement, and affiliate-commission
+   * reversal. Provider-driven refunds (payment.factory.refund) used to
+   * update the order row directly and bypass `updateStatus()`, leaving
+   * stock under-counted, coupon limits over-counted, and affiliates
+   * with refunded earnings still on their balance. Centralised here so
+   * every refund path (gateway-initiated, return-driven, manual admin)
+   * applies the same effects.
+   *
+   * Idempotent: each step uses conditional updates / status filters so
+   * calling twice (e.g. partial refund then full refund) doesn't double
+   * the inventory restore or commission decrement.
+   */
+  static async applyRefundEffects(
+    storeId: string,
+    orderId: string,
+    options: { restoreInventory?: boolean } = {}
+  ): Promise<void> {
+    const restoreInventory = options.restoreInventory ?? true;
+    const order = await prisma.order.findFirst({
+      where: { id: orderId, storeId },
+      include: { items: true },
+    });
+    if (!order) return;
+
+    if (restoreInventory) {
+      await prisma.$transaction(async tx => {
+        for (const item of order.items) {
+          const [lockedProduct] = await tx.$queryRaw<
+            Array<{ id: string; inventory: number; track_inventory: boolean }>
+          >`
+            SELECT id, inventory, track_inventory FROM "products"
+            WHERE id = ${item.productId}
+            FOR UPDATE
+          `;
+          if (!lockedProduct?.track_inventory) continue;
+          const prevStock = lockedProduct.inventory;
+          await tx.product.update({
+            where: { id: item.productId },
+            data: { inventory: { increment: item.quantity } },
+          });
+          if (item.variantId) {
+            await tx.productVariant.update({
+              where: { id: item.variantId },
+              data: { inventory: { increment: item.quantity } },
+            });
+          }
+          await tx.inventoryHistory.create({
+            data: {
+              productId: item.productId,
+              storeId,
+              type: 'return_stock',
+              quantity: item.quantity,
+              previousStock: prevStock,
+              newStock: prevStock + item.quantity,
+              reason: 'Order refunded',
+              reference: orderId,
+            },
+          });
+        }
+      });
+    }
+
+    if (order.couponCode) {
+      // Decrement back to zero floor — concurrent refunds shouldn't push
+      // usageCount negative.
+      await prisma.coupon.updateMany({
+        where: { storeId, code: order.couponCode, usageCount: { gt: 0 } },
+        data: { usageCount: { decrement: 1 } },
+      });
+    }
+
+    // Reverse affiliate commission (no-op if none was paid for this order).
+    await affiliateService
+      .reverseCommission(storeId, orderId)
+      .catch(err =>
+        logger.error(
+          { err, storeId, orderId },
+          '[OrderService] Affiliate commission reversal failed during refund'
+        )
+      );
   }
 
   static async getCustomerOrders(

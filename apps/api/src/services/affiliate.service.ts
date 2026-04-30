@@ -480,6 +480,51 @@ class AffiliateService {
     return { commissionAmount, rate };
   }
 
+  /**
+   * Reverse a commission previously paid out for an order. Called when
+   * the order is refunded or fully cancelled — the customer gets their
+   * money back, so the affiliate doesn't get to keep the commission.
+   *
+   * Idempotent: if no commission_paid referral exists for this order
+   * (e.g. the order was refunded before delivery, or this is a partial
+   * refund where commission stays earned), returns null silently. The
+   * referral row gets status='refunded' so finance can audit it; the
+   * affiliate's totalEarned + pendingBalance get the commission
+   * decremented (mirrors the increment in processCommission).
+   */
+  async reverseCommission(storeId: string, orderId: string) {
+    const referral = await prisma.affiliateReferral.findFirst({
+      where: { storeId, orderId, status: 'commission_paid' },
+    });
+
+    if (!referral || !referral.commissionAmount) {
+      return null;
+    }
+
+    const amount = Number(referral.commissionAmount);
+
+    await prisma.$transaction([
+      prisma.affiliateReferral.update({
+        where: { id: referral.id },
+        data: { status: 'refunded' },
+      }),
+      prisma.affiliate.update({
+        where: { id: referral.affiliateId },
+        data: {
+          totalEarned: { decrement: amount },
+          pendingBalance: { decrement: amount },
+        },
+      }),
+    ]);
+
+    logger.info(
+      { storeId, orderId, affiliateId: referral.affiliateId, amount },
+      '[AffiliateService] Commission reversed (order refunded)'
+    );
+
+    return { amount };
+  }
+
   // ---- Referrals ----
 
   async getReferrals(storeId: string, affiliateId: string, options: ListReferralsOptions = {}) {

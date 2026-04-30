@@ -135,20 +135,34 @@ class LoyaltyAutomationService {
           return dob.getMonth() + 1 === todayMonth && dob.getDate() === todayDay;
         });
 
+        // Bulk lookup of customers who already received this year's
+        // birthday bonus. Previously the per-member findFirst loop ran
+        // N queries; on a store with hundreds of birthday-aligned
+        // customers that turned a daily cron into a slow-then-timeout
+        // pathology. One IN-list query is fine even at large N because
+        // we already capped the candidate set above.
+        const yearStart = new Date(thisYear, 0, 1);
+        const candidateIds = birthdayMembers.map(m => m.customerId);
+        const alreadyAwarded =
+          candidateIds.length === 0
+            ? new Set<string>()
+            : new Set(
+                (
+                  await prisma.loyaltyTransaction.findMany({
+                    where: {
+                      storeId: store.id,
+                      customerId: { in: candidateIds },
+                      type: 'earn_birthday',
+                      createdAt: { gte: yearStart },
+                    },
+                    select: { customerId: true },
+                  })
+                ).map(t => t.customerId)
+              );
+
         for (const member of birthdayMembers) {
           try {
-            // Check if birthday bonus already awarded this year
-            const yearStart = new Date(thisYear, 0, 1);
-            const existingBonus = await prisma.loyaltyTransaction.findFirst({
-              where: {
-                storeId: store.id,
-                customerId: member.customerId,
-                type: 'earn_birthday',
-                createdAt: { gte: yearStart },
-              },
-            });
-
-            if (existingBonus) {
+            if (alreadyAwarded.has(member.customerId)) {
               logger.debug(
                 { storeId: store.id, customerId: member.customerId },
                 '[LoyaltyAutomation] Birthday bonus already awarded this year — skipping'
@@ -272,22 +286,34 @@ class LoyaltyAutomationService {
         }
       }
 
+      // Batch the loyaltyPoints lookup. The previous per-group findUnique
+      // ran one query per (store, customer) pair; on annual expiration
+      // sweeps that's the dominant cost. Single findMany with composite
+      // filters keeps the cron under the connection-pool budget.
+      const groupKeys = [...grouped.values()];
+      const records =
+        groupKeys.length === 0
+          ? []
+          : await prisma.loyaltyPoints.findMany({
+              where: {
+                OR: groupKeys.map(g => ({
+                  storeId: g.storeId,
+                  customerId: g.customerId,
+                })),
+              },
+              select: { id: true, storeId: true, customerId: true, points: true },
+            });
+      const recordByKey = new Map<
+        string,
+        { id: string; storeId: string; customerId: string; points: number }
+      >();
+      for (const r of records) {
+        recordByKey.set(`${r.storeId}:${r.customerId}`, r);
+      }
+
       for (const [, group] of grouped) {
         try {
-          // Check if an expiration transaction was already created for these txn IDs
-          // We use description to carry txn IDs reference, but the safest idempotency
-          // guard is: mark expired transactions by nulling their expiresAt after processing.
-          // We do that by setting expiresAt to a sentinel value (null means "processed").
-          // Actually safest: we update expiresAt to null on the source txns after processing.
-
-          const loyaltyRecord = await prisma.loyaltyPoints.findUnique({
-            where: {
-              storeId_customerId: {
-                storeId: group.storeId,
-                customerId: group.customerId,
-              },
-            },
-          });
+          const loyaltyRecord = recordByKey.get(`${group.storeId}:${group.customerId}`);
 
           if (!loyaltyRecord) continue;
 

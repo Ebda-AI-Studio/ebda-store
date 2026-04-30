@@ -380,30 +380,112 @@ export class InventoryService {
   }
 
   /**
-   * Bulk adjust inventory for multiple products
+   * Bulk adjust inventory for multiple products.
+   *
+   * Previously implemented as a per-adjustment loop calling
+   * `adjustInventory`, which issued 3 queries per row (findFirst +
+   * transactional update + history insert). On a 100-row CSV import
+   * that's 300 round-trips against Neon's pooled connection — slow
+   * enough to noticeably stall the admin response. This rewrite:
+   *
+   *   1. Single findMany to load every candidate product
+   *   2. Validate each adjustment in memory (out-of-store / not-found
+   *      / negative-stock) without hitting the DB
+   *   3. One transaction with all product updates + a `createMany`
+   *      for history rows
+   *   4. Fire back-in-stock notifications post-commit for every
+   *      product that crossed 0 → >0
+   *
+   * Per-row error handling is preserved: a single bad row marks just
+   * that row as failed; valid rows still apply atomically inside the
+   * transaction.
    */
   static async bulkAdjustInventory(
     storeId: string,
     adjustments: InventoryAdjustment[],
     userId?: string
   ): Promise<{ successful: number; failed: number; errors: string[] }> {
-    let successful = 0;
     let failed = 0;
     const errors: string[] = [];
 
+    if (adjustments.length === 0) {
+      return { successful: 0, failed: 0, errors: [] };
+    }
+
+    const ids = adjustments.map(a => a.productId);
+    const products = await prisma.product.findMany({
+      where: { id: { in: ids }, storeId, deletedAt: null },
+      select: { id: true, inventory: true, name: true },
+    });
+    const productById = new Map(products.map(p => [p.id, p]));
+
+    type Plan = {
+      adjustment: InventoryAdjustment;
+      previousStock: number;
+      newStock: number;
+      productName: string;
+    };
+    const plans: Plan[] = [];
+
     for (const adjustment of adjustments) {
-      try {
-        await this.adjustInventory(storeId, adjustment, userId);
-        successful++;
-      } catch (error) {
+      const product = productById.get(adjustment.productId);
+      if (!product) {
         failed++;
-        errors.push(
-          `Product ${adjustment.productId}: ${error instanceof Error ? error.message : 'Unknown error'}`
+        errors.push(`Product ${adjustment.productId}: NOT_FOUND`);
+        continue;
+      }
+      const previousStock = product.inventory;
+      const newStock = previousStock + adjustment.quantity;
+      if (newStock < 0) {
+        failed++;
+        errors.push(`Product ${adjustment.productId}: INSUFFICIENT_STOCK`);
+        continue;
+      }
+      plans.push({ adjustment, previousStock, newStock, productName: product.name });
+    }
+
+    if (plans.length === 0) {
+      return { successful: 0, failed, errors };
+    }
+
+    await prisma.$transaction([
+      ...plans.map(p =>
+        prisma.product.update({
+          where: { id: p.adjustment.productId },
+          data: { inventory: p.newStock },
+        })
+      ),
+      prisma.inventoryHistory.createMany({
+        data: plans.map(p => ({
+          productId: p.adjustment.productId,
+          storeId,
+          type: p.adjustment.type,
+          quantity: p.adjustment.quantity,
+          previousStock: p.previousStock,
+          newStock: p.newStock,
+          reason: p.adjustment.reason,
+          reference: p.adjustment.reference,
+          createdBy: userId,
+        })),
+      }),
+    ]);
+
+    // Back-in-stock notifications fire AFTER the transaction commits
+    // so a notification doesn't go out for a write that later got
+    // rolled back. Same fire-and-forget contract as adjustInventory.
+    for (const p of plans) {
+      if (p.previousStock <= 0 && p.newStock > 0) {
+        this.fireBackInStockNotifications(storeId, p.adjustment.productId, p.productName).catch(
+          err =>
+            logger.error(
+              { err, storeId, productId: p.adjustment.productId },
+              '[InventoryService] Back-in-stock notification failed'
+            )
         );
       }
     }
 
-    return { successful, failed, errors };
+    return { successful: plans.length, failed, errors };
   }
 
   /**
