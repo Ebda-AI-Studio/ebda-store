@@ -9,6 +9,8 @@ import { notificationDispatcher } from './notification-dispatcher.service';
 import { OneSignalService } from './onesignal.service';
 import { featureService } from './feature.service';
 import { shippingCarrierService } from './shipping-carrier.service';
+import { ShippingService } from './shipping.service';
+import { LoyaltyService } from './loyalty.service';
 import { affiliateService } from './affiliate.service';
 import logger from '../lib/logger';
 
@@ -165,7 +167,35 @@ export class OrderService {
     const taxRates = await prisma.taxRate.findMany({ where: { storeId, isActive: true } });
     const taxRate = taxRates.length > 0 ? Number(taxRates[0].rate) / 100 : 0;
     const tax = Math.round(subtotal * taxRate);
-    const shipping = 0; // Free shipping (simplified)
+
+    // Resolve shipping for the order's delivery area. Until now this was
+    // hardcoded to 0 — the storefront cart/checkout calls
+    // /stores/public/:id/shipping/calculate and DOES show a fee in the
+    // breakdown, but the persisted Order had shipping=0, so the merchant
+    // was silently losing the delivery fee on every order. Re-run the
+    // same calculation server-side here (never trust a client-asserted
+    // shipping cost) using the address's `area` field. When no zone
+    // matches, the calculator returns 0 — same outcome as before for
+    // stores with zero shipping zones configured.
+    const shippingArea =
+      typeof (data.shippingAddress as Record<string, unknown>).area === 'string'
+        ? (data.shippingAddress as Record<string, string>).area
+        : (data.shippingAddress.city ?? data.shippingAddress.state ?? '');
+    let shipping = 0;
+    try {
+      const result = await ShippingService.calculateShipping(storeId, shippingArea, subtotal);
+      shipping = result.freeShipping ? 0 : result.shippingCost;
+    } catch (err) {
+      // Defensive: if the shipping lookup throws, fall back to 0 rather
+      // than fail the entire checkout. Worst case is a one-off undercharge
+      // that surfaces in the merchant's order detail with shipping=0
+      // (visible vs the cart UI shipping line — easy to spot).
+      logger.error({ err, storeId, shippingArea }, 'Shipping calculation failed; defaulting to 0');
+    }
+    // Free-shipping coupon: zero out shipping after we resolved the
+    // base fee, so a "Free shipping over X" coupon stacks correctly
+    // with the store's free-shipping threshold (whichever zeros first).
+    // The coupon resolution below also independently zeroes shipping.
 
     // Resolve coupon (if any) on the server -- we never trust a client-asserted
     // discount, since the cart could have changed between /coupons/validate
@@ -192,10 +222,13 @@ export class OrderService {
           },
           subtotal
         );
+      } else {
+        // Free-shipping coupon — zero out the shipping line we just
+        // resolved above. Stacks naturally with the store's own
+        // free-shipping threshold (whichever zeros first wins; both
+        // mean the customer pays no delivery fee).
+        shipping = 0;
       }
-      // free_shipping coupons zero the shipping line. Shipping is already 0
-      // in the current "simplified" pricing above; this is a no-op today but
-      // keeps the semantics correct for when shipping cost gets wired in.
     }
 
     const discount = couponDiscount;
@@ -705,6 +738,28 @@ export class OrderService {
       affiliateService
         .processCommission(storeId, orderId)
         .catch(err => logger.error({ err }, 'Affiliate commission processing failed'));
+
+      // Award loyalty points for the purchase. Defined in
+      // loyalty.service for months but never invoked anywhere — every
+      // delivered order silently failed to credit the customer's
+      // points balance, while the admin loyalty UI cheerfully
+      // advertised the program. Fire-and-forget: a missing customerId
+      // (guest checkout) returns null and short-circuits inside the
+      // service, and any exception is swallowed by the .catch so we
+      // never fail the status update over a points-credit glitch.
+      if (updatedOrder.customerId) {
+        LoyaltyService.earnPointsFromPurchase(
+          storeId,
+          updatedOrder.customerId,
+          orderId,
+          updatedOrder.total
+        ).catch(err =>
+          logger.error(
+            { err, storeId, orderId, customerId: updatedOrder.customerId },
+            'Loyalty earn-from-purchase failed'
+          )
+        );
+      }
     }
 
     // Auto-ship on confirmation (fire-and-forget)

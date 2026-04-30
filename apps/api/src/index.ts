@@ -113,7 +113,7 @@ app.use(
 );
 
 // CORS domain cache shared via module so store.routes.ts can bust it on domain changes
-import { corsDomainCache, CORS_CACHE_TTL_MS } from './lib/cors-cache';
+import { corsDomainCache, CORS_CACHE_TTL_MS, isPlatformOrigin } from './lib/cors-cache';
 
 app.use(
   cors({
@@ -125,29 +125,18 @@ app.use(
       // is set, which does not block non-browser clients.
       if (!origin) return callback(null, false);
 
-      // Always allow platform URLs. The hardcoded forcemediakw.com origins
-      // are a defensive layer so a missing/forgotten WEB_URL or ADMIN_URL
-      // env var on Railway can't lock the production frontends out of the
-      // API. config.webUrl/adminUrl take precedence when set.
-      const platformOrigins = [
-        config.webUrl,
-        config.adminUrl,
-        'https://store.forcemediakw.com',
-        'https://app.forcemediakw.com',
-      ].filter(Boolean);
-      if (platformOrigins.includes(origin)) return callback(null, true);
-
-      // Allow Vercel preview/production deployments for the project (strict prefix match)
+      // Platform origins (storefront / admin / vercel previews / localhost) —
+      // single source of truth shared with the CSRF middleware so the two
+      // can never drift. Custom merchant domains fall through to the DB
+      // lookup below; they're CORS-allowed but the CSRF token check
+      // still applies to them (see security.ts comment).
       if (
-        origin.endsWith('.vercel.app') &&
-        (/^https:\/\/force-web(-[a-z0-9]+)?\.vercel\.app$/.test(origin) ||
-          /^https:\/\/force-admin(-[a-z0-9]+)?\.vercel\.app$/.test(origin))
+        isPlatformOrigin(origin, {
+          webUrl: config.webUrl,
+          adminUrl: config.adminUrl,
+          nodeEnv: config.nodeEnv,
+        })
       ) {
-        return callback(null, true);
-      }
-
-      // Allow localhost in development
-      if (config.nodeEnv !== 'production' && origin.includes('localhost')) {
         return callback(null, true);
       }
 

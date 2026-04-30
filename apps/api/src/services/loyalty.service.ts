@@ -391,17 +391,6 @@ export class LoyaltyService {
       ...(store.loyaltySettings as Partial<LoyaltySettings>),
     };
 
-    // Get loyalty record
-    const loyalty = await prisma.loyaltyPoints.findUnique({
-      where: {
-        storeId_customerId: { storeId, customerId },
-      },
-    });
-
-    if (!loyalty) {
-      throw new AppError(400, 'NO_POINTS', 'Customer has no loyalty points');
-    }
-
     if (pointsToRedeem < settings.minRedeemPoints) {
       throw new AppError(
         400,
@@ -410,37 +399,64 @@ export class LoyaltyService {
       );
     }
 
-    if (loyalty.points < pointsToRedeem) {
-      throw new AppError(400, 'INSUFFICIENT_POINTS', 'Insufficient points balance');
-    }
-
     // Calculate discount value
     const discountFils = pointsToRedeem * settings.pointsValue;
 
-    // Update balance and log transaction atomically
-    const [updated] = await prisma.$transaction([
-      prisma.loyaltyPoints.update({
-        where: { id: loyalty.id },
-        data: {
-          points: { decrement: pointsToRedeem },
-          totalRedeemed: { increment: pointsToRedeem },
-        },
-      }),
-      prisma.loyaltyTransaction.create({
-        data: {
-          storeId,
-          customerId,
-          orderId,
-          type: 'redeem_discount',
-          points: -pointsToRedeem,
-          description: `Redeemed ${pointsToRedeem} points for ${(discountFils / 1000).toFixed(3)} KWD discount`,
-        },
-      }),
-    ]);
+    // Race-safe redeem: previously this was read-then-decrement, so two
+    // concurrent calls could both pass the `loyalty.points >=
+    // pointsToRedeem` check and the customer would burn the balance
+    // twice. The conditional `updateMany` does the gate AND the
+    // decrement in a single statement; if the row's points have
+    // already moved below the threshold, `count === 0` and we treat
+    // that as INSUFFICIENT_POINTS.
+    const reserve = await prisma.loyaltyPoints.updateMany({
+      where: {
+        storeId,
+        customerId,
+        points: { gte: pointsToRedeem },
+      },
+      data: {
+        points: { decrement: pointsToRedeem },
+        totalRedeemed: { increment: pointsToRedeem },
+      },
+    });
+    if (reserve.count === 0) {
+      // Either no row at all, or balance dropped below the threshold
+      // between the read and the write. Distinguish for a clearer
+      // client error.
+      const exists = await prisma.loyaltyPoints.findUnique({
+        where: { storeId_customerId: { storeId, customerId } },
+        select: { id: true },
+      });
+      if (!exists) {
+        throw new AppError(400, 'NO_POINTS', 'Customer has no loyalty points');
+      }
+      throw new AppError(400, 'INSUFFICIENT_POINTS', 'Insufficient points balance');
+    }
+
+    // The decrement succeeded — log the transaction and return the
+    // post-write balance. We re-read the row inside the same logical
+    // call so the caller sees the value AFTER the decrement; a separate
+    // tx isn't needed because the conditional updateMany already
+    // committed the consistent state.
+    await prisma.loyaltyTransaction.create({
+      data: {
+        storeId,
+        customerId,
+        orderId,
+        type: 'redeem_discount',
+        points: -pointsToRedeem,
+        description: `Redeemed ${pointsToRedeem} points for ${(discountFils / 1000).toFixed(3)} KWD discount`,
+      },
+    });
+    const updated = await prisma.loyaltyPoints.findUnique({
+      where: { storeId_customerId: { storeId, customerId } },
+      select: { points: true },
+    });
 
     return {
       discountFils,
-      newBalance: updated.points,
+      newBalance: updated?.points ?? 0,
     };
   }
 

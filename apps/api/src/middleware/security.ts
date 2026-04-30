@@ -4,6 +4,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { prisma } from '@force/database';
 import { redis } from '../services/redis.service';
 import { BoundedMap } from '../lib/bounded-map';
+import { isPlatformOrigin } from '../lib/cors-cache';
+import { config } from '../config';
 import logger from '../lib/logger';
 
 // ==========================================
@@ -116,28 +118,37 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
     return next();
   }
 
-  // OWASP "custom request header" defense — applies REGARDLESS of auth.
+  // OWASP "custom request header" defense — applies when the Origin is
+  // a platform origin we control end-to-end.
   //
   // A simple HTML form attack can only forge POSTs with
   // `application/x-www-form-urlencoded` / `multipart/form-data` /
-  // `text/plain`. The moment a request uses `Content-Type:
-  // application/json` (or sends an `X-Requested-With` header), the
-  // browser issues a CORS preflight first. Our CORS config only echoes
-  // an Allow-Origin for our own storefront/admin domains, so an
-  // attacker's page can't pass preflight — the actual POST never fires.
-  // That makes JSON / XHR requests inherently CSRF-immune even without
-  // a session cookie or auth token.
+  // `text/plain`. JSON / XHR requests trigger a CORS preflight first,
+  // and our CORS config rejects unknown origins — so JSON POSTs from
+  // forcemediakw.com (admin / storefront) are inherently safe.
   //
-  // Previously this skip required a valid auth cookie to apply, which
-  // broke guest checkout: a logged-out shopper hitting /payments/create
-  // with a JSON body had no token cookie, so the middleware fell
-  // through to the session+CSRF-token verifier and rejected with
-  // `Invalid CSRF token`. The cookie predicate added nothing — a JSON
-  // POST is preflight-protected whether the request is authenticated
-  // or not.
+  // CRITICAL: this skip MUST gate on the request's Origin being a
+  // PLATFORM origin, not "any allowed origin". Custom merchant domains
+  // are also CORS-allowlisted (via DB lookup at runtime), so without
+  // the platform-origin gate a malicious merchant could configure
+  // `attacker.com` as their store's domain, mount a JSON CSRF page
+  // there, and ride the API host's cookie to call any other store's
+  // endpoints. The CSRF-token verifier below catches that case.
+  //
+  // Guest checkout still works because the storefront is a platform
+  // origin (store.forcemediakw.com) and is in the platform allowlist.
   const contentType = req.headers['content-type'] || '';
   const xRequestedWith = req.headers['x-requested-with'];
-  if (contentType.includes('application/json') || xRequestedWith) {
+  const origin = req.headers.origin as string | undefined;
+  const isJsonOrXhr = contentType.includes('application/json') || !!xRequestedWith;
+  if (
+    isJsonOrXhr &&
+    isPlatformOrigin(origin, {
+      webUrl: config.webUrl,
+      adminUrl: config.adminUrl,
+      nodeEnv: config.nodeEnv,
+    })
+  ) {
     return next();
   }
 
