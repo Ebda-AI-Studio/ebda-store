@@ -4,7 +4,7 @@ import { authenticate, customerUserId } from '../middleware/auth';
 import { requirePermission } from '../middleware/rbac';
 import { ReturnService } from '../services/return.service';
 import { auditLog, writeLimiter } from '../middleware/security';
-import { requireStoreAccess } from '../middleware/store-access';
+import { requireStoreAccess, checkStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 
 const router = Router({ mergeParams: true });
@@ -127,8 +127,31 @@ router.get(
 
       const returnRequest = await ReturnService.getById(storeId, id);
 
-      // Check if customer owns this return
-      if (returnRequest.customerId !== req.user!.userId && req.user!.role === 'customer') {
+      // Tenant + ownership gate. Previously the only check was "if
+      // role===customer, must match customerId" — which left admins
+      // with a clean bypass: a store_admin from Store A could read
+      // any return on Store B by changing :storeId. Now:
+      //   - customer: must own the return (customerId match)
+      //   - store_admin / super_admin: must own (or be platform-staff
+      //     for) the storeId in the URL
+      const role = req.user!.role;
+      if (role === 'customer') {
+        if (returnRequest.customerId !== req.user!.userId) {
+          res.status(403).json({
+            success: false,
+            error: { code: 'FORBIDDEN', message: 'Access denied' },
+          });
+          return;
+        }
+      } else if (role === 'store_admin' || role === 'super_admin') {
+        const access = await checkStoreAccess(storeId, req.user!);
+        if (!access.ok) {
+          res
+            .status(access.status)
+            .json({ success: false, error: { code: access.code, message: access.message } });
+          return;
+        }
+      } else {
         res.status(403).json({
           success: false,
           error: { code: 'FORBIDDEN', message: 'Access denied' },

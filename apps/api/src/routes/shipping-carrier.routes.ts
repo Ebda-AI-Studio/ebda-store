@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
-import { requireStoreAccess } from '../middleware/store-access';
+import { requireStoreAccess, checkStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { shippingCarrierService } from '../services/shipping-carrier.service';
 import { CARRIER_CODES, CarrierCode } from '../services/carriers/types';
@@ -406,8 +406,27 @@ router.get(
         return;
       }
 
-      // Customers can only view their own orders; admins can view any
-      if (user?.role === 'customer' && order.customerId !== user.userId) {
+      // Customer path: ownership against `customerId`.
+      // Admin path: must own the store (or be super_admin) — without
+      // this check a store_admin from Store A could read tracking for
+      // any Order under Store B by changing :storeId in the URL.
+      if (user?.role === 'customer') {
+        if (order.customerId !== user.userId) {
+          res.status(403).json({
+            success: false,
+            error: { code: 'FORBIDDEN', message: 'Access denied' },
+          });
+          return;
+        }
+      } else if (user?.role === 'store_admin' || user?.role === 'super_admin') {
+        const access = await checkStoreAccess(storeId, user);
+        if (!access.ok) {
+          res
+            .status(access.status)
+            .json({ success: false, error: { code: access.code, message: access.message } });
+          return;
+        }
+      } else {
         res.status(403).json({
           success: false,
           error: { code: 'FORBIDDEN', message: 'Access denied' },

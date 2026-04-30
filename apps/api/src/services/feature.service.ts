@@ -40,25 +40,33 @@ class FeatureService {
   // DB Read — always returns full 21-key map
   // ==========================================
 
-  private async readFromDb(storeId: string): Promise<Record<FeatureKey, boolean>> {
-    const rows = await prisma.storeFeature.findMany({
-      where: { storeId },
-      select: { featureKey: true, enabled: true },
-    });
-
-    // Start with all keys defaulting to false
+  /**
+   * Build the full 21-key feature map from a list of `storeFeature` rows.
+   * Pure transform; takes anything findMany-shaped so it can be reused
+   * with the transaction client during write paths (defends against
+   * Neon read-replica staleness — see updateStoreFeatures).
+   */
+  private rowsToMap(
+    rows: Array<{ featureKey: string; enabled: boolean }>
+  ): Record<FeatureKey, boolean> {
     const map = Object.fromEntries(FEATURE_KEYS_ARRAY.map(key => [key, false])) as Record<
       FeatureKey,
       boolean
     >;
-
     for (const row of rows) {
       if (FEATURE_KEYS_ARRAY.includes(row.featureKey as FeatureKey)) {
         map[row.featureKey as FeatureKey] = row.enabled;
       }
     }
-
     return map;
+  }
+
+  private async readFromDb(storeId: string): Promise<Record<FeatureKey, boolean>> {
+    const rows = await prisma.storeFeature.findMany({
+      where: { storeId },
+      select: { featureKey: true, enabled: true },
+    });
+    return this.rowsToMap(rows);
   }
 
   // ==========================================
@@ -118,9 +126,14 @@ class FeatureService {
   ): Promise<Record<FeatureKey, boolean>> {
     const now = new Date();
 
-    await prisma.$transaction(
-      Object.entries(updates).map(([featureKey, enabled]) =>
-        prisma.storeFeature.upsert({
+    // Run upserts AND the post-write read in a single interactive
+    // transaction. Reading via the same `tx` client guarantees the
+    // SELECT goes to the primary that just absorbed the writes —
+    // avoids the Neon read-replica staleness window where the cache
+    // would otherwise be repopulated with the pre-write row state.
+    const freshFeatures = await prisma.$transaction(async tx => {
+      for (const [featureKey, enabled] of Object.entries(updates)) {
+        await tx.storeFeature.upsert({
           where: { storeId_featureKey: { storeId, featureKey } },
           create: {
             storeId,
@@ -134,12 +147,15 @@ class FeatureService {
             enabledAt: enabled ? now : null,
             enabledBy: userId,
           },
-        })
-      )
-    );
+        });
+      }
+      const rows = await tx.storeFeature.findMany({
+        where: { storeId },
+        select: { featureKey: true, enabled: true },
+      });
+      return this.rowsToMap(rows);
+    });
 
-    // Re-read from DB and SET cache (not DELETE) to avoid Neon replica staleness
-    const freshFeatures = await this.readFromDb(storeId);
     await this.writeToCache(storeId, freshFeatures);
 
     logger.info(

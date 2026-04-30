@@ -152,6 +152,16 @@ export const config = {
   backupSchedule: process.env.BACKUP_SCHEDULE || '0 3 * * *', // Daily at 3 AM
   backupRetentionDays: parseInt(process.env.BACKUP_RETENTION_DAYS || '30', 10),
   backupS3Bucket: process.env.BACKUP_S3_BUCKET || '',
+
+  // Shipping carrier webhook shared secrets. iCarry / Aramex push
+  // shipment status updates to /webhooks/shipping/<carrier>. The
+  // carriers don't sign their payloads, so we require a shared secret
+  // configured on both sides as `Authorization: Bearer <secret>` on
+  // the inbound POST. When unset the endpoint refuses every webhook
+  // (fail-closed) — without this an attacker who knows the URL could
+  // forge "delivered" status updates on any tracking number.
+  icarryWebhookSecret: process.env.ICARRY_WEBHOOK_SECRET || '',
+  aramexWebhookSecret: process.env.ARAMEX_WEBHOOK_SECRET || '',
 } as const;
 
 // Additional production validations (core secrets already validated above)

@@ -534,10 +534,36 @@ router.post('/whatsapp', express.json(), async (req: Request, res: Response) => 
 // ==========================================
 
 /**
+ * Verify a shared-secret bearer token on a carrier webhook. iCarry /
+ * Aramex don't sign their payloads, so we configure a shared secret
+ * in both control panels and check `Authorization: Bearer <secret>`
+ * (or `X-Webhook-Secret`) on every inbound POST. Fail-closed: if the
+ * env var isn't configured, refuse every webhook — better to lose a
+ * tracking-status push than to accept arbitrary "delivered" forgeries.
+ *
+ * Uses timing-safe equality so a stopwatch attacker can't probe for
+ * the secret one byte at a time.
+ */
+function verifyCarrierWebhookSecret(req: Request, expected: string): boolean {
+  if (!expected) return false;
+  const auth = (req.headers.authorization as string | undefined) || '';
+  const fromBearer = auth.toLowerCase().startsWith('bearer ') ? auth.slice(7) : '';
+  const fromHeader = (req.headers['x-webhook-secret'] as string | undefined) || '';
+  const presented = fromBearer || fromHeader;
+  if (!presented || presented.length !== expected.length) return false;
+  return crypto.timingSafeEqual(Buffer.from(presented), Buffer.from(expected));
+}
+
+/**
  * POST /webhooks/shipping/icarry
  * Receive push notifications from iCarry
  */
 router.post('/shipping/icarry', express.json(), async (req: Request, res: Response) => {
+  if (!verifyCarrierWebhookSecret(req, config.icarryWebhookSecret)) {
+    logger.warn({ ip: req.ip }, '[WEBHOOK] iCarry webhook rejected — bad/missing secret');
+    res.sendStatus(401);
+    return;
+  }
   try {
     const headers = Object.fromEntries(
       Object.entries(req.headers).map(([k, v]) => [k, String(v ?? '')])
@@ -555,6 +581,11 @@ router.post('/shipping/icarry', express.json(), async (req: Request, res: Respon
  * Receive push notifications from Aramex
  */
 router.post('/shipping/aramex', express.json(), async (req: Request, res: Response) => {
+  if (!verifyCarrierWebhookSecret(req, config.aramexWebhookSecret)) {
+    logger.warn({ ip: req.ip }, '[WEBHOOK] Aramex webhook rejected — bad/missing secret');
+    res.sendStatus(401);
+    return;
+  }
   try {
     const headers = Object.fromEntries(
       Object.entries(req.headers).map(([k, v]) => [k, String(v ?? '')])

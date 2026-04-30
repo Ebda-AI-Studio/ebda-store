@@ -6,7 +6,10 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     include: ['**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
-    exclude: ['**/node_modules/**', '**/dist/**', '**/.next/**'],
+    // `.claude/worktrees/**` houses temporary git worktrees from
+    // subagent runs; their stale tests would otherwise be picked up
+    // and either fail (missing deps) or duplicate the live tests.
+    exclude: ['**/node_modules/**', '**/dist/**', '**/.next/**', '**/.claude/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html', 'lcov'],

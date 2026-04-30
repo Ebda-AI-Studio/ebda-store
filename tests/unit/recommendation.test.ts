@@ -169,11 +169,18 @@ describe('getCartRecommendations', () => {
     const cartProductIds = ['prod-A', 'prod-B'];
     const recommendedId = 'prod-C';
 
-    // Manual cross-sell returns prod-B (already in cart) and prod-C (not in cart)
+    // Manual cross-sell returns prod-B (already in cart) and prod-C (not in cart).
+    // The N+1 fix in T1-10 batches manual lookups across every cart item in a
+    // single IN-list query, so the rows now include sourceProductId for the
+    // service's per-source grouping.
     mockPrisma.productRelation.findMany.mockResolvedValue([
-      { targetProductId: 'prod-B' },
-      { targetProductId: recommendedId },
+      { sourceProductId: 'prod-A', targetProductId: 'prod-B' },
+      { sourceProductId: 'prod-A', targetProductId: recommendedId },
     ]);
+    // FBT runs in parallel with the manual lookup (Promise.all). Cart
+    // items without manual relations fall through to FBT — empty array
+    // here means prod-B (no manual rels) yields no FBT recommendations.
+    mockPrisma.frequentlyBoughtTogether.findMany.mockResolvedValue([]);
 
     mockPrisma.product.findMany.mockResolvedValue([mockProductShape(recommendedId)]);
 

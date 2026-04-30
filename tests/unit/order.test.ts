@@ -212,9 +212,13 @@ describe('OrderService', () => {
       const result = await OrderService.getById(mockStoreId, 'order-123');
 
       expect(result).toEqual(mockOrder);
+      // `deletedAt: null` is part of the defensive soft-delete filter
+      // added in tier-2 hardening — Order has a soft-delete column the
+      // schema declares but no caller currently sets, and we don't want
+      // a future archive feature to leak archived rows through getById.
       expect(prisma.order.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: 'order-123', storeId: mockStoreId },
+          where: { id: 'order-123', storeId: mockStoreId, deletedAt: null },
         })
       );
     });
@@ -617,7 +621,7 @@ describe('OrderService', () => {
       expect(result.meta.total).toBe(2);
       expect(prisma.order.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { storeId: mockStoreId, customerId: mockCustomerId },
+          where: { storeId: mockStoreId, customerId: mockCustomerId, deletedAt: null },
           orderBy: { createdAt: 'desc' },
         })
       );
