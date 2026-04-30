@@ -2,6 +2,7 @@ import { prisma, Prisma, ProductStatus } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import { slugify } from '@force/shared';
 import { redis } from './redis.service';
+import { invalidateCached, invalidateCachedPrefix } from '../lib/public-cache';
 import logger from '../lib/logger';
 
 interface CreateProductData {
@@ -165,18 +166,29 @@ export class ProductService {
   /**
    * Invalidate Redis caches related to a store's products and categories.
    * Best-effort: failures are logged but do not throw.
+   *
+   * The Redis side of `public:products:<storeId>:...` keys we let expire
+   * naturally on their 30s TTL — pattern delete would require SCAN and
+   * the staleness window is small. The in-memory mirror IS swept here
+   * via prefix delete because it has no per-key TTL when Redis is
+   * unavailable (a sale-price update in admin used to stay invisible
+   * until the API process restarted).
    */
   private static async invalidateStoreProductCache(storeId: string): Promise<void> {
     try {
-      // Invalidate the categories cache (product counts may have changed)
       await redis.delete(`categories:store:${storeId}`);
-      // Product list caches expire after 30s so we don't attempt pattern-based deletion
+      await redis.delete(`public:categories:${storeId}`);
     } catch (err) {
       logger.warn(
         { err: err instanceof Error ? err.message : 'unknown', storeId },
         '[PRODUCT] Redis cache invalidation failed'
       );
     }
+    // Synchronous in-memory clear so the failover cache doesn't
+    // outlive the Redis row.
+    invalidateCachedPrefix(`public:products:${storeId}:`);
+    invalidateCachedPrefix(`public:suggest:${storeId}:`);
+    await invalidateCached(`public:categories:${storeId}`);
   }
 
   static async create(storeId: string, data: CreateProductData) {

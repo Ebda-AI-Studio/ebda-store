@@ -15,54 +15,12 @@ import {
   newsletterLimiter,
 } from '../middleware/security';
 import { getStoreIdFromRequest } from '../utils/store-helpers';
-import { redis } from '../services/redis.service';
-import { BoundedMap } from '../lib/bounded-map';
 import logger from '../lib/logger';
 import { featureService } from '../services/feature.service';
+import { getCached } from '../lib/public-cache';
+import { redis } from '../services/redis.service';
 
 const router = Router();
-
-// ==========================================
-// Cache-aside helper (uses Redis with in-memory fallback)
-// ==========================================
-
-// Bounded to 1000 keys so a long-running process never grows the Map
-// without limit when Redis is unavailable. The cache is a best-effort
-// fallback for Redis, so random eviction is acceptable.
-const memoryCache = new BoundedMap<string, { data: unknown; expiresAt: number }>(1000);
-
-async function getCached<T>(key: string, ttl: number, fetchFn: () => Promise<T>): Promise<T> {
-  // Try Redis first
-  try {
-    const cached = await redis.get<string>(key);
-    if (cached) {
-      return typeof cached === 'string' ? JSON.parse(cached) : (cached as T);
-    }
-  } catch {
-    // Redis unavailable, fall through to memory cache
-  }
-
-  // Try in-memory cache
-  const memEntry = memoryCache.get(key);
-  if (memEntry && memEntry.expiresAt > Date.now()) {
-    return memEntry.data as T;
-  }
-
-  // Fetch fresh data
-  const data = await fetchFn();
-
-  // Write to Redis (best-effort)
-  try {
-    await redis.set(key, JSON.stringify(data), ttl);
-  } catch {
-    // Redis unavailable, use memory cache as fallback
-  }
-
-  // Always write to memory cache as fallback
-  memoryCache.set(key, { data, expiresAt: Date.now() + ttl * 1000 });
-
-  return data;
-}
 
 // Apply public rate limiter to all routes
 router.use(publicLimiter);

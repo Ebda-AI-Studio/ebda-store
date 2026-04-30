@@ -34,6 +34,21 @@ function authScope(email: string, storeId: string | null) {
 export class AuthService {
   private static readonly SALT_ROUNDS = 12;
 
+  /**
+   * Pre-computed bcrypt hash of a value no caller can ever provide
+   * (32 random bytes generated once at boot). Used to equalize the
+   * login response time when the user record doesn't exist — without
+   * this dummy compare, "no user" returns ~50ms faster than "user
+   * exists, password wrong" and an attacker can enumerate registered
+   * emails by timing the response. The hash itself is irrelevant
+   * (compare always fails); we only care that the caller waits the
+   * same wall-clock time as the happy path.
+   */
+  private static readonly DUMMY_PASSWORD_HASH: string = bcrypt.hashSync(
+    crypto.randomBytes(32).toString('hex'),
+    12
+  );
+
   static async register(data: {
     email: string;
     password: string;
@@ -55,10 +70,6 @@ export class AuthService {
       where: authScope(data.email, storeId),
     });
 
-    if (existingUser) {
-      throw new AppError(409, 'ALREADY_EXISTS', 'User with this email already exists');
-    }
-
     // Parse name into first/last if provided
     let firstName = data.firstName;
     let lastName = data.lastName;
@@ -68,8 +79,18 @@ export class AuthService {
       lastName = nameParts.slice(1).join(' ') || '';
     }
 
-    // Hash password
+    // Always hash, even for the existing-user branch. Bcrypt is the
+    // expensive part of register; skipping it for an already-registered
+    // email used to make the 409 ALREADY_EXISTS response measurably
+    // faster than the happy path, which let an attacker enumerate
+    // registered emails by stopwatch alone. The 409 status itself
+    // still leaks existence (UX requires a user-visible "email taken"
+    // signal), but the timing channel is now closed.
     const passwordHash = await bcrypt.hash(data.password, this.SALT_ROUNDS);
+
+    if (existingUser) {
+      throw new AppError(409, 'ALREADY_EXISTS', 'User with this email already exists');
+    }
 
     // Create user
     const user = await prisma.user.create({
@@ -294,7 +315,11 @@ export class AuthService {
     });
 
     if (!user) {
-      // Record failed attempt even for non-existent users (prevent enumeration)
+      // Run a dummy bcrypt.compare so the response time matches the
+      // "user exists, wrong password" path. Skipping it here was
+      // previously a ~50ms timing oracle that let an attacker
+      // enumerate registered emails by stopwatch.
+      await bcrypt.compare(password, this.DUMMY_PASSWORD_HASH);
       await accountLockout.recordFailedAttempt(lockoutKey, ip);
       throw new AppError(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
     }

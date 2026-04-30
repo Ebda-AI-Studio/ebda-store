@@ -5,6 +5,7 @@ import { requirePermission } from '../middleware/rbac';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { requireStoreAccess } from '../middleware/store-access';
 import { prisma } from '@force/database';
+import { invalidateCached } from '../lib/public-cache';
 
 const router = Router({ mergeParams: true });
 
@@ -128,6 +129,11 @@ router.post(
         userAgent: req.headers['user-agent'],
       });
 
+      // Storefront caches the public category list for 120s. Without
+      // this bust, a merchant adding a category waits two minutes for
+      // it to appear on the live site.
+      await invalidateCached(`public:categories:${storeId}`);
+
       res.status(201).json({
         success: true,
         data: { category },
@@ -202,6 +208,8 @@ router.put(
         userAgent: req.headers['user-agent'],
       });
 
+      await invalidateCached(`public:categories:${storeId}`);
+
       res.json({
         success: true,
         data: { category },
@@ -250,6 +258,8 @@ router.delete(
         ip: req.ip,
         userAgent: req.headers['user-agent'],
       });
+
+      await invalidateCached(`public:categories:${storeId}`);
 
       res.json({
         success: true,

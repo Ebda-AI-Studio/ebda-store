@@ -385,6 +385,15 @@ export class BulkService {
 
     // ---- Phase 3: Batch-create new categories and tags ----
 
+    // Track the IDs of categories/tags this run created so we can clean
+    // up orphans at the end. Phase 3 runs OUTSIDE the per-batch product
+    // transaction (it has to — categories/tags are referenced by every
+    // batch), so a Phase-4 batch failure used to leave dangling rows
+    // with no products attached. We collect the new IDs here and prune
+    // any that never got linked at the bottom of the function.
+    const createdCategoryIds = new Set<string>();
+    const createdTagIds = new Set<string>();
+
     if (newCategoryNames.size > 0) {
       // Generate unique slugs for new categories using the in-memory set
       const categoryData: Array<{ storeId: string; name: string; slug: string }> = [];
@@ -409,6 +418,7 @@ export class BulkService {
       });
       for (const c of newCats) {
         categoryByName.set(c.name, c.id);
+        createdCategoryIds.add(c.id);
       }
     }
 
@@ -423,6 +433,7 @@ export class BulkService {
       });
       for (const t of newTags) {
         tagByName.set(t.name, t.id);
+        createdTagIds.add(t.id);
       }
     }
 
@@ -599,6 +610,40 @@ export class BulkService {
                 : `Rolled back (batch failure at row ${rowIndex})`,
           });
         }
+      }
+    }
+
+    // Orphan cleanup. Any category/tag this run created that didn't
+    // end up linked to a product is dead weight (the rows referencing
+    // it failed and rolled back). Delete the unreferenced ones — leaves
+    // categories/tags that another product happens to use intact.
+    if (createdCategoryIds.size > 0) {
+      const referenced = await prisma.productCategory.findMany({
+        where: { categoryId: { in: [...createdCategoryIds] } },
+        select: { categoryId: true },
+        distinct: ['categoryId'],
+      });
+      const referencedIds = new Set(referenced.map(r => r.categoryId));
+      const orphanIds = [...createdCategoryIds].filter(id => !referencedIds.has(id));
+      if (orphanIds.length > 0) {
+        await prisma.category.deleteMany({
+          where: { id: { in: orphanIds }, storeId },
+        });
+      }
+    }
+
+    if (createdTagIds.size > 0) {
+      const referenced = await prisma.productTag.findMany({
+        where: { tagId: { in: [...createdTagIds] } },
+        select: { tagId: true },
+        distinct: ['tagId'],
+      });
+      const referencedIds = new Set(referenced.map(r => r.tagId));
+      const orphanIds = [...createdTagIds].filter(id => !referencedIds.has(id));
+      if (orphanIds.length > 0) {
+        await prisma.tag.deleteMany({
+          where: { id: { in: orphanIds }, storeId },
+        });
       }
     }
 

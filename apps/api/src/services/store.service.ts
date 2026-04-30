@@ -2,7 +2,25 @@ import { prisma, Prisma } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import { slugify } from '@force/shared';
 import { redis } from './redis.service';
+import { invalidateCached, invalidateCachedPrefix } from '../lib/public-cache';
 import logger from '../lib/logger';
+
+/**
+ * Bust every public-cache entry that depends on a store record. The
+ * `public:store:<slugOrId>` key is hit by both the slug and the UUID
+ * paths, so we invalidate both. Categories and product lists are
+ * separate keys handled by their own services, but a store update can
+ * still change the embedded settings (currency, theme) the storefront
+ * shows next to product cards — so we also drop product/category
+ * caches for the same store. Cheap relative to the cost of serving
+ * stale settings to a customer mid-purchase.
+ */
+async function bustStoreCaches(storeId: string, slug: string | null): Promise<void> {
+  await invalidateCached(`public:store:${storeId}`);
+  if (slug) await invalidateCached(`public:store:${slug}`);
+  await invalidateCached(`public:categories:${storeId}`);
+  invalidateCachedPrefix(`public:products:${storeId}:`);
+}
 
 interface CreateStoreData {
   name: string;
@@ -252,6 +270,7 @@ export class StoreService {
       );
     }
 
+    await bustStoreCaches(updatedStore.id, updatedStore.slug);
     return updatedStore;
   }
 
@@ -298,6 +317,9 @@ export class StoreService {
         '[STORE] Redis cache invalidation failed on delete'
       );
     }
+
+    // Public-facing storefront caches too — same logic as updates.
+    await bustStoreCaches(storeId, store.slug);
 
     return { id: storeId, name: store.name, slug: store.slug };
   }
@@ -385,6 +407,7 @@ export class StoreService {
     });
 
     await StoreService.invalidateCache(store);
+    await bustStoreCaches(updatedStore.id, updatedStore.slug);
     return updatedStore;
   }
 
@@ -397,6 +420,7 @@ export class StoreService {
     });
 
     await StoreService.invalidateCache(store);
+    await bustStoreCaches(updatedStore.id, updatedStore.slug);
     return updatedStore;
   }
 
@@ -428,6 +452,7 @@ export class StoreService {
     });
 
     await StoreService.invalidateCache(store);
+    await bustStoreCaches(updatedStore.id, updatedStore.slug);
     return updatedStore;
   }
 
@@ -440,6 +465,7 @@ export class StoreService {
     });
 
     await StoreService.invalidateCache(store);
+    await bustStoreCaches(updatedStore.id, updatedStore.slug);
     return updatedStore;
   }
 
@@ -469,6 +495,7 @@ export class StoreService {
     });
 
     await StoreService.invalidateCache(store);
+    await bustStoreCaches(updatedStore.id, updatedStore.slug);
     return updatedStore;
   }
 
@@ -481,6 +508,7 @@ export class StoreService {
     });
 
     await StoreService.invalidateCache(store);
+    await bustStoreCaches(updatedStore.id, updatedStore.slug);
     return updatedStore;
   }
 
@@ -512,6 +540,7 @@ export class StoreService {
     });
 
     await StoreService.invalidateCache(store);
+    await bustStoreCaches(updatedStore.id, updatedStore.slug);
     return updatedStore;
   }
 
@@ -551,6 +580,7 @@ export class StoreService {
     });
 
     await StoreService.invalidateCache(store);
+    await bustStoreCaches(updatedStore.id, updatedStore.slug);
     return updatedStore;
   }
 }
