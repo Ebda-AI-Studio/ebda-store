@@ -287,6 +287,32 @@ export class EmailService {
   }
 
   /**
+   * Duplicate-registration notice. Sent to the rightful owner when
+   * someone (or themselves) submits the register form with their
+   * existing email — the API now responds the same way for new and
+   * existing emails (T1-4 enumeration close), so this email is the
+   * legitimate user's signal that "the form was completed against my
+   * address". Includes a sign-in link and a password-reset hint, but
+   * NO clickable tokens — if it wasn't them, the worst-case is a
+   * forced password reset.
+   */
+  static async sendDuplicateRegistrationNotice(data: {
+    email: string;
+    name: string;
+    storeName?: string;
+  }): Promise<void> {
+    const html = this.renderTemplate('duplicate-registration', data);
+    await this.send({
+      to: data.email,
+      subject:
+        data.storeName && data.storeName.length > 0
+          ? `Account already exists at ${data.storeName}`
+          : 'Account already exists',
+      html,
+    });
+  }
+
+  /**
    * Resend Email Verification
    */
   static async sendResendVerification(data: {
@@ -368,6 +394,10 @@ export class EmailService {
       'resend-verification': d =>
         this.resendVerificationTemplate(
           d as { email: string; name: string; verificationUrl: string; expiresIn: string }
+        ),
+      'duplicate-registration': d =>
+        this.duplicateRegistrationTemplate(
+          d as { email: string; name: string; storeName?: string }
         ),
       'admin-new-order': d => this.adminNewOrderTemplate(d as OrderEmailData),
       'admin-refund': d =>
@@ -663,6 +693,50 @@ export class EmailService {
       <p style="font-size: 12px; color: #999; margin-top: 24px;">
         If the button above doesn't work, copy and paste this link into your browser:<br>
         <a href="${verificationUrlEsc}" style="color: #ff6e00; word-break: break-all;">${verificationUrlEsc}</a>
+      </p>
+    `);
+  }
+
+  /**
+   * Duplicate Registration Notice template.
+   *
+   * Sent to the legitimate owner of an email when someone (possibly
+   * them) submits the register form against an already-registered
+   * address. The API now responds the same way regardless of whether
+   * the email exists — this email is the legitimate owner's signal
+   * that the form was completed against their address. Deliberately
+   * has NO clickable token; if it wasn't them, the worst they need
+   * to do is reset their password.
+   */
+  private static duplicateRegistrationTemplate(d: {
+    email: string;
+    name: string;
+    storeName?: string;
+  }): string {
+    const loginUrlEsc = escapeHtml(`${config.webUrl}/auth/login`);
+    const resetUrlEsc = escapeHtml(`${config.webUrl}/auth/forgot-password`);
+    const storeRef = d.storeName ? ` at ${escapeHtml(d.storeName)}` : '';
+    return EmailService.baseTemplate(`
+      <h2>Account already exists</h2>
+      <p>Hi ${escapeHtml(d.name)},</p>
+      <p>
+        Someone (possibly you) just tried to register a new account${storeRef}
+        using this email address — but you already have an account here.
+      </p>
+      <p>
+        If this was you, just sign in normally:
+      </p>
+      <p style="text-align: center; margin: 24px 0;">
+        <a href="${loginUrlEsc}" class="button">Sign in</a>
+      </p>
+      <p>
+        If you've forgotten your password, you can
+        <a href="${resetUrlEsc}" style="color: #ff6e00;">request a reset link</a>.
+      </p>
+      <p style="font-size: 14px; color: #666; margin-top: 24px;">
+        If this wasn't you, you can ignore this email — no changes were
+        made to your account. We recommend resetting your password if
+        you think someone else has your email address.
       </p>
     `);
   }

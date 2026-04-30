@@ -14,7 +14,7 @@ interface AuthContextType {
     password: string;
     firstName: string;
     lastName: string;
-  }) => Promise<{ success: boolean; error?: string }>;
+  }) => Promise<{ success: boolean; verifyEmailRequired?: boolean; error?: string }>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -74,19 +74,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = useCallback(
     async (data: { email: string; password: string; firstName: string; lastName: string }) => {
       const result = await api.register({ ...data, storeId: store.id });
-      if (result.success && result.data) {
-        // Access token is set as HTTP-only cookie by the API.
-        // Only store the refresh token in localStorage.
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('refreshToken', result.data.refreshToken);
-          if ((result.data as any).csrfToken) {
-            localStorage.setItem('csrfToken', (result.data as any).csrfToken);
-          }
-        }
-        setUser(result.data.user);
-        return { success: true };
+      if (!result.success) {
+        return { success: false, error: result.error?.message || 'Failed to register' };
       }
-      return { success: false, error: result.error?.message || 'Failed to register' };
+      // T1-4: register no longer issues tokens. The API responds with
+      // `{ emailVerificationSent: true }` for both new and existing
+      // emails (closes the enumeration channel). Caller redirects to
+      // a "check your email" page; the user signs in via /auth/login
+      // after verifying their address.
+      return { success: true, verifyEmailRequired: true };
     },
     [store.id]
   );

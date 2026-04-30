@@ -124,25 +124,23 @@ router.post('/register', authLimiter, async (req: Request, res: Response, next: 
       storeId: data.storeId ?? null,
     });
 
-    // Audit log
+    // T1-4 enumeration close: register no longer leaks "this email
+    // already exists" via response status, body shape, or tokens.
+    // AuthService.register handles both branches and returns the same
+    // `{ emailVerificationSent: true }` for new and existing emails;
+    // existing users get a notification email, new users get the
+    // standard verification email. The audit log key is the
+    // submitted email rather than a user.id (we deliberately don't
+    // expose whether a row was created).
     await auditLog({
       action: 'user.register',
-      userId: result.user.id,
       resourceType: 'user',
-      resourceId: result.user.id,
+      details: { email: data.email },
       ip: req.ip,
       userAgent: req.headers['user-agent'],
     });
 
-    // Set access token as HTTP-only cookie for cookie-based auth
-    setTokenCookie(res, result.accessToken);
-
-    // ALSO return the access token in the body so Bearer-token clients
-    // (notably the iOS admin PWA, where third-party cookies get purged
-    // by WebKit) can store it in localStorage and send it via the
-    // Authorization header. Cookie + Bearer are both supported by the
-    // API's auth middleware; the header takes precedence.
-    res.status(201).json({
+    res.status(200).json({
       success: true,
       data: result,
     });

@@ -723,16 +723,29 @@ class ShippingCarrierService {
       '[ShippingCarrierService] Tracking cron: polling shipments'
     );
 
-    for (const { id } of activeShipments) {
-      try {
-        await this.updateShipmentStatus(id);
-      } catch (err) {
-        logger.error(
-          { err, shipmentId: id },
-          '[ShippingCarrierService] Failed to update shipment status'
-        );
+    // Process with bounded concurrency. Sequential was N × (DB lookup
+    // + provider HTTP + DB update) = ~600 round-trips for a 200-shipment
+    // run; the provider call dominates so a worker pool of 8 cuts the
+    // wall-clock by roughly 8×. Capped intentionally — going higher
+    // risks tripping carrier rate limits (iCarry / Aramex publish
+    // 10 req/s ceilings) and exhausting the Neon connection pool.
+    const concurrency = 8;
+    const queue = [...activeShipments];
+    const workers = Array.from({ length: Math.min(concurrency, queue.length) }, async () => {
+      while (queue.length > 0) {
+        const next = queue.shift();
+        if (!next) return;
+        try {
+          await this.updateShipmentStatus(next.id);
+        } catch (err) {
+          logger.error(
+            { err, shipmentId: next.id },
+            '[ShippingCarrierService] Failed to update shipment status'
+          );
+        }
       }
-    }
+    });
+    await Promise.all(workers);
   }
 
   // ==========================================

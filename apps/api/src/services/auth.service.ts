@@ -68,6 +68,7 @@ export class AuthService {
     // stores can share an email — the lookup must use the composite key.
     const existingUser = await prisma.user.findFirst({
       where: authScope(data.email, storeId),
+      select: { id: true, email: true, firstName: true, lastName: true, storeId: true },
     });
 
     // Parse name into first/last if provided
@@ -80,16 +81,47 @@ export class AuthService {
     }
 
     // Always hash, even for the existing-user branch. Bcrypt is the
-    // expensive part of register; skipping it for an already-registered
-    // email used to make the 409 ALREADY_EXISTS response measurably
-    // faster than the happy path, which let an attacker enumerate
-    // registered emails by stopwatch alone. The 409 status itself
-    // still leaks existence (UX requires a user-visible "email taken"
-    // signal), but the timing channel is now closed.
+    // expensive part of register; skipping it makes the existing-user
+    // path measurably faster and lets an attacker enumerate registered
+    // emails by stopwatch.
     const passwordHash = await bcrypt.hash(data.password, this.SALT_ROUNDS);
 
+    // T1-4 enumeration close. Both branches return the IDENTICAL
+    // response shape `{ emailVerificationSent: true }` with NO tokens.
+    //   - new email: create user, send verification email (links to a
+    //     verify endpoint that grants tokens after email is verified)
+    //   - existing email: send a "registration attempt" notice to the
+    //     rightful owner (no clickable tokens in the email — if it
+    //     wasn't them, worst case is they reset their password)
+    // The only side-channel left is the wall-clock cost of
+    // `prisma.user.create` vs `EmailService.send` — both involve
+    // network IO so the variance is dominated by SMTP latency, not
+    // the existence check.
     if (existingUser) {
-      throw new AppError(409, 'ALREADY_EXISTS', 'User with this email already exists');
+      const storeName = existingUser.storeId
+        ? (
+            await prisma.store
+              .findUnique({
+                where: { id: existingUser.storeId },
+                select: { name: true },
+              })
+              .catch(() => null)
+          )?.name
+        : undefined;
+      const recipientName =
+        `${existingUser.firstName ?? ''} ${existingUser.lastName ?? ''}`.trim() ||
+        existingUser.email;
+      void EmailService.sendDuplicateRegistrationNotice({
+        email: existingUser.email,
+        name: recipientName,
+        storeName: storeName ?? undefined,
+      }).catch(err =>
+        logger.error(
+          { err, email: existingUser.email },
+          'Failed to send duplicate-registration notice'
+        )
+      );
+      return { emailVerificationSent: true } as const;
     }
 
     // Create user
@@ -115,18 +147,9 @@ export class AuthService {
       },
     });
 
-    // Generate tokens
-    const tokens = await this.generateTokens({
-      userId: user.id,
-      email: user.email,
-      role: user.role,
-      storeId: user.storeId,
-    });
-
-    // User is registered — return to caller as fast as possible. Verification
-    // email goes out fire-and-forget so a slow / unreachable SMTP host can't
-    // stall the registration response. If delivery fails the customer can
-    // request a resend via /auth/resend-verification.
+    // Verification email goes out fire-and-forget so a slow / unreachable
+    // SMTP host can't stall the registration response. If delivery fails
+    // the customer can request a resend via /auth/resend-verification.
     void this.sendVerificationEmail(
       user.id,
       user.email,
@@ -135,9 +158,7 @@ export class AuthService {
       logger.error({ err, userId: user.id }, 'Failed to send verification email after register')
     );
 
-    // Reflect the optimistic dispatch — the email was queued, not necessarily
-    // delivered; clients use this only to tell the user to check their inbox.
-    return { user, ...tokens, emailVerificationSent: true };
+    return { emailVerificationSent: true } as const;
   }
 
   /**

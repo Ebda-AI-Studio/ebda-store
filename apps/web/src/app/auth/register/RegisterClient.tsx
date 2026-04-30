@@ -54,14 +54,14 @@ export default function RegisterClient() {
         throw new Error(result.error?.message || 'Failed to register');
       }
 
-      // Access token is set as HTTP-only cookie by the API.
-      // Only store refresh token in localStorage.
-      if (result.data) {
-        localStorage.setItem('refreshToken', result.data.refreshToken);
-      }
-
-      // Redirect to home
-      router.push(storeUrl('/'));
+      // T1-4: register no longer returns tokens. The API responds the
+      // same way for new and existing emails (enumeration close), so
+      // we always send the user to the "verify your email" page —
+      // they get a link in their inbox (real registration) or a
+      // "someone tried to register with this email" notice (existing
+      // account). Either way the next action is in their inbox, not
+      // here.
+      router.push(storeUrl('/auth/check-email'));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to register');
     } finally {
