@@ -56,11 +56,22 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     import('socket.io-client').then(({ io }) => {
       if (cancelled) return;
 
+      // Pass the access token via the handshake auth payload — the
+      // API socket service accepts `socket.handshake.auth.token` ahead
+      // of cookies. Necessary for the iOS PWA where third-party
+      // cookies are stripped by WebKit; without this the socket never
+      // authenticates and the bell shows a permanent "Reconnecting…"
+      // footer even though OneSignal push is delivering the actual
+      // notifications.
+      const accessToken =
+        typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+
       socketRef.current = io(apiUrl, {
         withCredentials: true,
         reconnection: true,
         reconnectionAttempts: 5,
         reconnectionDelay: 1000,
+        auth: accessToken ? { token: accessToken } : undefined,
       });
 
       socketRef.current.on('connect', () => {

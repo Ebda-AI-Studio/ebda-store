@@ -220,6 +220,7 @@ export class ReturnService {
     // Send real-time notification to store admins
     try {
       socketService.newReturnNotification(storeId, {
+        returnId: returnRequest.id,
         returnNumber,
         orderNumber: order.orderNumber,
         customerName:

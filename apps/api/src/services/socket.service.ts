@@ -233,49 +233,79 @@ class SocketService {
    */
   newOrderNotification(
     storeId: string,
-    order: { orderNumber: string; total: number; customerName: string }
+    order: {
+      orderId?: string;
+      orderNumber: string;
+      total: number;
+      customerName: string;
+    }
   ) {
+    // `data.url` lets the bell-icon click handler navigate straight
+    // into the order detail page. Without it the merchant sees the
+    // notification but has to manually go find the order.
+    const url = order.orderId
+      ? `/stores/${storeId}/orders/${order.orderId}`
+      : `/stores/${storeId}/orders`;
     this.notifyStore(storeId, {
       type: 'new_order',
       title: 'New Order Received',
       message: `Order #${order.orderNumber} from ${order.customerName} - ${(order.total / 1000).toFixed(3)} KWD`,
-      data: order,
+      data: { ...order, storeId, url },
       createdAt: new Date(),
     });
   }
 
   newReviewNotification(
     storeId: string,
-    review: { productName: string; rating: number; customerName: string }
+    review: {
+      reviewId?: string;
+      productName: string;
+      rating: number;
+      customerName: string;
+    }
   ) {
     this.notifyStore(storeId, {
       type: 'new_review',
       title: 'New Product Review',
       message: `${review.customerName} left a ${review.rating}-star review on ${review.productName}`,
-      data: review,
+      data: { ...review, storeId, url: `/stores/${storeId}/reviews` },
       createdAt: new Date(),
     });
   }
 
   newReturnNotification(
     storeId: string,
-    returnRequest: { returnNumber: string; orderNumber: string; customerName: string }
+    returnRequest: {
+      returnId?: string;
+      returnNumber: string;
+      orderNumber: string;
+      customerName: string;
+    }
   ) {
+    const url = returnRequest.returnId
+      ? `/stores/${storeId}/returns/${returnRequest.returnId}`
+      : `/stores/${storeId}/returns`;
     this.notifyStore(storeId, {
       type: 'new_return',
       title: 'New Return Request',
       message: `Return request #${returnRequest.returnNumber} for order #${returnRequest.orderNumber} from ${returnRequest.customerName}`,
-      data: returnRequest,
+      data: { ...returnRequest, storeId, url },
       createdAt: new Date(),
     });
   }
 
-  lowStockNotification(storeId: string, product: { name: string; inventory: number }) {
+  lowStockNotification(
+    storeId: string,
+    product: { productId?: string; name: string; inventory: number }
+  ) {
+    const url = product.productId
+      ? `/stores/${storeId}/products/${product.productId}/edit`
+      : `/stores/${storeId}/inventory`;
     this.notifyStore(storeId, {
       type: 'low_stock',
       title: 'Low Stock Alert',
       message: `${product.name} has only ${product.inventory} items left in stock`,
-      data: product,
+      data: { ...product, storeId, url },
       createdAt: new Date(),
     });
   }

@@ -10,13 +10,17 @@ interface CustomerCardProps {
 export function CustomerCard({ order }: CustomerCardProps) {
   const t = useT('orders.detail');
   const customer = order.customer;
-  const phone = customer?.phone || order.shippingAddress?.phone || '';
-  const email = customer?.email || order.shippingAddress?.email || '';
-  const name = customer
-    ? `${customer.firstName ?? ''} ${customer.lastName ?? ''}`.trim()
-    : `${order.shippingAddress?.firstName ?? ''} ${order.shippingAddress?.lastName ?? ''}`.trim();
+  // Guest orders fall through DeliveryCard's recipient block — rendering
+  // them here as well duplicates name/phone/email + the call/WA buttons,
+  // which clutters the mobile detail page. Show this card only when the
+  // order is linked to a real customer account.
+  if (!customer) return null;
 
-  if (!customer && !phone && !email && !name) return null;
+  const phone = customer.phone || order.shippingAddress?.phone || '';
+  const email = customer.email || order.shippingAddress?.email || '';
+  const name = `${customer.firstName ?? ''} ${customer.lastName ?? ''}`.trim();
+
+  if (!phone && !email && !name) return null;
 
   const digits = phone.replace(/\D/g, '');
   const callHref = digits ? `tel:${digits}` : null;

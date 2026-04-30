@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useNotifications } from '@/contexts/NotificationContext';
 import { formatDistanceToNow } from 'date-fns';
 import { useT } from '@/i18n/useT';
@@ -25,10 +26,27 @@ const colorMap: Record<string, string> = {
 
 export function NotificationBell() {
   const t = useT('components.notificationBell');
+  const router = useRouter();
   const { notifications, unreadCount, isConnected, markAsRead, markAllAsRead, clearNotifications } =
     useNotifications();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Initial-connect grace period. The bell mounts with `isConnected=false`
+  // because the socket handshake hasn't completed yet. Without this
+  // delay the "Reconnecting…" footer flashes on every page render in
+  // the moments before the first connect, which the merchant reports
+  // as "always there". 3s covers a normal handshake (typically <500ms
+  // over a healthy connection) with margin for cold-starts.
+  const [showReconnecting, setShowReconnecting] = useState(false);
+  useEffect(() => {
+    if (isConnected) {
+      setShowReconnecting(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setShowReconnecting(true), 3_000);
+    return () => window.clearTimeout(timer);
+  }, [isConnected]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -41,6 +59,20 @@ export function NotificationBell() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Click handler: mark read AND navigate to the related resource if
+  // the notification carries a `data.url`. Without this the merchant
+  // sees a "New Order Received" entry and has to manually go find
+  // the order; with it the entire row is a button to the order
+  // detail page.
+  function handleNotificationClick(notification: (typeof notifications)[number]) {
+    markAsRead(notification.id);
+    const url = typeof notification.data?.url === 'string' ? notification.data.url : null;
+    if (url) {
+      setIsOpen(false);
+      router.push(url);
+    }
+  }
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -134,7 +166,7 @@ export function NotificationBell() {
                 {notifications.map(notification => (
                   <li
                     key={notification.id}
-                    onClick={() => markAsRead(notification.id)}
+                    onClick={() => handleNotificationClick(notification)}
                     className={`px-4 py-3 border-b border-border dark:border-border hover:bg-muted dark:hover:bg-foreground/50 cursor-pointer transition-colors ${
                       !notification.read ? 'bg-primary/5' : ''
                     }`}
@@ -173,8 +205,8 @@ export function NotificationBell() {
             )}
           </div>
 
-          {/* Footer */}
-          {!isConnected && (
+          {/* Footer — only after the 3s grace window (see showReconnecting) */}
+          {!isConnected && showReconnecting && (
             <div className="px-4 py-2 bg-warning/5 dark:bg-warning/30 border-t border-warning/30 dark:border-yellow-800">
               <p className="text-xs text-warning dark:text-warning flex items-center gap-1">
                 <span className="w-2 h-2 bg-warning rounded-full animate-pulse" />

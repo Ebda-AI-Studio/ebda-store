@@ -494,6 +494,7 @@ export class OrderService {
     // Send real-time notification to store admins
     try {
       socketService.newOrderNotification(storeId, {
+        orderId: order.id,
         orderNumber: order.orderNumber,
         total: order.total,
         customerName:

@@ -268,6 +268,7 @@ export class ReviewService {
     // Send real-time notification to store admins
     try {
       socketService.newReviewNotification(storeId, {
+        reviewId: review.id,
         productName: product.name,
         rating: data.rating,
         customerName: 'Customer', // Anonymized for privacy

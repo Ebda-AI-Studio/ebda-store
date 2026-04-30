@@ -43,12 +43,25 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
   const { user, isLoading, isAuthenticated, logout } = useAuth();
   const { isEnabled } = useFeatures();
 
-  // Redirect to login if not authenticated once loading completes
+  // Redirect to login if not authenticated once loading completes.
+  //
+  // - `router.replace` (not `push`): back from /auth/login should
+  //   return the customer to whatever they were on BEFORE the
+  //   protected route (thank-you / home / wherever), not bounce
+  //   them straight back into /account/* and re-trigger this
+  //   redirect into a loop.
+  // - `?redirect=<original path>`: the login client already reads
+  //   this param and sends successful sign-ins back to it. Without
+  //   it, a guest who clicks "View Order Status" on the success
+  //   page → logs in → lands on the home page instead of their
+  //   orders.
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      router.push(storeUrl('/auth/login'));
+      const target = `${pathname || '/account'}`;
+      const loginUrl = `${storeUrl('/auth/login')}?redirect=${encodeURIComponent(target)}`;
+      router.replace(loginUrl);
     }
-  }, [isLoading, isAuthenticated, router, storeUrl]);
+  }, [isLoading, isAuthenticated, router, storeUrl, pathname]);
 
   async function handleLogout() {
     await logout();
