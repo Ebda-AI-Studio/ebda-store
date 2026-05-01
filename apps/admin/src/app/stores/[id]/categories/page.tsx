@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button, useToast } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { ImageUpload } from '../../../../components/ImageUpload';
 import { apiGet, apiPost, apiPut, apiDelete } from '../../../../lib/api';
 import { CategoryForm, type CategoryFormData } from './CategoryForm';
 import { CategoryTable, type Category } from './CategoryTable';
@@ -51,6 +52,42 @@ export default function StoreCategoriesPage() {
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const { success: toastSuccess, error: showError } = useToast();
 
+  // Best Sellers virtual category cover. Lives on the Store row, not on
+  // a Category row — so it gets its own tiny GET/PUT pair instead of
+  // riding the categories CRUD.
+  const [bestSellersImage, setBestSellersImage] = useState<string | null>(null);
+  const [savingBestSellersImage, setSavingBestSellersImage] = useState(false);
+
+  const fetchBestSellersImage = useCallback(async () => {
+    if (!storeId) return;
+    const { data } = await apiGet<{ image: string | null }>(
+      `/api/v1/stores/${storeId}/categories/best-sellers-image`
+    );
+    setBestSellersImage(data?.image ?? null);
+  }, [storeId]);
+
+  const saveBestSellersImage = useCallback(
+    async (image: string | null) => {
+      if (!storeId) return;
+      setSavingBestSellersImage(true);
+      try {
+        const { error: apiError } = await apiPut(
+          `/api/v1/stores/${storeId}/categories/best-sellers-image`,
+          { image }
+        );
+        if (apiError) {
+          showError(t('errorTitle'), apiError.message ?? '');
+          return;
+        }
+        setBestSellersImage(image);
+        toastSuccess(image ? 'Best Sellers cover updated' : 'Best Sellers cover removed');
+      } finally {
+        setSavingBestSellersImage(false);
+      }
+    },
+    [storeId, showError, toastSuccess, t]
+  );
+
   const fetchCategories = useCallback(async () => {
     if (!storeId) return;
     setIsLoading(true);
@@ -73,7 +110,8 @@ export default function StoreCategoriesPage() {
 
   useEffect(() => {
     fetchCategories();
-  }, [fetchCategories]);
+    fetchBestSellersImage();
+  }, [fetchCategories, fetchBestSellersImage]);
 
   function openAddForm() {
     setEditingId(null);
@@ -231,6 +269,34 @@ export default function StoreCategoriesPage() {
           storeId={storeId}
         />
       )}
+
+      {/* Best Sellers virtual category cover. The storefront treats
+          Best Sellers like any other category tile, so the merchant
+          should be able to give it the same visual treatment. The
+          image persists on the Store row (not on a Category row),
+          which is why this lives outside CategoryTable. */}
+      <div className="mb-4 rounded-xl border bg-card p-4 shadow-sm">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h3 className="text-base font-semibold text-foreground">Best Sellers cover</h3>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Shown on the storefront's Best Sellers tile alongside your real categories. The tile
+              only renders when at least one product is flagged as a best seller.
+            </p>
+          </div>
+          <div className="md:w-64">
+            <ImageUpload
+              value={bestSellersImage ?? ''}
+              onUpload={url => saveBestSellersImage(url)}
+              onRemove={() => saveBestSellersImage(null)}
+              folder="categories"
+              storeId={storeId}
+              label={savingBestSellersImage ? 'Saving…' : 'Upload cover'}
+              accept="image/jpeg,image/png,image/webp"
+            />
+          </div>
+        </div>
+      </div>
 
       {/* Categories List */}
       <div className="rounded-xl border bg-card shadow-sm overflow-hidden">

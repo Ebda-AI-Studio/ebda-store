@@ -4,6 +4,7 @@ import { slugify } from '@force/shared';
 import { redis } from './redis.service';
 import { invalidateCached, invalidateCachedPrefix } from '../lib/public-cache';
 import logger from '../lib/logger';
+import { cleanupRemovedImages } from './r2-cleanup.service';
 
 interface CreateProductData {
   name: string;
@@ -266,6 +267,13 @@ export class ProductService {
       }
     }
 
+    // Snapshot the URLs we're about to drop so we can run the R2-side
+    // cleanup AFTER the transaction commits. Doing the diff up front
+    // means we don't have to round-trip back to the DB to figure out
+    // what disappeared.
+    const previousImageUrls = product.images?.map(i => i.url) ?? [];
+    const nextImageUrls = data.images?.map(i => i.url) ?? previousImageUrls;
+
     // Wrap image/category replacement and product update in a transaction
     // so that a failure mid-way does not leave orphaned or missing relations.
     const updatedProduct = await prisma.$transaction(async tx => {
@@ -329,10 +337,28 @@ export class ProductService {
     });
 
     await this.invalidateStoreProductCache(storeId);
+
+    // Fire-and-forget R2 cleanup for any image URL that disappeared
+    // during this update. Runs AFTER the transaction commits so a
+    // transient R2 hiccup can't roll back legitimate DB edits, and
+    // so isStillReferenced() sees the post-write state. We don't
+    // await — the merchant's save shouldn't pay R2 round-trip
+    // latency.
+    if (data.images !== undefined) {
+      void cleanupRemovedImages(previousImageUrls, nextImageUrls).catch(err =>
+        logger.warn({ err, productId }, '[product.update] r2 cleanup failed')
+      );
+    }
+
     return updatedProduct;
   }
 
   static async delete(storeId: string, productId: string) {
+    // Soft-delete keeps the row + child rows around so the deletion
+    // is reversible (admin restore flow). DON'T touch R2 here — those
+    // images need to survive in case the merchant restores. The
+    // hard-delete path (orphan-audit script + future "purge soft-
+    // deleted" job) is what cleans up R2 long-term.
     await this.getById(storeId, productId);
 
     await prisma.product.update({
@@ -646,20 +672,20 @@ export class ProductService {
       );
     }
 
-    // Two queries in parallel: real categories + the count of products
-    // flagged as best-sellers. We expose Best Sellers as a VIRTUAL
-    // category alongside the real ones so the storefront's nav, grid,
-    // and listing pages all treat it identically to a real category —
-    // but the underlying product membership is the per-product
-    // `isBestSeller` flag, NOT a ProductCategory link. This lets a
-    // product live in its real bucket (Palestinian / Spices / etc.)
-    // AND simultaneously appear in Best Sellers without the merchant
-    // having to double-tag.
+    // Three queries in parallel: real categories + the count of products
+    // flagged as best-sellers + the store's bestSellersImage cover.
+    // We expose Best Sellers as a VIRTUAL category alongside the real
+    // ones so the storefront's nav, grid, and listing pages all treat
+    // it identically to a real category — but the underlying product
+    // membership is the per-product `isBestSeller` flag, NOT a
+    // ProductCategory link. This lets a product live in its real
+    // bucket (Palestinian / Spices / etc.) AND simultaneously appear
+    // in Best Sellers without the merchant having to double-tag.
     //
     // The virtual entry uses `slug: 'best-sellers'`; the storefront
     // ProductsClient special-cases that slug into `sort=best_seller`
     // when fetching products.
-    const [categories, bestSellerCount] = await Promise.all([
+    const [categories, bestSellerCount, store] = await Promise.all([
       prisma.category.findMany({
         where: {
           storeId,
@@ -680,6 +706,10 @@ export class ProductService {
       }),
       prisma.product.count({
         where: { storeId, isBestSeller: true, deletedAt: null, status: 'active' },
+      }),
+      prisma.store.findUnique({
+        where: { id: storeId },
+        select: { bestSellersImage: true },
       }),
     ]);
 
@@ -704,7 +734,10 @@ export class ProductService {
               nameAr: 'الأكثر مبيعاً',
               description: null,
               descriptionAr: null,
-              image: null,
+              // Store-level cover for the Best Sellers tile. Falls
+              // back to null (text-only treatment) when the merchant
+              // hasn't uploaded one.
+              image: store?.bestSellersImage ?? null,
               isActive: true,
               position: -1,
               isVirtual: true as const,

@@ -1,5 +1,7 @@
 import { prisma } from '@force/database';
 import { AppError } from '../middleware/error-handler';
+import logger from '../lib/logger';
+import { deleteR2ObjectIfOrphan } from './r2-cleanup.service';
 
 interface CreateOptionInput {
   name: string;
@@ -456,7 +458,7 @@ export class VariantService {
       throw new AppError(404, 'NOT_FOUND', 'Variant not found');
     }
 
-    return prisma.productVariant.update({
+    const updated = await prisma.productVariant.update({
       where: { id: variantId },
       data: input,
       include: {
@@ -469,6 +471,18 @@ export class VariantService {
         },
       },
     });
+
+    // If the variant's image URL changed, queue the old object for R2
+    // cleanup. Skip when input.imageUrl is undefined (caller didn't
+    // touch the field) — only the explicit-set or explicit-null cases
+    // should trigger a delete.
+    if (input.imageUrl !== undefined && variant.imageUrl && variant.imageUrl !== input.imageUrl) {
+      void deleteR2ObjectIfOrphan(variant.imageUrl).catch(err =>
+        logger.warn({ err, variantId }, '[variant.update] r2 cleanup failed')
+      );
+    }
+
+    return updated;
   }
 
   /**
@@ -487,6 +501,15 @@ export class VariantService {
     }
 
     await prisma.productVariant.delete({ where: { id: variantId } });
+
+    // Variant rows are hard-deleted (no soft-delete on this table), so
+    // the image is genuinely orphaned the moment the row goes. Safe to
+    // clean up immediately.
+    if (variant.imageUrl) {
+      void deleteR2ObjectIfOrphan(variant.imageUrl).catch(err =>
+        logger.warn({ err, variantId }, '[variant.delete] r2 cleanup failed')
+      );
+    }
   }
 
   /**

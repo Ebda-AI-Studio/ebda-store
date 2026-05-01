@@ -40,7 +40,18 @@ interface OneSignalV16 {
     serviceWorkerPath?: string;
     allowLocalhostAsSecureOrigin?: boolean;
     autoResubscribe?: boolean;
+    autoRegister?: boolean;
     notifyButton?: { enable?: boolean };
+    promptOptions?: {
+      slidedown?: {
+        prompts?: Array<{
+          type: 'push';
+          autoPrompt?: boolean;
+          text?: { actionMessage?: string; acceptButton?: string; cancelButton?: string };
+          delay?: { pageViews?: number; timeDelay?: number };
+        }>;
+      };
+    };
   }) => Promise<void>;
   User?: {
     addTag?: (key: string, value: string) => Promise<void> | void;
@@ -115,6 +126,20 @@ export function OneSignalStorefrontInit() {
           serviceWorkerPath: '/OneSignalSDKWorker.js',
           allowLocalhostAsSecureOrigin: true,
           autoResubscribe: true,
+          // Defensively disable EVERY built-in trigger — the merchant
+          // complained the OneSignal slidedown was firing on its own
+          // (likely an auto-prompt left enabled in the dashboard for
+          // this app). Subscription only happens when the storefront
+          // dispatches `force:open-push-prompt` (see
+          // PushNotificationPrompt) or when a future custom button
+          // calls OneSignal.User.PushSubscription.optIn() directly.
+          autoRegister: false,
+          notifyButton: { enable: false },
+          promptOptions: {
+            slidedown: {
+              prompts: [{ type: 'push', autoPrompt: false }],
+            },
+          },
         });
       } catch (err) {
         // Push is an enhancement, never block the storefront.

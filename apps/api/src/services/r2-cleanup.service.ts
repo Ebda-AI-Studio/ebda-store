@@ -1,0 +1,133 @@
+import { prisma } from '@force/database';
+import { config } from '../config';
+import { StorageService } from './storage.service';
+import logger from '../lib/logger';
+
+/**
+ * Helper that deletes R2 objects when their last DB reference goes away.
+ *
+ * Why this exists: before this service, replacing a product image (admin
+ * UI edits the gallery and saves) deleted the `product_images` row but
+ * NEVER deleted the underlying R2 object. Every edit leaked storage,
+ * and the leaked objects then made periodic orphan-audit cleanups
+ * dangerous (it became hard to tell "real orphan" from "in-flight
+ * upload"). One Palora's worth of data already vanished that way — the
+ * audit deleted objects that the audit thought were orphans but the
+ * still-pointing DB rows had stale URLs.
+ *
+ * Safety model:
+ *  - Only delete a key after confirming NO other live row points at the
+ *    same URL (productImage, productVariant.imageUrl, category.image,
+ *    store logo/hero/og/favicon, storePage.coverImage). This is a
+ *    targeted version of `scripts/r2-orphan-audit.ts`'s cross-table
+ *    sweep, scoped to a single URL so it's cheap.
+ *  - Skip URLs that aren't ours (third-party CDN images stay alone).
+ *  - Best-effort: errors are logged and swallowed; no caller wants
+ *    their product save to fail because R2 had a hiccup.
+ *  - Run AFTER the DB transaction commits. Calling inside the
+ *    transaction would let a transient R2 failure roll back legitimate
+ *    DB edits.
+ *
+ * Call from anywhere a row that owns an R2 image is being replaced or
+ * deleted (product update, variant update, category update, etc.).
+ */
+
+/** Convert a DB-stored URL to its R2 object key, or null if foreign. */
+export function urlToR2Key(url: string | null | undefined): string | null {
+  if (!url) return null;
+  if (config.storagePublicUrl && url.startsWith(config.storagePublicUrl + '/')) {
+    return url.slice(config.storagePublicUrl.length + 1);
+  }
+  if (config.storageEndpoint && config.storageBucket) {
+    const endpointPrefix = `${config.storageEndpoint}/${config.storageBucket}/`;
+    if (url.startsWith(endpointPrefix)) {
+      return url.slice(endpointPrefix.length);
+    }
+  }
+  return null;
+}
+
+/**
+ * True when at least one live row anywhere in the schema still
+ * references this URL. Checks every table that the orphan-audit script
+ * tracks — keep in sync when a new image-bearing column is added.
+ */
+async function isStillReferenced(url: string): Promise<boolean> {
+  // Run all the existence checks in parallel; any single match is
+  // enough to abort the delete. Using `findFirst` + `select: { id }`
+  // keeps each query as a one-row index probe.
+  const [pi, pv, cat, page, storeLogo, storeLogoAr, storeHero, storeOg, storeFavicon] =
+    await Promise.all([
+      prisma.productImage.findFirst({ where: { url }, select: { id: true } }),
+      prisma.productVariant.findFirst({ where: { imageUrl: url }, select: { id: true } }),
+      prisma.category.findFirst({ where: { image: url }, select: { id: true } }),
+      prisma.storePage.findFirst({ where: { coverImage: url }, select: { id: true } }),
+      prisma.store.findFirst({ where: { logo: url }, select: { id: true } }),
+      prisma.store.findFirst({ where: { logoAr: url }, select: { id: true } }),
+      prisma.store.findFirst({ where: { heroImage: url }, select: { id: true } }),
+      prisma.store.findFirst({ where: { ogImage: url }, select: { id: true } }),
+      prisma.store.findFirst({ where: { favicon: url }, select: { id: true } }),
+    ]);
+  return Boolean(
+    pi || pv || cat || page || storeLogo || storeLogoAr || storeHero || storeOg || storeFavicon
+  );
+}
+
+/**
+ * Delete the R2 object backing `url` if it's safe to do so.
+ *
+ * "Safe" = the URL is in our bucket, AND no DB row still points at it.
+ * Errors are logged and swallowed — never propagated to the caller.
+ *
+ * This is intended to be called AFTER the DB write that removed the
+ * row: by the time we run, the new `images` array is already saved,
+ * so an existence check sees the post-write state and won't flag
+ * "still referenced" against the row we just deleted.
+ */
+export async function deleteR2ObjectIfOrphan(url: string | null | undefined): Promise<void> {
+  if (!url) return;
+  const key = urlToR2Key(url);
+  if (!key) {
+    // External URL (storefront pasted in a Picsum / CDN URL, etc.) —
+    // not ours to touch.
+    return;
+  }
+  if (!StorageService.isAvailable()) {
+    return;
+  }
+  try {
+    const stillUsed = await isStillReferenced(url);
+    if (stillUsed) {
+      logger.info({ key, url }, '[r2-cleanup] skipping delete — URL still referenced elsewhere');
+      return;
+    }
+    await StorageService.delete(key);
+    logger.info({ key }, '[r2-cleanup] deleted orphan R2 object');
+  } catch (err) {
+    // Best-effort. Don't surface to the caller — the merchant just
+    // saved a product, they shouldn't see "save failed" because R2
+    // 503'd a delete request.
+    logger.warn({ err, key, url }, '[r2-cleanup] failed to delete orphan R2 object');
+  }
+}
+
+/**
+ * Diff `oldUrls` against `newUrls` and asynchronously clean up any URL
+ * that disappeared. Runs concurrently with reasonable bounds.
+ *
+ * Returns immediately — never awaits the cleanup itself, so callers
+ * can fire-and-forget without blocking the request response. The
+ * function still awaits internally so the Node process keeps the work
+ * alive until it finishes (no detached promises that can be GC'd).
+ */
+export function cleanupRemovedImages(
+  oldUrls: Array<string | null | undefined>,
+  newUrls: Array<string | null | undefined>
+): Promise<void> {
+  const newSet = new Set(newUrls.filter((u): u is string => Boolean(u)));
+  const removed = oldUrls.filter(
+    (u): u is string => typeof u === 'string' && u.length > 0 && !newSet.has(u)
+  );
+  if (removed.length === 0) return Promise.resolve();
+  return Promise.all(removed.map(url => deleteR2ObjectIfOrphan(url))).then(() => undefined);
+}

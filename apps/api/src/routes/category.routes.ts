@@ -6,6 +6,8 @@ import { auditLog, writeLimiter } from '../middleware/security';
 import { requireStoreAccess } from '../middleware/store-access';
 import { prisma } from '@force/database';
 import { invalidateCached } from '../lib/public-cache';
+import { deleteR2ObjectIfOrphan } from '../services/r2-cleanup.service';
+import logger from '../lib/logger';
 
 const router = Router({ mergeParams: true });
 
@@ -36,6 +38,86 @@ const updateCategorySchema = z.object({
   descriptionAr: z.string().optional().nullable(),
   image: z.string().url().optional().nullable(),
 });
+
+// GET /stores/:storeId/categories/best-sellers-image — read the
+// store's Best Sellers virtual category cover. Tiny endpoint so the
+// admin UI can show the current value alongside the real category
+// list. Mounted before `/` to avoid colliding with the categoryId
+// path parameter on the PUT/DELETE routes.
+router.get(
+  '/best-sellers-image',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const store = await prisma.store.findUnique({
+        where: { id: storeId },
+        select: { bestSellersImage: true },
+      });
+      res.json({ success: true, data: { image: store?.bestSellersImage ?? null } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// PUT /stores/:storeId/categories/best-sellers-image — set/clear the
+// virtual category cover. Pass `image: null` to clear; passing an
+// R2-hosted URL queues the previous one for orphan cleanup.
+router.put(
+  '/best-sellers-image',
+  authenticate,
+  requirePermission('products:write'),
+  requireStoreAccess,
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const schema = z.object({
+        image: z.string().url().nullable(),
+      });
+      const data = schema.parse(req.body);
+
+      const existing = await prisma.store.findUnique({
+        where: { id: storeId },
+        select: { bestSellersImage: true },
+      });
+      const previous = existing?.bestSellersImage ?? null;
+
+      const store = await prisma.store.update({
+        where: { id: storeId },
+        data: { bestSellersImage: data.image },
+        select: { bestSellersImage: true },
+      });
+
+      if (previous && previous !== data.image) {
+        void deleteR2ObjectIfOrphan(previous).catch(err =>
+          logger.warn({ err, storeId }, '[best-sellers-image] r2 cleanup failed')
+        );
+      }
+
+      await auditLog({
+        action: 'store.bestSellersImage.updated',
+        userId: req.user!.userId,
+        resourceType: 'store',
+        resourceId: storeId,
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+
+      // Bust the public categories cache so the storefront sees the
+      // new tile image on the next request rather than waiting out
+      // the 120s TTL.
+      await invalidateCached(`public:categories:${storeId}`);
+
+      res.json({ success: true, data: { image: store.bestSellersImage } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 // GET /stores/:storeId/categories — admin list. Used to be
 // `authenticate` only; any store_admin token could read another
@@ -183,6 +265,8 @@ router.put(
         }
       }
 
+      const previousImage = existing.image;
+
       const category = await prisma.category.update({
         where: { id: categoryId },
         data: {
@@ -197,6 +281,15 @@ router.put(
           _count: { select: { products: true } },
         },
       });
+
+      // If the cover image changed, queue the old object for R2 cleanup.
+      // Only fires when `data.image` is in the patch (undefined means
+      // "leave existing"). Best-effort, no failure surfaced upstream.
+      if (data.image !== undefined && previousImage && previousImage !== data.image) {
+        void deleteR2ObjectIfOrphan(previousImage).catch(err =>
+          logger.warn({ err, categoryId }, '[category.update] r2 cleanup failed')
+        );
+      }
 
       await auditLog({
         action: 'category.updated',

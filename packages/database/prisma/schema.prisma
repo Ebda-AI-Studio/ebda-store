@@ -173,6 +173,10 @@ model Store {
   heroCtaTextAr  String?     @map("hero_cta_text_ar")
   heroCtaLink    String?     @map("hero_cta_link")
   heroImage      String?     @map("hero_image")
+  // Cover image shown on the storefront's Best Sellers virtual
+  // category tile. Optional — when null the storefront falls back to
+  // the text-only treatment.
+  bestSellersImage String?   @map("best_sellers_image")
   description    String?
   descriptionAr  String?     @map("description_ar")
   currency       String      @default("KWD")
