@@ -259,6 +259,12 @@ async function fetchStoreByDomain(domain: string): Promise<ResolvedStore | null>
       heroCtaTextAr: storeData.heroCtaTextAr ?? null,
       heroCtaLink: storeData.heroCtaLink ?? null,
       heroImage: storeData.heroImage ?? null,
+      // Per-store typography overrides — passed through verbatim;
+      // layout.tsx sanitises every value before injecting CSS.
+      typography:
+        storeData.typography && typeof storeData.typography === 'object'
+          ? (storeData.typography as Record<string, unknown>)
+          : null,
     };
   } catch (error) {
     console.error(`Error fetching store for domain ${domain}:`, error);
@@ -378,6 +384,12 @@ async function fetchStoreBySlug(slug: string): Promise<ResolvedStore | null> {
       heroCtaTextAr: storeData.heroCtaTextAr ?? null,
       heroCtaLink: storeData.heroCtaLink ?? null,
       heroImage: storeData.heroImage ?? null,
+      // Per-store typography overrides — passed through verbatim;
+      // layout.tsx sanitises every value before injecting CSS.
+      typography:
+        storeData.typography && typeof storeData.typography === 'object'
+          ? (storeData.typography as Record<string, unknown>)
+          : null,
     };
   } catch (error) {
     console.error(`Error fetching store for slug ${slug}:`, error);
@@ -518,6 +530,12 @@ export async function getStoreById(storeId: string): Promise<ResolvedStore | nul
       heroCtaTextAr: storeData.heroCtaTextAr ?? null,
       heroCtaLink: storeData.heroCtaLink ?? null,
       heroImage: storeData.heroImage ?? null,
+      // Per-store typography overrides — passed through verbatim;
+      // layout.tsx sanitises every value before injecting CSS.
+      typography:
+        storeData.typography && typeof storeData.typography === 'object'
+          ? (storeData.typography as Record<string, unknown>)
+          : null,
     };
   } catch (error) {
     console.error(`Error fetching store ${storeId}:`, error);
