@@ -177,6 +177,11 @@ model Store {
   // category tile. Optional — when null the storefront falls back to
   // the text-only treatment.
   bestSellersImage String?   @map("best_sellers_image")
+  // Per-store typography overrides — see TypographySettings type in
+  // @force/shared. JSON because the shape will keep evolving (more
+  // zones, line-height/letter-spacing, etc.) and we don't want a
+  // column-add migration each time.
+  typography     Json?       @map("typography")
   description    String?
   descriptionAr  String?     @map("description_ar")
   currency       String      @default("KWD")

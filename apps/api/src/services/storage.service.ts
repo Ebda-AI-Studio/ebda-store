@@ -63,6 +63,9 @@ const ALLOWED_TENANT_FOLDERS = new Set<string>([
   'branding',
   'hero',
   'misc',
+  // Per-store custom fonts uploaded via the typography admin page.
+  // Uses the same key shape as everything else: stores/<storeId>/fonts/...
+  'fonts',
 ]);
 
 /**

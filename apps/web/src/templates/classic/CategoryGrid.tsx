@@ -17,7 +17,11 @@ export default function ClassicCategoryGrid({
   const displayTitle = getDisplayTitle(isRtl, title, titleAr);
 
   return (
-    <section className="py-16 md:py-24 bg-background" dir={isRtl ? 'rtl' : 'ltr'}>
+    <section
+      className="py-16 md:py-24 bg-background"
+      dir={isRtl ? 'rtl' : 'ltr'}
+      data-zone="categories"
+    >
       <div className="container mx-auto px-4">
         {/* Section Header - Elegant centered */}
         {displayTitle && (

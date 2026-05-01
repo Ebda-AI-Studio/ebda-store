@@ -17,7 +17,11 @@ export default function ElegantCategoryGrid({
   const displayTitle = getDisplayTitle(isRtl, title, titleAr);
 
   return (
-    <section className="py-20 md:py-28 bg-background" dir={isRtl ? 'rtl' : 'ltr'}>
+    <section
+      className="py-20 md:py-28 bg-background"
+      dir={isRtl ? 'rtl' : 'ltr'}
+      data-zone="categories"
+    >
       <div className="container mx-auto px-4">
         {/* Section header — eyebrow ("Shop by") removed; was hardcoded
             marketing copy. */}

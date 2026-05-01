@@ -35,6 +35,7 @@ import onesignalRoutes from './onesignal.routes';
 import storeLayoutRoutes from './store-layout.routes';
 import publicStoreLayoutRoutes from './public-store-layout.routes';
 import pagesRoutes from './pages.routes';
+import typographyRoutes from './typography.routes';
 import { tenantContext } from '../middleware/tenant-context';
 
 const router = Router();
@@ -72,6 +73,7 @@ router.use('/stores', tenantContext, storeRoutes);
 router.use('/admin/stores/:storeId/layout', tenantContext, storeLayoutRoutes);
 router.use('/stores/:storeId/products', tenantContext, productRoutes);
 router.use('/stores/:storeId/categories', tenantContext, categoryRoutes);
+router.use('/stores/:storeId/typography', tenantContext, typographyRoutes);
 router.use('/stores/:storeId/cart', tenantContext, cartRoutes);
 router.use('/stores/:storeId/orders', tenantContext, orderRoutes);
 // Customers export (.xlsx). Mounted at /stores/:storeId so the route

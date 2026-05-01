@@ -66,6 +66,7 @@ export default function ModernProductGrid({
       role="list"
       aria-label={isRtl ? 'قائمة المنتجات' : 'Product list'}
       dir={isRtl ? 'rtl' : 'ltr'}
+      data-zone="products"
     >
       {products.map((product, index) => (
         <div

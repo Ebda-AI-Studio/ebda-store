@@ -27,7 +27,11 @@ export default function MinimalProductGrid({
   const gridCols = getGridColsClass(columns);
 
   return (
-    <section className="py-12 sm:py-20 md:py-32 bg-background" dir={isRtl ? 'rtl' : 'ltr'}>
+    <section
+      className="py-12 sm:py-20 md:py-32 bg-background"
+      dir={isRtl ? 'rtl' : 'ltr'}
+      data-zone="products"
+    >
       <div className="container mx-auto px-4">
         {displayTitle && (
           <h2 className="text-sm tracking-[0.2em] uppercase text-muted-foreground mb-10 sm:mb-12 md:mb-16 text-center">

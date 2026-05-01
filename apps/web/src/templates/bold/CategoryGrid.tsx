@@ -20,6 +20,7 @@ export default function BoldCategoryGrid({
     <section
       className="py-12 sm:py-16 md:py-28 bg-background relative overflow-hidden"
       dir={isRtl ? 'rtl' : 'ltr'}
+      data-zone="categories"
     >
       {/* Background accent */}
       <div className="absolute top-0 left-0 w-1/2 h-1/2 bg-primary/5 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />

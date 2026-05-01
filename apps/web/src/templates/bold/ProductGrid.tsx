@@ -30,6 +30,7 @@ export default function BoldProductGrid({
     <section
       className="py-12 sm:py-16 md:py-28 bg-background relative overflow-hidden"
       dir={isRtl ? 'rtl' : 'ltr'}
+      data-zone="products"
     >
       {/* Background accents */}
       <div className="absolute bottom-0 right-0 w-1/2 h-1/2 bg-primary/5 rounded-full blur-3xl translate-x-1/2 translate-y-1/2" />

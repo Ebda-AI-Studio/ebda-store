@@ -27,6 +27,7 @@ export default function ModernCategoryGrid({
     <div
       className={`grid gap-4 md:gap-6 ${getGridCols(categories.length)}`}
       dir={isRtl ? 'rtl' : 'ltr'}
+      data-zone="categories"
     >
       {categories.map(category => (
         <CategoryCard key={category.id} category={category} isRtl={isRtl} urlPrefix={urlPrefix} />

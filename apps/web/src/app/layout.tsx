@@ -284,6 +284,103 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         .join('; ')} }`
     : '';
 
+  // Build the per-store typography style tags (custom-font @font-face,
+  // Google Fonts <link>, and per-zone CSS rules targeting
+  // `[data-zone="..."]` containers in every template). The shape is
+  // validated by Zod on PUT, but we still sanitize each output value
+  // because the storefront ultimately injects this into a <style> tag.
+  const ZONE_NAMES = [
+    'beforeHeader',
+    'header',
+    'categories',
+    'products',
+    'footer',
+    'afterFooter',
+  ] as const;
+  const sanitizeFontValue = (v: unknown): string | null => {
+    if (typeof v !== 'string' || v.length === 0 || v.length > 200) return null;
+    if (/[{}]|url\s*\(|@import|expression\s*\(|javascript\s*:|<|>/i.test(v)) return null;
+    return v;
+  };
+  const sanitizeUrl = (v: unknown): string | null => {
+    if (typeof v !== 'string' || v.length === 0 || v.length > 2048) return null;
+    if (!/^https:\/\//.test(v)) return null;
+    if (/["'<>{}\\]/.test(v)) return null;
+    return v;
+  };
+  const typo = store.typography as
+    | {
+        fonts?: Array<
+          | { type: 'google'; url?: string; family?: string }
+          | {
+              type: 'custom';
+              family?: string;
+              url?: string;
+              format?: string;
+              weight?: string;
+              style?: string;
+            }
+        >;
+        zones?: Record<string, Record<string, string>>;
+      }
+    | null
+    | undefined;
+  const googleFontUrls: string[] = [];
+  const fontFaceRules: string[] = [];
+  if (typo?.fonts && Array.isArray(typo.fonts)) {
+    for (const f of typo.fonts) {
+      const url = sanitizeUrl(f.url);
+      if (!url) continue;
+      if (f.type === 'google') {
+        googleFontUrls.push(url);
+      } else if (f.type === 'custom') {
+        const family = sanitizeFontValue(f.family);
+        const format = ['woff2', 'woff', 'ttf', 'otf'].includes(String(f.format))
+          ? String(f.format)
+          : 'woff2';
+        if (!family) continue;
+        const weight = sanitizeFontValue(f.weight) ?? 'normal';
+        const style = f.style === 'italic' ? 'italic' : 'normal';
+        fontFaceRules.push(
+          `@font-face{font-family:'${family}';src:url('${url}') format('${format}');font-weight:${weight};font-style:${style};font-display:swap;}`
+        );
+      }
+    }
+  }
+  const zoneRules: string[] = [];
+  if (typo?.zones) {
+    for (const zone of ZONE_NAMES) {
+      const cfg = typo.zones[zone];
+      if (!cfg || typeof cfg !== 'object') continue;
+      const decls: string[] = [];
+      const fam = sanitizeFontValue(cfg.fontFamily);
+      if (fam) decls.push(`font-family:${fam}`);
+      const size = sanitizeFontValue(cfg.fontSize);
+      if (size) decls.push(`font-size:${size}`);
+      const weight = sanitizeFontValue(cfg.fontWeight);
+      if (weight) decls.push(`font-weight:${weight}`);
+      const lh = sanitizeFontValue(cfg.lineHeight);
+      if (lh) decls.push(`line-height:${lh}`);
+      const ls = sanitizeFontValue(cfg.letterSpacing);
+      if (ls) decls.push(`letter-spacing:${ls}`);
+      const color = sanitizeFontValue(cfg.color);
+      if (color) decls.push(`color:${color}`);
+      if (decls.length === 0) continue;
+      // Apply to the zone container AND every descendant — that way
+      // a merchant who picks "Header = Playfair" doesn't have to
+      // re-tag every <h1>/<a>/<span> inside the header. Using a CSS
+      // selector instead of a CSS variable keeps templates from
+      // having to be rewritten to read the variable.
+      zoneRules.push(`[data-zone="${zone}"], [data-zone="${zone}"] *{${decls.join(';')}}`);
+    }
+  }
+  // Combine the typography rules into the same style tag the theme
+  // already injects — keeps the surface area minimal and avoids
+  // duplicate <style> blocks. All inputs above pass through
+  // sanitizeFontValue/sanitizeUrl to prevent CSS-injection escapes.
+  const typographyCss = [...fontFaceRules, ...zoneRules].join('\n');
+  const combinedStyleTag = [themeStyleTag, typographyCss].filter(Boolean).join('\n');
+
   return (
     <html lang={lang} dir={dir} suppressHydrationWarning>
       <head>
@@ -291,7 +388,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }}
         />
-        {themeStyleTag && <style dangerouslySetInnerHTML={{ __html: themeStyleTag }} />}
+        {googleFontUrls.map(url => (
+          <link key={url} rel="stylesheet" href={url} />
+        ))}
+        {combinedStyleTag && <style dangerouslySetInnerHTML={{ __html: combinedStyleTag }} />}
         {/* Detect system dark mode preference and apply .dark class before paint */}
         <script
           dangerouslySetInnerHTML={{

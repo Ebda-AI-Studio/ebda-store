@@ -27,7 +27,11 @@ export default function ElegantProductGrid({
   const gridCols = getGridColsClass(columns);
 
   return (
-    <section className="py-12 sm:py-16 md:py-28 bg-background" dir={isRtl ? 'rtl' : 'ltr'}>
+    <section
+      className="py-12 sm:py-16 md:py-28 bg-background"
+      dir={isRtl ? 'rtl' : 'ltr'}
+      data-zone="products"
+    >
       <div className="container mx-auto px-4">
         {/* Section header — editorial style. Eyebrow line ("Discover")
             removed; was hardcoded marketing copy. The merchant's title

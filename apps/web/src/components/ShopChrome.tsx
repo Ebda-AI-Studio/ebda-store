@@ -198,51 +198,65 @@ export function ShopChrome({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
+      {/* `data-zone` wrappers let the per-store typography rules in
+          apps/web/src/app/layout.tsx target each storefront zone
+          without having to rewrite the templates' internal markup.
+          Six zones, applied uniformly across all 5 packs. */}
       {store.announcementBar?.enabled && store.announcementBar.text && (
-        <T.AnnouncementBar
-          text={store.announcementBar.text}
-          textAr={store.announcementBar.textAr}
-          link={store.announcementBar.link}
-          linkText={store.announcementBar.linkText}
-          linkTextAr={store.announcementBar.linkTextAr}
-          bgColor={store.announcementBar.bgColor}
-          textColor={store.announcementBar.textColor}
-          dismissible={store.announcementBar.dismissible}
-          isRtl={isRtl}
-        />
+        <div data-zone="beforeHeader">
+          <T.AnnouncementBar
+            text={store.announcementBar.text}
+            textAr={store.announcementBar.textAr}
+            link={store.announcementBar.link}
+            linkText={store.announcementBar.linkText}
+            linkTextAr={store.announcementBar.linkTextAr}
+            bgColor={store.announcementBar.bgColor}
+            textColor={store.announcementBar.textColor}
+            dismissible={store.announcementBar.dismissible}
+            isRtl={isRtl}
+          />
+        </div>
       )}
-      <T.Header
-        branding={branding}
-        navigation={navigation}
-        isRtl={isRtl}
-        cartItemCount={itemCount}
-        onSearch={handleSearch}
-        urlPrefix={urlPrefix}
-        utilityBar={utilityBar}
-      />
+      <div data-zone="header">
+        <T.Header
+          branding={branding}
+          navigation={navigation}
+          isRtl={isRtl}
+          cartItemCount={itemCount}
+          onSearch={handleSearch}
+          urlPrefix={urlPrefix}
+          utilityBar={utilityBar}
+        />
+      </div>
       <main className="flex-1">{children}</main>
-      <T.Footer
-        branding={branding}
-        contact={{
-          email: contact.email,
-          phone: contact.phone,
-          phoneAr: contact.phoneAr,
-          whatsapp: contact.whatsapp,
-          address: contact.address,
-          addressAr: contact.addressAr,
-          addressUrl,
-          addressLink,
-        }}
-        socials={contact.socialLinks}
-        navigation={navigation}
-        footerLinks={footerLinks}
-        // Pages the merchant explicitly disabled in /content/<slug>.
-        // The footer hides matching legal links so a disabled Privacy
-        // page doesn't leave a dead "Privacy" link in the bottom bar.
-        disabledCmsSlugs={store.disabledCmsSlugs}
-        isRtl={isRtl}
-        urlPrefix={urlPrefix}
-      />
+      <div data-zone="footer">
+        <T.Footer
+          branding={branding}
+          contact={{
+            email: contact.email,
+            phone: contact.phone,
+            phoneAr: contact.phoneAr,
+            whatsapp: contact.whatsapp,
+            address: contact.address,
+            addressAr: contact.addressAr,
+            addressUrl,
+            addressLink,
+          }}
+          socials={contact.socialLinks}
+          navigation={navigation}
+          footerLinks={footerLinks}
+          // Pages the merchant explicitly disabled in /content/<slug>.
+          // The footer hides matching legal links so a disabled Privacy
+          // page doesn't leave a dead "Privacy" link in the bottom bar.
+          disabledCmsSlugs={store.disabledCmsSlugs}
+          isRtl={isRtl}
+          urlPrefix={urlPrefix}
+        />
+      </div>
+      {/* afterFooter — empty placeholder so any merchant-injected text
+          below the footer (cookie disclaimer, copyright, etc) inherits
+          the typography zone. Kept zero-height when there's no content. */}
+      <div data-zone="afterFooter" />
     </div>
   );
 }

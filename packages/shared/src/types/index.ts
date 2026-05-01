@@ -6,6 +6,9 @@ export * from './store-theme';
 // Store Layout Settings (Pecannbee-style flow toggles)
 export * from './store-layout';
 
+// Per-store typography overrides
+export * from './typography';
+
 // API Response Types
 export interface ApiResponse<T = unknown> {
   success: boolean;

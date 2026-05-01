@@ -75,6 +75,10 @@ const ALLOWED_FOLDERS = new Set([
   'branding',
   'hero',
   'misc',
+  // Custom fonts (woff2/woff/ttf/otf) uploaded by the typography
+  // admin. The /uploads/font endpoint enforces the file-type filter
+  // — this set is the broader allowlist for both image and font flows.
+  'fonts',
 ]);
 
 /**
@@ -438,6 +442,124 @@ router.delete(
         success: true,
         data: { message: 'File deleted successfully' },
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// Custom-font uploads have a different MIME-type allowlist than image
+// uploads, so they get their own multer + endpoint instead of bolting
+// onto /uploads/image.
+const fontUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB — fonts are typically <500KB; cap is generous
+    files: 1,
+  },
+  fileFilter: (_req, file, cb) => {
+    const allowedTypes = new Set([
+      'font/woff2',
+      'font/woff',
+      'font/ttf',
+      'font/otf',
+      // Browsers are inconsistent about font MIME types — some send
+      // application/* variants. Accept the safe set that maps to
+      // formats we'd write into a CSS @font-face src().
+      'application/font-woff2',
+      'application/font-woff',
+      'application/x-font-woff',
+      'application/x-font-woff2',
+      'application/x-font-ttf',
+      'application/x-font-otf',
+      'application/octet-stream', // Some browsers send this for fonts; we still validate the extension below.
+    ]);
+    const allowedExts = /\.(woff2|woff|ttf|otf)$/i;
+    if (allowedTypes.has(file.mimetype) || allowedExts.test(file.originalname)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`Invalid font file: ${file.originalname} (${file.mimetype})`));
+    }
+  },
+});
+
+/**
+ * POST /uploads/font
+ * Upload a custom font file (.woff2 / .woff / .ttf / .otf) into
+ * `stores/<storeId>/fonts/...`. Used by the typography admin page.
+ * Returns the public URL + format (extension) so the admin can write
+ * a TypographyFontSourceCustom entry into the store's typography
+ * config without a second round-trip.
+ */
+router.post(
+  '/font',
+  authenticate,
+  requirePermission('settings:write'),
+  uploadLimiter,
+  dailyUploadLimiter,
+  fontUpload.single('file'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!req.file) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'NO_FILE', message: 'No font file uploaded' },
+        });
+        return;
+      }
+
+      // Force the folder to `fonts` regardless of what the client sent
+      // — keeps every per-store font under a predictable prefix that
+      // `r2-orphan-audit.ts` and the typography R2-cleanup branch can
+      // reason about.
+      const storeId = (req.query.storeId as string) || (req.headers['x-store-id'] as string);
+      if (!storeId) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'MISSING_STORE', message: 'storeId is required for font uploads' },
+        });
+        return;
+      }
+      const access = await checkStoreAccess(storeId, req.user!);
+      if (!access.ok) {
+        res
+          .status(access.status)
+          .json({ success: false, error: { code: access.code, message: access.message } });
+        return;
+      }
+
+      const ext = (
+        req.file.originalname.match(/\.(woff2|woff|ttf|otf)$/i)?.[1] ?? 'woff2'
+      ).toLowerCase();
+      const result = await withOptionalTenantContext(storeId, async () => {
+        const uploaded = await StorageService.upload(req.file!.buffer, req.file!.originalname, {
+          folder: 'fonts',
+          storeId,
+          contentType:
+            ext === 'woff2'
+              ? 'font/woff2'
+              : ext === 'woff'
+                ? 'font/woff'
+                : ext === 'ttf'
+                  ? 'font/ttf'
+                  : 'font/otf',
+          allowedTypes: ['font/woff2', 'font/woff', 'font/ttf', 'font/otf'],
+        });
+
+        await auditLog({
+          action: 'font.uploaded',
+          userId: req.user!.userId,
+          resourceType: 'file',
+          resourceId: uploaded.key,
+          details: { filename: req.file!.originalname, size: uploaded.size, format: ext },
+          ip: req.ip,
+          userAgent: req.headers['user-agent'],
+        });
+
+        return { ...uploaded, format: ext };
+      });
+
+      res.json({ success: true, data: result });
     } catch (error) {
       next(error);
     }
