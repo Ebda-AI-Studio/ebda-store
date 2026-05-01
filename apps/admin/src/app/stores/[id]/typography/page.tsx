@@ -14,19 +14,20 @@ import { apiGet, apiPut, apiFetch } from '../../../../lib/api';
 // active. Keep this UI in lock-step with the Zod schema in
 // apps/api/src/routes/typography.routes.ts.
 
-// Inherited / baseline values per zone — these are the typical defaults
-// across the 5 packs (Modern / Classic / Minimal / Bold / Elegant). They
-// vary slightly per template, but the numbers below are the common
-// starting points so the merchant can see what they're overriding
-// before they type a new value. Leaving a field blank inherits from
-// the active template's CSS.
+// Per-zone metadata. Sizes / weights aren't fixed numbers — they
+// vary across the 5 packs (Modern / Classic / Minimal / Bold /
+// Elegant) and even across elements inside a single zone (a section
+// H2 is bigger than a category-tile label even though both live
+// inside the "categories" zone). Leaving a zone field blank inherits
+// from the active template's CSS for that specific element. Don't
+// invent and display fake "Template default ≈ Npx" hints — they
+// were misleading.
 interface ZoneDef {
   key: ZoneKey;
   label: string;
   labelAr: string;
   description: string;
   descriptionAr: string;
-  defaults: { fontSize: string; fontWeight: string; lineHeight: string };
   /** Marks the row visually as a sub-zone (rendered as a nested
    *  override of one of the broad zones). */
   isSubZone?: boolean;
@@ -40,7 +41,6 @@ const ZONES: ZoneDef[] = [
     labelAr: 'قبل الهيدر (شريط الإعلان)',
     description: 'The thin promo strip above the header.',
     descriptionAr: 'الشريط الإعلاني فوق الهيدر.',
-    defaults: { fontSize: '14px (0.875rem)', fontWeight: '500', lineHeight: '1.5' },
   },
   {
     key: 'header',
@@ -48,7 +48,6 @@ const ZONES: ZoneDef[] = [
     labelAr: 'الهيدر',
     description: 'Logo, navigation, search, cart icons.',
     descriptionAr: 'الشعار، القائمة، البحث، أيقونات السلة.',
-    defaults: { fontSize: '16px (1rem)', fontWeight: '500', lineHeight: '1.5' },
   },
   {
     key: 'categories',
@@ -56,7 +55,6 @@ const ZONES: ZoneDef[] = [
     labelAr: 'الفئات',
     description: 'The categories grid / strip on the homepage.',
     descriptionAr: 'شبكة / شريط الفئات على الصفحة الرئيسية.',
-    defaults: { fontSize: '24px (1.5rem)', fontWeight: '600', lineHeight: '1.25' },
   },
   {
     key: 'products',
@@ -64,7 +62,6 @@ const ZONES: ZoneDef[] = [
     labelAr: 'المنتجات',
     description: 'Whole product surfaces — listing, detail, recommendations.',
     descriptionAr: 'كل صفحات المنتجات — القائمة، التفاصيل، التوصيات.',
-    defaults: { fontSize: '16px (1rem)', fontWeight: '500', lineHeight: '1.5' },
   },
   {
     key: 'footer',
@@ -72,7 +69,6 @@ const ZONES: ZoneDef[] = [
     labelAr: 'الفوتر',
     description: 'Footer columns, links, copyright row.',
     descriptionAr: 'أعمدة الفوتر والروابط وسطر حقوق النشر.',
-    defaults: { fontSize: '14px (0.875rem)', fontWeight: '400', lineHeight: '1.5' },
   },
   {
     key: 'afterFooter',
@@ -80,7 +76,6 @@ const ZONES: ZoneDef[] = [
     labelAr: 'بعد الفوتر',
     description: 'Anything appended below the footer (cookie strip, etc.).',
     descriptionAr: 'أي عنصر يظهر تحت الفوتر (شريط الكوكيز إلخ).',
-    defaults: { fontSize: '12px (0.75rem)', fontWeight: '400', lineHeight: '1.4' },
   },
   // Sub-zones — nested overrides.
   {
@@ -90,7 +85,6 @@ const ZONES: ZoneDef[] = [
     description: 'Homepage section H2s ("New Arrivals", "Shop by Category") + listing-page H1.',
     descriptionAr:
       'عناوين أقسام الصفحة الرئيسية ("أحدث المنتجات"، "تسوق حسب الفئة") وعنوان صفحة القائمة.',
-    defaults: { fontSize: '28px (1.75rem)', fontWeight: '700', lineHeight: '1.2' },
     isSubZone: true,
   },
   {
@@ -99,7 +93,6 @@ const ZONES: ZoneDef[] = [
     labelAr: 'اسم المنتج',
     description: 'Just the product name on a card. Overrides the broader "Products" font.',
     descriptionAr: 'اسم المنتج فقط على البطاقة. يتجاوز إعدادات منطقة "المنتجات" الأشمل.',
-    defaults: { fontSize: '16px (1rem)', fontWeight: '600', lineHeight: '1.3' },
     isSubZone: true,
   },
   {
@@ -108,7 +101,6 @@ const ZONES: ZoneDef[] = [
     labelAr: 'سعر المنتج',
     description: 'Just the price text on a product card.',
     descriptionAr: 'نص السعر فقط على بطاقة المنتج.',
-    defaults: { fontSize: '16px (1rem)', fontWeight: '700', lineHeight: '1.2' },
     isSubZone: true,
   },
   {
@@ -117,7 +109,6 @@ const ZONES: ZoneDef[] = [
     labelAr: 'الأزرار',
     description: '"Add to cart", "Subscribe", "View store", and similar action buttons.',
     descriptionAr: 'أزرار "أضف للسلة"، "اشترك"، "عرض المتجر"، وما شابه.',
-    defaults: { fontSize: '14px (0.875rem)', fontWeight: '500', lineHeight: '1.2' },
     isSubZone: true,
   },
   {
@@ -126,7 +117,6 @@ const ZONES: ZoneDef[] = [
     labelAr: 'الفلاتر',
     description: 'Filter sidebar on /products — sort, search, price range, category chips.',
     descriptionAr: 'الشريط الجانبي للفلاتر — الترتيب، البحث، مجال السعر، رقاقات الفئات.',
-    defaults: { fontSize: '14px (0.875rem)', fontWeight: '500', lineHeight: '1.4' },
     isSubZone: true,
   },
 ];
@@ -566,12 +556,12 @@ export default function TypographyPage() {
                             type="text"
                             value={cfg.fontSize ?? ''}
                             onChange={e => updateZone(z.key, { fontSize: e.target.value })}
-                            placeholder={`e.g. 16 or 16px or 1rem`}
+                            placeholder="e.g. 16 or 16px or 1rem"
                             className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
                           />
                           <span className="text-[11px] text-muted-foreground/80">
-                            Template default ≈ {z.defaults.fontSize}. A bare number is treated as
-                            pixels (16 → 16px).
+                            Leave blank to inherit from your active template (sizes vary per pack
+                            and per element). A bare number is treated as pixels (16 → 16px).
                           </span>
                         </label>
                         <label className="flex flex-col gap-1">
@@ -582,11 +572,12 @@ export default function TypographyPage() {
                             type="text"
                             value={cfg.fontWeight ?? ''}
                             onChange={e => updateZone(z.key, { fontWeight: e.target.value })}
-                            placeholder={`inherit (≈ ${z.defaults.fontWeight})`}
+                            placeholder="inherit"
                             className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
                           />
                           <span className="text-[11px] text-muted-foreground/80">
-                            Template default ≈ {z.defaults.fontWeight}.
+                            Leave blank to inherit. Use 400 for regular, 600 for semibold, 700 for
+                            bold.
                           </span>
                         </label>
                         <label className="flex flex-col gap-1">
@@ -628,8 +619,7 @@ export default function TypographyPage() {
                           />
                           <span className="text-[11px] text-muted-foreground/80">
                             Leave blank for automatic — we apply <strong>1.6</strong> whenever you
-                            set a font-size, which keeps Arabic characters from getting their tops
-                            clipped. Template default ≈ {z.defaults.lineHeight}.
+                            set a font-size so Arabic characters don't get their tops clipped.
                           </span>
                         </label>
                         <label className="flex flex-col gap-1">
