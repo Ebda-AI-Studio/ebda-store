@@ -45,3 +45,32 @@ change that affects the public read path.
 `checkout-flow.js` creates real orders. Use a disposable test store
 on staging, or accept that you're filling production with
 `LoadTest Buyer` orders that need cleaning up.
+
+## Bypassing the rate limiter for honest measurements
+
+The API caps `/api/` at 100 req per 15 min per IP. From a single
+laptop a load test trips this within seconds and the bulk of the
+results become 429s — making the timings meaningless.
+
+To get an honest measurement:
+
+1. Set `LOAD_TEST_BYPASS_TOKEN` on Railway (long random value):
+   ```bash
+   railway variables --service api --set "LOAD_TEST_BYPASS_TOKEN=$(openssl rand -hex 32)"
+   railway redeploy --service api
+   ```
+2. Run the test with the same token:
+   ```bash
+   STORE_ID=<uuid> LOAD_TEST_TOKEN=<same value> ./run.sh storefront-browse
+   ```
+3. **Unset the token after the test** so production traffic
+   can't bypass the limiter:
+   ```bash
+   railway variables --service api --unset LOAD_TEST_BYPASS_TOKEN
+   railway redeploy --service api
+   ```
+
+The k6 scenarios automatically forward `LOAD_TEST_TOKEN` as the
+`x-load-test-token` header when set; the API checks
+`process.env.LOAD_TEST_BYPASS_TOKEN` and skips the global limiter
+on a match.

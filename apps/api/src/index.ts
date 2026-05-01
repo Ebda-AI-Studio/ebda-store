@@ -206,6 +206,17 @@ app.use(
     },
     standardHeaders: true,
     legacyHeaders: false,
+    // Skip the limiter when a load test sends a valid bypass token.
+    // We only check when LOAD_TEST_BYPASS_TOKEN is set on Railway —
+    // unset means "no bypass possible", so production traffic is
+    // always rate limited regardless of header values. Use a long
+    // random value for the env var so the header isn't guessable.
+    skip: req => {
+      const expected = process.env.LOAD_TEST_BYPASS_TOKEN;
+      if (!expected) return false;
+      const provided = req.header('x-load-test-token');
+      return Boolean(provided) && provided === expected;
+    },
   })
 );
 

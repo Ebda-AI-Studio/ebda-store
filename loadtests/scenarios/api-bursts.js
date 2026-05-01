@@ -30,7 +30,10 @@ export const options = {
   },
 };
 
-const headers = { 'x-store-id': STORE_ID };
+const headers = {
+  'x-store-id': STORE_ID,
+  ...(__ENV.LOAD_TEST_TOKEN ? { 'x-load-test-token': __ENV.LOAD_TEST_TOKEN } : {}),
+};
 
 export default function () {
   const r = http.get(`${BASE}/public/products?limit=12`, { headers });

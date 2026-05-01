@@ -41,7 +41,12 @@ export const options = {
   },
 };
 
-const headers = { 'x-store-id': STORE_ID };
+const headers = {
+  'x-store-id': STORE_ID,
+  // Optional: when LOAD_TEST_TOKEN is set, the global rate limiter
+  // skips this request (matches LOAD_TEST_BYPASS_TOKEN env on the API).
+  ...(__ENV.LOAD_TEST_TOKEN ? { 'x-load-test-token': __ENV.LOAD_TEST_TOKEN } : {}),
+};
 
 export default function () {
   group('list', () => {
