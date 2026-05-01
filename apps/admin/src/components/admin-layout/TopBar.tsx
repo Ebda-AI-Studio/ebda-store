@@ -122,14 +122,17 @@ export function TopBar({
           visible without discovery. */}
       {actions && (
         <div className="lg:hidden">
-          {/* Force-wrap any nested flex container the page passed in.
-              Most pages render `actions` as `<div className="flex gap-2">`
-              which defaults to nowrap and pushes overflow buttons
-              off-screen. The descendant selector below adds `flex-wrap`
-              to those nested divs so a 4-button toolbar (Edit / Variants
-              / Recommendations / Delete on the product page) breaks
-              into two rows on mobile instead of hiding the last button. */}
-          <div className="flex flex-wrap items-center gap-2 px-4 pb-2 [&_div]:flex-wrap">
+          {/* Most pages pass `actions` as `<div className="flex gap-2">`
+              (a nowrap flex). On a 360-390px phone viewport that
+              container's width pushed 3rd/4th buttons (e.g.
+              "Recommendations" / "Delete" on the product page) past
+              the right edge with no scroll affordance — merchants
+              reported the buttons as "missing".
+              `[&>div]:contents` collapses that wrapper so the buttons
+              become direct flex children of OUR row below — then our
+              `flex-wrap` actually wraps them onto a second line
+              instead of being trapped inside the page's nowrap flex. */}
+          <div className="flex flex-wrap items-center gap-2 px-4 pb-2 [&>div]:contents">
             {actions}
           </div>
         </div>

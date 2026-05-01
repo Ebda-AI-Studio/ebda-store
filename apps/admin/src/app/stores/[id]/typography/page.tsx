@@ -13,13 +13,54 @@ import { apiGet, apiPut, apiFetch } from '../../../../lib/api';
 // active. Keep this UI in lock-step with the Zod schema in
 // apps/api/src/routes/typography.routes.ts.
 
-const ZONES: Array<{ key: ZoneKey; label: string }> = [
-  { key: 'beforeHeader', label: 'Before header (announcement bar)' },
-  { key: 'header', label: 'Header' },
-  { key: 'categories', label: 'Categories' },
-  { key: 'products', label: 'Products' },
-  { key: 'footer', label: 'Footer' },
-  { key: 'afterFooter', label: 'After footer' },
+// Inherited / baseline values per zone — these are the typical defaults
+// across the 5 packs (Modern / Classic / Minimal / Bold / Elegant). They
+// vary slightly per template, but the numbers below are the common
+// starting points so the merchant can see what they're overriding
+// before they type a new value. Leaving a field blank inherits from
+// the active template's CSS.
+const ZONES: Array<{
+  key: ZoneKey;
+  label: string;
+  description: string;
+  defaults: { fontSize: string; fontWeight: string; lineHeight: string };
+}> = [
+  {
+    key: 'beforeHeader',
+    label: 'Before header (announcement bar)',
+    description: 'The thin promo strip above the header.',
+    defaults: { fontSize: '14px (0.875rem)', fontWeight: '500', lineHeight: '1.5' },
+  },
+  {
+    key: 'header',
+    label: 'Header',
+    description: 'Logo, navigation, search, cart icons.',
+    defaults: { fontSize: '16px (1rem)', fontWeight: '500', lineHeight: '1.5' },
+  },
+  {
+    key: 'categories',
+    label: 'Categories',
+    description: 'The categories grid + section heading on the homepage.',
+    defaults: { fontSize: '24px (1.5rem)', fontWeight: '600', lineHeight: '1.25' },
+  },
+  {
+    key: 'products',
+    label: 'Products',
+    description: 'Product cards, names, prices on listing + detail pages.',
+    defaults: { fontSize: '16px (1rem)', fontWeight: '500', lineHeight: '1.5' },
+  },
+  {
+    key: 'footer',
+    label: 'Footer',
+    description: 'Footer columns, links, copyright row.',
+    defaults: { fontSize: '14px (0.875rem)', fontWeight: '400', lineHeight: '1.5' },
+  },
+  {
+    key: 'afterFooter',
+    label: 'After footer',
+    description: 'Anything appended below the footer (cookie strip, etc.).',
+    defaults: { fontSize: '12px (0.75rem)', fontWeight: '400', lineHeight: '1.4' },
+  },
 ];
 
 type ZoneKey = 'beforeHeader' | 'header' | 'categories' | 'products' | 'footer' | 'afterFooter';
@@ -156,6 +197,19 @@ export default function TypographyPage() {
     setTypo(t => ({ ...t, fonts: t.fonts.filter((_, i) => i !== idx) }));
   };
 
+  // Apply the chosen family to every zone in one click. Saves the
+  // merchant from picking the same dropdown value six times when they
+  // just want one font everywhere — the common case.
+  const applyFontToAllZones = (family: string) => {
+    const applied: Typography['zones'] = {};
+    for (const z of ZONES) {
+      const existing = typo.zones[z.key] ?? {};
+      applied[z.key] = { ...existing, fontFamily: family };
+    }
+    setTypo(t => ({ ...t, zones: applied }));
+    toastSuccess(`Set ${family} on every zone`);
+  };
+
   const onFontFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -238,8 +292,11 @@ export default function TypographyPage() {
           <section className="rounded-2xl border border-border bg-card p-5">
             <h2 className="text-base font-semibold text-foreground">Fonts library</h2>
             <p className="mt-1 text-xs text-muted-foreground">
-              Add the fonts you want to use in any zone below. Either paste a Google Fonts URL or
-              upload your own font file (.woff2 / .woff / .ttf / .otf).
+              Add the fonts you want available on this store. Adding one here only{' '}
+              <strong>loads</strong> it on the storefront — it doesn't apply automatically. Use the
+              dropdown in each zone below to actually pick a font, or click{' '}
+              <em>Apply to all zones</em> on a font to set it everywhere in one click. Both Google
+              Fonts URLs and uploaded files (.woff2 / .woff / .ttf / .otf) are supported.
             </p>
 
             {typo.fonts.length > 0 && (
@@ -247,21 +304,34 @@ export default function TypographyPage() {
                 {typo.fonts.map((f, i) => (
                   <li
                     key={i}
-                    className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-background px-3 py-2 text-sm"
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/60 bg-background px-3 py-2 text-sm"
                   >
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <div className="truncate font-medium text-foreground">{f.family}</div>
                       <div className="truncate text-xs text-muted-foreground">
                         {f.type === 'google' ? 'Google Fonts' : `Custom (${f.format})`} — {f.url}
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => removeFont(i)}
-                      className="shrink-0 rounded-lg border border-destructive/30 px-2.5 py-1 text-xs font-medium text-destructive hover:bg-destructive/5"
-                    >
-                      Remove
-                    </button>
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      {/* "Apply to all zones" — most common case is one
+                          font everywhere; without this the merchant
+                          has to set the same dropdown six times. */}
+                      <button
+                        type="button"
+                        onClick={() => applyFontToAllZones(`'${f.family}'`)}
+                        className="rounded-lg border border-primary/40 px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/5"
+                        title="Set this font on every zone"
+                      >
+                        Apply to all zones
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeFont(i)}
+                        className="rounded-lg border border-destructive/30 px-2.5 py-1 text-xs font-medium text-destructive hover:bg-destructive/5"
+                      >
+                        Remove
+                      </button>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -346,6 +416,7 @@ export default function TypographyPage() {
                     <div className="flex items-center justify-between">
                       <h3 className="text-sm font-semibold text-foreground">{z.label}</h3>
                     </div>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{z.description}</p>
                     <div className="mt-3 grid gap-3 md:grid-cols-3">
                       <label className="flex flex-col gap-1">
                         <span className="text-xs font-medium text-muted-foreground">
@@ -362,30 +433,37 @@ export default function TypographyPage() {
                             </option>
                           ))}
                         </select>
+                        <span className="text-[11px] text-muted-foreground/80">
+                          Inherits the template default if left blank.
+                        </span>
                       </label>
                       <label className="flex flex-col gap-1">
-                        <span className="text-xs font-medium text-muted-foreground">
-                          Font size (e.g. 16px, 1rem)
-                        </span>
+                        <span className="text-xs font-medium text-muted-foreground">Font size</span>
                         <input
                           type="text"
                           value={cfg.fontSize ?? ''}
                           onChange={e => updateZone(z.key, { fontSize: e.target.value })}
-                          placeholder="inherit"
+                          placeholder={`inherit (≈ ${z.defaults.fontSize})`}
                           className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
                         />
+                        <span className="text-[11px] text-muted-foreground/80">
+                          Template default ≈ {z.defaults.fontSize}.
+                        </span>
                       </label>
                       <label className="flex flex-col gap-1">
                         <span className="text-xs font-medium text-muted-foreground">
-                          Font weight (e.g. 400, bold)
+                          Font weight
                         </span>
                         <input
                           type="text"
                           value={cfg.fontWeight ?? ''}
                           onChange={e => updateZone(z.key, { fontWeight: e.target.value })}
-                          placeholder="inherit"
+                          placeholder={`inherit (≈ ${z.defaults.fontWeight})`}
                           className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
                         />
+                        <span className="text-[11px] text-muted-foreground/80">
+                          Template default ≈ {z.defaults.fontWeight}.
+                        </span>
                       </label>
                       <label className="flex flex-col gap-1">
                         <span className="text-xs font-medium text-muted-foreground">Color</span>
@@ -407,6 +485,9 @@ export default function TypographyPage() {
                             className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm"
                           />
                         </div>
+                        <span className="text-[11px] text-muted-foreground/80">
+                          Template default = the active theme's foreground color.
+                        </span>
                       </label>
                       <label className="flex flex-col gap-1">
                         <span className="text-xs font-medium text-muted-foreground">
@@ -416,9 +497,12 @@ export default function TypographyPage() {
                           type="text"
                           value={cfg.lineHeight ?? ''}
                           onChange={e => updateZone(z.key, { lineHeight: e.target.value })}
-                          placeholder="inherit"
+                          placeholder={`inherit (≈ ${z.defaults.lineHeight})`}
                           className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
                         />
+                        <span className="text-[11px] text-muted-foreground/80">
+                          Template default ≈ {z.defaults.lineHeight}.
+                        </span>
                       </label>
                       <label className="flex flex-col gap-1">
                         <span className="text-xs font-medium text-muted-foreground">
@@ -428,9 +512,12 @@ export default function TypographyPage() {
                           type="text"
                           value={cfg.letterSpacing ?? ''}
                           onChange={e => updateZone(z.key, { letterSpacing: e.target.value })}
-                          placeholder="inherit"
+                          placeholder="inherit (≈ normal)"
                           className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
                         />
+                        <span className="text-[11px] text-muted-foreground/80">
+                          Template default ≈ normal (0).
+                        </span>
                       </label>
                     </div>
                   </div>
