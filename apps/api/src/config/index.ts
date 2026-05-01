@@ -153,6 +153,17 @@ export const config = {
   backupRetentionDays: parseInt(process.env.BACKUP_RETENTION_DAYS || '30', 10),
   backupS3Bucket: process.env.BACKUP_S3_BUCKET || '',
 
+  // Inngest — durable async job queue for fan-out work that doesn't
+  // need to block the request (post-order push/email, bulk imports,
+  // PDF generation). When `INNGEST_EVENT_KEY` is unset the client
+  // runs in dev mode and routes events to the local Inngest dev
+  // server (npx inngest-cli dev). `INNGEST_SIGNING_KEY` is required
+  // for the production /api/v1/inngest endpoint to verify Inngest
+  // platform request signatures — without it the endpoint fail-
+  // closes and Inngest can't invoke our functions.
+  inngestEventKey: process.env.INNGEST_EVENT_KEY || '',
+  inngestSigningKey: process.env.INNGEST_SIGNING_KEY || '',
+
   // Shipping carrier webhook shared secrets. iCarry / Aramex push
   // shipment status updates to /webhooks/shipping/<carrier>. The
   // carriers don't sign their payloads, so we require a shared secret

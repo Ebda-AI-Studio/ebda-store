@@ -27,6 +27,9 @@ import { shippingCarrierService } from './services/shipping-carrier.service';
 import { loyaltyAutomationService } from './services/loyalty-automation.service';
 import { AuthService } from './services/auth.service';
 import { SentryService } from './services/sentry.service';
+import { inngest } from './lib/inngest/client';
+import { inngestFunctions } from './lib/inngest/functions';
+import { serve as inngestServe } from 'inngest/express';
 import logger from './lib/logger';
 
 // Initialize Sentry before anything else
@@ -212,6 +215,19 @@ app.use('/api/v1/webhooks', express.raw({ type: 'application/json' }), webhookRo
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// Inngest serve handler. Mounted before auth/CSRF because Inngest's
+// platform calls this endpoint with its own request signature
+// (verified inside the SDK using INNGEST_SIGNING_KEY) — it must not
+// be subject to our cookie-based CSRF gate. The handler responds to
+// PUT (function registration) and POST (function invocation).
+app.use(
+  '/api/v1/inngest',
+  inngestServe({
+    client: inngest,
+    functions: [...inngestFunctions],
+  })
+);
 
 // Cookie parsing (for HTTP-only auth cookie support)
 app.use(cookieParser());
