@@ -4,7 +4,7 @@
   "private": true,
   "description": "Force Media E-Commerce Website Builder Platform - A multi-tenant SaaS e-commerce solution",
   "author": "Force Media <contact@forcemediakw.com>",
-  "license": "MIT",
+  "license": "UNLICENSED",
   "homepage": "https://github.com/forcemedia/force-website-builder",
   "repository": {
     "type": "git",

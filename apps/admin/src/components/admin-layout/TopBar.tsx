@@ -112,15 +112,24 @@ export function TopBar({
         </div>
       </div>
 
-      {/* Mobile-only secondary row for the page actions. Horizontal
-          scroll prevents 3+ buttons from wrapping into 2-line stacks
-          (the previous bug — see the products screenshot where every
-          action button broke onto 2-3 lines). `[&_*]:shrink-0` keeps
-          inner Button + Link wrappers from shrinking inside the scroll
-          strip. */}
+      {/* Mobile-only secondary row for the page actions. Use
+          flex-wrap so buttons that don't fit wrap to a second line
+          rather than getting hidden in an off-screen horizontal
+          scroll strip — merchants reported the rightmost action
+          (e.g. "Recommendations" on the product detail page) appearing
+          to be missing because it sat off-screen with no visual scroll
+          hint. Letting them wrap is uglier but every button stays
+          visible without discovery. */}
       {actions && (
         <div className="lg:hidden">
-          <div className="-mx-2 flex items-center gap-2 overflow-x-auto px-4 pb-2 [&_*]:shrink-0">
+          {/* Force-wrap any nested flex container the page passed in.
+              Most pages render `actions` as `<div className="flex gap-2">`
+              which defaults to nowrap and pushes overflow buttons
+              off-screen. The descendant selector below adds `flex-wrap`
+              to those nested divs so a 4-button toolbar (Edit / Variants
+              / Recommendations / Delete on the product page) breaks
+              into two rows on mobile instead of hiding the last button. */}
+          <div className="flex flex-wrap items-center gap-2 px-4 pb-2 [&_div]:flex-wrap">
             {actions}
           </div>
         </div>

@@ -2,6 +2,13 @@
 
 Multi-tenant SaaS e-commerce platform by Force Media. Provision and manage multiple online stores — each with its own admin, storefront, products, orders, and customers.
 
+> **Proprietary commercial software.** © 2026 Force Media. All rights reserved.
+> This is closed-source software developed for and operated by Force Media.
+> Access to the repository is granted to authorized contributors only — see
+> [LICENSE](./LICENSE) for terms. No part of this code may be copied,
+> redistributed, hosted, or used to build derivative or competing works
+> without the prior written permission of Force Media.
+
 ## Architecture
 
 ```

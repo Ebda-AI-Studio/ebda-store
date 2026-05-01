@@ -45,15 +45,19 @@ export function AdminFeatureProvider({ storeId, children }: AdminFeatureProvider
 
   useEffect(() => {
     if (!storeId || !user) {
-      setIsLoading(false);
+      // AuthProvider hasn't resolved yet OR storeId not in URL — STAY
+      // in the loading state. Flipping to `false` here was the
+      // 1-second flicker: the settings page rendered the (incorrectly
+      // empty / unfiltered) card grid for a tick, then snapped back to
+      // skeletons once user resolved and fetchFeatures kicked off,
+      // then settled on the real cards once features loaded — three
+      // layout swaps in a second, which read as a bug.
       return;
     }
 
     let cancelled = false;
 
     async function fetchFeatures() {
-      setIsLoading(true);
-
       const endpoint =
         user!.role === 'super_admin'
           ? `/api/v1/admin/stores/${storeId}/features`
