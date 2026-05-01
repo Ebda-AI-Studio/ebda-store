@@ -105,6 +105,13 @@ export default function CheckoutClient() {
         product: {
           id: item.productId,
           name: item.name,
+          // Forward the Arabic name so OrderSummary's productLabel
+          // picks it on Arabic locale. The CartContext already loads
+          // nameAr off `Product.nameAr`; this map was previously
+          // dropping it on the floor, leaving the checkout / payment
+          // review pages stuck on the English name even when the rest
+          // of the storefront localised correctly.
+          nameAr: item.nameAr,
           slug: item.slug,
           images: item.image ? [{ id: '1', url: item.image, alt: item.name }] : [],
         },

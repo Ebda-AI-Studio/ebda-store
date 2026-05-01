@@ -8,6 +8,9 @@ export interface CheckoutCartItem {
   product: {
     id: string;
     name: string;
+    /** Arabic display name — OrderSummary picks this when locale is
+     *  Arabic. Optional because not every product is translated. */
+    nameAr?: string;
     slug: string;
     images: { id: string; url: string; alt?: string }[];
   };

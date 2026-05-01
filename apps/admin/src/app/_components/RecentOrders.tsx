@@ -16,27 +16,31 @@ export function RecentOrders({ orders, isLoading, storeName }: RecentOrdersProps
   const t = useT('dashboard.super');
 
   return (
+    // Slimmer rows: half the vertical padding, smaller icon, status as
+    // an inline pill rather than a stacked Badge below the price.
+    // Saves ~40% vertical space across the Recent Orders list which
+    // was dominating the dashboard.
     <div className="force-card animate-slide-up p-0" style={{ animationDelay: '0.3s' }}>
-      <div className="flex items-center justify-between border-b px-6 py-4">
+      <div className="flex items-center justify-between border-b px-4 py-3">
         <div>
-          <h2 className="font-semibold text-foreground">{t('recentOrdersTitle')}</h2>
+          <h2 className="text-sm font-semibold text-foreground">{t('recentOrdersTitle')}</h2>
           <p className="text-xs text-muted-foreground">{storeName || t('recentOrdersAll')}</p>
         </div>
         <Link
           href="/stores"
-          className="text-sm font-medium text-primary hover:text-primary/80 transition-colors"
+          className="text-xs font-medium text-primary hover:text-primary/80 transition-colors"
         >
           {t('viewAll')}
         </Link>
       </div>
       <div className="divide-y divide-border/50">
         {isLoading ? (
-          <div className="space-y-4 p-6">
+          <div className="space-y-3 p-4">
             {[1, 2, 3].map(i => (
-              <div key={i} className="flex items-center gap-4">
-                <div className="h-10 w-10 rounded-xl force-skeleton" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 w-32 force-skeleton" />
+              <div key={i} className="flex items-center gap-3">
+                <div className="h-8 w-8 rounded-lg force-skeleton" />
+                <div className="flex-1 space-y-1.5">
+                  <div className="h-3 w-32 force-skeleton" />
                   <div className="h-3 w-48 force-skeleton" />
                 </div>
               </div>
@@ -46,12 +50,12 @@ export function RecentOrders({ orders, isLoading, storeName }: RecentOrdersProps
           orders.map(order => (
             <div
               key={order.id}
-              className="flex items-center justify-between px-6 py-4 transition-colors hover:bg-muted/30"
+              className="flex items-center justify-between gap-3 px-4 py-2.5 transition-colors hover:bg-muted/30"
             >
-              <div className="flex items-center gap-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500/20 to-violet-500/10">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-500/10">
                   <svg
-                    className="h-5 w-5 text-violet-600"
+                    className="h-4 w-4 text-violet-600"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -64,17 +68,16 @@ export function RecentOrders({ orders, isLoading, storeName }: RecentOrdersProps
                     />
                   </svg>
                 </div>
-                <div>
-                  <p className="font-medium text-foreground">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-foreground">
                     {order.orderNumber || `#${order.id.slice(0, 8).toUpperCase()}`}
                   </p>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="truncate text-xs text-muted-foreground">
                     {order.customer?.firstName} {order.customer?.lastName} • {order.store?.name}
                   </p>
                 </div>
               </div>
-              <div className="text-end">
-                <p className="font-semibold text-primary">{formatPrice(order.total)}</p>
+              <div className="flex shrink-0 items-center gap-2">
                 <Badge
                   variant={
                     order.status === 'paid' || order.status === 'completed'
@@ -83,10 +86,11 @@ export function RecentOrders({ orders, isLoading, storeName }: RecentOrdersProps
                         ? 'secondary'
                         : 'destructive'
                   }
-                  className="mt-1 capitalize"
+                  className="text-[10px] px-2 py-0.5 capitalize"
                 >
                   {order.status}
                 </Badge>
+                <p className="text-sm font-semibold text-primary">{formatPrice(order.total)}</p>
               </div>
             </div>
           ))
