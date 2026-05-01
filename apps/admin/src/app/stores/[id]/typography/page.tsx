@@ -1,11 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useLocale } from 'next-intl';
 import Link from 'next/link';
 import { Button, useToast } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { useCurrentStore } from '../../../../hooks/useCurrentStore';
 import { apiGet, apiPut, apiFetch } from '../../../../lib/api';
 
 // Typography is store-scoped and template-agnostic — the storefront's
@@ -205,6 +206,51 @@ export default function TypographyPage() {
   const [customFamilyDraft, setCustomFamilyDraft] = useState('');
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Real measured per-zone defaults from the live storefront. We
+  // load the storefront homepage in a hidden iframe with
+  // `?probe=typography`, the storefront's TypographyProbe component
+  // measures `getComputedStyle()` for the first element of each
+  // data-zone after hydration, and posts the values back here. This
+  // replaces the fake "Template default ≈ 24px" hints I had to
+  // delete — now the merchant sees the actual inherited number for
+  // their currently-active template + any overrides they already saved.
+  const [measured, setMeasured] = useState<Record<string, Record<string, string>> | null>(null);
+  const { store: currentStore } = useCurrentStore(storeId);
+  const probeUrl = useMemo(() => {
+    const domain = currentStore?.domain;
+    const slug = currentStore?.slug;
+    const base = domain
+      ? `https://${domain}`
+      : process.env.NEXT_PUBLIC_WEB_URL && slug
+        ? `${process.env.NEXT_PUBLIC_WEB_URL}/${slug}`
+        : null;
+    return base ? `${base}?probe=typography` : null;
+  }, [currentStore?.domain, currentStore?.slug]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handler = (e: MessageEvent) => {
+      if (!e.data || e.data.type !== 'force:typography-probe') return;
+      const m = e.data.measurements;
+      if (m && typeof m === 'object') setMeasured(m);
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, []);
+
+  /**
+   * Format a getComputedStyle value into something readable. The
+   * browser returns canonical values: `font-size: '14.4px'`,
+   * `line-height: 'normal'` or `'24px'`, `font-weight: '500'`,
+   * `color: 'rgb(0, 0, 0)'`. Display them roughly as-is — the
+   * merchant cares about the units, not pretty formatting.
+   */
+  const fmt = (v?: string) => {
+    if (!v) return '—';
+    if (v === 'normal') return 'normal';
+    return v;
+  };
 
   const load = useCallback(async () => {
     if (!storeId) return;
@@ -545,7 +591,14 @@ export default function TypographyPage() {
                             ))}
                           </select>
                           <span className="text-[11px] text-muted-foreground/80">
-                            Inherits the template default if left blank.
+                            {measured?.[z.key]?.fontFamily ? (
+                              <>
+                                Currently inherits{' '}
+                                <strong>{fmt(measured[z.key].fontFamily)}</strong>.
+                              </>
+                            ) : (
+                              'Inherits the template default if left blank.'
+                            )}
                           </span>
                         </label>
                         <label className="flex flex-col gap-1">
@@ -560,8 +613,15 @@ export default function TypographyPage() {
                             className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
                           />
                           <span className="text-[11px] text-muted-foreground/80">
-                            Leave blank to inherit from your active template (sizes vary per pack
-                            and per element). A bare number is treated as pixels (16 → 16px).
+                            {measured?.[z.key]?.fontSize ? (
+                              <>
+                                Currently inherits <strong>{fmt(measured[z.key].fontSize)}</strong>{' '}
+                                on your live storefront.
+                              </>
+                            ) : (
+                              'Leave blank to inherit from your active template.'
+                            )}{' '}
+                            A bare number is treated as pixels (16 → 16px).
                           </span>
                         </label>
                         <label className="flex flex-col gap-1">
@@ -576,8 +636,15 @@ export default function TypographyPage() {
                             className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
                           />
                           <span className="text-[11px] text-muted-foreground/80">
-                            Leave blank to inherit. Use 400 for regular, 600 for semibold, 700 for
-                            bold.
+                            {measured?.[z.key]?.fontWeight ? (
+                              <>
+                                Currently inherits{' '}
+                                <strong>{fmt(measured[z.key].fontWeight)}</strong>.
+                              </>
+                            ) : (
+                              'Leave blank to inherit.'
+                            )}{' '}
+                            Use 400 for regular, 600 for semibold, 700 for bold.
                           </span>
                         </label>
                         <label className="flex flex-col gap-1">
@@ -603,7 +670,13 @@ export default function TypographyPage() {
                             />
                           </div>
                           <span className="text-[11px] text-muted-foreground/80">
-                            Template default = the active theme's foreground color.
+                            {measured?.[z.key]?.color ? (
+                              <>
+                                Currently inherits <strong>{fmt(measured[z.key].color)}</strong>.
+                              </>
+                            ) : (
+                              "Inherits from the active theme's foreground colour."
+                            )}
                           </span>
                         </label>
                         <label className="flex flex-col gap-1">
@@ -618,6 +691,12 @@ export default function TypographyPage() {
                             className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
                           />
                           <span className="text-[11px] text-muted-foreground/80">
+                            {measured?.[z.key]?.lineHeight ? (
+                              <>
+                                Currently inherits{' '}
+                                <strong>{fmt(measured[z.key].lineHeight)}</strong>.{' '}
+                              </>
+                            ) : null}
                             Leave blank for automatic — we apply <strong>1.6</strong> whenever you
                             set a font-size so Arabic characters don't get their tops clipped.
                           </span>
@@ -630,11 +709,18 @@ export default function TypographyPage() {
                             type="text"
                             value={cfg.letterSpacing ?? ''}
                             onChange={e => updateZone(z.key, { letterSpacing: e.target.value })}
-                            placeholder="inherit (≈ normal)"
+                            placeholder="inherit"
                             className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
                           />
                           <span className="text-[11px] text-muted-foreground/80">
-                            Template default ≈ normal (0).
+                            {measured?.[z.key]?.letterSpacing ? (
+                              <>
+                                Currently inherits{' '}
+                                <strong>{fmt(measured[z.key].letterSpacing)}</strong>.
+                              </>
+                            ) : (
+                              'Leave blank to inherit (typically `normal`).'
+                            )}
                           </span>
                         </label>
                       </div>
@@ -645,6 +731,36 @@ export default function TypographyPage() {
             </div>
           </section>
         </div>
+      )}
+
+      {/* Hidden iframe loads the live storefront with `?probe=
+          typography`. The storefront's TypographyProbe component
+          measures real getComputedStyle values per data-zone after
+          hydration and posts them back here via postMessage; the
+          listener wired up in useEffect populates `measured`. We use
+          opacity:0 + pointer-events:none + position:absolute rather
+          than display:none so the iframe still lays out and
+          stylesheets actually compute. */}
+      {probeUrl && (
+        <iframe
+          src={probeUrl}
+          aria-hidden
+          tabIndex={-1}
+          title="Typography defaults probe"
+          // Off-screen rather than display:none so the iframe actually
+          // renders the storefront, computes styles, and runs the
+          // probe component. Desktop-ish viewport so layout-driven
+          // rules (e.g. responsive font scales) match what shoppers see.
+          style={{
+            position: 'fixed',
+            top: '-99999px',
+            left: '-99999px',
+            width: '1280px',
+            height: '720px',
+            border: 0,
+            visibility: 'hidden',
+          }}
+        />
       )}
     </AdminLayout>
   );

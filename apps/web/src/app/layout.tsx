@@ -13,6 +13,7 @@ import { MarketingPixelsProvider } from '../components/MarketingPixels';
 import { ServiceWorkerRegistration } from '../components/ServiceWorkerRegistration';
 import { PushNotificationPrompt } from '../components/PushNotificationPrompt';
 import { OneSignalStorefrontInit } from '../components/OneSignalStorefrontInit';
+import { TypographyProbe } from '../components/TypographyProbe';
 import { AffiliateTracker } from '../components/AffiliateTracker';
 import { StoreMaintenance } from '../components/StoreMaintenance';
 import { type MarketingPixels, themeToCssVars } from '@force/shared';
@@ -470,6 +471,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                       <div id="main-content">{children}</div>
                       <PushNotificationPrompt />
                       <OneSignalStorefrontInit />
+                      {/* Activates ONLY when ?probe=typography is on
+                          the URL and the page is in a trusted-admin
+                          iframe. Measures real getComputedStyle()
+                          values per data-zone and posts them back to
+                          the admin so the typography form can show
+                          real inherited defaults. */}
+                      <TypographyProbe />
                     </CartProvider>
                   </ToastProvider>
                 </AuthProvider>
