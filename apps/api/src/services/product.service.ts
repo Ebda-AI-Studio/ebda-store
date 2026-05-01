@@ -707,10 +707,24 @@ export class ProductService {
       prisma.product.count({
         where: { storeId, isBestSeller: true, deletedAt: null, status: 'active' },
       }),
-      prisma.store.findUnique({
-        where: { id: storeId },
-        select: { bestSellersImage: true },
-      }),
+      // Defensive: bestSellersImage was added in migration
+      // 20260501000000. Until that lands on every environment, treat a
+      // P2022 ("column does not exist") as a missing image and keep
+      // serving the categories list. Without this guard a fresh deploy
+      // ahead of the migration takes the whole endpoint down with a
+      // 500.
+      prisma.store
+        .findUnique({
+          where: { id: storeId },
+          select: { bestSellersImage: true },
+        })
+        .catch(err => {
+          logger.warn(
+            { err, storeId },
+            '[getCategories] bestSellersImage read failed — column missing?'
+          );
+          return null;
+        }),
     ]);
 
     const realCategories = categories.map(c => ({

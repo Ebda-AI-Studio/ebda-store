@@ -52,11 +52,20 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
-      const store = await prisma.store.findUnique({
-        where: { id: storeId },
-        select: { bestSellersImage: true },
-      });
-      res.json({ success: true, data: { image: store?.bestSellersImage ?? null } });
+      // Defensive: when the column hasn't been provisioned yet (pre-
+      // migration), return null rather than 500ing. The admin form
+      // shows an empty uploader and the next save kicks the column
+      // into existence on Railway's Dockerfile-driven migrate-deploy.
+      try {
+        const store = await prisma.store.findUnique({
+          where: { id: storeId },
+          select: { bestSellersImage: true },
+        });
+        res.json({ success: true, data: { image: store?.bestSellersImage ?? null } });
+      } catch (err) {
+        logger.warn({ err, storeId }, '[best-sellers-image GET] column missing?');
+        res.json({ success: true, data: { image: null } });
+      }
     } catch (error) {
       next(error);
     }

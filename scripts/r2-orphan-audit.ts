@@ -31,7 +31,7 @@
  *     one key per line. The merchant reviews this file before deleting.
  */
 
-import { S3Client, ListObjectsV2Command } from '@aws-sdk/client-s3';
+import { S3Client, ListObjectsV2Command, DeleteObjectsCommand } from '@aws-sdk/client-s3';
 import { PrismaClient } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -39,6 +39,7 @@ import * as path from 'path';
 interface R2Object {
   key: string;
   size: number;
+  lastModified?: Date;
 }
 
 interface AuditResult {
@@ -46,6 +47,9 @@ interface AuditResult {
   totalBytes: number;
   orphanKeys: string[];
   orphanBytes: number;
+  /** Keys we deliberately skipped because they were too fresh — likely
+   *  in-flight uploads whose DB row hasn't landed yet. */
+  skippedRecent: number;
 }
 
 function requireEnv(name: string): string {
@@ -74,7 +78,7 @@ async function listAllR2Objects(client: S3Client, bucket: string): Promise<R2Obj
 
     for (const obj of response.Contents ?? []) {
       if (obj.Key) {
-        objects.push({ key: obj.Key, size: obj.Size ?? 0 });
+        objects.push({ key: obj.Key, size: obj.Size ?? 0, lastModified: obj.LastModified });
       }
     }
 
@@ -195,12 +199,31 @@ function walkJsonForUrls(value: unknown, visit: (url: string) => void): void {
   }
 }
 
+/**
+ * Read CLI flags so the same script can run as a read-only audit OR
+ * as an authoritative cleanup. Defaults are conservative: dry-run
+ * (no deletes) and a 1-hour minimum age on any candidate key (so an
+ * upload that landed in R2 a minute ago doesn't get reaped before the
+ * DB row catches up).
+ */
+function parseArgs() {
+  const apply = process.argv.includes('--apply');
+  const minAgeArg = process.argv.find(a => a.startsWith('--min-age-hours='));
+  const minAgeHours = minAgeArg ? Number(minAgeArg.split('=')[1]) : 1;
+  return {
+    apply,
+    minAgeMs: Math.max(0, minAgeHours) * 60 * 60 * 1000,
+    minAgeHours: Math.max(0, minAgeHours),
+  };
+}
+
 async function audit(): Promise<AuditResult> {
   const endpoint = requireEnv('STORAGE_ENDPOINT');
   const accessKey = requireEnv('STORAGE_ACCESS_KEY');
   const secretKey = requireEnv('STORAGE_SECRET_KEY');
   const bucket = process.env.STORAGE_BUCKET || 'uploads';
   const publicBase = process.env.STORAGE_PUBLIC_URL || '';
+  const { apply, minAgeMs, minAgeHours } = parseArgs();
 
   const client = new S3Client({
     endpoint,
@@ -225,11 +248,42 @@ async function audit(): Promise<AuditResult> {
     const orphans: string[] = [];
     let orphanBytes = 0;
     let totalBytes = 0;
+    let skippedRecent = 0;
+    const now = Date.now();
     for (const obj of objects) {
       totalBytes += obj.size;
-      if (!referenced.has(obj.key)) {
-        orphans.push(obj.key);
-        orphanBytes += obj.size;
+      if (referenced.has(obj.key)) continue;
+      // Skip keys that were uploaded more recently than the
+      // min-age window. The window protects against the race where a
+      // file was just PUT to R2 but the DB row carrying its URL
+      // hasn't been written yet (or is in flight). Without this
+      // guard, a cleanup running mid-upload can wipe a freshly-uploaded
+      // image — exactly the failure mode that may have produced
+      // Palora's missing covers.
+      const ageMs = obj.lastModified ? now - obj.lastModified.getTime() : Infinity;
+      if (ageMs < minAgeMs) {
+        skippedRecent++;
+        continue;
+      }
+      orphans.push(obj.key);
+      orphanBytes += obj.size;
+    }
+
+    if (apply && orphans.length > 0) {
+      console.log(
+        `\n--apply set: deleting ${orphans.length} orphan keys (min-age ${minAgeHours}h)…`
+      );
+      // R2's S3-compatible API caps DeleteObjects batches at 1000.
+      const BATCH = 1000;
+      for (let i = 0; i < orphans.length; i += BATCH) {
+        const slice = orphans.slice(i, i + BATCH);
+        await client.send(
+          new DeleteObjectsCommand({
+            Bucket: bucket,
+            Delete: { Objects: slice.map(Key => ({ Key })), Quiet: true },
+          })
+        );
+        console.log(`  deleted ${Math.min(i + BATCH, orphans.length)}/${orphans.length}`);
       }
     }
 
@@ -238,6 +292,7 @@ async function audit(): Promise<AuditResult> {
       totalBytes,
       orphanKeys: orphans,
       orphanBytes,
+      skippedRecent,
     };
   } finally {
     await prisma.$disconnect();
@@ -262,15 +317,22 @@ audit()
     const outPath = path.join('/tmp', `r2-orphans-${ts}.txt`);
     fs.writeFileSync(outPath, result.orphanKeys.join('\n') + '\n');
 
+    const apply = process.argv.includes('--apply');
     console.log('');
     console.log('=== R2 Orphan Audit ===');
-    console.log(`Total keys:    ${result.totalKeys}`);
-    console.log(`Total bytes:   ${formatBytes(result.totalBytes)}`);
-    console.log(`Orphan count:  ${result.orphanKeys.length}`);
-    console.log(`Orphan bytes:  ${formatBytes(result.orphanBytes)}`);
-    console.log(`Orphan list:   ${outPath}`);
+    console.log(`Total keys:       ${result.totalKeys}`);
+    console.log(`Total bytes:      ${formatBytes(result.totalBytes)}`);
+    console.log(`Orphan count:     ${result.orphanKeys.length}`);
+    console.log(`Orphan bytes:     ${formatBytes(result.orphanBytes)}`);
+    console.log(`Skipped (fresh):  ${result.skippedRecent}`);
+    console.log(`Orphan list:      ${outPath}`);
     console.log('');
-    console.log('No files were deleted. Review the orphan list before any cleanup.');
+    if (apply) {
+      console.log('Applied: orphan objects above were deleted from R2.');
+    } else {
+      console.log('Dry run. Pass --apply to delete the orphans listed above.');
+      console.log('Pass --min-age-hours=N (default 1) to widen the safety window.');
+    }
   })
   .catch(err => {
     console.error('Audit failed:', err);
