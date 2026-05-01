@@ -22,6 +22,11 @@ export const invoiceEmail: InngestFunction.Any = inngest.createFunction(
   async ({ event, step }) => {
     const { orderId, storeId, to } = event.data;
 
+    if (!orderId || !storeId || !to) {
+      logger.warn({ event: event.name }, 'invoice email-requested fired without ids — skipping');
+      return;
+    }
+
     const html = await step.run('render-invoice', () =>
       InvoiceService.generateInvoice(storeId, orderId)
     );

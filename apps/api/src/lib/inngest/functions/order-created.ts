@@ -32,6 +32,14 @@ export const orderCreated: InngestFunction.Any = inngest.createFunction(
   async ({ event, step }) => {
     const { orderId, storeId, paymentMethod } = event.data;
 
+    // Guard against empty test payloads from Inngest's sync UI — they
+    // arrive with `data: {}` and would crash Prisma with an
+    // `id: undefined` validation error.
+    if (!orderId || !storeId) {
+      logger.warn({ event: event.name }, 'order/created fired without ids — skipping');
+      return;
+    }
+
     const order = await step.run('load-order', async () => {
       const row = await prisma.order.findUnique({
         where: { id: orderId },

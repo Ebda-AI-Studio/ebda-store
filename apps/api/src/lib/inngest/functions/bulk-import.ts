@@ -30,6 +30,15 @@ export const bulkImportProducts: InngestFunction.Any = inngest.createFunction(
   async ({ event }) => {
     const { jobId } = event.data;
 
+    // Inngest may invoke this function with an empty test payload during
+    // sync / replay. Guard before hitting Prisma — `findUnique` with
+    // `id: undefined` throws a validation error and counts as a failed
+    // run in the UI, masking real failures.
+    if (!jobId) {
+      logger.warn('bulk-import/started fired without jobId — skipping');
+      return;
+    }
+
     const job = await prisma.bulkImportJob.findUnique({ where: { id: jobId } });
     if (!job) {
       logger.warn({ jobId }, 'bulk-import/started fired for missing job');
