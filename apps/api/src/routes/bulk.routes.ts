@@ -5,8 +5,9 @@ import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { BulkService } from '../services/bulk.service';
 import { xlsxBufferToImportCsv } from '../services/xlsx-import';
-import { ProductStatus } from '@force/database';
+import { prisma, ProductStatus } from '@force/database';
 import { auditLog, writeLimiter } from '../middleware/security';
+import { inngest } from '../lib/inngest/client';
 
 const router = Router();
 
@@ -102,7 +103,9 @@ router.get(
   }
 );
 
-// POST /stores/:storeId/bulk/import - Import products from CSV
+// POST /stores/:storeId/bulk/import - Enqueue an async product import
+// from CSV. Returns immediately with a jobId; the admin polls
+// /import-jobs/:jobId for progress + final result.
 router.post(
   '/:storeId/bulk/import',
   authenticate,
@@ -125,27 +128,34 @@ router.post(
       const parsedOptions = importOptionsSchema.parse(options || {});
       const userId = req.user!.userId;
 
-      const result = await BulkService.importProducts(storeId, csvData, parsedOptions, userId);
+      const job = await prisma.bulkImportJob.create({
+        data: {
+          storeId,
+          userId,
+          csvData,
+          updateExisting: parsedOptions.updateExisting ?? true,
+        },
+        select: { id: true, status: true, createdAt: true },
+      });
 
-      // Audit log
+      await inngest.send({
+        name: 'bulk-import/started',
+        data: { jobId: job.id, storeId },
+      });
+
       await auditLog({
-        action: 'bulk.import',
+        action: 'bulk.import.queued',
         userId,
         resourceType: 'product',
         resourceId: storeId,
-        details: {
-          total: result.total,
-          created: result.created,
-          updated: result.updated,
-          failed: result.failed,
-        },
+        details: { jobId: job.id },
         ip: req.ip,
         userAgent: req.headers['user-agent'],
       });
 
-      res.json({
+      res.status(202).json({
         success: true,
-        data: { result },
+        data: { job },
       });
     } catch (error) {
       next(error);
@@ -204,33 +214,79 @@ router.post(
         trackInventory: parsedOptions.trackInventory,
       });
 
-      const result = await BulkService.importProducts(
-        storeId,
-        csvData,
-        { updateExisting: parsedOptions.updateExisting ?? true },
-        userId
-      );
+      const job = await prisma.bulkImportJob.create({
+        data: {
+          storeId,
+          userId,
+          csvData,
+          updateExisting: parsedOptions.updateExisting ?? true,
+        },
+        select: { id: true, status: true, createdAt: true },
+      });
 
-      // Audit log
+      await inngest.send({
+        name: 'bulk-import/started',
+        data: { jobId: job.id, storeId },
+      });
+
       await auditLog({
-        action: 'bulk.import',
+        action: 'bulk.import.queued',
         userId,
         resourceType: 'product',
         resourceId: storeId,
-        details: {
-          total: result.total,
-          created: result.created,
-          updated: result.updated,
-          failed: result.failed,
-        },
+        details: { jobId: job.id, source: 'xlsx' },
         ip: req.ip,
         userAgent: req.headers['user-agent'],
       });
 
-      res.json({
+      res.status(202).json({
         success: true,
-        data: { result },
+        data: { job },
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// GET /stores/:storeId/bulk/import-jobs/:jobId - Poll a queued/running
+// import for progress + final result. Returns the lightweight job
+// row (without csvData) so the admin can render a progress bar.
+router.get(
+  '/:storeId/bulk/import-jobs/:jobId',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, jobId } = req.params;
+      const job = await prisma.bulkImportJob.findFirst({
+        where: { id: jobId, storeId },
+        select: {
+          id: true,
+          status: true,
+          total: true,
+          processed: true,
+          created: true,
+          updated: true,
+          failed: true,
+          errors: true,
+          errorMessage: true,
+          startedAt: true,
+          completedAt: true,
+          createdAt: true,
+        },
+      });
+
+      if (!job) {
+        res.status(404).json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'Import job not found' },
+        });
+        return;
+      }
+
+      res.json({ success: true, data: { job } });
     } catch (error) {
       next(error);
     }

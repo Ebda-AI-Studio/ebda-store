@@ -283,6 +283,7 @@ model Store {
   affiliatePayouts         AffiliatePayout[]
   affiliateConfig          AffiliateConfig?
   pages                    StorePage[]
+  bulkImportJobs           BulkImportJob[]
 
   @@index([ownerId])
   @@index([status])
@@ -1691,4 +1692,51 @@ model Review {
   @@index([rating])
   @@index([storeId, productId]) // Composite: reviews by store and product
   @@map("reviews")
+}
+
+// ==========================================
+// Background jobs
+// ==========================================
+
+// Bulk product import job — queued from POST /:storeId/bulk/import,
+// processed asynchronously by the Inngest `bulk-import-products`
+// function so the request returns immediately and the admin can
+// poll for progress instead of waiting on a long synchronous loop.
+model BulkImportJob {
+  id             String           @id @default(uuid())
+  storeId        String           @map("store_id")
+  userId         String?          @map("user_id")
+  status         BulkImportStatus @default(queued)
+  // Raw CSV content. Stored as text rather than referencing R2 to
+  // keep the import pipeline self-contained — admin uploads are
+  // small (mid-tens of MB at most) and TOAST handles it.
+  csvData        String           @map("csv_data") @db.Text
+  updateExisting Boolean          @default(true) @map("update_existing")
+  // Progress counters — written by the Inngest function as it
+  // processes rows. Polling endpoint reads these to render a
+  // progress bar and final summary.
+  total          Int              @default(0)
+  processed      Int              @default(0)
+  created        Int              @default(0)
+  updated        Int              @default(0)
+  failed         Int              @default(0)
+  errors         Json? // Array of { row, error } once finished
+  errorMessage   String?          @map("error_message") // Top-level failure reason if status=failed
+  startedAt      DateTime?        @map("started_at")
+  completedAt    DateTime?        @map("completed_at")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId, createdAt(sort: Desc)])
+  @@index([status])
+  @@map("bulk_import_jobs")
+}
+
+enum BulkImportStatus {
+  queued
+  running
+  completed
+  failed
 }

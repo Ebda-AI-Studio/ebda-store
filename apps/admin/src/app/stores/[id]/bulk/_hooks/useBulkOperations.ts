@@ -1,14 +1,25 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { apiPost, apiFetch } from '../../../../../lib/api';
-import type { ExportFilters, FileKind, ImportOptions, ImportResult } from '../_components/types';
+import { apiPost, apiGet, apiFetch } from '../../../../../lib/api';
+import type {
+  ExportFilters,
+  FileKind,
+  ImportJob,
+  ImportOptions,
+  ImportResult,
+} from '../_components/types';
 
 interface UseBulkOperationsArgs {
   storeId: string;
   networkErrorMessage: string;
   importFailedMessage: string;
 }
+
+const POLL_INTERVAL_MS = 1500;
+const POLL_MAX_ATTEMPTS = 600; // 15 min cap
+
+const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 /**
  * Groups the import/export network calls so the page component can
@@ -22,6 +33,7 @@ export function useBulkOperations({
   const [isImporting, setIsImporting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [importProgress, setImportProgress] = useState<ImportJob | null>(null);
 
   const downloadTemplate = useCallback(async () => {
     try {
@@ -55,6 +67,7 @@ export function useBulkOperations({
 
       setIsImporting(true);
       setImportResult(null);
+      setImportProgress(null);
 
       try {
         const isXlsx = fileKind === 'xlsx';
@@ -74,19 +87,52 @@ export function useBulkOperations({
             }
           : { csvData: csvContent, options: { updateExisting: options.updateExisting } };
 
-        const { data, error } = await apiPost<{ result: ImportResult }>(endpoint, body);
+        const enqueue = await apiPost<{ job: ImportJob }>(endpoint, body);
 
-        if (data) {
-          setImportResult(data.result);
-        } else {
+        if (!enqueue.data) {
           setImportResult({
             total: 0,
             created: 0,
             updated: 0,
             failed: 1,
-            errors: [{ row: 0, error: error?.message || importFailedMessage }],
+            errors: [{ row: 0, error: enqueue.error?.message || importFailedMessage }],
           });
+          return;
         }
+
+        const jobId = enqueue.data.job.id;
+        for (let attempt = 0; attempt < POLL_MAX_ATTEMPTS; attempt++) {
+          await wait(POLL_INTERVAL_MS);
+          const poll = await apiGet<{ job: ImportJob }>(
+            `/api/v1/stores/${storeId}/bulk/import-jobs/${jobId}`
+          );
+          if (!poll.data) continue;
+
+          setImportProgress(poll.data.job);
+          const status = poll.data.job.status;
+          if (status === 'completed' || status === 'failed') {
+            const job = poll.data.job;
+            setImportResult({
+              total: job.total,
+              created: job.created,
+              updated: job.updated,
+              failed: status === 'failed' && job.errorMessage ? job.failed + 1 : job.failed,
+              errors:
+                status === 'failed' && job.errorMessage
+                  ? [{ row: 0, error: job.errorMessage }, ...(job.errors ?? [])]
+                  : (job.errors ?? []),
+            });
+            return;
+          }
+        }
+
+        setImportResult({
+          total: 0,
+          created: 0,
+          updated: 0,
+          failed: 1,
+          errors: [{ row: 0, error: importFailedMessage }],
+        });
       } catch {
         setImportResult({
           total: 0,
@@ -134,12 +180,16 @@ export function useBulkOperations({
     [storeId]
   );
 
-  const clearImportResult = useCallback(() => setImportResult(null), []);
+  const clearImportResult = useCallback(() => {
+    setImportResult(null);
+    setImportProgress(null);
+  }, []);
 
   return {
     isImporting,
     isExporting,
     importResult,
+    importProgress,
     downloadTemplate,
     importFile,
     exportProducts,

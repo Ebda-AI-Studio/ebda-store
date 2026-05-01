@@ -30,6 +30,7 @@ export default function BulkOperationsPage() {
     isImporting,
     isExporting,
     importResult,
+    importProgress,
     downloadTemplate,
     importFile,
     exportProducts,
@@ -66,6 +67,7 @@ export default function BulkOperationsPage() {
         <BulkImportWizard
           isImporting={isImporting}
           importResult={importResult}
+          importProgress={importProgress}
           onDownloadTemplate={downloadTemplate}
           onImport={importFile}
           onClearResult={clearImportResult}

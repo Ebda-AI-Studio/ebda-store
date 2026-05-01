@@ -3,12 +3,13 @@
 import { useRef, useState } from 'react';
 import { Button, Input, Label } from '@force/ui';
 import { useT } from '@/i18n/useT';
-import type { DefaultStatus, FileKind, ImportOptions, ImportResult } from './types';
+import type { DefaultStatus, FileKind, ImportJob, ImportOptions, ImportResult } from './types';
 import { BulkImportResults } from './BulkImportResults';
 
 interface BulkImportWizardProps {
   isImporting: boolean;
   importResult: ImportResult | null;
+  importProgress: ImportJob | null;
   onDownloadTemplate: () => void;
   onImport: (args: {
     fileKind: FileKind;
@@ -28,6 +29,7 @@ interface BulkImportWizardProps {
 export function BulkImportWizard({
   isImporting,
   importResult,
+  importProgress,
   onDownloadTemplate,
   onImport,
   onClearResult,
@@ -298,6 +300,12 @@ export function BulkImportWizard({
               </Button>
             )}
           </div>
+
+          {isImporting && importProgress && importProgress.total > 0 && (
+            <div className="rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
+              {`${importProgress.processed}/${importProgress.total} (${importProgress.status})`}
+            </div>
+          )}
         </div>
       </div>
 

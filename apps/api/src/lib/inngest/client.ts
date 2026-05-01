@@ -21,7 +21,15 @@ type OrderCreatedEvent = EventPayload & {
   };
 };
 
-export type AppEvent = OrderCreatedEvent;
+type BulkImportStartedEvent = EventPayload & {
+  name: 'bulk-import/started';
+  data: {
+    jobId: string;
+    storeId: string;
+  };
+};
+
+export type AppEvent = OrderCreatedEvent | BulkImportStartedEvent;
 
 export const inngest = new Inngest({
   id: 'force-api',
