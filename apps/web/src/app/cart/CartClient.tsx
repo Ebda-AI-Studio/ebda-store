@@ -365,7 +365,7 @@ export default function CartClient() {
                           {item.image ? (
                             <Image
                               src={item.image}
-                              alt={item.name}
+                              alt={language === 'ar' && item.nameAr ? item.nameAr : item.name}
                               width={128}
                               height={128}
                               className="h-full w-full object-cover"
@@ -401,7 +401,9 @@ export default function CartClient() {
                                   {item.category}
                                 </span>
                               )}
-                              <h3 className="mt-0.5 font-semibold text-foreground">{item.name}</h3>
+                              <h3 className="mt-0.5 font-semibold text-foreground">
+                                {language === 'ar' && item.nameAr ? item.nameAr : item.name}
+                              </h3>
                               <p className="mt-1 text-sm text-muted-foreground">
                                 {formatPrice(item.price)}{' '}
                                 {t('each', '\u0644\u0644\u0648\u0627\u062d\u062f')}

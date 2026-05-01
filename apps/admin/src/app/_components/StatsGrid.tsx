@@ -42,16 +42,15 @@ export function StatsGrid({ stats, isLoading }: StatsGridProps) {
 
   if (isLoading) {
     return (
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
           <div key={i} className="force-stat-card">
-            <div className="flex items-start justify-between">
-              <div className="flex-1 space-y-3">
-                <div className="h-3 w-24 force-skeleton" />
-                <div className="h-8 w-32 force-skeleton" />
-                <div className="h-3 w-16 force-skeleton" />
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex-1 space-y-2">
+                <div className="h-3 w-20 force-skeleton" />
+                <div className="h-7 w-24 force-skeleton" />
               </div>
-              <div className="h-12 w-12 rounded-2xl force-skeleton" />
+              <div className="h-9 w-9 rounded-lg force-skeleton" />
             </div>
           </div>
         ))}
@@ -60,30 +59,33 @@ export function StatsGrid({ stats, isLoading }: StatsGridProps) {
   }
 
   return (
-    <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 stagger-animation">
+    // Tighter grid (gap-3 vs gap-6) + slimmer cards via the updated
+    // `.force-stat-card` padding — kills the empty white band that
+    // dominated the platform dashboard.
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 stagger-animation">
       {statCards.map((stat, index) => (
         <div
           key={stat.name}
           className="force-stat-card"
           style={{ animationDelay: `${index * 0.1}s` }}
         >
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <p className="text-sm font-medium text-muted-foreground">{stat.name}</p>
-              <div className="mt-2">
-                <p className="text-3xl font-bold tracking-tight text-foreground">
-                  {stat.isRevenue ? stat.value : formatNumber(stat.value as number)}
-                </p>
-              </div>
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                {stat.name}
+              </p>
+              <p className="mt-1 text-2xl font-bold tracking-tight text-foreground">
+                {stat.isRevenue ? stat.value : formatNumber(stat.value as number)}
+              </p>
             </div>
             <div
-              className={`flex h-12 w-12 items-center justify-center rounded-2xl ${stat.iconBg} text-white shadow-lg`}
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${stat.iconBg} text-white`}
             >
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  strokeWidth={1.5}
+                  strokeWidth={1.75}
                   d={stat.icon}
                 />
               </svg>

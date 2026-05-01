@@ -64,7 +64,7 @@ export default function ClassicCartTable({
                 <button
                   type="button"
                   onClick={() => onRemove?.(item.id)}
-                  className="inline-flex min-h-[44px] items-center text-sm uppercase tracking-widest text-muted-foreground hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive cursor-pointer"
+                  className="inline-flex min-h-[44px] items-center text-base uppercase tracking-widest text-muted-foreground hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive cursor-pointer"
                   aria-label={isRtl ? 'إزالة' : 'Remove'}
                 >
                   {isRtl ? 'إزالة' : 'Remove'}

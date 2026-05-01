@@ -76,7 +76,7 @@ export default function MinimalCartTable({
                   <button
                     type="button"
                     onClick={() => onRemove?.(item.id)}
-                    className="ms-4 inline-flex min-h-[44px] items-center text-xs hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive cursor-pointer"
+                    className="ms-4 inline-flex min-h-[44px] items-center text-sm hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive cursor-pointer"
                     aria-label={isRtl ? 'إزالة' : 'Remove'}
                   >
                     {isRtl ? 'إزالة' : 'Remove'}

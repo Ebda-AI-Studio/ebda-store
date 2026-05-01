@@ -46,22 +46,31 @@ export async function requireStoreAccess(
       throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
     }
 
-    // Super admin can access any store, but we log the access
+    // Super admin can access any store; log only WRITES, not reads.
+    // Logging every GET (dashboard polling, notification refresh,
+    // analytics tabs, etc.) was generating an audit-log entry every
+    // minute per super-admin per store — pure noise. Writes
+    // (POST/PUT/PATCH/DELETE) are the events that actually matter
+    // for compliance / forensics. STORE_ACCESS_DENIED below still
+    // fires on every method since denied access IS a security event.
     if (user.role === 'super_admin') {
-      await auditLog({
-        action: 'STORE_ACCESS',
-        userId: user.userId,
-        resourceType: 'store',
-        resourceId: storeId,
-        details: {
-          storeName: store.name,
-          accessType: 'super_admin_access',
-          method: req.method,
-          path: req.path,
-        },
-        ip: req.ip,
-        userAgent: req.headers['user-agent'],
-      });
+      const isWrite = !['GET', 'HEAD', 'OPTIONS'].includes(req.method);
+      if (isWrite) {
+        await auditLog({
+          action: 'STORE_ACCESS',
+          userId: user.userId,
+          resourceType: 'store',
+          resourceId: storeId,
+          details: {
+            storeName: store.name,
+            accessType: 'super_admin_access',
+            method: req.method,
+            path: req.path,
+          },
+          ip: req.ip,
+          userAgent: req.headers['user-agent'],
+        });
+      }
 
       // Attach store to request for downstream use
       req.store = store;

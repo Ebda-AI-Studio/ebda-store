@@ -59,7 +59,7 @@ export default function BoldCartTable({
                 <button
                   type="button"
                   onClick={() => onRemove?.(item.id)}
-                  className="h-11 w-11 flex-shrink-0 border-2 border-foreground bg-background font-black text-foreground hover:bg-destructive hover:text-destructive-foreground hover:border-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 cursor-pointer"
+                  className="h-11 w-11 flex-shrink-0 border-2 border-foreground bg-background text-2xl font-black text-foreground hover:bg-destructive hover:text-destructive-foreground hover:border-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 cursor-pointer"
                   aria-label={isRtl ? 'إزالة' : 'Remove'}
                 >
                   ×

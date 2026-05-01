@@ -158,9 +158,11 @@
     transform: translateY(-1px);
   }
 
-  /* Force Stat Card */
+  /* Force Stat Card — slim padding so the dashboard's top row isn't
+     three quarters whitespace. Was p-6 (24px); 16/20px is enough to
+     breathe without dominating the page. */
   .force-stat-card {
-    @apply relative overflow-hidden rounded-2xl border bg-card p-6 transition-all duration-300;
+    @apply relative overflow-hidden rounded-xl border bg-card px-5 py-4 transition-all duration-300;
   }
 
   .force-stat-card::before {

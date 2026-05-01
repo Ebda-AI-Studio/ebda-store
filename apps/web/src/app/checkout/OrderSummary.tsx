@@ -35,7 +35,12 @@ export function OrderSummary({
   onRemoveCoupon,
   couponError,
 }: OrderSummaryProps) {
-  const { t } = useLanguage();
+  const { t, isRtl } = useLanguage();
+  // Localised product name on the order summary line — checkout +
+  // payment review need to mirror the storefront which already shows
+  // Arabic names. Falls back to `name` when nameAr isn't set.
+  const productLabel = (p: { name: string; nameAr?: string }) =>
+    isRtl && p.nameAr ? p.nameAr : p.name;
 
   return (
     <div className="mt-8 lg:col-span-5 lg:mt-0">
@@ -51,7 +56,7 @@ export function OrderSummary({
                 {item.product.images?.[0] ? (
                   <Image
                     src={item.product.images[0].url}
-                    alt={item.product.name}
+                    alt={productLabel(item.product)}
                     fill
                     className="object-cover"
                   />
@@ -77,7 +82,9 @@ export function OrderSummary({
                 </span>
               </div>
               <div className="flex flex-1 flex-col">
-                <h3 className="text-sm font-medium text-foreground">{item.product.name}</h3>
+                <h3 className="text-sm font-medium text-foreground">
+                  {productLabel(item.product)}
+                </h3>
                 <p className="mt-auto text-sm font-medium text-muted-foreground">
                   {formatPrice(item.price * item.quantity)}
                 </p>
