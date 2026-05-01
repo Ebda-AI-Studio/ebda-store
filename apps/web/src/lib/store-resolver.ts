@@ -138,9 +138,17 @@ const DEFAULT_STORE: ResolvedStore = {
   heroImage: null,
 };
 
-// Simple in-memory cache for store resolution
+// Simple in-memory cache for store resolution.
+//
+// 2 minutes (down from 5) — short enough that admin-driven changes
+// (typography, Best Sellers cover, hero copy, theme, announcement
+// bar) feel responsive to the merchant, long enough that we're not
+// re-hitting the public store endpoint constantly and racking up
+// Vercel function invocations. The API itself caches the store
+// payload in Redis upstream, so the per-call cost is small either
+// way, but 2 min is the sweet spot for cost vs. perceived freshness.
 const storeCache = new Map<string, { store: ResolvedStore; expires: number }>();
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const CACHE_TTL = 2 * 60 * 1000;
 
 /**
  * Get the store domain from request headers
@@ -172,7 +180,7 @@ export async function isPlatformDomain(): Promise<boolean> {
 async function fetchStoreByDomain(domain: string): Promise<ResolvedStore | null> {
   try {
     const response = await fetch(`${API_URL}/public/store/resolve`, {
-      next: { revalidate: 300 }, // Revalidate every 5 minutes
+      next: { revalidate: 120 }, // 2-minute revalidate — paired with the in-memory storeCache TTL
       headers: {
         'Content-Type': 'application/json',
         'x-store-domain': domain,
@@ -302,7 +310,7 @@ async function resolveStoreByDomain(domain: string): Promise<ResolvedStore | nul
 async function fetchStoreBySlug(slug: string): Promise<ResolvedStore | null> {
   try {
     const response = await fetch(`${API_URL}/public/stores/${slug}`, {
-      next: { revalidate: 300 },
+      next: { revalidate: 120 },
       headers: { 'Content-Type': 'application/json' },
     });
 
