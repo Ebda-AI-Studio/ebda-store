@@ -306,7 +306,10 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
 
   return (
     <ShopChrome>
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 flex-1">
+      {/* Whole product detail page — gallery + info + variants +
+          related-products + frequently-bought-together — falls under
+          the merchant's "Products" typography zone. */}
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 flex-1" data-zone="products">
         {/* Breadcrumb */}
         <nav className="mb-8 flex items-center gap-2 text-sm text-muted-foreground">
           <Link href={storeUrl('/')} className="hover:text-primary">

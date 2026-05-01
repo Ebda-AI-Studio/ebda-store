@@ -194,7 +194,9 @@ function SearchContent() {
 
   return (
     <ShopChrome>
-      <div className="container mx-auto px-4 py-8 flex-1">
+      {/* Search results are still product listings — same typography
+          zone as /products. */}
+      <div className="container mx-auto px-4 py-8 flex-1" data-zone="products">
         <h1 className="text-3xl font-bold mb-6">
           {t(
             'Search Products',

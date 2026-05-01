@@ -311,7 +311,15 @@ export default function ProductsClient({
 
   return (
     <ShopChrome>
-      <div className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8">
+      {/* data-zone="products" wraps the entire listing — header h1 +
+          breadcrumb + filter sidebar (sort, price range, search,
+          category chips) + product grid + counter — so the merchant's
+          "Products" zone typography settings cascade to every text
+          element on this page in one shot. */}
+      <div
+        className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8"
+        data-zone="products"
+      >
         {/* Breadcrumb */}
         <nav className="mb-6 flex items-center gap-2 text-sm text-muted-foreground">
           <Link href="/" className="transition-colors hover:text-primary">

@@ -105,7 +105,10 @@ export function CartRecommendations({ storeId, productIds }: CartRecommendations
   };
 
   return (
-    <div className="mb-8 rounded-2xl border border-border bg-card p-6 shadow-sm">
+    <div
+      className="mb-8 rounded-2xl border border-border bg-card p-6 shadow-sm"
+      data-zone="products"
+    >
       <h2 className="text-lg font-bold text-foreground">
         {t('You Might Also Need', 'قد تحتاج أيضاً')}
       </h2>
