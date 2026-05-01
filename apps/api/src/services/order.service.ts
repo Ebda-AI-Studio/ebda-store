@@ -3,11 +3,11 @@ import { prisma, Prisma, OrderStatus } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import { CartService } from './cart.service';
 import { CouponService } from './coupon.service';
-import { EmailService, type OrderEmailData } from './email.service';
+import { EmailService } from './email.service';
 import { socketService } from './socket.service';
 import { notificationDispatcher } from './notification-dispatcher.service';
-import { OneSignalService } from './onesignal.service';
 import { featureService } from './feature.service';
+import { inngest } from '../lib/inngest/client';
 import { shippingCarrierService } from './shipping-carrier.service';
 import { ShippingService } from './shipping.service';
 import { LoyaltyService } from './loyalty.service';
@@ -427,71 +427,22 @@ export class OrderService {
         .catch(err => logger.error({ err }, 'Affiliate referral link failed'));
     }
 
-    // Order is committed — return to caller as fast as possible.
-    // Emails + notifications fan out fire-and-forget so a slow / unreachable
-    // SMTP host or notification provider can't block the checkout response
-    // (this previously caused 45s+ "Processing…" hangs on the storefront).
-    // Guest checkout: there is no `order.customer` record. Fall back to
-    // the shipping address fields the visitor provided so the email
-    // confirmation still reaches them and shows their name.
-    const guestFirstName =
-      typeof data.shippingAddress.firstName === 'string' ? data.shippingAddress.firstName : '';
-    const guestLastName =
-      typeof data.shippingAddress.lastName === 'string' ? data.shippingAddress.lastName : '';
-    const guestEmail =
-      typeof data.shippingAddress.email === 'string' ? data.shippingAddress.email : '';
-    const emailData: OrderEmailData = {
-      orderNumber: order.orderNumber,
-      customerName:
-        `${order.customer?.firstName || guestFirstName} ${order.customer?.lastName || guestLastName}`.trim() ||
-        order.customer?.email ||
-        guestEmail ||
-        'Customer',
-      customerEmail: order.customer?.email || guestEmail,
-      items: order.items.map(item => ({
-        name: item.productName,
-        quantity: item.quantity,
-        price: item.price,
-      })),
-      subtotal: order.subtotal,
-      tax: order.tax,
-      shipping: order.shipping,
-      discount: order.discount,
-      couponCode: order.couponCode ?? undefined,
-      total: order.total,
-      shippingAddress: data.shippingAddress,
-    };
+    // Order is committed — fan out the email/push/dispatcher work onto
+    // the Inngest queue so a slow SMTP host or OneSignal hiccup can't
+    // block the checkout response (this previously caused 45s+
+    // "Processing…" hangs on the storefront). The order/created
+    // handler in lib/inngest/functions/order-created.ts re-fetches the
+    // order from Postgres and runs each side effect as its own
+    // retryable step.
+    inngest
+      .send({
+        name: 'order/created',
+        data: { orderId: order.id, storeId, paymentMethod: data.paymentMethod },
+      })
+      .catch(err => logger.error({ err, orderId: order.id }, 'Failed to enqueue order/created'));
 
-    void Promise.all([
-      EmailService.sendOrderConfirmation(emailData).catch(err =>
-        logger.error({ err }, 'Failed to send customer order confirmation email')
-      ),
-      EmailService.sendAdminNewOrder(emailData).catch(err =>
-        logger.error({ err }, 'Failed to send admin new-order email')
-      ),
-    ]);
-
-    // Dispatch to WhatsApp/SMS/Push channels (fire-and-forget)
-    void prisma.store
-      .findUnique({ where: { id: storeId }, select: { name: true } })
-      .catch(() => null)
-      .then(storeForNotification =>
-        notificationDispatcher
-          .dispatch(storeId, 'order_confirmed', {
-            customerName:
-              `${order.customer?.firstName || ''} ${order.customer?.lastName || ''}`.trim() ||
-              order.customer?.email ||
-              'Customer',
-            customerPhone: data.shippingAddress.phone ?? undefined,
-            orderNumber: order.orderNumber,
-            total: order.total,
-            storeId,
-            storeName: storeForNotification?.name ?? storeId,
-          })
-          .catch(err => logger.error({ err }, 'Notification dispatch failed'))
-      );
-
-    // Send real-time notification to store admins
+    // WebSocket emit stays in-process — it's a free local dispatch and
+    // the admin page expects the toast within ~1s of order creation.
     try {
       socketService.newOrderNotification(storeId, {
         orderId: order.id,
@@ -505,30 +456,6 @@ export class OrderService {
     } catch (notifyError) {
       logger.error({ err: notifyError }, 'Failed to send order notification');
     }
-
-    // Fire-and-forget OneSignal browser push to store admins + super admins.
-    // Tag-filtered server-side so other tenants' admins are never reached.
-    void prisma.store
-      .findUnique({ where: { id: storeId }, select: { name: true } })
-      .catch(() => null)
-      .then(s =>
-        OneSignalService.notifyAdminsOfOrder({
-          orderId: order.id,
-          orderNumber: order.orderNumber,
-          storeId,
-          storeName: s?.name ?? storeId,
-          customerName:
-            `${order.customer?.firstName || ''} ${order.customer?.lastName || ''}`.trim() ||
-            order.customer?.email ||
-            'Customer',
-          total: order.total,
-          currency: order.currency,
-          // Surfaced in the super_admin push body. Whatever the customer
-          // selected at checkout (cod / knet / visa / etc.) gets a
-          // human-readable label inside notifyAdminsOfOrder.
-          paymentMethod: data.paymentMethod,
-        }).catch(err => logger.error({ err }, 'OneSignal admin push failed'))
-      );
 
     return order;
   }

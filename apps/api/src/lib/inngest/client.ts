@@ -17,6 +17,7 @@ type OrderCreatedEvent = EventPayload & {
   data: {
     orderId: string;
     storeId: string;
+    paymentMethod: string;
   };
 };
 

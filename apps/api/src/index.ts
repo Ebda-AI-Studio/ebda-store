@@ -225,7 +225,7 @@ app.use(
   '/api/v1/inngest',
   inngestServe({
     client: inngest,
-    functions: [...inngestFunctions],
+    functions: inngestFunctions,
   })
 );
 
