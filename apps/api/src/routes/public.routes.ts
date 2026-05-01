@@ -19,6 +19,7 @@ import logger from '../lib/logger';
 import { featureService } from '../services/feature.service';
 import { getCached } from '../lib/public-cache';
 import { redis } from '../services/redis.service';
+import { setEdgeCache } from '../lib/edge-cache';
 
 const router = Router();
 
@@ -120,7 +121,12 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
       })
     );
 
-    res.setHeader('Cache-Control', 'private, max-age=60');
+    // Edge-cacheable: product list is identical for all anonymous
+    // visitors of the same store. Per-tenant via the default Vary on
+    // x-store-id; per-locale because the storefront ?lang= query
+    // surfaces in the URL, so it's already in the cache key without
+    // needing Accept-Language Vary.
+    setEdgeCache(res, { sMaxAge: 60, staleWhileRevalidate: 300 });
     res.json({
       success: true,
       data: result,
@@ -143,7 +149,7 @@ router.get('/products/:slugOrId', async (req: Request, res: Response, next: Next
       ? await ProductService.getPublicById(storeId, slugOrId)
       : await ProductService.getPublicBySlug(storeId, slugOrId);
 
-    res.setHeader('Cache-Control', 'private, max-age=60');
+    setEdgeCache(res, { sMaxAge: 60, staleWhileRevalidate: 300 });
     res.json({
       success: true,
       data: { product },
@@ -161,7 +167,7 @@ router.get('/categories', async (req: Request, res: Response, next: NextFunction
       ProductService.getCategories(storeId)
     );
 
-    res.setHeader('Cache-Control', 'private, max-age=60');
+    setEdgeCache(res, { sMaxAge: 120, staleWhileRevalidate: 600 });
     res.json({
       success: true,
       data: { categories },
@@ -628,7 +634,7 @@ router.get('/stores', async (req: Request, res: Response, next: NextFunction) =>
       }),
     ]);
 
-    res.setHeader('Cache-Control', 'private, max-age=60');
+    setEdgeCache(res, { sMaxAge: 120, staleWhileRevalidate: 600 });
     res.json({
       success: true,
       data: stores,
@@ -738,7 +744,7 @@ router.get('/stores/:slugOrId', async (req: Request, res: Response, next: NextFu
       return;
     }
 
-    res.setHeader('Cache-Control', 'private, max-age=60');
+    setEdgeCache(res, { sMaxAge: 120, staleWhileRevalidate: 600 });
     res.json({
       success: true,
       data: result,
@@ -799,7 +805,7 @@ router.get('/store', async (_req: Request, res: Response, next: NextFunction) =>
       );
     }
 
-    res.setHeader('Cache-Control', 'private, max-age=60');
+    setEdgeCache(res, { sMaxAge: 120, staleWhileRevalidate: 600 });
     res.json({
       success: true,
       data: { store },
@@ -912,7 +918,7 @@ router.get(
       });
       const disabledCmsSlugs = disabledPages.map(p => p.slug);
 
-      res.setHeader('Cache-Control', 'private, max-age=60');
+      setEdgeCache(res, { sMaxAge: 120, staleWhileRevalidate: 600 });
       res.json({
         success: true,
         data: { store, enabledFeatures, disabledCmsSlugs },
