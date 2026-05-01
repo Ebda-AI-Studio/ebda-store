@@ -153,43 +153,43 @@ enum VerificationTokenType {
 // ==========================================
 
 model Store {
-  id             String      @id @default(uuid())
-  name           String
-  nameAr         String?     @map("name_ar")
-  slug           String      @unique
-  domain         String?     @unique
-  ownerId        String      @map("owner_id")
-  status         StoreStatus @default(active)
-  plan           StorePlan   @default(starter)
-  logo           String?
-  logoAr         String?     @map("logo_ar")
-  favicon        String?
+  id               String      @id @default(uuid())
+  name             String
+  nameAr           String?     @map("name_ar")
+  slug             String      @unique
+  domain           String?     @unique
+  ownerId          String      @map("owner_id")
+  status           StoreStatus @default(active)
+  plan             StorePlan   @default(starter)
+  logo             String?
+  logoAr           String?     @map("logo_ar")
+  favicon          String?
   // Hero customization
-  heroTitle      String?     @map("hero_title")
-  heroTitleAr    String?     @map("hero_title_ar")
-  heroSubtitle   String?     @map("hero_subtitle")
-  heroSubtitleAr String?     @map("hero_subtitle_ar")
-  heroCtaText    String?     @map("hero_cta_text")
-  heroCtaTextAr  String?     @map("hero_cta_text_ar")
-  heroCtaLink    String?     @map("hero_cta_link")
-  heroImage      String?     @map("hero_image")
+  heroTitle        String?     @map("hero_title")
+  heroTitleAr      String?     @map("hero_title_ar")
+  heroSubtitle     String?     @map("hero_subtitle")
+  heroSubtitleAr   String?     @map("hero_subtitle_ar")
+  heroCtaText      String?     @map("hero_cta_text")
+  heroCtaTextAr    String?     @map("hero_cta_text_ar")
+  heroCtaLink      String?     @map("hero_cta_link")
+  heroImage        String?     @map("hero_image")
   // Cover image shown on the storefront's Best Sellers virtual
   // category tile. Optional — when null the storefront falls back to
   // the text-only treatment.
-  bestSellersImage String?   @map("best_sellers_image")
+  bestSellersImage String?     @map("best_sellers_image")
   // Per-store typography overrides — see TypographySettings type in
   // @force/shared. JSON because the shape will keep evolving (more
   // zones, line-height/letter-spacing, etc.) and we don't want a
   // column-add migration each time.
-  typography     Json?       @map("typography")
-  description    String?
-  descriptionAr  String?     @map("description_ar")
-  currency       String      @default("KWD")
-  timezone       String      @default("Asia/Kuwait")
-  settings       Json        @default("{}")
-  createdAt      DateTime    @default(now()) @map("created_at")
-  updatedAt      DateTime    @updatedAt @map("updated_at")
-  deletedAt      DateTime?   @map("deleted_at") // Soft delete support
+  typography       Json?       @map("typography")
+  description      String?
+  descriptionAr    String?     @map("description_ar")
+  currency         String      @default("KWD")
+  timezone         String      @default("Asia/Kuwait")
+  settings         Json        @default("{}")
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
+  deletedAt        DateTime?   @map("deleted_at") // Soft delete support
 
   // Template & Theme
   template       StoreTemplate @default(modern)
@@ -475,6 +475,9 @@ model Product {
   // schema doesn't know about the index and `prisma migrate dev` will
   // try to drop it on every diff.
   @@index([storeId, isBestSeller])
+  // Storefront list query: store-scoped, soft-delete-aware, newest-first.
+  // Created in 20260501030000_perf_indexes.
+  @@index([storeId, deletedAt, createdAt(sort: Desc)])
   @@map("products")
 }
 
@@ -746,6 +749,9 @@ model Order {
   @@index([createdAt])
   @@index([storeId, customerId]) // Composite: customer orders in a store
   @@index([storeId, status]) // Composite: orders by store and status
+  // Admin orders list — newest first within a store. Created in
+  // 20260501030000_perf_indexes.
+  @@index([storeId, createdAt(sort: Desc)])
   @@map("orders")
 }
 
@@ -1397,6 +1403,9 @@ model AuditLog {
   @@index([action])
   @@index([resourceType])
   @@index([createdAt])
+  // Admin "audit logs for this store" page — store-scoped, newest-first.
+  // Created in 20260501030000_perf_indexes.
+  @@index([storeId, createdAt(sort: Desc)])
   @@map("audit_logs")
 }
 
