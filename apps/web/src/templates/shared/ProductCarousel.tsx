@@ -102,7 +102,11 @@ export function ProductCarousel({
   if (products.length === 0) return null;
 
   return (
-    <section className="px-4 sm:px-6 lg:px-8" dir={isRtl ? 'rtl' : 'ltr'}>
+    // ProductCarousel is the primary "New Arrivals" + "Best Sellers"
+    // surface on the homepage. Without this data-zone tag the
+    // homepage product cards inherited template defaults instead of
+    // the merchant's "Products" zone typography.
+    <section className="px-4 sm:px-6 lg:px-8" dir={isRtl ? 'rtl' : 'ltr'} data-zone="products">
       <div className="mx-auto max-w-7xl">
         <SectionHeading
           title={title}
