@@ -57,7 +57,24 @@ STORE_ID=<uuid> ./run.sh api-bursts
 When the numbers shift materially, capture them inline below with
 the date and a one-line note about what changed.
 
-| Date       | Scenario          | p95       | Notes                           |
-| ---------- | ----------------- | --------- | ------------------------------- |
-| 2026-05-01 | storefront-browse | (pending) | Initial baseline post-perf-pass |
-| 2026-05-01 | api-bursts        | (pending) | Initial baseline post-perf-pass |
+| Date       | Scenario          | p95                           | Notes                                                                                                                                                                                          |
+| ---------- | ----------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-05-02 | storefront-browse | 456ms (list) / 477ms (detail) | Single-IP run from local laptop. 18% requests 429'd by `100 req / 15min / IP` global limiter — expected for single-source tests. p95 is real-world for the requests that actually got through. |
+| 2026-05-02 | api-bursts        | (pending)                     | Skipped — same single-IP rate-limit issue would dominate the result.                                                                                                                           |
+
+## Single-IP rate-limit caveat
+
+The global limiter at `apps/api/src/index.ts` caps `/api/` at 100
+req per 15 min per IP — appropriate for production where users are
+distributed across many IPs, but it dominates single-source load
+tests within seconds. For meaningful stress tests, either:
+
+- Run from k6 Cloud / multiple cloud regions (distinct IPs)
+- Add a temporary `LOAD_TEST_BYPASS_TOKEN` header check on the
+  limiter that's only set on Railway during a planned test window
+- Sustain measurements at low VU counts (under ~5 from one IP)
+
+The post-perf-pass numbers above are the real p95 for the requests
+that _weren't_ rate-limited, so they reflect the API + DB + edge
+performance honestly. The 18% failure rate is a measurement
+artifact of single-IP testing, not a system problem.
