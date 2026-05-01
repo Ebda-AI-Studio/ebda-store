@@ -207,7 +207,12 @@ export default function ProductDetailPage() {
         storeName: product.store?.name || t('fallbackStore'),
       })}
       actions={
-        <div className="flex gap-2">
+        // `flex-wrap` so all four buttons always render — at narrow
+        // desktop widths or on the mobile-actions row this used to
+        // push "Recommendations" / "Delete" off-screen with no
+        // affordance to find them. Wrapping is uglier on tablets but
+        // never hides actions.
+        <div className="flex flex-wrap gap-2">
           <Link href={`/stores/${storeId}/products/${product.id}/edit`}>
             <Button variant="outline" size="sm">
               {tActions('edit')}

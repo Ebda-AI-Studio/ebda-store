@@ -172,13 +172,33 @@ export default function TypographyPage() {
     [storeId, toastError, toastSuccess]
   );
 
+  // Normalise unit-less numeric inputs into valid CSS. Merchants
+  // routinely type "16" thinking the field is a number — but the
+  // storefront emits the value verbatim into a CSS rule, and CSS
+  // ignores `font-size: 16` entirely. Convert any pure number to
+  // pixels; leave anything that already has a unit (px / rem / em /
+  // %, calc(), clamp() …) alone.
+  const normaliseSize = (raw: string): string => {
+    const trimmed = raw.trim();
+    if (!trimmed) return trimmed;
+    if (/^-?\d+(?:\.\d+)?$/.test(trimmed)) return `${trimmed}px`;
+    return trimmed;
+  };
   const updateZone = (zone: ZoneKey, patch: Partial<ZoneSettings>) => {
     const current = typo.zones[zone] ?? {};
     const merged = { ...current, ...patch };
-    // Strip empty strings so the API receives clean optional fields.
     const cleaned: ZoneSettings = {};
     for (const [k, v] of Object.entries(merged)) {
-      if (typeof v === 'string' && v.trim()) cleaned[k as keyof ZoneSettings] = v.trim();
+      if (typeof v !== 'string') continue;
+      const trimmed = v.trim();
+      if (!trimmed) continue;
+      // Auto-append `px` to bare numbers in the size + spacing fields.
+      // fontWeight is unitless, so don't touch it. Color also unitless.
+      const final =
+        k === 'fontSize' || k === 'lineHeight' || k === 'letterSpacing'
+          ? normaliseSize(trimmed)
+          : trimmed;
+      cleaned[k as keyof ZoneSettings] = final;
     }
     setTypo(t => ({ ...t, zones: { ...t.zones, [zone]: cleaned } }));
   };
@@ -443,11 +463,12 @@ export default function TypographyPage() {
                           type="text"
                           value={cfg.fontSize ?? ''}
                           onChange={e => updateZone(z.key, { fontSize: e.target.value })}
-                          placeholder={`inherit (≈ ${z.defaults.fontSize})`}
+                          placeholder={`e.g. 16 or 16px or 1rem`}
                           className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
                         />
                         <span className="text-[11px] text-muted-foreground/80">
-                          Template default ≈ {z.defaults.fontSize}.
+                          Template default ≈ {z.defaults.fontSize}. A bare number is treated as
+                          pixels (16 → 16px).
                         </span>
                       </label>
                       <label className="flex flex-col gap-1">
