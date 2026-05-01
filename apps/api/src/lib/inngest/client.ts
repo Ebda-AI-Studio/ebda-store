@@ -29,7 +29,16 @@ type BulkImportStartedEvent = EventPayload & {
   };
 };
 
-export type AppEvent = OrderCreatedEvent | BulkImportStartedEvent;
+type InvoiceEmailRequestedEvent = EventPayload & {
+  name: 'order/invoice.email-requested';
+  data: {
+    orderId: string;
+    storeId: string;
+    to: string;
+  };
+};
+
+export type AppEvent = OrderCreatedEvent | BulkImportStartedEvent | InvoiceEmailRequestedEvent;
 
 export const inngest = new Inngest({
   id: 'force-api',

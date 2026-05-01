@@ -1,6 +1,7 @@
 import type { InngestFunction } from 'inngest';
 import { orderCreated } from './order-created';
 import { bulkImportProducts } from './bulk-import';
+import { invoiceEmail } from './invoice-email';
 
 /**
  * Registry of every Inngest function the API exposes. The serve
@@ -8,4 +9,8 @@ import { bulkImportProducts } from './bulk-import';
  * `/api/v1/inngest`. Functions added here are picked up by the
  * Inngest platform on the next deploy / dev sync.
  */
-export const inngestFunctions: InngestFunction.Any[] = [orderCreated, bulkImportProducts];
+export const inngestFunctions: InngestFunction.Any[] = [
+  orderCreated,
+  bulkImportProducts,
+  invoiceEmail,
+];

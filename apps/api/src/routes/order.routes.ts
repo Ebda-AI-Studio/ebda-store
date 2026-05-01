@@ -4,11 +4,11 @@ import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess, checkStoreAccess } from '../middleware/store-access';
 import { OrderService } from '../services/order.service';
 import { InvoiceService } from '../services/invoice.service';
-import { EmailService } from '../services/email.service';
 import { requirePermission, requireRole } from '../middleware/rbac';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { getAuthUser } from '../utils/store-helpers';
 import { prisma } from '@force/database';
+import { inngest } from '../lib/inngest/client';
 import logger from '../lib/logger';
 
 const router = Router({ mergeParams: true });
@@ -238,7 +238,8 @@ router.get(
 
 /**
  * POST /stores/:storeId/orders/:orderId/invoice/email
- * Email the invoice to the customer associated with the order. Admin only.
+ * Queue an invoice email send. Returns 202 immediately — the actual
+ * SMTP send happens on the Inngest queue with retries.
  */
 router.post(
   '/:orderId/invoice/email',
@@ -259,14 +260,14 @@ router.post(
         });
         return;
       }
-      const html = await InvoiceService.generateInvoice(storeId, orderId);
-      await EmailService.send({
-        to: customerEmail,
-        subject: `Invoice ${order.orderNumber}`,
-        html,
+
+      await inngest.send({
+        name: 'order/invoice.email-requested',
+        data: { orderId, storeId, to: customerEmail },
       });
+
       await auditLog({
-        action: 'order.invoice.emailed',
+        action: 'order.invoice.email-queued',
         userId: getAuthUser(req).userId,
         resourceType: 'order',
         resourceId: orderId,
@@ -274,7 +275,8 @@ router.post(
         ip: req.ip,
         userAgent: req.headers['user-agent'],
       });
-      res.json({ success: true });
+
+      res.status(202).json({ success: true });
     } catch (error) {
       next(error);
     }
