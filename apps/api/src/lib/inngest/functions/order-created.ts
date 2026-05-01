@@ -22,8 +22,10 @@ export const orderCreated: InngestFunction.Any = inngest.createFunction(
     id: 'order-created-fanout',
     name: 'Order created — email + push + dispatcher fan-out',
     // Cap concurrent runs per store so a single tenant's burst can't
-    // monopolize Inngest workers / hammer external providers.
-    concurrency: { key: 'event.data.storeId', limit: 10 },
+    // monopolize Inngest workers / hammer external providers. Limit
+    // is 5 because Inngest's free plan caps per-function concurrency
+    // at 5; bump alongside the plan if we ever upgrade.
+    concurrency: { key: 'event.data.storeId', limit: 5 },
     retries: 3,
     triggers: [{ event: 'order/created' }],
   },
