@@ -166,13 +166,15 @@ export function ProductsTable({
     },
     {
       header: t('table.status'),
+      mobileBadge: true,
       cell: product => <StatusBadge status={product.status} />,
     },
     {
       header: t('table.actions'),
       alignEnd: true,
+      mobileActions: true,
       cell: product => (
-        <div className="flex items-center justify-end gap-2 flex-wrap">
+        <div className="flex items-center gap-2 md:justify-end md:flex-wrap">
           {product.hasVariants && (
             <Link href={`/stores/${storeId}/products/${product.id}/variants`}>
               <Button variant="outline" size="sm">

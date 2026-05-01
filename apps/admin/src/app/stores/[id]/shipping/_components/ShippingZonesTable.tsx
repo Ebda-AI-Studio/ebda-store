@@ -98,6 +98,7 @@ export function ShippingZonesTable({ zones, onEdit, onToggle, onDelete }: Shippi
     },
     {
       header: t('status'),
+      mobileBadge: true,
       cell: zone => (
         <button
           type="button"
@@ -115,8 +116,9 @@ export function ShippingZonesTable({ zones, onEdit, onToggle, onDelete }: Shippi
     {
       header: t('actions'),
       alignEnd: true,
+      mobileActions: true,
       cell: zone => (
-        <div className="flex items-center justify-end gap-2">
+        <div className="flex items-center gap-2 md:justify-end">
           <button
             type="button"
             onClick={() => onEdit(zone)}

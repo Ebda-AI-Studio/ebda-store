@@ -47,6 +47,7 @@ export function MembersTable({
     },
     {
       header: t('columns.tier'),
+      mobileBadge: true,
       cell: member => (
         <span
           className={`px-2 py-1 rounded-full text-xs font-medium ${TIER_COLORS[member.tier]?.bg} ${TIER_COLORS[member.tier]?.text}`}
@@ -74,6 +75,7 @@ export function MembersTable({
     {
       header: t('columns.actions'),
       alignEnd: true,
+      mobileActions: true,
       cell: member => (
         <button
           type="button"

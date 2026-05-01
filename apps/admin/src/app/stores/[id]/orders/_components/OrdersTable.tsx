@@ -106,6 +106,7 @@ export function OrdersTable({
     },
     {
       header: t('table.status'),
+      mobileBadge: true,
       cell: order => {
         const transitions = VALID_TRANSITIONS[order.status] ?? [];
         const isUpdating = updatingId === order.id;
@@ -152,12 +153,13 @@ export function OrdersTable({
     {
       header: t('table.actions'),
       alignEnd: true,
+      mobileActions: true,
       cell: order => {
         const isUpdating = updatingId === order.id;
         const isCodUnpaid =
           order.paymentStatus === 'unpaid' && order.payments?.some(p => p.provider === 'cod');
         return (
-          <div className="flex items-center justify-end gap-2 flex-wrap">
+          <div className="flex items-center gap-2 md:justify-end md:flex-wrap">
             {isCodUnpaid && (
               <div className="flex items-center gap-2" data-row-stop>
                 <input

@@ -17,6 +17,15 @@ export interface DataTableColumn<T> {
    *  the top of the mobile card (no label). Use for the row's primary
    *  identity — product name, order number, customer name. */
   primaryOnMobile?: boolean;
+  /** When true, render the value (no label) in the top-right of the
+   *  mobile card next to the primary cell — used for status pills /
+   *  badges that belong with the title block, not in a separate row. */
+  mobileBadge?: boolean;
+  /** When true, render the cell as the bottom action toolbar of the
+   *  mobile card (full-width, flex-wrap, no label). Use for the
+   *  "actions" column with its row of buttons. Replaces the old
+   *  label/value row which crammed buttons into 50% of the card width. */
+  mobileActions?: boolean;
   /** Right-align this column (numbers, currency, status). */
   alignEnd?: boolean;
   /** Optional CSS for the desktop `<th>` / `<td>` (e.g. width, padding). */
@@ -42,19 +51,25 @@ interface DataTableProps<T> {
  * of cards on phones. Every dense list in the admin (orders, products,
  * customers, coupons, shipping zones, tax rates, loyalty members,
  * stores) is the same shape — one wrapper makes them all readable on a
- * phone instead of horizontally-scrolled mini-text.
+ * phone instead of horizontally-scrolled mini-text or label/value rows
+ * with 60% empty middle space.
  *
  * Mobile card layout:
  *   ┌──────────────────────────────────┐
- *   │ <primaryOnMobile cell>           │  ← bold, full-width
- *   │ Header A: <cell>                 │
- *   │ Header B: <cell>                 │
- *   │ ...                              │
+ *   │ <primaryOnMobile>      <badge>   │  ← title + status pill
+ *   │ ──────────────────────────────── │
+ *   │ Header A   <cell>                │  ← label · value rows
+ *   │ Header B   <cell>                │
+ *   │ ──────────────────────────────── │
+ *   │ <mobileActions cell, full-width> │  ← action toolbar
  *   └──────────────────────────────────┘
  *
- * Columns marked `hideOnMobile` are dropped from the card; the rest
- * render as labelled rows. The author still gets full control because
- * `cell()` returns any ReactNode — chips, action menus, links, etc.
+ * Columns can opt into specific roles via `primaryOnMobile`,
+ * `mobileBadge`, or `mobileActions`. Columns marked `hideOnMobile` are
+ * dropped from the card entirely. Anything else becomes a label/value
+ * row, but with `gap-3` natural flow rather than `justify-between` —
+ * killed the empty-middle gap that made every list look like data fell
+ * off the right side of the screen.
  */
 export function DataTable<T>({
   columns,
@@ -70,7 +85,11 @@ export function DataTable<T>({
 
   const mobileColumns = columns.filter(c => !c.hideOnMobile);
   const primaryColumn = mobileColumns.find(c => c.primaryOnMobile);
-  const labelColumns = mobileColumns.filter(c => !c.primaryOnMobile);
+  const badgeColumns = mobileColumns.filter(c => c.mobileBadge);
+  const actionsColumn = mobileColumns.find(c => c.mobileActions);
+  const labelColumns = mobileColumns.filter(
+    c => !c.primaryOnMobile && !c.mobileBadge && !c.mobileActions
+  );
 
   return (
     <>
@@ -126,23 +145,62 @@ export function DataTable<T>({
               onRowClick ? 'cursor-pointer active:bg-muted/50 transition-colors' : ''
             }`}
           >
-            {primaryColumn && (
-              <div className="mb-2 text-base font-semibold text-foreground">
-                {primaryColumn.cell(row, i)}
+            {/* Title row: primary cell on the left, badges on the right.
+                Wraps if the title is long so badges don't get pushed
+                off-card. */}
+            {(primaryColumn || badgeColumns.length > 0) && (
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1 text-base font-semibold text-foreground">
+                  {primaryColumn?.cell(row, i)}
+                </div>
+                {badgeColumns.length > 0 && (
+                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+                    {badgeColumns.map((c, ci) => (
+                      <div key={ci}>{c.cell(row, i)}</div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
-            <dl className="space-y-1.5 text-sm">
-              {labelColumns.map((c, ci) => (
-                <div key={ci} className="flex items-baseline justify-between gap-3">
-                  <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    {c.header}
-                  </dt>
-                  <dd className={`text-foreground ${c.alignEnd ? 'text-end' : 'text-start'}`}>
-                    {c.cell(row, i)}
-                  </dd>
-                </div>
-              ))}
-            </dl>
+
+            {/* Label/value rows. `gap-3` natural flow (label hugs left,
+                value hugs label) — no more `justify-between` blowing up
+                short values to the right edge of the card. */}
+            {labelColumns.length > 0 && (
+              <dl
+                className={`space-y-1 text-sm ${
+                  primaryColumn || badgeColumns.length > 0 ? 'mt-3' : ''
+                }`}
+              >
+                {labelColumns.map((c, ci) => (
+                  <div key={ci} className="flex items-baseline gap-3">
+                    <dt className="w-24 shrink-0 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      {c.header}
+                    </dt>
+                    <dd
+                      className={`min-w-0 flex-1 text-foreground ${
+                        c.alignEnd ? 'text-end' : 'text-start'
+                      }`}
+                    >
+                      {c.cell(row, i)}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+
+            {/* Actions toolbar — full-width strip at the bottom of the
+                card, with overflow-x-auto so 4+ buttons can scroll
+                horizontally rather than wrap. The wrapped child (a
+                button/link) decides its own padding/sizing. */}
+            {actionsColumn && (
+              <div
+                className="-mx-1 mt-3 flex items-center gap-2 overflow-x-auto px-1 pt-2 [&_*]:shrink-0 border-t border-border/40"
+                onClick={e => e.stopPropagation()}
+              >
+                {actionsColumn.cell(row, i)}
+              </div>
+            )}
           </div>
         ))}
       </div>

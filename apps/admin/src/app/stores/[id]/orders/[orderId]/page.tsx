@@ -92,8 +92,14 @@ export default function OrderDetailPage() {
       if (apiError) {
         toastError(tList('errors.markPaid'), apiError.message ?? '');
       } else {
-        setOrder(o => (o ? { ...o, paymentStatus: 'paid' } : o));
         toastSuccess(tList('toast.markedPaidTitle'));
+        // The mark-paid endpoint also advances `status` (pending →
+        // confirmed) when the order was unpaid. If we just patched
+        // paymentStatus locally and left `status` stale, the next
+        // "Processed" tap re-sent status: pending and the API errored
+        // with "Cannot transition from confirmed to confirmed". Refetch
+        // so local state matches the server's transitioned status too.
+        await fetchOrder();
       }
     } catch {
       toastError(tList('errors.markPaid'));

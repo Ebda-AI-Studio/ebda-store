@@ -44,6 +44,7 @@ export function StoresTable({ stores }: StoresTableProps) {
     },
     {
       header: t('colStatus'),
+      mobileBadge: true,
       cell: store => {
         const status = statusConfig[store.status];
         return (
@@ -92,6 +93,7 @@ export function StoresTable({ stores }: StoresTableProps) {
     {
       header: t('colActions'),
       alignEnd: true,
+      mobileActions: true,
       cell: store => (
         <Link href={`/stores/${store.id}`}>
           <Button variant="outline" size="sm" className="rounded-xl">

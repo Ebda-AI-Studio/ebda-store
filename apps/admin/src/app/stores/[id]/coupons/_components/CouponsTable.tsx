@@ -118,6 +118,7 @@ export function CouponsTable({
     },
     {
       header: tTable('status'),
+      mobileBadge: true,
       cell: coupon => {
         const status = getCouponStatus(coupon);
         return (
@@ -132,8 +133,9 @@ export function CouponsTable({
     {
       header: tTable('actions'),
       alignEnd: true,
+      mobileActions: true,
       cell: coupon => (
-        <div className="flex items-center justify-end gap-2">
+        <div className="flex items-center gap-2 md:justify-end">
           <button
             type="button"
             onClick={() => onToggleActive(coupon.id)}

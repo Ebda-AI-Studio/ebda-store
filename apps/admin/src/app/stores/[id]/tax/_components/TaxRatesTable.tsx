@@ -80,6 +80,7 @@ export function TaxRatesTable({
     },
     {
       header: t('columns.status'),
+      mobileBadge: true,
       cell: rate => (
         <button
           type="button"
@@ -97,8 +98,9 @@ export function TaxRatesTable({
     {
       header: t('columns.actions'),
       alignEnd: true,
+      mobileActions: true,
       cell: rate => (
-        <div className="flex items-center justify-end gap-2">
+        <div className="flex items-center gap-2 md:justify-end">
           <button
             type="button"
             onClick={() => onEdit(rate)}
