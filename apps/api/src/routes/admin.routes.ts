@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { authenticate } from '../middleware/auth';
 import { requireRole } from '../middleware/rbac';
@@ -395,7 +396,11 @@ router.get(
 
 /**
  * PUT /admin/users/:id
- * Update a user's role and status
+ * Update a user's profile fields, role, status, and (optionally)
+ * password. The password field is the admin-side reset path —
+ * super_admin can set a new password for any user without knowing
+ * the old one. The old password is required only on the user-self
+ * change-password flow (see auth.routes).
  */
 router.put(
   '/users/:id',
@@ -404,8 +409,13 @@ router.put(
     try {
       const { id } = req.params;
       const schema = z.object({
+        firstName: z.string().min(1).max(100).optional(),
+        lastName: z.string().min(1).max(100).optional(),
+        email: z.string().email().max(255).optional(),
+        phone: z.string().max(40).optional().nullable(),
         role: z.enum(['super_admin', 'store_admin', 'customer']).optional(),
         status: z.enum(['active', 'inactive', 'suspended']).optional(),
+        password: z.string().min(8).max(255).optional(),
       });
       const data = schema.parse(req.body);
 
@@ -418,12 +428,37 @@ router.put(
         return;
       }
 
+      // Email collision: if changing email, ensure no other user has it.
+      if (data.email && data.email.toLowerCase() !== existing.email.toLowerCase()) {
+        const collide = await prisma.user.findFirst({
+          where: { email: data.email.toLowerCase(), id: { not: id } },
+          select: { id: true },
+        });
+        if (collide) {
+          res.status(409).json({
+            success: false,
+            error: { code: 'EMAIL_TAKEN', message: 'Another user already has this email' },
+          });
+          return;
+        }
+      }
+
+      const updateData: Prisma.UserUpdateInput = {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email ? data.email.toLowerCase() : undefined,
+        phone: data.phone === undefined ? undefined : data.phone,
+        role: data.role as UserRole | undefined,
+        status: data.status as 'active' | 'inactive' | 'suspended' | undefined,
+      };
+      if (data.password) {
+        // 12 rounds matches the auth service's SALT_ROUNDS.
+        updateData.passwordHash = await bcrypt.hash(data.password, 12);
+      }
+
       const user = await prisma.user.update({
         where: { id },
-        data: {
-          role: data.role as UserRole | undefined,
-          status: data.status as 'active' | 'inactive' | 'suspended' | undefined,
-        },
+        data: updateData,
         select: {
           id: true,
           email: true,
@@ -439,12 +474,17 @@ router.put(
         },
       });
 
+      // Don't include `password` in the audit metadata — only that it
+      // changed. Same treatment as auth.service.changePassword.
+      const changed = Object.keys(data).filter(k => k !== 'password');
+      if (data.password) changed.push('password');
+
       await auditLog({
         action: 'user.updated',
         userId: req.user!.userId,
         resourceType: 'user',
         resourceId: id,
-        details: { changedFields: Object.keys(data).join(', ') },
+        details: { changedFields: changed.join(', ') },
         ip: req.ip,
         userAgent: req.headers['user-agent'],
       });
@@ -453,6 +493,93 @@ router.put(
         success: true,
         data: { user },
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * DELETE /admin/users/:id
+ * Hard-delete a user. Super-admin only. Refuses to delete the caller's
+ * own account, the last super_admin, or a store_admin who still owns
+ * stores (the merchant should reassign / archive the stores first to
+ * avoid orphaning tenant data).
+ */
+router.delete(
+  '/users/:id',
+  requireRole('super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+
+      if (id === req.user!.userId) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'CANNOT_DELETE_SELF',
+            message: 'You cannot delete your own account',
+          },
+        });
+        return;
+      }
+
+      const target = await prisma.user.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          stores: { select: { id: true, name: true } },
+        },
+      });
+      if (!target) {
+        res.status(404).json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'User not found' },
+        });
+        return;
+      }
+
+      if (target.role === 'super_admin') {
+        const supers = await prisma.user.count({ where: { role: 'super_admin' } });
+        if (supers <= 1) {
+          res.status(400).json({
+            success: false,
+            error: {
+              code: 'LAST_SUPER_ADMIN',
+              message: 'Cannot delete the last super_admin',
+            },
+          });
+          return;
+        }
+      }
+
+      if (target.role === 'store_admin' && target.stores.length > 0) {
+        const names = target.stores.map(s => s.name).join(', ');
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'STORE_ADMIN_HAS_STORES',
+            message: `User still owns ${target.stores.length} store(s) (${names}). Reassign or delete those first.`,
+          },
+        });
+        return;
+      }
+
+      await prisma.user.delete({ where: { id } });
+
+      await auditLog({
+        action: 'user.deleted',
+        userId: req.user!.userId,
+        resourceType: 'user',
+        resourceId: id,
+        details: { email: target.email, role: target.role },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+
+      res.json({ success: true, data: { message: 'User deleted' } });
     } catch (error) {
       next(error);
     }

@@ -1,11 +1,11 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Button } from '@force/ui';
+import { Button, useToast } from '@force/ui';
 import { AdminLayout } from '../../../components/AdminLayout';
-import { apiGet, apiPut } from '../../../lib/api';
+import { apiGet, apiPut, apiDelete } from '../../../lib/api';
 import { useT } from '@/i18n/useT';
 
 interface UserDetail {
@@ -44,6 +44,15 @@ export default function UserDetailPage() {
   // Edit form state
   const [editRole, setEditRole] = useState<string>('customer');
   const [editStatus, setEditStatus] = useState<string>('active');
+  const [editFirstName, setEditFirstName] = useState<string>('');
+  const [editLastName, setEditLastName] = useState<string>('');
+  const [editEmail, setEditEmail] = useState<string>('');
+  const [editPassword, setEditPassword] = useState<string>('');
+  const [confirmPassword, setConfirmPassword] = useState<string>('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const router = useRouter();
+  const { success: toastSuccess, error: toastError } = useToast();
 
   function formatDate(dateString: string | null) {
     if (!dateString) return t('neverLoggedIn');
@@ -69,6 +78,9 @@ export default function UserDetailPage() {
         setUser(u);
         setEditRole(u.role);
         setEditStatus(u.status || (u.isActive ? 'active' : 'inactive'));
+        setEditFirstName(u.firstName);
+        setEditLastName(u.lastName);
+        setEditEmail(u.email);
       } else if (apiError) {
         setError(apiError.message || t('updateFailed'));
       }
@@ -85,22 +97,42 @@ export default function UserDetailPage() {
 
   const handleSave = async () => {
     if (!user) return;
+    // If a new password is being set, require the confirmation match.
+    if (editPassword && editPassword !== confirmPassword) {
+      setSaveMessage({ type: 'error', text: 'Passwords do not match' });
+      return;
+    }
     setIsSaving(true);
     setSaveMessage(null);
     try {
+      const body: Record<string, unknown> = {
+        firstName: editFirstName.trim(),
+        lastName: editLastName.trim(),
+        email: editEmail.trim().toLowerCase(),
+        role: editRole,
+        status: editStatus,
+        isActive: editStatus === 'active',
+      };
+      if (editPassword) body.password = editPassword;
+
       const { data, error: apiError } = await apiPut<{ user?: UserDetail } & UserDetail>(
         `/api/v1/admin/users/${userId}`,
-        {
-          role: editRole,
-          status: editStatus,
-          isActive: editStatus === 'active',
-        }
+        body
       );
       if (data) {
         const u = (data.user || data) as UserDetail;
         setUser(u);
         setEditRole(u.role);
         setEditStatus(u.status || (u.isActive ? 'active' : 'inactive'));
+        setEditFirstName(u.firstName);
+        setEditLastName(u.lastName);
+        setEditEmail(u.email);
+        // Clear the password fields after a successful save so a
+        // refresh / second save doesn't accidentally rewrite the
+        // hash with the same value or expose the field as
+        // pre-filled.
+        setEditPassword('');
+        setConfirmPassword('');
         setSaveMessage({ type: 'success', text: t('updateSuccess') });
       } else if (apiError) {
         setSaveMessage({
@@ -112,6 +144,24 @@ export default function UserDetailPage() {
       setSaveMessage({ type: 'error', text: t('updateNetworkError') });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!user) return;
+    setIsDeleting(true);
+    try {
+      const { error: apiError } = await apiDelete(`/api/v1/admin/users/${userId}`);
+      if (apiError) {
+        toastError('Delete failed', apiError.message ?? '');
+        setIsDeleting(false);
+        return;
+      }
+      toastSuccess('User deleted');
+      router.push('/users');
+    } catch {
+      toastError('Delete failed', 'Network error');
+      setIsDeleting(false);
     }
   };
 
@@ -141,7 +191,13 @@ export default function UserDetailPage() {
 
   const resolvedStatus = user.status || (user.isActive ? 'active' : 'inactive');
   const statusStyle = STATUS_STYLES[resolvedStatus] ?? STATUS_STYLES.inactive;
-  const hasChanges = editRole !== user.role || editStatus !== resolvedStatus;
+  const hasChanges =
+    editRole !== user.role ||
+    editStatus !== resolvedStatus ||
+    editFirstName.trim() !== user.firstName ||
+    editLastName.trim() !== user.lastName ||
+    editEmail.trim().toLowerCase() !== user.email.toLowerCase() ||
+    editPassword.length > 0;
 
   return (
     <AdminLayout
@@ -241,7 +297,9 @@ export default function UserDetailPage() {
               <h2 className="font-semibold text-foreground">{t('editUser')}</h2>
             </div>
             <div className="p-6 space-y-6">
-              {/* Read-only info */}
+              {/* Identity — now editable. Super-admin needs to fix
+                  typos / change emails / rename users without going
+                  to Postgres directly. */}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1">
@@ -249,9 +307,9 @@ export default function UserDetailPage() {
                   </label>
                   <input
                     type="text"
-                    value={user.firstName}
-                    disabled
-                    className="w-full rounded-lg border border-border bg-muted px-4 py-2 text-sm text-muted-foreground cursor-not-allowed"
+                    value={editFirstName}
+                    onChange={e => setEditFirstName(e.target.value)}
+                    className="w-full rounded-lg border border-border bg-background px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                   />
                 </div>
                 <div>
@@ -260,9 +318,9 @@ export default function UserDetailPage() {
                   </label>
                   <input
                     type="text"
-                    value={user.lastName}
-                    disabled
-                    className="w-full rounded-lg border border-border bg-muted px-4 py-2 text-sm text-muted-foreground cursor-not-allowed"
+                    value={editLastName}
+                    onChange={e => setEditLastName(e.target.value)}
+                    className="w-full rounded-lg border border-border bg-background px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                   />
                 </div>
               </div>
@@ -273,11 +331,41 @@ export default function UserDetailPage() {
                 </label>
                 <input
                   type="email"
-                  value={user.email}
-                  disabled
-                  className="w-full rounded-lg border border-border bg-muted px-4 py-2 text-sm text-muted-foreground cursor-not-allowed"
+                  value={editEmail}
+                  onChange={e => setEditEmail(e.target.value)}
+                  className="w-full rounded-lg border border-border bg-background px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 />
-                <p className="mt-1 text-xs text-muted-foreground">{t('emailHint')}</p>
+              </div>
+
+              {/* Set new password — admin-side reset path. Empty
+                  fields = leave existing password alone. Doesn't
+                  surface the existing hash. */}
+              <div className="rounded-xl border border-border/60 bg-muted/30 p-4 space-y-3">
+                <p className="text-sm font-medium text-foreground">Set new password</p>
+                <p className="text-xs text-muted-foreground">
+                  Leave blank to keep the current password. Minimum 8 characters.
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <input
+                    type="password"
+                    placeholder="New password"
+                    autoComplete="new-password"
+                    value={editPassword}
+                    onChange={e => setEditPassword(e.target.value)}
+                    className="w-full rounded-lg border border-border bg-background px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                  <input
+                    type="password"
+                    placeholder="Confirm password"
+                    autoComplete="new-password"
+                    value={confirmPassword}
+                    onChange={e => setConfirmPassword(e.target.value)}
+                    className="w-full rounded-lg border border-border bg-background px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                </div>
+                {editPassword && editPassword !== confirmPassword && (
+                  <p className="text-xs text-destructive">Passwords do not match</p>
+                )}
               </div>
 
               {/* Editable fields */}
@@ -357,10 +445,72 @@ export default function UserDetailPage() {
                   {isSaving ? t('saving') : t('save')}
                 </button>
               </div>
+
+              {/* Danger zone — hard-delete the user. The API refuses
+                  for self-deletes, the last super_admin, and store-
+                  admins who still own stores; the toast will surface
+                  the reason. */}
+              <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="font-medium text-destructive">Danger zone</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Permanently delete this user account. Cannot be undone.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className="rounded-lg border border-destructive bg-card px-4 py-2 text-sm font-medium text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                  >
+                    Delete user
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
+
+      {showDeleteConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => !isDeleting && setShowDeleteConfirm(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-xl bg-card p-6 shadow-xl"
+            onClick={e => e.stopPropagation()}
+          >
+            <h2 className="text-lg font-semibold text-foreground">Delete user?</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              This will permanently delete{' '}
+              <strong>
+                {user.firstName} {user.lastName}
+              </strong>{' '}
+              ({user.email}). This action cannot be undone.
+            </p>
+            <div className="mt-6 flex items-center justify-end gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={isDeleting}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={isDeleting}
+                isLoading={isDeleting}
+              >
+                {isDeleting ? 'Deleting…' : 'Delete user'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </AdminLayout>
   );
 }
