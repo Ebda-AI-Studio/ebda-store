@@ -103,18 +103,22 @@ export function FrequentlyBoughtTogether({ storeId, productId }: FrequentlyBough
   };
 
   const handleAddAllToCart = async () => {
-    await Promise.all(
-      products.map(p =>
-        addItem({
-          id: p.id,
-          name: p.name,
-          nameAr: p.nameAr,
-          price: p.price,
-          slug: p.slug,
-          image: p.images?.[0]?.url,
-        })
-      )
-    );
+    // Serialize the addItem calls instead of firing them in parallel.
+    // The previous Promise.all racing the calls meant the cart-context
+    // POSTs hit the API with stale local state — the second add saw
+    // the cart pre-first-add, so the API ended up with only one of
+    // the items merged in. Sequential awaits guarantee each addItem
+    // sees the post-previous-add cart state.
+    for (const p of products) {
+      await addItem({
+        id: p.id,
+        name: p.name,
+        nameAr: p.nameAr,
+        price: p.price,
+        slug: p.slug,
+        image: p.images?.[0]?.url,
+      });
+    }
     toastSuccess(
       t('Added all to cart!', 'أضيفت جميعها إلى السلة!'),
       `${products.length} ${t('items added to your cart', 'منتجات أضيفت إلى سلتك')}`
