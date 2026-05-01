@@ -543,6 +543,7 @@
       "fallbackStore": "Unknown",
       "backToProducts": "Back to Products",
       "manageVariants": "Manage Variants",
+      "recommendations": "Recommendations",
       "sections": {
         "basicInformation": "Basic Information",
         "media": "Media",

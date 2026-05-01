@@ -283,26 +283,36 @@ export default function EditProductPage() {
       subtitle={t('subtitle', { storeName: product?.store?.name || t('fallbackStore') })}
       actions={
         product ? (
-          <Link
-            href={`/stores/${storeId}/products/${product.id}/variants`}
-            className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-accent transition-colors"
-          >
-            {t('manageVariants')}
-            <svg
-              className="h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              aria-hidden="true"
+          // flex-wrap so both buttons stay visible at narrow viewport
+          // widths instead of pushing one off-screen.
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href={`/stores/${storeId}/products/${product.id}/variants`}
+              className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-accent transition-colors"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M13 7l5 5m0 0l-5 5m5-5H6"
-              />
-            </svg>
-          </Link>
+              {t('manageVariants')}
+              <svg
+                className="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M13 7l5 5m0 0l-5 5m5-5H6"
+                />
+              </svg>
+            </Link>
+            <Link
+              href={`/stores/${storeId}/products/${product.id}/recommendations`}
+              className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-accent transition-colors"
+            >
+              {t('recommendations')}
+            </Link>
+          </div>
         ) : undefined
       }
     >
