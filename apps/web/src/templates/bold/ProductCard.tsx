@@ -140,7 +140,10 @@ function BoldProductCard({
 
       {/* Content */}
       <div className="p-5">
-        <h3 className="font-black text-base uppercase tracking-tight line-clamp-1 group-hover:text-primary transition-colors duration-200">
+        <h3
+          data-zone="productName"
+          className="font-black text-base uppercase tracking-tight line-clamp-1 group-hover:text-primary transition-colors duration-200"
+        >
           {isRtl && product.nameAr ? product.nameAr : product.name}
         </h3>
         <Price

@@ -155,6 +155,10 @@ export const AddToCartButton = forwardRef<HTMLButtonElement, AddToCartButtonProp
           ref={ref}
           onClick={handleClick}
           disabled={isDisabled}
+          // data-zone="cta" routes the per-store typography sub-zone
+          // for buttons / CTAs to every Add-to-Cart instance across
+          // the storefront, regardless of which template renders it.
+          data-zone="cta"
           className={cn(
             'relative flex items-center justify-center w-10 h-10 rounded-full transition-all',
             'bg-primary text-primary-foreground hover:bg-primary/90',
@@ -183,8 +187,13 @@ export const AddToCartButton = forwardRef<HTMLButtonElement, AddToCartButtonProp
         onClick={handleClick}
         disabled={isDisabled}
         variant={variant === 'default' ? 'default' : variant === 'outline' ? 'outline' : 'ghost'}
+        // See comment on the iconOnly branch above — same data-zone tag.
+        data-zone="cta"
         className={cn(
-          'relative',
+          // `whitespace-nowrap` keeps Arabic labels like "إضافة للسلة"
+          // on a single line. Without it, narrow product-card columns
+          // wrap the label across two lines.
+          'relative whitespace-nowrap',
           isAdded && 'bg-green-500 hover:bg-green-500 border-green-500',
           className
         )}

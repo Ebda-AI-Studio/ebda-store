@@ -13,12 +13,23 @@
 // storefront stylesheet doesn't need to know which template is active.
 
 export type TypographyZone =
+  // Broad zones — wrap whole regions of the storefront.
   | 'beforeHeader'
   | 'header'
   | 'categories'
   | 'products'
   | 'footer'
-  | 'afterFooter';
+  | 'afterFooter'
+  // Sub-zones — nested inside the broad zones for finer control.
+  // CSS-specificity makes the more specific selector win automatically,
+  // so e.g. `productName` overrides `products` for the actual product
+  // name text, while everything else inside `products` keeps inheriting
+  // from the broad `products` rule.
+  | 'sectionTitle'
+  | 'productName'
+  | 'productPrice'
+  | 'cta'
+  | 'filters';
 
 export const TYPOGRAPHY_ZONES: TypographyZone[] = [
   'beforeHeader',
@@ -27,6 +38,11 @@ export const TYPOGRAPHY_ZONES: TypographyZone[] = [
   'products',
   'footer',
   'afterFooter',
+  'sectionTitle',
+  'productName',
+  'productPrice',
+  'cta',
+  'filters',
 ];
 
 export interface TypographyZoneSettings {

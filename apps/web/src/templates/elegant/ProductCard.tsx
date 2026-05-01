@@ -201,7 +201,10 @@ function ElegantProductCard({
 
       {/* Content — refined, centered */}
       <div className="text-center space-y-1.5">
-        <h3 className="text-xs tracking-[0.15em] uppercase text-foreground/80 group-hover:text-foreground transition-colors duration-300 line-clamp-1">
+        <h3
+          data-zone="productName"
+          className="text-xs tracking-[0.15em] uppercase text-foreground/80 group-hover:text-foreground transition-colors duration-300 line-clamp-1"
+        >
           {isRtl && product.nameAr ? product.nameAr : product.name}
         </h3>
         <Price

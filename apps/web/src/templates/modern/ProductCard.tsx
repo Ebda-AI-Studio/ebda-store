@@ -202,6 +202,7 @@ function ModernProductCard({
         )}
 
         <h3
+          data-zone="productName"
           className={`font-semibold text-sm text-foreground group-hover:text-primary transition-colors duration-300 ease-out line-clamp-2 leading-snug tracking-tight ${isRtl ? 'text-right' : ''}`}
         >
           {isRtl && product.nameAr ? product.nameAr : product.name}

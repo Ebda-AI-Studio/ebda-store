@@ -290,12 +290,22 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // validated by Zod on PUT, but we still sanitize each output value
   // because the storefront ultimately injects this into a <style> tag.
   const ZONE_NAMES = [
+    // Broad zones — keep listed FIRST so their CSS rules emit first
+    // and the sub-zone rules below them win cascade ties.
     'beforeHeader',
     'header',
     'categories',
     'products',
     'footer',
     'afterFooter',
+    // Sub-zones — nested inside the broad ones; emitted last so a
+    // tied selector still wins on source order, on top of having
+    // (usually) the same specificity.
+    'sectionTitle',
+    'productName',
+    'productPrice',
+    'cta',
+    'filters',
   ] as const;
   const sanitizeFontValue = (v: unknown): string | null => {
     if (typeof v !== 'string' || v.length === 0 || v.length > 200) return null;
@@ -360,7 +370,18 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       const weight = sanitizeFontValue(cfg.fontWeight);
       if (weight) decls.push(`font-weight:${weight}`);
       const lh = sanitizeFontValue(cfg.lineHeight);
-      if (lh) decls.push(`line-height:${lh}`);
+      if (lh) {
+        decls.push(`line-height:${lh}`);
+      } else if (size) {
+        // When the merchant bumps font-size but doesn't touch
+        // line-height, the parent's existing tight line-height (often
+        // 1.0–1.2 in template card containers) clips the top of
+        // Arabic letters that have upper diacritics or extensions
+        // (ش / خ / ة / ه). Pin a safe Arabic-friendly default of 1.6
+        // alongside the size so the new larger glyphs always have
+        // vertical room. Merchant-supplied lineHeight (above) wins.
+        decls.push('line-height:1.6');
+      }
       const ls = sanitizeFontValue(cfg.letterSpacing);
       if (ls) decls.push(`letter-spacing:${ls}`);
       const color = sanitizeFontValue(cfg.color);

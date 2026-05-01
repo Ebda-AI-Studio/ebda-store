@@ -144,7 +144,10 @@ function ClassicProductCard({
 
       {/* Product info */}
       <div className={`text-center ${isRtl ? 'direction-rtl' : ''}`}>
-        <h3 className="font-serif text-sm md:text-base text-foreground mb-2 group-hover:text-primary transition-colors duration-500 leading-snug tracking-tight">
+        <h3
+          data-zone="productName"
+          className="font-serif text-sm md:text-base text-foreground mb-2 group-hover:text-primary transition-colors duration-500 leading-snug tracking-tight"
+        >
           {isRtl && product.nameAr ? product.nameAr : product.name}
         </h3>
 

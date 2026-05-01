@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
+import { useLocale } from 'next-intl';
 import Link from 'next/link';
 import { Button, useToast } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
@@ -19,51 +20,129 @@ import { apiGet, apiPut, apiFetch } from '../../../../lib/api';
 // starting points so the merchant can see what they're overriding
 // before they type a new value. Leaving a field blank inherits from
 // the active template's CSS.
-const ZONES: Array<{
+interface ZoneDef {
   key: ZoneKey;
   label: string;
+  labelAr: string;
   description: string;
+  descriptionAr: string;
   defaults: { fontSize: string; fontWeight: string; lineHeight: string };
-}> = [
+  /** Marks the row visually as a sub-zone (rendered as a nested
+   *  override of one of the broad zones). */
+  isSubZone?: boolean;
+}
+
+const ZONES: ZoneDef[] = [
+  // Broad zones — wrap whole storefront regions.
   {
     key: 'beforeHeader',
     label: 'Before header (announcement bar)',
+    labelAr: 'قبل الهيدر (شريط الإعلان)',
     description: 'The thin promo strip above the header.',
+    descriptionAr: 'الشريط الإعلاني فوق الهيدر.',
     defaults: { fontSize: '14px (0.875rem)', fontWeight: '500', lineHeight: '1.5' },
   },
   {
     key: 'header',
     label: 'Header',
+    labelAr: 'الهيدر',
     description: 'Logo, navigation, search, cart icons.',
+    descriptionAr: 'الشعار، القائمة، البحث، أيقونات السلة.',
     defaults: { fontSize: '16px (1rem)', fontWeight: '500', lineHeight: '1.5' },
   },
   {
     key: 'categories',
     label: 'Categories',
-    description: 'The categories grid + section heading on the homepage.',
+    labelAr: 'الفئات',
+    description: 'The categories grid / strip on the homepage.',
+    descriptionAr: 'شبكة / شريط الفئات على الصفحة الرئيسية.',
     defaults: { fontSize: '24px (1.5rem)', fontWeight: '600', lineHeight: '1.25' },
   },
   {
     key: 'products',
     label: 'Products',
-    description: 'Product cards, names, prices on listing + detail pages.',
+    labelAr: 'المنتجات',
+    description: 'Whole product surfaces — listing, detail, recommendations.',
+    descriptionAr: 'كل صفحات المنتجات — القائمة، التفاصيل، التوصيات.',
     defaults: { fontSize: '16px (1rem)', fontWeight: '500', lineHeight: '1.5' },
   },
   {
     key: 'footer',
     label: 'Footer',
+    labelAr: 'الفوتر',
     description: 'Footer columns, links, copyright row.',
+    descriptionAr: 'أعمدة الفوتر والروابط وسطر حقوق النشر.',
     defaults: { fontSize: '14px (0.875rem)', fontWeight: '400', lineHeight: '1.5' },
   },
   {
     key: 'afterFooter',
     label: 'After footer',
+    labelAr: 'بعد الفوتر',
     description: 'Anything appended below the footer (cookie strip, etc.).',
+    descriptionAr: 'أي عنصر يظهر تحت الفوتر (شريط الكوكيز إلخ).',
     defaults: { fontSize: '12px (0.75rem)', fontWeight: '400', lineHeight: '1.4' },
+  },
+  // Sub-zones — nested overrides.
+  {
+    key: 'sectionTitle',
+    label: 'Section title',
+    labelAr: 'عنوان القسم',
+    description: 'Homepage section H2s ("New Arrivals", "Shop by Category") + listing-page H1.',
+    descriptionAr:
+      'عناوين أقسام الصفحة الرئيسية ("أحدث المنتجات"، "تسوق حسب الفئة") وعنوان صفحة القائمة.',
+    defaults: { fontSize: '28px (1.75rem)', fontWeight: '700', lineHeight: '1.2' },
+    isSubZone: true,
+  },
+  {
+    key: 'productName',
+    label: 'Product name',
+    labelAr: 'اسم المنتج',
+    description: 'Just the product name on a card. Overrides the broader "Products" font.',
+    descriptionAr: 'اسم المنتج فقط على البطاقة. يتجاوز إعدادات منطقة "المنتجات" الأشمل.',
+    defaults: { fontSize: '16px (1rem)', fontWeight: '600', lineHeight: '1.3' },
+    isSubZone: true,
+  },
+  {
+    key: 'productPrice',
+    label: 'Product price',
+    labelAr: 'سعر المنتج',
+    description: 'Just the price text on a product card.',
+    descriptionAr: 'نص السعر فقط على بطاقة المنتج.',
+    defaults: { fontSize: '16px (1rem)', fontWeight: '700', lineHeight: '1.2' },
+    isSubZone: true,
+  },
+  {
+    key: 'cta',
+    label: 'Buttons / CTAs',
+    labelAr: 'الأزرار',
+    description: '"Add to cart", "Subscribe", "View store", and similar action buttons.',
+    descriptionAr: 'أزرار "أضف للسلة"، "اشترك"، "عرض المتجر"، وما شابه.',
+    defaults: { fontSize: '14px (0.875rem)', fontWeight: '500', lineHeight: '1.2' },
+    isSubZone: true,
+  },
+  {
+    key: 'filters',
+    label: 'Filters',
+    labelAr: 'الفلاتر',
+    description: 'Filter sidebar on /products — sort, search, price range, category chips.',
+    descriptionAr: 'الشريط الجانبي للفلاتر — الترتيب، البحث، مجال السعر، رقاقات الفئات.',
+    defaults: { fontSize: '14px (0.875rem)', fontWeight: '500', lineHeight: '1.4' },
+    isSubZone: true,
   },
 ];
 
-type ZoneKey = 'beforeHeader' | 'header' | 'categories' | 'products' | 'footer' | 'afterFooter';
+type ZoneKey =
+  | 'beforeHeader'
+  | 'header'
+  | 'categories'
+  | 'products'
+  | 'footer'
+  | 'afterFooter'
+  | 'sectionTitle'
+  | 'productName'
+  | 'productPrice'
+  | 'cta'
+  | 'filters';
 
 interface ZoneSettings {
   fontFamily?: string;
@@ -123,6 +202,8 @@ const QUICK_GOOGLE_FONTS: Array<{ family: string; url: string }> = [
 
 export default function TypographyPage() {
   const params = useParams();
+  const locale = useLocale();
+  const isAr = locale === 'ar';
   const storeId = params?.id as string;
   const { success: toastSuccess, error: toastError } = useToast();
 
@@ -429,117 +510,144 @@ export default function TypographyPage() {
               attributes. Leave a field blank to inherit from the active template.
             </p>
             <div className="mt-4 space-y-5">
-              {ZONES.map(z => {
+              {ZONES.map((z, i) => {
                 const cfg = typo.zones[z.key] ?? {};
+                // Insert a subtle divider + header before the first
+                // sub-zone so the merchant sees they're a finer-grained
+                // override layer on top of the broad zones above.
+                const isFirstSubZone = z.isSubZone && !ZONES[i - 1]?.isSubZone;
                 return (
-                  <div key={z.key} className="rounded-xl border border-border/60 bg-background p-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-semibold text-foreground">{z.label}</h3>
-                    </div>
-                    <p className="mt-0.5 text-xs text-muted-foreground">{z.description}</p>
-                    <div className="mt-3 grid gap-3 md:grid-cols-3">
-                      <label className="flex flex-col gap-1">
-                        <span className="text-xs font-medium text-muted-foreground">
-                          Font family
-                        </span>
-                        <select
-                          value={cfg.fontFamily ?? ''}
-                          onChange={e => updateZone(z.key, { fontFamily: e.target.value })}
-                          className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
-                        >
-                          {familyOptions.map(o => (
-                            <option key={o.value} value={o.value}>
-                              {o.label}
-                            </option>
-                          ))}
-                        </select>
-                        <span className="text-[11px] text-muted-foreground/80">
-                          Inherits the template default if left blank.
-                        </span>
-                      </label>
-                      <label className="flex flex-col gap-1">
-                        <span className="text-xs font-medium text-muted-foreground">Font size</span>
-                        <input
-                          type="text"
-                          value={cfg.fontSize ?? ''}
-                          onChange={e => updateZone(z.key, { fontSize: e.target.value })}
-                          placeholder={`e.g. 16 or 16px or 1rem`}
-                          className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
-                        />
-                        <span className="text-[11px] text-muted-foreground/80">
-                          Template default ≈ {z.defaults.fontSize}. A bare number is treated as
-                          pixels (16 → 16px).
-                        </span>
-                      </label>
-                      <label className="flex flex-col gap-1">
-                        <span className="text-xs font-medium text-muted-foreground">
-                          Font weight
-                        </span>
-                        <input
-                          type="text"
-                          value={cfg.fontWeight ?? ''}
-                          onChange={e => updateZone(z.key, { fontWeight: e.target.value })}
-                          placeholder={`inherit (≈ ${z.defaults.fontWeight})`}
-                          className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
-                        />
-                        <span className="text-[11px] text-muted-foreground/80">
-                          Template default ≈ {z.defaults.fontWeight}.
-                        </span>
-                      </label>
-                      <label className="flex flex-col gap-1">
-                        <span className="text-xs font-medium text-muted-foreground">Color</span>
-                        <div className="flex gap-2">
-                          <input
-                            type="color"
-                            value={
-                              cfg.color && /^#[0-9a-f]{6}$/i.test(cfg.color) ? cfg.color : '#000000'
-                            }
-                            onChange={e => updateZone(z.key, { color: e.target.value })}
-                            className="h-10 w-12 cursor-pointer rounded-lg border border-border bg-background"
-                            aria-label="Pick color"
-                          />
+                  <div key={z.key}>
+                    {isFirstSubZone && (
+                      <div className="mb-5 rounded-xl border border-dashed border-border bg-muted/30 p-3 text-xs text-muted-foreground">
+                        <strong className="text-foreground">Fine-grained overrides</strong> — these
+                        target specific elements inside the broad zones above. CSS specificity wins,
+                        so e.g. setting <em>Product name</em> font size overrides the broader{' '}
+                        <em>Products</em> setting for product names only.
+                      </div>
+                    )}
+                    <div className="rounded-xl border border-border/60 bg-background p-4">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-semibold text-foreground">
+                          {isAr ? z.labelAr : z.label}
+                        </h3>
+                        {z.isSubZone && (
+                          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+                            sub-zone
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-0.5 text-xs text-muted-foreground">{z.description}</p>
+                      <div className="mt-3 grid gap-3 md:grid-cols-3">
+                        <label className="flex flex-col gap-1">
+                          <span className="text-xs font-medium text-muted-foreground">
+                            Font family
+                          </span>
+                          <select
+                            value={cfg.fontFamily ?? ''}
+                            onChange={e => updateZone(z.key, { fontFamily: e.target.value })}
+                            className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                          >
+                            {familyOptions.map(o => (
+                              <option key={o.value} value={o.value}>
+                                {o.label}
+                              </option>
+                            ))}
+                          </select>
+                          <span className="text-[11px] text-muted-foreground/80">
+                            Inherits the template default if left blank.
+                          </span>
+                        </label>
+                        <label className="flex flex-col gap-1">
+                          <span className="text-xs font-medium text-muted-foreground">
+                            Font size
+                          </span>
                           <input
                             type="text"
-                            value={cfg.color ?? ''}
-                            onChange={e => updateZone(z.key, { color: e.target.value })}
-                            placeholder="#000000 / hsl(...) / rgb(...)"
-                            className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                            value={cfg.fontSize ?? ''}
+                            onChange={e => updateZone(z.key, { fontSize: e.target.value })}
+                            placeholder={`e.g. 16 or 16px or 1rem`}
+                            className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
                           />
-                        </div>
-                        <span className="text-[11px] text-muted-foreground/80">
-                          Template default = the active theme's foreground color.
-                        </span>
-                      </label>
-                      <label className="flex flex-col gap-1">
-                        <span className="text-xs font-medium text-muted-foreground">
-                          Line height
-                        </span>
-                        <input
-                          type="text"
-                          value={cfg.lineHeight ?? ''}
-                          onChange={e => updateZone(z.key, { lineHeight: e.target.value })}
-                          placeholder={`inherit (≈ ${z.defaults.lineHeight})`}
-                          className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
-                        />
-                        <span className="text-[11px] text-muted-foreground/80">
-                          Template default ≈ {z.defaults.lineHeight}.
-                        </span>
-                      </label>
-                      <label className="flex flex-col gap-1">
-                        <span className="text-xs font-medium text-muted-foreground">
-                          Letter spacing
-                        </span>
-                        <input
-                          type="text"
-                          value={cfg.letterSpacing ?? ''}
-                          onChange={e => updateZone(z.key, { letterSpacing: e.target.value })}
-                          placeholder="inherit (≈ normal)"
-                          className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
-                        />
-                        <span className="text-[11px] text-muted-foreground/80">
-                          Template default ≈ normal (0).
-                        </span>
-                      </label>
+                          <span className="text-[11px] text-muted-foreground/80">
+                            Template default ≈ {z.defaults.fontSize}. A bare number is treated as
+                            pixels (16 → 16px).
+                          </span>
+                        </label>
+                        <label className="flex flex-col gap-1">
+                          <span className="text-xs font-medium text-muted-foreground">
+                            Font weight
+                          </span>
+                          <input
+                            type="text"
+                            value={cfg.fontWeight ?? ''}
+                            onChange={e => updateZone(z.key, { fontWeight: e.target.value })}
+                            placeholder={`inherit (≈ ${z.defaults.fontWeight})`}
+                            className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                          />
+                          <span className="text-[11px] text-muted-foreground/80">
+                            Template default ≈ {z.defaults.fontWeight}.
+                          </span>
+                        </label>
+                        <label className="flex flex-col gap-1">
+                          <span className="text-xs font-medium text-muted-foreground">Color</span>
+                          <div className="flex gap-2">
+                            <input
+                              type="color"
+                              value={
+                                cfg.color && /^#[0-9a-f]{6}$/i.test(cfg.color)
+                                  ? cfg.color
+                                  : '#000000'
+                              }
+                              onChange={e => updateZone(z.key, { color: e.target.value })}
+                              className="h-10 w-12 cursor-pointer rounded-lg border border-border bg-background"
+                              aria-label="Pick color"
+                            />
+                            <input
+                              type="text"
+                              value={cfg.color ?? ''}
+                              onChange={e => updateZone(z.key, { color: e.target.value })}
+                              placeholder="#000000 / hsl(...) / rgb(...)"
+                              className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                            />
+                          </div>
+                          <span className="text-[11px] text-muted-foreground/80">
+                            Template default = the active theme's foreground color.
+                          </span>
+                        </label>
+                        <label className="flex flex-col gap-1">
+                          <span className="text-xs font-medium text-muted-foreground">
+                            Line height
+                          </span>
+                          <input
+                            type="text"
+                            value={cfg.lineHeight ?? ''}
+                            onChange={e => updateZone(z.key, { lineHeight: e.target.value })}
+                            placeholder="auto (1.6)"
+                            className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                          />
+                          <span className="text-[11px] text-muted-foreground/80">
+                            Leave blank for automatic — we apply <strong>1.6</strong> whenever you
+                            set a font-size, which keeps Arabic characters from getting their tops
+                            clipped. Template default ≈ {z.defaults.lineHeight}.
+                          </span>
+                        </label>
+                        <label className="flex flex-col gap-1">
+                          <span className="text-xs font-medium text-muted-foreground">
+                            Letter spacing
+                          </span>
+                          <input
+                            type="text"
+                            value={cfg.letterSpacing ?? ''}
+                            onChange={e => updateZone(z.key, { letterSpacing: e.target.value })}
+                            placeholder="inherit (≈ normal)"
+                            className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                          />
+                          <span className="text-[11px] text-muted-foreground/80">
+                            Template default ≈ normal (0).
+                          </span>
+                        </label>
+                      </div>
                     </div>
                   </div>
                 );

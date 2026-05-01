@@ -46,12 +46,19 @@ const typographySchema = z.object({
   fonts: z.array(fontSourceSchema).max(20),
   zones: z
     .object({
+      // Broad zones
       beforeHeader: zoneSchema.optional(),
       header: zoneSchema.optional(),
       categories: zoneSchema.optional(),
       products: zoneSchema.optional(),
       footer: zoneSchema.optional(),
       afterFooter: zoneSchema.optional(),
+      // Sub-zones (nested inside broad zones; CSS specificity wins)
+      sectionTitle: zoneSchema.optional(),
+      productName: zoneSchema.optional(),
+      productPrice: zoneSchema.optional(),
+      cta: zoneSchema.optional(),
+      filters: zoneSchema.optional(),
     })
     .default({}),
 });

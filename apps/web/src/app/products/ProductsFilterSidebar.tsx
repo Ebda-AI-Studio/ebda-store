@@ -306,7 +306,12 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
   );
 
   return (
-    <aside className="w-full shrink-0 lg:w-64">
+    // data-zone="filters" lets the merchant set typography
+    // (size / colour / family) on the entire filter sidebar
+    // independently of the broader "Products" zone — sort dropdown,
+    // search input, price range labels, category chips, mobile sheet
+    // trigger, the lot.
+    <aside className="w-full shrink-0 lg:w-64" data-zone="filters">
       {/* Mobile trigger — opens the bottom-sheet. */}
       <button
         type="button"

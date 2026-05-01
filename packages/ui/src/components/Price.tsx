@@ -80,6 +80,11 @@ export const Price = forwardRef<HTMLDivElement, PriceProps>(
     return (
       <div
         ref={ref}
+        // data-zone="productPrice" so the per-store typography
+        // sub-zone (configured in the admin) overrides Price font /
+        // size / color across every template that uses this shared
+        // component.
+        data-zone="productPrice"
         className={cn('flex items-center gap-2 flex-wrap', className)}
         dir={isRtl ? 'rtl' : 'ltr'}
         {...props}

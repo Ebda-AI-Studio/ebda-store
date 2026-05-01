@@ -85,7 +85,10 @@ function MinimalProductCard({
 
       {/* Text — name + price, ultra-minimal */}
       <div className={`space-y-1.5 ${isRtl ? 'text-right' : 'text-left'}`}>
-        <h3 className="text-xs tracking-[0.18em] uppercase font-light text-muted-foreground group-hover:text-foreground transition-colors duration-500 ease-out leading-snug">
+        <h3
+          data-zone="productName"
+          className="text-xs tracking-[0.18em] uppercase font-light text-muted-foreground group-hover:text-foreground transition-colors duration-500 ease-out leading-snug"
+        >
           {isRtl && product.nameAr ? product.nameAr : product.name}
         </h3>
         <Price
