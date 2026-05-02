@@ -1,4 +1,4 @@
-import { getStore } from '../lib/store-resolver';
+import { getStoreOrNotFound } from '../lib/store-resolver';
 import { API_URL } from '../lib/api';
 import type { Product, Category } from '../lib/api';
 import { resolveLayoutSettings, type StoreLayoutSettings } from '@force/shared';
@@ -136,7 +136,7 @@ async function fetchLayoutSettings(storeId: string): Promise<StoreLayoutSettings
 }
 
 export default async function HomePage() {
-  const store = await getStore();
+  const store = await getStoreOrNotFound();
   const layout = await fetchLayoutSettings(store.id);
   const { featuredProducts, newArrivals, bestSellers, categories, testimonials } =
     await fetchHomepageData(store, layout);

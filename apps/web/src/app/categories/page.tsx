@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { getStore } from '../../lib/store-resolver';
+import { getStoreOrNotFound } from '../../lib/store-resolver';
 import { API_URL, type Category } from '@/lib/api';
 import CategoriesClient from './CategoriesClient';
 
@@ -47,7 +47,7 @@ async function fetchCategories(store: { id: string; domain?: string }): Promise<
 }
 
 export default async function CategoriesPage() {
-  const store = await getStore();
+  const store = await getStoreOrNotFound();
   const categories = await fetchCategories(store);
 
   return <CategoriesClient categories={categories} />;

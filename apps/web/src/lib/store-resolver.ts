@@ -1,4 +1,5 @@
 import { headers } from 'next/headers';
+import { notFound } from 'next/navigation';
 import {
   type StoreTheme,
   type StoreSocialLinks,
@@ -454,6 +455,45 @@ export async function getStore(): Promise<ResolvedStore> {
   }
 
   // 3. Default demo store
+  return DEFAULT_STORE;
+}
+
+/**
+ * Server-component variant of {@link getStore} that triggers Next's
+ * `notFound()` when a store identifier was provided in the request but
+ * doesn't match any active store (custom domain not registered, or
+ * platform-path slug like `/haha` that no merchant owns).
+ *
+ * Pages that depend on a real store (homepage, /products, /categories,
+ * etc.) should use this so unknown slugs land on the branded
+ * `not-found.tsx` instead of silently rendering the empty `Force` demo
+ * storefront — the latter looked broken to customers and made
+ * "is this typo a real shop?" investigations harder for support.
+ *
+ * The layout itself still uses the lenient `getStore()` because the
+ * not-found page renders inside that layout and needs the
+ * `DEFAULT_STORE` chrome (Force-branded header/footer) to render
+ * without crashing.
+ */
+export async function getStoreOrNotFound(): Promise<ResolvedStore> {
+  const domain = await getStoreDomain();
+  if (domain) {
+    const store = await resolveStoreByDomain(domain);
+    if (!store) notFound();
+    return store;
+  }
+
+  const slug = await getStoreSlug();
+  if (slug) {
+    const store = await resolveStoreBySlug(slug);
+    if (!store) notFound();
+    return store;
+  }
+
+  // No identifier in the request at all — bare-root on a platform
+  // domain. Middleware redirects this to forcemediakw.com in
+  // production, so reaching here means localhost or a preview
+  // deploy; render the default chrome rather than 404.
   return DEFAULT_STORE;
 }
 

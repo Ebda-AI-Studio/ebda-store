@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
-import { getStore } from '../../lib/store-resolver';
+import { getStoreOrNotFound } from '../../lib/store-resolver';
 import { API_URL } from '../../lib/api';
 import ProductsClient from './ProductsClient';
 
@@ -67,7 +67,7 @@ export default async function ProductsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const store = await getStore();
+  const store = await getStoreOrNotFound();
   const params = await searchParams;
   const rawCategory = params.category;
   const category = Array.isArray(rawCategory) ? rawCategory[0] : rawCategory;

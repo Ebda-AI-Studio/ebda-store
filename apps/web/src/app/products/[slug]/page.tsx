@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { getStore } from '../../../lib/store-resolver';
+import { getStore, getStoreOrNotFound } from '../../../lib/store-resolver';
 import { API_URL } from '../../../lib/api';
 import { productJsonLd, breadcrumbJsonLd, getSiteUrl } from '../../../lib/structured-data';
 import ProductDetailClient from './ProductDetailClient';
@@ -132,7 +132,7 @@ async function fetchInitialProduct(slug: string, store: { id: string; domain?: s
 }
 
 export default async function ProductDetailPage({ params }: { params: Promise<{ slug: string }> }) {
-  const [{ slug }, store] = await Promise.all([params, getStore()]);
+  const [{ slug }, store] = await Promise.all([params, getStoreOrNotFound()]);
   const initialProduct = await fetchInitialProduct(slug, store);
 
   const siteUrl = getSiteUrl(store);
