@@ -3,10 +3,10 @@
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Button, Badge } from '@force/ui';
+import { Button, Badge, Modal, ModalBody, ModalFooter, Input, Label } from '@force/ui';
 import { AdminLayout } from '../../components/AdminLayout';
 import { ErrorState } from '../../components/ErrorState';
-import { apiGet } from '../../lib/api';
+import { apiGet, apiPost } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { useT } from '@/i18n/useT';
@@ -69,6 +69,28 @@ export default function UsersPage() {
   const debouncedSearch = useDebouncedValue(search, 300);
   const [roleFilter, setRoleFilter] = useState<string>('all');
 
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviting, setInviting] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [inviteForm, setInviteForm] = useState({
+    email: '',
+    firstName: '',
+    lastName: '',
+    password: '',
+    role: 'store_admin' as 'super_admin' | 'store_admin',
+  });
+
+  function resetInviteForm() {
+    setInviteForm({
+      email: '',
+      firstName: '',
+      lastName: '',
+      password: '',
+      role: 'store_admin',
+    });
+    setInviteError(null);
+  }
+
   function formatDate(date: string | null) {
     if (!date) return t('neverLoggedIn');
     return new Date(date).toLocaleDateString('en-US', {
@@ -115,12 +137,32 @@ export default function UsersPage() {
     setPagination(prev => ({ ...prev, page: 1 }));
   }
 
+  async function handleInvite(e: React.FormEvent) {
+    e.preventDefault();
+    setInviteError(null);
+    setInviting(true);
+    try {
+      const { error: apiError } = await apiPost<{ user: User }>('/api/v1/admin/users', inviteForm);
+      if (apiError) {
+        setInviteError(apiError.message || t('errorDefault'));
+        return;
+      }
+      setInviteOpen(false);
+      resetInviteForm();
+      await fetchUsers();
+    } catch {
+      setInviteError(t('errorNetwork'));
+    } finally {
+      setInviting(false);
+    }
+  }
+
   return (
     <AdminLayout
       title={t('title')}
       subtitle={t('subtitle')}
       actions={
-        <Button size="sm">
+        <Button size="sm" onClick={() => setInviteOpen(true)}>
           <svg className="me-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
@@ -382,6 +424,101 @@ export default function UsersPage() {
           )}
         </div>
       )}
+      <Modal
+        isOpen={inviteOpen}
+        onClose={() => {
+          setInviteOpen(false);
+          resetInviteForm();
+        }}
+        title={t('inviteUser')}
+        size="md"
+      >
+        <form onSubmit={handleInvite}>
+          <ModalBody className="space-y-4">
+            <div>
+              <Label htmlFor="invite-email">{t('email') || 'Email'}</Label>
+              <Input
+                id="invite-email"
+                type="email"
+                required
+                autoComplete="off"
+                value={inviteForm.email}
+                onChange={e => setInviteForm({ ...inviteForm, email: e.target.value })}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="invite-first">{t('firstName') || 'First name'}</Label>
+                <Input
+                  id="invite-first"
+                  required
+                  value={inviteForm.firstName}
+                  onChange={e => setInviteForm({ ...inviteForm, firstName: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="invite-last">{t('lastName') || 'Last name'}</Label>
+                <Input
+                  id="invite-last"
+                  required
+                  value={inviteForm.lastName}
+                  onChange={e => setInviteForm({ ...inviteForm, lastName: e.target.value })}
+                />
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="invite-password">{t('password') || 'Password'}</Label>
+              <Input
+                id="invite-password"
+                type="password"
+                required
+                minLength={8}
+                autoComplete="new-password"
+                value={inviteForm.password}
+                onChange={e => setInviteForm({ ...inviteForm, password: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="invite-role">{t('role') || 'Role'}</Label>
+              <select
+                id="invite-role"
+                className="block w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={inviteForm.role}
+                onChange={e =>
+                  setInviteForm({
+                    ...inviteForm,
+                    role: e.target.value as 'super_admin' | 'store_admin',
+                  })
+                }
+              >
+                <option value="store_admin">{t('roleStoreAdmins') || 'Store Admin'}</option>
+                <option value="super_admin">{t('roleSuperAdmins') || 'Super Admin'}</option>
+              </select>
+            </div>
+            {inviteError && (
+              <p className="text-sm text-destructive" role="alert">
+                {inviteError}
+              </p>
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setInviteOpen(false);
+                resetInviteForm();
+              }}
+              disabled={inviting}
+            >
+              {tc('cancel') || 'Cancel'}
+            </Button>
+            <Button type="submit" disabled={inviting}>
+              {inviting ? tc('saving') || 'Saving…' : t('inviteUser')}
+            </Button>
+          </ModalFooter>
+        </form>
+      </Modal>
     </AdminLayout>
   );
 }

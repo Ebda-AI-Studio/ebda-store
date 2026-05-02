@@ -349,6 +349,87 @@ router.get(
 );
 
 /**
+ * POST /admin/users
+ * Create a new user. Super-admin only. Used by the platform-wide
+ * "Invite user" button. Creates a user in the admin namespace
+ * (storeId=NULL) so the partial unique `users_admin_email_key` fires
+ * if the email already exists as an admin.
+ *
+ * For store_admin creation: storeId-NULL is correct — the user
+ * becomes an owner of zero stores at create-time and is then assigned
+ * via the per-store team flow (Store.ownerId update). Customers are
+ * NOT createable here; that goes through the public registration
+ * route on the storefront.
+ */
+router.post(
+  '/users',
+  requireRole('super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const schema = z.object({
+        email: z.string().email().max(255),
+        firstName: z.string().min(1).max(100),
+        lastName: z.string().min(1).max(100),
+        password: z.string().min(8).max(255),
+        role: z.enum(['super_admin', 'store_admin']),
+      });
+      const data = schema.parse(req.body);
+      const email = data.email.toLowerCase();
+
+      const existing = await prisma.user.findFirst({
+        where: { email, storeId: null },
+        select: { id: true },
+      });
+      if (existing) {
+        res.status(409).json({
+          success: false,
+          error: { code: 'EMAIL_TAKEN', message: 'An admin user with this email already exists' },
+        });
+        return;
+      }
+
+      const user = await prisma.user.create({
+        data: {
+          email,
+          firstName: data.firstName,
+          lastName: data.lastName,
+          passwordHash: await bcrypt.hash(data.password, 12),
+          role: data.role as UserRole,
+          status: 'active',
+          emailVerified: true,
+          language: 'en',
+        },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          role: true,
+          status: true,
+          createdAt: true,
+          lastLoginAt: true,
+          stores: { select: { id: true, name: true } },
+        },
+      });
+
+      await auditLog({
+        action: 'user.created',
+        userId: req.user!.userId,
+        resourceType: 'user',
+        resourceId: user.id,
+        details: { email: user.email, role: user.role },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+
+      res.status(201).json({ success: true, data: { user } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
  * GET /admin/users/:id
  * Get a single user by ID
  */

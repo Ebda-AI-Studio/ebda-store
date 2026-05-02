@@ -305,6 +305,24 @@ export class StoreService {
       // Now the store delete cascades through everything else
       // (products, categories, customers, pages, carts, coupons, etc.).
       await tx.store.delete({ where: { id: storeId } });
+
+      // If the owner was a store_admin and this was their only store,
+      // delete the user too. Otherwise they remain in the system as a
+      // login-able account with no stores to manage — confusing UI and
+      // dead weight on the users list. Super-admins are never deleted
+      // here (they own the platform, not specific stores). Cleaned up
+      // historically by `scripts/admin-cleanup-orphan-store-admins.mjs`.
+      const owner = await tx.user.findUnique({
+        where: { id: store.ownerId },
+        select: { id: true, role: true, _count: { select: { stores: true } } },
+      });
+      if (owner && owner.role === 'store_admin' && owner._count.stores === 0) {
+        await tx.auditLog.updateMany({ where: { userId: owner.id }, data: { userId: null } });
+        await tx.refreshToken.deleteMany({ where: { userId: owner.id } });
+        await tx.verificationToken.deleteMany({ where: { userId: owner.id } });
+        await tx.oneSignalSubscription.deleteMany({ where: { userId: owner.id } });
+        await tx.user.delete({ where: { id: owner.id } });
+      }
     });
 
     // Invalidate store cache (best-effort, post-commit)
