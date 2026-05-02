@@ -213,6 +213,17 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
 // sequence and rely on lockout behavior without the rate-limit
 // trip-wire firing first.
 const isTestEnv = process.env.NODE_ENV === 'test' || process.env.VITEST === 'true';
+
+// Shared skip predicate for load-test bypass. Active only when
+// LOAD_TEST_BYPASS_TOKEN is set on the host AND the request carries
+// a matching `x-load-test-token` header. Production traffic is
+// rate-limited as usual whenever the env var is unset (default).
+const skipForLoadTest = (req: Request): boolean => {
+  const expected = process.env.LOAD_TEST_BYPASS_TOKEN;
+  if (!expected) return false;
+  return req.header('x-load-test-token') === expected;
+};
+const skipForLoadTestOrTests = (req: Request): boolean => isTestEnv || skipForLoadTest(req);
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 15,
@@ -222,7 +233,7 @@ export const authLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  skip: () => isTestEnv,
+  skip: skipForLoadTestOrTests,
   keyGenerator: req => {
     // Use IP + email for more granular limiting
     const email = req.body?.email || 'unknown';
@@ -243,6 +254,7 @@ export const passwordResetLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: skipForLoadTest,
 });
 
 // Limiter for API writes (orders, payments)
@@ -255,6 +267,7 @@ export const writeLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: skipForLoadTest,
 });
 
 // Stricter limiter for payment operations
@@ -267,6 +280,7 @@ export const paymentLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: skipForLoadTest,
 });
 
 // File upload limiter - more restrictive
@@ -279,6 +293,7 @@ export const uploadLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: skipForLoadTest,
   keyGenerator: req => {
     // Limit per user, not per IP
     return req.user?.userId || req.ip || 'anonymous';
@@ -295,6 +310,7 @@ export const dailyUploadLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: skipForLoadTest,
   keyGenerator: req => {
     return req.user?.userId || req.ip || 'anonymous';
   },
@@ -310,6 +326,7 @@ export const publicLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: skipForLoadTest,
 });
 
 // Store resolver rate limiter - stricter for domain resolution
@@ -322,6 +339,7 @@ export const storeResolveLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: skipForLoadTest,
 });
 
 // Cart rate limiter - prevent cart bombing
@@ -334,6 +352,7 @@ export const cartLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: skipForLoadTest,
   keyGenerator: req => {
     // Use session ID if available, otherwise IP
     const sessionId = req.headers['x-session-id'] as string;
@@ -354,6 +373,7 @@ export const newsletterLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: skipForLoadTest,
   keyGenerator: req => {
     const sessionId = req.headers['x-session-id'] as string;
     return `${sessionId || 'anon'}:${req.ip || 'noip'}`;
