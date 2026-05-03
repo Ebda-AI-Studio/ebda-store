@@ -54,17 +54,21 @@ export interface CategorySuggestion {
   confidence: 'high' | 'medium' | 'low';
 }
 
-// Default model is `gemini-flash-latest` — Google's auto-updated
-// alias that points at whichever Flash model is currently in the
-// free tier. Hard-coded names like `gemini-1.5-flash` and
-// `gemini-2.0-flash` keep getting deprecated or moved to paid tiers,
-// so we let Google manage the alias and override via env if a
-// specific snapshot is needed for QA / paid upgrade.
+// Default model is `gemini-flash-lite-latest` — Google's auto-
+// updated alias for the cheapest / highest-throughput Flash model.
+// Lite has substantially higher free-tier RPM (~30) than the
+// standard flash (~10), which matters for bulk catalogue sweeps.
+// Quality is imperceptibly different for translation / SEO /
+// classification tasks. Override via GEMINI_MODEL env var to flip
+// to a paid tier (e.g. gemini-2.5-flash) once billing is enabled.
 //
-// Verified models on free tier (as of 2026-05-03): gemini-flash-latest,
-// gemini-flash-lite-latest, gemini-2.5-flash-lite. `gemini-2.0-flash`
-// and `gemini-2.0-flash-lite` are paid-only on this account.
-const MODEL = process.env.GEMINI_MODEL || 'gemini-flash-latest';
+// Verified models on free tier (as of 2026-05-03):
+//   gemini-flash-lite-latest  (best for bulk — higher RPM)
+//   gemini-2.5-flash-lite     (specific snapshot)
+//   gemini-flash-latest       (works but lower RPM, hits quota in bulk)
+// `gemini-2.0-flash` + `gemini-2.0-flash-lite` are paid-only on
+// this account; `gemini-1.5-flash` is deprecated from v1beta.
+const MODEL = process.env.GEMINI_MODEL || 'gemini-flash-lite-latest';
 const CACHE_TTL_SECONDS = 7 * 24 * 60 * 60;
 const META_TITLE_MAX = 60;
 const META_DESCRIPTION_MAX = 160;

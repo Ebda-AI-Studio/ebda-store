@@ -13,11 +13,11 @@ import { inngest } from '../client';
  */
 const ERROR_CAP = 50;
 
-// Gemini free tier is 15 req/min. We pace bulk calls at one every
-// 5 seconds (= 12 RPM) so the per-minute cap never fires mid-sweep.
-// A 232-product sweep takes ~20 min instead of failing at minute 1.
-// Override via env if the operator has upgraded to paid quota.
-const THROTTLE_MS = parseInt(process.env.AI_BULK_THROTTLE_MS || '5000', 10);
+// Throttle bulk AI calls so the per-minute quota never fires mid-
+// sweep. `gemini-flash-lite-latest` allows ~30 RPM free — we pace
+// at one every 2.5s (~24 RPM) which leaves headroom. Override via
+// AI_BULK_THROTTLE_MS env to slow down or speed up.
+const THROTTLE_MS = parseInt(process.env.AI_BULK_THROTTLE_MS || '2500', 10);
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 interface BulkError {
