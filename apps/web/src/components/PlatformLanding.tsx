@@ -26,11 +26,13 @@ const ORANGE_DARK = '#3D1F1F';
 type Lang = 'en' | 'ar';
 
 const COPY = {
-  // Company name lives on the masthead; product is the section/page.
-  // Visitors see "Force AI" (who's selling) and "Store" (what's on offer).
-  brand: { en: 'Force AI', ar: 'فورس AI' },
-  brandProduct: { en: 'Store', ar: 'ستور' },
-  brandFull: { en: 'Force Store', ar: 'فورس ستور' },
+  // Force AI = company, Force Store = product on this page.
+  // Header shows the product name prominently with the company as a
+  // smaller affiliation line — same pattern Stripe uses (Stripe /
+  // Atlas, Stripe / Climate). Visitors see what page they're on
+  // first, then who makes it.
+  brand: { en: 'Force Store', ar: 'فورس ستور' },
+  brandCompany: { en: 'by Force AI', ar: 'من Force AI' },
   langToggle: { en: 'عربي', ar: 'English' },
   navServices: { en: 'What we do', ar: 'خدماتنا' },
   navProcess: { en: 'How it works', ar: 'خطواتنا' },
@@ -38,8 +40,8 @@ const COPY = {
   navStart: { en: 'Get started', ar: 'ابدأ الآن' },
 
   heroEyebrow: {
-    en: 'From Force AI — meet Force Store',
-    ar: 'من Force AI — تعرّف على Force Store',
+    en: 'For Kuwait merchants',
+    ar: 'للتجار في الكويت',
   },
   heroTitle: {
     en: 'Sell more in Kuwait, with less hassle',
@@ -388,14 +390,13 @@ export function PlatformLanding({ notFoundBanner = false }: PlatformLandingProps
       <header className="sticky top-0 z-50 border-b border-gray-100 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
           <Link href="/" className="flex items-center gap-2">
-            <img src="/logo.svg" alt="Force AI" className="h-7 w-auto" />
-            <span className="text-lg font-bold tracking-tight">{t(COPY.brand)}</span>
-            <span
-              className="rounded-md px-2 py-0.5 text-xs font-bold text-white"
-              style={{ backgroundColor: ORANGE }}
-            >
-              {t(COPY.brandProduct)}
-            </span>
+            <img src="/logo.svg" alt="Force Store" className="h-7 w-auto" />
+            <div className="flex flex-col leading-tight">
+              <span className="text-base font-bold tracking-tight md:text-lg">{t(COPY.brand)}</span>
+              <span className="text-[10px] uppercase tracking-wide text-gray-400">
+                {t(COPY.brandCompany)}
+              </span>
+            </div>
           </Link>
           <nav className="hidden items-center gap-6 text-sm md:flex">
             <a href="#services" className="text-gray-600 transition-colors hover:text-gray-900">

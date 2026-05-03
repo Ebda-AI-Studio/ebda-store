@@ -2,6 +2,7 @@
 
 import { useT } from '@/i18n/useT';
 import { LogoUploader } from './LogoUploader';
+import { AITranslateMissingButton } from '../../../../../components/AITranslateMissingButton';
 import type { StoreBranding } from './types';
 
 interface BrandingIdentityTabProps {
@@ -19,6 +20,29 @@ export function BrandingIdentityTab({ branding, onChange, storeId }: BrandingIde
 
   return (
     <div className="bg-card rounded-xl border p-6 space-y-6">
+      <div className="flex items-center justify-end">
+        <AITranslateMissingButton
+          storeId={storeId}
+          pairs={[
+            {
+              key: 'name',
+              en: branding.name,
+              ar: branding.nameAr || '',
+              kind: 'store-name',
+              onEnFilled: v => onChange({ ...branding, name: v }),
+              onArFilled: v => onChange({ ...branding, nameAr: v }),
+            },
+            {
+              key: 'description',
+              en: branding.description || '',
+              ar: branding.descriptionAr || '',
+              kind: 'store-description',
+              onEnFilled: v => onChange({ ...branding, description: v }),
+              onArFilled: v => onChange({ ...branding, descriptionAr: v }),
+            },
+          ]}
+        />
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <label className="block text-sm font-medium text-foreground mb-1">{t('storeName')}</label>

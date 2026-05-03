@@ -7,7 +7,7 @@ import { useT } from '@/i18n/useT';
 import Link from 'next/link';
 import { AdminLayout } from '../../../../../../components/AdminLayout';
 import { MultiImageUpload } from '../../../../../../components/ImageUpload';
-import { AITranslateButton } from '../../../../../../components/AITranslateButton';
+import { AITranslateMissingButton } from '../../../../../../components/AITranslateMissingButton';
 import { useAuth } from '../../../../../../lib/auth';
 import { apiGet, apiPut } from '../../../../../../lib/api';
 import { EditSidebar } from './_components/EditSidebar';
@@ -327,9 +327,32 @@ export default function EditProductPage() {
         <div className="grid gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2 space-y-6">
             <div className="rounded-xl border bg-card p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-foreground mb-4">
-                {tSections('basicInformation')}
-              </h2>
+              <div className="mb-4 flex items-center justify-between gap-3 flex-wrap">
+                <h2 className="text-lg font-semibold text-foreground">
+                  {tSections('basicInformation')}
+                </h2>
+                <AITranslateMissingButton
+                  storeId={storeId}
+                  pairs={[
+                    {
+                      key: 'name',
+                      en: formData.name,
+                      ar: formData.nameAr,
+                      kind: 'product-name',
+                      onEnFilled: v => updateField('name', v),
+                      onArFilled: v => updateField('nameAr', v),
+                    },
+                    {
+                      key: 'description',
+                      en: formData.description ?? '',
+                      ar: formData.descriptionAr ?? '',
+                      kind: 'product-description',
+                      onEnFilled: v => updateField('description', v),
+                      onArFilled: v => updateField('descriptionAr', v),
+                    },
+                  ]}
+                />
+              </div>
               <div className="space-y-4">
                 <Input
                   label={tFields('name')}
@@ -338,34 +361,14 @@ export default function EditProductPage() {
                   placeholder={tFields('namePlaceholder')}
                   required
                 />
-                <div>
-                  <Input
-                    label={tFields('nameAr')}
-                    value={formData.nameAr}
-                    onChange={e => updateField('nameAr', e.target.value)}
-                    placeholder={tFields('nameArPlaceholder')}
-                    lang="ar"
-                    dir="rtl"
-                  />
-                  <div className="mt-1.5 flex gap-2">
-                    <AITranslateButton
-                      storeId={storeId}
-                      source={formData.name}
-                      from="en"
-                      to="ar"
-                      kind="product-name"
-                      onResult={value => updateField('nameAr', value)}
-                    />
-                    <AITranslateButton
-                      storeId={storeId}
-                      source={formData.nameAr}
-                      from="ar"
-                      to="en"
-                      kind="product-name"
-                      onResult={value => updateField('name', value)}
-                    />
-                  </div>
-                </div>
+                <Input
+                  label={tFields('nameAr')}
+                  value={formData.nameAr}
+                  onChange={e => updateField('nameAr', e.target.value)}
+                  placeholder={tFields('nameArPlaceholder')}
+                  lang="ar"
+                  dir="rtl"
+                />
                 <Textarea
                   label={tFields('description')}
                   value={formData.description}
@@ -373,35 +376,15 @@ export default function EditProductPage() {
                   placeholder={tFields('descriptionPlaceholder')}
                   rows={4}
                 />
-                <div>
-                  <Textarea
-                    label={tFields('descriptionAr')}
-                    value={formData.descriptionAr}
-                    onChange={e => updateField('descriptionAr', e.target.value)}
-                    placeholder={tFields('descriptionArPlaceholder')}
-                    rows={4}
-                    lang="ar"
-                    dir="rtl"
-                  />
-                  <div className="mt-1.5 flex gap-2">
-                    <AITranslateButton
-                      storeId={storeId}
-                      source={formData.description ?? ''}
-                      from="en"
-                      to="ar"
-                      kind="product-description"
-                      onResult={value => updateField('descriptionAr', value)}
-                    />
-                    <AITranslateButton
-                      storeId={storeId}
-                      source={formData.descriptionAr ?? ''}
-                      from="ar"
-                      to="en"
-                      kind="product-description"
-                      onResult={value => updateField('description', value)}
-                    />
-                  </div>
-                </div>
+                <Textarea
+                  label={tFields('descriptionAr')}
+                  value={formData.descriptionAr}
+                  onChange={e => updateField('descriptionAr', e.target.value)}
+                  placeholder={tFields('descriptionArPlaceholder')}
+                  rows={4}
+                  lang="ar"
+                  dir="rtl"
+                />
               </div>
             </div>
 

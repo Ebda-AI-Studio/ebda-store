@@ -1,6 +1,7 @@
 'use client';
 
 import { ImageUpload } from '../../../../components/ImageUpload';
+import { AITranslateMissingButton } from '../../../../components/AITranslateMissingButton';
 import { useT } from '@/i18n/useT';
 
 interface CategoryFormData {
@@ -45,25 +46,48 @@ export function CategoryForm({
   const t = useT('categories.form');
   return (
     <div className="mb-6 rounded-xl border bg-card shadow-sm">
-      <div className="flex items-center justify-between border-b p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b p-4">
         <h2 className="font-semibold text-foreground">
           {editingId ? t('editTitle') : t('addTitle')}
         </h2>
-        <button
-          type="button"
-          onClick={onClose}
-          className="p-1 text-muted-foreground hover:text-muted-foreground"
-          aria-label={t('close')}
-        >
-          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M6 18L18 6M6 6l12 12"
-            />
-          </svg>
-        </button>
+        <div className="flex items-center gap-3">
+          <AITranslateMissingButton
+            storeId={storeId}
+            pairs={[
+              {
+                key: 'name',
+                en: form.name,
+                ar: form.nameAr,
+                kind: 'category-name',
+                onEnFilled: v => onFormChange(prev => ({ ...prev, name: v })),
+                onArFilled: v => onFormChange(prev => ({ ...prev, nameAr: v })),
+              },
+              {
+                key: 'description',
+                en: form.description,
+                ar: form.descriptionAr,
+                kind: 'category-description',
+                onEnFilled: v => onFormChange(prev => ({ ...prev, description: v })),
+                onArFilled: v => onFormChange(prev => ({ ...prev, descriptionAr: v })),
+              },
+            ]}
+          />
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1 text-muted-foreground hover:text-muted-foreground"
+            aria-label={t('close')}
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+        </div>
       </div>
       <form onSubmit={onSubmit} className="p-6 space-y-4">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
