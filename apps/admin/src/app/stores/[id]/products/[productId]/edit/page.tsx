@@ -9,7 +9,7 @@ import { AdminLayout } from '../../../../../../components/AdminLayout';
 import { MultiImageUpload } from '../../../../../../components/ImageUpload';
 import { AITranslateMissingButton } from '../../../../../../components/AITranslateMissingButton';
 import { useAuth } from '../../../../../../lib/auth';
-import { apiGet, apiPut } from '../../../../../../lib/api';
+import { apiGet, apiPost, apiPut } from '../../../../../../lib/api';
 import { EditSidebar } from './_components/EditSidebar';
 
 interface Product {
@@ -79,7 +79,14 @@ export default function EditProductPage() {
     isNew: false,
     isBestSeller: false,
     category: '',
+    metaTitle: '',
+    metaTitleAr: '',
+    metaDescription: '',
+    metaDescriptionAr: '',
   });
+
+  const [seoGenerating, setSeoGenerating] = useState(false);
+  const [seoMessage, setSeoMessage] = useState<string | null>(null);
 
   const statuses = useMemo(
     () => [
@@ -153,6 +160,11 @@ export default function EditProductPage() {
           isNew: p.isNew || false,
           isBestSeller: p.isBestSeller || false,
           category: p.categories?.[0]?.categoryId || p.categories?.[0]?.category?.id || '',
+          metaTitle: (p as Product & { metaTitle?: string }).metaTitle || '',
+          metaTitleAr: (p as Product & { metaTitleAr?: string }).metaTitleAr || '',
+          metaDescription: (p as Product & { metaDescription?: string }).metaDescription || '',
+          metaDescriptionAr:
+            (p as Product & { metaDescriptionAr?: string }).metaDescriptionAr || '',
         });
       } catch {
         setError(t('loadFailed'));
@@ -167,6 +179,44 @@ export default function EditProductPage() {
   const updateField = (field: string, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
+
+  async function generateSeo(mode: 'fill-empty' | 'overwrite') {
+    if (!product) return;
+    setSeoMessage(null);
+    setSeoGenerating(true);
+    try {
+      const { data, error: apiError } = await apiPost<{
+        suggestion: {
+          title: string;
+          titleAr: string;
+          description: string;
+          descriptionAr: string;
+          keywords: string[];
+        };
+      }>(`/api/v1/stores/${storeId}/ai/seo`, { kind: 'product', id: product.id });
+      if (apiError || !data) {
+        setSeoMessage(apiError?.message || 'AI generation failed');
+        return;
+      }
+      const s = data.suggestion;
+      setFormData(prev => ({
+        ...prev,
+        metaTitle: mode === 'overwrite' || !prev.metaTitle ? s.title : prev.metaTitle,
+        metaTitleAr: mode === 'overwrite' || !prev.metaTitleAr ? s.titleAr : prev.metaTitleAr,
+        metaDescription:
+          mode === 'overwrite' || !prev.metaDescription ? s.description : prev.metaDescription,
+        metaDescriptionAr:
+          mode === 'overwrite' || !prev.metaDescriptionAr
+            ? s.descriptionAr
+            : prev.metaDescriptionAr,
+      }));
+      setSeoMessage('AI filled the SEO fields. Review then click Save changes.');
+    } catch {
+      setSeoMessage('Network error contacting AI');
+    } finally {
+      setSeoGenerating(false);
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -202,6 +252,11 @@ export default function EditProductPage() {
         isFeatured: formData.isFeatured,
         isNew: formData.isNew,
         isBestSeller: formData.isBestSeller,
+        // null clears, undefined leaves alone — same convention as compareAtPrice.
+        metaTitle: formData.metaTitle || null,
+        metaTitleAr: formData.metaTitleAr || null,
+        metaDescription: formData.metaDescription || null,
+        metaDescriptionAr: formData.metaDescriptionAr || null,
         images: images.map((url, i) => ({ url, position: i })),
       };
 
@@ -484,6 +539,73 @@ export default function EditProductPage() {
                   value={formData.inventory}
                   onChange={e => updateField('inventory', e.target.value)}
                   placeholder={tFields('quantityPlaceholder')}
+                />
+              </div>
+            </div>
+
+            {/* SEO meta — what shows up on Google + social shares.
+                "Generate with AI" pulls from the same /ai/seo endpoint
+                the bulk sweep uses, so per-product regeneration is
+                consistent with the catalogue-wide flow. */}
+            <div className="rounded-xl border bg-card p-6 shadow-sm">
+              <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold text-foreground">SEO</h2>
+                  <p className="text-xs text-muted-foreground">
+                    How this product appears on Google and when shared.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => generateSeo('fill-empty')}
+                    disabled={seoGenerating}
+                    className="inline-flex items-center gap-2 rounded-lg border border-[#fc6b02]/40 bg-[#fc6b02]/5 px-3 py-1.5 text-xs font-semibold text-[#fc6b02] transition-colors hover:bg-[#fc6b02]/10 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <span aria-hidden>✨</span>
+                    {seoGenerating ? 'Generating…' : 'AI fill empty'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => generateSeo('overwrite')}
+                    disabled={seoGenerating}
+                    className="inline-flex items-center gap-2 rounded-lg border border-[#fc6b02] px-3 py-1.5 text-xs font-semibold text-[#fc6b02] transition-colors hover:bg-[#fc6b02]/5 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Regenerate all
+                  </button>
+                </div>
+              </div>
+              {seoMessage && <p className="mb-3 text-xs text-muted-foreground">{seoMessage}</p>}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Input
+                  label={`Meta title (${formData.metaTitle.length}/60)`}
+                  value={formData.metaTitle}
+                  onChange={e => updateField('metaTitle', e.target.value)}
+                  maxLength={70}
+                />
+                <Input
+                  label={`Meta title AR (${formData.metaTitleAr.length}/60)`}
+                  value={formData.metaTitleAr}
+                  onChange={e => updateField('metaTitleAr', e.target.value)}
+                  maxLength={70}
+                  lang="ar"
+                  dir="rtl"
+                />
+                <Textarea
+                  label={`Meta description (${formData.metaDescription.length}/160)`}
+                  value={formData.metaDescription}
+                  onChange={e => updateField('metaDescription', e.target.value)}
+                  maxLength={180}
+                  rows={3}
+                />
+                <Textarea
+                  label={`Meta description AR (${formData.metaDescriptionAr.length}/160)`}
+                  value={formData.metaDescriptionAr}
+                  onChange={e => updateField('metaDescriptionAr', e.target.value)}
+                  maxLength={180}
+                  rows={3}
+                  lang="ar"
+                  dir="rtl"
                 />
               </div>
             </div>

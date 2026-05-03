@@ -33,6 +33,11 @@ const createProductSchema = z.object({
   isFeatured: z.boolean().optional(),
   isNew: z.boolean().optional(),
   isBestSeller: z.boolean().optional(),
+  // SEO meta — null clears, undefined leaves alone (Prisma convention).
+  metaTitle: z.string().max(180).optional().nullable(),
+  metaTitleAr: z.string().max(180).optional().nullable(),
+  metaDescription: z.string().max(400).optional().nullable(),
+  metaDescriptionAr: z.string().max(400).optional().nullable(),
   categories: z.array(z.string()).optional(),
   images: z
     .array(

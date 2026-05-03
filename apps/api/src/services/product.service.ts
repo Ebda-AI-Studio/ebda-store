@@ -25,6 +25,11 @@ interface CreateProductData {
   isBestSeller?: boolean;
   categories?: string[];
   images?: { url: string; alt?: string }[];
+  /** SEO meta — set per-product or via the AI sweep. `null` clears. */
+  metaTitle?: string | null;
+  metaTitleAr?: string | null;
+  metaDescription?: string | null;
+  metaDescriptionAr?: string | null;
 }
 
 type UpdateProductData = Partial<CreateProductData>;
@@ -328,6 +333,13 @@ export class ProductService {
           ...(data.isFeatured !== undefined ? { featured: data.isFeatured } : {}),
           ...(data.isNew !== undefined ? { isNew: data.isNew } : {}),
           ...(data.isBestSeller !== undefined ? { isBestSeller: data.isBestSeller } : {}),
+          // SEO — accept only when present so omitting them doesn't clear.
+          ...(data.metaTitle !== undefined ? { metaTitle: data.metaTitle } : {}),
+          ...(data.metaTitleAr !== undefined ? { metaTitleAr: data.metaTitleAr } : {}),
+          ...(data.metaDescription !== undefined ? { metaDescription: data.metaDescription } : {}),
+          ...(data.metaDescriptionAr !== undefined
+            ? { metaDescriptionAr: data.metaDescriptionAr }
+            : {}),
         },
         include: {
           images: { orderBy: { position: 'asc' } },
