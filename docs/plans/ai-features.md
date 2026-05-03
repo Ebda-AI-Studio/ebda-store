@@ -1,8 +1,9 @@
 # AI features plan — making "Force AI" mean something
 
 **Status:** plan, not yet built
-**Owner:** Force AI (company) — the platform itself stays unnamed for now
-**Goal:** ship three concrete AI features so the company name describes real capabilities
+**Product:** Force Store (the e-commerce platform)
+**Company:** Force AI (the parent brand that owns Force Store + Force WhatsApp Business Platform)
+**Goal:** ship three concrete AI features so the parent name describes real capabilities
 
 The three features chosen, in priority order:
 

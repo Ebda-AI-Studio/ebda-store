@@ -26,7 +26,8 @@ const ORANGE_DARK = '#3D1F1F';
 type Lang = 'en' | 'ar';
 
 const COPY = {
-  brand: { en: 'Force AI', ar: 'فورس AI' },
+  brand: { en: 'Force Store', ar: 'فورس ستور' },
+  brandParent: { en: 'a Force AI product', ar: 'منتج من فورس AI' },
   langToggle: { en: 'عربي', ar: 'English' },
   navServices: { en: 'What we do', ar: 'خدماتنا' },
   navProcess: { en: 'How it works', ar: 'خطواتنا' },
@@ -382,7 +383,12 @@ export function PlatformLanding({ notFoundBanner = false }: PlatformLandingProps
           <Link href="/" className="flex items-center gap-2">
             {/* Force F mark — the real Force Media logo, not a placeholder. */}
             <img src="/logo.svg" alt="Force" className="h-7 w-auto" />
-            <span className="text-lg font-bold tracking-tight">{t(COPY.brand)}</span>
+            <div className="flex flex-col leading-tight">
+              <span className="text-lg font-bold tracking-tight">{t(COPY.brand)}</span>
+              <span className="text-[10px] uppercase tracking-wide text-gray-400">
+                {t(COPY.brandParent)}
+              </span>
+            </div>
           </Link>
           <nav className="hidden items-center gap-6 text-sm md:flex">
             <a href="#services" className="text-gray-600 transition-colors hover:text-gray-900">
@@ -699,7 +705,12 @@ export function PlatformLanding({ notFoundBanner = false }: PlatformLandingProps
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 text-sm text-gray-500 md:flex-row">
           <div className="flex items-center gap-2">
             <img src="/logo.svg" alt="Force" className="h-6 w-auto" />
-            <span className="font-semibold text-gray-700">{t(COPY.brand)}</span>
+            <div className="flex flex-col">
+              <span className="font-semibold text-gray-700">{t(COPY.brand)}</span>
+              <span className="text-[11px] uppercase tracking-wide text-gray-400">
+                {t(COPY.brandParent)}
+              </span>
+            </div>
             <span className="hidden md:inline">— {t(COPY.footerTagline)}</span>
           </div>
           <div className="flex items-center gap-4">
