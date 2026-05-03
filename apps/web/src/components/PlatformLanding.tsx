@@ -1,0 +1,505 @@
+'use client';
+
+import Link from 'next/link';
+import { useState, useEffect } from 'react';
+
+/**
+ * Platform landing page for `store.forcemediakw.com` — replaces the
+ * old "redirect to forcemediakw.com" behaviour with a properly
+ * positioned page about the Force Store Builder service itself.
+ *
+ * Used in two places:
+ *   1. The bare-root homepage when no merchant slug / domain resolved
+ *      (`app/page.tsx` switches to this when `store.id === 'demo'`).
+ *   2. The 404 page for unknown slugs (`app/not-found.tsx`), with a
+ *      banner at the top calling out the not-found state.
+ *
+ * Self-contained chrome (header + footer) so it doesn't pick up the
+ * merchant template's storefront UI when a real store can't be
+ * resolved. Force Media palette + Poppins/Tajawal typography mirrors
+ * the parent marketing site at forcemediakw.com.
+ */
+
+const ORANGE = '#fc6b02';
+const ORANGE_DARK = '#3D1F1F';
+
+type Lang = 'en' | 'ar';
+
+const COPY = {
+  brand: { en: 'Force Store', ar: 'فورس ستور' },
+  langToggle: { en: 'عربي', ar: 'English' },
+  navServices: { en: 'What we do', ar: 'خدماتنا' },
+  navProcess: { en: 'How it works', ar: 'خطواتنا' },
+  navContact: { en: 'Contact', ar: 'تواصل معنا' },
+  navStart: { en: 'Get started', ar: 'ابدأ الآن' },
+
+  heroTitle: {
+    en: 'Launch your online store in Kuwait',
+    ar: 'أطلق متجرك الإلكتروني في الكويت',
+  },
+  heroSubtitle: {
+    en: 'A complete e-commerce platform built for Kuwait merchants — local payments, bilingual storefront, mobile PWA, push notifications, and real-time order management.',
+    ar: 'منصة تجارة إلكترونية متكاملة مصممة للتجار في الكويت — وسائل دفع محلية، متجر بلغتين، تطبيق ويب للجوال، إشعارات فورية، وإدارة طلبات بالوقت الفعلي.',
+  },
+  heroCta1: { en: 'Start your store', ar: 'ابدأ متجرك' },
+  heroCta2: { en: 'Talk on WhatsApp', ar: 'تواصل عبر واتساب' },
+
+  whySectionTitle: {
+    en: 'Built for Kuwait merchants',
+    ar: 'مصممة للتجار في الكويت',
+  },
+  whySectionSubtitle: {
+    en: 'Every piece tuned for the way Kuwaiti shoppers buy and Kuwaiti merchants operate.',
+    ar: 'كل التفاصيل مهيأة لطريقة شراء العملاء في الكويت وطريقة عمل التجار المحليين.',
+  },
+
+  servicesTitle: { en: 'What we do', ar: 'خدماتنا' },
+  servicesSubtitle: {
+    en: 'A full storefront platform end-to-end — you focus on products, we handle the rest.',
+    ar: 'منصة متجر متكاملة من البداية للنهاية — أنت تركز على منتجاتك، ونحن نتولى الباقي.',
+  },
+
+  processTitle: { en: 'How it works', ar: 'كيف نعمل' },
+  processSubtitle: {
+    en: 'From first conversation to live store, in days not months.',
+    ar: 'من أول محادثة حتى إطلاق المتجر، بأيام لا أشهر.',
+  },
+
+  marketingCalloutTitle: {
+    en: 'Need marketing too?',
+    ar: 'تبحث عن التسويق أيضاً؟',
+  },
+  marketingCalloutBody: {
+    en: 'Force Media is our parent brand running full-service marketing across Kuwait, Saudi Arabia, and Qatar — strategy, content, paid ads, social, and influencer campaigns. 250+ companies trust them with their growth.',
+    ar: 'فورس ميديا هي شركتنا الأم التي تقدم خدمات التسويق المتكاملة في الكويت والسعودية وقطر — استراتيجية، محتوى، إعلانات ممولة، تواصل اجتماعي، وحملات المؤثرين. أكثر من 250 شركة تثق بها في نموها.',
+  },
+  marketingCalloutCta: { en: 'Visit Force Media →', ar: 'زيارة فورس ميديا ←' },
+
+  contactTitle: { en: 'Get in touch', ar: 'تواصل معنا' },
+  contactSubtitle: {
+    en: 'Tell us about your products, your timeline, and your budget. We’ll come back with a plan in 24 hours.',
+    ar: 'أخبرنا عن منتجاتك وجدولك الزمني وميزانيتك. سنعود إليك بخطة خلال 24 ساعة.',
+  },
+  contactAddress: { en: 'Sanam Tower, Floor 33', ar: 'برج سنام، الدور 33' },
+  contactCity: { en: 'Fahad Al-Salem Street, Kuwait City', ar: 'شارع فهد السالم، مدينة الكويت' },
+
+  footerTagline: {
+    en: 'The store builder behind Kuwait’s best independent shops.',
+    ar: 'منصة بناء المتاجر خلف أفضل المتاجر المستقلة في الكويت.',
+  },
+  footerCopyright: {
+    en: '© 2026 Force Media Kuwait. All rights reserved.',
+    ar: '© 2026 فورس ميديا الكويت. جميع الحقوق محفوظة.',
+  },
+};
+
+const FEATURES: Array<{ titleEn: string; titleAr: string; bodyEn: string; bodyAr: string }> = [
+  {
+    titleEn: 'Kuwait payment providers',
+    titleAr: 'وسائل دفع كويتية',
+    bodyEn:
+      'Tap, MyFatoorah, Hesabe, UPayments, KNet, Visa, Mastercard, Apple Pay, and cash on delivery — all wired in.',
+    bodyAr:
+      'تاب، ماي فاتورة، حسابي، يو بايمنتس، كي نت، فيزا، ماستركارد، آبل باي، والدفع عند الاستلام — كلها جاهزة.',
+  },
+  {
+    titleEn: 'Bilingual Arabic & English',
+    titleAr: 'عربي وإنجليزي',
+    bodyEn:
+      'Full RTL/LTR support across the storefront, checkout, emails, push notifications, and invoices.',
+    bodyAr: 'دعم كامل للعربية والإنجليزية في المتجر وصفحة الدفع والإيميلات والإشعارات والفواتير.',
+  },
+  {
+    titleEn: 'Mobile PWA + push',
+    titleAr: 'تطبيق ويب وإشعارات فورية',
+    bodyEn:
+      'Customers install your store as a home-screen app and get push pings on order status and promotions.',
+    bodyAr:
+      'يثبّت العملاء متجرك كتطبيق على الشاشة الرئيسية ويتلقون إشعارات فورية بحالة الطلب والعروض.',
+  },
+  {
+    titleEn: 'Real-time admin',
+    titleAr: 'لوحة تحكم لحظية',
+    bodyEn:
+      'New orders ping your phone the moment they land. Switch stores, update products, fulfil orders from anywhere.',
+    bodyAr:
+      'الطلبات الجديدة تصل إلى هاتفك فور إرسالها. بدّل بين متاجرك، حدّث المنتجات، أنجز الطلبات من أي مكان.',
+  },
+];
+
+const SERVICES: Array<{ titleEn: string; titleAr: string; bodyEn: string; bodyAr: string }> = [
+  {
+    titleEn: 'Storefront design',
+    titleAr: 'تصميم المتجر',
+    bodyEn:
+      'Pick a template, customize colors, fonts, hero, sections — everything tenant-editable.',
+    bodyAr: 'اختر قالباً، خصص الألوان والخطوط والقسم الرئيسي والأقسام — كل شيء قابل للتعديل.',
+  },
+  {
+    titleEn: 'Product catalog',
+    titleAr: 'كتالوج المنتجات',
+    bodyEn: 'Categories, variants, images, SKUs, inventory tracking, bulk CSV/XLSX import.',
+    bodyAr: 'فئات، تنويعات، صور، أكواد SKU، تتبع مخزون، استيراد بالجملة من CSV/XLSX.',
+  },
+  {
+    titleEn: 'Cart & checkout',
+    titleAr: 'السلة والدفع',
+    bodyEn: 'Guest checkout, address book, coupons, shipping zones, tax rules, multi-currency.',
+    bodyAr: 'دفع للضيوف، دفتر عناوين، كوبونات، مناطق شحن، قواعد ضريبية، دعم عملات متعددة.',
+  },
+  {
+    titleEn: 'Order management',
+    titleAr: 'إدارة الطلبات',
+    bodyEn: 'Status workflow, refunds, returns, shipment tracking, automated invoices.',
+    bodyAr: 'مراحل الطلب، الاسترداد، المرتجعات، تتبع الشحنات، فواتير تلقائية.',
+  },
+  {
+    titleEn: 'Customer engagement',
+    titleAr: 'تواصل مع العملاء',
+    bodyEn: 'Wishlist, reviews, abandoned cart recovery, loyalty points, affiliate program.',
+    bodyAr: 'قائمة الأمنيات، التقييمات، استرجاع السلات المتروكة، نقاط الولاء، برنامج المسوقين.',
+  },
+  {
+    titleEn: 'Marketing pixels',
+    titleAr: 'بكسلات التسويق',
+    bodyEn: 'Meta, TikTok, Snapchat, GA4, GTM — wired in per-store, no code.',
+    bodyAr: 'ميتا، تيك توك، سناب شات، جوجل أناليتكس، GTM — كلها مفعّلة لكل متجر بدون كود.',
+  },
+  {
+    titleEn: 'SEO & speed',
+    titleAr: 'SEO والسرعة',
+    bodyEn: 'Per-store meta, sitemap, structured data, edge-cached storefront with sub-500ms p95.',
+    bodyAr: 'بيانات SEO لكل متجر، خريطة موقع، بيانات منظمة، تخزين مؤقت على الحافة لسرعة عالية.',
+  },
+  {
+    titleEn: 'Custom domain',
+    titleAr: 'نطاق مخصص',
+    bodyEn: 'Bring your own domain (e.g. yourshop.com) with automatic SSL and DNS guidance.',
+    bodyAr: 'استخدم نطاقك الخاص (مثل yourshop.com) مع شهادات SSL تلقائية ومساعدة في الإعدادات.',
+  },
+];
+
+const STEPS: Array<{
+  n: number;
+  titleEn: string;
+  titleAr: string;
+  bodyEn: string;
+  bodyAr: string;
+}> = [
+  {
+    n: 1,
+    titleEn: 'Discovery',
+    titleAr: 'التعرف على متجرك',
+    bodyEn: 'We learn your products, audience, and goals over a 30-min call.',
+    bodyAr: 'نتعرف على منتجاتك وعملائك وأهدافك في مكالمة مدتها 30 دقيقة.',
+  },
+  {
+    n: 2,
+    titleEn: 'Setup',
+    titleAr: 'الإعداد',
+    bodyEn: 'We provision your store, design the look, integrate payments, and load your catalog.',
+    bodyAr: 'نُجهّز متجرك، نصمم الواجهة، نربط وسائل الدفع، ونرفع كتالوج منتجاتك.',
+  },
+  {
+    n: 3,
+    titleEn: 'Launch',
+    titleAr: 'الإطلاق',
+    bodyEn: 'We train your team, run final QA, and go live. Ongoing support included.',
+    bodyAr: 'ندرّب فريقك، نُجري الاختبار النهائي، ونطلق المتجر. الدعم المستمر مشمول.',
+  },
+];
+
+const WHATSAPP_URL = 'https://wa.me/96566740311';
+const PHONE = '+965 66740311';
+const EMAIL = 'info@forcemediakw.com';
+const FORCE_MEDIA_URL = 'https://forcemediakw.com';
+
+interface PlatformLandingProps {
+  /**
+   * When set, renders a "Store not found" banner above the hero —
+   * used by the 404 page to signal that the URL was wrong without
+   * losing the rest of the platform pitch.
+   */
+  notFoundBanner?: boolean;
+}
+
+export function PlatformLanding({ notFoundBanner = false }: PlatformLandingProps) {
+  const [lang, setLang] = useState<Lang>('en');
+
+  useEffect(() => {
+    const saved =
+      typeof window !== 'undefined' ? window.localStorage.getItem('platform-lang') : null;
+    if (saved === 'ar' || saved === 'en') setLang(saved);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('platform-lang', lang);
+      document.documentElement.lang = lang;
+      document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+    }
+  }, [lang]);
+
+  const t = (e: { en: string; ar: string }) => e[lang];
+
+  return (
+    <div className="min-h-screen bg-white text-[#2C2C2C]" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+      {/* Header */}
+      <header className="sticky top-0 z-50 border-b border-gray-100 bg-white/90 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
+          <Link href="/" className="flex items-center gap-2">
+            <span
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-base font-extrabold text-white"
+              style={{ backgroundColor: ORANGE }}
+            >
+              F
+            </span>
+            <span className="text-lg font-bold tracking-tight">{t(COPY.brand)}</span>
+          </Link>
+          <nav className="hidden items-center gap-6 text-sm md:flex">
+            <a href="#services" className="text-gray-600 transition-colors hover:text-gray-900">
+              {t(COPY.navServices)}
+            </a>
+            <a href="#process" className="text-gray-600 transition-colors hover:text-gray-900">
+              {t(COPY.navProcess)}
+            </a>
+            <a href="#contact" className="text-gray-600 transition-colors hover:text-gray-900">
+              {t(COPY.navContact)}
+            </a>
+          </nav>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setLang(lang === 'en' ? 'ar' : 'en')}
+              className="rounded-md border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:border-gray-300"
+            >
+              {t(COPY.langToggle)}
+            </button>
+            <a
+              href={WHATSAPP_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hidden rounded-md px-4 py-1.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 sm:inline-block"
+              style={{ backgroundColor: ORANGE }}
+            >
+              {t(COPY.navStart)}
+            </a>
+          </div>
+        </div>
+      </header>
+
+      {notFoundBanner && (
+        <div className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-center text-sm text-amber-900">
+          <strong className="font-semibold">404 — </strong>
+          {lang === 'ar'
+            ? 'هذا المتجر غير موجود على منصتنا. تعرّف على ما نقدّمه أدناه.'
+            : 'That store doesn’t exist on our platform. Here’s what we offer.'}
+        </div>
+      )}
+
+      {/* Hero */}
+      <section className="relative overflow-hidden">
+        <div
+          className="absolute inset-0 -z-10 opacity-[0.03]"
+          style={{
+            backgroundImage: `radial-gradient(${ORANGE} 1px, transparent 1px)`,
+            backgroundSize: '24px 24px',
+          }}
+        />
+        <div className="mx-auto max-w-5xl px-4 py-20 text-center md:py-28">
+          <h1 className="mb-6 text-4xl font-extrabold leading-tight tracking-tight md:text-6xl">
+            {t(COPY.heroTitle)}
+          </h1>
+          <p className="mx-auto mb-10 max-w-2xl text-lg text-gray-600 md:text-xl">
+            {t(COPY.heroSubtitle)}
+          </p>
+          <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <a
+              href={WHATSAPP_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-lg px-6 py-3 text-base font-semibold text-white shadow-lg transition-opacity hover:opacity-90"
+              style={{ backgroundColor: ORANGE }}
+            >
+              {t(COPY.heroCta1)}
+            </a>
+            <a
+              href={`mailto:${EMAIL}`}
+              className="inline-flex items-center gap-2 rounded-lg border-2 px-6 py-3 text-base font-semibold transition-colors"
+              style={{ borderColor: ORANGE, color: ORANGE }}
+            >
+              {t(COPY.heroCta2)}
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* Why */}
+      <section className="bg-gray-50 py-20">
+        <div className="mx-auto max-w-6xl px-4">
+          <div className="mb-12 text-center">
+            <h2 className="mb-3 text-3xl font-bold md:text-4xl">{t(COPY.whySectionTitle)}</h2>
+            <div className="mx-auto h-1 w-16 rounded" style={{ backgroundColor: ORANGE }} />
+            <p className="mx-auto mt-4 max-w-2xl text-gray-600">{t(COPY.whySectionSubtitle)}</p>
+          </div>
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+            {FEATURES.map((f, i) => (
+              <div key={i} className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+                <div
+                  className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg text-sm font-bold text-white"
+                  style={{ backgroundColor: ORANGE }}
+                >
+                  {i + 1}
+                </div>
+                <h3 className="mb-2 text-lg font-bold">{lang === 'ar' ? f.titleAr : f.titleEn}</h3>
+                <p className="text-sm text-gray-600">{lang === 'ar' ? f.bodyAr : f.bodyEn}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Services */}
+      <section id="services" className="py-20">
+        <div className="mx-auto max-w-6xl px-4">
+          <div className="mb-12 text-center">
+            <h2 className="mb-3 text-3xl font-bold md:text-4xl">{t(COPY.servicesTitle)}</h2>
+            <div className="mx-auto h-1 w-16 rounded" style={{ backgroundColor: ORANGE }} />
+            <p className="mx-auto mt-4 max-w-2xl text-gray-600">{t(COPY.servicesSubtitle)}</p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {SERVICES.map((s, i) => (
+              <div
+                key={i}
+                className="rounded-xl border border-gray-100 bg-white p-5 transition-shadow hover:shadow-md"
+              >
+                <h3 className="mb-2 text-base font-bold" style={{ color: ORANGE }}>
+                  {lang === 'ar' ? s.titleAr : s.titleEn}
+                </h3>
+                <p className="text-sm text-gray-600">{lang === 'ar' ? s.bodyAr : s.bodyEn}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Process */}
+      <section id="process" className="bg-gray-50 py-20">
+        <div className="mx-auto max-w-5xl px-4">
+          <div className="mb-12 text-center">
+            <h2 className="mb-3 text-3xl font-bold md:text-4xl">{t(COPY.processTitle)}</h2>
+            <div className="mx-auto h-1 w-16 rounded" style={{ backgroundColor: ORANGE }} />
+            <p className="mx-auto mt-4 max-w-2xl text-gray-600">{t(COPY.processSubtitle)}</p>
+          </div>
+          <div className="grid gap-6 md:grid-cols-3">
+            {STEPS.map((s, i) => (
+              <div key={i} className="relative rounded-xl bg-white p-6 shadow-sm">
+                <div
+                  className="mb-4 flex h-12 w-12 items-center justify-center rounded-full text-lg font-extrabold text-white"
+                  style={{ backgroundColor: ORANGE }}
+                >
+                  {s.n}
+                </div>
+                <h3 className="mb-2 text-xl font-bold">{lang === 'ar' ? s.titleAr : s.titleEn}</h3>
+                <p className="text-sm text-gray-600">{lang === 'ar' ? s.bodyAr : s.bodyEn}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Marketing callout */}
+      <section className="py-20">
+        <div className="mx-auto max-w-4xl px-4">
+          <div
+            className="overflow-hidden rounded-2xl p-8 text-white shadow-xl md:p-12"
+            style={{
+              background: `linear-gradient(135deg, ${ORANGE_DARK}, ${ORANGE})`,
+            }}
+          >
+            <h2 className="mb-3 text-2xl font-bold md:text-3xl">{t(COPY.marketingCalloutTitle)}</h2>
+            <p className="mb-6 text-base opacity-95 md:text-lg">{t(COPY.marketingCalloutBody)}</p>
+            <a
+              href={FORCE_MEDIA_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-lg bg-white px-6 py-3 text-sm font-semibold transition-opacity hover:opacity-90"
+              style={{ color: ORANGE }}
+            >
+              {t(COPY.marketingCalloutCta)}
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* Contact */}
+      <section id="contact" className="bg-gray-50 py-20">
+        <div className="mx-auto max-w-4xl px-4">
+          <div className="mb-12 text-center">
+            <h2 className="mb-3 text-3xl font-bold md:text-4xl">{t(COPY.contactTitle)}</h2>
+            <div className="mx-auto h-1 w-16 rounded" style={{ backgroundColor: ORANGE }} />
+            <p className="mx-auto mt-4 max-w-xl text-gray-600">{t(COPY.contactSubtitle)}</p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-3">
+            <a
+              href={WHATSAPP_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex flex-col items-center gap-2 rounded-xl border border-gray-100 bg-white p-6 text-center transition-shadow hover:shadow-md"
+            >
+              <span className="text-2xl">💬</span>
+              <span className="text-xs uppercase tracking-wide text-gray-500">WhatsApp</span>
+              <span className="font-semibold" style={{ color: ORANGE }} dir="ltr">
+                {PHONE}
+              </span>
+            </a>
+            <a
+              href={`mailto:${EMAIL}`}
+              className="flex flex-col items-center gap-2 rounded-xl border border-gray-100 bg-white p-6 text-center transition-shadow hover:shadow-md"
+            >
+              <span className="text-2xl">✉</span>
+              <span className="text-xs uppercase tracking-wide text-gray-500">Email</span>
+              <span className="font-semibold" style={{ color: ORANGE }} dir="ltr">
+                {EMAIL}
+              </span>
+            </a>
+            <div className="flex flex-col items-center gap-2 rounded-xl border border-gray-100 bg-white p-6 text-center">
+              <span className="text-2xl">📍</span>
+              <span className="text-xs uppercase tracking-wide text-gray-500">
+                {lang === 'ar' ? 'العنوان' : 'Office'}
+              </span>
+              <span className="text-sm font-medium">{t(COPY.contactAddress)}</span>
+              <span className="text-xs text-gray-500">{t(COPY.contactCity)}</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="border-t border-gray-100 bg-white py-10">
+        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 text-sm text-gray-500 md:flex-row">
+          <div className="flex items-center gap-2">
+            <span
+              className="flex h-7 w-7 items-center justify-center rounded text-xs font-extrabold text-white"
+              style={{ backgroundColor: ORANGE }}
+            >
+              F
+            </span>
+            <span className="font-semibold text-gray-700">{t(COPY.brand)}</span>
+            <span className="hidden md:inline">— {t(COPY.footerTagline)}</span>
+          </div>
+          <div className="flex items-center gap-4">
+            <a
+              href={FORCE_MEDIA_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-gray-700"
+            >
+              forcemediakw.com
+            </a>
+            <span className="text-xs">{t(COPY.footerCopyright)}</span>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+}

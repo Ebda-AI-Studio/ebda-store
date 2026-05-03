@@ -18,18 +18,6 @@ const PLATFORM_HOSTS = new Set([
 ]);
 
 /**
- * Platform hosts where a bare-root request (path `/`) should redirect to the
- * marketing site instead of rendering the storefront's no-store fallback.
- * This is what kills the "Force Demo Store" UX on the storefront platform
- * domain — customers landing on `https://store.forcemediakw.com` are sent
- * straight to the marketing site rather than seeing a placeholder store.
- *
- * Localhost is intentionally excluded so dev still works with the fallback.
- */
-const PLATFORM_ROOT_REDIRECT_HOSTS = new Set(['store.forcemediakw.com']);
-const PLATFORM_ROOT_REDIRECT_TARGET = 'https://forcemediakw.com';
-
-/**
  * Hosting provider suffixes — any subdomain is platform (preview deploys, tunnels).
  * These are used for development/staging only. Production custom domains never
  * end with these suffixes.
@@ -120,42 +108,15 @@ function extractStoreSlug(pathname: string): { slug: string; rewrittenPath: stri
 
 export function middleware(request: NextRequest) {
   const hostname = request.headers.get('host') || '';
-  const host = hostname.split(':')[0].toLowerCase();
   const storeIdentifier = getStoreIdentifier(hostname);
 
-  // Bare root on the production storefront platform domain — redirect to
-  // the marketing site so customers never land on a placeholder store.
-  //
-  // CRITICAL: only redirect on a real top-level navigation, not on
-  // fetches. When a customer is on a deep page (e.g. /<slug>/products)
-  // and Next's client router prefetches data for `/`, it issues an RSC
-  // fetch like `store.forcemediakw.com/?_rsc=xxx`. CORS refuses to
-  // follow a 302 to a different origin, so the redirect surfaced as
-  // "Redirect is not allowed for a preflight request" and broke
-  // every client-side product / checkout navigation.
-  //
-  // We use `Sec-Fetch-Mode` + `Sec-Fetch-Dest` because they're set by
-  // the browser, can't be spoofed, and reliably distinguish a real
-  // address-bar / link navigation from any kind of background fetch.
-  // Defensive fallback: also bail on the legacy `_rsc` query / `rsc:1`
-  // / `next-router-prefetch:1` indicators, in case a browser ever
-  // omits Sec-Fetch-* headers.
-  if (PLATFORM_ROOT_REDIRECT_HOSTS.has(host) && request.nextUrl.pathname === '/') {
-    const fetchMode = request.headers.get('sec-fetch-mode');
-    const fetchDest = request.headers.get('sec-fetch-dest');
-    const looksLikeFetch =
-      // Any non-navigate fetch mode: cors, no-cors, same-origin, websocket
-      (fetchMode && fetchMode !== 'navigate') ||
-      // Any non-document destination: empty (fetch), script, style, image, etc.
-      (fetchDest && fetchDest !== 'document') ||
-      // Legacy / Next-specific signals
-      request.nextUrl.searchParams.has('_rsc') ||
-      request.headers.get('rsc') === '1' ||
-      request.headers.get('next-router-prefetch') === '1';
-    if (!looksLikeFetch) {
-      return NextResponse.redirect(PLATFORM_ROOT_REDIRECT_TARGET, 302);
-    }
-  }
+  // Bare root on `store.forcemediakw.com` no longer redirects to
+  // forcemediakw.com — the homepage now serves a dedicated Force
+  // Store Builder landing page (apps/web/src/components/PlatformLanding.tsx)
+  // and unknown slugs render the same component as a 404 via
+  // app/not-found.tsx. The redirect was lossy: customers learning
+  // about the store-builder platform got dumped onto the parent
+  // marketing site that pitches a different service.
 
   // Clone the request headers
   const requestHeaders = new Headers(request.headers);

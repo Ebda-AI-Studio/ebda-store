@@ -3,6 +3,7 @@ import { API_URL } from '../lib/api';
 import type { Product, Category } from '../lib/api';
 import { resolveLayoutSettings, type StoreLayoutSettings } from '@force/shared';
 import { HomePageContent } from './HomePageContent';
+import { PlatformLanding } from '../components/PlatformLanding';
 
 /**
  * Server-side data fetch for the homepage. Mirrors the pattern in
@@ -137,6 +138,16 @@ async function fetchLayoutSettings(storeId: string): Promise<StoreLayoutSettings
 
 export default async function HomePage() {
   const store = await getStoreOrNotFound();
+
+  // Bare-root on a platform domain (no slug, no custom domain) —
+  // serve the Force Store Builder landing page instead of a merchant
+  // homepage. Replaces the old "redirect to forcemediakw.com" flow
+  // because the marketing site doesn't actually pitch the store-
+  // builder service this URL belongs to.
+  if (store.id === 'demo') {
+    return <PlatformLanding />;
+  }
+
   const layout = await fetchLayoutSettings(store.id);
   const { featuredProducts, newArrivals, bestSellers, categories, testimonials } =
     await fetchHomepageData(store, layout);
