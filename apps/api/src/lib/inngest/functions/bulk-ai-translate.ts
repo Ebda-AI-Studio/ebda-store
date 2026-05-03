@@ -17,6 +17,12 @@ import { inngest } from '../client';
  */
 const ERROR_CAP = 50;
 
+// Gemini free tier is 15 req/min. Pace bulk calls at one every 5s
+// (= 12 RPM) so the per-minute cap never fires mid-sweep. See same
+// constant + docstring in bulk-ai-seo.ts.
+const THROTTLE_MS = parseInt(process.env.AI_BULK_THROTTLE_MS || '5000', 10);
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 interface BulkError {
   entityKind: 'product' | 'category' | 'store';
   entityId: string;
@@ -121,6 +127,7 @@ export const bulkAiTranslate: InngestFunction.Any = inngest.createFunction(
             });
             updates[fillTo === 'ar' ? 'nameAr' : 'name'] = r.translation;
             filled++;
+            await sleep(THROTTLE_MS);
           } catch (err) {
             await recordError({
               entityKind: 'product',
@@ -146,6 +153,7 @@ export const bulkAiTranslate: InngestFunction.Any = inngest.createFunction(
             });
             updates[fillTo === 'ar' ? 'descriptionAr' : 'description'] = r.translation;
             filled++;
+            await sleep(THROTTLE_MS);
           } catch (err) {
             await recordError({
               entityKind: 'product',
@@ -204,6 +212,7 @@ export const bulkAiTranslate: InngestFunction.Any = inngest.createFunction(
           });
           updates[fillTo === 'ar' ? 'nameAr' : 'name'] = r.translation;
           filled++;
+          await sleep(THROTTLE_MS);
         } catch (err) {
           await recordError({
             entityKind: 'category',
@@ -227,6 +236,7 @@ export const bulkAiTranslate: InngestFunction.Any = inngest.createFunction(
           });
           updates[fillTo === 'ar' ? 'descriptionAr' : 'description'] = r.translation;
           filled++;
+          await sleep(THROTTLE_MS);
         } catch (err) {
           await recordError({
             entityKind: 'category',
@@ -272,6 +282,7 @@ export const bulkAiTranslate: InngestFunction.Any = inngest.createFunction(
           });
           updates[fillTo === 'ar' ? 'nameAr' : 'name'] = r.translation;
           filled++;
+          await sleep(THROTTLE_MS);
         } catch (err) {
           await recordError({
             entityKind: 'store',
@@ -295,6 +306,7 @@ export const bulkAiTranslate: InngestFunction.Any = inngest.createFunction(
           });
           updates[fillTo === 'ar' ? 'descriptionAr' : 'description'] = r.translation;
           filled++;
+          await sleep(THROTTLE_MS);
         } catch (err) {
           await recordError({
             entityKind: 'store',

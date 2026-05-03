@@ -13,6 +13,13 @@ import { inngest } from '../client';
  */
 const ERROR_CAP = 50;
 
+// Gemini free tier is 15 req/min. We pace bulk calls at one every
+// 5 seconds (= 12 RPM) so the per-minute cap never fires mid-sweep.
+// A 232-product sweep takes ~20 min instead of failing at minute 1.
+// Override via env if the operator has upgraded to paid quota.
+const THROTTLE_MS = parseInt(process.env.AI_BULK_THROTTLE_MS || '5000', 10);
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 interface BulkError {
   entityKind: 'product' | 'category' | 'store';
   entityId: string;
@@ -125,6 +132,7 @@ export const bulkAiSeo: InngestFunction.Any = inngest.createFunction(
           },
         });
         filled++;
+        await sleep(THROTTLE_MS);
       } catch (err) {
         await recordError({
           entityKind: 'store',
@@ -208,6 +216,9 @@ export const bulkAiSeo: InngestFunction.Any = inngest.createFunction(
               },
             });
             filled++;
+            // Throttle to stay under the free-tier 15 RPM. Only sleep
+            // after a real call — skipped entities pass through fast.
+            await sleep(THROTTLE_MS);
           } catch (err) {
             await recordError({
               entityKind: 'product',
