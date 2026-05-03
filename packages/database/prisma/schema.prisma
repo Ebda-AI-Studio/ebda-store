@@ -284,6 +284,7 @@ model Store {
   affiliateConfig          AffiliateConfig?
   pages                    StorePage[]
   bulkImportJobs           BulkImportJob[]
+  aiUsage                  AiUsage[]
 
   @@index([ownerId])
   @@index([status])
@@ -1739,4 +1740,25 @@ enum BulkImportStatus {
   running
   completed
   failed
+}
+
+// Tracks every AI call made on behalf of a store so we can enforce
+// per-store daily token budgets, audit usage, and bill (if/when we
+// charge for it). `cachedHit=true` means the AI service returned a
+// cached answer and didn't actually call the model — counted for
+// observability but not against the token budget.
+model AiUsage {
+  id           String   @id @default(uuid())
+  storeId      String   @map("store_id")
+  feature      String // 'translate' | 'seo' | 'categorize'
+  inputTokens  Int      @default(0) @map("input_tokens")
+  outputTokens Int      @default(0) @map("output_tokens")
+  cachedHit    Boolean  @default(false) @map("cached_hit")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId, createdAt(sort: Desc)])
+  @@index([feature])
+  @@map("ai_usage")
 }

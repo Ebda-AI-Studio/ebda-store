@@ -7,6 +7,7 @@ import { useT } from '@/i18n/useT';
 import Link from 'next/link';
 import { AdminLayout } from '../../../../../../components/AdminLayout';
 import { MultiImageUpload } from '../../../../../../components/ImageUpload';
+import { AITranslateButton } from '../../../../../../components/AITranslateButton';
 import { useAuth } from '../../../../../../lib/auth';
 import { apiGet, apiPut } from '../../../../../../lib/api';
 import { EditSidebar } from './_components/EditSidebar';
@@ -337,14 +338,34 @@ export default function EditProductPage() {
                   placeholder={tFields('namePlaceholder')}
                   required
                 />
-                <Input
-                  label={tFields('nameAr')}
-                  value={formData.nameAr}
-                  onChange={e => updateField('nameAr', e.target.value)}
-                  placeholder={tFields('nameArPlaceholder')}
-                  lang="ar"
-                  dir="rtl"
-                />
+                <div>
+                  <Input
+                    label={tFields('nameAr')}
+                    value={formData.nameAr}
+                    onChange={e => updateField('nameAr', e.target.value)}
+                    placeholder={tFields('nameArPlaceholder')}
+                    lang="ar"
+                    dir="rtl"
+                  />
+                  <div className="mt-1.5 flex gap-2">
+                    <AITranslateButton
+                      storeId={storeId}
+                      source={formData.name}
+                      from="en"
+                      to="ar"
+                      kind="product-name"
+                      onResult={value => updateField('nameAr', value)}
+                    />
+                    <AITranslateButton
+                      storeId={storeId}
+                      source={formData.nameAr}
+                      from="ar"
+                      to="en"
+                      kind="product-name"
+                      onResult={value => updateField('name', value)}
+                    />
+                  </div>
+                </div>
                 <Textarea
                   label={tFields('description')}
                   value={formData.description}
@@ -352,15 +373,35 @@ export default function EditProductPage() {
                   placeholder={tFields('descriptionPlaceholder')}
                   rows={4}
                 />
-                <Textarea
-                  label={tFields('descriptionAr')}
-                  value={formData.descriptionAr}
-                  onChange={e => updateField('descriptionAr', e.target.value)}
-                  placeholder={tFields('descriptionArPlaceholder')}
-                  rows={4}
-                  lang="ar"
-                  dir="rtl"
-                />
+                <div>
+                  <Textarea
+                    label={tFields('descriptionAr')}
+                    value={formData.descriptionAr}
+                    onChange={e => updateField('descriptionAr', e.target.value)}
+                    placeholder={tFields('descriptionArPlaceholder')}
+                    rows={4}
+                    lang="ar"
+                    dir="rtl"
+                  />
+                  <div className="mt-1.5 flex gap-2">
+                    <AITranslateButton
+                      storeId={storeId}
+                      source={formData.description ?? ''}
+                      from="en"
+                      to="ar"
+                      kind="product-description"
+                      onResult={value => updateField('descriptionAr', value)}
+                    />
+                    <AITranslateButton
+                      storeId={storeId}
+                      source={formData.descriptionAr ?? ''}
+                      from="ar"
+                      to="en"
+                      kind="product-description"
+                      onResult={value => updateField('description', value)}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 

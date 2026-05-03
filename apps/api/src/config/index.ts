@@ -153,6 +153,18 @@ export const config = {
   backupRetentionDays: parseInt(process.env.BACKUP_RETENTION_DAYS || '30', 10),
   backupS3Bucket: process.env.BACKUP_S3_BUCKET || '',
 
+  // AI features — Force Store AI assistant uses Google Gemini 2.0 Flash
+  // for translation, SEO meta generation, and category suggestions.
+  // Free tier covers 15 req/min and ~1500 req/day per project, which
+  // is well above what a single store will use. `AI_FEATURES_ENABLED`
+  // is a kill switch in case the free tier rate-limits us during a
+  // launch and we need to disable cleanly without redeploying.
+  // `AI_DAILY_TOKEN_BUDGET_PER_STORE` caps a single tenant's usage so
+  // a runaway script can't burn the shared free quota.
+  googleAiKey: process.env.GOOGLE_GENERATIVE_AI_KEY || '',
+  aiFeaturesEnabled: process.env.AI_FEATURES_ENABLED !== 'false',
+  aiDailyTokenBudgetPerStore: parseInt(process.env.AI_DAILY_TOKEN_BUDGET_PER_STORE || '200000', 10),
+
   // Inngest — durable async job queue for fan-out work that doesn't
   // need to block the request (post-order push/email, bulk imports,
   // PDF generation). When `INNGEST_EVENT_KEY` is unset the client
