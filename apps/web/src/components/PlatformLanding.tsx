@@ -34,53 +34,56 @@ const COPY = {
   navStart: { en: 'Get started', ar: 'ابدأ الآن' },
 
   heroTitle: {
-    en: 'Launch your online store in Kuwait',
-    ar: 'أطلق متجرك الإلكتروني في الكويت',
+    en: 'Sell more in Kuwait, with less hassle',
+    ar: 'بيع أكثر في الكويت، بمجهود أقل',
   },
   heroSubtitle: {
-    en: 'An e-commerce platform built for Kuwait merchants who want more than a Shopify subscription — bilingual by default, mobile PWA with iOS push, real-time operator dashboard, and a multi-tenant architecture priced for the local market.',
-    ar: 'منصة تجارة إلكترونية مصممة للتجار في الكويت الذين يريدون أكثر من اشتراك Shopify — بلغتين منذ البداية، تطبيق ويب للجوال مع إشعارات iOS، لوحة تحكم لحظية للمتاجر، وبنية متعددة المتاجر بأسعار السوق المحلي.',
+    en: 'A done-for-you online store that handles the boring parts — payments, delivery, taxes, customer accounts — so you can focus on products, marketing, and growing your sales.',
+    ar: 'متجر إلكتروني نُجهّزه لك يتولى المهام الرتيبة — الدفع، التوصيل، الضرائب، حسابات العملاء — حتى تتفرغ لمنتجاتك وتسويقك ونمو مبيعاتك.',
   },
   heroCta1: { en: 'Talk on WhatsApp', ar: 'تواصل عبر واتساب' },
   heroCta2: { en: 'Email us', ar: 'راسلنا بالبريد' },
 
   whySectionTitle: {
-    en: 'Built for Kuwait merchants',
-    ar: 'مصممة للتجار في الكويت',
+    en: 'What changes when you sell here',
+    ar: 'ما الذي يتغيّر عندما تبيع معنا',
   },
   whySectionSubtitle: {
-    en: 'Every piece tuned for the way Kuwaiti shoppers buy and Kuwaiti merchants operate.',
-    ar: 'كل التفاصيل مهيأة لطريقة شراء العملاء في الكويت وطريقة عمل التجار المحليين.',
+    en: 'Concrete outcomes for the way Kuwaiti shoppers buy and Kuwaiti merchants operate.',
+    ar: 'نتائج ملموسة تناسب طريقة شراء العملاء في الكويت وطريقة عمل التجار المحليين.',
   },
 
-  servicesTitle: { en: 'What we do', ar: 'خدماتنا' },
+  servicesTitle: { en: 'Everything your store needs', ar: 'كل ما يحتاجه متجرك' },
   servicesSubtitle: {
-    en: 'A full storefront platform end-to-end — you focus on products, we handle the rest.',
-    ar: 'منصة متجر متكاملة من البداية للنهاية — أنت تركز على منتجاتك، ونحن نتولى الباقي.',
+    en: 'You focus on products and customers. We handle the rest.',
+    ar: 'أنت تركز على منتجاتك وعملائك. نحن نتولى الباقي.',
   },
 
-  processTitle: { en: 'How it works', ar: 'كيف نعمل' },
+  processTitle: { en: 'From idea to live store, in days', ar: 'من الفكرة لمتجر يبيع، خلال أيام' },
   processSubtitle: {
-    en: 'From first conversation to live store, in days not months.',
-    ar: 'من أول محادثة حتى إطلاق المتجر، بأيام لا أشهر.',
+    en: 'No long onboarding. No monthly waiting. You talk to us, we build, you sell.',
+    ar: 'لا انتظار طويل للإعداد. تتحدث معنا، نبني، أنت تبيع.',
   },
 
-  integrationsTitle: { en: 'Plays well with', ar: 'يتكامل مع' },
+  integrationsTitle: { en: 'Works with what you already use', ar: 'يعمل مع الأدوات التي تستخدمها' },
   integrationsSubtitle: {
-    en: 'Pre-wired with the providers Kuwait merchants actually use.',
-    ar: 'جاهز للعمل مع مزودي الخدمات الذين يستخدمهم التجار في الكويت.',
+    en: 'The payment, shipping, and marketing services Kuwaiti merchants run on — already connected.',
+    ar: 'خدمات الدفع والشحن والتسويق التي يعتمد عليها التجار في الكويت — كلها متصلة بالفعل.',
   },
 
-  audienceTitle: { en: 'Who this is for', ar: 'لمن هذه المنصة' },
+  audienceTitle: { en: 'Who sells with us', ar: 'من يبيع معنا' },
   audienceSubtitle: {
-    en: 'B2C storefronts and B2B catalogues — same codebase, different toggle.',
-    ar: 'متاجر بيع للمستهلك ومتاجر بيع بالجملة — نفس المنصة، إعدادات مختلفة.',
+    en: 'Whether you sell to shoppers or to other businesses — we’ve got you covered.',
+    ar: 'سواء كنت تبيع للمستهلكين أو للشركات الأخرى — نحن نغطّيك.',
   },
 
-  includedTitle: { en: 'What’s included', ar: 'ما الذي يشمله الاشتراك' },
+  includedTitle: {
+    en: 'You get a working store, not a checklist',
+    ar: 'تحصل على متجر يعمل، لا قائمة مهام',
+  },
   includedSubtitle: {
-    en: 'You get a working store, not a checklist.',
-    ar: 'تحصل على متجر يعمل فعلياً، ليس مجرد قائمة مهام.',
+    en: 'Most platforms hand you a self-serve dashboard and disappear. We set everything up with you.',
+    ar: 'معظم المنصات تعطيك لوحة تحكم وتختفي. نحن نُجهّز كل شيء معك.',
   },
 
   marketingCalloutTitle: {
@@ -98,22 +101,22 @@ const COPY = {
     ar: 'لديك قائمة عملاء جاهزة؟',
   },
   wbsCalloutBody: {
-    en: 'Force Bulk WhatsApp is our sister product for sending personalised WhatsApp campaigns to hundreds or thousands of contacts at once — order updates, promo blasts, abandoned-cart recovery. Bundle it with your store and we’ll wire your customer list into it on day one.',
-    ar: 'Force Bulk WhatsApp هو منتجنا الشقيق لإرسال حملات واتساب مخصصة لمئات أو آلاف العملاء دفعة واحدة — تحديثات الطلبات، عروض ترويجية، استرجاع السلات المتروكة. اشترك معه مع متجرك ونربط قائمة عملائك من اليوم الأول.',
+    en: 'Force WhatsApp Business Platform is our sister product. Send personalised WhatsApp campaigns to hundreds or thousands of customers at once — promotions, order updates, abandoned-cart reminders. Bundle it with your store and we’ll connect your customer list on day one.',
+    ar: 'منصة فورس لأعمال واتساب هي منتجنا الشقيق. أرسل حملات واتساب مخصصة لمئات أو آلاف العملاء دفعة واحدة — عروض، تحديثات طلبات، تذكير بالسلات المتروكة. اشترك معه مع متجرك ونربط قائمة عملائك من اليوم الأول.',
   },
   wbsCalloutCta: { en: 'Ask about the bundle', ar: 'اسأل عن الباقة المشتركة' },
 
   contactTitle: { en: 'Get in touch', ar: 'تواصل معنا' },
   contactSubtitle: {
-    en: 'Tell us about your products, your timeline, and your budget. We’ll come back with a plan in 24 hours.',
-    ar: 'أخبرنا عن منتجاتك وجدولك الزمني وميزانيتك. سنعود إليك بخطة خلال 24 ساعة.',
+    en: 'Tell us what you sell. We come back in 24 hours with a clear plan and a price.',
+    ar: 'أخبرنا ماذا تبيع. سنعود إليك خلال 24 ساعة بخطة واضحة وسعر محدد.',
   },
   contactAddress: { en: 'Sanam Tower, Floor 33', ar: 'برج سنام، الدور 33' },
   contactCity: { en: 'Fahad Al-Salem Street, Kuwait City', ar: 'شارع فهد السالم، مدينة الكويت' },
 
   footerTagline: {
-    en: 'The store builder behind Kuwait’s best independent shops.',
-    ar: 'منصة بناء المتاجر خلف أفضل المتاجر المستقلة في الكويت.',
+    en: 'Online stores, done for you, in Kuwait.',
+    ar: 'متاجر إلكترونية، نُجهّزها لك، في الكويت.',
   },
   footerCopyright: {
     en: '© 2026 Force Media Kuwait. All rights reserved.',
@@ -123,90 +126,102 @@ const COPY = {
 
 const FEATURES: Array<{ titleEn: string; titleAr: string; bodyEn: string; bodyAr: string }> = [
   {
-    titleEn: 'Bilingual without compromises',
-    titleAr: 'بلغتين بدون تنازلات',
+    titleEn: 'Reach Arabic and English customers equally',
+    titleAr: 'اوصل لعملاء العربية والإنجليزية بنفس الجودة',
     bodyEn:
-      'Arabic and English are first-class throughout — schema, checkout, emails, push, invoices, SEO meta. Not a translation plugin grafted on top.',
+      'Your store, checkout, receipts, and notifications all speak both languages naturally. No customer drops off because the page reads wrong.',
     bodyAr:
-      'العربية والإنجليزية مدعومتان بالكامل في كل تفاصيل المنصة — قاعدة البيانات والدفع والإيميلات والإشعارات والفواتير. ليست مجرد إضافة ترجمة.',
+      'متجرك وصفحة الدفع والإيصالات والإشعارات بلغتين بشكل طبيعي. لا تخسر عميلاً لأن الصفحة تقرأ بشكل خاطئ.',
   },
   {
-    titleEn: 'iOS push that actually works',
-    titleAr: 'إشعارات iOS تعمل فعلاً',
+    titleEn: 'Bring customers back without paying for ads',
+    titleAr: 'أعد عملاءك بدون مصاريف إعلانات',
     bodyEn:
-      'Web push on iPhone is hard — we run two OneSignal apps, branded opt-in, and a tested install-to-home-screen flow. Customers get pinged when their order ships.',
+      'Send promotions and order updates straight to their phones — even on iPhone. Repeat sales without spending on Meta or TikTok every time.',
     bodyAr:
-      'إشعارات الويب على iPhone صعبة — نشغّل تطبيقين من OneSignal وحوار اشتراك مخصص وتدفق تثبيت مجرّب على الشاشة الرئيسية. العملاء يصلهم تنبيه فور شحن طلبهم.',
+      'أرسل العروض وتحديثات الطلبات مباشرة إلى هواتفهم — حتى على iPhone. مبيعات متكررة بدون صرف على ميتا أو تيك توك في كل مرة.',
   },
   {
-    titleEn: 'Operator-grade dashboard',
-    titleAr: 'لوحة تحكم احترافية',
+    titleEn: 'Manage everything from your phone',
+    titleAr: 'أدر كل شيء من هاتفك',
     bodyEn:
-      'New orders push to your phone the second checkout completes. Bulk import 5k products, manage variants, fulfil orders, all from a PWA installed to your home screen.',
+      'A new order? Your phone buzzes. Update a price, change stock, refund a customer, all from your home-screen app — wherever you are.',
     bodyAr:
-      'الطلبات الجديدة ترسل إلى هاتفك لحظة إتمام الدفع. استيراد 5 آلاف منتج، إدارة التنويعات، إنجاز الطلبات — من تطبيق على شاشتك الرئيسية.',
+      'طلب جديد؟ هاتفك يرنّ. عدّل سعراً، غيّر مخزوناً، استرد لعميل — كل ذلك من تطبيق على شاشتك الرئيسية، أينما كنت.',
   },
   {
-    titleEn: 'Multi-tenant by design',
-    titleAr: 'متعدد المتاجر منذ التصميم',
+    titleEn: 'Run several brands from one place',
+    titleAr: 'شغّل عدة علامات تجارية من مكان واحد',
     bodyEn:
-      'Run several brands or pilot a new line without paying for a separate Shopify subscription each time. Tenant isolation enforced at the database level.',
+      'Selling more than one brand or product line? Open a second store without paying double. Switch between them with one tap.',
     bodyAr:
-      'شغّل عدة علامات تجارية أو جرّب خط منتجات جديد بدون اشتراك Shopify مستقل لكل واحد. عزل المتاجر مفروض على مستوى قاعدة البيانات.',
+      'تبيع أكثر من علامة تجارية أو خط منتجات؟ افتح متجراً ثانياً بدون دفع ضعف الاشتراك. التبديل بنقرة واحدة.',
   },
 ];
 
 const SERVICES: Array<{ titleEn: string; titleAr: string; bodyEn: string; bodyAr: string }> = [
   {
-    titleEn: 'Storefront design',
-    titleAr: 'تصميم المتجر',
+    titleEn: 'A store that looks the part',
+    titleAr: 'متجر بمظهر احترافي',
     bodyEn:
-      'Pick a template, customize colors, fonts, hero, sections — everything tenant-editable.',
-    bodyAr: 'اختر قالباً، خصص الألوان والخطوط والقسم الرئيسي والأقسام — كل شيء قابل للتعديل.',
-  },
-  {
-    titleEn: 'Product catalog',
-    titleAr: 'كتالوج المنتجات',
-    bodyEn: 'Categories, variants, images, SKUs, inventory tracking, bulk CSV/XLSX import.',
-    bodyAr: 'فئات، تنويعات، صور، أكواد SKU، تتبع مخزون، استيراد بالجملة من CSV/XLSX.',
-  },
-  {
-    titleEn: 'Cart & checkout',
-    titleAr: 'السلة والدفع',
-    bodyEn: 'Guest checkout, address book, coupons, shipping zones, tax rules, multi-currency.',
-    bodyAr: 'دفع للضيوف، دفتر عناوين، كوبونات، مناطق شحن، قواعد ضريبية، دعم عملات متعددة.',
-  },
-  {
-    titleEn: 'Order management',
-    titleAr: 'إدارة الطلبات',
-    bodyEn: 'Status workflow, refunds, returns, shipment tracking, automated invoices.',
-    bodyAr: 'مراحل الطلب، الاسترداد، المرتجعات، تتبع الشحنات، فواتير تلقائية.',
-  },
-  {
-    titleEn: 'Customer engagement',
-    titleAr: 'تواصل مع العملاء',
-    bodyEn: 'Wishlist, reviews, abandoned cart recovery, loyalty points, affiliate program.',
-    bodyAr: 'قائمة الأمنيات، التقييمات، استرجاع السلات المتروكة، نقاط الولاء، برنامج المسوقين.',
-  },
-  {
-    titleEn: 'Marketing pixels',
-    titleAr: 'بكسلات التسويق',
-    bodyEn: 'Meta, TikTok, Snapchat, GA4, GTM — wired in per-store, no code.',
-    bodyAr: 'ميتا، تيك توك، سناب شات، جوجل أناليتكس، GTM — كلها مفعّلة لكل متجر بدون كود.',
-  },
-  {
-    titleEn: 'SEO & speed',
-    titleAr: 'SEO والسرعة',
-    bodyEn:
-      'Per-store meta, sitemap, structured data, and a Vercel edge-cached storefront for fast page loads.',
+      'Clean, modern designs your customers trust. Pick the template, tweak colours and copy until it feels like your brand.',
     bodyAr:
-      'بيانات SEO لكل متجر، خريطة موقع، بيانات منظمة، وتخزين مؤقت على Vercel Edge لتحميل سريع.',
+      'تصاميم نظيفة وعصرية تكسب ثقة عملاءك. اختر القالب، عدّل الألوان والنصوص حتى يعكس علامتك.',
   },
   {
-    titleEn: 'Custom domain',
-    titleAr: 'نطاق مخصص',
-    bodyEn: 'Bring your own domain (e.g. yourshop.com) with automatic SSL and DNS guidance.',
-    bodyAr: 'استخدم نطاقك الخاص (مثل yourshop.com) مع شهادات SSL تلقائية ومساعدة في الإعدادات.',
+    titleEn: 'Products done right',
+    titleAr: 'إدارة منتجات صحيحة',
+    bodyEn:
+      'Sizes, colours, live stock, photos, prices in Arabic and English. Upload thousands at once from Excel.',
+    bodyAr:
+      'مقاسات، ألوان، مخزون لحظي، صور، أسعار بالعربية والإنجليزية. ارفع آلاف المنتجات دفعة واحدة من Excel.',
+  },
+  {
+    titleEn: 'Checkout that converts',
+    titleAr: 'صفحة دفع تحوّل الزوار لمشترين',
+    bodyEn:
+      'Guest checkout, saved addresses, coupons, shipping zones, taxes — fewer abandoned carts, more completed orders.',
+    bodyAr:
+      'دفع للضيوف، عناوين محفوظة، كوبونات، مناطق شحن، ضرائب — سلات مهجورة أقل، وطلبات مكتملة أكثر.',
+  },
+  {
+    titleEn: 'Orders without chaos',
+    titleAr: 'طلبات بدون فوضى',
+    bodyEn:
+      'Track every order from new to delivered. Refund a customer in two taps. Send shipment tracking automatically.',
+    bodyAr: 'تابع كل طلب من جديد إلى تم التسليم. استرد لعميل بنقرتين. أرسل تتبع الشحنة تلقائياً.',
+  },
+  {
+    titleEn: 'Bring buyers back',
+    titleAr: 'أعد المشترين مرة أخرى',
+    bodyEn:
+      'Wishlist, reviews, cart-recovery emails, loyalty points, affiliate program — built-in ways to grow repeat sales.',
+    bodyAr:
+      'قائمة أمنيات، تقييمات، إيميلات لاسترجاع السلة، نقاط ولاء، برنامج مسوقين — أدوات لتكرار البيع.',
+  },
+  {
+    titleEn: 'Track what your ads do',
+    titleAr: 'اعرف ما الذي تفعله إعلاناتك',
+    bodyEn:
+      'Meta, TikTok, Snap, and Google all see the right events from your store, so your ROAS reports are honest.',
+    bodyAr:
+      'ميتا، تيك توك، سناب، وجوجل ترى الأحداث الصحيحة من متجرك، فتقارير عائد الإعلان تكون دقيقة.',
+  },
+  {
+    titleEn: 'Found on Google',
+    titleAr: 'مرئي على جوجل',
+    bodyEn:
+      'Each product page is built to rank — meta tags, sitemap, structured data, and fast loading. Free traffic over time.',
+    bodyAr:
+      'كل صفحة منتج مهيأة للظهور في نتائج البحث — معلومات الصفحة، خريطة الموقع، بيانات منظمة، تحميل سريع. زيارات مجانية مع الوقت.',
+  },
+  {
+    titleEn: 'Your own domain',
+    titleAr: 'نطاق متجرك الخاص',
+    bodyEn:
+      'Run on yourshop.com (or a name you own). We set up DNS and SSL for you — customers see your brand, not ours.',
+    bodyAr:
+      'شغّل المتجر على yourshop.com (أو نطاقك الخاص). نُجهّز DNS و SSL لك — عملاءك يرون علامتك، لا علامتنا.',
   },
 ];
 
@@ -230,61 +245,63 @@ const INTEGRATIONS: Array<{ label: string; tag: string }> = [
 
 const AUDIENCES: Array<{ titleEn: string; titleAr: string; bodyEn: string; bodyAr: string }> = [
   {
-    titleEn: 'B2C storefronts',
-    titleAr: 'متاجر للمستهلكين',
+    titleEn: 'Selling to shoppers',
+    titleAr: 'تبيع للمستهلكين',
     bodyEn:
-      'Fashion, beauty, food, electronics, gifts. Customer accounts, wishlist, reviews, marketing pixels, push promotions.',
+      'Fashion, beauty, food, electronics, gifts — anywhere customers buy with their phones. We give them a fast, friendly store and you the tools to bring them back.',
     bodyAr:
-      'الأزياء والجمال والطعام والإلكترونيات والهدايا. حسابات العملاء، قائمة الأمنيات، التقييمات، بكسلات التسويق، عروض ترويجية بالإشعارات.',
+      'أزياء، جمال، طعام، إلكترونيات، هدايا — في أي مجال يشتري فيه العملاء عبر هواتفهم. نُقدّم لهم متجراً سريعاً وودوداً، ونعطيك أدوات تُعيدهم للشراء مرة أخرى.',
   },
   {
-    titleEn: 'B2B catalogues',
-    titleAr: 'متاجر البيع بالجملة',
+    titleEn: 'Selling to businesses',
+    titleAr: 'تبيع للشركات',
     bodyEn:
-      'Wholesale, restocking platforms, distributor portals. Variant pricing, bulk SKUs, custom-domain login, owner and admin roles.',
+      'Wholesale, distributors, restocking. Set different prices per customer, hide the catalogue behind a login, take big orders without phone calls.',
     bodyAr:
-      'البيع بالجملة، منصات إعادة التوريد، بوابات الموزعين. تسعير حسب التنويع، SKUs بالجملة، تسجيل دخول بنطاق مخصص، أدوار مالك ومدير.',
+      'بيع بالجملة، موزعين، إعادة توريد. ضع أسعاراً مختلفة لكل عميل، أخفِ الكتالوج خلف تسجيل دخول، استقبل طلبات كبيرة بدون مكالمات هاتفية.',
   },
   {
-    titleEn: 'Multi-brand operators',
-    titleAr: 'المشغلون متعددو العلامات',
+    titleEn: 'Running more than one brand',
+    titleAr: 'تدير أكثر من علامة تجارية',
     bodyEn:
-      'Run several stores from one admin without paying per-store Shopify subscriptions. Switch context with one click.',
+      'Two stores, three lines, a pilot brand — open them all from one place without paying for each one separately.',
     bodyAr:
-      'شغّل عدة متاجر من لوحة تحكم واحدة بدون اشتراكات Shopify منفصلة لكل متجر. التبديل بين المتاجر بنقرة واحدة.',
+      'متجران، ثلاثة خطوط، علامة تجريبية — افتحها كلها من مكان واحد بدون اشتراك مستقل لكل واحدة.',
   },
 ];
 
 const INCLUDED: Array<{ titleEn: string; titleAr: string; bodyEn: string; bodyAr: string }> = [
   {
-    titleEn: 'Discovery + setup',
-    titleAr: 'استشارة وإعداد',
+    titleEn: 'A 30-minute call',
+    titleAr: 'مكالمة 30 دقيقة',
     bodyEn:
-      'A 30-minute call to map your products and constraints, then we provision your store and integrations — you don’t click through a wizard.',
+      'You tell us about your products, your customers, and your timeline. We come back with a clear plan — no jargon, no upsells.',
     bodyAr:
-      'مكالمة 30 دقيقة لفهم منتجاتك ومتطلباتك، ثم نُجهّز متجرك وتكاملاتك — أنت لا تتجوّل في معالج إعدادات.',
+      'تخبرنا عن منتجاتك وعملائك وجدولك الزمني. نعود إليك بخطة واضحة — بدون مصطلحات معقدة وبدون عروض إضافية.',
   },
   {
-    titleEn: 'Catalogue load',
-    titleAr: 'رفع الكتالوج',
+    titleEn: 'Your products, uploaded for you',
+    titleAr: 'منتجاتك، نرفعها نحن',
     bodyEn:
-      'Send us your products as a spreadsheet (or photos + descriptions) and we import them — variants, categories, images.',
-    bodyAr: 'أرسل لنا منتجاتك بصيغة Excel (أو صور ووصف) ونحن نرفعها — تنويعات، فئات، وصور.',
-  },
-  {
-    titleEn: 'Training + handover',
-    titleAr: 'تدريب وتسليم',
-    bodyEn:
-      'Walk-through with your team on the admin app: orders, refunds, products, customers, marketing. Recording included.',
+      'Send us an Excel sheet — or just photos and prices. We do the upload, the variants, the categories. You review.',
     bodyAr:
-      'جلسة شرح لفريقك على تطبيق الإدارة: الطلبات، الاسترداد، المنتجات، العملاء، التسويق. تسجيل الجلسة مشمول.',
+      'أرسل لنا ملف Excel — أو فقط صوراً وأسعاراً. نحن نتولّى الرفع والتنويعات والفئات. أنت تراجع.',
   },
   {
-    titleEn: 'Ongoing support',
-    titleAr: 'دعم مستمر',
+    titleEn: 'Training your team',
+    titleAr: 'تدريب فريقك',
     bodyEn:
-      'A direct WhatsApp line for issues and feature requests — same number you use to start the conversation.',
-    bodyAr: 'خط واتساب مباشر للمشاكل وطلبات الميزات — نفس الرقم الذي تبدأ به المحادثة.',
+      'A walkthrough with you and your staff on receiving orders, refunds, updating products, and reading reports. Video kept for new hires.',
+    bodyAr:
+      'جلسة شرح معك ومع فريقك على استقبال الطلبات والاسترداد وتحديث المنتجات وقراءة التقارير. الفيديو محفوظ للموظفين الجدد.',
+  },
+  {
+    titleEn: 'A WhatsApp number that answers',
+    titleAr: 'رقم واتساب يردّ عليك',
+    bodyEn:
+      'After launch you keep the same WhatsApp line. Real humans, real responses — not a ticket queue.',
+    bodyAr:
+      'بعد الإطلاق تبقى على نفس خط الواتساب. أشخاص حقيقيون وردود سريعة — ليست بطاقات دعم في طابور.',
   },
 ];
 
@@ -297,24 +314,30 @@ const STEPS: Array<{
 }> = [
   {
     n: 1,
-    titleEn: 'Discovery',
-    titleAr: 'التعرف على متجرك',
-    bodyEn: 'We learn your products, audience, and goals over a 30-min call.',
-    bodyAr: 'نتعرف على منتجاتك وعملائك وأهدافك في مكالمة مدتها 30 دقيقة.',
+    titleEn: 'We talk',
+    titleAr: 'نتحدث',
+    bodyEn:
+      'You tell us what you sell, who buys it, and where you want to be in three months. No demo, just a conversation.',
+    bodyAr:
+      'تخبرنا ماذا تبيع، من يشتري منك، وأين تريد أن تكون بعد ثلاثة أشهر. لا عرض تقديمي، فقط محادثة.',
   },
   {
     n: 2,
-    titleEn: 'Setup',
-    titleAr: 'الإعداد',
-    bodyEn: 'We provision your store, design the look, integrate payments, and load your catalog.',
-    bodyAr: 'نُجهّز متجرك، نصمم الواجهة، نربط وسائل الدفع، ونرفع كتالوج منتجاتك.',
+    titleEn: 'We build',
+    titleAr: 'نبني',
+    bodyEn:
+      'Your store goes live with your products, your colours, your domain. Payments tested, delivery wired, ready to take orders.',
+    bodyAr:
+      'متجرك يصبح جاهزاً بمنتجاتك، ألوانك، نطاقك. الدفع مُجرّب، التوصيل موصول، وجاهز لاستقبال الطلبات.',
   },
   {
     n: 3,
-    titleEn: 'Launch',
-    titleAr: 'الإطلاق',
-    bodyEn: 'We train your team, run final QA, and go live. Ongoing support included.',
-    bodyAr: 'ندرّب فريقك، نُجري الاختبار النهائي، ونطلق المتجر. الدعم المستمر مشمول.',
+    titleEn: 'You sell',
+    titleAr: 'أنت تبيع',
+    bodyEn:
+      'You announce, we monitor, customers buy. We stay close for the first weeks to fix anything that comes up.',
+    bodyAr:
+      'أنت تعلن، نحن نراقب، العملاء يشترون. نبقى قريبين منك في الأسابيع الأولى لمعالجة أي شيء يطرأ.',
   },
 ];
 
