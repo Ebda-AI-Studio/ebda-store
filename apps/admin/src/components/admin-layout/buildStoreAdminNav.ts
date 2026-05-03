@@ -18,6 +18,7 @@ export type NavLabels = {
   layout: string;
   content: string;
   settings: string;
+  aiTools: string;
 };
 
 // Super Admin navigation (Force Media platform admin)
@@ -93,6 +94,12 @@ export function buildStoreAdminNav(storeId: string, labels: NavLabels): NavItem[
       name: labels.content,
       href: `/stores/${storeId}/content`,
       icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
+    },
+    {
+      name: labels.aiTools,
+      href: `/stores/${storeId}/ai-tools`,
+      // sparkle icon — matches the orange "✨" in the AI buttons throughout
+      icon: 'M5 3v4 M3 5h4 M6 17v4 M4 19h4 M13 3l3.5 7L24 13.5 16.5 17 13 24l-3.5-7L2 13.5 9.5 10z',
     },
     {
       name: labels.settings,

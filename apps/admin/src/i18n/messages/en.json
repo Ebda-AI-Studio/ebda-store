@@ -3397,6 +3397,7 @@
       "navLayout": "Layout",
       "navContent": "Content",
       "navSettings": "Settings",
+      "navAiTools": "AI Tools",
       "superAdmin": "Super Admin",
       "superAdminHint": "Full platform access",
       "superAdminViewingStore": "Super Admin",

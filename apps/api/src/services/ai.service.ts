@@ -54,7 +54,10 @@ export interface CategorySuggestion {
   confidence: 'high' | 'medium' | 'low';
 }
 
-const MODEL = 'gemini-2.0-flash';
+// Free-tier eligible model. `gemini-2.0-flash` requires paid billing
+// on most accounts as of 2026; `gemini-1.5-flash` stays in the free
+// tier (15 req/min, 1500 req/day). Override via env to upgrade.
+const MODEL = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
 const CACHE_TTL_SECONDS = 7 * 24 * 60 * 60;
 const META_TITLE_MAX = 60;
 const META_DESCRIPTION_MAX = 160;
@@ -111,6 +114,38 @@ async function recordUsage(
     // Never fail the user-facing request because we couldn't log usage.
     logger.warn({ err, storeId, feature }, 'Failed to record AI usage');
   }
+}
+
+/**
+ * Translate Google Generative AI SDK errors into AppError so the
+ * Express error handler can return a useful HTTP status + message
+ * to the merchant instead of a generic 500.
+ */
+function rethrowAsAppError(err: unknown, fallback: string): never {
+  const e = err as { status?: number; message?: string };
+  if (e?.status === 429) {
+    throw new AppError(
+      429,
+      'AI_QUOTA_EXCEEDED',
+      'AI quota reached for this minute or day. Try again shortly, or contact support to raise the limit.'
+    );
+  }
+  if (e?.status === 401 || e?.status === 403) {
+    throw new AppError(
+      503,
+      'AI_NOT_CONFIGURED',
+      'AI features are misconfigured on this server (auth failed). Contact support.'
+    );
+  }
+  if (e?.status === 400) {
+    throw new AppError(
+      502,
+      'AI_BAD_REQUEST',
+      e.message?.slice(0, 240) || 'AI rejected the request shape.'
+    );
+  }
+  logger.error({ err }, fallback);
+  throw new AppError(502, 'AI_UPSTREAM_ERROR', fallback);
 }
 
 /**
@@ -175,7 +210,12 @@ export class AIService {
     }. Kind: ${input.kind}.${lengthHint}\n\nSource:\n${trimmed}`;
 
     const model = getClient().getGenerativeModel({ model: MODEL, systemInstruction });
-    const res = await model.generateContent(userPrompt);
+    let res;
+    try {
+      res = await model.generateContent(userPrompt);
+    } catch (err) {
+      rethrowAsAppError(err, 'AI translation failed');
+    }
     const translation = res.response.text().trim();
 
     const usage = res.response.usageMetadata;
@@ -241,7 +281,12 @@ export class AIService {
       systemInstruction,
       generationConfig: { responseMimeType: 'application/json' },
     });
-    const res = await model.generateContent(userPrompt);
+    let res;
+    try {
+      res = await model.generateContent(userPrompt);
+    } catch (err) {
+      rethrowAsAppError(err, 'AI SEO generation failed');
+    }
     const raw = stripJsonFences(res.response.text());
 
     let parsed: SeoSuggestion;
@@ -326,7 +371,12 @@ export class AIService {
       systemInstruction,
       generationConfig: { responseMimeType: 'application/json' },
     });
-    const res = await model.generateContent(userPrompt);
+    let res;
+    try {
+      res = await model.generateContent(userPrompt);
+    } catch (err) {
+      rethrowAsAppError(err, 'AI categorisation failed');
+    }
     const raw = stripJsonFences(res.response.text());
 
     let parsed: { matches: Array<{ id: string; confidence: 'high' | 'medium' | 'low' }> };
