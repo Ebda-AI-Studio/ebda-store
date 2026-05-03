@@ -93,6 +93,16 @@ const COPY = {
   },
   marketingCalloutCta: { en: 'Visit Force Media →', ar: 'زيارة فورس ميديا ←' },
 
+  wbsCalloutTitle: {
+    en: 'Already have a list of customers?',
+    ar: 'لديك قائمة عملاء جاهزة؟',
+  },
+  wbsCalloutBody: {
+    en: 'Force Bulk WhatsApp is our sister product for sending personalised WhatsApp campaigns to hundreds or thousands of contacts at once — order updates, promo blasts, abandoned-cart recovery. Bundle it with your store and we’ll wire your customer list into it on day one.',
+    ar: 'Force Bulk WhatsApp هو منتجنا الشقيق لإرسال حملات واتساب مخصصة لمئات أو آلاف العملاء دفعة واحدة — تحديثات الطلبات، عروض ترويجية، استرجاع السلات المتروكة. اشترك معه مع متجرك ونربط قائمة عملائك من اليوم الأول.',
+  },
+  wbsCalloutCta: { en: 'Ask about the bundle', ar: 'اسأل عن الباقة المشتركة' },
+
   contactTitle: { en: 'Get in touch', ar: 'تواصل معنا' },
   contactSubtitle: {
     en: 'Tell us about your products, your timeline, and your budget. We’ll come back with a plan in 24 hours.',
@@ -187,8 +197,10 @@ const SERVICES: Array<{ titleEn: string; titleAr: string; bodyEn: string; bodyAr
   {
     titleEn: 'SEO & speed',
     titleAr: 'SEO والسرعة',
-    bodyEn: 'Per-store meta, sitemap, structured data, edge-cached storefront with sub-500ms p95.',
-    bodyAr: 'بيانات SEO لكل متجر، خريطة موقع، بيانات منظمة، تخزين مؤقت على الحافة لسرعة عالية.',
+    bodyEn:
+      'Per-store meta, sitemap, structured data, and a Vercel edge-cached storefront for fast page loads.',
+    bodyAr:
+      'بيانات SEO لكل متجر، خريطة موقع، بيانات منظمة، وتخزين مؤقت على Vercel Edge لتحميل سريع.',
   },
   {
     titleEn: 'Custom domain',
@@ -229,9 +241,9 @@ const AUDIENCES: Array<{ titleEn: string; titleAr: string; bodyEn: string; bodyA
     titleEn: 'B2B catalogues',
     titleAr: 'متاجر البيع بالجملة',
     bodyEn:
-      'Wholesale, restocking platforms, distributor portals. Variant pricing, bulk SKUs, custom-domain login, role-based admin access.',
+      'Wholesale, restocking platforms, distributor portals. Variant pricing, bulk SKUs, custom-domain login, owner and admin roles.',
     bodyAr:
-      'البيع بالجملة، منصات إعادة التوريد، بوابات الموزعين. تسعير حسب التنويع، SKUs بالجملة، تسجيل دخول بنطاق مخصص، صلاحيات مديرين متعددة.',
+      'البيع بالجملة، منصات إعادة التوريد، بوابات الموزعين. تسعير حسب التنويع، SKUs بالجملة، تسجيل دخول بنطاق مخصص، أدوار مالك ومدير.',
   },
   {
     titleEn: 'Multi-brand operators',
@@ -271,9 +283,8 @@ const INCLUDED: Array<{ titleEn: string; titleAr: string; bodyEn: string; bodyAr
     titleEn: 'Ongoing support',
     titleAr: 'دعم مستمر',
     bodyEn:
-      'WhatsApp line for issues and feature requests. Bug fixes are on us; new features are scoped together.',
-    bodyAr:
-      'خط واتساب للمشاكل وطلبات الميزات. إصلاح الأخطاء على حسابنا؛ الميزات الجديدة نُحددها سوياً.',
+      'A direct WhatsApp line for issues and feature requests — same number you use to start the conversation.',
+    bodyAr: 'خط واتساب مباشر للمشاكل وطلبات الميزات — نفس الرقم الذي تبدأ به المحادثة.',
   },
 ];
 
@@ -586,6 +597,32 @@ export function PlatformLanding({ notFoundBanner = false }: PlatformLandingProps
               style={{ color: ORANGE }}
             >
               {t(COPY.marketingCalloutCta)}
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* Sister-product callout — Force Bulk WhatsApp */}
+      <section className="pb-20">
+        <div className="mx-auto max-w-4xl px-4">
+          <div className="rounded-2xl border-2 p-8 md:p-10" style={{ borderColor: ORANGE }}>
+            <div
+              className="mb-3 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide"
+              style={{ color: ORANGE }}
+            >
+              <span>📲</span>
+              <span>{lang === 'ar' ? 'منتج شقيق' : 'Sister product'}</span>
+            </div>
+            <h2 className="mb-3 text-2xl font-bold md:text-3xl">{t(COPY.wbsCalloutTitle)}</h2>
+            <p className="mb-6 text-base text-gray-600 md:text-lg">{t(COPY.wbsCalloutBody)}</p>
+            <a
+              href={WHATSAPP_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-lg px-6 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+              style={{ backgroundColor: ORANGE }}
+            >
+              {t(COPY.wbsCalloutCta)}
             </a>
           </div>
         </div>
