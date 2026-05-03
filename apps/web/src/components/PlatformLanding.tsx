@@ -38,8 +38,8 @@ const COPY = {
     ar: 'أطلق متجرك الإلكتروني في الكويت',
   },
   heroSubtitle: {
-    en: 'An AI-assisted e-commerce platform tailored to Kuwait — bilingual by default, mobile PWA with iOS push, real-time operator dashboard, and a multi-tenant architecture you don’t pay Shopify rates for.',
-    ar: 'منصة تجارة إلكترونية مدعومة بالذكاء الاصطناعي ومصممة للكويت — بلغتين منذ البداية، تطبيق ويب للجوال مع إشعارات iOS، لوحة تحكم لحظية للمتاجر، وبنية متعددة المتاجر بدون أسعار Shopify.',
+    en: 'An e-commerce platform built for Kuwait merchants who want more than a Shopify subscription — bilingual by default, mobile PWA with iOS push, real-time operator dashboard, and a multi-tenant architecture priced for the local market.',
+    ar: 'منصة تجارة إلكترونية مصممة للتجار في الكويت الذين يريدون أكثر من اشتراك Shopify — بلغتين منذ البداية، تطبيق ويب للجوال مع إشعارات iOS، لوحة تحكم لحظية للمتاجر، وبنية متعددة المتاجر بأسعار السوق المحلي.',
   },
   heroCta1: { en: 'Talk on WhatsApp', ar: 'تواصل عبر واتساب' },
   heroCta2: { en: 'Email us', ar: 'راسلنا بالبريد' },
@@ -63,6 +63,24 @@ const COPY = {
   processSubtitle: {
     en: 'From first conversation to live store, in days not months.',
     ar: 'من أول محادثة حتى إطلاق المتجر، بأيام لا أشهر.',
+  },
+
+  integrationsTitle: { en: 'Plays well with', ar: 'يتكامل مع' },
+  integrationsSubtitle: {
+    en: 'Pre-wired with the providers Kuwait merchants actually use.',
+    ar: 'جاهز للعمل مع مزودي الخدمات الذين يستخدمهم التجار في الكويت.',
+  },
+
+  audienceTitle: { en: 'Who this is for', ar: 'لمن هذه المنصة' },
+  audienceSubtitle: {
+    en: 'B2C storefronts and B2B catalogues — same codebase, different toggle.',
+    ar: 'متاجر بيع للمستهلك ومتاجر بيع بالجملة — نفس المنصة، إعدادات مختلفة.',
+  },
+
+  includedTitle: { en: 'What’s included', ar: 'ما الذي يشمله الاشتراك' },
+  includedSubtitle: {
+    en: 'You get a working store, not a checklist.',
+    ar: 'تحصل على متجر يعمل فعلياً، ليس مجرد قائمة مهام.',
   },
 
   marketingCalloutTitle: {
@@ -177,6 +195,85 @@ const SERVICES: Array<{ titleEn: string; titleAr: string; bodyEn: string; bodyAr
     titleAr: 'نطاق مخصص',
     bodyEn: 'Bring your own domain (e.g. yourshop.com) with automatic SSL and DNS guidance.',
     bodyAr: 'استخدم نطاقك الخاص (مثل yourshop.com) مع شهادات SSL تلقائية ومساعدة في الإعدادات.',
+  },
+];
+
+// Real integrations the platform ships with. Listed because every
+// competitor lists theirs and it builds credibility — not because
+// having KNet alone differentiates us.
+const INTEGRATIONS: Array<{ label: string; tag: string }> = [
+  { label: 'Tap', tag: 'Payments' },
+  { label: 'MyFatoorah', tag: 'Payments' },
+  { label: 'Hesabe', tag: 'Payments' },
+  { label: 'UPayments', tag: 'Payments' },
+  { label: 'KNet', tag: 'Payments' },
+  { label: 'OneSignal', tag: 'Push' },
+  { label: 'Cloudflare R2', tag: 'Storage' },
+  { label: 'Meta Pixel', tag: 'Pixels' },
+  { label: 'TikTok Pixel', tag: 'Pixels' },
+  { label: 'Snap Pixel', tag: 'Pixels' },
+  { label: 'GA4 / GTM', tag: 'Analytics' },
+  { label: 'iCarry / Aramex', tag: 'Shipping' },
+];
+
+const AUDIENCES: Array<{ titleEn: string; titleAr: string; bodyEn: string; bodyAr: string }> = [
+  {
+    titleEn: 'B2C storefronts',
+    titleAr: 'متاجر للمستهلكين',
+    bodyEn:
+      'Fashion, beauty, food, electronics, gifts. Customer accounts, wishlist, reviews, marketing pixels, push promotions.',
+    bodyAr:
+      'الأزياء والجمال والطعام والإلكترونيات والهدايا. حسابات العملاء، قائمة الأمنيات، التقييمات، بكسلات التسويق، عروض ترويجية بالإشعارات.',
+  },
+  {
+    titleEn: 'B2B catalogues',
+    titleAr: 'متاجر البيع بالجملة',
+    bodyEn:
+      'Wholesale, restocking platforms, distributor portals. Variant pricing, bulk SKUs, custom-domain login, role-based admin access.',
+    bodyAr:
+      'البيع بالجملة، منصات إعادة التوريد، بوابات الموزعين. تسعير حسب التنويع، SKUs بالجملة، تسجيل دخول بنطاق مخصص، صلاحيات مديرين متعددة.',
+  },
+  {
+    titleEn: 'Multi-brand operators',
+    titleAr: 'المشغلون متعددو العلامات',
+    bodyEn:
+      'Run several stores from one admin without paying per-store Shopify subscriptions. Switch context with one click.',
+    bodyAr:
+      'شغّل عدة متاجر من لوحة تحكم واحدة بدون اشتراكات Shopify منفصلة لكل متجر. التبديل بين المتاجر بنقرة واحدة.',
+  },
+];
+
+const INCLUDED: Array<{ titleEn: string; titleAr: string; bodyEn: string; bodyAr: string }> = [
+  {
+    titleEn: 'Discovery + setup',
+    titleAr: 'استشارة وإعداد',
+    bodyEn:
+      'A 30-minute call to map your products and constraints, then we provision your store and integrations — you don’t click through a wizard.',
+    bodyAr:
+      'مكالمة 30 دقيقة لفهم منتجاتك ومتطلباتك، ثم نُجهّز متجرك وتكاملاتك — أنت لا تتجوّل في معالج إعدادات.',
+  },
+  {
+    titleEn: 'Catalogue load',
+    titleAr: 'رفع الكتالوج',
+    bodyEn:
+      'Send us your products as a spreadsheet (or photos + descriptions) and we import them — variants, categories, images.',
+    bodyAr: 'أرسل لنا منتجاتك بصيغة Excel (أو صور ووصف) ونحن نرفعها — تنويعات، فئات، وصور.',
+  },
+  {
+    titleEn: 'Training + handover',
+    titleAr: 'تدريب وتسليم',
+    bodyEn:
+      'Walk-through with your team on the admin app: orders, refunds, products, customers, marketing. Recording included.',
+    bodyAr:
+      'جلسة شرح لفريقك على تطبيق الإدارة: الطلبات، الاسترداد، المنتجات، العملاء، التسويق. تسجيل الجلسة مشمول.',
+  },
+  {
+    titleEn: 'Ongoing support',
+    titleAr: 'دعم مستمر',
+    bodyEn:
+      'WhatsApp line for issues and feature requests. Bug fixes are on us; new features are scoped together.',
+    bodyAr:
+      'خط واتساب للمشاكل وطلبات الميزات. إصلاح الأخطاء على حسابنا؛ الميزات الجديدة نُحددها سوياً.',
   },
 ];
 
@@ -397,6 +494,72 @@ export function PlatformLanding({ notFoundBanner = false }: PlatformLandingProps
                   {s.n}
                 </div>
                 <h3 className="mb-2 text-xl font-bold">{lang === 'ar' ? s.titleAr : s.titleEn}</h3>
+                <p className="text-sm text-gray-600">{lang === 'ar' ? s.bodyAr : s.bodyEn}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Audience */}
+      <section className="py-20">
+        <div className="mx-auto max-w-6xl px-4">
+          <div className="mb-12 text-center">
+            <h2 className="mb-3 text-3xl font-bold md:text-4xl">{t(COPY.audienceTitle)}</h2>
+            <div className="mx-auto h-1 w-16 rounded" style={{ backgroundColor: ORANGE }} />
+            <p className="mx-auto mt-4 max-w-2xl text-gray-600">{t(COPY.audienceSubtitle)}</p>
+          </div>
+          <div className="grid gap-6 md:grid-cols-3">
+            {AUDIENCES.map((a, i) => (
+              <div
+                key={i}
+                className="rounded-xl border border-gray-100 bg-white p-6 transition-shadow hover:shadow-md"
+              >
+                <h3 className="mb-2 text-lg font-bold">{lang === 'ar' ? a.titleAr : a.titleEn}</h3>
+                <p className="text-sm text-gray-600">{lang === 'ar' ? a.bodyAr : a.bodyEn}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Integrations */}
+      <section className="bg-gray-50 py-16">
+        <div className="mx-auto max-w-6xl px-4">
+          <div className="mb-8 text-center">
+            <h2 className="mb-3 text-2xl font-bold md:text-3xl">{t(COPY.integrationsTitle)}</h2>
+            <p className="mx-auto max-w-2xl text-sm text-gray-600">
+              {t(COPY.integrationsSubtitle)}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            {INTEGRATIONS.map((it, i) => (
+              <span
+                key={i}
+                className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700"
+              >
+                <span>{it.label}</span>
+                <span className="text-xs uppercase tracking-wide text-gray-400">· {it.tag}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* What's included (onboarding promise) */}
+      <section className="py-20">
+        <div className="mx-auto max-w-6xl px-4">
+          <div className="mb-12 text-center">
+            <h2 className="mb-3 text-3xl font-bold md:text-4xl">{t(COPY.includedTitle)}</h2>
+            <div className="mx-auto h-1 w-16 rounded" style={{ backgroundColor: ORANGE }} />
+            <p className="mx-auto mt-4 max-w-2xl text-gray-600">{t(COPY.includedSubtitle)}</p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {INCLUDED.map((s, i) => (
+              <div key={i} className="rounded-xl border border-gray-100 bg-white p-5">
+                <h3 className="mb-2 text-base font-bold" style={{ color: ORANGE }}>
+                  {lang === 'ar' ? s.titleAr : s.titleEn}
+                </h3>
                 <p className="text-sm text-gray-600">{lang === 'ar' ? s.bodyAr : s.bodyEn}</p>
               </div>
             ))}
