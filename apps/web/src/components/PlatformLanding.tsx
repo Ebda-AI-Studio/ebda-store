@@ -26,7 +26,7 @@ const ORANGE_DARK = '#3D1F1F';
 type Lang = 'en' | 'ar';
 
 const COPY = {
-  brand: { en: 'Force Store', ar: 'فورس ستور' },
+  brand: { en: 'Force AI', ar: 'فورس AI' },
   langToggle: { en: 'عربي', ar: 'English' },
   navServices: { en: 'What we do', ar: 'خدماتنا' },
   navProcess: { en: 'How it works', ar: 'خطواتنا' },
@@ -38,11 +38,11 @@ const COPY = {
     ar: 'أطلق متجرك الإلكتروني في الكويت',
   },
   heroSubtitle: {
-    en: 'A complete e-commerce platform built for Kuwait merchants — local payments, bilingual storefront, mobile PWA, push notifications, and real-time order management.',
-    ar: 'منصة تجارة إلكترونية متكاملة مصممة للتجار في الكويت — وسائل دفع محلية، متجر بلغتين، تطبيق ويب للجوال، إشعارات فورية، وإدارة طلبات بالوقت الفعلي.',
+    en: 'An AI-assisted e-commerce platform tailored to Kuwait — bilingual by default, mobile PWA with iOS push, real-time operator dashboard, and a multi-tenant architecture you don’t pay Shopify rates for.',
+    ar: 'منصة تجارة إلكترونية مدعومة بالذكاء الاصطناعي ومصممة للكويت — بلغتين منذ البداية، تطبيق ويب للجوال مع إشعارات iOS، لوحة تحكم لحظية للمتاجر، وبنية متعددة المتاجر بدون أسعار Shopify.',
   },
-  heroCta1: { en: 'Start your store', ar: 'ابدأ متجرك' },
-  heroCta2: { en: 'Talk on WhatsApp', ar: 'تواصل عبر واتساب' },
+  heroCta1: { en: 'Talk on WhatsApp', ar: 'تواصل عبر واتساب' },
+  heroCta2: { en: 'Email us', ar: 'راسلنا بالبريد' },
 
   whySectionTitle: {
     en: 'Built for Kuwait merchants',
@@ -95,35 +95,36 @@ const COPY = {
 
 const FEATURES: Array<{ titleEn: string; titleAr: string; bodyEn: string; bodyAr: string }> = [
   {
-    titleEn: 'Kuwait payment providers',
-    titleAr: 'وسائل دفع كويتية',
+    titleEn: 'Bilingual without compromises',
+    titleAr: 'بلغتين بدون تنازلات',
     bodyEn:
-      'Tap, MyFatoorah, Hesabe, UPayments, KNet, Visa, Mastercard, Apple Pay, and cash on delivery — all wired in.',
+      'Arabic and English are first-class throughout — schema, checkout, emails, push, invoices, SEO meta. Not a translation plugin grafted on top.',
     bodyAr:
-      'تاب، ماي فاتورة، حسابي، يو بايمنتس، كي نت، فيزا، ماستركارد، آبل باي، والدفع عند الاستلام — كلها جاهزة.',
+      'العربية والإنجليزية مدعومتان بالكامل في كل تفاصيل المنصة — قاعدة البيانات والدفع والإيميلات والإشعارات والفواتير. ليست مجرد إضافة ترجمة.',
   },
   {
-    titleEn: 'Bilingual Arabic & English',
-    titleAr: 'عربي وإنجليزي',
+    titleEn: 'iOS push that actually works',
+    titleAr: 'إشعارات iOS تعمل فعلاً',
     bodyEn:
-      'Full RTL/LTR support across the storefront, checkout, emails, push notifications, and invoices.',
-    bodyAr: 'دعم كامل للعربية والإنجليزية في المتجر وصفحة الدفع والإيميلات والإشعارات والفواتير.',
+      'Web push on iPhone is hard — we run two OneSignal apps, branded opt-in, and a tested install-to-home-screen flow. Customers get pinged when their order ships.',
+    bodyAr:
+      'إشعارات الويب على iPhone صعبة — نشغّل تطبيقين من OneSignal وحوار اشتراك مخصص وتدفق تثبيت مجرّب على الشاشة الرئيسية. العملاء يصلهم تنبيه فور شحن طلبهم.',
   },
   {
-    titleEn: 'Mobile PWA + push',
-    titleAr: 'تطبيق ويب وإشعارات فورية',
+    titleEn: 'Operator-grade dashboard',
+    titleAr: 'لوحة تحكم احترافية',
     bodyEn:
-      'Customers install your store as a home-screen app and get push pings on order status and promotions.',
+      'New orders push to your phone the second checkout completes. Bulk import 5k products, manage variants, fulfil orders, all from a PWA installed to your home screen.',
     bodyAr:
-      'يثبّت العملاء متجرك كتطبيق على الشاشة الرئيسية ويتلقون إشعارات فورية بحالة الطلب والعروض.',
+      'الطلبات الجديدة ترسل إلى هاتفك لحظة إتمام الدفع. استيراد 5 آلاف منتج، إدارة التنويعات، إنجاز الطلبات — من تطبيق على شاشتك الرئيسية.',
   },
   {
-    titleEn: 'Real-time admin',
-    titleAr: 'لوحة تحكم لحظية',
+    titleEn: 'Multi-tenant by design',
+    titleAr: 'متعدد المتاجر منذ التصميم',
     bodyEn:
-      'New orders ping your phone the moment they land. Switch stores, update products, fulfil orders from anywhere.',
+      'Run several brands or pilot a new line without paying for a separate Shopify subscription each time. Tenant isolation enforced at the database level.',
     bodyAr:
-      'الطلبات الجديدة تصل إلى هاتفك فور إرسالها. بدّل بين متاجرك، حدّث المنتجات، أنجز الطلبات من أي مكان.',
+      'شغّل عدة علامات تجارية أو جرّب خط منتجات جديد بدون اشتراك Shopify مستقل لكل واحد. عزل المتاجر مفروض على مستوى قاعدة البيانات.',
   },
 ];
 
@@ -248,12 +249,8 @@ export function PlatformLanding({ notFoundBanner = false }: PlatformLandingProps
       <header className="sticky top-0 z-50 border-b border-gray-100 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
           <Link href="/" className="flex items-center gap-2">
-            <span
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-base font-extrabold text-white"
-              style={{ backgroundColor: ORANGE }}
-            >
-              F
-            </span>
+            {/* Force F mark — the real Force Media logo, not a placeholder. */}
+            <img src="/logo.svg" alt="Force" className="h-7 w-auto" />
             <span className="text-lg font-bold tracking-tight">{t(COPY.brand)}</span>
           </Link>
           <nav className="hidden items-center gap-6 text-sm md:flex">
@@ -478,12 +475,7 @@ export function PlatformLanding({ notFoundBanner = false }: PlatformLandingProps
       <footer className="border-t border-gray-100 bg-white py-10">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 text-sm text-gray-500 md:flex-row">
           <div className="flex items-center gap-2">
-            <span
-              className="flex h-7 w-7 items-center justify-center rounded text-xs font-extrabold text-white"
-              style={{ backgroundColor: ORANGE }}
-            >
-              F
-            </span>
+            <img src="/logo.svg" alt="Force" className="h-6 w-auto" />
             <span className="font-semibold text-gray-700">{t(COPY.brand)}</span>
             <span className="hidden md:inline">— {t(COPY.footerTagline)}</span>
           </div>
