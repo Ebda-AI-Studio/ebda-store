@@ -285,6 +285,7 @@ model Store {
   pages                    StorePage[]
   bulkImportJobs           BulkImportJob[]
   aiUsage                  AiUsage[]
+  bulkAiJobs               BulkAiJob[]
 
   @@index([ownerId])
   @@index([status])
@@ -1736,6 +1737,55 @@ model BulkImportJob {
 }
 
 enum BulkImportStatus {
+  queued
+  running
+  completed
+  failed
+}
+
+// Catalogue-wide AI sweep — translation or SEO generation across
+// every product/category in a store. Started from the AI Tools admin
+// page, processed by an Inngest function, polled by the same page
+// for progress + final summary. The smart-skip rules from per-form
+// AI buttons apply: never overwrite a filled field, never call the
+// model for an entity that's already complete.
+model BulkAiJob {
+  id           String          @id @default(uuid())
+  storeId      String          @map("store_id")
+  userId       String?         @map("user_id")
+  kind         BulkAiJobKind
+  status       BulkAiJobStatus @default(queued)
+  // Direction is meaningful only for translate jobs. `to_ar` = fill
+  // empty Arabic from English source. `to_en` = the reverse.
+  direction    String?         @db.Text
+  total        Int             @default(0)
+  processed    Int             @default(0)
+  filled       Int             @default(0)
+  skipped      Int             @default(0)
+  failed       Int             @default(0)
+  // Capped list of recent failures for surfacing to the merchant —
+  // [{entityId, entityName, error}, ...]. Hard-cap to 50 so the row
+  // doesn't grow unbounded on a totally-failing run.
+  errors       Json?
+  errorMessage String?         @map("error_message") // Top-level failure reason if status=failed
+  startedAt    DateTime?       @map("started_at")
+  completedAt  DateTime?       @map("completed_at")
+  createdAt    DateTime        @default(now()) @map("created_at")
+  updatedAt    DateTime        @updatedAt @map("updated_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId, createdAt(sort: Desc)])
+  @@index([status])
+  @@map("bulk_ai_jobs")
+}
+
+enum BulkAiJobKind {
+  translate
+  seo
+}
+
+enum BulkAiJobStatus {
   queued
   running
   completed

@@ -12,6 +12,7 @@ import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { writeLimiter } from '../middleware/security';
 import { AIService } from '../services/ai.service';
+import { inngest } from '../lib/inngest/client';
 import { prisma } from '@force/database';
 
 const router = Router({ mergeParams: true });
@@ -173,5 +174,122 @@ router.post(
     }
   }
 );
+
+// =====================================================================
+// Bulk sweeps — translate or SEO across the entire catalogue.
+// Returns 202 + jobId; admin polls /bulk/:jobId for progress.
+// =====================================================================
+
+const bulkTranslateSchema = z.object({
+  direction: z.enum(['to_ar', 'to_en']),
+});
+
+router.post(
+  '/bulk/translate',
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const { direction } = bulkTranslateSchema.parse(req.body);
+
+      const job = await prisma.bulkAiJob.create({
+        data: { storeId, userId: req.user!.userId, kind: 'translate', direction },
+        select: { id: true, status: true, kind: true, createdAt: true },
+      });
+
+      await inngest.send({
+        name: 'bulk-ai/translate-requested',
+        data: { jobId: job.id, storeId, direction },
+      });
+
+      res.status(202).json({ success: true, data: { job } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.post('/bulk/seo', writeLimiter, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { storeId } = req.params;
+
+    const job = await prisma.bulkAiJob.create({
+      data: { storeId, userId: req.user!.userId, kind: 'seo' },
+      select: { id: true, status: true, kind: true, createdAt: true },
+    });
+
+    await inngest.send({
+      name: 'bulk-ai/seo-requested',
+      data: { jobId: job.id, storeId },
+    });
+
+    res.status(202).json({ success: true, data: { job } });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/bulk', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { storeId } = req.params;
+    const jobs = await prisma.bulkAiJob.findMany({
+      where: { storeId },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+      select: {
+        id: true,
+        kind: true,
+        status: true,
+        direction: true,
+        total: true,
+        processed: true,
+        filled: true,
+        skipped: true,
+        failed: true,
+        errorMessage: true,
+        startedAt: true,
+        completedAt: true,
+        createdAt: true,
+      },
+    });
+    res.json({ success: true, data: { jobs } });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/bulk/:jobId', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { storeId, jobId } = req.params;
+    const job = await prisma.bulkAiJob.findFirst({
+      where: { id: jobId, storeId },
+      select: {
+        id: true,
+        kind: true,
+        status: true,
+        direction: true,
+        total: true,
+        processed: true,
+        filled: true,
+        skipped: true,
+        failed: true,
+        errors: true,
+        errorMessage: true,
+        startedAt: true,
+        completedAt: true,
+        createdAt: true,
+      },
+    });
+    if (!job) {
+      res
+        .status(404)
+        .json({ success: false, error: { code: 'NOT_FOUND', message: 'Job not found' } });
+      return;
+    }
+    res.json({ success: true, data: { job } });
+  } catch (error) {
+    next(error);
+  }
+});
 
 export default router;

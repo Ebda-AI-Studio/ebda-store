@@ -38,7 +38,29 @@ type InvoiceEmailRequestedEvent = EventPayload & {
   };
 };
 
-export type AppEvent = OrderCreatedEvent | BulkImportStartedEvent | InvoiceEmailRequestedEvent;
+type BulkAiTranslateEvent = EventPayload & {
+  name: 'bulk-ai/translate-requested';
+  data: {
+    jobId: string;
+    storeId: string;
+    direction: 'to_ar' | 'to_en';
+  };
+};
+
+type BulkAiSeoEvent = EventPayload & {
+  name: 'bulk-ai/seo-requested';
+  data: {
+    jobId: string;
+    storeId: string;
+  };
+};
+
+export type AppEvent =
+  | OrderCreatedEvent
+  | BulkImportStartedEvent
+  | InvoiceEmailRequestedEvent
+  | BulkAiTranslateEvent
+  | BulkAiSeoEvent;
 
 export const inngest = new Inngest({
   id: 'force-api',

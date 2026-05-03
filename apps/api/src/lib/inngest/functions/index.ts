@@ -4,6 +4,8 @@ import { bulkImportProducts } from './bulk-import';
 import { invoiceEmail } from './invoice-email';
 import { heartbeat } from './heartbeat';
 import { auditLogArchive } from './audit-log-archive';
+import { bulkAiTranslate } from './bulk-ai-translate';
+import { bulkAiSeo } from './bulk-ai-seo';
 
 /**
  * Registry of every Inngest function the API exposes. The serve
@@ -17,4 +19,6 @@ export const inngestFunctions: InngestFunction.Any[] = [
   invoiceEmail,
   heartbeat,
   auditLogArchive,
+  bulkAiTranslate,
+  bulkAiSeo,
 ];
