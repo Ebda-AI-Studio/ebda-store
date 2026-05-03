@@ -184,6 +184,22 @@ const bulkTranslateSchema = z.object({
   direction: z.enum(['to_ar', 'to_en']),
 });
 
+// Helper: when inngest is unreachable (DNS / outage / wrong key), the
+// job row was created but no one will ever process it. Mark it failed
+// so the merchant sees an actionable error instead of a stuck "queued"
+// row that lingers forever.
+async function markJobFailedIfEnqueueFailed(jobId: string, err: unknown): Promise<void> {
+  const message = err instanceof Error ? err.message : 'Failed to enqueue job';
+  try {
+    await prisma.bulkAiJob.update({
+      where: { id: jobId },
+      data: { status: 'failed', errorMessage: message, completedAt: new Date() },
+    });
+  } catch {
+    // best-effort
+  }
+}
+
 router.post(
   '/bulk/translate',
   writeLimiter,
@@ -197,10 +213,22 @@ router.post(
         select: { id: true, status: true, kind: true, createdAt: true },
       });
 
-      await inngest.send({
-        name: 'bulk-ai/translate-requested',
-        data: { jobId: job.id, storeId, direction },
-      });
+      try {
+        await inngest.send({
+          name: 'bulk-ai/translate-requested',
+          data: { jobId: job.id, storeId, direction },
+        });
+      } catch (err) {
+        await markJobFailedIfEnqueueFailed(job.id, err);
+        res.status(503).json({
+          success: false,
+          error: {
+            code: 'AI_QUEUE_UNREACHABLE',
+            message: 'Could not enqueue the sweep right now. Try again in a minute.',
+          },
+        });
+        return;
+      }
 
       res.status(202).json({ success: true, data: { job } });
     } catch (error) {
@@ -218,10 +246,22 @@ router.post('/bulk/seo', writeLimiter, async (req: Request, res: Response, next:
       select: { id: true, status: true, kind: true, createdAt: true },
     });
 
-    await inngest.send({
-      name: 'bulk-ai/seo-requested',
-      data: { jobId: job.id, storeId },
-    });
+    try {
+      await inngest.send({
+        name: 'bulk-ai/seo-requested',
+        data: { jobId: job.id, storeId },
+      });
+    } catch (err) {
+      await markJobFailedIfEnqueueFailed(job.id, err);
+      res.status(503).json({
+        success: false,
+        error: {
+          code: 'AI_QUEUE_UNREACHABLE',
+          message: 'Could not enqueue the sweep right now. Try again in a minute.',
+        },
+      });
+      return;
+    }
 
     res.status(202).json({ success: true, data: { job } });
   } catch (error) {
