@@ -389,11 +389,16 @@ export function PlatformLanding({ notFoundBanner = false }: PlatformLandingProps
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-gray-100 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
-          <Link href="/" className="flex items-center gap-2">
-            <img src="/logo.svg" alt="Force Store" className="h-7 w-auto" />
-            <div className="flex flex-col leading-tight">
-              <span className="text-base font-bold tracking-tight md:text-lg">{t(COPY.brand)}</span>
-              <span className="text-[10px] uppercase tracking-wide text-gray-400">
+          <Link href="/" className="flex items-center gap-2.5">
+            <img src="/logo.svg" alt="Force Store" className="h-9 w-auto md:h-10" />
+            <div className="flex flex-col leading-none">
+              <span className="text-xl font-extrabold tracking-tight text-gray-900 md:text-2xl">
+                {t(COPY.brand)}
+              </span>
+              <span
+                className="mt-0.5 text-xs font-bold uppercase tracking-[0.18em] md:text-[13px]"
+                style={{ color: ORANGE }}
+              >
                 {t(COPY.brandCompany)}
               </span>
             </div>
@@ -621,32 +626,13 @@ export function PlatformLanding({ notFoundBanner = false }: PlatformLandingProps
         </div>
       </section>
 
-      {/* Marketing callout */}
+      {/* Sister-product callout — Force WhatsApp Business Platform.
+          Sits BEFORE the parent-brand marketing callout so the
+          adjacent product upsell (operational use case for an
+          existing Force Store customer) is the first cross-sell a
+          merchant sees. The marketing callout below cross-sells the
+          parent brand for traffic acquisition. */}
       <section className="py-20">
-        <div className="mx-auto max-w-4xl px-4">
-          <div
-            className="overflow-hidden rounded-2xl p-8 text-white shadow-xl md:p-12"
-            style={{
-              background: `linear-gradient(135deg, ${ORANGE_DARK}, ${ORANGE})`,
-            }}
-          >
-            <h2 className="mb-3 text-2xl font-bold md:text-3xl">{t(COPY.marketingCalloutTitle)}</h2>
-            <p className="mb-6 text-base opacity-95 md:text-lg">{t(COPY.marketingCalloutBody)}</p>
-            <a
-              href={FORCE_MEDIA_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded-lg bg-white px-6 py-3 text-sm font-semibold transition-opacity hover:opacity-90"
-              style={{ color: ORANGE }}
-            >
-              {t(COPY.marketingCalloutCta)}
-            </a>
-          </div>
-        </div>
-      </section>
-
-      {/* Sister-product callout — Force Bulk WhatsApp */}
-      <section className="pb-20">
         <div className="mx-auto max-w-4xl px-4">
           <div className="rounded-2xl border-2 p-8 md:p-10" style={{ borderColor: ORANGE }}>
             <div
@@ -666,6 +652,30 @@ export function PlatformLanding({ notFoundBanner = false }: PlatformLandingProps
               style={{ backgroundColor: ORANGE }}
             >
               {t(COPY.wbsCalloutCta)}
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* Marketing callout — parent brand cross-sell */}
+      <section className="pb-20">
+        <div className="mx-auto max-w-4xl px-4">
+          <div
+            className="overflow-hidden rounded-2xl p-8 text-white shadow-xl md:p-12"
+            style={{
+              background: `linear-gradient(135deg, ${ORANGE_DARK}, ${ORANGE})`,
+            }}
+          >
+            <h2 className="mb-3 text-2xl font-bold md:text-3xl">{t(COPY.marketingCalloutTitle)}</h2>
+            <p className="mb-6 text-base opacity-95 md:text-lg">{t(COPY.marketingCalloutBody)}</p>
+            <a
+              href={FORCE_MEDIA_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-lg bg-white px-6 py-3 text-sm font-semibold transition-opacity hover:opacity-90"
+              style={{ color: ORANGE }}
+            >
+              {t(COPY.marketingCalloutCta)}
             </a>
           </div>
         </div>
@@ -702,14 +712,22 @@ export function PlatformLanding({ notFoundBanner = false }: PlatformLandingProps
                 {EMAIL}
               </span>
             </a>
-            <div className="flex flex-col items-center gap-2 rounded-xl border border-gray-100 bg-white p-6 text-center">
+            <a
+              href="https://www.google.com/maps/search/?api=1&query=Sanam+Tower+Kuwait+City"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={
+                lang === 'ar' ? 'افتح برج سنام في خرائط جوجل' : 'Open Sanam Tower in Google Maps'
+              }
+              className="flex flex-col items-center gap-2 rounded-xl border border-gray-100 bg-white p-6 text-center transition-shadow hover:shadow-md"
+            >
               <span className="text-2xl">📍</span>
               <span className="text-xs uppercase tracking-wide text-gray-500">
                 {lang === 'ar' ? 'العنوان' : 'Office'}
               </span>
               <span className="text-sm font-medium">{t(COPY.contactAddress)}</span>
               <span className="text-xs text-gray-500">{t(COPY.contactCity)}</span>
-            </div>
+            </a>
           </div>
         </div>
       </section>
@@ -717,9 +735,17 @@ export function PlatformLanding({ notFoundBanner = false }: PlatformLandingProps
       {/* Footer */}
       <footer className="border-t border-gray-100 bg-white py-10">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 text-sm text-gray-500 md:flex-row">
-          <div className="flex items-center gap-2">
-            <img src="/logo.svg" alt="Force AI" className="h-6 w-auto" />
-            <span className="font-semibold text-gray-700">{t(COPY.brand)}</span>
+          <div className="flex items-center gap-2.5">
+            <img src="/logo.svg" alt="Force Store" className="h-7 w-auto" />
+            <div className="flex flex-col leading-none">
+              <span className="text-base font-extrabold text-gray-800">{t(COPY.brand)}</span>
+              <span
+                className="mt-0.5 text-[11px] font-bold uppercase tracking-[0.18em]"
+                style={{ color: ORANGE }}
+              >
+                {t(COPY.brandCompany)}
+              </span>
+            </div>
             <span className="hidden md:inline">— {t(COPY.footerTagline)}</span>
           </div>
           <div className="flex items-center gap-4">
