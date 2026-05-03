@@ -54,10 +54,17 @@ export interface CategorySuggestion {
   confidence: 'high' | 'medium' | 'low';
 }
 
-// Free-tier eligible model. `gemini-2.0-flash` requires paid billing
-// on most accounts as of 2026; `gemini-1.5-flash` stays in the free
-// tier (15 req/min, 1500 req/day). Override via env to upgrade.
-const MODEL = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+// Default model is `gemini-flash-latest` — Google's auto-updated
+// alias that points at whichever Flash model is currently in the
+// free tier. Hard-coded names like `gemini-1.5-flash` and
+// `gemini-2.0-flash` keep getting deprecated or moved to paid tiers,
+// so we let Google manage the alias and override via env if a
+// specific snapshot is needed for QA / paid upgrade.
+//
+// Verified models on free tier (as of 2026-05-03): gemini-flash-latest,
+// gemini-flash-lite-latest, gemini-2.5-flash-lite. `gemini-2.0-flash`
+// and `gemini-2.0-flash-lite` are paid-only on this account.
+const MODEL = process.env.GEMINI_MODEL || 'gemini-flash-latest';
 const CACHE_TTL_SECONDS = 7 * 24 * 60 * 60;
 const META_TITLE_MAX = 60;
 const META_DESCRIPTION_MAX = 160;
