@@ -382,20 +382,25 @@ enum StoreTemplate {
 // ==========================================
 
 model Category {
-  id            String    @id @default(uuid())
-  storeId       String    @map("store_id")
-  name          String
-  nameAr        String?   @map("name_ar")
-  slug          String
-  description   String?
-  descriptionAr String?   @map("description_ar")
-  image         String?
-  parentId      String?   @map("parent_id")
-  position      Int       @default(0)
-  isActive      Boolean   @default(true) @map("is_active")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
-  deletedAt     DateTime? @map("deleted_at") // Soft delete support
+  id                String    @id @default(uuid())
+  storeId           String    @map("store_id")
+  name              String
+  nameAr            String?   @map("name_ar")
+  slug              String
+  description       String?
+  descriptionAr     String?   @map("description_ar")
+  image             String?
+  parentId          String?   @map("parent_id")
+  position          Int       @default(0)
+  isActive          Boolean   @default(true) @map("is_active")
+  // SEO meta — set per-category in admin or via the AI bulk sweep.
+  metaTitle         String?   @map("meta_title")
+  metaTitleAr       String?   @map("meta_title_ar")
+  metaDescription   String?   @map("meta_description")
+  metaDescriptionAr String?   @map("meta_description_ar")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  deletedAt         DateTime? @map("deleted_at") // Soft delete support
 
   // Relations
   store    Store             @relation(fields: [storeId], references: [id], onDelete: Cascade)

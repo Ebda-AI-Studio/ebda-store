@@ -2,6 +2,7 @@
 
 import { Button, Select } from '@force/ui';
 import { useT } from '@/i18n/useT';
+import { AICategorySuggestions } from '../../../../../../../components/AICategorySuggestions';
 
 interface Option {
   value: string;
@@ -23,6 +24,11 @@ interface EditSidebarProps {
   onIsBestSellerChange: (value: boolean) => void;
   saving: boolean;
   onCancel: () => void;
+  /** Tenant scope for AI calls. */
+  storeId: string;
+  /** Product name + description, fed to category-suggest endpoint. */
+  productName: string;
+  productDescription: string;
 }
 
 export function EditSidebar({
@@ -40,6 +46,9 @@ export function EditSidebar({
   onIsBestSellerChange,
   saving,
   onCancel,
+  storeId,
+  productName,
+  productDescription,
 }: EditSidebarProps) {
   const tSections = useT('products.edit.sections');
   const tFields = useT('products.edit.fields');
@@ -64,6 +73,13 @@ export function EditSidebar({
           value={category}
           onChange={e => onCategoryChange(e.target.value)}
           options={categoryOptions}
+        />
+        <AICategorySuggestions
+          storeId={storeId}
+          productName={productName}
+          productDescription={productDescription}
+          hasSelection={!!category}
+          onSelect={onCategoryChange}
         />
       </div>
 

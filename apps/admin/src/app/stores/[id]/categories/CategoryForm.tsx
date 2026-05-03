@@ -1,7 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import { ImageUpload } from '../../../../components/ImageUpload';
 import { AITranslateMissingButton } from '../../../../components/AITranslateMissingButton';
+import { apiPost } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
 
 interface CategoryFormData {
@@ -11,6 +13,10 @@ interface CategoryFormData {
   description: string;
   descriptionAr: string;
   image: string;
+  metaTitle?: string;
+  metaTitleAr?: string;
+  metaDescription?: string;
+  metaDescriptionAr?: string;
 }
 
 interface CategoryFormProps {
@@ -44,6 +50,49 @@ export function CategoryForm({
   storeId,
 }: CategoryFormProps) {
   const t = useT('categories.form');
+  const [seoGenerating, setSeoGenerating] = useState(false);
+  const [seoMessage, setSeoMessage] = useState<string | null>(null);
+
+  async function generateSeo(mode: 'fill-empty' | 'overwrite') {
+    if (!editingId) {
+      setSeoMessage('Save the category first, then generate SEO.');
+      return;
+    }
+    setSeoMessage(null);
+    setSeoGenerating(true);
+    try {
+      const { data, error } = await apiPost<{
+        suggestion: {
+          title: string;
+          titleAr: string;
+          description: string;
+          descriptionAr: string;
+        };
+      }>(`/api/v1/stores/${storeId}/ai/seo`, { kind: 'category', id: editingId });
+      if (error || !data) {
+        setSeoMessage(error?.message || 'AI generation failed');
+        return;
+      }
+      const s = data.suggestion;
+      onFormChange(prev => ({
+        ...prev,
+        metaTitle: mode === 'overwrite' || !prev.metaTitle ? s.title : prev.metaTitle,
+        metaTitleAr: mode === 'overwrite' || !prev.metaTitleAr ? s.titleAr : prev.metaTitleAr,
+        metaDescription:
+          mode === 'overwrite' || !prev.metaDescription ? s.description : prev.metaDescription,
+        metaDescriptionAr:
+          mode === 'overwrite' || !prev.metaDescriptionAr
+            ? s.descriptionAr
+            : prev.metaDescriptionAr,
+      }));
+      setSeoMessage('AI filled the SEO fields. Click save to persist.');
+    } catch {
+      setSeoMessage('Network error contacting AI');
+    } finally {
+      setSeoGenerating(false);
+    }
+  }
+
   return (
     <div className="mb-6 rounded-xl border bg-card shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b p-4">
@@ -188,6 +237,92 @@ export function CategoryForm({
             storeId={storeId}
             label={t('uploadCategoryImage')}
           />
+        </div>
+
+        {/* SEO meta — what shows up on Google + social shares for this category. */}
+        <div className="rounded-lg border border-border p-4">
+          <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">SEO</h3>
+              <p className="text-xs text-muted-foreground">How this category appears on Google.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => generateSeo('fill-empty')}
+                disabled={seoGenerating}
+                className="inline-flex items-center gap-2 rounded-lg border border-[#fc6b02]/40 bg-[#fc6b02]/5 px-3 py-1.5 text-xs font-semibold text-[#fc6b02] transition-colors hover:bg-[#fc6b02]/10 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <span aria-hidden>✨</span>
+                {seoGenerating ? 'Generating…' : 'AI fill empty'}
+              </button>
+              <button
+                type="button"
+                onClick={() => generateSeo('overwrite')}
+                disabled={seoGenerating}
+                className="inline-flex items-center gap-2 rounded-lg border border-[#fc6b02] px-3 py-1.5 text-xs font-semibold text-[#fc6b02] transition-colors hover:bg-[#fc6b02]/5 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Regenerate all
+              </button>
+            </div>
+          </div>
+          {seoMessage && <p className="mb-2 text-xs text-muted-foreground">{seoMessage}</p>}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-foreground">
+                Meta title ({(form.metaTitle ?? '').length}/60)
+              </label>
+              <input
+                type="text"
+                maxLength={70}
+                value={form.metaTitle ?? ''}
+                onChange={e => onFormChange(prev => ({ ...prev, metaTitle: e.target.value }))}
+                className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-foreground">
+                Meta title AR ({(form.metaTitleAr ?? '').length}/60)
+              </label>
+              <input
+                type="text"
+                maxLength={70}
+                lang="ar"
+                dir="rtl"
+                value={form.metaTitleAr ?? ''}
+                onChange={e => onFormChange(prev => ({ ...prev, metaTitleAr: e.target.value }))}
+                className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-foreground">
+                Meta description ({(form.metaDescription ?? '').length}/160)
+              </label>
+              <textarea
+                maxLength={180}
+                rows={2}
+                value={form.metaDescription ?? ''}
+                onChange={e => onFormChange(prev => ({ ...prev, metaDescription: e.target.value }))}
+                className="w-full resize-none rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-foreground">
+                Meta description AR ({(form.metaDescriptionAr ?? '').length}/160)
+              </label>
+              <textarea
+                maxLength={180}
+                rows={2}
+                lang="ar"
+                dir="rtl"
+                value={form.metaDescriptionAr ?? ''}
+                onChange={e =>
+                  onFormChange(prev => ({ ...prev, metaDescriptionAr: e.target.value }))
+                }
+                className="w-full resize-none rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+            </div>
+          </div>
         </div>
 
         {saveMessage && (

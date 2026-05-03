@@ -626,6 +626,9 @@ export default function EditProductPage() {
             onIsBestSellerChange={value => updateField('isBestSeller', value)}
             saving={saving}
             onCancel={() => router.push(`/stores/${storeId}/products/${productId}`)}
+            storeId={storeId}
+            productName={formData.name}
+            productDescription={formData.description}
           />
         </div>
       </form>

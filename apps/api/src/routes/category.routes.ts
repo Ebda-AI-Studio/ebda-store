@@ -23,6 +23,10 @@ const createCategorySchema = z.object({
   description: z.string().optional(),
   descriptionAr: z.string().optional(),
   image: z.string().url().optional(),
+  metaTitle: z.string().max(180).optional().nullable(),
+  metaTitleAr: z.string().max(180).optional().nullable(),
+  metaDescription: z.string().max(400).optional().nullable(),
+  metaDescriptionAr: z.string().max(400).optional().nullable(),
 });
 
 const updateCategorySchema = z.object({
@@ -37,6 +41,10 @@ const updateCategorySchema = z.object({
   description: z.string().optional().nullable(),
   descriptionAr: z.string().optional().nullable(),
   image: z.string().url().optional().nullable(),
+  metaTitle: z.string().max(180).optional().nullable(),
+  metaTitleAr: z.string().max(180).optional().nullable(),
+  metaDescription: z.string().max(400).optional().nullable(),
+  metaDescriptionAr: z.string().max(400).optional().nullable(),
 });
 
 // GET /stores/:storeId/categories/best-sellers-image — read the
@@ -285,6 +293,15 @@ router.put(
           description: data.description,
           descriptionAr: data.descriptionAr,
           image: data.image,
+          // SEO meta — accept only when present so omitting them
+          // doesn't clear an existing value. null in the patch
+          // explicitly clears (Prisma convention).
+          ...(data.metaTitle !== undefined ? { metaTitle: data.metaTitle } : {}),
+          ...(data.metaTitleAr !== undefined ? { metaTitleAr: data.metaTitleAr } : {}),
+          ...(data.metaDescription !== undefined ? { metaDescription: data.metaDescription } : {}),
+          ...(data.metaDescriptionAr !== undefined
+            ? { metaDescriptionAr: data.metaDescriptionAr }
+            : {}),
         },
         include: {
           _count: { select: { products: true } },

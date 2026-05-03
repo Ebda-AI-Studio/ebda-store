@@ -81,18 +81,18 @@ export const bulkAiSeo: InngestFunction.Any = inngest.createFunction(
       },
     });
 
-    // Categories don't have SEO meta columns — they're skipped at the
-    // schema layer. Total = store row + every product.
+    // Total = store row + every category + every product.
     await step.run('mark-running', async () => {
-      const productCount = await prisma.product.count({
-        where: { storeId, deletedAt: null },
-      });
+      const [productCount, categoryCount] = await Promise.all([
+        prisma.product.count({ where: { storeId, deletedAt: null } }),
+        prisma.category.count({ where: { storeId, deletedAt: null } }),
+      ]);
       await prisma.bulkAiJob.update({
         where: { id: jobId },
         data: {
           status: 'running',
           startedAt: new Date(),
-          total: productCount + 1,
+          total: productCount + categoryCount + 1,
         },
       });
     });
@@ -151,9 +151,63 @@ export const bulkAiSeo: InngestFunction.Any = inngest.createFunction(
       data: { processed, filled, skipped, failed },
     });
 
-    // Categories: schema doesn't expose SEO meta columns on Category
-    // today. Skipped here; if those columns get added later, drop in
-    // a category sweep block that mirrors the product loop below.
+    // Categories
+    const cats = await prisma.category.findMany({
+      where: { storeId, deletedAt: null },
+      select: {
+        id: true,
+        name: true,
+        nameAr: true,
+        description: true,
+        descriptionAr: true,
+        metaTitle: true,
+        metaTitleAr: true,
+        metaDescription: true,
+        metaDescriptionAr: true,
+      },
+    });
+    for (const c of cats) {
+      if (!needsSeo(c)) {
+        skipped++;
+      } else {
+        try {
+          const r = await AIService.suggestSeo({
+            storeId,
+            kind: 'category',
+            storeName: store.name,
+            storeNameAr: store.nameAr,
+            entityName: c.name,
+            entityNameAr: c.nameAr,
+            entityDescription: c.description,
+            entityDescriptionAr: c.descriptionAr,
+          });
+          await prisma.category.update({
+            where: { id: c.id },
+            data: {
+              metaTitle: c.metaTitle?.trim() || r.suggestion.title,
+              metaTitleAr: c.metaTitleAr?.trim() || r.suggestion.titleAr,
+              metaDescription: c.metaDescription?.trim() || r.suggestion.description,
+              metaDescriptionAr: c.metaDescriptionAr?.trim() || r.suggestion.descriptionAr,
+            },
+          });
+          filled++;
+          await sleep(THROTTLE_MS);
+        } catch (err) {
+          await recordError({
+            entityKind: 'category',
+            entityId: c.id,
+            entityName: c.name,
+            error: err instanceof Error ? err.message : 'unknown',
+          });
+        }
+      }
+      processed++;
+    }
+
+    await prisma.bulkAiJob.update({
+      where: { id: jobId },
+      data: { processed, filled, skipped, failed, errors: errors as object },
+    });
 
     // Products — page through to bound memory
     const PAGE = 25;
