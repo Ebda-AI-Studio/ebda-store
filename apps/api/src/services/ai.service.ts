@@ -21,6 +21,7 @@ import { prisma } from '@force/database';
 import { config } from '../config';
 import { redis } from './redis.service';
 import { AppError } from '../middleware/error-handler';
+import { assertAiQuota } from '../lib/ai-quota';
 import logger from '../lib/logger';
 
 type Feature = 'translate' | 'seo' | 'categorize';
@@ -201,6 +202,7 @@ export class AIService {
       return { translation: hit, cached: true };
     }
 
+    await assertAiQuota();
     await checkBudget(input.storeId);
 
     const lengthHint =
@@ -266,6 +268,7 @@ export class AIService {
       return { suggestion: JSON.parse(hit) as SeoSuggestion, cached: true };
     }
 
+    await assertAiQuota();
     await checkBudget(input.storeId);
 
     const systemInstruction =
@@ -362,6 +365,7 @@ export class AIService {
       };
     }
 
+    await assertAiQuota();
     await checkBudget(input.storeId);
 
     const catList = input.existingCategories
