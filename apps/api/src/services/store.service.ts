@@ -139,9 +139,11 @@ export class StoreService {
       throw new AppError(404, 'NOT_FOUND', 'Store not found');
     }
 
-    // Write to cache (best-effort, 60s TTL)
+    // Write to cache (best-effort, 120s TTL — invalidated explicitly
+    // on every store update so admin edits land within seconds, not
+    // minutes).
     try {
-      await redis.set(`store:slug:${slug}`, JSON.stringify(store), 60);
+      await redis.set(`store:slug:${slug}`, JSON.stringify(store), 120);
     } catch (err) {
       logger.warn(
         { err: err instanceof Error ? err.message : 'unknown' },
@@ -394,9 +396,9 @@ export class StoreService {
       throw new AppError(404, 'NOT_FOUND', 'Store not found');
     }
 
-    // Write to cache (best-effort, 60s TTL)
+    // Write to cache (best-effort, 120s TTL — invalidated on store updates).
     try {
-      await redis.set(`store:domain:${domain}`, JSON.stringify(store), 60);
+      await redis.set(`store:domain:${domain}`, JSON.stringify(store), 120);
     } catch (err) {
       logger.warn(
         { err: err instanceof Error ? err.message : 'unknown' },

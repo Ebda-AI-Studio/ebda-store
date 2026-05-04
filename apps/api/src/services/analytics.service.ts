@@ -120,7 +120,7 @@ export class AnalyticsService {
     // Build a cache key that includes the date range so different periods don't collide
     const cacheKey = `analytics:dashboard:${storeId}:${startDate.toISOString()}:${endDate.toISOString()}`;
 
-    return getCachedAnalytics(cacheKey, 60, async () => {
+    return getCachedAnalytics(cacheKey, 120, async () => {
       return this._computeDashboardStats(storeId, startDate, endDate);
     });
   }

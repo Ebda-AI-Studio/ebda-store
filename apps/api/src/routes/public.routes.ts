@@ -108,7 +108,7 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
     // Build a cache key from query params so different filters get their own entry
     const cacheKey = `public:products:${storeId}:${page || 1}:${limit || 20}:${category || ''}:${search || ''}:${featured || ''}:${sortValue || ''}:${minPrice || ''}:${maxPrice || ''}`;
 
-    const result = await getCached(cacheKey, 30, () =>
+    const result = await getCached(cacheKey, 120, () =>
       ProductService.listPublic(storeId, {
         page: page ? parseInt(page as string) : undefined,
         limit: limit ? parseInt(limit as string) : undefined,
@@ -502,11 +502,11 @@ router.get('/:storeId/search/suggest', async (req: Request, res: Response, next:
     }
 
     const cacheKey = `public:suggest:${storeId}:${trimmed.toLowerCase()}`;
-    const result = await getCached(cacheKey, 30, () =>
+    const result = await getCached(cacheKey, 120, () =>
       ProductService.getSuggestSuggestions(storeId, trimmed, 25)
     );
 
-    res.setHeader('Cache-Control', 'private, max-age=30');
+    res.setHeader('Cache-Control', 'private, max-age=120');
     res.json({ success: true, data: result });
   } catch (error) {
     next(error);
@@ -650,12 +650,12 @@ router.get('/stores', async (req: Request, res: Response, next: NextFunction) =>
   }
 });
 
-// GET /stores/:slugOrId - Get store by slug or ID (public, cached 60s)
+// GET /stores/:slugOrId - Get store by slug or ID (public, cached 120s)
 router.get('/stores/:slugOrId', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { slugOrId } = req.params;
 
-    const result = await getCached(`public:store:${slugOrId}`, 60, async () => {
+    const result = await getCached(`public:store:${slugOrId}`, 120, async () => {
       // Check if it's a UUID (ID) or slug
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
         slugOrId
@@ -795,9 +795,11 @@ router.get('/store', async (_req: Request, res: Response, next: NextFunction) =>
       return;
     }
 
-    // Write to cache (best-effort, 60s TTL)
+    // Write to cache (best-effort, 5min TTL — default store rarely
+    // changes; even longer would be fine but 5 min keeps merchant
+    // edits visible without an explicit invalidate hook).
     try {
-      await redis.set(cacheKey, JSON.stringify(store), 60);
+      await redis.set(cacheKey, JSON.stringify(store), 300);
     } catch (err) {
       logger.warn(
         { err: err instanceof Error ? err.message : 'unknown' },

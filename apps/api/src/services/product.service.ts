@@ -501,9 +501,10 @@ export class ProductService {
       },
     };
 
-    // Write to cache (best-effort, 30s TTL)
+    // Write to cache (best-effort, 120s TTL — invalidated on product
+    // mutations via `invalidateCachedPrefix('public:products:<storeId>:')`).
     try {
-      await redis.set(cacheKey, JSON.stringify(result), 30);
+      await redis.set(cacheKey, JSON.stringify(result), 120);
     } catch (err) {
       logger.warn(
         { err: err instanceof Error ? err.message : 'unknown' },
@@ -773,9 +774,10 @@ export class ProductService {
           ]
         : realCategories;
 
-    // Write to cache (best-effort, 60s TTL)
+    // Write to cache (best-effort, 120s TTL — invalidated when
+    // categories or product status changes).
     try {
-      await redis.set(cacheKey, JSON.stringify(result), 60);
+      await redis.set(cacheKey, JSON.stringify(result), 120);
     } catch (err) {
       logger.warn(
         { err: err instanceof Error ? err.message : 'unknown' },
