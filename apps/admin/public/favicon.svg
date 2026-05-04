@@ -1,14 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- Force Store Admin (FSA) — orange tile + white wordmark.
-       Brand orange #ff6e00 matches the Force F logo (apps/admin/public/logo.svg). -->
-  <rect width="512" height="512" rx="96" ry="96" fill="#ff6e00"/>
-  <text x="256" y="256"
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Force Store Admin">
+  <rect width="512" height="512" rx="96" fill="#FF6E00"/>
+  <text x="50%" y="50%"
         text-anchor="middle"
         dominant-baseline="central"
         font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, system-ui, sans-serif"
         font-weight="800"
         font-size="200"
         letter-spacing="-8"
-        fill="#ffffff">FSA</text>
+        fill="#FFFFFF">FSA</text>
 </svg>

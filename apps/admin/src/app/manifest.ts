@@ -14,7 +14,7 @@ import type { MetadataRoute } from 'next';
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Force Admin',
+    name: 'Force Store Admin',
     short_name: 'Force Admin',
     description: 'Force Website Builder operator console',
     start_url: '/',
@@ -22,30 +22,36 @@ export default function manifest(): MetadataRoute.Manifest {
     display: 'standalone',
     orientation: 'any',
     background_color: '#ffffff',
-    theme_color: '#0a0a0a',
+    theme_color: '#FF6E00',
     icons: [
       {
-        src: '/icon-192.png',
-        sizes: '192x192',
-        type: 'image/png',
-        purpose: 'any',
-      },
-      {
-        src: '/icon.png',
-        sizes: '512x512',
-        type: 'image/png',
-        purpose: 'any',
-      },
-      {
-        src: '/icon.png',
-        sizes: '512x512',
-        type: 'image/png',
-        purpose: 'maskable',
-      },
-      {
-        src: '/logo.svg',
+        src: '/favicon.svg',
         sizes: 'any',
         type: 'image/svg+xml',
+        purpose: 'any',
+      },
+      {
+        src: '/icon-192x192.png',
+        sizes: '192x192',
+        type: 'image/png',
+        purpose: 'any maskable',
+      },
+      {
+        src: '/icon-384x384.png',
+        sizes: '384x384',
+        type: 'image/png',
+        purpose: 'any maskable',
+      },
+      {
+        src: '/icon-512x512.png',
+        sizes: '512x512',
+        type: 'image/png',
+        purpose: 'any maskable',
+      },
+      {
+        src: '/apple-touch-icon.png',
+        sizes: '180x180',
+        type: 'image/png',
         purpose: 'any',
       },
     ],
