@@ -223,6 +223,15 @@ npm run dev
 | **Store Admin** | Single store | Products, orders, customers, settings, analytics, notifications |
 | **Customer**    | Storefront   | Browse, purchase, manage account, wishlists                     |
 
+## Branding & PWA
+
+**Two distinct brand surfaces:**
+
+- **Admin (`app.forcemediakw.com`)** — uses the unified Force operator brand: orange `#FF6E00` tile + white "FSA" (Force Store Admin) wordmark, shared favicon template with [Force Media CRM](https://github.com/ForceAI-KW/Force-Media-CRM) and [WhatsApp Bulk Sender](https://github.com/ForceAI-KW/whatsapp-broadcaster). Sources: `apps/admin/public/favicon.svg`, generator at `apps/admin/scripts/generate-pwa-icons.mjs`, dynamic manifest at `apps/admin/src/app/manifest.ts`.
+- **Storefront (`store.forcemediakw.com`)** — **per-tenant branding**: each merchant's logo, theme color, and PWA name flow through `apps/web/src/app/manifest.ts` (dynamic, host-resolved) backed by `apps/api/src/services/pwa.service.ts::generateManifest`. Today supports 192 + 512 icons per store; the plan to extend to the full 6-size set via single-source upload + sharp auto-generation lives at `docs/superpowers/plans/2026-05-04-storefront-per-store-pwa-full-sizes.md`.
+
+See also `docs/superpowers/plans/2026-05-04-cost-reduction.md` — Phase 1 urgent: Google AI cap (env-var daily/monthly limits) + Neon compute reduction (FWB project at 97% of free CU-hr cap as of 2026-05-04).
+
 ## License
 
 Proprietary - Force Media
