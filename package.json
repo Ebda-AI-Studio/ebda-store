@@ -55,11 +55,14 @@
     "docker:build": "docker-compose build",
     "deploy": "npm run build && pm2 reload ecosystem.config.js --env production",
     "prepare": "husky",
-    "commitlint": "commitlint --edit"
+    "commitlint": "commitlint --edit",
+    "secrets": "secretlint --maskSecrets '**/*'",
+    "audit:high": "npm audit --audit-level=high"
   },
   "devDependencies": {
     "@commitlint/cli": "^20.5.3",
     "@commitlint/config-conventional": "^20.5.3",
+    "@secretlint/secretlint-rule-preset-recommend": "^13.0.0",
     "@types/node": "^20.10.0",
     "@types/supertest": "^7.2.0",
     "@types/swagger-jsdoc": "^6.0.4",
@@ -73,6 +76,7 @@
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
     "prettier": "^3.1.0",
+    "secretlint": "^13.0.0",
     "supertest": "^7.2.2",
     "typescript": "^5.3.0",
     "typescript-eslint": "^8.59.1",
@@ -80,6 +84,9 @@
     "zod": "^3.22.4"
   },
   "lint-staged": {
+    "*": [
+      "secretlint"
+    ],
     "*.{ts,tsx,js,jsx}": [
       "prettier --write"
     ],
