@@ -3,16 +3,23 @@
 ## Tech Stack
 
 - **API**: Express.js + TypeScript (apps/api)
-- **Admin Dashboard**: Next.js + App Router (apps/admin)
-- **Storefront**: Next.js + App Router (apps/web)
+- **Admin Dashboard**: Next.js 16 + App Router (apps/admin) — `next-intl` for i18n
+- **Storefront**: Next.js 16 + App Router (apps/web)
 - **ORM**: Prisma (packages/database)
 - **Database**: Neon PostgreSQL (serverless)
 - **Storage**: Cloudflare R2 (S3-compatible, public bucket via `*.r2.dev`)
-- **Cache**: Redis
+- **Cache**: Redis (Railway internal)
 - **UI Components**: Shared package (@force/ui) with Tailwind CSS
 - **Validation**: Zod (shared schemas in @force/shared)
 - **Auth**: Custom JWT (HTTP-only cookies, cross-origin with SameSite=None)
 - **Real-time**: Socket.io (WebSocket notifications)
+- **Async queue**: Inngest (bulk AI sweeps, order-created fanout, abandoned-cart, etc.)
+- **AI**: Google Gemini (`gemini-flash-lite-latest`) — translation, SEO, categorization with daily/monthly quota caps + 2.5s bulk throttle
+- **Push notifications**: dual-stack — `web-push` (VAPID, RFC 8030) for storefront and OneSignal (admin order alerts + storefront broadcast layer)
+- **Email**: SMTP via `nodemailer` (Resend in prod) with `email-queue.service.ts`
+- **Error monitoring**: Sentry (`@sentry/node` + profiling)
+- **Logging**: `pino` (structured JSON logs, `pino-pretty` in dev)
+- **Payment providers**: Tap, MyFatoorah, Hesabe, UPayments (Kuwait — Stripe doesn't work locally)
 
 ## Architecture
 
@@ -63,6 +70,22 @@ The API and frontends are on **different domains**. This has major implications:
 - **Store context (admin)**: `StoreContext` provides store list. Don't fetch `/admin/stores` elsewhere.
 - **Store context (web)**: `StoreContext` provides current store. Don't fetch store info elsewhere.
 - **API calls**: Use `apiGet`/`apiPost`/`apiPut`/`apiDelete` from `lib/api.ts`. Only use raw `fetch()` for file downloads or server components.
+
+### Async Work (Inngest)
+
+Anything `>300ms` or that calls a 3rd-party (Gemini, OneSignal, Vercel domains, SMTP) goes through `apps/api/src/lib/inngest`. Functions live in `lib/inngest/functions/` and are registered via `lib/inngest/client.ts`. Patterns:
+
+- Mark a job as `failed` on enqueue error so retries surface in the UI (see commit `205b84b`).
+- Bulk AI sweeps throttle at `AI_BULK_THROTTLE_MS` to stay under Gemini free-tier RPM (commit `6e8b5cb`).
+- Cap AI calls per-day / per-month via `AI_DAILY_REQUEST_CAP` / `AI_MONTHLY_REQUEST_CAP` (`lib/ai-quota.ts`) so a single sweep can't brick the day's quota.
+
+### Redis Cache TTL Floor
+
+Short Redis TTLs (<120s) hammer Neon compute on cache miss. ESLint rule blocks them — `feedback-rollback-recipe.md` and commit `b6e6cd7`. If you need a sub-2-min cache, use the in-memory `bounded-map.ts` instead.
+
+### Tenant Isolation (RLS)
+
+`apps/api/src/middleware/tenant-context.ts` uses AsyncLocalStorage (`runInTenantContext`) to set the Postgres session GUC that RLS policies read. After any Neon snapshot restore, re-verify policy state — the runtime depends on the policy shape being intact.
 
 ### Railway Build (Railpack)
 
@@ -141,6 +164,7 @@ authenticate → authorize('store_admin', 'super_admin') → requireStoreAccess 
 Required in production (app crashes without these):
 
 - `DATABASE_URL` — Neon PostgreSQL connection string
+- `DIRECT_URL` — Neon direct (non-pooled) URL for migrations / interactive transactions
 - `JWT_SECRET` — min 32 chars, no placeholder values
 - `ENCRYPTION_KEY` — min 32 chars
 - `PORT` — set automatically by Railway
@@ -148,32 +172,56 @@ Required in production (app crashes without these):
 
 Optional (feature degrades gracefully if missing):
 
-- `ONESIGNAL_APP_ID` — OneSignal app ID for push notifications (admin order alerts + storefront broadcasts)
-- `ONESIGNAL_REST_API_KEY` — OneSignal REST API key (matches the pattern `Authorization: Key <REST_API_KEY>`)
-  - When either is missing the broadcast endpoint returns `503 PUSH_NOT_CONFIGURED` and the admin notifications page surfaces a config note instead of crashing.
+- `REDIS_URL` — Railway internal (`redis.railway.internal:6379`); falls back to `localhost:6379` in dev
+- `ONESIGNAL_APP_ID` / `ONESIGNAL_REST_API_KEY` — admin order alerts + storefront broadcasts. When missing, broadcast endpoint returns `503 PUSH_NOT_CONFIGURED`.
+- `ONESIGNAL_ADMIN_APP_ID` / `ONESIGNAL_ADMIN_REST_API_KEY` — optional separate OneSignal app for admin alerts; falls back to the public app id/key if unset.
+- `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` — standards-based Web Push (RFC 8030) for storefront subscriptions. Without these, `push.service.ts` logs a warning and skips sends.
+- `SENTRY_DSN` — error monitoring; safe to omit in dev.
+- `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_FROM_NAME` / `SMTP_FROM_EMAIL` — outbound email via Resend.
+- `GOOGLE_GENERATIVE_AI_KEY` — Gemini AI features (translate, SEO, categorize). When missing, AI routes return a config error.
+- `GEMINI_MODEL` (default `gemini-flash-lite-latest`), `AI_BULK_THROTTLE_MS` (default 2500), `AI_DAILY_REQUEST_CAP` (default 1000), `AI_MONTHLY_REQUEST_CAP` (default 20000) — Gemini free-tier guardrails.
+- `VERCEL_API_TOKEN` / `VERCEL_PROJECT_ID` / `VERCEL_TEAM_ID` — required only for automatic custom-domain provisioning when stores attach a domain.
+- `WHATSAPP_VERIFY_TOKEN` — Meta Cloud API webhook verification (WhatsApp queue is wired but per-store credentials live on the store record).
+- Payment providers (per-store credentials live on the store record; env vars below are global defaults / test mode): `PAYMENT_TEST_MODE`, `DEFAULT_PAYMENT_PROVIDER`, `DEFAULT_CURRENCY`, plus provider-specific `TAP_*`, `MYFATOORAH_*`, `HESABE_*`, `UPAYMENTS_*`.
 
 ### Admin (Vercel)
 
 - `NEXT_PUBLIC_API_URL` — Railway API URL (e.g., `https://api-production-c058.up.railway.app`)
+- `NEXT_PUBLIC_ONESIGNAL_APP_ID` — OneSignal app ID for the admin PWA (`react-onesignal` in `apps/admin`).
 
 ### Web (Vercel)
 
 - `NEXT_PUBLIC_API_URL` — Railway API URL
-- `NEXT_PUBLIC_ONESIGNAL_APP_ID` — OneSignal app ID for storefront push subscription. Required for the v16 SDK to mount + tag devices with `storeId` so admin broadcasts reach this store's subscribers. Storefront silently no-ops when missing.
+- `NEXT_PUBLIC_ONESIGNAL_APP_ID` — OneSignal app ID for storefront broadcasts (script-tag init via `OneSignalStorefrontInit.tsx`). Storefront silently no-ops when missing.
+- `NEXT_PUBLIC_VAPID_PUBLIC_KEY` — VAPID public key for the standards-based Web Push subscription path.
 
 ## Commands
 
 ```bash
 npm run dev:api          # Start API dev server
-npm run dev:admin        # Start admin dev server
-npm run dev:web          # Start web dev server
+npm run dev:admin        # Start admin dev server (port 3001)
+npm run dev:web          # Start web dev server (port 3000)
 npm run build            # Build all workspaces
-npm run db:generate      # Run prisma generate
-npm run db:migrate       # Run prisma migrate dev
-npm run db:studio        # Open Prisma Studio
-npm run test             # Run all tests
+npm run typecheck        # tsc --noEmit across the repo
 npm run lint             # Lint all workspaces
+npm run lint:fix         # Lint + autofix
+npm run format           # Prettier write
+npm run format:check     # Prettier check (CI gate)
+npm run db:generate      # prisma generate
+npm run db:migrate       # prisma migrate dev
+npm run db:push          # prisma db push (dev only — bypasses migration history)
+npm run db:seed          # Seed dev/test data
+npm run db:studio        # Open Prisma Studio
+npm run test             # Run all vitest suites
+npm run test:unit        # tests/unit
+npm run test:integration # tests/integration (real DB + Redis)
+npm run test:e2e         # tests/e2e
+npm run test:coverage    # Coverage report
+npm run audit:high       # npm audit --audit-level=high
+npm run secrets          # secretlint scan (also runs via lint-staged on commit)
 ```
+
+CI (`.github/workflows/ci.yml`) runs lint → typecheck → build → unit tests → integration tests (with Postgres 16 + Redis 7 services) → e2e → security audit + trufflehog secret scan. Gitleaks runs separately via `.github/workflows/gitleaks.yml`.
 
 ## Production rollback + backup
 
