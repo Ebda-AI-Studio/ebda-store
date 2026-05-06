@@ -174,3 +174,13 @@ npm run db:studio        # Open Prisma Studio
 npm run test             # Run all tests
 npm run lint             # Lint all workspaces
 ```
+
+## Production rollback + backup
+
+This project follows the standing rollback discipline (see global `~/.claude/CLAUDE.md` + `~/.claude/projects/-Users-ahmadsharaf/memory/feedback-rollback-recipe.md`).
+
+- **Code rollback (all 3 deploys at once):** `bash scripts/rollback.sh` — git revert + push triggers Vercel admin (`apps/admin`) + Vercel storefront (`apps/web`) + Railway API. Lock-step matters — `apps/admin` and `apps/web` share API contracts via `@force/shared`. Don't promote one Vercel app without the other.
+- **Per-commit Neon snapshot:** `.github/workflows/neon-snapshot.yml` creates `prod-<short-sha>` branch on every push to main. Repo secrets: `NEON_API_KEY`, `NEON_PROJECT_ID`.
+- **Local pg_dump:** `bash scripts/backup-db.sh` writes to `~/Desktop/projects/_backups/force-website-builder/`. Reads `DATABASE_URL` from `apps/api/.env`.
+- **Migration rollback:** see `docs/ROLLBACK.md`. RLS policy state must be re-verified after restore (the `runInTenantContext` AsyncLocalStorage pattern depends on policy shape). Hand-written migrations live at `packages/database/prisma/migrations/<TS>_<name>/migration.sql` and apply on next API boot — by the time you notice a schema bug, it's already live.
+- **Trace what migrated:** `git log --diff-filter=A --name-only -- packages/database/prisma/migrations/`

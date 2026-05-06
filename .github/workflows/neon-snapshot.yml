@@ -1,0 +1,40 @@
+name: Neon snapshot
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot:
+    name: Create Neon branch from production
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create branch + prune old snapshots
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
+          GIT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [ -z "${NEON_API_KEY:-}" ] || [ -z "${NEON_PROJECT_ID:-}" ]; then
+            echo "::warning::NEON_API_KEY or NEON_PROJECT_ID not set; skipping snapshot."
+            exit 0
+          fi
+          SHORT_SHA="${GIT_SHA:0:8}"
+          BRANCH_NAME="prod-${SHORT_SHA}"
+          API="https://console.neon.tech/api/v2/projects/${NEON_PROJECT_ID}"
+          curl -fsSL -X POST "${API}/branches" \
+            -H "Authorization: Bearer ${NEON_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -d "{\"branch\":{\"name\":\"${BRANCH_NAME}\"}}" \
+            | jq -r '.branch | "Created: " + .name + " (" + .id + ")"'
+          BRANCHES_JSON=$(curl -fsSL "${API}/branches" -H "Authorization: Bearer ${NEON_API_KEY}")
+          OLD_IDS=$(echo "$BRANCHES_JSON" | jq -r '.branches | map(select(.name | startswith("prod-"))) | sort_by(.created_at) | reverse | .[9:] | .[].id')
+          for branch_id in $OLD_IDS; do
+            curl -fsSL -X DELETE "${API}/branches/${branch_id}" \
+              -H "Authorization: Bearer ${NEON_API_KEY}" || echo "::warning::Failed to delete ${branch_id}"
+            echo "Pruned: ${branch_id}"
+          done
