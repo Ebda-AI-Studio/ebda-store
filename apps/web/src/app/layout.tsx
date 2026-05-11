@@ -249,9 +249,16 @@ export async function generateMetadata(): Promise<Metadata> {
           },
         }
       : {}),
-    ...(store.googleSiteVerification
-      ? { verification: { google: store.googleSiteVerification } }
-      : {}),
+    // Platform-level Google Search Console verification for
+    // `store.forcemediakw.com`. The token is meant to be public (Google
+    // fetches the meta tag from a public URL), so it lives in source.
+    // Per-store tokens are layered on top so individual merchants can
+    // also verify their own custom domains independently.
+    verification: {
+      google: store.googleSiteVerification
+        ? ['gzm3VDXL0OakVx_Rf4ytQZSyWZeW4nHg0WLcvxsehVI', store.googleSiteVerification]
+        : 'gzm3VDXL0OakVx_Rf4ytQZSyWZeW4nHg0WLcvxsehVI',
+    },
   };
 }
 
