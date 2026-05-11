@@ -70,6 +70,18 @@ const themeSchema = z.record(z.string(), z.unknown()).refine(
 const optionalStr = (maxLen: number) =>
   z.preprocess(v => (v === '' || v === null ? undefined : v), z.string().max(maxLen).optional());
 
+// Merchants routinely paste the entire `<meta name="google-site-verification"
+// content="..." />` tag instead of just the content token. Extract the token
+// before validation so the storefront emits a valid meta tag and the
+// verification flow doesn't silently fail.
+const optionalGoogleVerification = z.preprocess(v => {
+  if (typeof v !== 'string') return v === null ? undefined : v;
+  const trimmed = v.trim();
+  if (trimmed === '') return undefined;
+  const tagMatch = trimmed.match(/content\s*=\s*["']([^"']+)["']/i);
+  return tagMatch ? tagMatch[1].trim() : trimmed;
+}, z.string().max(200).optional());
+
 const optionalUrl = z.preprocess(
   v => (v === '' || v === null ? undefined : v),
   z.string().url().max(500).optional()
@@ -88,7 +100,7 @@ const seoSchema = z
     metaDescriptionAr: optionalStr(500),
     ogImage: optionalUrl,
     twitterHandle: optionalStr(50),
-    googleSiteVerification: optionalStr(200),
+    googleSiteVerification: optionalGoogleVerification,
   })
   .strip();
 

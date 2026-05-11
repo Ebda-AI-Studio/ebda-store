@@ -32,6 +32,15 @@ const DEFAULT_SETTINGS: SeoSettings = {
 const TITLE_MAX = 60;
 const DESC_MAX = 160;
 
+// Pull the token out if the merchant pasted the entire
+// `<meta name="google-site-verification" content="..." />` tag.
+function extractGoogleVerificationToken(input: string): string {
+  const trimmed = input.trim();
+  if (!trimmed) return '';
+  const tagMatch = trimmed.match(/content\s*=\s*["']([^"']+)["']/i);
+  return tagMatch ? tagMatch[1].trim() : trimmed;
+}
+
 function CharCount({ value, max }: { value: string; max: number }) {
   const len = value.length;
   const isOver = len > max;
@@ -386,14 +395,22 @@ export default function StoreSeoPage() {
                 type="text"
                 value={settings.googleSiteVerification}
                 onChange={e =>
-                  setSettings(prev => ({ ...prev, googleSiteVerification: e.target.value }))
+                  setSettings(prev => ({
+                    ...prev,
+                    googleSiteVerification: extractGoogleVerificationToken(e.target.value),
+                  }))
                 }
                 placeholder={t('googleSiteVerificationPlaceholder')}
-                className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className="w-full rounded-lg border border-border px-4 py-2 text-sm font-mono focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               />
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="mt-1 text-xs text-muted-foreground whitespace-pre-line">
                 {t('googleSiteVerificationHint')}
               </p>
+              {settings.googleSiteVerification && (
+                <pre className="mt-2 overflow-x-auto rounded-md border border-border bg-muted px-3 py-2 text-[11px] text-muted-foreground">
+                  {`<meta name="google-site-verification" content="${settings.googleSiteVerification}" />`}
+                </pre>
+              )}
             </div>
           </div>
         </div>
