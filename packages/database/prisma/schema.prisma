@@ -158,6 +158,11 @@ model Store {
   nameAr           String?     @map("name_ar")
   slug             String      @unique
   domain           String?     @unique
+  // Resend email-sender state (platform-managed under a single Resend account)
+  emailSenderLocalPart  String    @default("noreply") @map("email_sender_local_part")
+  emailDomainId         String?   @map("email_domain_id")
+  emailDomainStatus     String?   @map("email_domain_status")
+  emailDomainVerifiedAt DateTime? @map("email_domain_verified_at")
   ownerId          String      @map("owner_id")
   status           StoreStatus @default(active)
   plan             StorePlan   @default(starter)
