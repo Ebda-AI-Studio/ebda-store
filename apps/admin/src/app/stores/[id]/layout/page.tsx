@@ -9,6 +9,7 @@ import { AdminLayout } from '../../../../components/AdminLayout';
 import { Toggle } from '../../../../components/Toggle';
 import { ImageUpload } from '../../../../components/ImageUpload';
 import { apiGet, apiPut } from '../../../../lib/api';
+import { getStoreHref } from '../../../../lib/store-url';
 
 interface StoreInfo {
   id: string;
@@ -84,12 +85,7 @@ export default function StoreLayoutPage() {
   // domain + path-based slug (`/<store-slug>`) — that is the route shape the
   // web app's middleware actually resolves; a `?storeSlug=` query gets
   // ignored and falls through to whichever store the platform serves at /.
-  const previewUrl =
-    storeInfo?.domain && storeInfo.domain.length > 0
-      ? `https://${storeInfo.domain}`
-      : storeInfo?.slug
-        ? `${process.env.NEXT_PUBLIC_WEB_URL ?? 'https://store.forcemediakw.com'}/${storeInfo.slug}`
-        : null;
+  const previewUrl = storeInfo?.slug ? getStoreHref(storeInfo) : null;
 
   return (
     <AdminLayout

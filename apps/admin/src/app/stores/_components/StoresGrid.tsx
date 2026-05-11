@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useT } from '@/i18n/useT';
+import { getStoreDisplayUrl } from '@/lib/store-url';
 import { formatDate, planConfig, statusConfig, type Store } from './types';
 
 interface StoresGridProps {
@@ -45,7 +46,7 @@ export function StoresGrid({ stores }: StoresGridProps) {
                   {store.name}
                 </h3>
                 <p className="text-sm text-muted-foreground truncate">
-                  {store.domain || `${store.slug}.forcemediakw.com`}
+                  {getStoreDisplayUrl(store)}
                 </p>
               </div>
             </div>

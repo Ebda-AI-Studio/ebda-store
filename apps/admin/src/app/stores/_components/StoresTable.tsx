@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Button } from '@force/ui';
 import { useT } from '@/i18n/useT';
+import { getStoreDisplayUrl } from '@/lib/store-url';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { formatDate, planConfig, statusConfig, type Store } from './types';
 
@@ -24,9 +25,7 @@ export function StoresTable({ stores }: StoresTableProps) {
           </div>
           <div className="min-w-0">
             <p className="font-medium text-foreground truncate">{store.name}</p>
-            <p className="text-sm text-muted-foreground truncate">
-              {store.domain || `${store.slug}.forcemediakw.com`}
-            </p>
+            <p className="text-sm text-muted-foreground truncate">{getStoreDisplayUrl(store)}</p>
           </div>
         </div>
       ),

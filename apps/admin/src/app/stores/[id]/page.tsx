@@ -6,6 +6,7 @@ import { Button, useToast } from '@force/ui';
 import { AdminLayout } from '../../../components/AdminLayout';
 import { useAuth } from '../../../lib/auth';
 import { apiDelete } from '../../../lib/api';
+import { getStoreDisplayUrl } from '../../../lib/store-url';
 import { useT } from '@/i18n/useT';
 import { useDashboardData } from './_hooks/useDashboardData';
 // OnboardingChecklist removed per merchant feedback — the file lives in
@@ -112,7 +113,7 @@ export default function StoreDetailPage() {
   return (
     <AdminLayout
       title={store.name}
-      subtitle={store.domain || `store.forcemediakw.com/${store.slug}`}
+      subtitle={getStoreDisplayUrl(store)}
       actions={
         <div className="flex gap-2">
           {!isEditing && (

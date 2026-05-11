@@ -6,6 +6,7 @@ import { Badge, Button } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { Alert } from '../../../../components/Alert';
 import { apiGet } from '../../../../lib/api';
+import { getPlatformStoreUrl, getStoreDisplayUrl } from '../../../../lib/store-url';
 import { useT } from '@/i18n/useT';
 import type { CreatedOwner, CreatedStore, DomainStatus } from './types';
 
@@ -67,13 +68,13 @@ export function SuccessScreen({ store, owner }: SuccessScreenProps) {
             <dl className="mt-2 space-y-1 text-sm">
               <div className="flex justify-between">
                 <dt className="text-muted-foreground">{t('storeUrl')}</dt>
-                <dd className="font-medium">{store.domain || `${store.slug}.forcemediakw.com`}</dd>
+                <dd className="font-medium">{getStoreDisplayUrl(store)}</dd>
               </div>
               {store.domain && (
                 <div className="flex justify-between">
                   <dt className="text-muted-foreground">{t('defaultUrl')}</dt>
                   <dd className="font-medium text-muted-foreground">
-                    {store.slug}.forcemediakw.com
+                    {getPlatformStoreUrl(store.slug)}
                   </dd>
                 </div>
               )}

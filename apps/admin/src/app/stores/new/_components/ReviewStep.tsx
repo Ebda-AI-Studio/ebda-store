@@ -1,6 +1,7 @@
 'use client';
 
 import { useT } from '@/i18n/useT';
+import { getPlatformStoreUrl } from '@/lib/store-url';
 import type { FormData, Step } from './types';
 
 interface ReviewStepProps {
@@ -36,7 +37,7 @@ export function ReviewStep({ formData, error, onJumpTo }: ReviewStepProps) {
             </div>
             <div className="flex justify-between">
               <dt className="text-muted-foreground">{t('reviewStoreUrl')}</dt>
-              <dd className="font-medium">{formData.storeSlug}.forcemediakw.com</dd>
+              <dd className="font-medium">{getPlatformStoreUrl(formData.storeSlug)}</dd>
             </div>
             {formData.customDomain && (
               <div className="flex justify-between">

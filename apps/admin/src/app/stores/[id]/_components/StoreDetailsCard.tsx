@@ -2,6 +2,7 @@
 
 import { Badge, Button, Input, Label } from '@force/ui';
 import { formatDate } from '../../../../lib/format';
+import { getStoreDisplayUrl } from '../../../../lib/store-url';
 import { useT } from '@/i18n/useT';
 import { statusColors, type Store, type StoreEditForm, type StoreFormErrors } from './types';
 
@@ -147,9 +148,7 @@ export function StoreDetailsCard({
             </div>
             <div>
               <p className="text-sm text-muted-foreground">{t('url')}</p>
-              <p className="font-medium text-foreground">
-                {store.domain || `${store.slug}.forcemediakw.com`}
-              </p>
+              <p className="font-medium text-foreground">{getStoreDisplayUrl(store)}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">{t('status')}</p>
