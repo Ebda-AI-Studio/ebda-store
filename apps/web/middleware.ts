@@ -152,8 +152,12 @@ export function middleware(request: NextRequest) {
     const response = NextResponse.rewrite(url, {
       request: { headers: requestHeaders },
     });
-    // Persist store slug in cookie so subsequent pages (e.g. /products) keep store context
-    response.cookies.set('x-store-slug', slugInfo.slug, { path: '/', httpOnly: true });
+    // Only set the cookie when it's missing or stale. Re-setting it on every
+    // request forces Next to mark the response uncacheable
+    // (`Cache-Control: no-store`), which hurts crawl budget on the storefront.
+    if (request.cookies.get('x-store-slug')?.value !== slugInfo.slug) {
+      response.cookies.set('x-store-slug', slugInfo.slug, { path: '/', httpOnly: true });
+    }
     return response;
   }
 

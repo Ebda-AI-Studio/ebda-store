@@ -104,11 +104,13 @@ export function breadcrumbJsonLd(items: BreadcrumbItem[]) {
  * Resolve the canonical site URL for this store.
  */
 export function getSiteUrl(store?: ResolvedStore): string {
+  // Whitespace defense: a stray newline in the Vercel env var silently breaks
+  // every URL in robots.txt + sitemap.xml (Google then can't fetch the map).
   if (process.env.NEXT_PUBLIC_SITE_URL) {
-    return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, '');
+    return process.env.NEXT_PUBLIC_SITE_URL.trim().replace(/\/$/, '');
   }
   if (store?.domain) {
-    return `https://${store.domain}`;
+    return `https://${store.domain.trim()}`;
   }
   return 'https://store.forcemediakw.com';
 }
