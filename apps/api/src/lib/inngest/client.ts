@@ -80,6 +80,27 @@ export type AppEvent =
   | OrderDeliveredEvent
   | ReviewSubmittedEvent;
 
+// Inngest re-registers the function manifest only when it detects a
+// deploy-version change. Without an explicit deploy id, Railway boots
+// look identical across deploys to Inngest's tracker — new functions
+// get accepted as events but no handler runs (BulkAiJob rows stuck
+// 'queued' forever). Map RAILWAY_DEPLOYMENT_ID (auto-set per deploy)
+// to INNGEST_DEPLOY_ID at process start. Fallback chain handles other
+// platforms + local dev gracefully.
+//
+// See ~/.claude/projects/-Users-ahmadsharaf/memory/feedback-inngest-deploy-sync-trap.md
+// for the full trap explanation.
+if (!process.env.INNGEST_DEPLOY_ID) {
+  const detected =
+    process.env.RAILWAY_DEPLOYMENT_ID ||
+    process.env.VERCEL_GIT_COMMIT_SHA ||
+    process.env.GIT_COMMIT ||
+    process.env.SOURCE_VERSION;
+  if (detected) {
+    process.env.INNGEST_DEPLOY_ID = detected;
+  }
+}
+
 export const inngest = new Inngest({
   id: 'force-api',
   // Inngest's SDK auto-detects dev mode from the absence of an event
