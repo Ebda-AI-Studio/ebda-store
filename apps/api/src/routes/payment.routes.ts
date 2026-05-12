@@ -81,8 +81,8 @@ const refundSchema = z.object({
  */
 router.get('/config', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const providers = await PaymentService.getAvailableProviders();
     const storeId = req.headers['x-store-id'] as string | undefined;
+    const providers = await PaymentService.getAvailableProviders(storeId);
 
     // Check if COD is enabled for this store (or globally)
     let codConfig: { fixedFee: number; displayName: string; displayNameAr: string | null } | null =
@@ -144,8 +144,9 @@ router.get('/methods', async (req: Request, res: Response, next: NextFunction) =
     const amount = parseInt(req.query.amount as string) || 1000;
     const currency = (req.query.currency as Currency) || 'KWD';
     const provider = req.query.provider as PaymentProvider | undefined;
+    const storeId = req.headers['x-store-id'] as string | undefined;
 
-    const methods = await PaymentService.getPaymentMethods(amount, currency, provider);
+    const methods = await PaymentService.getPaymentMethods(amount, currency, provider, storeId);
 
     res.json({
       success: true,
