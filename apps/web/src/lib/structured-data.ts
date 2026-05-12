@@ -10,6 +10,20 @@ interface ProductForJsonLd {
   images?: Array<{ url: string; alt?: string }>;
   inventory?: number;
   categories?: Array<{ category?: { name?: string; slug?: string } }>;
+  /** Verified-purchase published reviews for JSON-LD. Server MUST pre-filter
+   *  (status='published' AND verifiedPurchase=true) before passing here. */
+  reviews?: Array<{
+    author: string;
+    rating: number;
+    body: string;
+    datePublished: string; // ISO 8601
+    inLanguage?: 'en' | 'ar';
+  }>;
+  /** Aggregate over verified-purchase published reviews only. */
+  aggregateRating?: {
+    ratingValue: number;
+    reviewCount: number;
+  };
 }
 
 /**
@@ -46,6 +60,14 @@ export function productJsonLd(product: ProductForJsonLd, store: ResolvedStore) {
         name: store.name,
       },
     },
+    // Emit aggregateRating only when there are real verified reviews.
+    ...(product.aggregateRating && product.aggregateRating.reviewCount > 0
+      ? { aggregateRating: aggregateRatingJsonLd(product.aggregateRating) }
+      : {}),
+    // Embed up to 20 review snippets inside the Product node.
+    ...(product.reviews && product.reviews.length > 0
+      ? { review: product.reviews.map(r => reviewJsonLd(r)) }
+      : {}),
   };
 }
 

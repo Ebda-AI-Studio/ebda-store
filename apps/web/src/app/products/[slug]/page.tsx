@@ -152,9 +152,47 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
         }))
       : [];
 
+  // Build review and aggregateRating inputs for JSON-LD.
+  // The API already filtered to status='published' + verifiedPurchase=true
+  // — we just map the shape here.
+  const reviewsForJsonLd =
+    initialProduct?.reviews?.map(
+      (r: {
+        customer?: { firstName?: string; lastName?: string } | null;
+        rating: number;
+        body?: string | null;
+        createdAt: string;
+        language?: string | null;
+      }) => ({
+        author:
+          r.customer?.firstName || r.customer?.lastName
+            ? [r.customer.firstName, r.customer.lastName].filter(Boolean).join(' ')
+            : 'Verified Buyer',
+        rating: r.rating,
+        body: r.body ?? '',
+        datePublished: new Date(r.createdAt).toISOString().slice(0, 10),
+        inLanguage: (r.language as 'en' | 'ar') ?? undefined,
+      })
+    ) ?? [];
+
+  const aggregateRatingForJsonLd =
+    initialProduct?.ratingStats?.ratingCount > 0
+      ? {
+          ratingValue: initialProduct.ratingStats.ratingAverage ?? 0,
+          reviewCount: initialProduct.ratingStats.ratingCount,
+        }
+      : undefined;
+
   const jsonLdScripts = initialProduct
     ? [
-        productJsonLd(initialProduct, store),
+        productJsonLd(
+          {
+            ...initialProduct,
+            reviews: reviewsForJsonLd.length > 0 ? reviewsForJsonLd : undefined,
+            aggregateRating: aggregateRatingForJsonLd,
+          },
+          store
+        ),
         breadcrumbJsonLd([
           { name: 'Home', url: siteUrl },
           { name: 'Products', url: `${siteUrl}/products` },

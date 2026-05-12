@@ -554,6 +554,27 @@ export class ProductService {
         },
       },
     },
+    // JSON-LD reviews: only published + verified-purchase, capped at 20.
+    // Defense-in-depth — AI-generated or unverified reviews cannot appear
+    // in structured data even if inserted through another code path.
+    reviews: {
+      where: { status: 'published', verifiedPurchase: true },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+      select: {
+        id: true,
+        rating: true,
+        title: true,
+        body: true,
+        bodyTranslated: true,
+        language: true,
+        createdAt: true,
+        ownerResponse: true,
+        ownerResponseAr: true,
+        ownerResponseAt: true,
+        customer: { select: { firstName: true, lastName: true } },
+      },
+    },
   } as const satisfies Prisma.ProductInclude;
 
   /**
@@ -663,7 +684,20 @@ export class ProductService {
       throw new AppError(404, 'NOT_FOUND', 'Product not found');
     }
 
-    return this.reshapePublicProductDetail(product);
+    const ratingAggregate = await prisma.review.aggregate({
+      where: { productId: product.id, storeId, status: 'published', verifiedPurchase: true },
+      _avg: { rating: true },
+      _count: { rating: true },
+    });
+
+    const ratingStats = {
+      ratingAverage: ratingAggregate._avg.rating
+        ? Math.round(ratingAggregate._avg.rating * 10) / 10
+        : null,
+      ratingCount: ratingAggregate._count.rating,
+    };
+
+    return { ...this.reshapePublicProductDetail(product), ratingStats };
   }
 
   static async getPublicById(storeId: string, productId: string) {
@@ -676,7 +710,20 @@ export class ProductService {
       throw new AppError(404, 'NOT_FOUND', 'Product not found');
     }
 
-    return this.reshapePublicProductDetail(product);
+    const ratingAggregate = await prisma.review.aggregate({
+      where: { productId: product.id, storeId, status: 'published', verifiedPurchase: true },
+      _avg: { rating: true },
+      _count: { rating: true },
+    });
+
+    const ratingStats = {
+      ratingAverage: ratingAggregate._avg.rating
+        ? Math.round(ratingAggregate._avg.rating * 10) / 10
+        : null,
+      ratingCount: ratingAggregate._count.rating,
+    };
+
+    return { ...this.reshapePublicProductDetail(product), ratingStats };
   }
 
   static async getCategories(storeId: string) {

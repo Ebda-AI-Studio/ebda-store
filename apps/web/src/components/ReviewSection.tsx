@@ -15,6 +15,7 @@ interface Review {
   /** Legacy alias — API previously returned `comment`, now returns `body`.
    *  Keep both so the component degrades gracefully during deploy roll. */
   comment?: string;
+  bodyTranslated?: string | null;
   title?: string;
   language?: string;
   verifiedPurchase?: boolean;
@@ -30,6 +31,10 @@ interface Review {
   isMine?: boolean;
   /** Legacy compat — mapped from status !== 'published' in API response. */
   isApproved?: boolean;
+  /** Store owner response fields */
+  ownerResponse?: string | null;
+  ownerResponseAr?: string | null;
+  ownerResponseAt?: string | null;
 }
 
 interface ReviewsResponse {
@@ -123,6 +128,8 @@ export default function ReviewSection({ storeId, productId }: Props) {
   const [averageRating, setAverageRating] = useState<number>(0);
   const [totalCount, setTotalCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
+  // Track which reviews have the translate toggle active (show bodyTranslated)
+  const [translatedIds, setTranslatedIds] = useState<Set<string>>(new Set());
 
   // Write-review form state
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -232,6 +239,19 @@ export default function ReviewSection({ storeId, productId }: Props) {
     }
   }
 
+  // Toggle translate-to-viewer-locale for a specific review
+  const toggleTranslate = (reviewId: string) => {
+    setTranslatedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(reviewId)) {
+        next.delete(reviewId);
+      } else {
+        next.add(reviewId);
+      }
+      return next;
+    });
+  };
+
   // Derive the store name for display - fallback gracefully
   const storeName = store?.name || t('Store', 'المتجر');
 
@@ -241,7 +261,7 @@ export default function ReviewSection({ storeId, productId }: Props) {
         {t('Customer Reviews', 'مراجعات العملاء')}
       </h2>
 
-      {/* Average rating summary */}
+      {/* Average rating summary — prominent count + verified label */}
       {!isLoading && totalCount > 0 && (
         <div className="mt-4 flex items-center gap-4">
           <span className="text-5xl font-bold text-foreground">{averageRating.toFixed(1)}</span>
@@ -249,8 +269,8 @@ export default function ReviewSection({ storeId, productId }: Props) {
             <StarDisplay rating={Math.round(averageRating)} size="lg" />
             <p className="mt-1 text-sm text-muted-foreground">
               {t(
-                `Based on ${totalCount} ${totalCount === 1 ? 'review' : 'reviews'}`,
-                `بناءً على ${totalCount} ${totalCount === 1 ? 'مراجعة' : 'مراجعات'}`
+                `${averageRating.toFixed(1)} out of 5 — ${totalCount} verified ${totalCount === 1 ? 'review' : 'reviews'}`,
+                `${averageRating.toFixed(1)} من 5 — ${totalCount} ${totalCount === 1 ? 'مراجعة' : 'مراجعة'} موثّقة`
               )}
             </p>
           </div>
@@ -270,6 +290,21 @@ export default function ReviewSection({ storeId, productId }: Props) {
           {reviews.map(review => {
             const isPending =
               review.isMine && (review.status === 'pending' || review.isApproved === false);
+            // Determine if a translation toggle is available:
+            // show only when bodyTranslated exists and review language differs from viewer locale
+            const hasTranslation =
+              !!review.bodyTranslated && review.language && review.language !== language;
+            const showTranslated = hasTranslation && translatedIds.has(review.id);
+            const displayBody = showTranslated
+              ? review.bodyTranslated
+              : (review.body ?? review.comment);
+
+            // Owner response: use Arabic version when viewer is in Arabic locale
+            const ownerResponseText =
+              language === 'ar' && review.ownerResponseAr
+                ? review.ownerResponseAr
+                : review.ownerResponse;
+
             return (
               <div
                 key={review.id}
@@ -279,7 +314,27 @@ export default function ReviewSection({ storeId, productId }: Props) {
               >
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <p className="font-medium text-foreground">{getReviewerName(review)}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-foreground">{getReviewerName(review)}</p>
+                      {/* Verified purchase badge */}
+                      {review.verifiedPurchase && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-[hsl(var(--success))]/10 px-2 py-0.5 text-xs font-medium text-[hsl(var(--success))]">
+                          <svg
+                            className="h-3 w-3"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                            aria-hidden="true"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                          {t('Verified purchase', 'شراء موثّق')}
+                        </span>
+                      )}
+                    </div>
                     <StarDisplay rating={review.rating} />
                   </div>
                   <time className="text-sm text-muted-foreground whitespace-nowrap">
@@ -294,10 +349,36 @@ export default function ReviewSection({ storeId, productId }: Props) {
                     )}
                   </p>
                 )}
-                {(review.body || review.comment) && (
-                  <p className="mt-3 text-muted-foreground leading-relaxed">
-                    {review.body ?? review.comment}
-                  </p>
+                {displayBody && (
+                  <p className="mt-3 text-muted-foreground leading-relaxed">{displayBody}</p>
+                )}
+                {/* Translate toggle — only shown when a translation exists in the other locale */}
+                {hasTranslation && (
+                  <button
+                    type="button"
+                    onClick={() => toggleTranslate(review.id)}
+                    className="mt-2 text-xs text-primary hover:underline focus:outline-none"
+                  >
+                    {showTranslated
+                      ? t('Show original', 'عرض النص الأصلي')
+                      : t('Translate', 'ترجمة')}
+                  </button>
+                )}
+                {/* Owner response */}
+                {ownerResponseText && (
+                  <div className="mt-4 rounded-lg bg-muted/50 border border-border px-4 py-3">
+                    <p className="text-xs font-semibold text-foreground mb-1">
+                      {t(`Response from ${storeName}`, `رد من ${storeName}`)}
+                    </p>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      {ownerResponseText}
+                    </p>
+                    {review.ownerResponseAt && (
+                      <p className="mt-1 text-xs text-muted-foreground/70">
+                        {formatDate(review.ownerResponseAt)}
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
             );
@@ -305,13 +386,10 @@ export default function ReviewSection({ storeId, productId }: Props) {
         </div>
       )}
 
-      {/* Empty state */}
+      {/* Empty state — no sample cards until Task 31 */}
       {!isLoading && reviews.length === 0 && (
         <p className="mt-6 text-muted-foreground">
-          {t(
-            'No reviews yet for this product. Be the first to share your thoughts!',
-            'لا توجد مراجعات بعد لهذا المنتج. كن أول من يشارك رأيه!'
-          )}
+          {t('Be the first to review this product.', 'كن أول من يراجع هذا المنتج.')}
         </p>
       )}
 
