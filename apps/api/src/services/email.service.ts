@@ -280,7 +280,13 @@ export class EmailService {
    */
   private static async sendForStore(
     storeId: string,
-    args: { to: string | string[]; subject: string; content: string; text?: string }
+    args: {
+      to: string | string[];
+      subject: string;
+      content: string;
+      text?: string;
+      language?: 'en' | 'ar';
+    }
   ): Promise<void> {
     const store = await prisma.store.findUnique({
       where: { id: storeId },
@@ -300,8 +306,9 @@ export class EmailService {
       },
     });
     if (!store) throw new Error(`Store ${storeId} not found`);
-    const defaultLanguage =
+    const storeDefaultLang =
       (store.settings as Record<string, unknown> | null)?.defaultLanguage === 'ar' ? 'ar' : 'en';
+    const language = args.language ?? storeDefaultLang;
     const html = renderBrandedShell(args.content, {
       name: store.name,
       nameAr: store.nameAr,
@@ -310,7 +317,7 @@ export class EmailService {
       email: store.email,
       phone: store.phone,
       address: store.address,
-      defaultLanguage,
+      defaultLanguage: language,
     });
     await ResendService.sendBrandedEmail(storeId, {
       to: args.to,
@@ -398,24 +405,34 @@ export class EmailService {
   /**
    * Order Confirmation Email
    */
-  static async sendOrderConfirmation(storeId: string, data: OrderEmailData): Promise<void> {
-    const content = this.orderConfirmationTemplate(data);
+  static async sendOrderConfirmation(
+    storeId: string,
+    data: OrderEmailData,
+    language?: 'en' | 'ar'
+  ): Promise<void> {
+    const content = this.renderTemplate('order-confirmation', data, language);
     await this.sendForStore(storeId, {
       to: data.customerEmail,
       subject: `Order Confirmed - #${data.orderNumber}`,
       content,
+      language,
     });
   }
 
   /**
    * Payment Success Email
    */
-  static async sendPaymentSuccess(storeId: string, data: OrderEmailData): Promise<void> {
-    const content = this.paymentSuccessTemplate(data);
+  static async sendPaymentSuccess(
+    storeId: string,
+    data: OrderEmailData,
+    language?: 'en' | 'ar'
+  ): Promise<void> {
+    const content = this.renderTemplate('payment-success', data, language);
     await this.sendForStore(storeId, {
       to: data.customerEmail,
       subject: `Payment Received - Order #${data.orderNumber}`,
       content,
+      language,
     });
   }
 
@@ -429,13 +446,15 @@ export class EmailService {
       customerName: string;
       orderNumber: string;
       reason?: string;
-    }
+    },
+    language?: 'en' | 'ar'
   ): Promise<void> {
-    const content = this.paymentFailedTemplate(data);
+    const content = this.renderTemplate('payment-failed', data, language);
     await this.sendForStore(storeId, {
       to: data.customerEmail,
       subject: `Payment Failed - Order #${data.orderNumber}`,
       content,
+      language,
     });
   }
 
@@ -451,13 +470,15 @@ export class EmailService {
       trackingNumber?: string;
       trackingUrl?: string;
       carrier?: string;
-    }
+    },
+    language?: 'en' | 'ar'
   ): Promise<void> {
-    const content = this.orderShippedTemplate(data);
+    const content = this.renderTemplate('order-shipped', data, language);
     await this.sendForStore(storeId, {
       to: data.customerEmail,
       subject: `Your Order Has Shipped - #${data.orderNumber}`,
       content,
+      language,
     });
   }
 
@@ -471,21 +492,27 @@ export class EmailService {
       name: string;
       resetUrl: string;
       expiresIn: string;
-    }
+    },
+    language?: 'en' | 'ar'
   ): Promise<void> {
-    const content = this.passwordResetTemplate(data);
+    const content = this.renderTemplate('password-reset', data, language);
     await this.sendForStore(storeId, {
       to: data.email,
       subject: 'Reset Your Password',
       content,
+      language,
     });
   }
 
   /**
    * Welcome Email
    */
-  static async sendWelcome(storeId: string, data: { email: string; name: string }): Promise<void> {
-    const content = this.welcomeTemplate(data);
+  static async sendWelcome(
+    storeId: string,
+    data: { email: string; name: string },
+    language?: 'en' | 'ar'
+  ): Promise<void> {
+    const content = this.renderTemplate('welcome', data, language);
     // Load store name so the subject reflects the buying merchant, not the
     // platform. sendForStore loads the full store again — accepted cost
     // since welcome emails are a low-frequency path.
@@ -498,6 +525,7 @@ export class EmailService {
       to: data.email,
       subject: `Welcome to ${storeName}`,
       content,
+      language,
     });
   }
 
@@ -511,13 +539,15 @@ export class EmailService {
       name: string;
       verificationUrl: string;
       expiresIn: string;
-    }
+    },
+    language?: 'en' | 'ar'
   ): Promise<void> {
-    const content = this.emailVerificationTemplate(data);
+    const content = this.renderTemplate('email-verification', data, language);
     await this.sendForStore(storeId, {
       to: data.email,
       subject: 'Verify Your Email Address',
       content,
+      language,
     });
   }
 
@@ -532,9 +562,10 @@ export class EmailService {
       email: string;
       name: string;
       storeName?: string;
-    }
+    },
+    language?: 'en' | 'ar'
   ): Promise<void> {
-    const content = this.duplicateRegistrationTemplate(data);
+    const content = this.renderTemplate('duplicate-registration', data, language);
     await this.sendForStore(storeId, {
       to: data.email,
       subject:
@@ -542,6 +573,7 @@ export class EmailService {
           ? `Account already exists at ${data.storeName}`
           : 'Account already exists',
       content,
+      language,
     });
   }
 
@@ -555,13 +587,15 @@ export class EmailService {
       name: string;
       verificationUrl: string;
       expiresIn: string;
-    }
+    },
+    language?: 'en' | 'ar'
   ): Promise<void> {
-    const content = this.resendVerificationTemplate(data);
+    const content = this.renderTemplate('resend-verification', data, language);
     await this.sendForStore(storeId, {
       to: data.email,
       subject: 'Verify Your Email Address - New Link',
       content,
+      language,
     });
   }
 
@@ -577,15 +611,17 @@ export class EmailService {
       returnNumber: string;
       orderNumber: string;
       type: string;
-    }
+    },
+    language?: 'en' | 'ar'
   ) {
     const typeLabel =
       data.type === 'exchange' ? 'Exchange' : data.type === 'refund' ? 'Refund' : 'Return';
-    const content = this.returnConfirmationTemplate(data);
+    const content = this.renderTemplate('return-confirmation', data, language);
     await this.sendForStore(storeId, {
       to: data.email,
       subject: `${typeLabel} Request Received - #${data.returnNumber}`,
       content,
+      language,
     });
   }
 
@@ -601,13 +637,15 @@ export class EmailService {
       returnNumber: string;
       status: string;
       notes?: string;
-    }
+    },
+    language?: 'en' | 'ar'
   ) {
-    const content = this.returnStatusUpdateTemplate(data);
+    const content = this.renderTemplate('return-status-update', data, language);
     await this.sendForStore(storeId, {
       to: data.email,
       subject: `Return Status Update - #${data.returnNumber}`,
       content,
+      language,
     });
   }
 
@@ -616,12 +654,14 @@ export class EmailService {
    */
   static async sendInvoice(
     storeId: string,
-    data: { to: string | string[]; orderNumber: string; html: string }
+    data: { to: string | string[]; orderNumber: string; html: string },
+    language?: 'en' | 'ar'
   ): Promise<void> {
     await this.sendForStore(storeId, {
       to: data.to,
       subject: `Invoice ${data.orderNumber}`,
       content: data.html,
+      language,
     });
   }
 
@@ -693,16 +733,29 @@ export class EmailService {
 
   /**
    * Render email template — returns inner content only.
+   * The optional `language` param is threaded to each per-template helper;
+   * helpers currently ignore it (Tier 1 — shell direction only). Tier 2
+   * will swap to the appropriate bilingual copy.
    */
-  private static renderTemplate(templateName: string, data: object): string {
-    const templates: Record<string, (data: object) => string> = {
-      'order-confirmation': d => this.orderConfirmationTemplate(d as OrderEmailData),
-      'payment-success': d => this.paymentSuccessTemplate(d as OrderEmailData),
-      'payment-failed': d =>
+  private static renderTemplate(
+    templateName: string,
+    data: object,
+    language: 'en' | 'ar' = 'en'
+  ): string {
+    const templates: Record<string, (data: object, lang: 'en' | 'ar') => string> = {
+      'order-confirmation': (d, l) => this.orderConfirmationTemplate(d as OrderEmailData, l),
+      'payment-success': (d, l) => this.paymentSuccessTemplate(d as OrderEmailData, l),
+      'payment-failed': (d, l) =>
         this.paymentFailedTemplate(
-          d as { customerEmail: string; customerName: string; orderNumber: string; reason?: string }
+          d as {
+            customerEmail: string;
+            customerName: string;
+            orderNumber: string;
+            reason?: string;
+          },
+          l
         ),
-      'order-shipped': d =>
+      'order-shipped': (d, l) =>
         this.orderShippedTemplate(
           d as {
             customerEmail: string;
@@ -711,29 +764,56 @@ export class EmailService {
             trackingNumber?: string;
             trackingUrl?: string;
             carrier?: string;
-          }
+          },
+          l
         ),
-      'password-reset': d =>
+      'password-reset': (d, l) =>
         this.passwordResetTemplate(
-          d as { email: string; name: string; resetUrl: string; expiresIn: string }
+          d as { email: string; name: string; resetUrl: string; expiresIn: string },
+          l
         ),
-      welcome: d => this.welcomeTemplate(d as { email: string; name: string }),
-      'email-verification': d =>
+      welcome: (d, l) => this.welcomeTemplate(d as { email: string; name: string }, l),
+      'email-verification': (d, l) =>
         this.emailVerificationTemplate(
-          d as { email: string; name: string; verificationUrl: string; expiresIn: string }
+          d as { email: string; name: string; verificationUrl: string; expiresIn: string },
+          l
         ),
-      'resend-verification': d =>
+      'resend-verification': (d, l) =>
         this.resendVerificationTemplate(
-          d as { email: string; name: string; verificationUrl: string; expiresIn: string }
+          d as { email: string; name: string; verificationUrl: string; expiresIn: string },
+          l
         ),
-      'duplicate-registration': d =>
+      'duplicate-registration': (d, l) =>
         this.duplicateRegistrationTemplate(
-          d as { email: string; name: string; storeName?: string }
+          d as { email: string; name: string; storeName?: string },
+          l
         ),
-      'admin-new-order': d => this.adminNewOrderTemplate(d as OrderEmailData),
-      'admin-refund': d =>
+      'return-confirmation': (d, l) =>
+        this.returnConfirmationTemplate(
+          d as {
+            customerName: string;
+            storeName: string;
+            returnNumber: string;
+            orderNumber: string;
+            type: string;
+          },
+          l
+        ),
+      'return-status-update': (d, l) =>
+        this.returnStatusUpdateTemplate(
+          d as {
+            customerName: string;
+            storeName: string;
+            returnNumber: string;
+            status: string;
+            notes?: string;
+          },
+          l
+        ),
+      'admin-new-order': (d, _l) => this.adminNewOrderTemplate(d as OrderEmailData),
+      'admin-refund': (d, _l) =>
         this.adminRefundTemplate(d as { orderNumber: string; amount: number; reason?: string }),
-      'contact-form': d =>
+      'contact-form': (d, _l) =>
         this.contactFormTemplate(
           d as { name: string; email: string; subject: string; message: string }
         ),
@@ -744,13 +824,14 @@ export class EmailService {
       throw new Error(`Email template not found: ${templateName}`);
     }
 
-    return template(data);
+    return template(data, language);
   }
 
   /**
    * Order Confirmation Template
    */
-  private static orderConfirmationTemplate(d: OrderEmailData): string {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  private static orderConfirmationTemplate(d: OrderEmailData, _lang: 'en' | 'ar' = 'en'): string {
     const itemsHtml = d.items
       .map(
         item => `
@@ -823,7 +904,8 @@ export class EmailService {
   /**
    * Payment Success Template
    */
-  private static paymentSuccessTemplate(d: OrderEmailData): string {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  private static paymentSuccessTemplate(d: OrderEmailData, _lang: 'en' | 'ar' = 'en'): string {
     return `
       <h2>Payment Received</h2>
       <p>Hi ${escapeHtml(d.customerName)},</p>
@@ -836,12 +918,16 @@ export class EmailService {
   /**
    * Payment Failed Template
    */
-  private static paymentFailedTemplate(d: {
-    customerEmail: string;
-    customerName: string;
-    orderNumber: string;
-    reason?: string;
-  }): string {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  private static paymentFailedTemplate(
+    d: {
+      customerEmail: string;
+      customerName: string;
+      orderNumber: string;
+      reason?: string;
+    },
+    _lang: 'en' | 'ar' = 'en'
+  ): string {
     return `
       <h2>Payment Failed</h2>
       <p>Hi ${escapeHtml(d.customerName)},</p>
@@ -857,14 +943,18 @@ export class EmailService {
   /**
    * Order Shipped Template
    */
-  private static orderShippedTemplate(d: {
-    customerEmail: string;
-    customerName: string;
-    orderNumber: string;
-    trackingNumber?: string;
-    trackingUrl?: string;
-    carrier?: string;
-  }): string {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  private static orderShippedTemplate(
+    d: {
+      customerEmail: string;
+      customerName: string;
+      orderNumber: string;
+      trackingNumber?: string;
+      trackingUrl?: string;
+      carrier?: string;
+    },
+    _lang: 'en' | 'ar' = 'en'
+  ): string {
     return `
       <h2>Your Order Has Shipped!</h2>
       <p>Hi ${escapeHtml(d.customerName)},</p>
@@ -887,12 +977,16 @@ export class EmailService {
   /**
    * Password Reset Template
    */
-  private static passwordResetTemplate(d: {
-    email: string;
-    name: string;
-    resetUrl: string;
-    expiresIn: string;
-  }): string {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  private static passwordResetTemplate(
+    d: {
+      email: string;
+      name: string;
+      resetUrl: string;
+      expiresIn: string;
+    },
+    _lang: 'en' | 'ar' = 'en'
+  ): string {
     return `
       <h2>Reset Your Password</h2>
       <p>Hi ${escapeHtml(d.name)},</p>
@@ -908,7 +1002,11 @@ export class EmailService {
   /**
    * Welcome Template
    */
-  private static welcomeTemplate(d: { email: string; name: string }): string {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  private static welcomeTemplate(
+    d: { email: string; name: string },
+    _lang: 'en' | 'ar' = 'en'
+  ): string {
     return `
       <h2>Welcome!</h2>
       <p>Hi ${escapeHtml(d.name)},</p>
@@ -929,12 +1027,16 @@ export class EmailService {
   /**
    * Email Verification Template
    */
-  private static emailVerificationTemplate(d: {
-    email: string;
-    name: string;
-    verificationUrl: string;
-    expiresIn: string;
-  }): string {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  private static emailVerificationTemplate(
+    d: {
+      email: string;
+      name: string;
+      verificationUrl: string;
+      expiresIn: string;
+    },
+    _lang: 'en' | 'ar' = 'en'
+  ): string {
     const verificationUrlEsc = escapeHtml(d.verificationUrl);
     return `
       <h2>Verify Your Email Address</h2>
@@ -955,12 +1057,16 @@ export class EmailService {
   /**
    * Resend Email Verification Template
    */
-  private static resendVerificationTemplate(d: {
-    email: string;
-    name: string;
-    verificationUrl: string;
-    expiresIn: string;
-  }): string {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  private static resendVerificationTemplate(
+    d: {
+      email: string;
+      name: string;
+      verificationUrl: string;
+      expiresIn: string;
+    },
+    _lang: 'en' | 'ar' = 'en'
+  ): string {
     const verificationUrlEsc = escapeHtml(d.verificationUrl);
     return `
       <h2>New Verification Link</h2>
@@ -981,11 +1087,15 @@ export class EmailService {
   /**
    * Duplicate Registration Notice template.
    */
-  private static duplicateRegistrationTemplate(d: {
-    email: string;
-    name: string;
-    storeName?: string;
-  }): string {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  private static duplicateRegistrationTemplate(
+    d: {
+      email: string;
+      name: string;
+      storeName?: string;
+    },
+    _lang: 'en' | 'ar' = 'en'
+  ): string {
     const loginUrlEsc = escapeHtml(`${config.webUrl}/auth/login`);
     const resetUrlEsc = escapeHtml(`${config.webUrl}/auth/forgot-password`);
     const storeRef = d.storeName ? ` at ${escapeHtml(d.storeName)}` : '';
@@ -1052,13 +1162,17 @@ export class EmailService {
   /**
    * Return Confirmation Template
    */
-  private static returnConfirmationTemplate(d: {
-    customerName: string;
-    storeName: string;
-    returnNumber: string;
-    orderNumber: string;
-    type: string;
-  }): string {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  private static returnConfirmationTemplate(
+    d: {
+      customerName: string;
+      storeName: string;
+      returnNumber: string;
+      orderNumber: string;
+      type: string;
+    },
+    _lang: 'en' | 'ar' = 'en'
+  ): string {
     const typeLabel =
       d.type === 'exchange' ? 'Exchange' : d.type === 'refund' ? 'Refund' : 'Return';
     return `
@@ -1078,13 +1192,17 @@ export class EmailService {
   /**
    * Return Status Update Template
    */
-  private static returnStatusUpdateTemplate(d: {
-    customerName: string;
-    storeName: string;
-    returnNumber: string;
-    status: string;
-    notes?: string;
-  }): string {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  private static returnStatusUpdateTemplate(
+    d: {
+      customerName: string;
+      storeName: string;
+      returnNumber: string;
+      status: string;
+      notes?: string;
+    },
+    _lang: 'en' | 'ar' = 'en'
+  ): string {
     const statusMessages: Record<string, string> = {
       approved:
         'Your return request has been approved! Please ship the items back to us using the provided instructions.',
@@ -1144,7 +1262,11 @@ export class EmailService {
 
   // renderTemplate kept for any internal legacy callers (not used in new send paths)
   /** @internal */
-  static _renderTemplateForTest(templateName: string, data: object): string {
-    return this.renderTemplate(templateName, data);
+  static _renderTemplateForTest(
+    templateName: string,
+    data: object,
+    language?: 'en' | 'ar'
+  ): string {
+    return this.renderTemplate(templateName, data, language);
   }
 }
