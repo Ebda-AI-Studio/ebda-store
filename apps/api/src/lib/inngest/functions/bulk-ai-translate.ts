@@ -39,7 +39,7 @@ export const bulkAiTranslate: InngestFunction.Any = inngest.createFunction(
     id: 'bulk-ai-translate',
     name: 'Bulk: translate missing EN/AR across catalogue',
     concurrency: { key: 'event.data.storeId', limit: 1 },
-    retries: 0,
+    retries: 2,
     triggers: [{ event: 'bulk-ai/translate-requested' }],
   },
   async ({ event, step }) => {

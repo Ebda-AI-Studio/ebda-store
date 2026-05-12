@@ -47,7 +47,7 @@ export const bulkAiSeo: InngestFunction.Any = inngest.createFunction(
     id: 'bulk-ai-seo',
     name: 'Bulk: generate missing SEO meta across catalogue',
     concurrency: { key: 'event.data.storeId', limit: 1 },
-    retries: 0,
+    retries: 2,
     triggers: [{ event: 'bulk-ai/seo-requested' }],
   },
   async ({ event, step }) => {

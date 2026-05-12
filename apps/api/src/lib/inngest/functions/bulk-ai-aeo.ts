@@ -91,7 +91,7 @@ export const bulkAiFaqAeo: InngestFunction.Any = inngest.createFunction(
     id: 'bulk-ai-faq-aeo',
     name: 'Bulk: draft AEO FAQ items for a store',
     concurrency: { key: 'event.data.storeId', limit: 1 },
-    retries: 0,
+    retries: 2,
     triggers: [{ event: 'bulk-ai/faq-aeo-requested' }],
   },
   async ({ event }) => {
@@ -305,7 +305,7 @@ export const bulkAiHowtoAeo: InngestFunction.Any = inngest.createFunction(
     id: 'bulk-ai-howto-aeo',
     name: 'Bulk: draft AEO HowTo guides for a store',
     concurrency: { key: 'event.data.storeId', limit: 1 },
-    retries: 0,
+    retries: 2,
     triggers: [{ event: 'bulk-ai/howto-aeo-requested' }],
   },
   async ({ event }) => {
@@ -549,7 +549,7 @@ export const bulkAiMetaAeo: InngestFunction.Any = inngest.createFunction(
     id: 'bulk-ai-meta-aeo',
     name: 'Bulk: rewrite meta descriptions in conversational AEO style',
     concurrency: { key: 'event.data.storeId', limit: 1 },
-    retries: 0,
+    retries: 2,
     triggers: [{ event: 'bulk-ai/meta-aeo-requested' }],
   },
   async ({ event }) => {
