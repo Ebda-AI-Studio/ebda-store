@@ -159,9 +159,18 @@ export class MyFatoorahPaymentProvider implements IPaymentProvider {
       return trimmed.length > 0 ? trimmed : undefined;
     };
 
-    // Execute payment with all methods available
-    const executeData = {
-      PaymentMethodId: 0, // 0 means show all payment methods
+    // MyFatoorah's v2 API has two payment endpoints:
+    //   - /v2/ExecutePayment — requires a SPECIFIC PaymentMethodId from
+    //     InitiatePayment. Used for embedded checkouts where the merchant
+    //     already knows which method (KNET / Visa / etc.) the user picked.
+    //     PaymentMethodId: 0 (legacy "show all methods" sentinel) is
+    //     rejected with 400 "This payment method is not supported".
+    //   - /v2/SendPayment — returns an InvoiceURL pointing at MyFatoorah's
+    //     hosted multi-method selection page. The user picks method THERE.
+    // FWB's UX is "select MyFatoorah at checkout → redirect to MyFatoorah →
+    // pick method on their page", which is the SendPayment flow.
+    const sendData = {
+      NotificationOption: 'LNK', // return URL only, no SMS/email
       InvoiceValue: amountInKWD,
       CustomerName: request.customer.name,
       CustomerEmail: request.customer.email,
@@ -171,7 +180,7 @@ export class MyFatoorahPaymentProvider implements IPaymentProvider {
       CallBackUrl: request.callbackUrl,
       ErrorUrl: request.errorUrl,
       Language: request.customer.language || 'en',
-      InvoiceItems: request.items?.map(item => ({
+      InvoiceItemsList: request.items?.map(item => ({
         ItemName: item.name,
         Quantity: item.quantity,
         UnitPrice: item.unitPrice / 1000,
@@ -180,9 +189,9 @@ export class MyFatoorahPaymentProvider implements IPaymentProvider {
     };
 
     const executeResponse = await this.request<MyFatoorahExecuteResponse>(
-      '/v2/ExecutePayment',
+      '/v2/SendPayment',
       'POST',
-      executeData
+      sendData
     );
 
     return {
