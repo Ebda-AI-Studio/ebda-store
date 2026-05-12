@@ -31,6 +31,72 @@ const YouMightAlsoLike = dynamic(() =>
   import('../../../components/YouMightAlsoLike').then(mod => ({ default: mod.YouMightAlsoLike }))
 );
 
+interface ProductFAQ {
+  id: string;
+  question: string;
+  questionAr?: string | null;
+  answer: string;
+  answerAr?: string | null;
+}
+
+function ProductFAQSection({
+  faqs,
+  language,
+  t,
+}: {
+  faqs: ProductFAQ[];
+  language: string;
+  t: (en: string, ar: string) => string;
+}) {
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
+  const isAr = language === 'ar';
+
+  return (
+    <section aria-labelledby="product-faq-heading" className="mt-16">
+      <h2 id="product-faq-heading" className="mb-6 text-2xl font-bold text-foreground">
+        {t('Product Q&A', 'أسئلة وأجوبة المنتج')}
+      </h2>
+      <div className="space-y-3">
+        {faqs.map((faq, index) => {
+          const question = isAr ? faq.questionAr || faq.question : faq.question;
+          const answer = isAr ? faq.answerAr || faq.answer : faq.answer;
+          return (
+            <div key={faq.id} className="rounded-xl border bg-card shadow-sm">
+              <button
+                type="button"
+                onClick={() => setOpenIndex(openIndex === index ? null : index)}
+                aria-expanded={openIndex === index}
+                className="flex w-full items-center justify-between p-5 text-left"
+              >
+                <span className="font-medium text-foreground">{question}</span>
+                <svg
+                  className={`h-5 w-5 shrink-0 text-muted-foreground transition-transform ${openIndex === index ? 'rotate-180' : ''}`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 9l-7 7-7-7"
+                  />
+                </svg>
+              </button>
+              {openIndex === index && (
+                <div className="border-t px-5 py-4">
+                  <p className="whitespace-pre-line text-muted-foreground">{answer}</p>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 function ProductSkeleton() {
   return (
     <div className="grid gap-8 lg:grid-cols-2 animate-pulse">
@@ -545,6 +611,11 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
             )}
           </div>
         </div>
+
+        {/* Product FAQ — rendered when the product has authored Q&A */}
+        {product?.faqs && product.faqs.length > 0 && (
+          <ProductFAQSection faqs={product.faqs} language={language} t={t} />
+        )}
 
         {/* Product Reviews */}
         {isEnabled('reviews') && product && store.id && store.id !== 'demo' && (

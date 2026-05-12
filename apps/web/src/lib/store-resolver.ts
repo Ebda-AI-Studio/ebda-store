@@ -108,6 +108,24 @@ export interface ResolvedStore {
   heroCtaTextAr?: string | null;
   heroCtaLink?: string | null;
   heroImage?: string | null;
+
+  // Store FAQs + HowTos (active only, ordered by orderIndex)
+  faqs?: Array<{
+    id: string;
+    question: string;
+    questionAr?: string | null;
+    answer: string;
+    answerAr?: string | null;
+  }>;
+  howtos?: Array<{
+    id: string;
+    title: string;
+    titleAr?: string | null;
+    description: string;
+    descriptionAr?: string | null;
+    steps: Array<{ name: string; text: string; image?: string }>;
+    stepsAr?: Array<{ name: string; text: string; image?: string }> | null;
+  }>;
 }
 
 /**
@@ -274,6 +292,8 @@ async function fetchStoreByDomain(domain: string): Promise<ResolvedStore | null>
         storeData.typography && typeof storeData.typography === 'object'
           ? (storeData.typography as Record<string, unknown>)
           : null,
+      faqs: Array.isArray(storeData.faqs) ? storeData.faqs : undefined,
+      howtos: Array.isArray(storeData.howtos) ? storeData.howtos : undefined,
     };
   } catch (error) {
     console.error(`Error fetching store for domain ${domain}:`, error);
@@ -399,6 +419,8 @@ async function fetchStoreBySlug(slug: string): Promise<ResolvedStore | null> {
         storeData.typography && typeof storeData.typography === 'object'
           ? (storeData.typography as Record<string, unknown>)
           : null,
+      faqs: Array.isArray(storeData.faqs) ? storeData.faqs : undefined,
+      howtos: Array.isArray(storeData.howtos) ? storeData.howtos : undefined,
     };
   } catch (error) {
     console.error(`Error fetching store for slug ${slug}:`, error);

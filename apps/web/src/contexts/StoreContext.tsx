@@ -107,6 +107,22 @@ export interface StoreData {
   heroCtaTextAr?: string | null;
   heroCtaLink?: string | null;
   heroImage?: string | null;
+  faqs?: Array<{
+    id: string;
+    question: string;
+    questionAr?: string | null;
+    answer: string;
+    answerAr?: string | null;
+  }>;
+  howtos?: Array<{
+    id: string;
+    title: string;
+    titleAr?: string | null;
+    description: string;
+    descriptionAr?: string | null;
+    steps: Array<{ name: string; text: string; image?: string }>;
+    stepsAr?: Array<{ name: string; text: string; image?: string }> | null;
+  }>;
 }
 
 interface StoreContextValue {

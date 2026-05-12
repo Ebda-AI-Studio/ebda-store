@@ -6,124 +6,164 @@ import { ShopChrome } from '../../components';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 
-// Generic FAQs -- no store-specific content here.
-// Payment methods reference the store's configured options; adjust if needed.
-const faqs = [
+// Generic fallback FAQs — shown only when the store hasn't authored any
+// store-specific FAQs via the admin FAQ manager.
+const GENERIC_FAQS = [
   {
     question: 'How do I place an order?',
-    questionAr:
-      '\u0643\u064a\u0641 \u0623\u0642\u0648\u0645 \u0628\u062a\u0642\u062f\u064a\u0645 \u0637\u0644\u0628\u061f',
+    questionAr: 'كيف أقوم بتقديم طلب؟',
     answer:
       'Simply browse our products, add items to your cart, and proceed to checkout. You can pay securely using your preferred payment method.',
     answerAr:
-      '\u0645\u0627 \u0639\u0644\u064a\u0643 \u0633\u0648\u0649 \u062a\u0635\u0641\u062d \u0645\u0646\u062a\u062c\u0627\u062a\u0646\u0627 \u0648\u0625\u0636\u0627\u0641\u0629 \u0627\u0644\u0639\u0646\u0627\u0635\u0631 \u0625\u0644\u0649 \u0633\u0644\u062a\u0643 \u0648\u0627\u0644\u0645\u062a\u0627\u0628\u0639\u0629 \u0625\u0644\u0649 \u0627\u0644\u062f\u0641\u0639. \u064a\u0645\u0643\u0646\u0643 \u0627\u0644\u062f\u0641\u0639 \u0628\u0623\u0645\u0627\u0646 \u0628\u0627\u0633\u062a\u062e\u062f\u0627\u0645 \u0637\u0631\u064a\u0642\u0629 \u0627\u0644\u062f\u0641\u0639 \u0627\u0644\u0645\u0641\u0636\u0644\u0629 \u0644\u062f\u064a\u0643.',
+      'ما عليك سوى تصفح منتجاتنا وإضافة العناصر إلى سلتك والمتابعة إلى الدفع. يمكنك الدفع بأمان باستخدام طريقة الدفع المفضلة لديك.',
   },
   {
     question: 'What payment methods do you accept?',
-    questionAr:
-      '\u0645\u0627 \u0647\u064a \u0637\u0631\u0642 \u0627\u0644\u062f\u0641\u0639 \u0627\u0644\u0645\u0642\u0628\u0648\u0644\u0629\u061f',
+    questionAr: 'ما هي طرق الدفع المقبولة؟',
     answer:
       'We accept a variety of payment methods including debit and credit cards and Cash on Delivery. All online payments are processed through a secure payment gateway.',
     answerAr:
-      '\u0646\u0642\u0628\u0644 \u0645\u062c\u0645\u0648\u0639\u0629 \u0645\u062a\u0646\u0648\u0639\u0629 \u0645\u0646 \u0637\u0631\u0642 \u0627\u0644\u062f\u0641\u0639 \u0628\u0645\u0627 \u0641\u064a \u0630\u0644\u0643 \u0628\u0637\u0627\u0642\u0627\u062a \u0627\u0644\u062e\u0635\u0645 \u0648\u0627\u0644\u0627\u0626\u062a\u0645\u0627\u0646 \u0648\u0627\u0644\u062f\u0641\u0639 \u0639\u0646\u062f \u0627\u0644\u0627\u0633\u062a\u0644\u0627\u0645. \u062a\u062a\u0645 \u0645\u0639\u0627\u0644\u062c\u0629 \u062c\u0645\u064a\u0639 \u0627\u0644\u0645\u062f\u0641\u0648\u0639\u0627\u062a \u0639\u0628\u0631 \u0627\u0644\u0625\u0646\u062a\u0631\u0646\u062a \u0645\u0646 \u062e\u0644\u0627\u0644 \u0628\u0648\u0627\u0628\u0629 \u062f\u0641\u0639 \u0622\u0645\u0646\u0629.',
+      'نقبل مجموعة متنوعة من طرق الدفع بما في ذلك بطاقات الخصم والائتمان والدفع عند الاستلام. تتم معالجة جميع المدفوعات عبر الإنترنت من خلال بوابة دفع آمنة.',
   },
   {
     question: 'How long does shipping take?',
-    questionAr:
-      '\u0643\u0645 \u064a\u0633\u062a\u063a\u0631\u0642 \u0627\u0644\u0634\u062d\u0646\u061f',
+    questionAr: 'كم يستغرق الشحن؟',
     answer:
       'Delivery times depend on your location and the shipping option selected at checkout. Please visit our Shipping page for full details.',
     answerAr:
-      '\u062a\u0639\u062a\u0645\u062f \u0623\u0648\u0642\u0627\u062a \u0627\u0644\u062a\u0648\u0635\u064a\u0644 \u0639\u0644\u0649 \u0645\u0648\u0642\u0639\u0643 \u0648\u062e\u064a\u0627\u0631 \u0627\u0644\u0634\u062d\u0646 \u0627\u0644\u0645\u062d\u062f\u062f \u0639\u0646\u062f \u0627\u0644\u062f\u0641\u0639. \u064a\u0631\u062c\u0649 \u0632\u064a\u0627\u0631\u0629 \u0635\u0641\u062d\u0629 \u0627\u0644\u0634\u062d\u0646 \u0644\u0645\u0632\u064a\u062f \u0645\u0646 \u0627\u0644\u062a\u0641\u0627\u0635\u064a\u0644.',
+      'تعتمد أوقات التوصيل على موقعك وخيار الشحن المحدد عند الدفع. يرجى زيارة صفحة الشحن لمزيد من التفاصيل.',
   },
   {
     question: 'What is your return policy?',
-    questionAr:
-      '\u0645\u0627 \u0647\u064a \u0633\u064a\u0627\u0633\u0629 \u0627\u0644\u0625\u0631\u062c\u0627\u0639 \u0644\u062f\u064a\u0643\u0645\u061f',
+    questionAr: 'ما هي سياسة الإرجاع لديكم؟',
     answer:
       'We offer a 30-day return policy for all unused items in original packaging. Please visit our Returns page for more details.',
     answerAr:
-      '\u0646\u0642\u062f\u0645 \u0633\u064a\u0627\u0633\u0629 \u0625\u0631\u062c\u0627\u0639 \u0644\u0645\u062f\u0629 30 \u064a\u0648\u0645\u0627\u064b \u0644\u062c\u0645\u064a\u0639 \u0627\u0644\u0639\u0646\u0627\u0635\u0631 \u063a\u064a\u0631 \u0627\u0644\u0645\u0633\u062a\u062e\u062f\u0645\u0629 \u0641\u064a \u0639\u0628\u0648\u062a\u0647\u0627 \u0627\u0644\u0623\u0635\u0644\u064a\u0629. \u064a\u0631\u062c\u0649 \u0632\u064a\u0627\u0631\u0629 \u0635\u0641\u062d\u0629 \u0627\u0644\u0645\u0631\u062a\u062c\u0639\u0627\u062a \u0644\u0645\u0632\u064a\u062f \u0645\u0646 \u0627\u0644\u062a\u0641\u0627\u0635\u064a\u0644.',
+      'نقدم سياسة إرجاع لمدة 30 يوماً لجميع العناصر غير المستخدمة في عبوتها الأصلية. يرجى زيارة صفحة المرتجعات لمزيد من التفاصيل.',
   },
   {
     question: 'How can I track my order?',
-    questionAr:
-      '\u0643\u064a\u0641 \u064a\u0645\u0643\u0646\u0646\u064a \u062a\u062a\u0628\u0639 \u0637\u0644\u0628\u064a\u061f',
+    questionAr: 'كيف يمكنني تتبع طلبي؟',
     answer:
       "Once your order ships, you'll receive an email with a tracking number. You can use this to track your package on the carrier's website or through your account order history.",
     answerAr:
-      '\u0628\u0645\u062c\u0631\u062f \u0634\u062d\u0646 \u0637\u0644\u0628\u0643\u060c \u0633\u062a\u062a\u0644\u0642\u0649 \u0628\u0631\u064a\u062f\u0627\u064b \u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a\u0627\u064b \u064a\u062d\u062a\u0648\u064a \u0639\u0644\u0649 \u0631\u0642\u0645 \u0627\u0644\u062a\u062a\u0628\u0639. \u064a\u0645\u0643\u0646\u0643 \u0627\u0633\u062a\u062e\u062f\u0627\u0645\u0647 \u0644\u062a\u062a\u0628\u0639 \u0637\u0631\u062f\u0643 \u0639\u0644\u0649 \u0645\u0648\u0642\u0639 \u0634\u0631\u0643\u0629 \u0627\u0644\u0634\u062d\u0646 \u0623\u0648 \u0645\u0646 \u062e\u0644\u0627\u0644 \u0633\u062c\u0644 \u0637\u0644\u0628\u0627\u062a\u0643.',
+      'بمجرد شحن طلبك، ستتلقى بريداً إلكترونياً يحتوي على رقم التتبع. يمكنك استخدامه لتتبع طردك على موقع شركة الشحن أو من خلال سجل طلباتك.',
   },
   {
     question: 'Can I cancel or modify my order?',
-    questionAr:
-      '\u0647\u0644 \u064a\u0645\u0643\u0646\u0646\u064a \u0625\u0644\u063a\u0627\u0621 \u0623\u0648 \u062a\u0639\u062f\u064a\u0644 \u0637\u0644\u0628\u064a\u061f',
+    questionAr: 'هل يمكنني إلغاء أو تعديل طلبي؟',
     answer:
       'Orders can be cancelled or modified within 1 hour of placement. After that, please contact our support team for assistance.',
     answerAr:
-      '\u064a\u0645\u0643\u0646 \u0625\u0644\u063a\u0627\u0621 \u0623\u0648 \u062a\u0639\u062f\u064a\u0644 \u0627\u0644\u0637\u0644\u0628\u0627\u062a \u062e\u0644\u0627\u0644 \u0633\u0627\u0639\u0629 \u0648\u0627\u062d\u062f\u0629 \u0645\u0646 \u062a\u0642\u062f\u064a\u0645\u0647\u0627. \u0628\u0639\u062f \u0630\u0644\u0643\u060c \u064a\u0631\u062c\u0649 \u0627\u0644\u062a\u0648\u0627\u0635\u0644 \u0645\u0639 \u0641\u0631\u064a\u0642 \u0627\u0644\u062f\u0639\u0645 \u0644\u0644\u0645\u0633\u0627\u0639\u062f\u0629.',
+      'يمكن إلغاء أو تعديل الطلبات خلال ساعة واحدة من تقديمها. بعد ذلك، يرجى التواصل مع فريق الدعم للمساعدة.',
   },
   {
     question: 'Do you offer gift wrapping?',
-    questionAr:
-      '\u0647\u0644 \u062a\u0642\u062f\u0645\u0648\u0646 \u062e\u062f\u0645\u0629 \u062a\u063a\u0644\u064a\u0641 \u0627\u0644\u0647\u062f\u0627\u064a\u0627\u061f',
+    questionAr: 'هل تقدمون خدمة تغليف الهدايا؟',
     answer:
       'Gift wrapping may be available at checkout for a small additional fee. You can also include a personalized message.',
     answerAr:
-      '\u0642\u062f \u064a\u0643\u0648\u0646 \u062a\u063a\u0644\u064a\u0641 \u0627\u0644\u0647\u062f\u0627\u064a\u0627 \u0645\u062a\u0627\u062d\u0627\u064b \u0639\u0646\u062f \u0627\u0644\u062f\u0641\u0639 \u0645\u0642\u0627\u0628\u0644 \u0631\u0633\u0648\u0645 \u0625\u0636\u0627\u0641\u064a\u0629 \u0628\u0633\u064a\u0637\u0629. \u064a\u0645\u0643\u0646\u0643 \u0623\u064a\u0636\u0627\u064b \u062a\u0636\u0645\u064a\u0646 \u0631\u0633\u0627\u0644\u0629 \u0634\u062e\u0635\u064a\u0629.',
+      'قد يكون تغليف الهدايا متاحاً عند الدفع مقابل رسوم إضافية بسيطة. يمكنك أيضاً تضمين رسالة شخصية.',
   },
   {
     question: 'How do I contact customer support?',
-    questionAr:
-      '\u0643\u064a\u0641 \u0623\u062a\u0648\u0627\u0635\u0644 \u0645\u0639 \u062e\u062f\u0645\u0629 \u0627\u0644\u0639\u0645\u0644\u0627\u0621\u061f',
+    questionAr: 'كيف أتواصل مع خدمة العملاء؟',
     answer:
       'You can reach us through the Contact page on our website. We aim to respond to all enquiries as quickly as possible.',
     answerAr:
-      '\u064a\u0645\u0643\u0646\u0643 \u0627\u0644\u062a\u0648\u0627\u0635\u0644 \u0645\u0639\u0646\u0627 \u0645\u0646 \u062e\u0644\u0627\u0644 \u0635\u0641\u062d\u0629 \u0627\u062a\u0635\u0644 \u0628\u0646\u0627 \u0639\u0644\u0649 \u0645\u0648\u0642\u0639\u0646\u0627. \u0646\u0633\u0639\u0649 \u0644\u0644\u0631\u062f \u0639\u0644\u0649 \u062c\u0645\u064a\u0639 \u0627\u0644\u0627\u0633\u062a\u0641\u0633\u0627\u0631\u0627\u062a \u0641\u064a \u0623\u0633\u0631\u0639 \u0648\u0642\u062a \u0645\u0645\u0643\u0646.',
+      'يمكنك التواصل معنا من خلال صفحة اتصل بنا على موقعنا. نسعى للرد على جميع الاستفسارات في أسرع وقت ممكن.',
   },
 ];
 
-export default function FAQClient() {
+interface StoreFaq {
+  id: string;
+  question: string;
+  questionAr?: string | null;
+  answer: string;
+  answerAr?: string | null;
+}
+
+interface StoreHowtoStep {
+  name: string;
+  text: string;
+  image?: string;
+}
+
+interface StoreHowto {
+  id: string;
+  title: string;
+  titleAr?: string | null;
+  description: string;
+  descriptionAr?: string | null;
+  steps: StoreHowtoStep[];
+  stepsAr?: StoreHowtoStep[] | null;
+}
+
+interface FAQClientProps {
+  storeFaqs?: StoreFaq[];
+  storeHowtos?: StoreHowto[];
+}
+
+export default function FAQClient({ storeFaqs = [], storeHowtos = [] }: FAQClientProps) {
   const { store } = useStore();
   const storeUrl = useStoreUrl();
-  const { t } = useLanguage();
-  const [openIndex, setOpenIndex] = useState<number | null>(0);
+  const { t, language } = useLanguage();
+  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
+  const [openHowtoIndex, setOpenHowtoIndex] = useState<number | null>(null);
+
+  const isAr = language === 'ar';
+
+  // Use store-authored FAQs when available; otherwise show generic fallback.
+  const faqs: Array<{ question: string; answer: string }> =
+    storeFaqs.length > 0
+      ? storeFaqs.map(f => ({
+          question: isAr ? f.questionAr || f.question : f.question,
+          answer: isAr ? f.answerAr || f.answer : f.answer,
+        }))
+      : GENERIC_FAQS.map(f => ({
+          question: t(f.question, f.questionAr),
+          answer: t(f.answer, f.answerAr),
+        }));
+
+  const howtos: Array<{ title: string; description: string; steps: StoreHowtoStep[] }> =
+    storeHowtos.map(h => ({
+      title: isAr ? h.titleAr || h.title : h.title,
+      description: isAr ? h.descriptionAr || h.description : h.description,
+      steps: isAr && h.stepsAr && h.stepsAr.length > 0 ? h.stepsAr : h.steps,
+    }));
 
   return (
     <ShopChrome>
       <div className="mx-auto w-full max-w-3xl flex-1 px-4 py-12 sm:px-6 lg:px-8">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-foreground">
-            {t(
-              'Frequently Asked Questions',
-              '\u0627\u0644\u0623\u0633\u0626\u0644\u0629 \u0627\u0644\u0634\u0627\u0626\u0639\u0629'
-            )}
+            {t('Frequently Asked Questions', 'الأسئلة الشائعة')}
           </h1>
           <p className="mt-2 text-muted-foreground">
             {t(
               `Find answers to common questions about ${store.name || 'our store'}`,
-              `\u0627\u0639\u062b\u0631 \u0639\u0644\u0649 \u0625\u062c\u0627\u0628\u0627\u062a \u0644\u0644\u0623\u0633\u0626\u0644\u0629 \u0627\u0644\u0634\u0627\u0626\u0639\u0629 \u062d\u0648\u0644 ${store.name || '\u0645\u062a\u062c\u0631\u0646\u0627'}`
+              `اعثر على إجابات للأسئلة الشائعة حول ${store.name || 'متجرنا'}`
             )}
           </p>
         </div>
 
+        {/* FAQ accordion */}
         <div className="mt-12 space-y-4">
           {faqs.map((faq, index) => (
             <div key={index} className="rounded-xl border bg-card shadow-sm">
               <button
                 type="button"
-                onClick={() => setOpenIndex(openIndex === index ? null : index)}
-                aria-expanded={openIndex === index}
+                onClick={() => setOpenFaqIndex(openFaqIndex === index ? null : index)}
+                aria-expanded={openFaqIndex === index}
                 className="flex w-full items-center justify-between p-6 text-left"
               >
-                <span className="font-medium text-foreground">
-                  {t(faq.question, faq.questionAr)}
-                </span>
+                <span className="font-medium text-foreground">{faq.question}</span>
                 <svg
-                  className={`h-5 w-5 text-muted-foreground transition-transform ${openIndex === index ? 'rotate-180' : ''}`}
+                  className={`h-5 w-5 shrink-0 text-muted-foreground transition-transform ${openFaqIndex === index ? 'rotate-180' : ''}`}
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
+                  aria-hidden="true"
                 >
                   <path
                     strokeLinecap="round"
@@ -133,34 +173,99 @@ export default function FAQClient() {
                   />
                 </svg>
               </button>
-              {openIndex === index && (
+              {openFaqIndex === index && (
                 <div className="border-t px-6 py-4">
-                  <p className="text-muted-foreground">{t(faq.answer, faq.answerAr)}</p>
+                  <p className="whitespace-pre-line text-muted-foreground">{faq.answer}</p>
                 </div>
               )}
             </div>
           ))}
         </div>
 
+        {/* HowTo guides — only rendered when store has authored them */}
+        {howtos.length > 0 && (
+          <section aria-labelledby="howto-heading" className="mt-16">
+            <h2 id="howto-heading" className="mb-6 text-2xl font-bold text-foreground">
+              {t('How-To Guides', 'أدلة إرشادية')}
+            </h2>
+            <div className="space-y-4">
+              {howtos.map((h, index) => (
+                <div key={index} className="rounded-xl border bg-card shadow-sm">
+                  <button
+                    type="button"
+                    onClick={() => setOpenHowtoIndex(openHowtoIndex === index ? null : index)}
+                    aria-expanded={openHowtoIndex === index}
+                    className="flex w-full items-center justify-between p-6 text-left"
+                  >
+                    <span className="font-medium text-foreground">{h.title}</span>
+                    <svg
+                      className={`h-5 w-5 shrink-0 text-muted-foreground transition-transform ${openHowtoIndex === index ? 'rotate-180' : ''}`}
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      aria-hidden="true"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 9l-7 7-7-7"
+                      />
+                    </svg>
+                  </button>
+                  {openHowtoIndex === index && (
+                    <div className="border-t px-6 py-4">
+                      {h.description && (
+                        <p className="mb-4 text-muted-foreground">{h.description}</p>
+                      )}
+                      <ol className="list-decimal space-y-3 pl-5">
+                        {h.steps.map((step, si) => (
+                          <li key={si}>
+                            <span className="font-medium text-foreground">{step.name}</span>
+                            {step.text && (
+                              <span className="text-muted-foreground">: {step.text}</span>
+                            )}
+                            {step.image && (
+                              <img
+                                src={step.image}
+                                alt={step.name}
+                                className="mt-2 rounded-lg"
+                                loading="lazy"
+                              />
+                            )}
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
         <div className="mt-12 rounded-xl border bg-card p-8 text-center shadow-sm">
           <h2 className="text-xl font-semibold text-foreground">
-            {t(
-              'Still have questions?',
-              '\u0644\u0627 \u062a\u0632\u0627\u0644 \u0644\u062f\u064a\u0643 \u0623\u0633\u0626\u0644\u0629\u061f'
-            )}
+            {t('Still have questions?', 'لا تزال لديك أسئلة؟')}
           </h2>
           <p className="mt-2 text-muted-foreground">
             {t(
               "Can't find the answer you're looking for? Please contact our support team.",
-              '\u0644\u0645 \u062a\u062c\u062f \u0627\u0644\u0625\u062c\u0627\u0628\u0629 \u0627\u0644\u062a\u064a \u062a\u0628\u062d\u062b \u0639\u0646\u0647\u0627\u061f \u064a\u0631\u062c\u0649 \u0627\u0644\u062a\u0648\u0627\u0635\u0644 \u0645\u0639 \u0641\u0631\u064a\u0642 \u0627\u0644\u062f\u0639\u0645.'
+              'لم تجد الإجابة التي تبحث عنها؟ يرجى التواصل مع فريق الدعم.'
             )}
           </p>
           <Link
             href={storeUrl('/contact')}
             className="mt-4 inline-flex items-center gap-2 text-primary hover:underline"
           >
-            {t('Contact Us', '\u062a\u0648\u0627\u0635\u0644 \u0645\u0639\u0646\u0627')}
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            {t('Contact Us', 'تواصل معنا')}
+            <svg
+              className="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              aria-hidden="true"
+            >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </Link>

@@ -100,6 +100,13 @@ interface Product {
   categories?: ProductCategory[];
   variants?: ProductVariant[];
   options?: ProductOption[];
+  faqs?: Array<{
+    id: string;
+    question: string;
+    questionAr?: string | null;
+    answer: string;
+    answerAr?: string | null;
+  }>;
   createdAt?: string;
 }
 

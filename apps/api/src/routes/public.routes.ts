@@ -722,6 +722,30 @@ router.get('/stores/:slugOrId', async (req: Request, res: Response, next: NextFu
           heroCtaLink: true,
           heroImage: true,
           createdAt: true,
+          faqs: {
+            where: { isActive: true },
+            orderBy: { orderIndex: 'asc' },
+            select: {
+              id: true,
+              question: true,
+              questionAr: true,
+              answer: true,
+              answerAr: true,
+            },
+          },
+          howtos: {
+            where: { isActive: true },
+            orderBy: { orderIndex: 'asc' },
+            select: {
+              id: true,
+              title: true,
+              titleAr: true,
+              description: true,
+              descriptionAr: true,
+              steps: true,
+              stepsAr: true,
+            },
+          },
         },
       });
 
@@ -896,6 +920,30 @@ router.get(
           heroCtaTextAr: true,
           heroCtaLink: true,
           heroImage: true,
+          faqs: {
+            where: { isActive: true },
+            orderBy: { orderIndex: 'asc' },
+            select: {
+              id: true,
+              question: true,
+              questionAr: true,
+              answer: true,
+              answerAr: true,
+            },
+          },
+          howtos: {
+            where: { isActive: true },
+            orderBy: { orderIndex: 'asc' },
+            select: {
+              id: true,
+              title: true,
+              titleAr: true,
+              description: true,
+              descriptionAr: true,
+              steps: true,
+              stepsAr: true,
+            },
+          },
         },
       });
 

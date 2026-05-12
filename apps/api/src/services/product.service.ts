@@ -526,6 +526,15 @@ export class ProductService {
     images: { orderBy: { position: 'asc' } },
     categories: { include: { category: true } },
     store: { select: { id: true, name: true, slug: true } },
+    faqs: {
+      select: {
+        id: true,
+        question: true,
+        questionAr: true,
+        answer: true,
+        answerAr: true,
+      },
+    },
     options: {
       orderBy: { position: 'asc' },
       include: {

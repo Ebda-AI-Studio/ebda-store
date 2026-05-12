@@ -1,7 +1,12 @@
 import type { Metadata } from 'next';
 import { getStore, getStoreOrNotFound } from '../../../lib/store-resolver';
 import { API_URL } from '../../../lib/api';
-import { productJsonLd, breadcrumbJsonLd, getSiteUrl } from '../../../lib/structured-data';
+import {
+  productJsonLd,
+  breadcrumbJsonLd,
+  faqPageJsonLd,
+  getSiteUrl,
+} from '../../../lib/structured-data';
 import { JsonLd } from '../../../components/JsonLd';
 import ProductDetailClient from './ProductDetailClient';
 
@@ -137,6 +142,16 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
   const initialProduct = await fetchInitialProduct(slug, store);
 
   const siteUrl = getSiteUrl(store);
+
+  // Per-product FAQ JSON-LD (separate FAQPage block alongside the Product block)
+  const productFaqItems: Array<{ question: string; answer: string }> =
+    initialProduct?.faqs?.length > 0
+      ? initialProduct.faqs.map((f: { question: string; answer: string }) => ({
+          question: f.question,
+          answer: f.answer,
+        }))
+      : [];
+
   const jsonLdScripts = initialProduct
     ? [
         productJsonLd(initialProduct, store),
@@ -145,6 +160,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
           { name: 'Products', url: `${siteUrl}/products` },
           { name: initialProduct.name, url: `${siteUrl}/products/${initialProduct.slug}` },
         ]),
+        ...(productFaqItems.length > 0 ? [faqPageJsonLd(productFaqItems)] : []),
       ]
     : [];
 
