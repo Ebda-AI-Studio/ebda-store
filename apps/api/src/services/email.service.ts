@@ -158,12 +158,12 @@ export function renderBrandedShell(content: string, store: EmailStoreContext): s
     }
     .ribbon { height: 6px; background: var(--brand); }
     .header {
-      padding: 32px 28px 24px;
+      padding: 40px 28px 32px;
       text-align: center;
       background: linear-gradient(180deg, var(--brand-soft) 0%, transparent 100%);
       border-bottom: 1px solid var(--line-soft);
     }
-    .store-logo { max-height: 110px; max-width: 280px; display: inline-block; }
+    .store-logo { max-height: 180px; max-width: 420px; display: inline-block; height: auto; width: auto; }
     .store-name { font-size: 22px; font-weight: 700; color: var(--ink); letter-spacing: -0.01em; }
     .content { padding: 28px 28px 8px; }
     .content h1, .content h2 { color: var(--ink); margin: 0 0 14px; }
@@ -211,7 +211,7 @@ export function renderBrandedShell(content: string, store: EmailStoreContext): s
       .header { padding: 24px 18px 18px; }
       .content { padding: 22px 18px 4px; }
       .footer { padding: 18px 18px 22px; }
-      .store-logo { max-height: 48px; }
+      .store-logo { max-height: 140px; max-width: 320px; }
     }
   </style>
 </head>
