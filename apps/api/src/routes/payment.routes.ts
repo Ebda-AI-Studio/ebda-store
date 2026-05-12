@@ -372,7 +372,8 @@ router.post(
               : `${storefrontBaseUrl}/checkout/error`,
             webhookUrl: `${config.apiUrl}/webhooks/payment`,
           },
-          data.provider
+          data.provider,
+          order.storeId
         );
 
         // Payment provider accepted the request — clear rollback context so we

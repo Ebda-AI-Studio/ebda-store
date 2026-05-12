@@ -137,6 +137,61 @@ function generateIdempotencyKey(
   }
 }
 
+/**
+ * Resolve which store this webhook belongs to BEFORE calling handleWebhook,
+ * so PaymentService.handleWebhook can verify the HMAC signature with the
+ * correct per-store webhook secret from PaymentConfig (not the empty
+ * platform-level env-var fallback).
+ *
+ * Without this, every incoming webhook for a per-store provider would
+ * either fail signature verification or 500 with PROVIDER_NOT_CONFIGURED.
+ *
+ * Returns undefined when we can't match the payload to a Payment row —
+ * handleWebhook will then take its env-var path, which is correct
+ * behaviour for the platform-only test stores (currently none in prod).
+ */
+async function resolveStoreIdFromWebhookPayload(
+  provider: PaymentProvider,
+  payload: Record<string, unknown>
+): Promise<string | undefined> {
+  const data = payload.Data as Record<string, unknown> | undefined;
+  const charge = payload.charge as Record<string, unknown> | undefined;
+  const stringify = (v: unknown): string | null => {
+    if (typeof v === 'string' && v.length > 0) return v;
+    if (typeof v === 'number') return String(v);
+    return null;
+  };
+
+  let transactionId: string | null = null;
+  let invoiceId: string | null = null;
+  switch (provider) {
+    case 'tap':
+      transactionId = stringify(payload.id) ?? stringify(charge?.id);
+      break;
+    case 'myfatoorah':
+      invoiceId = stringify(payload.InvoiceId) ?? stringify(data?.InvoiceId);
+      break;
+    case 'hesabe':
+      transactionId = stringify(payload.paymentId) ?? stringify(payload.transaction_id);
+      break;
+    case 'upayments':
+      transactionId = stringify(payload.transaction_id);
+      invoiceId = stringify(payload.invoice_id);
+      break;
+  }
+
+  if (!transactionId && !invoiceId) return undefined;
+
+  const payment = await prisma.payment.findFirst({
+    where: {
+      OR: [...(transactionId ? [{ transactionId }] : []), ...(invoiceId ? [{ invoiceId }] : [])],
+    },
+    select: { order: { select: { storeId: true } } },
+  });
+
+  return payment?.order?.storeId;
+}
+
 // ==========================================
 // Kuwait Payment Provider Webhooks
 // Supports: Tap, MyFatoorah, Hesabe, UPayments
@@ -219,11 +274,16 @@ router.post(
 
       // Pass the parsed payload for business logic and the raw body string for
       // HMAC signature verification so providers compute the correct digest.
+      // storeId is resolved upfront so handleWebhook can load the right
+      // per-store webhook secret for signature verification — without this,
+      // signature checks against platform-level env vars (always empty in
+      // FWB prod) would reject every per-tenant webhook.
+      const storeIdForWebhook = await resolveStoreIdFromWebhookPayload(provider, payload);
       const result = await PaymentService.handleWebhook(
         provider,
         payload,
         signature,
-        undefined,
+        storeIdForWebhook,
         rawBody.toString()
       );
 
@@ -232,7 +292,7 @@ router.post(
         await markWebhookProcessed(result.orderId, idempotencyKey);
       }
 
-      logger.info({ provider, result }, '[WEBHOOK] Processed');
+      logger.info({ provider, storeId: storeIdForWebhook, result }, '[WEBHOOK] Processed');
 
       await auditLog({
         action: 'WEBHOOK_PROCESSED',
@@ -346,11 +406,15 @@ router.post('/payment', async (req: Request, res: Response, next: NextFunction) 
 
     // Pass the parsed payload for business logic and the raw body string for
     // HMAC signature verification so providers compute the correct digest.
+    // Resolve storeId from the payment row matching this payload so the per-
+    // store webhook secret is used for signature verification (see handler
+    // above for the same rationale).
+    const storeIdForWebhook = await resolveStoreIdFromWebhookPayload(provider, payload);
     const result = await PaymentService.handleWebhook(
       provider,
       payload,
       signature,
-      undefined,
+      storeIdForWebhook,
       rawBody.toString()
     );
 
@@ -359,7 +423,10 @@ router.post('/payment', async (req: Request, res: Response, next: NextFunction) 
       await markWebhookProcessed(result.orderId, idempotencyKey);
     }
 
-    logger.info({ provider, result }, '[WEBHOOK] Auto-detected provider processed');
+    logger.info(
+      { provider, storeId: storeIdForWebhook, result },
+      '[WEBHOOK] Auto-detected provider processed'
+    );
 
     await auditLog({
       action: 'WEBHOOK_PROCESSED',
