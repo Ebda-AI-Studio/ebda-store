@@ -6,6 +6,7 @@ import { heartbeat } from './heartbeat';
 import { auditLogArchive } from './audit-log-archive';
 import { bulkAiTranslate } from './bulk-ai-translate';
 import { bulkAiSeo } from './bulk-ai-seo';
+import { bulkAiFaqAeo, bulkAiHowtoAeo, bulkAiMetaAeo } from './bulk-ai-aeo';
 
 /**
  * Registry of every Inngest function the API exposes. The serve
@@ -21,4 +22,7 @@ export const inngestFunctions: InngestFunction.Any[] = [
   auditLogArchive,
   bulkAiTranslate,
   bulkAiSeo,
+  bulkAiFaqAeo,
+  bulkAiHowtoAeo,
+  bulkAiMetaAeo,
 ];

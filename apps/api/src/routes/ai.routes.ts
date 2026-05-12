@@ -332,4 +332,119 @@ router.get('/bulk/:jobId', async (req: Request, res: Response, next: NextFunctio
   }
 });
 
+// =====================================================================
+// AEO bulk sweeps — FAQ items, HowTo guides, conversational meta.
+// Each returns 202 + jobId; poll /bulk/:jobId for progress.
+// =====================================================================
+
+router.post(
+  '/bulk/faq-aeo',
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const count = Math.min(parseInt(String(req.body?.count ?? '8'), 10) || 8, 20);
+
+      const job = await prisma.bulkAiJob.create({
+        data: { storeId, userId: req.user!.userId, kind: 'faq_aeo' },
+        select: { id: true, status: true, kind: true, createdAt: true },
+      });
+
+      try {
+        await inngest.send({
+          name: 'bulk-ai/faq-aeo-requested',
+          data: { jobId: job.id, storeId, count },
+        });
+      } catch (err) {
+        await markJobFailedIfEnqueueFailed(job.id, err);
+        res.status(503).json({
+          success: false,
+          error: {
+            code: 'AI_QUEUE_UNREACHABLE',
+            message: 'Could not enqueue the FAQ draft right now. Try again in a minute.',
+          },
+        });
+        return;
+      }
+
+      res.status(202).json({ success: true, data: { job } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.post(
+  '/bulk/howto-aeo',
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const count = Math.min(parseInt(String(req.body?.count ?? '3'), 10) || 3, 10);
+
+      const job = await prisma.bulkAiJob.create({
+        data: { storeId, userId: req.user!.userId, kind: 'howto_aeo' },
+        select: { id: true, status: true, kind: true, createdAt: true },
+      });
+
+      try {
+        await inngest.send({
+          name: 'bulk-ai/howto-aeo-requested',
+          data: { jobId: job.id, storeId, count },
+        });
+      } catch (err) {
+        await markJobFailedIfEnqueueFailed(job.id, err);
+        res.status(503).json({
+          success: false,
+          error: {
+            code: 'AI_QUEUE_UNREACHABLE',
+            message: 'Could not enqueue the HowTo draft right now. Try again in a minute.',
+          },
+        });
+        return;
+      }
+
+      res.status(202).json({ success: true, data: { job } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.post(
+  '/bulk/meta-aeo',
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+
+      const job = await prisma.bulkAiJob.create({
+        data: { storeId, userId: req.user!.userId, kind: 'meta_aeo' },
+        select: { id: true, status: true, kind: true, createdAt: true },
+      });
+
+      try {
+        await inngest.send({
+          name: 'bulk-ai/meta-aeo-requested',
+          data: { jobId: job.id, storeId },
+        });
+      } catch (err) {
+        await markJobFailedIfEnqueueFailed(job.id, err);
+        res.status(503).json({
+          success: false,
+          error: {
+            code: 'AI_QUEUE_UNREACHABLE',
+            message: 'Could not enqueue the meta rewrite right now. Try again in a minute.',
+          },
+        });
+        return;
+      }
+
+      res.status(202).json({ success: true, data: { job } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 export default router;

@@ -1802,6 +1802,9 @@ model BulkAiJob {
 enum BulkAiJobKind {
   translate
   seo
+  faq_aeo
+  howto_aeo
+  meta_aeo
 }
 
 enum BulkAiJobStatus {

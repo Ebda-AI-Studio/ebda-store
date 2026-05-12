@@ -24,7 +24,7 @@ import { apiGet, apiPost } from '../../../../lib/api';
 
 interface BulkAiJob {
   id: string;
-  kind: 'translate' | 'seo';
+  kind: 'translate' | 'seo' | 'faq_aeo' | 'howto_aeo' | 'meta_aeo';
   status: 'queued' | 'running' | 'completed' | 'failed';
   direction: 'to_ar' | 'to_en' | null;
   total: number;
@@ -57,7 +57,9 @@ export default function AiToolsPage() {
   const [jobs, setJobs] = useState<BulkAiJob[]>([]);
   const [activeJob, setActiveJob] = useState<BulkAiJobDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [starting, setStarting] = useState<'translate-ar' | 'translate-en' | 'seo' | null>(null);
+  const [starting, setStarting] = useState<
+    'translate-ar' | 'translate-en' | 'seo' | 'faq-aeo' | 'howto-aeo' | 'meta-aeo' | null
+  >(null);
 
   const fetchJobs = useCallback(async () => {
     if (!storeId) return;
@@ -133,10 +135,73 @@ export default function AiToolsPage() {
     }
   }
 
+  async function startFaqAeo() {
+    setError(null);
+    setStarting('faq-aeo');
+    try {
+      const { data, error: apiError } = await apiPost<{ job: BulkAiJob }>(
+        `/api/v1/stores/${storeId}/ai/bulk/faq-aeo`,
+        { count: 8 }
+      );
+      if (apiError || !data) {
+        setError(apiError?.message || 'Failed to start FAQ draft');
+        return;
+      }
+      setActiveJob({ ...data.job, errors: null } as BulkAiJobDetail);
+      await fetchJobs();
+    } catch {
+      setError('Network error');
+    } finally {
+      setStarting(null);
+    }
+  }
+
+  async function startHowtoAeo() {
+    setError(null);
+    setStarting('howto-aeo');
+    try {
+      const { data, error: apiError } = await apiPost<{ job: BulkAiJob }>(
+        `/api/v1/stores/${storeId}/ai/bulk/howto-aeo`,
+        { count: 3 }
+      );
+      if (apiError || !data) {
+        setError(apiError?.message || 'Failed to start How-To draft');
+        return;
+      }
+      setActiveJob({ ...data.job, errors: null } as BulkAiJobDetail);
+      await fetchJobs();
+    } catch {
+      setError('Network error');
+    } finally {
+      setStarting(null);
+    }
+  }
+
+  async function startMetaAeo() {
+    setError(null);
+    setStarting('meta-aeo');
+    try {
+      const { data, error: apiError } = await apiPost<{ job: BulkAiJob }>(
+        `/api/v1/stores/${storeId}/ai/bulk/meta-aeo`,
+        {}
+      );
+      if (apiError || !data) {
+        setError(apiError?.message || 'Failed to start meta rewrite');
+        return;
+      }
+      setActiveJob({ ...data.job, errors: null } as BulkAiJobDetail);
+      await fetchJobs();
+    } catch {
+      setError('Network error');
+    } finally {
+      setStarting(null);
+    }
+  }
+
   return (
     <AdminLayout
       title="AI Tools"
-      subtitle="Catalogue-wide translation and SEO sweeps"
+      subtitle="Catalogue-wide translation, SEO, and AEO sweeps"
       actions={
         <Link href={`/stores/${storeId}`}>
           <Button type="button" variant="outline">
@@ -184,6 +249,39 @@ export default function AiToolsPage() {
         />
       </div>
 
+      <div className="mt-4 grid gap-4 md:grid-cols-3">
+        <BulkActionCard
+          title="Draft FAQs with AI"
+          body="Generates up to 8 store-level FAQ items covering delivery, payments, returns, product care, and more — bilingual (EN + AR). Skips questions a merchant has already edited."
+          buttonLabel="Draft FAQs"
+          loading={starting === 'faq-aeo'}
+          disabled={
+            !!activeJob && activeJob.status !== 'completed' && activeJob.status !== 'failed'
+          }
+          onClick={startFaqAeo}
+        />
+        <BulkActionCard
+          title="Draft How-To Guides with AI"
+          body="Drafts up to 3 step-by-step HowTo guides relevant to the store's product mix (e.g. how to place an order, how to return an item). Bilingual EN + AR."
+          buttonLabel="Draft HowTos"
+          loading={starting === 'howto-aeo'}
+          disabled={
+            !!activeJob && activeJob.status !== 'completed' && activeJob.status !== 'failed'
+          }
+          onClick={startHowtoAeo}
+        />
+        <BulkActionCard
+          title="Rewrite Meta Descriptions (AEO)"
+          body="Rewrites empty store and product meta descriptions in a conversational, direct-answer style suited for AI answer engines. Only fills blank fields — never overwrites existing content."
+          buttonLabel="Rewrite meta"
+          loading={starting === 'meta-aeo'}
+          disabled={
+            !!activeJob && activeJob.status !== 'completed' && activeJob.status !== 'failed'
+          }
+          onClick={startMetaAeo}
+        />
+      </div>
+
       {activeJob && (
         <ActiveJobCard
           job={activeJob}
@@ -221,7 +319,13 @@ export default function AiToolsPage() {
                     <td className="px-4 py-3 font-medium">
                       {j.kind === 'translate'
                         ? `Translate (${j.direction === 'to_en' ? '→ EN' : '→ AR'})`
-                        : 'SEO meta'}
+                        : j.kind === 'seo'
+                          ? 'SEO meta'
+                          : j.kind === 'faq_aeo'
+                            ? 'Draft FAQs'
+                            : j.kind === 'howto_aeo'
+                              ? 'Draft HowTos'
+                              : 'Meta AEO rewrite'}
                     </td>
                     <td className="px-4 py-3">
                       <StatusBadge status={j.status} />
@@ -326,7 +430,13 @@ function ActiveJobCard({ job, onClose }: { job: BulkAiJobDetail; onClose: () => 
           <h3 className="text-base font-semibold">
             {job.kind === 'translate'
               ? `Translation sweep (${job.direction === 'to_en' ? '→ EN' : '→ AR'})`
-              : 'SEO meta sweep'}
+              : job.kind === 'seo'
+                ? 'SEO meta sweep'
+                : job.kind === 'faq_aeo'
+                  ? 'FAQ draft sweep'
+                  : job.kind === 'howto_aeo'
+                    ? 'HowTo draft sweep'
+                    : 'Meta AEO rewrite sweep'}
           </h3>
           <p className="text-xs text-muted-foreground">
             {isDone
