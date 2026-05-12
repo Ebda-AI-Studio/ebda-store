@@ -25,7 +25,7 @@ const nextConfig = {
         : []),
       {
         protocol: 'https',
-        hostname: 'cdn.forcemedia.com',
+        hostname: 'cdn.forcemediakw.com',
         port: '',
         pathname: '/**',
       },

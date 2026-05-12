@@ -232,7 +232,7 @@ async function seedSuperAdmin() {
       'ADMIN_PASSWORD environment variable is required for seeding. Set it before running the seed script.'
     );
   }
-  const adminEmail = process.env.ADMIN_EMAIL || 'admin@forcemedia.com';
+  const adminEmail = process.env.ADMIN_EMAIL || 'admin@forcemediakw.com';
 
   const existingAdmin = await prisma.user.findFirst({
     where: { role: 'super_admin' },

@@ -369,9 +369,17 @@ export class EmailService {
    */
   static async sendWelcome(storeId: string, data: { email: string; name: string }): Promise<void> {
     const content = this.welcomeTemplate(data);
+    // Load store name so the subject reflects the buying merchant, not the
+    // platform. sendForStore loads the full store again — accepted cost
+    // since welcome emails are a low-frequency path.
+    const store = await prisma.store.findUnique({
+      where: { id: storeId },
+      select: { name: true },
+    });
+    const storeName = store?.name ?? 'our store';
     await this.sendForStore(storeId, {
       to: data.email,
-      subject: 'Welcome to Force Store',
+      subject: `Welcome to ${storeName}`,
       content,
     });
   }
