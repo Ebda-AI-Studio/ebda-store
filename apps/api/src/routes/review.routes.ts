@@ -7,6 +7,8 @@ import { requireFeature } from '../middleware/feature-gate';
 import { ReviewService } from '../services/review.service';
 import { LoyaltyService } from '../services/loyalty.service';
 import logger from '../lib/logger';
+import { prisma } from '@force/database';
+import { draftOwnerResponse, summarizeProductReviews } from '../lib/ai/review-tools';
 
 // `mergeParams: true` so the child router's handlers see `:storeId` from
 // the parent mount path (`/stores/:storeId/reviews` in routes/index.ts).
@@ -321,6 +323,87 @@ router.delete(
         success: true,
         message: 'Review deleted successfully',
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// ==========================================
+// AI Endpoints (admin only)
+// ==========================================
+
+// POST /reviews/admin/:id/draft-response
+// Calls Gemini to draft a bilingual owner response. Merchant edits +
+// approves before the result is persisted via PUT /admin/:id.
+router.post(
+  '/admin/:id/draft-response',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStore,
+  requireStoreAccess,
+  requireFeature('reviews'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const draft = await draftOwnerResponse(id);
+      res.json({ success: true, data: draft });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// POST /reviews/admin/products/:productId/summary
+// Summarises up to 100 published verified reviews for a product.
+// Returns topPositives, topNegatives, overallSentiment, reviewCount.
+router.post(
+  '/admin/products/:productId/summary',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStore,
+  requireStoreAccess,
+  requireFeature('reviews'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { productId } = req.params;
+      const summary = await summarizeProductReviews(productId);
+      res.json({ success: true, data: summary });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// PUT /reviews/admin/:id/owner-response
+// Persists the merchant-approved bilingual owner response.
+const ownerResponseSchema = z.object({
+  ownerResponse: z.string().max(2000).optional(),
+  ownerResponseAr: z.string().max(2000).optional(),
+});
+
+router.put(
+  '/admin/:id/owner-response',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStore,
+  requireStoreAccess,
+  requireFeature('reviews'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const data = ownerResponseSchema.parse(req.body);
+      // Direct prisma update — ReviewService.update doesn't expose owner
+      // response fields (those are merchant-managed, not moderation fields).
+      const review = await prisma.review.update({
+        where: { id, storeId: req.storeId! },
+        data: {
+          ownerResponse: data.ownerResponse,
+          ownerResponseAr: data.ownerResponseAr,
+          ownerResponseAt: data.ownerResponse || data.ownerResponseAr ? new Date() : undefined,
+        },
+      });
+      res.json({ success: true, data: { review } });
     } catch (error) {
       next(error);
     }

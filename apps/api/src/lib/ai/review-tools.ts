@@ -1,0 +1,222 @@
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import { prisma } from '@force/database';
+import { config } from '../../config';
+import logger from '../logger';
+import { assertAiQuota } from '../ai-quota';
+
+async function throttle() {
+  const ms = parseInt(process.env.AI_BULK_THROTTLE_MS || '2500', 10);
+  await new Promise(r => setTimeout(r, ms));
+}
+
+function getModel() {
+  if (!config.googleAiKey) {
+    throw new Error('AI_NOT_CONFIGURED: GOOGLE_GENERATIVE_AI_KEY missing');
+  }
+  const genAI = new GoogleGenerativeAI(config.googleAiKey);
+  const modelName = process.env.GEMINI_MODEL || 'gemini-flash-lite-latest';
+  return genAI.getGenerativeModel({
+    model: modelName,
+    generationConfig: { responseMimeType: 'application/json' },
+  });
+}
+
+function stripFences(text: string): string {
+  return text
+    .trim()
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/i, '')
+    .trim();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 1. TRANSLATE — auto on submit. en review → ar; ar review → en.
+//    Smart-skips if bodyTranslated is already set.
+// ─────────────────────────────────────────────────────────────────────────────
+export async function translateReview(reviewId: string): Promise<void> {
+  const review = await prisma.review.findUnique({
+    where: { id: reviewId },
+    select: { id: true, body: true, language: true, bodyTranslated: true },
+  });
+  if (!review) {
+    logger.warn({ reviewId }, '[REVIEW-TOOLS] translateReview: review not found');
+    return;
+  }
+  if (review.bodyTranslated) {
+    logger.info({ reviewId }, '[REVIEW-TOOLS] translateReview: already translated, skipping');
+    return;
+  }
+
+  const target = review.language === 'ar' ? 'English' : 'Arabic';
+  const prompt = `Translate the following customer product review to ${target}. Preserve the tone (positive/negative/neutral) and personal voice. Do not soften criticism. Return JSON: { "translated": "..." }.
+
+Review:
+${review.body}`;
+
+  await assertAiQuota();
+  await throttle();
+
+  const result = await getModel().generateContent(prompt);
+  const parsed = JSON.parse(stripFences(result.response.text())) as { translated: string };
+
+  await prisma.review.update({
+    where: { id: reviewId },
+    data: { bodyTranslated: parsed.translated, bodyTranslatedAt: new Date() },
+  });
+
+  logger.info({ reviewId, target }, '[REVIEW-TOOLS] translateReview: done');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 2. SPAM DETECTION — auto on submit.
+//    Score 0-1: >0.7 = spam, 0.3-0.7 = pending, <0.3 = auto-publish.
+// ─────────────────────────────────────────────────────────────────────────────
+export interface SpamCheckResult {
+  spamScore: number;
+  reasons: string[];
+  recommendedStatus: 'published' | 'pending' | 'spam';
+}
+
+export async function detectSpamReview(reviewId: string): Promise<SpamCheckResult> {
+  const review = await prisma.review.findUnique({
+    where: { id: reviewId },
+    select: { body: true, title: true, rating: true, language: true },
+  });
+  if (!review) {
+    logger.warn({ reviewId }, '[REVIEW-TOOLS] detectSpamReview: review not found');
+    return { spamScore: 0, reasons: [], recommendedStatus: 'pending' };
+  }
+
+  const prompt = `You are a fraud detector for product reviews on a Kuwait e-commerce platform. Analyze this review for spam, fakeness, profanity, or off-topic content.
+
+Score 0.0-1.0:
+- 0.0-0.2: clearly genuine
+- 0.2-0.5: likely genuine, minor concerns
+- 0.5-0.8: suspicious (very short, generic, mismatched language, marketing speak)
+- 0.8-1.0: clearly spam/fake/abusive
+
+Reasons to flag: profanity, hate speech, off-topic content (not about the product), competitor mentions, marketing/promotional spam, copy-paste from other sites, single-word reviews, all-caps abuse, rating-comment mismatch (e.g. 5 stars with negative text).
+
+Return JSON: { "spamScore": number, "reasons": string[] }
+
+Review:
+title: ${review.title ?? '(none)'}
+rating: ${review.rating}/5
+language: ${review.language}
+body: ${review.body}`;
+
+  await assertAiQuota();
+  await throttle();
+
+  const result = await getModel().generateContent(prompt);
+  const parsed = JSON.parse(stripFences(result.response.text())) as {
+    spamScore: number;
+    reasons: string[];
+  };
+
+  const score = Math.max(0, Math.min(1, parsed.spamScore || 0));
+  const recommendedStatus: SpamCheckResult['recommendedStatus'] =
+    score >= 0.7 ? 'spam' : score >= 0.3 ? 'pending' : 'published';
+
+  logger.info({ reviewId, score, recommendedStatus }, '[REVIEW-TOOLS] detectSpamReview: done');
+  return { spamScore: score, reasons: parsed.reasons || [], recommendedStatus };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 3. SUMMARIZE — merchant dashboard button.
+//    Returns top positives + top negatives + sentiment from up to 100 reviews.
+// ─────────────────────────────────────────────────────────────────────────────
+export interface ReviewSummary {
+  topPositives: string[];
+  topNegatives: string[];
+  overallSentiment: 'positive' | 'mixed' | 'negative';
+  reviewCount: number;
+}
+
+export async function summarizeProductReviews(productId: string): Promise<ReviewSummary> {
+  const reviews = await prisma.review.findMany({
+    where: { productId, status: 'published', verifiedPurchase: true },
+    select: { rating: true, body: true, language: true },
+    orderBy: { createdAt: 'desc' },
+    take: 100,
+  });
+
+  if (reviews.length === 0) {
+    return { topPositives: [], topNegatives: [], overallSentiment: 'mixed', reviewCount: 0 };
+  }
+
+  const reviewsText = reviews.map((r, i) => `[${i + 1}] (${r.rating}⭐) ${r.body}`).join('\n');
+
+  const prompt = `Analyze these ${reviews.length} customer reviews for a single product. Identify recurring themes — top 3 positive aspects customers mention, top 3 negative aspects, and the overall sentiment.
+
+Return JSON: { "topPositives": [string], "topNegatives": [string], "overallSentiment": "positive" | "mixed" | "negative" }
+
+Each theme should be a short phrase (3-7 words) summarizing what multiple reviewers mention. Use English regardless of the review language.
+
+Reviews:
+${reviewsText}`;
+
+  await assertAiQuota();
+  await throttle();
+
+  const result = await getModel().generateContent(prompt);
+  const parsed = JSON.parse(stripFences(result.response.text())) as Omit<
+    ReviewSummary,
+    'reviewCount'
+  >;
+
+  logger.info(
+    { productId, reviewCount: reviews.length, sentiment: parsed.overallSentiment },
+    '[REVIEW-TOOLS] summarizeProductReviews: done'
+  );
+  return { ...parsed, reviewCount: reviews.length };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 4. DRAFT OWNER RESPONSE — merchant dashboard button.
+//    Drafts a bilingual reply (en + ar). Merchant edits + approves before save.
+// ─────────────────────────────────────────────────────────────────────────────
+export interface OwnerResponseDraft {
+  en: string;
+  ar: string;
+}
+
+export async function draftOwnerResponse(reviewId: string): Promise<OwnerResponseDraft> {
+  const review = await prisma.review.findUnique({
+    where: { id: reviewId },
+    select: {
+      id: true,
+      rating: true,
+      title: true,
+      body: true,
+      language: true,
+      store: { select: { name: true, nameAr: true } },
+      product: { select: { name: true, nameAr: true } },
+    },
+  });
+  if (!review) throw new Error(`Review ${reviewId} not found`);
+
+  const prompt = `You are helping a Kuwait merchant draft a professional, warm response to a customer's product review. Match the tone (positive review → thank them genuinely; negative → empathize + offer to make it right). Keep responses concise (1-3 sentences).
+
+Write BOTH versions in JSON: { "en": "...", "ar": "..." }
+- en: English
+- ar: Arabic (formal MSA, not dialect)
+
+Sign off with the store name, no other branding.
+
+Store: ${review.store.name}${review.store.nameAr ? ` (${review.store.nameAr})` : ''}
+Product: ${review.product.name}${review.product.nameAr ? ` (${review.product.nameAr})` : ''}
+Review:
+- rating: ${review.rating}/5
+- title: ${review.title ?? '(none)'}
+- body: ${review.body}`;
+
+  await assertAiQuota();
+  await throttle();
+
+  const result = await getModel().generateContent(prompt);
+  const parsed = JSON.parse(stripFences(result.response.text())) as OwnerResponseDraft;
+
+  logger.info({ reviewId }, '[REVIEW-TOOLS] draftOwnerResponse: done');
+  return parsed;
+}

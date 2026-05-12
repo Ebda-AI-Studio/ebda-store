@@ -8,6 +8,7 @@ import { bulkAiTranslate } from './bulk-ai-translate';
 import { bulkAiSeo } from './bulk-ai-seo';
 import { bulkAiFaqAeo, bulkAiHowtoAeo, bulkAiMetaAeo } from './bulk-ai-aeo';
 import { reviewRequest } from './review-request';
+import { reviewModeration } from './review-moderation';
 
 /**
  * Registry of every Inngest function the API exposes. The serve
@@ -27,4 +28,5 @@ export const inngestFunctions: InngestFunction.Any[] = [
   bulkAiHowtoAeo,
   bulkAiMetaAeo,
   reviewRequest,
+  reviewModeration,
 ];

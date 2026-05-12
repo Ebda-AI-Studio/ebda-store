@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { Button, Badge, Modal, useToast } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
-import { apiGet, apiPost, apiDelete } from '../../../../lib/api';
+import { apiGet, apiPost, apiPut, apiDelete } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
 
 interface Review {
@@ -13,11 +13,14 @@ interface Review {
   title: string | null;
   body: string;
   language: string;
+  bodyTranslated: string | null;
   verifiedPurchase: boolean;
   status: 'pending' | 'published' | 'rejected' | 'spam';
   rejectionReason: string | null;
   spamScore: number | null;
+  spamReasons: string[] | null;
   ownerResponse: string | null;
+  ownerResponseAr: string | null;
   createdAt: string;
   product: {
     id: string;
@@ -30,6 +33,18 @@ interface Review {
     firstName: string;
     lastName: string;
   } | null;
+}
+
+interface ReviewSummary {
+  topPositives: string[];
+  topNegatives: string[];
+  overallSentiment: 'positive' | 'mixed' | 'negative';
+  reviewCount: number;
+}
+
+interface OwnerResponseDraft {
+  en: string;
+  ar: string;
 }
 
 function formatDate(date: string) {
@@ -57,6 +72,17 @@ function StarRating({ rating }: { rating: number }) {
   );
 }
 
+function SpamBadge({ score }: { score: number | null }) {
+  if (score === null) return null;
+  const pct = Math.round(score * 100);
+  const variant = score >= 0.7 ? 'destructive' : score >= 0.3 ? 'secondary' : 'outline';
+  return (
+    <Badge variant={variant as 'destructive' | 'secondary' | 'outline'} className="text-xs">
+      Spam {pct}%
+    </Badge>
+  );
+}
+
 export default function ReviewsPage() {
   const params = useParams();
   const storeId = params?.id as string;
@@ -69,6 +95,21 @@ export default function ReviewsPage() {
   const [meta, setMeta] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const { success: toastSuccess, error: showError } = useToast();
+
+  // Translate toggle — per review show bodyTranslated when available
+  const [showTranslated, setShowTranslated] = useState<Record<string, boolean>>({});
+
+  // Summary modal — keyed by productId
+  const [summaryTarget, setSummaryTarget] = useState<string | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summary, setSummary] = useState<ReviewSummary | null>(null);
+
+  // Draft response modal — keyed by reviewId
+  const [draftTarget, setDraftTarget] = useState<string | null>(null);
+  const [draftLoading, setDraftLoading] = useState(false);
+  const [draftEn, setDraftEn] = useState('');
+  const [draftAr, setDraftAr] = useState('');
+  const [savingResponse, setSavingResponse] = useState(false);
 
   const fetchReviews = useCallback(async () => {
     if (!storeId) return;
@@ -142,10 +183,83 @@ export default function ReviewsPage() {
     }
   }
 
+  // ── AI: summarize product reviews ─────────────────────────────────────────
+  async function handleSummarize(productId: string) {
+    setSummaryTarget(productId);
+    setSummary(null);
+    setSummaryLoading(true);
+    try {
+      const { data, error } = await apiPost<ReviewSummary>(
+        `/api/v1/stores/${storeId}/reviews/admin/products/${productId}/summary`
+      );
+      if (error || !data) {
+        showError(t('errorTitle'), t('aiErrorGeneric'));
+        setSummaryTarget(null);
+        return;
+      }
+      setSummary(data);
+    } catch (err) {
+      console.error('Failed to summarize:', err);
+      showError(t('errorTitle'), t('aiErrorGeneric'));
+      setSummaryTarget(null);
+    } finally {
+      setSummaryLoading(false);
+    }
+  }
+
+  // ── AI: draft owner response ───────────────────────────────────────────────
+  async function handleDraftResponse(reviewId: string) {
+    setDraftTarget(reviewId);
+    setDraftEn('');
+    setDraftAr('');
+    setDraftLoading(true);
+    try {
+      const { data, error } = await apiPost<OwnerResponseDraft>(
+        `/api/v1/stores/${storeId}/reviews/admin/${reviewId}/draft-response`
+      );
+      if (error || !data) {
+        showError(t('errorTitle'), t('aiErrorGeneric'));
+        setDraftTarget(null);
+        return;
+      }
+      setDraftEn(data.en);
+      setDraftAr(data.ar);
+    } catch (err) {
+      console.error('Failed to draft response:', err);
+      showError(t('errorTitle'), t('aiErrorGeneric'));
+      setDraftTarget(null);
+    } finally {
+      setDraftLoading(false);
+    }
+  }
+
+  async function handleSaveResponse() {
+    if (!draftTarget) return;
+    setSavingResponse(true);
+    try {
+      const { error } = await apiPut(
+        `/api/v1/stores/${storeId}/reviews/admin/${draftTarget}/owner-response`,
+        { ownerResponse: draftEn, ownerResponseAr: draftAr }
+      );
+      if (error) {
+        showError(t('errorTitle'), t('aiSaveResponseFailed'));
+        return;
+      }
+      toastSuccess(t('aiSaveResponseTitle'), t('aiSaveResponseBody'));
+      setDraftTarget(null);
+      fetchReviews();
+    } catch (err) {
+      console.error('Failed to save response:', err);
+      showError(t('errorTitle'), t('aiSaveResponseFailed'));
+    } finally {
+      setSavingResponse(false);
+    }
+  }
+
   return (
     <AdminLayout title={t('title')} subtitle={t('subtitle')}>
       {/* Filters */}
-      <div className="mb-6 flex gap-2">
+      <div className="mb-6 flex flex-wrap gap-2">
         <Button
           variant={filter === 'all' ? 'default' : 'outline'}
           size="sm"
@@ -173,6 +287,13 @@ export default function ReviewsPage() {
           onClick={() => setFilter('rejected')}
         >
           {t('filterRejected')}
+        </Button>
+        <Button
+          variant={filter === 'spam' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setFilter('spam')}
+        >
+          {t('filterSpam')}
         </Button>
       </div>
 
@@ -202,74 +323,142 @@ export default function ReviewsPage() {
           </div>
         ) : (
           <div className="divide-y">
-            {reviews.map(review => (
-              <div key={review.id} className="p-6">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <StarRating rating={review.rating} />
-                      <Badge variant={review.status === 'published' ? 'default' : 'secondary'}>
-                        {review.status === 'published' ? t('approved') : review.status}
-                      </Badge>
-                      {review.verifiedPurchase && (
-                        <Badge variant="outline" className="text-success border-success/40">
-                          {t('verifiedPurchase')}
+            {reviews.map(review => {
+              const isTranslated = showTranslated[review.id];
+              const displayBody =
+                isTranslated && review.bodyTranslated ? review.bodyTranslated : review.body;
+              return (
+                <div key={review.id} className="p-6">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      {/* Row 1: Rating + badges */}
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
+                        <StarRating rating={review.rating} />
+                        <Badge variant={review.status === 'published' ? 'default' : 'secondary'}>
+                          {review.status === 'published' ? t('approved') : review.status}
                         </Badge>
+                        {review.verifiedPurchase && (
+                          <Badge variant="outline" className="text-success border-success/40">
+                            {t('verifiedPurchase')}
+                          </Badge>
+                        )}
+                        <SpamBadge score={review.spamScore} />
+                      </div>
+
+                      {review.title && (
+                        <h3 className="font-semibold text-foreground mb-1">{review.title}</h3>
                       )}
-                    </div>
 
-                    {review.title && (
-                      <h3 className="font-semibold text-foreground mb-1">{review.title}</h3>
-                    )}
-
-                    <p className="text-muted-foreground text-sm mb-3">{review.body}</p>
-
-                    {review.rejectionReason && (
-                      <p className="text-destructive text-xs mb-2">
-                        {t('rejectionReason')}: {review.rejectionReason}
+                      {/* Review body with translate toggle */}
+                      <p
+                        className="text-muted-foreground text-sm mb-1"
+                        dir={isTranslated ? (review.language === 'ar' ? 'ltr' : 'rtl') : undefined}
+                      >
+                        {displayBody}
                       </p>
-                    )}
+                      {review.bodyTranslated && (
+                        <button
+                          className="text-xs text-primary underline mb-2"
+                          onClick={() =>
+                            setShowTranslated(prev => ({
+                              ...prev,
+                              [review.id]: !prev[review.id],
+                            }))
+                          }
+                        >
+                          {isTranslated
+                            ? t('showOriginal')
+                            : t('showTranslated', { lang: review.language === 'ar' ? 'AR' : 'EN' })}
+                        </button>
+                      )}
 
-                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                      <span>
-                        {t('productLabel')}
-                        <span className="font-medium text-foreground">{review.product.name}</span>
-                      </span>
-                      <span>
-                        {t('byLabel')}
-                        <span className="font-medium text-foreground">
-                          {review.customer
-                            ? `${review.customer.firstName} ${review.customer.lastName}`
-                            : t('anonymous')}
+                      {/* Spam reasons */}
+                      {review.spamReasons && review.spamReasons.length > 0 && (
+                        <p className="text-xs text-destructive mb-2">
+                          {t('spamReasons')}: {review.spamReasons.join(', ')}
+                        </p>
+                      )}
+
+                      {review.rejectionReason && (
+                        <p className="text-destructive text-xs mb-2">
+                          {t('rejectionReason')}: {review.rejectionReason}
+                        </p>
+                      )}
+
+                      {/* Existing owner response */}
+                      {review.ownerResponse && (
+                        <div className="mt-2 rounded-md bg-muted/50 px-3 py-2 text-xs">
+                          <span className="font-medium text-foreground">
+                            {t('ownerResponse')}:{' '}
+                          </span>
+                          {review.ownerResponse}
+                        </div>
+                      )}
+
+                      <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground mt-2">
+                        <span>
+                          {t('productLabel')}
+                          <span className="font-medium text-foreground">{review.product.name}</span>
                         </span>
-                      </span>
-                      <span>{formatDate(review.createdAt)}</span>
+                        <span>
+                          {t('byLabel')}
+                          <span className="font-medium text-foreground">
+                            {review.customer
+                              ? `${review.customer.firstName} ${review.customer.lastName}`
+                              : t('anonymous')}
+                          </span>
+                        </span>
+                        <span>{formatDate(review.createdAt)}</span>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="flex gap-2">
-                    {review.status !== 'published' && (
-                      <Button size="sm" onClick={() => handleApprove(review.id)}>
-                        {t('approve')}
+                    {/* Action buttons */}
+                    <div className="flex flex-col gap-2 shrink-0">
+                      {review.status !== 'published' && (
+                        <Button size="sm" onClick={() => handleApprove(review.id)}>
+                          {t('approve')}
+                        </Button>
+                      )}
+                      {review.status === 'published' && (
+                        <Button variant="outline" size="sm" onClick={() => handleReject(review.id)}>
+                          {t('unapprove')}
+                        </Button>
+                      )}
+                      {/* AI: Draft response */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDraftResponse(review.id)}
+                        disabled={draftLoading && draftTarget === review.id}
+                      >
+                        {draftLoading && draftTarget === review.id
+                          ? t('aiDrafting')
+                          : t('draftResponse')}
                       </Button>
-                    )}
-                    {review.status === 'published' && (
-                      <Button variant="outline" size="sm" onClick={() => handleReject(review.id)}>
-                        {t('unapprove')}
+                      {/* AI: Summarize this product's reviews */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleSummarize(review.product.id)}
+                        disabled={summaryLoading && summaryTarget === review.product.id}
+                      >
+                        {summaryLoading && summaryTarget === review.product.id
+                          ? t('aiSummarizing')
+                          : t('summarize')}
                       </Button>
-                    )}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-destructive hover:bg-destructive/5"
-                      onClick={() => setDeleteTarget(review.id)}
-                    >
-                      {t('delete')}
-                    </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-destructive hover:bg-destructive/5"
+                        onClick={() => setDeleteTarget(review.id)}
+                      >
+                        {t('delete')}
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
@@ -318,6 +507,105 @@ export default function ReviewsPage() {
           </Button>
           <Button variant="destructive" size="sm" onClick={confirmDelete}>
             {t('delete')}
+          </Button>
+        </div>
+      </Modal>
+
+      {/* AI: Summary Modal */}
+      <Modal
+        isOpen={!!summaryTarget && !summaryLoading}
+        onClose={() => {
+          setSummaryTarget(null);
+          setSummary(null);
+        }}
+        title={t('aiSummaryTitle')}
+      >
+        {summary ? (
+          <div className="space-y-4 text-sm">
+            <div>
+              <p className="font-semibold text-foreground mb-1">{t('aiSummaryPositives')}</p>
+              <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                {summary.topPositives.length > 0 ? (
+                  summary.topPositives.map((p, i) => <li key={i}>{p}</li>)
+                ) : (
+                  <li>{t('aiSummaryNone')}</li>
+                )}
+              </ul>
+            </div>
+            <div>
+              <p className="font-semibold text-foreground mb-1">{t('aiSummaryNegatives')}</p>
+              <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                {summary.topNegatives.length > 0 ? (
+                  summary.topNegatives.map((n, i) => <li key={i}>{n}</li>)
+                ) : (
+                  <li>{t('aiSummaryNone')}</li>
+                )}
+              </ul>
+            </div>
+            <p className="text-muted-foreground">
+              {t('aiSummarySentiment')}:{' '}
+              <span className="font-medium text-foreground capitalize">
+                {summary.overallSentiment}
+              </span>
+              {' · '}
+              {t('aiSummaryCount', { count: summary.reviewCount })}
+            </p>
+          </div>
+        ) : (
+          <p className="text-muted-foreground text-sm">{t('loading')}</p>
+        )}
+        <div className="mt-6 flex justify-end">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setSummaryTarget(null);
+              setSummary(null);
+            }}
+          >
+            {t('cancel')}
+          </Button>
+        </div>
+      </Modal>
+
+      {/* AI: Draft Response Modal */}
+      <Modal
+        isOpen={!!draftTarget && !draftLoading}
+        onClose={() => setDraftTarget(null)}
+        title={t('aiDraftTitle')}
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-muted-foreground mb-1">
+              {t('aiDraftEnLabel')}
+            </label>
+            <textarea
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm text-foreground resize-none focus:outline-none focus:ring-2 focus:ring-primary/50"
+              rows={4}
+              value={draftEn}
+              onChange={e => setDraftEn(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-muted-foreground mb-1">
+              {t('aiDraftArLabel')}
+            </label>
+            <textarea
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm text-foreground resize-none focus:outline-none focus:ring-2 focus:ring-primary/50"
+              rows={4}
+              dir="rtl"
+              value={draftAr}
+              onChange={e => setDraftAr(e.target.value)}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">{t('aiDraftHint')}</p>
+        </div>
+        <div className="mt-6 flex justify-end gap-3">
+          <Button variant="outline" size="sm" onClick={() => setDraftTarget(null)}>
+            {t('cancel')}
+          </Button>
+          <Button size="sm" onClick={handleSaveResponse} disabled={savingResponse}>
+            {savingResponse ? t('saving') : t('aiSaveResponse')}
           </Button>
         </div>
       </Modal>
