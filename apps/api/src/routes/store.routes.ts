@@ -5,6 +5,7 @@ import { requireStoreAccess } from '../middleware/store-access';
 import { Prisma, prisma, StoreStatus } from '@force/database';
 import { StoreService } from '../services/store.service';
 import { VercelDomainService } from '../services/vercel-domain.service';
+import { ResendService } from '../services/resend.service';
 import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
 import { getAuthUser } from '../utils/store-helpers';
@@ -687,24 +688,73 @@ router.get(
     try {
       const { id } = req.params;
       const store = await StoreService.getById(id);
+      const storeRow = await prisma.store.findUnique({
+        where: { id },
+        select: { emailDomainId: true, emailDomainStatus: true, emailDomainVerifiedAt: true },
+      });
 
+      // No custom domain at all — neither Vercel nor Resend state is meaningful.
       if (!store.domain) {
         res.json({
           success: true,
-          data: { domain: null, verified: false, dnsRecords: [] },
+          data: {
+            domain: null,
+            verified: false,
+            dnsRecords: [],
+            emailSender: {
+              domainId: storeRow?.emailDomainId ?? null,
+              status: storeRow?.emailDomainStatus ?? null,
+              verifiedAt: storeRow?.emailDomainVerifiedAt ?? null,
+            },
+          },
         });
         return;
       }
 
-      const status = await VercelDomainService.getDomain(store.domain);
+      const vercelStatus = await VercelDomainService.getDomain(store.domain);
+
+      // Best-effort: refresh Resend status alongside. Failure shouldn't block
+      // the admin page from rendering — the storefront domain status is the
+      // primary concern; the email DNS records are secondary.
+      let resendRecords: Array<{ type: string; name: string; value: string }> = [];
+      if (storeRow?.emailDomainId) {
+        try {
+          const refreshed = await ResendService.refreshDomainStatus(id);
+          resendRecords = refreshed.records.map(r => ({
+            type: r.type,
+            name: r.name,
+            value: r.value,
+          }));
+        } catch (err) {
+          logger.warn(
+            { err, storeId: id },
+            'Resend status fetch failed during GET /domain — admin will still render Vercel side'
+          );
+        }
+      }
+
+      // Merge Vercel + Resend DNS records into one panel. The admin renders
+      // this list under a neutral 'DNS records to add at your registrar'
+      // heading so merchants never see provider names.
+      const vercelRecords = vercelStatus?.dnsRecords ?? [
+        { type: 'CNAME', name: store.domain, value: 'cname.vercel-dns.com' },
+      ];
+      const mergedDns = [...vercelRecords, ...resendRecords];
 
       res.json({
         success: true,
-        data: status || {
-          domain: store.domain,
-          verified: false,
-          misconfigured: true,
-          dnsRecords: [{ type: 'CNAME', name: store.domain, value: 'cname.vercel-dns.com' }],
+        data: {
+          ...(vercelStatus ?? {
+            domain: store.domain,
+            verified: false,
+            misconfigured: true,
+          }),
+          dnsRecords: mergedDns,
+          emailSender: {
+            domainId: storeRow?.emailDomainId ?? null,
+            status: storeRow?.emailDomainStatus ?? null,
+            verifiedAt: storeRow?.emailDomainVerifiedAt ?? null,
+          },
         },
       });
     } catch (error) {
@@ -876,6 +926,39 @@ router.put(
       if (rollbackVercelAdd) {
         await rollbackVercelAdd();
       }
+      next(error);
+    }
+  }
+);
+
+// POST /stores/:id/email-sender/provision — create or refresh the Resend
+// domain entry and return the DNS records the merchant must add. Idempotent.
+router.post(
+  '/:id/email-sender/provision',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const records = await ResendService.provisionStoreDomain(req.params.id);
+      res.json({ success: true, data: { records } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// POST /stores/:id/email-sender/verify — refresh status from Resend.
+router.post(
+  '/:id/email-sender/verify',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const result = await ResendService.refreshDomainStatus(req.params.id);
+      res.json({ success: true, data: result });
+    } catch (error) {
       next(error);
     }
   }
