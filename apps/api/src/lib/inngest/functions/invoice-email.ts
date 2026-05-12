@@ -42,11 +42,7 @@ export const invoiceEmail: InngestFunction.Any = inngest.createFunction(
 
     await step.run('send-email', async () => {
       try {
-        await EmailService.send({
-          to,
-          subject: `Invoice ${order.orderNumber}`,
-          html,
-        });
+        await EmailService.sendInvoice(storeId, { to, orderNumber: order.orderNumber, html });
       } catch (err) {
         logger.error({ err, orderId, to }, 'Invoice email send failed');
         throw err;

@@ -18,7 +18,8 @@ vi.mock('@api/services/redis.service', () => ({
 
 vi.mock('@api/services/email.service', () => ({
   EmailService: {
-    send: vi.fn(),
+    sendRaw: vi.fn(),
+    sendPlatformRaw: vi.fn(),
   },
 }));
 
@@ -56,7 +57,7 @@ describe('Email Queue Service', () => {
         html: '<p>Hello</p>',
       };
 
-      const id = await emailQueue.enqueue(emailOptions);
+      const id = await emailQueue.enqueue('store-1', emailOptions);
 
       expect(id).toMatch(/^email_\d+_[a-z0-9]+$/);
       expect(mockRedisClient.lpush).toHaveBeenCalledWith(
@@ -65,9 +66,9 @@ describe('Email Queue Service', () => {
       );
     });
 
-    it('should send email immediately when Redis unavailable', async () => {
+    it('should send email immediately when Redis unavailable (with storeId)', async () => {
       vi.mocked(redis.isAvailable).mockReturnValue(false);
-      vi.mocked(EmailService.send).mockResolvedValue({} as any);
+      vi.mocked(EmailService.sendRaw).mockResolvedValue(undefined);
 
       const emailOptions = {
         to: 'test@example.com',
@@ -75,9 +76,24 @@ describe('Email Queue Service', () => {
         html: '<p>Hello</p>',
       };
 
-      await emailQueue.enqueue(emailOptions);
+      await emailQueue.enqueue('store-1', emailOptions);
 
-      expect(EmailService.send).toHaveBeenCalledWith(emailOptions);
+      expect(EmailService.sendRaw).toHaveBeenCalledWith('store-1', emailOptions);
+    });
+
+    it('should send platform email immediately when Redis unavailable (no storeId)', async () => {
+      vi.mocked(redis.isAvailable).mockReturnValue(false);
+      vi.mocked(EmailService.sendPlatformRaw).mockResolvedValue(undefined);
+
+      const emailOptions = {
+        to: 'test@example.com',
+        subject: 'Test Email',
+        html: '<p>Hello</p>',
+      };
+
+      await emailQueue.enqueue(null, emailOptions);
+
+      expect(EmailService.sendPlatformRaw).toHaveBeenCalledWith(emailOptions);
     });
 
     it('should generate unique IDs for each email', async () => {
@@ -87,8 +103,8 @@ describe('Email Queue Service', () => {
         html: '<p>Test</p>',
       };
 
-      const id1 = await emailQueue.enqueue(emailOptions);
-      const id2 = await emailQueue.enqueue(emailOptions);
+      const id1 = await emailQueue.enqueue('store-1', emailOptions);
+      const id2 = await emailQueue.enqueue('store-1', emailOptions);
 
       expect(id1).not.toBe(id2);
     });
@@ -152,6 +168,7 @@ describe('Email Queue Service', () => {
     it('should return failed emails from queue', async () => {
       const failedEmail: QueuedEmail = {
         id: 'email_123',
+        storeId: 'store-1',
         options: { to: 'test@example.com', subject: 'Test', html: '<p>Test</p>' },
         attempts: 3,
         maxAttempts: 3,
@@ -181,6 +198,7 @@ describe('Email Queue Service', () => {
     it('should move failed emails back to main queue', async () => {
       const failedEmail: QueuedEmail = {
         id: 'email_123',
+        storeId: 'store-1',
         options: { to: 'test@example.com', subject: 'Test', html: '<p>Test</p>' },
         attempts: 3,
         maxAttempts: 3,
@@ -204,6 +222,7 @@ describe('Email Queue Service', () => {
     it('should clear error when retrying', async () => {
       const failedEmail: QueuedEmail = {
         id: 'email_123',
+        storeId: null,
         options: { to: 'test@example.com', subject: 'Test', html: '<p>Test</p>' },
         attempts: 3,
         maxAttempts: 3,
@@ -243,7 +262,7 @@ describe('Email Queue Integration', () => {
       vi.mocked(redis.isAvailable).mockReturnValue(true);
       vi.mocked(redis.getClient).mockReturnValue(mockClient as any);
 
-      await emailQueue.enqueue({
+      await emailQueue.enqueue('store-1', {
         to: 'user@example.com',
         subject: 'Welcome',
         html: '<h1>Welcome!</h1>',
@@ -253,6 +272,7 @@ describe('Email Queue Integration', () => {
 
       expect(pushedData).toMatchObject({
         id: expect.stringMatching(/^email_\d+_/),
+        storeId: 'store-1',
         options: {
           to: 'user@example.com',
           subject: 'Welcome',

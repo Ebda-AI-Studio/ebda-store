@@ -111,7 +111,7 @@ export class AuthService {
       const recipientName =
         `${existingUser.firstName ?? ''} ${existingUser.lastName ?? ''}`.trim() ||
         existingUser.email;
-      void EmailService.sendDuplicateRegistrationNotice({
+      void EmailService.sendDuplicateRegistrationNotice(storeId ?? existingUser.storeId ?? '', {
         email: existingUser.email,
         name: recipientName,
         storeName: storeName ?? undefined,
@@ -153,7 +153,8 @@ export class AuthService {
     void this.sendVerificationEmail(
       user.id,
       user.email,
-      `${user.firstName} ${user.lastName}`.trim() || user.email
+      `${user.firstName} ${user.lastName}`.trim() || user.email,
+      storeId
     ).catch(err =>
       logger.error({ err, userId: user.id }, 'Failed to send verification email after register')
     );
@@ -164,7 +165,12 @@ export class AuthService {
   /**
    * Create and send email verification token
    */
-  static async sendVerificationEmail(userId: string, email: string, name: string): Promise<void> {
+  static async sendVerificationEmail(
+    userId: string,
+    email: string,
+    name: string,
+    storeId: string | null = null
+  ): Promise<void> {
     // Delete any existing verification tokens for this user
     await prisma.verificationToken.deleteMany({
       where: {
@@ -190,12 +196,21 @@ export class AuthService {
 
     // Send verification email
     const verificationUrl = `${config.webUrl}/auth/verify-email?token=${token}`;
-    await EmailService.sendEmailVerification({
-      email,
-      name,
-      verificationUrl,
-      expiresIn: '24 hours',
-    });
+    if (storeId) {
+      await EmailService.sendEmailVerification(storeId, {
+        email,
+        name,
+        verificationUrl,
+        expiresIn: '24 hours',
+      });
+    } else {
+      // Admin accounts (no storeId) skip the branded email path — they
+      // don't belong to a store and verification flow is admin-only.
+      logger.info(
+        { userId, email },
+        'Skipping branded verification email — no storeId (admin account)'
+      );
+    }
   }
 
   /**
@@ -249,17 +264,19 @@ export class AuthService {
 
     // Welcome email is a follow-up — fire-and-forget so SMTP latency can't
     // delay the verify-email API response.
-    void EmailService.sendWelcome({
-      email: verificationToken.user.email,
-      name:
-        `${verificationToken.user.firstName} ${verificationToken.user.lastName}`.trim() ||
-        verificationToken.user.email,
-    }).catch(err =>
-      logger.error(
-        { err, userId: verificationToken.userId },
-        'Failed to send welcome email after verify'
-      )
-    );
+    if (verificationToken.user.storeId) {
+      void EmailService.sendWelcome(verificationToken.user.storeId, {
+        email: verificationToken.user.email,
+        name:
+          `${verificationToken.user.firstName} ${verificationToken.user.lastName}`.trim() ||
+          verificationToken.user.email,
+      }).catch(err =>
+        logger.error(
+          { err, userId: verificationToken.userId },
+          'Failed to send welcome email after verify'
+        )
+      );
+    }
 
     return { success: true, message: 'Email verified successfully' };
   }
@@ -628,12 +645,17 @@ export class AuthService {
 
     // Send reset email
     const resetUrl = `${config.webUrl}/auth/reset-password?token=${resetToken}`;
-    await EmailService.sendPasswordReset({
-      email: user.email,
-      name: `${user.firstName} ${user.lastName}`.trim() || user.email,
-      resetUrl,
-      expiresIn: '1 hour',
-    });
+    if (user.storeId) {
+      await EmailService.sendPasswordReset(user.storeId, {
+        email: user.email,
+        name: `${user.firstName} ${user.lastName}`.trim() || user.email,
+        resetUrl,
+        expiresIn: '1 hour',
+      });
+    } else {
+      // Admin password-reset: no store context, skip branded email.
+      logger.info({ userId: user.id }, 'Skipping branded password-reset email — admin account');
+    }
   }
 
   static async resetPassword(token: string, newPassword: string): Promise<void> {

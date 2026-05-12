@@ -221,7 +221,7 @@ export class ProvisioningService {
     // Store is provisioned — fire-and-forget the welcome email so SMTP latency
     // can't stall the provisioning API response.
     if (result.isNewUser) {
-      void EmailService.sendWelcome({
+      void EmailService.sendWelcome(result.store.id, {
         email: ownerEmail,
         name: ownerName,
       }).catch(err =>

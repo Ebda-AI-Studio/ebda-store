@@ -207,7 +207,7 @@ export class ReturnService {
 
     // Return is committed — fire-and-forget the confirmation email so SMTP
     // latency can't stall the API response.
-    void EmailService.sendReturnConfirmation({
+    void EmailService.sendReturnConfirmation(storeId, {
       email: order.customer?.email || '',
       customerName:
         `${order.customer?.firstName || ''} ${order.customer?.lastName || ''}`.trim() || 'Customer',
@@ -292,7 +292,7 @@ export class ReturnService {
 
     // Status was updated — fire-and-forget the email so SMTP latency can't
     // stall the API response.
-    void EmailService.sendReturnStatusUpdate({
+    void EmailService.sendReturnStatusUpdate(storeId, {
       email: updatedReturn.customer.email,
       customerName: `${updatedReturn.customer.firstName} ${updatedReturn.customer.lastName}`,
       storeName: updatedReturn.store.name,

@@ -1,4 +1,11 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+
+// email.service now imports @force/database at the module level;
+// mock it so this unit test doesn't require a generated prisma client.
+vi.mock('@force/database', () => ({
+  prisma: { store: { findUnique: vi.fn() } },
+}));
+
 import { renderBrandedShell, type EmailStoreContext } from '@api/services/email.service';
 
 const baseStore = (overrides: Partial<EmailStoreContext> = {}): EmailStoreContext => ({

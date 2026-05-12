@@ -993,7 +993,7 @@ router.post(
 
       // Fire-and-forget welcome email — don't await so a slow / misconfigured
       // SMTP server doesn't keep the customer staring at a spinner.
-      EmailService.sendWelcome({ email: normalizedEmail, name: '' }).catch(err => {
+      EmailService.sendWelcome(storeId, { email: normalizedEmail, name: '' }).catch(err => {
         logger.warn(
           { err: err instanceof Error ? err.message : 'unknown', storeId },
           '[NEWSLETTER] welcome email failed'

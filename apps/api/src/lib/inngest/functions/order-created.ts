@@ -86,7 +86,9 @@ export const orderCreated: InngestFunction.Any = inngest.createFunction(
     );
 
     await Promise.allSettled([
-      step.run('send-customer-confirmation', () => EmailService.sendOrderConfirmation(emailData)),
+      step.run('send-customer-confirmation', () =>
+        EmailService.sendOrderConfirmation(storeId, emailData)
+      ),
       step.run('send-admin-new-order', () => EmailService.sendAdminNewOrder(emailData)),
       step.run('dispatch-notification-channels', async () => {
         await notificationDispatcher.dispatch(storeId, 'order_confirmed', {

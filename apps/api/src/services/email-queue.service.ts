@@ -11,6 +11,7 @@ import logger from '../lib/logger';
 
 export interface QueuedEmail {
   id: string;
+  storeId: string | null;
   options: EmailOptions;
   attempts: number;
   maxAttempts: number;
@@ -31,11 +32,12 @@ class EmailQueueService {
   /**
    * Add email to queue
    */
-  async enqueue(options: EmailOptions): Promise<string> {
+  async enqueue(storeId: string | null, options: EmailOptions): Promise<string> {
     const id = `email_${Date.now()}_${crypto.randomBytes(5).toString('hex')}`;
 
     const queuedEmail: QueuedEmail = {
       id,
+      storeId,
       options,
       attempts: 0,
       maxAttempts: MAX_ATTEMPTS,
@@ -103,7 +105,7 @@ class EmailQueueService {
   }
 
   /**
-   * Send email with retry logic
+   * Send email with retry logic — dispatches to the right sender based on storeId.
    */
   private async sendEmail(email: QueuedEmail): Promise<void> {
     email.attempts++;
@@ -111,7 +113,11 @@ class EmailQueueService {
 
     try {
       await withCircuitBreaker('email', async () => {
-        await EmailService.send(email.options);
+        if (email.storeId) {
+          await EmailService.sendRaw(email.storeId, email.options);
+        } else {
+          await EmailService.sendPlatformRaw(email.options);
+        }
       });
 
       logger.info({ emailId: email.id, to: email.options.to }, '[EMAIL QUEUE] Sent email');
@@ -220,8 +226,8 @@ class EmailQueueService {
 export const emailQueue = new EmailQueueService();
 
 /**
- * Convenience function to queue an email
+ * Convenience function to queue an email (no store context — platform sender).
  */
 export async function queueEmail(options: EmailOptions): Promise<string> {
-  return emailQueue.enqueue(options);
+  return emailQueue.enqueue(null, options);
 }

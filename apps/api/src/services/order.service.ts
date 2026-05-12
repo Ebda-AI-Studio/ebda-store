@@ -691,7 +691,7 @@ export class OrderService {
     const customerPhone = shippingAddrFull?.phone ?? undefined;
 
     if (status === 'shipped') {
-      void EmailService.sendOrderShipped({
+      void EmailService.sendOrderShipped(storeId, {
         customerEmail,
         customerName,
         orderNumber: updatedOrder.orderNumber,
@@ -699,7 +699,7 @@ export class OrderService {
       }).catch(err => logger.error({ err }, 'Failed to send order shipped email'));
     } else if (status === 'confirmed' && shippingAddrFull) {
       // Payment success / order confirmed
-      void EmailService.sendPaymentSuccess({
+      void EmailService.sendPaymentSuccess(storeId, {
         orderNumber: updatedOrder.orderNumber,
         customerName,
         customerEmail,
