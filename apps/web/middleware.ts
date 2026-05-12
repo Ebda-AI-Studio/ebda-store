@@ -73,6 +73,7 @@ const KNOWN_APP_ROUTES = new Set([
   'returns',
   'shipping',
   'wishlist',
+  'review',
   '_next',
   'api',
   'manifest',

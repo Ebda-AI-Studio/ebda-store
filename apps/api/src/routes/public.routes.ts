@@ -20,6 +20,8 @@ import { featureService } from '../services/feature.service';
 import { getCached } from '../lib/public-cache';
 import { redis } from '../services/redis.service';
 import { setEdgeCache } from '../lib/edge-cache';
+import { verifyReviewToken } from '../lib/review-token';
+import { inngest } from '../lib/inngest/client';
 
 const router = Router();
 
@@ -1059,6 +1061,174 @@ router.post(
         success: true,
         data: { alreadySubscribed: false },
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// ==========================================
+// Token-gated review submission (Task 28)
+// ==========================================
+
+// GET /reviews/can-submit?orderId=...&productId=...&token=...
+// Validates the HMAC token + order state + no-existing-review.
+// Returns product + store info for the form to render.
+router.get(
+  '/reviews/can-submit',
+  publicLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const schema = z.object({
+        orderId: z.string().min(1),
+        productId: z.string().min(1),
+        token: z.string().min(1),
+      });
+      const { orderId, productId, token } = schema.parse(req.query);
+
+      const order = await prisma.order.findUnique({
+        where: { id: orderId },
+        select: {
+          id: true,
+          status: true,
+          storeId: true,
+          reviewRequestSentAt: true,
+          deliveredAt: true,
+        },
+      });
+      if (!order) {
+        res.status(404).json({ ok: false, error: 'ORDER_NOT_FOUND' });
+        return;
+      }
+      if (order.status !== 'delivered') {
+        res.status(400).json({ ok: false, error: 'ORDER_NOT_DELIVERED' });
+        return;
+      }
+
+      const sentAt = order.reviewRequestSentAt || order.deliveredAt;
+      if (!sentAt) {
+        res.status(400).json({ ok: false, error: 'NO_SENT_AT' });
+        return;
+      }
+
+      const tokenOk = verifyReviewToken(orderId, productId, token, sentAt);
+      if (!tokenOk) {
+        res.status(401).json({ ok: false, error: 'INVALID_TOKEN' });
+        return;
+      }
+
+      // Check no existing review for this (orderId, productId) pair
+      const existing = await prisma.review.findUnique({
+        where: { orderId_productId: { orderId, productId } },
+        select: { id: true },
+      });
+      if (existing) {
+        res.status(409).json({ ok: false, error: 'ALREADY_REVIEWED', reviewId: existing.id });
+        return;
+      }
+
+      // Load product + store info for the form
+      const product = await prisma.product.findUnique({
+        where: { id: productId },
+        select: { id: true, name: true, nameAr: true, images: true, storeId: true },
+      });
+      if (!product || product.storeId !== order.storeId) {
+        res.status(404).json({ ok: false, error: 'PRODUCT_NOT_FOUND' });
+        return;
+      }
+
+      const store = await prisma.store.findUnique({
+        where: { id: order.storeId },
+        select: { name: true, nameAr: true, slug: true, logo: true },
+      });
+
+      res.json({ ok: true, product, store });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// POST /reviews/submit
+// Creates a verified-purchase Review (status: 'pending') and fires
+// the review/submitted Inngest event for AI spam-check + translation (Task 30).
+router.post(
+  '/reviews/submit',
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const schema = z.object({
+        orderId: z.string().min(1),
+        productId: z.string().min(1),
+        token: z.string().min(1),
+        rating: z.number().int().min(1).max(5),
+        title: z.string().max(200).optional().nullable(),
+        body: z.string().min(20, 'Review must be at least 20 characters').max(5000),
+        language: z.enum(['en', 'ar']).default('en'),
+      });
+      const data = schema.parse(req.body);
+
+      // Re-validate token + order state — never trust the form's prior check
+      const order = await prisma.order.findUnique({
+        where: { id: data.orderId },
+        select: {
+          id: true,
+          status: true,
+          storeId: true,
+          reviewRequestSentAt: true,
+          deliveredAt: true,
+          customerId: true,
+        },
+      });
+      if (!order || order.status !== 'delivered') {
+        res.status(400).json({ ok: false, error: 'ORDER_NOT_DELIVERED' });
+        return;
+      }
+
+      const sentAt = order.reviewRequestSentAt || order.deliveredAt;
+      if (!sentAt || !verifyReviewToken(data.orderId, data.productId, data.token, sentAt)) {
+        res.status(401).json({ ok: false, error: 'INVALID_TOKEN' });
+        return;
+      }
+
+      // Verify the product is actually in this order (defense-in-depth)
+      const orderItem = await prisma.orderItem.findFirst({
+        where: { orderId: data.orderId, productId: data.productId },
+        select: { id: true },
+      });
+      if (!orderItem) {
+        res.status(400).json({ ok: false, error: 'PRODUCT_NOT_IN_ORDER' });
+        return;
+      }
+
+      // Create the review — status 'pending' until AI spam-check + moderation
+      const review = await prisma.review.create({
+        data: {
+          productId: data.productId,
+          storeId: order.storeId,
+          orderId: data.orderId,
+          customerId: order.customerId,
+          rating: data.rating,
+          title: data.title ?? null,
+          body: data.body,
+          language: data.language,
+          verifiedPurchase: true,
+          status: 'pending',
+        },
+        select: { id: true },
+      });
+
+      // Fire AI spam-check + translation event (Task 30 wires the handler)
+      inngest
+        .send({
+          name: 'review/submitted',
+          data: { reviewId: review.id, storeId: order.storeId },
+        })
+        .catch(err =>
+          logger.warn({ err, reviewId: review.id }, '[ReviewSubmit] inngest enqueue failed')
+        );
+
+      res.json({ ok: true, reviewId: review.id });
     } catch (error) {
       next(error);
     }

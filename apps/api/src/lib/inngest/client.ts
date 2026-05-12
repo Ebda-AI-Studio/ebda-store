@@ -63,13 +63,22 @@ type OrderDeliveredEvent = EventPayload & {
   };
 };
 
+type ReviewSubmittedEvent = EventPayload & {
+  name: 'review/submitted';
+  data: {
+    reviewId: string;
+    storeId: string;
+  };
+};
+
 export type AppEvent =
   | OrderCreatedEvent
   | BulkImportStartedEvent
   | InvoiceEmailRequestedEvent
   | BulkAiTranslateEvent
   | BulkAiSeoEvent
-  | OrderDeliveredEvent;
+  | OrderDeliveredEvent
+  | ReviewSubmittedEvent;
 
 export const inngest = new Inngest({
   id: 'force-api',
