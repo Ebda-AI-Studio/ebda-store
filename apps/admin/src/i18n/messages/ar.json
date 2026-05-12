@@ -1314,7 +1314,10 @@
       "twitter": "Twitter / X",
       "tiktok": "TikTok",
       "youtube": "YouTube",
-      "snapchat": "Snapchat"
+      "snapchat": "Snapchat",
+      "linkedin": "LinkedIn",
+      "wikidata": "معرّف Wikidata",
+      "wikipedia": "Wikipedia"
     }
   },
   "coupons": {
@@ -3088,7 +3091,29 @@
       "howtoActive": "نشط",
       "howtoInactive": "غير نشط",
       "howtoSaveError": "تعذّر حفظ الدليل",
-      "howtoDeleteError": "تعذّر حذف الدليل"
+      "howtoDeleteError": "تعذّر حذف الدليل",
+      "socialTitle": "التواصل الاجتماعي ورسم المعرفة",
+      "socialSubtitle": "اربط ملفاتك الموثّقة حتى تتمكن وكلاء الذكاء الاصطناعي ومحركات البحث من ربط متجرك بشبكة الويب الأوسع بثقة.",
+      "socialWikidata": "معرّف Wikidata",
+      "socialWikidataPlaceholder": "https://www.wikidata.org/wiki/Q12345",
+      "socialWikidataHint": "كيان Wikidata الخاص بمتجرك. الصق الرابط الكامل.",
+      "socialWikipedia": "Wikipedia",
+      "socialWikipediaPlaceholder": "https://en.wikipedia.org/wiki/Your_Store",
+      "socialWikipediaHint": "مقالة ويكيبيديا الخاصة بمتجرك أو علامتك التجارية.",
+      "socialInstagram": "Instagram",
+      "socialInstagramPlaceholder": "https://instagram.com/yourstore",
+      "socialTiktok": "TikTok",
+      "socialTiktokPlaceholder": "https://tiktok.com/@yourstore",
+      "socialLinkedin": "LinkedIn",
+      "socialLinkedinPlaceholder": "https://linkedin.com/company/yourstore",
+      "socialFacebook": "Facebook",
+      "socialFacebookPlaceholder": "https://facebook.com/yourstore",
+      "socialYoutube": "YouTube",
+      "socialYoutubePlaceholder": "https://youtube.com/@yourstore",
+      "socialTwitter": "X (Twitter)",
+      "socialTwitterPlaceholder": "https://twitter.com/yourstore",
+      "socialSaveError": "تعذّر حفظ روابط التواصل",
+      "socialSaveSuccess": "تم حفظ روابط التواصل"
     }
   },
   "language": {

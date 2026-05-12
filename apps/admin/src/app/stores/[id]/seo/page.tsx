@@ -19,6 +19,38 @@ interface SeoSettings {
   emailSenderLocalPart: string;
 }
 
+interface SocialLinks {
+  wikidata: string;
+  wikipedia: string;
+  instagram: string;
+  tiktok: string;
+  linkedin: string;
+  facebook: string;
+  youtube: string;
+  twitter: string;
+}
+
+const DEFAULT_SOCIAL: SocialLinks = {
+  wikidata: '',
+  wikipedia: '',
+  instagram: '',
+  tiktok: '',
+  linkedin: '',
+  facebook: '',
+  youtube: '',
+  twitter: '',
+};
+
+function isValidUrl(value: string): boolean {
+  if (!value.trim()) return true; // empty is valid
+  try {
+    new URL(value.trim());
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 interface StoreFaq {
   id: string;
   question: string;
@@ -132,14 +164,23 @@ export default function StoreSeoPage() {
   const [howtoDraft, setHowtoDraft] = useState<Omit<StoreHowto, 'id'>>(EMPTY_HOWTO);
   const [isSavingHowto, setIsSavingHowto] = useState(false);
 
+  // Social & Knowledge Graph state
+  const [socialLinks, setSocialLinks] = useState<SocialLinks>(DEFAULT_SOCIAL);
+  const [isSavingSocial, setIsSavingSocial] = useState(false);
+  const [socialMessage, setSocialMessage] = useState<{
+    type: 'success' | 'error';
+    text: string;
+  } | null>(null);
+
   const fetchSeo = useCallback(async () => {
     if (!storeId) return;
     setIsLoading(true);
     try {
-      const [seoRes, faqsRes, howtosRes] = await Promise.all([
+      const [seoRes, faqsRes, howtosRes, storeRes] = await Promise.all([
         apiGet<{ seo?: Partial<SeoSettings> }>(`/api/v1/stores/${storeId}/seo`),
         apiGet<StoreFaq[]>(`/api/v1/stores/${storeId}/faqs`),
         apiGet<StoreHowto[]>(`/api/v1/stores/${storeId}/howtos`),
+        apiGet<{ store?: { socialLinks?: Partial<SocialLinks> } }>(`/api/v1/stores/${storeId}`),
       ]);
 
       const seoData = seoRes.data;
@@ -166,6 +207,19 @@ export default function StoreSeoPage() {
           Array.isArray(howtosRes.data) ? howtosRes.data : ((howtosRes.data as any).data ?? [])
         );
       }
+
+      const rawSocial =
+        (storeRes.data as any)?.store?.socialLinks ?? (storeRes.data as any)?.socialLinks ?? {};
+      setSocialLinks({
+        wikidata: rawSocial.wikidata || '',
+        wikipedia: rawSocial.wikipedia || '',
+        instagram: rawSocial.instagram || '',
+        tiktok: rawSocial.tiktok || '',
+        linkedin: rawSocial.linkedin || '',
+        facebook: rawSocial.facebook || '',
+        youtube: rawSocial.youtube || '',
+        twitter: rawSocial.twitter || '',
+      });
     } catch (err) {
       console.error('Failed to fetch SEO settings:', err);
     } finally {
@@ -306,6 +360,29 @@ export default function StoreSeoPage() {
   useEffect(() => {
     fetchSeo();
   }, [fetchSeo]);
+
+  async function handleSaveSocial() {
+    setIsSavingSocial(true);
+    setSocialMessage(null);
+    try {
+      // Strip whitespace and filter out invalid URLs; send only truthy values
+      const payload = Object.fromEntries(
+        Object.entries(socialLinks)
+          .map(([k, v]) => [k, v.trim()])
+          .filter(([, v]) => v === '' || isValidUrl(v as string))
+      );
+      const { error } = await apiPut(`/api/v1/stores/${storeId}/social`, payload);
+      if (error) {
+        setSocialMessage({ type: 'error', text: error.message || t('socialSaveError') });
+      } else {
+        setSocialMessage({ type: 'success', text: t('socialSaveSuccess') });
+      }
+    } catch {
+      setSocialMessage({ type: 'error', text: t('socialSaveError') });
+    } finally {
+      setIsSavingSocial(false);
+    }
+  }
 
   async function handleSave() {
     setIsSaving(true);
@@ -1005,6 +1082,131 @@ export default function StoreSeoPage() {
                 }}
                 autoFocus
               />
+            </div>
+          )}
+        </div>
+
+        {/* ===== Social & Knowledge Graph ===== */}
+        <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="font-semibold text-foreground">{t('socialTitle')}</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">{t('socialSubtitle')}</p>
+            </div>
+            <button
+              type="button"
+              onClick={handleSaveSocial}
+              disabled={isSavingSocial}
+              className="px-4 py-1.5 text-xs font-medium bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50"
+            >
+              {isSavingSocial ? '…' : t('faqSave')}
+            </button>
+          </div>
+
+          {/* Knowledge graph fields first — these are the highest-value signals */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            {(
+              [
+                {
+                  key: 'wikidata',
+                  labelKey: 'socialWikidata',
+                  placeholderKey: 'socialWikidataPlaceholder',
+                  hintKey: 'socialWikidataHint',
+                },
+                {
+                  key: 'wikipedia',
+                  labelKey: 'socialWikipedia',
+                  placeholderKey: 'socialWikipediaPlaceholder',
+                  hintKey: 'socialWikipediaHint',
+                },
+              ] as const
+            ).map(({ key, labelKey, placeholderKey, hintKey }) => (
+              <div key={key}>
+                <label className="block text-sm font-medium text-foreground mb-1">
+                  {t(labelKey)}
+                </label>
+                <input
+                  type="url"
+                  value={socialLinks[key]}
+                  onChange={e => setSocialLinks(prev => ({ ...prev, [key]: e.target.value }))}
+                  onBlur={e => setSocialLinks(prev => ({ ...prev, [key]: e.target.value.trim() }))}
+                  placeholder={t(placeholderKey)}
+                  className={`w-full rounded-lg border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary ${
+                    socialLinks[key] && !isValidUrl(socialLinks[key])
+                      ? 'border-destructive/40'
+                      : 'border-border'
+                  }`}
+                />
+                <p className="mt-1 text-xs text-muted-foreground">{t(hintKey)}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Social platform URLs */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            {(
+              [
+                {
+                  key: 'instagram',
+                  labelKey: 'socialInstagram',
+                  placeholderKey: 'socialInstagramPlaceholder',
+                },
+                {
+                  key: 'tiktok',
+                  labelKey: 'socialTiktok',
+                  placeholderKey: 'socialTiktokPlaceholder',
+                },
+                {
+                  key: 'linkedin',
+                  labelKey: 'socialLinkedin',
+                  placeholderKey: 'socialLinkedinPlaceholder',
+                },
+                {
+                  key: 'facebook',
+                  labelKey: 'socialFacebook',
+                  placeholderKey: 'socialFacebookPlaceholder',
+                },
+                {
+                  key: 'youtube',
+                  labelKey: 'socialYoutube',
+                  placeholderKey: 'socialYoutubePlaceholder',
+                },
+                {
+                  key: 'twitter',
+                  labelKey: 'socialTwitter',
+                  placeholderKey: 'socialTwitterPlaceholder',
+                },
+              ] as const
+            ).map(({ key, labelKey, placeholderKey }) => (
+              <div key={key}>
+                <label className="block text-sm font-medium text-foreground mb-1">
+                  {t(labelKey)}
+                </label>
+                <input
+                  type="url"
+                  value={socialLinks[key]}
+                  onChange={e => setSocialLinks(prev => ({ ...prev, [key]: e.target.value }))}
+                  onBlur={e => setSocialLinks(prev => ({ ...prev, [key]: e.target.value.trim() }))}
+                  placeholder={t(placeholderKey)}
+                  className={`w-full rounded-lg border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary ${
+                    socialLinks[key] && !isValidUrl(socialLinks[key])
+                      ? 'border-destructive/40'
+                      : 'border-border'
+                  }`}
+                />
+              </div>
+            ))}
+          </div>
+
+          {socialMessage && (
+            <div
+              className={`rounded-lg p-3 text-sm ${
+                socialMessage.type === 'success'
+                  ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
+                  : 'bg-destructive/5 border border-destructive/30 text-destructive'
+              }`}
+            >
+              {socialMessage.text}
             </div>
           )}
         </div>

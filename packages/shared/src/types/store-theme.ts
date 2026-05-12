@@ -78,6 +78,10 @@ export interface StoreSocialLinks {
   whatsapp?: string;
   telegram?: string;
   pinterest?: string;
+  /** Wikidata entity URL — strong knowledge-graph identity signal for AI agents */
+  wikidata?: string;
+  /** Wikipedia article URL — used as sameAs in Store JSON-LD */
+  wikipedia?: string;
 }
 
 /**

@@ -150,6 +150,9 @@ const socialSchema = z
     tiktok: optionalUrl,
     youtube: optionalUrl,
     snapchat: optionalUrl,
+    linkedin: optionalUrl,
+    wikidata: optionalUrl,
+    wikipedia: optionalUrl,
     whatsapp: optionalStr(50),
   })
   .strip();

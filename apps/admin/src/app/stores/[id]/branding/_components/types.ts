@@ -45,6 +45,9 @@ export interface StoreBranding {
     tiktok?: string;
     youtube?: string;
     snapchat?: string;
+    linkedin?: string;
+    wikidata?: string;
+    wikipedia?: string;
   };
 }
 
@@ -87,7 +90,16 @@ export const COLOR_PRESETS: Array<{ key: string; hex: string }> = [
 ];
 
 export const SOCIAL_PLATFORMS: Array<{
-  key: 'instagram' | 'facebook' | 'twitter' | 'tiktok' | 'youtube' | 'snapchat';
+  key:
+    | 'instagram'
+    | 'facebook'
+    | 'twitter'
+    | 'tiktok'
+    | 'youtube'
+    | 'snapchat'
+    | 'linkedin'
+    | 'wikidata'
+    | 'wikipedia';
   labelKey: string;
   placeholder: string;
 }> = [
@@ -97,4 +109,11 @@ export const SOCIAL_PLATFORMS: Array<{
   { key: 'tiktok', labelKey: 'tiktok', placeholder: 'https://tiktok.com/@yourstore' },
   { key: 'youtube', labelKey: 'youtube', placeholder: 'https://youtube.com/@yourstore' },
   { key: 'snapchat', labelKey: 'snapchat', placeholder: 'https://snapchat.com/add/yourstore' },
+  { key: 'linkedin', labelKey: 'linkedin', placeholder: 'https://linkedin.com/company/yourstore' },
+  { key: 'wikidata', labelKey: 'wikidata', placeholder: 'https://www.wikidata.org/wiki/Q12345' },
+  {
+    key: 'wikipedia',
+    labelKey: 'wikipedia',
+    placeholder: 'https://en.wikipedia.org/wiki/Your_Store',
+  },
 ];
