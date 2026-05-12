@@ -83,6 +83,44 @@ export class ResendService {
 
     return ((data as { records?: unknown[] }).records ?? []).map(toDnsRecord);
   }
+
+  /**
+   * Fetch latest Resend status, persist it, and return status + DNS records.
+   * Admin "Verify" button calls this. Setting `emailDomainVerifiedAt` only on
+   * the verified→ transition so we have a stable timestamp.
+   */
+  static async refreshDomainStatus(storeId: string): Promise<{
+    status: string;
+    records: DomainDnsRecord[];
+  }> {
+    const store = await prisma.store.findUnique({
+      where: { id: storeId },
+      select: { id: true, emailDomainId: true },
+    });
+    if (!store) throw new Error(`Store ${storeId} not found`);
+    if (!store.emailDomainId) {
+      throw new Error('Store email sender not provisioned yet — call provisionStoreDomain first');
+    }
+
+    const { data, error } = await ensureClient().domains.get(store.emailDomainId);
+    if (error || !data) {
+      throw new Error(`Resend get-domain failed: ${error?.message ?? 'unknown'}`);
+    }
+
+    const status = (data as { status?: string }).status ?? 'pending';
+    const updateData: { emailDomainStatus: string; emailDomainVerifiedAt?: Date } = {
+      emailDomainStatus: status,
+    };
+    if (status === 'verified') {
+      updateData.emailDomainVerifiedAt = new Date();
+    }
+    await prisma.store.update({ where: { id: storeId }, data: updateData });
+
+    return {
+      status,
+      records: ((data as { records?: unknown[] }).records ?? []).map(toDnsRecord),
+    };
+  }
 }
 
 function toDnsRecord(r: unknown): DomainDnsRecord {

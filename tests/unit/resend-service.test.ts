@@ -133,3 +133,55 @@ describe('ResendService.provisionStoreDomain', () => {
     await expect(ResendService.provisionStoreDomain('store-1')).rejects.toThrow(/already exists/);
   });
 });
+
+describe('ResendService.refreshDomainStatus', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('fetches latest status and persists verified + verifiedAt', async () => {
+    prismaFindUniqueMock.mockResolvedValue({
+      id: 'store-1',
+      emailDomainId: 'd_abc123',
+    });
+    mockDomainsGet.mockResolvedValue({
+      data: {
+        id: 'd_abc123',
+        status: 'verified',
+        records: [{ type: 'TXT', name: 'send.wadyaljuz.com', value: '...' }],
+      },
+      error: null,
+    });
+
+    const result = await ResendService.refreshDomainStatus('store-1');
+
+    expect(mockDomainsGet).toHaveBeenCalledWith('d_abc123');
+    expect(prismaUpdateMock).toHaveBeenCalledWith({
+      where: { id: 'store-1' },
+      data: { emailDomainStatus: 'verified', emailDomainVerifiedAt: expect.any(Date) },
+    });
+    expect(result.status).toBe('verified');
+    expect(result.records).toHaveLength(1);
+  });
+
+  it('persists non-verified status without touching emailDomainVerifiedAt', async () => {
+    prismaFindUniqueMock.mockResolvedValue({
+      id: 'store-1',
+      emailDomainId: 'd_abc123',
+    });
+    mockDomainsGet.mockResolvedValue({
+      data: { id: 'd_abc123', status: 'pending', records: [] },
+      error: null,
+    });
+
+    await ResendService.refreshDomainStatus('store-1');
+
+    expect(prismaUpdateMock).toHaveBeenCalledWith({
+      where: { id: 'store-1' },
+      data: { emailDomainStatus: 'pending' },
+    });
+  });
+
+  it('throws if store has no emailDomainId yet', async () => {
+    prismaFindUniqueMock.mockResolvedValue({ id: 'store-1', emailDomainId: null });
+    await expect(ResendService.refreshDomainStatus('store-1')).rejects.toThrow(/not provisioned/i);
+  });
+});
