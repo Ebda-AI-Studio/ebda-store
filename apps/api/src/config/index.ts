@@ -135,7 +135,12 @@ export const config = {
   smtpUser: process.env.SMTP_USER || '',
   smtpPassword: process.env.SMTP_PASSWORD || '',
   smtpFromName: process.env.SMTP_FROM_NAME || 'Force Media',
-  smtpFromEmail: process.env.SMTP_FROM_EMAIL || 'noreply@forcemedia.com',
+  smtpFromEmail: process.env.SMTP_FROM_EMAIL || 'noreply@forcemediakw.com',
+
+  // Resend SDK key (single platform-wide account; all merchant domains live
+  // under it). When missing, ResendService gracefully degrades to no-op +
+  // logs a warning so dev environments don't crash on every send.
+  resendApiKey: process.env.RESEND_API_KEY || '',
 
   // Logging & Monitoring
   logLevel: process.env.LOG_LEVEL || 'debug',
