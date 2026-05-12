@@ -183,7 +183,8 @@ export class ResendService {
     const sender = resolveSender(store);
     const client = ensureClient();
 
-    const sdkPayload: Record<string, unknown> = {
+    type SendPayload = Parameters<typeof client.emails.send>[0];
+    const sdkPayload: SendPayload = {
       from: sender.from,
       to: Array.isArray(opts.to) ? opts.to : [opts.to],
       subject: opts.subject,
@@ -192,9 +193,7 @@ export class ResendService {
     if (sender.replyTo) sdkPayload.replyTo = sender.replyTo;
     if (opts.text) sdkPayload.text = opts.text;
 
-    const { data, error } = await client.emails.send(
-      sdkPayload as Parameters<typeof client.emails.send>[0]
-    );
+    const { data, error } = await client.emails.send(sdkPayload);
     if (error || !data) {
       throw new Error(`Resend send failed: ${error?.message ?? 'unknown'}`);
     }
