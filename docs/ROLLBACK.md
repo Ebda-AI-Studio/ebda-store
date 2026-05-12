@@ -45,7 +45,32 @@ Effect:
 
 ### C. Migration rollback (Neon snapshot restore)
 
-FWB uses **hand-written migrations** at `packages/database/prisma/migrations/<TS>_<name>/migration.sql`. Migrations apply on next Railway API boot. So by the time you notice an issue, the migration is already live.
+FWB uses **hand-written migrations** at `packages/database/prisma/migrations/<TS>_<name>/migration.sql`. Since commit `decd870` (2026-05-12), migrations apply automatically via Railway's `preDeployCommand` on every deploy — see "Migration auto-apply check" below. So by the time you notice an issue, the migration is already live.
+
+> ⚠️ **Migration auto-apply check** — verify after EVERY migration-bearing push
+>
+> Railway's `railway.json:startCommand` for Dockerfile deploys runs in **exec form**, not shell form. The previous setup (`"startCommand": "npx prisma migrate deploy && node apps/api/dist/index.js"`) was silently broken: `&&` was parsed as a literal argument, so `prisma migrate deploy` ran fine but `node` was never invoked. Three deploys in a row (1066ea5, 44b6462, plus one before) failed health checks this way. The old container kept serving so the failure was invisible until someone watched deploy logs.
+>
+> **Current setup** uses `preDeployCommand` (runs migration on a one-off container before the new replica is promoted) + `startCommand` as plain `node apps/api/dist/index.js`.
+>
+> After pushing a migration-bearing commit, **watch the Railway deploy logs for the `preDeploy` phase**. You should see:
+>
+> ```
+> [preDeploy] npx prisma migrate deploy --schema=packages/database/prisma/schema.prisma
+> [preDeploy] Applying migration `<TS>_<name>`
+> ```
+>
+> If the preDeploy phase is silent OR shows "No pending migrations to apply." right after a commit that introduces a new migration, the schema-vs-code mismatch will manifest as Prisma `P2022 column does not exist` errors at runtime. Recover with:
+>
+> ```bash
+> # apply manually against prod Neon from your local machine
+> cd packages/database && npx prisma migrate deploy --schema=prisma/schema.prisma
+> # DATABASE_URL must point at prod Neon (check apps/api/.env)
+> ```
+>
+> See [`feedback-railway-startcommand-exec-form.md`](~/.claude/projects/-Users-ahmadsharaf/memory/feedback-railway-startcommand-exec-form.md) for the full trap explanation.
+
+---
 
 Per existing project memory, the project uses `force_app` role for prod (RLS enforced) + `neondb_owner` for migrations (RLS bypass). This doesn't affect rollback mechanics; just be aware which role is touching what.
 
