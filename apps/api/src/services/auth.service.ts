@@ -111,16 +111,24 @@ export class AuthService {
       const recipientName =
         `${existingUser.firstName ?? ''} ${existingUser.lastName ?? ''}`.trim() ||
         existingUser.email;
-      void EmailService.sendDuplicateRegistrationNotice(storeId ?? existingUser.storeId ?? '', {
-        email: existingUser.email,
-        name: recipientName,
-        storeName: storeName ?? undefined,
-      }).catch(err =>
-        logger.error(
-          { err, email: existingUser.email },
-          'Failed to send duplicate-registration notice'
-        )
-      );
+      const notifyStoreId = storeId ?? existingUser.storeId;
+      if (notifyStoreId) {
+        void EmailService.sendDuplicateRegistrationNotice(notifyStoreId, {
+          email: existingUser.email,
+          name: recipientName,
+          storeName: storeName ?? undefined,
+        }).catch(err =>
+          logger.error(
+            { err, email: existingUser.email },
+            'Failed to send duplicate-registration notice'
+          )
+        );
+      } else {
+        logger.info(
+          { email: existingUser.email },
+          'Skipping duplicate-registration notice — admin account'
+        );
+      }
       return { emailVerificationSent: true } as const;
     }
 

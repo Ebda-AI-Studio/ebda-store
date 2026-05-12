@@ -16,7 +16,7 @@
 - **Async queue**: Inngest (bulk AI sweeps, order-created fanout, abandoned-cart, etc.)
 - **AI**: Google Gemini (`gemini-flash-lite-latest`) — translation, SEO, categorization with daily/monthly quota caps + 2.5s bulk throttle
 - **Push notifications**: dual-stack — `web-push` (VAPID, RFC 8030) for storefront and OneSignal (admin order alerts + storefront broadcast layer)
-- **Email**: SMTP via `nodemailer` (Resend in prod) with `email-queue.service.ts`
+- **Email**: Resend SDK via `resend.service.ts` (per-store branded sender with platform fallback) + `email-queue.service.ts` for retry/replay
 - **Error monitoring**: Sentry (`@sentry/node` + profiling)
 - **Logging**: `pino` (structured JSON logs, `pino-pretty` in dev)
 - **Payment providers**: Tap, MyFatoorah, Hesabe, UPayments (Kuwait — Stripe doesn't work locally)

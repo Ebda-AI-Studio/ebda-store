@@ -141,6 +141,17 @@ export interface OrderEmailData {
   };
 }
 
+// Lazy platform-sender Resend client. Shared between sendPlatform +
+// sendPlatformRaw so we don't instantiate the SDK on every admin email.
+let _platformResend: import('resend').Resend | null = null;
+async function getPlatformResend(): Promise<import('resend').Resend> {
+  if (!_platformResend) {
+    const { Resend } = await import('resend');
+    _platformResend = new Resend(config.resendApiKey);
+  }
+  return _platformResend;
+}
+
 export class EmailService {
   // ---------------------------------------------------------------------------
   // Internal routing helpers
@@ -212,8 +223,7 @@ export class EmailService {
       address: null,
       defaultLanguage: 'en',
     });
-    const { Resend } = await import('resend');
-    const r = new Resend(config.resendApiKey);
+    const r = await getPlatformResend();
     const payload: Record<string, unknown> = {
       from: 'Force Store <noreply@forcemediakw.com>',
       to: Array.isArray(args.to) ? args.to : [args.to],
@@ -249,8 +259,7 @@ export class EmailService {
    * Replay a queued email with no store context — platform sender.
    */
   static async sendPlatformRaw(options: EmailOptions): Promise<void> {
-    const { Resend } = await import('resend');
-    const r = new Resend(config.resendApiKey);
+    const r = await getPlatformResend();
     const payload: Record<string, unknown> = {
       from: 'Force Store <noreply@forcemediakw.com>',
       to: Array.isArray(options.to) ? options.to : [options.to],
