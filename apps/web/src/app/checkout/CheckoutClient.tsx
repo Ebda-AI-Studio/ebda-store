@@ -231,7 +231,7 @@ export default function CheckoutClient() {
             ? api.get<{ zones: ShippingZone[] }>(`/stores/public/${store.id}/shipping`)
             : Promise.resolve(null),
           api.get<{
-            providers: PaymentProvider[];
+            providers: (PaymentProvider | string)[];
             defaultProvider?: string;
             cod?: { fixedFee: number; displayName: string; displayNameAr: string | null };
           }>('/payments/config'),
@@ -242,7 +242,13 @@ export default function CheckoutClient() {
         }
 
         if (paymentResult.success && paymentResult.data) {
-          const allProviders = [...(paymentResult.data.providers || [])];
+          // API returns providers as a string[] (e.g. ["myfatoorah"]) — normalize
+          // each entry to the {id, name} object the PaymentStep map expects.
+          // PaymentStep falls back to DEFAULT_PAYMENT_PROVIDERS for display info.
+          const rawProviders = paymentResult.data.providers || [];
+          const allProviders: PaymentProvider[] = rawProviders.map(p =>
+            typeof p === 'string' ? { id: p, name: p } : p
+          );
 
           // Add COD as a provider option if enabled
           if (paymentResult.data.cod) {
