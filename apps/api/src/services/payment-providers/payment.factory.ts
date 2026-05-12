@@ -804,6 +804,11 @@ export class PaymentService {
 
     const order = payment.order;
 
+    // Guest orders carry customer details on order.shippingAddress (JSON),
+    // not on order.customer (which is null for guests). Same provider-side
+    // validation that rejects empty CustomerEmail (MyFatoorah 400) applies on
+    // retry — fall through to shippingAddress fields before defaulting.
+    const retryShipping = (order.shippingAddress ?? {}) as Record<string, string | undefined>;
     return this.createPayment(
       {
         orderId: order.id,
@@ -811,11 +816,12 @@ export class PaymentService {
         amount: order.total,
         currency: order.currency as Currency,
         customer: {
-          id: order.customerId!,
+          id: order.customerId ?? `guest-${order.id}`,
           name:
-            `${order.customer?.firstName || ''} ${order.customer?.lastName || ''}`.trim() ||
+            `${order.customer?.firstName ?? retryShipping.firstName ?? ''} ${order.customer?.lastName ?? retryShipping.lastName ?? ''}`.trim() ||
             'Customer',
-          email: order.customer?.email || '',
+          email: order.customer?.email || retryShipping.email || '',
+          phone: retryShipping.phone || undefined,
         },
         items: order.items.map(item => ({
           name: item.productName,

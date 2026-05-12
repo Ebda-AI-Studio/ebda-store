@@ -341,16 +341,25 @@ router.post(
             orderNumber: order.orderNumber,
             amount: order.total,
             currency: order.currency as Currency,
-            customer: {
-              // Guest checkout: synthesize a stable id from the order's
-              // own id so payment providers that hash the customer for
-              // 3D-Secure / fraud scoring still see a consistent value.
-              id: req.user?.userId ?? `guest-${order.id}`,
-              name:
-                `${order.customer?.firstName || ''} ${order.customer?.lastName || ''}`.trim() ||
-                'Customer',
-              email: order.customer?.email || '',
-            },
+            customer: (() => {
+              // Guest checkout has order.customer = null but the checkout
+              // form's name/email/phone live on order.shippingAddress (JSON).
+              // Providers like MyFatoorah reject empty emails (400 "must be a
+              // valid email") so always fall through to the shippingAddress
+              // values before defaulting to a blank — guests are the common
+              // case on storefronts, not the exception.
+              const shipping = (order.shippingAddress ?? {}) as Record<string, string | undefined>;
+              return {
+                // Stable id so providers hashing the customer for 3D-Secure /
+                // fraud scoring see a consistent value across retries.
+                id: req.user?.userId ?? `guest-${order.id}`,
+                name:
+                  `${order.customer?.firstName ?? shipping.firstName ?? ''} ${order.customer?.lastName ?? shipping.lastName ?? ''}`.trim() ||
+                  'Customer',
+                email: order.customer?.email || shipping.email || '',
+                phone: shipping.phone || undefined,
+              };
+            })(),
             items: order.items.map(item => ({
               name: item.productName,
               quantity: item.quantity,
