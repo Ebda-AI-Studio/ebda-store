@@ -61,6 +61,9 @@ export class AuthService {
      * Store A doesn't conflict with an existing global admin email.
      */
     storeId?: string | null;
+    /** Buyer's UI locale at registration time — used to send the
+     *  verification email in the customer's language. */
+    language?: 'en' | 'ar';
   }) {
     const storeId = data.storeId ?? null;
 
@@ -68,7 +71,14 @@ export class AuthService {
     // stores can share an email — the lookup must use the composite key.
     const existingUser = await prisma.user.findFirst({
       where: authScope(data.email, storeId),
-      select: { id: true, email: true, firstName: true, lastName: true, storeId: true },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        storeId: true,
+        language: true,
+      },
     });
 
     // Parse name into first/last if provided
@@ -113,11 +123,15 @@ export class AuthService {
         existingUser.email;
       const notifyStoreId = storeId ?? existingUser.storeId;
       if (notifyStoreId) {
-        void EmailService.sendDuplicateRegistrationNotice(notifyStoreId, {
-          email: existingUser.email,
-          name: recipientName,
-          storeName: storeName ?? undefined,
-        }).catch(err =>
+        void EmailService.sendDuplicateRegistrationNotice(
+          notifyStoreId,
+          {
+            email: existingUser.email,
+            name: recipientName,
+            storeName: storeName ?? undefined,
+          },
+          (existingUser.language as 'en' | 'ar' | undefined) ?? undefined
+        ).catch(err =>
           logger.error(
             { err, email: existingUser.email },
             'Failed to send duplicate-registration notice'
@@ -162,7 +176,8 @@ export class AuthService {
       user.id,
       user.email,
       `${user.firstName} ${user.lastName}`.trim() || user.email,
-      storeId
+      storeId,
+      data.language
     ).catch(err =>
       logger.error({ err, userId: user.id }, 'Failed to send verification email after register')
     );
@@ -177,7 +192,8 @@ export class AuthService {
     userId: string,
     email: string,
     name: string,
-    storeId: string | null = null
+    storeId: string | null = null,
+    language?: 'en' | 'ar'
   ): Promise<void> {
     // Delete any existing verification tokens for this user
     await prisma.verificationToken.deleteMany({
@@ -205,12 +221,16 @@ export class AuthService {
     // Send verification email
     const verificationUrl = `${config.webUrl}/auth/verify-email?token=${token}`;
     if (storeId) {
-      await EmailService.sendEmailVerification(storeId, {
-        email,
-        name,
-        verificationUrl,
-        expiresIn: '24 hours',
-      });
+      await EmailService.sendEmailVerification(
+        storeId,
+        {
+          email,
+          name,
+          verificationUrl,
+          expiresIn: '24 hours',
+        },
+        language
+      );
     } else {
       // Admin accounts (no storeId) skip the branded email path — they
       // don't belong to a store and verification flow is admin-only.
@@ -235,7 +255,20 @@ export class AuthService {
         type: 'email',
         usedAt: null,
       },
-      include: { user: true },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            emailVerified: true,
+            storeId: true,
+            language: true,
+            deletedAt: true,
+          },
+        },
+      },
     });
 
     if (!verificationToken) {
@@ -273,12 +306,16 @@ export class AuthService {
     // Welcome email is a follow-up — fire-and-forget so SMTP latency can't
     // delay the verify-email API response.
     if (verificationToken.user.storeId) {
-      void EmailService.sendWelcome(verificationToken.user.storeId, {
-        email: verificationToken.user.email,
-        name:
-          `${verificationToken.user.firstName} ${verificationToken.user.lastName}`.trim() ||
-          verificationToken.user.email,
-      }).catch(err =>
+      void EmailService.sendWelcome(
+        verificationToken.user.storeId,
+        {
+          email: verificationToken.user.email,
+          name:
+            `${verificationToken.user.firstName} ${verificationToken.user.lastName}`.trim() ||
+            verificationToken.user.email,
+        },
+        (verificationToken.user.language as 'en' | 'ar' | undefined) ?? undefined
+      ).catch(err =>
         logger.error(
           { err, userId: verificationToken.userId },
           'Failed to send welcome email after verify'
@@ -299,6 +336,15 @@ export class AuthService {
   ): Promise<{ success: boolean; message: string }> {
     const user = await prisma.user.findFirst({
       where: authScope(email, storeId),
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        storeId: true,
+        emailVerified: true,
+        language: true,
+      },
     });
 
     if (!user) {
@@ -330,12 +376,14 @@ export class AuthService {
       );
     }
 
-    // Send new verification email — forward storeId so the branded sender path is used
+    // Send new verification email — forward storeId and language so the branded
+    // sender and buyer's locale are both preserved.
     await this.sendVerificationEmail(
       user.id,
       user.email,
       `${user.firstName} ${user.lastName}`.trim() || user.email,
-      user.storeId
+      user.storeId,
+      (user.language as 'en' | 'ar' | undefined) ?? undefined
     );
 
     return { success: true, message: 'Verification email sent' };
@@ -631,6 +679,14 @@ export class AuthService {
     // existence of an account on Store B with the same email.
     const user = await prisma.user.findFirst({
       where: authScope(email, storeId),
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        storeId: true,
+        language: true,
+      },
     });
 
     if (!user) {
@@ -655,12 +711,16 @@ export class AuthService {
     // Send reset email
     const resetUrl = `${config.webUrl}/auth/reset-password?token=${resetToken}`;
     if (user.storeId) {
-      await EmailService.sendPasswordReset(user.storeId, {
-        email: user.email,
-        name: `${user.firstName} ${user.lastName}`.trim() || user.email,
-        resetUrl,
-        expiresIn: '1 hour',
-      });
+      await EmailService.sendPasswordReset(
+        user.storeId,
+        {
+          email: user.email,
+          name: `${user.firstName} ${user.lastName}`.trim() || user.email,
+          resetUrl,
+          expiresIn: '1 hour',
+        },
+        (user.language as 'en' | 'ar' | undefined) ?? undefined
+      );
     } else {
       // Admin password-reset: no store context, skip branded email.
       logger.info({ userId: user.id }, 'Skipping branded password-reset email — admin account');

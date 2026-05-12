@@ -740,6 +740,12 @@ model Order {
   updatedAt       DateTime           @updatedAt @map("updated_at")
   deletedAt       DateTime?          @map("deleted_at") // Soft delete support
 
+  // Buyer's UI locale at checkout time ('en' | 'ar'). Used to send
+  // transactional emails in the customer's language regardless of the
+  // store's defaultLanguage setting. NULL for pre-feature orders —
+  // email service falls back to store.settings.defaultLanguage.
+  locale             String?
+
   // Webhook idempotency - prevents duplicate processing
   idempotencyKey     String?   @unique @map("idempotency_key")
   webhookProcessedAt DateTime? @map("webhook_processed_at")

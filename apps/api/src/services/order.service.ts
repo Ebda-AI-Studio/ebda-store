@@ -44,6 +44,9 @@ interface CreateOrderData {
   paymentMethod: string;
   notes?: string;
   couponCode?: string;
+  /** Buyer's UI locale at checkout time. Stored on the order so
+   *  transactional emails are sent in the buyer's language. */
+  locale?: 'en' | 'ar';
 }
 
 export class OrderService {
@@ -318,6 +321,7 @@ export class OrderService {
           couponCode: appliedCoupon?.code ?? null,
           couponDiscount,
           total,
+          locale: data.locale ?? null,
           shippingAddress: data.shippingAddress,
           billingAddress: data.billingAddress || data.shippingAddress,
           notes: data.notes,
@@ -437,7 +441,12 @@ export class OrderService {
     inngest
       .send({
         name: 'order/created',
-        data: { orderId: order.id, storeId, paymentMethod: data.paymentMethod },
+        data: {
+          orderId: order.id,
+          storeId,
+          paymentMethod: data.paymentMethod,
+          locale: order.locale ?? undefined,
+        },
       })
       .catch(err => logger.error({ err, orderId: order.id }, 'Failed to enqueue order/created'));
 
@@ -616,6 +625,7 @@ export class OrderService {
         },
       },
     });
+    const orderLocale = (updatedOrder.locale ?? undefined) as 'en' | 'ar' | undefined;
 
     // Refund / cancellation side-effects: inventory restore + coupon
     // decrement + affiliate-commission reversal. Centralised in
@@ -691,29 +701,37 @@ export class OrderService {
     const customerPhone = shippingAddrFull?.phone ?? undefined;
 
     if (status === 'shipped') {
-      void EmailService.sendOrderShipped(storeId, {
-        customerEmail,
-        customerName,
-        orderNumber: updatedOrder.orderNumber,
-        // trackingNumber and trackingUrl can be passed when available
-      }).catch(err => logger.error({ err }, 'Failed to send order shipped email'));
+      void EmailService.sendOrderShipped(
+        storeId,
+        {
+          customerEmail,
+          customerName,
+          orderNumber: updatedOrder.orderNumber,
+          // trackingNumber and trackingUrl can be passed when available
+        },
+        orderLocale
+      ).catch(err => logger.error({ err }, 'Failed to send order shipped email'));
     } else if (status === 'confirmed' && shippingAddrFull) {
       // Payment success / order confirmed
-      void EmailService.sendPaymentSuccess(storeId, {
-        orderNumber: updatedOrder.orderNumber,
-        customerName,
-        customerEmail,
-        items: updatedOrder.items.map(item => ({
-          name: item.productName,
-          quantity: item.quantity,
-          price: item.price,
-        })),
-        subtotal: updatedOrder.subtotal,
-        tax: updatedOrder.tax,
-        shipping: updatedOrder.shipping,
-        total: updatedOrder.total,
-        shippingAddress: shippingAddrFull,
-      }).catch(err => logger.error({ err }, 'Failed to send payment success email'));
+      void EmailService.sendPaymentSuccess(
+        storeId,
+        {
+          orderNumber: updatedOrder.orderNumber,
+          customerName,
+          customerEmail,
+          items: updatedOrder.items.map(item => ({
+            name: item.productName,
+            quantity: item.quantity,
+            price: item.price,
+          })),
+          subtotal: updatedOrder.subtotal,
+          tax: updatedOrder.tax,
+          shipping: updatedOrder.shipping,
+          total: updatedOrder.total,
+          shippingAddress: shippingAddrFull,
+        },
+        orderLocale
+      ).catch(err => logger.error({ err }, 'Failed to send payment success email'));
     } else if (status === 'refunded') {
       void EmailService.sendAdminRefund({
         orderNumber: updatedOrder.orderNumber,

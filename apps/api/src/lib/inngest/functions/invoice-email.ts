@@ -34,15 +34,21 @@ export const invoiceEmail: InngestFunction.Any = inngest.createFunction(
     const order = await step.run('load-order-number', async () => {
       const row = await prisma.order.findUnique({
         where: { id: orderId },
-        select: { orderNumber: true },
+        select: { orderNumber: true, locale: true },
       });
       if (!row) throw new Error(`Order ${orderId} not found`);
       return row;
     });
 
+    const orderLocale = (order.locale ?? undefined) as 'en' | 'ar' | undefined;
+
     await step.run('send-email', async () => {
       try {
-        await EmailService.sendInvoice(storeId, { to, orderNumber: order.orderNumber, html });
+        await EmailService.sendInvoice(
+          storeId,
+          { to, orderNumber: order.orderNumber, html },
+          orderLocale
+        );
       } catch (err) {
         logger.error({ err, orderId, to }, 'Invoice email send failed');
         throw err;

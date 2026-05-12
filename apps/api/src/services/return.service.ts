@@ -150,6 +150,7 @@ export class ReturnService {
         },
       },
     });
+    const orderLocale = (order?.locale ?? undefined) as 'en' | 'ar' | undefined;
 
     if (!order) {
       throw new AppError(400, 'INVALID_ORDER', 'Order not found or not eligible for return');
@@ -207,15 +208,20 @@ export class ReturnService {
 
     // Return is committed — fire-and-forget the confirmation email so SMTP
     // latency can't stall the API response.
-    void EmailService.sendReturnConfirmation(storeId, {
-      email: order.customer?.email || '',
-      customerName:
-        `${order.customer?.firstName || ''} ${order.customer?.lastName || ''}`.trim() || 'Customer',
-      storeName: order.store.name,
-      returnNumber,
-      orderNumber: order.orderNumber,
-      type: data.type,
-    }).catch(err => logger.error({ err }, 'Failed to send return confirmation email'));
+    void EmailService.sendReturnConfirmation(
+      storeId,
+      {
+        email: order.customer?.email || '',
+        customerName:
+          `${order.customer?.firstName || ''} ${order.customer?.lastName || ''}`.trim() ||
+          'Customer',
+        storeName: order.store.name,
+        returnNumber,
+        orderNumber: order.orderNumber,
+        type: data.type,
+      },
+      orderLocale
+    ).catch(err => logger.error({ err }, 'Failed to send return confirmation email'));
 
     // Send real-time notification to store admins
     try {
@@ -282,7 +288,7 @@ export class ReturnService {
           select: { email: true, firstName: true, lastName: true },
         },
         order: {
-          select: { orderNumber: true },
+          select: { orderNumber: true, locale: true },
         },
         store: {
           select: { name: true },
@@ -290,16 +296,22 @@ export class ReturnService {
       },
     });
 
+    const returnOrderLocale = (updatedReturn.order?.locale ?? undefined) as 'en' | 'ar' | undefined;
+
     // Status was updated — fire-and-forget the email so SMTP latency can't
     // stall the API response.
-    void EmailService.sendReturnStatusUpdate(storeId, {
-      email: updatedReturn.customer.email,
-      customerName: `${updatedReturn.customer.firstName} ${updatedReturn.customer.lastName}`,
-      storeName: updatedReturn.store.name,
-      returnNumber: updatedReturn.returnNumber,
-      status,
-      notes,
-    }).catch(err => logger.error({ err }, 'Failed to send return status email'));
+    void EmailService.sendReturnStatusUpdate(
+      storeId,
+      {
+        email: updatedReturn.customer.email,
+        customerName: `${updatedReturn.customer.firstName} ${updatedReturn.customer.lastName}`,
+        storeName: updatedReturn.store.name,
+        returnNumber: updatedReturn.returnNumber,
+        status,
+        notes,
+      },
+      returnOrderLocale
+    ).catch(err => logger.error({ err }, 'Failed to send return status email'));
 
     // Send real-time notification to customer
     try {

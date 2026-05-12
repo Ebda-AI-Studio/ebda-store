@@ -30,7 +30,7 @@ export const orderCreated: InngestFunction.Any = inngest.createFunction(
     triggers: [{ event: 'order/created' }],
   },
   async ({ event, step }) => {
-    const { orderId, storeId, paymentMethod } = event.data;
+    const { orderId, storeId, paymentMethod, locale } = event.data;
 
     // Guard against empty test payloads from Inngest's sync UI — they
     // arrive with `data: {}` and would crash Prisma with an
@@ -43,11 +43,18 @@ export const orderCreated: InngestFunction.Any = inngest.createFunction(
     const order = await step.run('load-order', async () => {
       const row = await prisma.order.findUnique({
         where: { id: orderId },
-        include: { customer: true, items: true },
+        include: {
+          customer: true,
+          items: true,
+        },
       });
       if (!row) throw new Error(`Order ${orderId} not found`);
       return row;
     });
+
+    // Buyer's locale: prefer event payload (set at enqueue time), then
+    // the persisted Order.locale, then fall through to store default.
+    const emailLocale = (locale ?? order.locale ?? undefined) as 'en' | 'ar' | undefined;
 
     const shippingAddress = order.shippingAddress as Record<string, unknown>;
     const guestFirstName =
@@ -87,7 +94,7 @@ export const orderCreated: InngestFunction.Any = inngest.createFunction(
 
     await Promise.allSettled([
       step.run('send-customer-confirmation', () =>
-        EmailService.sendOrderConfirmation(storeId, emailData)
+        EmailService.sendOrderConfirmation(storeId, emailData, emailLocale)
       ),
       step.run('send-admin-new-order', () => EmailService.sendAdminNewOrder(emailData)),
       step.run('dispatch-notification-channels', async () => {

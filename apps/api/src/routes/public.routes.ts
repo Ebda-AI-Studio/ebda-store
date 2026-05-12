@@ -92,6 +92,9 @@ const createOrderSchema = z.object({
   paymentMethod: z.string().min(1),
   notes: z.string().max(2000).optional(),
   couponCode: z.string().trim().min(1).max(50).optional(),
+  /** Buyer's UI locale. Stored on the order so transactional emails
+   *  arrive in the buyer's language regardless of the store default. */
+  locale: z.enum(['en', 'ar']).optional(),
 });
 
 // GET /products - List all public products (cached 30s)
@@ -993,7 +996,11 @@ router.post(
 
       // Fire-and-forget welcome email — don't await so a slow / misconfigured
       // SMTP server doesn't keep the customer staring at a spinner.
-      EmailService.sendWelcome(storeId, { email: normalizedEmail, name: '' }).catch(err => {
+      EmailService.sendWelcome(
+        storeId,
+        { email: normalizedEmail, name: '' },
+        (data.language as 'en' | 'ar' | undefined) ?? undefined
+      ).catch(err => {
         logger.warn(
           { err: err instanceof Error ? err.message : 'unknown', storeId },
           '[NEWSLETTER] welcome email failed'
