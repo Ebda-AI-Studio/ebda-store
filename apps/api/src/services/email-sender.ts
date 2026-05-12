@@ -20,8 +20,18 @@ export interface ResolvedSender {
   replyTo?: string;
 }
 
+// Strip CRLF + control chars from a display name to defend against
+// header injection. Resend's SDK should also reject malformed headers
+// but defence in depth is the rule here. Quoting display names that
+// contain RFC 5322 specials (commas, angle brackets) is deferred to
+// the SDK; we only sanitize control-chars + trim.
+function sanitizeDisplayName(name: string): string {
+  // eslint-disable-next-line no-control-regex
+  return name.replace(/[\r\n\x00-\x1f\x7f]/g, ' ').trim();
+}
+
 export function resolveSender(store: StoreSenderShape): ResolvedSender {
-  const displayName = store.name;
+  const displayName = sanitizeDisplayName(store.name);
   const localPart =
     store.emailSenderLocalPart && store.emailSenderLocalPart.trim().length > 0
       ? store.emailSenderLocalPart.trim()

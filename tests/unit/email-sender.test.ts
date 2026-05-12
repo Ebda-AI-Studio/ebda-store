@@ -56,4 +56,14 @@ describe('resolveSender', () => {
     const result = resolveSender(baseStore({ emailSenderLocalPart: '' }));
     expect(result.from).toBe('Wady Aljuz <noreply@forcemediakw.com>');
   });
+
+  it('strips CRLF from store name to prevent header injection', () => {
+    const result = resolveSender(baseStore({ name: 'Wady\r\nBcc: attacker@example.com' }));
+    expect(result.from).toBe('Wady  Bcc: attacker@example.com <noreply@forcemediakw.com>');
+  });
+
+  it('strips ASCII control chars from store name', () => {
+    const result = resolveSender(baseStore({ name: 'Wady\x00Aljuz\x07' }));
+    expect(result.from).toBe('Wady Aljuz <noreply@forcemediakw.com>');
+  });
 });
