@@ -1,6 +1,7 @@
 import { Resend } from 'resend';
 import { prisma } from '@force/database';
 import { config } from '../config';
+import logger from '../lib/logger';
 
 // Resend SDK wrapper — single platform-wide account. Merchant domains
 // live under it as verified senders. See spec at
@@ -120,6 +121,40 @@ export class ResendService {
       status,
       records: ((data as { records?: unknown[] }).records ?? []).map(toDnsRecord),
     };
+  }
+
+  /**
+   * Remove the Resend domain (called from the compensating-rollback path
+   * when a merchant changes/removes their custom domain). Idempotent + tolerant
+   * of 'not found' — we clear the columns either way so the store doesn't
+   * carry a dangling reference.
+   */
+  static async removeStoreDomain(storeId: string): Promise<void> {
+    const store = await prisma.store.findUnique({
+      where: { id: storeId },
+      select: { id: true, emailDomainId: true },
+    });
+    if (!store) return;
+    if (!store.emailDomainId) return;
+
+    const client = getClient();
+    if (client) {
+      const { error } = await client.domains.remove(store.emailDomainId);
+      if (error && error.name !== 'not_found') {
+        // Log but don't throw — we still want to clear our state so the
+        // store can re-provision cleanly. A dangling Resend record is
+        // recoverable from the dashboard; a dangling DB reference isn't.
+        logger.warn(
+          { err: error.message, storeId, domainId: store.emailDomainId },
+          'Resend remove-domain failed (clearing columns anyway)'
+        );
+      }
+    }
+
+    await prisma.store.update({
+      where: { id: storeId },
+      data: { emailDomainId: null, emailDomainStatus: null, emailDomainVerifiedAt: null },
+    });
   }
 }
 

@@ -185,3 +185,42 @@ describe('ResendService.refreshDomainStatus', () => {
     await expect(ResendService.refreshDomainStatus('store-1')).rejects.toThrow(/not provisioned/i);
   });
 });
+
+describe('ResendService.removeStoreDomain', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('removes the Resend domain and clears all three columns', async () => {
+    prismaFindUniqueMock.mockResolvedValue({ id: 'store-1', emailDomainId: 'd_abc123' });
+    mockDomainsRemove.mockResolvedValue({ data: { id: 'd_abc123' }, error: null });
+
+    await ResendService.removeStoreDomain('store-1');
+
+    expect(mockDomainsRemove).toHaveBeenCalledWith('d_abc123');
+    expect(prismaUpdateMock).toHaveBeenCalledWith({
+      where: { id: 'store-1' },
+      data: { emailDomainId: null, emailDomainStatus: null, emailDomainVerifiedAt: null },
+    });
+  });
+
+  it('is a no-op when store has no emailDomainId', async () => {
+    prismaFindUniqueMock.mockResolvedValue({ id: 'store-1', emailDomainId: null });
+    await ResendService.removeStoreDomain('store-1');
+    expect(mockDomainsRemove).not.toHaveBeenCalled();
+    expect(prismaUpdateMock).not.toHaveBeenCalled();
+  });
+
+  it('clears the columns even if Resend remove returns 404 (already gone)', async () => {
+    prismaFindUniqueMock.mockResolvedValue({ id: 'store-1', emailDomainId: 'd_abc123' });
+    mockDomainsRemove.mockResolvedValue({
+      data: null,
+      error: { name: 'not_found', message: 'Domain not found' },
+    });
+
+    await ResendService.removeStoreDomain('store-1');
+
+    expect(prismaUpdateMock).toHaveBeenCalledWith({
+      where: { id: 'store-1' },
+      data: { emailDomainId: null, emailDomainStatus: null, emailDomainVerifiedAt: null },
+    });
+  });
+});
