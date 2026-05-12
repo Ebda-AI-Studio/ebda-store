@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import { Button, Badge, Input, Label } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { Alert } from '../../../../components/Alert';
-import { apiGet, apiPut } from '../../../../lib/api';
+import { apiGet, apiPost, apiPut } from '../../../../lib/api';
 import { useCurrentStore } from '../../../../hooks/useCurrentStore';
 import { useT } from '@/i18n/useT';
 
@@ -25,6 +25,7 @@ export default function StoreDomainPage() {
     verified: boolean;
     misconfigured: boolean;
     dnsRecords: Array<{ type: string; name: string; value: string }>;
+    emailSender?: { domainId: string | null; status: string | null; verifiedAt: string | null };
   } | null>(null);
   const [domainError, setDomainError] = useState('');
 
@@ -37,6 +38,7 @@ export default function StoreDomainPage() {
         verified: boolean;
         misconfigured: boolean;
         dnsRecords: Array<{ type: string; name: string; value: string }>;
+        emailSender?: { domainId: string | null; status: string | null; verifiedAt: string | null };
       }>(`/api/v1/stores/${storeId}/domain`);
       if (data) setDomainStatus(data);
     } catch {
@@ -99,6 +101,50 @@ export default function StoreDomainPage() {
     }
   }
 
+  const [isProvisioningEmail, setIsProvisioningEmail] = useState(false);
+  const [isVerifyingEmail, setIsVerifyingEmail] = useState(false);
+  const [emailSenderError, setEmailSenderError] = useState('');
+
+  async function handleProvisionEmailSender() {
+    setIsProvisioningEmail(true);
+    setEmailSenderError('');
+    try {
+      const { error: apiError } = await apiPost(
+        `/api/v1/stores/${storeId}/email-sender/provision`,
+        {}
+      );
+      if (apiError) {
+        setEmailSenderError(apiError.message || t('emailSenderError'));
+      } else {
+        await checkDns();
+      }
+    } catch {
+      setEmailSenderError(t('emailSenderError'));
+    } finally {
+      setIsProvisioningEmail(false);
+    }
+  }
+
+  async function handleVerifyEmailSender() {
+    setIsVerifyingEmail(true);
+    setEmailSenderError('');
+    try {
+      const { error: apiError } = await apiPost(
+        `/api/v1/stores/${storeId}/email-sender/verify`,
+        {}
+      );
+      if (apiError) {
+        setEmailSenderError(apiError.message || t('emailSenderError'));
+      } else {
+        await checkDns();
+      }
+    } catch {
+      setEmailSenderError(t('emailSenderError'));
+    } finally {
+      setIsVerifyingEmail(false);
+    }
+  }
+
   if (isLoading) {
     return (
       <AdminLayout title={t('title')} subtitle={t('subtitle')} mode="store_admin" storeId={storeId}>
@@ -120,6 +166,14 @@ export default function StoreDomainPage() {
   }
 
   const domain = store.domain;
+
+  const senderPreview = (() => {
+    const name = store?.name ?? '';
+    const localPart = 'noreply'; // updated in Task 13 to read store.emailSenderLocalPart
+    const verifiedCustom = domainStatus?.emailSender?.status === 'verified' && !!store?.domain;
+    const host = verifiedCustom ? store!.domain : 'forcemediakw.com';
+    return `${name} <${localPart}@${host}>`;
+  })();
 
   return (
     <AdminLayout title={t('title')} subtitle={t('subtitle')} mode="store_admin" storeId={storeId}>
@@ -253,6 +307,58 @@ export default function StoreDomainPage() {
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">{t('noDomain')}</p>
+            )}
+          </div>
+        </div>
+
+        {/* Email sender card */}
+        <div className="mt-6 rounded-lg border border-border bg-card p-6">
+          <div className="mb-4">
+            <h2 className="text-lg font-semibold text-foreground">{t('emailSenderTitle')}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{t('emailSenderSubtitle')}</p>
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">{t('sendingAs')}</p>
+                <p className="font-mono text-sm text-foreground">{senderPreview}</p>
+              </div>
+              <Badge
+                variant={
+                  domainStatus?.emailSender?.status === 'verified'
+                    ? 'default'
+                    : domainStatus?.emailSender?.status === 'pending'
+                      ? 'secondary'
+                      : 'outline'
+                }
+              >
+                {domainStatus?.emailSender?.status === 'verified'
+                  ? t('statusVerified')
+                  : domainStatus?.emailSender?.status === 'pending'
+                    ? t('statusPending')
+                    : domainStatus?.emailSender?.status === 'failed'
+                      ? t('statusFailed')
+                      : t('statusNotConfigured')}
+              </Badge>
+            </div>
+
+            {emailSenderError && <p className="text-sm text-destructive">{emailSenderError}</p>}
+
+            {!domainStatus?.emailSender?.domainId && domain && (
+              <Button onClick={handleProvisionEmailSender} disabled={isProvisioningEmail}>
+                {isProvisioningEmail ? t('settingUp') : t('setupBrandedEmail')}
+              </Button>
+            )}
+
+            {domainStatus?.emailSender?.status === 'pending' && (
+              <Button
+                variant="outline"
+                onClick={handleVerifyEmailSender}
+                disabled={isVerifyingEmail}
+              >
+                {isVerifyingEmail ? t('verifying') : t('verifyEmailSender')}
+              </Button>
             )}
           </div>
         </div>

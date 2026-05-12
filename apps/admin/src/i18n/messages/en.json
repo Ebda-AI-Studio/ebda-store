@@ -3104,7 +3104,19 @@
       "colName": "Name",
       "colValue": "Value",
       "invalidDomain": "Please enter a valid domain (e.g., shop.example.com)",
-      "updateFailed": "Failed to update domain"
+      "updateFailed": "Failed to update domain",
+      "emailSenderTitle": "Email sender",
+      "emailSenderSubtitle": "Send order confirmations and receipts under your own domain.",
+      "sendingAs": "Sending as",
+      "setupBrandedEmail": "Set up branded email",
+      "verifyEmailSender": "Verify",
+      "verifying": "Verifying...",
+      "settingUp": "Setting up...",
+      "statusVerified": "Verified",
+      "statusPending": "Pending DNS verification",
+      "statusFailed": "Verification failed",
+      "statusNotConfigured": "Not configured",
+      "emailSenderError": "Failed to update email sender. Please try again."
     }
   },
   "categories": {

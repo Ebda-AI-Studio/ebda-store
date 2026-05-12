@@ -3104,7 +3104,19 @@
       "colName": "الاسم",
       "colValue": "القيمة",
       "invalidDomain": "يرجى إدخال نطاق صالح (مثل shop.example.com)",
-      "updateFailed": "تعذّر تحديث النطاق"
+      "updateFailed": "تعذّر تحديث النطاق",
+      "emailSenderTitle": "مرسل البريد الإلكتروني",
+      "emailSenderSubtitle": "أرسل تأكيدات الطلبات والإيصالات من نطاقك الخاص.",
+      "sendingAs": "يُرسل باسم",
+      "setupBrandedEmail": "إعداد البريد الإلكتروني المخصص",
+      "verifyEmailSender": "تحقق",
+      "verifying": "جارٍ التحقق...",
+      "settingUp": "جارٍ الإعداد...",
+      "statusVerified": "موثق",
+      "statusPending": "بانتظار تحقق DNS",
+      "statusFailed": "فشل التحقق",
+      "statusNotConfigured": "غير مهيأ",
+      "emailSenderError": "تعذّر تحديث مرسل البريد الإلكتروني. حاول مرة أخرى."
     }
   },
   "categories": {
