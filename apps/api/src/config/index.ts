@@ -138,9 +138,13 @@ export const config = {
   smtpFromEmail: process.env.SMTP_FROM_EMAIL || 'noreply@forcemediakw.com',
 
   // Resend SDK key (single platform-wide account; all merchant domains live
-  // under it). When missing, ResendService gracefully degrades to no-op +
-  // logs a warning so dev environments don't crash on every send.
-  resendApiKey: process.env.RESEND_API_KEY || '',
+  // under it). Falls back to SMTP_PASSWORD because the pre-existing setup
+  // (nodemailer-via-Resend-SMTP) stored the same `re_xxx` key there —
+  // Resend keys are valid as both SMTP password AND SDK auth, so the
+  // fallback bridges the migration without forcing an env-var rename
+  // on Railway. When neither is set, ResendService gracefully degrades to
+  // no-op + logs a warning so dev environments don't crash on every send.
+  resendApiKey: process.env.RESEND_API_KEY || process.env.SMTP_PASSWORD || '',
 
   // Logging & Monitoring
   logLevel: process.env.LOG_LEVEL || 'debug',
