@@ -7,6 +7,7 @@ import { auditLogArchive } from './audit-log-archive';
 import { bulkAiTranslate } from './bulk-ai-translate';
 import { bulkAiSeo } from './bulk-ai-seo';
 import { bulkAiFaqAeo, bulkAiHowtoAeo, bulkAiMetaAeo } from './bulk-ai-aeo';
+import { reviewRequest } from './review-request';
 
 /**
  * Registry of every Inngest function the API exposes. The serve
@@ -25,4 +26,5 @@ export const inngestFunctions: InngestFunction.Any[] = [
   bulkAiFaqAeo,
   bulkAiHowtoAeo,
   bulkAiMetaAeo,
+  reviewRequest,
 ];

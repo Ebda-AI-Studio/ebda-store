@@ -43,3 +43,6 @@ export type { ReturnConfirmationData } from './return-confirmation';
 
 export { returnStatusUpdateTemplate } from './return-status-update';
 export type { ReturnStatusUpdateData } from './return-status-update';
+
+export { reviewRequestTemplate } from './review-request';
+export type { ReviewRequestData } from './review-request';

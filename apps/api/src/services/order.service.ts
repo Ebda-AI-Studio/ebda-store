@@ -615,9 +615,16 @@ export class OrderService {
       );
     }
 
+    // Set deliveredAt when transitioning to delivered so the review-request
+    // Inngest function has an accurate timestamp for the 90-day token expiry.
+    const statusData: Record<string, unknown> = { status };
+    if (status === 'delivered' && order.status !== 'delivered') {
+      statusData.deliveredAt = new Date();
+    }
+
     const updatedOrder = await prisma.order.update({
       where: { id: orderId, storeId },
-      data: { status },
+      data: statusData,
       include: {
         items: true,
         customer: {
@@ -637,6 +644,11 @@ export class OrderService {
 
     // Process affiliate commission on delivery (fire-and-forget)
     if (status === 'delivered') {
+      // Queue review-request email (7-day delay handled inside the Inngest fn)
+      inngest
+        .send({ name: 'order/delivered', data: { orderId, storeId } })
+        .catch(err => logger.error({ err, orderId }, 'Failed to enqueue review-request event'));
+
       affiliateService
         .processCommission(storeId, orderId)
         .catch(err => logger.error({ err }, 'Affiliate commission processing failed'));

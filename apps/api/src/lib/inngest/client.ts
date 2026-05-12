@@ -55,12 +55,21 @@ type BulkAiSeoEvent = EventPayload & {
   };
 };
 
+type OrderDeliveredEvent = EventPayload & {
+  name: 'order/delivered';
+  data: {
+    orderId: string;
+    storeId: string;
+  };
+};
+
 export type AppEvent =
   | OrderCreatedEvent
   | BulkImportStartedEvent
   | InvoiceEmailRequestedEvent
   | BulkAiTranslateEvent
-  | BulkAiSeoEvent;
+  | BulkAiSeoEvent
+  | OrderDeliveredEvent;
 
 export const inngest = new Inngest({
   id: 'force-api',

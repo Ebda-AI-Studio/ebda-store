@@ -13,6 +13,7 @@ import { paymentFailedTemplate } from './email-templates/payment-failed';
 import { orderShippedTemplate } from './email-templates/order-shipped';
 import { returnConfirmationTemplate } from './email-templates/return-confirmation';
 import { returnStatusUpdateTemplate } from './email-templates/return-status-update';
+import { reviewRequestTemplate, type ReviewRequestData } from './email-templates/review-request';
 
 // ==========================================
 // Email Service
@@ -711,6 +712,28 @@ export class EmailService {
     const subject = returnStatusUpdateTemplate.subject[lang](data, store.name);
     const content = returnStatusUpdateTemplate[lang](data, store.name);
     await this.sendForStore(storeId, { to: data.email, subject, content, language: lang });
+  }
+
+  /**
+   * Post-purchase review request — fires 7 days after delivery via Inngest.
+   *
+   * Receives all items for the order so a consolidated email can be sent
+   * (one email, one CTA per product). The caller (review-request Inngest
+   * function) already resolved the correct locale; `language` is required.
+   */
+  static async sendReviewRequest(
+    storeId: string,
+    data: ReviewRequestData,
+    language: 'en' | 'ar'
+  ): Promise<void> {
+    const store = await prisma.store.findUnique({
+      where: { id: storeId },
+      select: { name: true, settings: true },
+    });
+    if (!store) throw new Error(`Store ${storeId} not found`);
+    const subject = reviewRequestTemplate.subject[language](data, store.name);
+    const content = reviewRequestTemplate[language](data, store.name);
+    await this.sendForStore(storeId, { to: data.to, subject, content, language });
   }
 
   /**
