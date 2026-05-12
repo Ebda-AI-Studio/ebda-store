@@ -8,6 +8,33 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { API_URL } from '../lib/api';
 import { formatDate as formatStoreDate } from '../lib/format-date';
 
+// Visual placeholders for the empty state. CRITICAL: these are NEVER
+// emitted as Schema.org Review markup — see ProductDetailPage's JSON-LD
+// emission (apps/web/src/app/products/[slug]/page.tsx), gated on real
+// verified-purchase published reviews only (Task 29).
+// Labeled "Sample — not real reviews" + aria-hidden + opacity-40 so
+// no one mistakes them for real customer reviews.
+const SAMPLE_CARDS = [
+  {
+    rating: 5,
+    title: 'Loved this — exceeded expectations',
+    titleAr: 'أحببته — تجاوز توقعاتي',
+    author: 'Verified Buyer',
+    authorAr: 'مشتري موثّق',
+    body: 'Quality is great, shipped fast. Definitely buying again.',
+    bodyAr: 'الجودة ممتازة، الشحن سريع. سأشتري مرة أخرى بكل تأكيد.',
+  },
+  {
+    rating: 4,
+    title: 'Good value',
+    titleAr: 'قيمة جيدة',
+    author: 'Verified Buyer',
+    authorAr: 'مشتري موثّق',
+    body: 'Works as described. Packaging could be better.',
+    bodyAr: 'يعمل كما هو موصوف. التغليف يمكن أن يكون أفضل.',
+  },
+];
+
 interface Review {
   id: string;
   rating: number;
@@ -386,11 +413,54 @@ export default function ReviewSection({ storeId, productId }: Props) {
         </div>
       )}
 
-      {/* Empty state — no sample cards until Task 31 */}
+      {/* Empty state — labeled sample cards so the section doesn't feel empty.
+          CRITICAL: these are NEVER emitted as Schema.org Review markup.
+          JSON-LD emission (page.tsx) is gated on real verified-purchase
+          published reviews only (Task 29) — that gate is unchanged here. */}
       {!isLoading && reviews.length === 0 && (
-        <p className="mt-6 text-muted-foreground">
-          {t('Be the first to review this product.', 'كن أول من يراجع هذا المنتج.')}
-        </p>
+        <div className="mt-6">
+          <p className="text-muted-foreground mb-8">
+            {t(
+              'No reviews yet. Be the first to review this product.',
+              'لا توجد مراجعات بعد. كن أول من يراجع هذا المنتج.'
+            )}
+          </p>
+
+          {/* Sample cards — aria-hidden so screen readers skip them entirely.
+              pointer-events-none so clicks don't land on them.
+              opacity-40 + border-dashed to visually signal "not a real card". */}
+          <div className="relative" aria-hidden="true">
+            {/* Amber badge overlapping the top edge of the card grid */}
+            <div className="absolute -top-3 inset-x-0 mx-auto w-fit px-3 py-1 rounded-full bg-amber-100 text-amber-900 text-xs font-semibold uppercase tracking-wide z-10 border border-amber-300">
+              {language === 'ar' ? 'مثال — ليست مراجعات حقيقية' : 'Sample — not real reviews'}
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 opacity-40 pointer-events-none select-none">
+              {SAMPLE_CARDS.map((s, i) => (
+                <div
+                  key={i}
+                  className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4"
+                >
+                  <div className="flex items-center gap-1 mb-2">
+                    {Array.from({ length: 5 }).map((_, j) => (
+                      <span key={j} className={j < s.rating ? 'text-amber-400' : 'text-gray-300'}>
+                        ★
+                      </span>
+                    ))}
+                  </div>
+                  <p className="text-sm font-medium text-foreground">
+                    {language === 'ar' ? s.titleAr : s.title}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    — {language === 'ar' ? s.authorAr : s.author}
+                  </p>
+                  <p className="text-sm mt-2 text-muted-foreground leading-relaxed line-clamp-3">
+                    {language === 'ar' ? s.bodyAr : s.body}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Write a review section */}
