@@ -90,7 +90,7 @@ export function ReviewForm({ orderId, productId, token, product, store }: Props)
     setSubmitting(true);
     setError(null);
 
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://api-production-c058.up.railway.app';
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://store-api.forcemediakw.com';
 
     try {
       const res = await fetch(`${apiUrl}/api/v1/public/reviews/submit`, {

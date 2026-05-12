@@ -89,7 +89,7 @@ const nextConfig = {
               // forcemediakw.com is the marketing-site origin: storefront's
               // maintenance page + bare-root redirect can trigger a browser
               // preconnect to it.
-              "connect-src 'self' https://api-production-c058.up.railway.app https://*.r2.dev https://*.google-analytics.com https://*.facebook.com https://*.tiktok.com wss://api-production-c058.up.railway.app https://fonts.googleapis.com https://fonts.gstatic.com https://vercel.live wss://vercel.live https://*.onesignal.com wss://*.onesignal.com https://forcemediakw.com",
+              "connect-src 'self' https://store-api.forcemediakw.com https://api-production-c058.up.railway.app https://*.r2.dev https://*.google-analytics.com https://*.facebook.com https://*.tiktok.com wss://store-api.forcemediakw.com wss://api-production-c058.up.railway.app https://fonts.googleapis.com https://fonts.gstatic.com https://vercel.live wss://vercel.live https://*.onesignal.com wss://*.onesignal.com https://forcemediakw.com",
               // Required so /OneSignalSDKWorker.js can register as a service
               // worker — Push API mandates same-origin worker scripts.
               "worker-src 'self' blob:",

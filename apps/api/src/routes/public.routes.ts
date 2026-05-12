@@ -341,7 +341,7 @@ router.post(
       const orderData = createOrderSchema.parse(req.body);
       // Customer-leak guard: only treat req.user as the order owner when
       // the role is `customer`. The API cookie is shared between admin
-      // and storefront origins (api-production-c058 host), so a merchant
+      // and storefront origins (store-api.forcemediakw.com host), so a merchant
       // signed into app.forcemediakw.com sends the SAME cookie to
       // /public/orders on store.forcemediakw.com. Without this guard
       // we'd attach the merchant's super_admin/store_admin userId as

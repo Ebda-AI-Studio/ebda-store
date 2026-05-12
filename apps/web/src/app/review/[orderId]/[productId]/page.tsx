@@ -19,7 +19,7 @@ export default async function ReviewPage({ params, searchParams }: PageProps) {
 
   if (!token) notFound();
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://api-production-c058.up.railway.app';
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://store-api.forcemediakw.com';
   let canSubmitData: { product: any; store: any } | null = null;
   let errorCode: string | null = null;
 

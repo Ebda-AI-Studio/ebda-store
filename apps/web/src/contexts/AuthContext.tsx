@@ -32,7 +32,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshUser = useCallback(async () => {
     // Auth is handled via HTTP-only cookies sent automatically with
     // credentials: 'include'. The cookie is scoped to the API domain
-    // (api-production-c058.up.railway.app), so an admin signed in at
+    // (store-api.forcemediakw.com), so an admin signed in at
     // app.forcemediakw.com sends the SAME cookie to /auth/me when the
     // storefront calls it — making the storefront think the admin is
     // a logged-in customer.
