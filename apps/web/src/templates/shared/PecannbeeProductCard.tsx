@@ -84,7 +84,13 @@ function PecannbeeProductCardImpl({
   };
 
   return (
-    <div className={`flex flex-col overflow-hidden ${styles.card}`} dir={isRtl ? 'rtl' : 'ltr'}>
+    <article
+      className={`flex flex-col overflow-hidden ${styles.card}`}
+      dir={isRtl ? 'rtl' : 'ltr'}
+      itemScope
+      itemType="https://schema.org/Product"
+      aria-labelledby={`prod-${product.id}-name`}
+    >
       <Link
         href={href}
         className="group/img block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
@@ -175,8 +181,10 @@ function PecannbeeProductCardImpl({
       <div className={`flex flex-1 flex-col gap-3 p-5 sm:p-6 ${styles.productCardBody ?? ''}`}>
         <Link href={href} className="focus:outline-none focus-visible:underline">
           <p
+            id={`prod-${product.id}-name`}
             className={`line-clamp-2 min-h-[3em] ${styles.productCardName}`}
             style={{ textWrap: 'balance' }}
+            itemProp="name"
           >
             {name}
           </p>
@@ -184,8 +192,17 @@ function PecannbeeProductCardImpl({
         <div
           className={`flex items-baseline gap-2 ${styles.productCardBody ? 'justify-center' : ''}`}
         >
-          <span className={styles.productCardPrice}>
-            {(product.price / 1000).toFixed(3)} {currency}
+          <span
+            itemProp="offers"
+            itemScope
+            itemType="https://schema.org/Offer"
+            className="contents"
+          >
+            <meta itemProp="priceCurrency" content={currency} />
+            <meta itemProp="price" content={String(product.price / 1000)} />
+            <span className={styles.productCardPrice}>
+              {(product.price / 1000).toFixed(3)} {currency}
+            </span>
           </span>
           {onSale && product.compareAtPrice && (
             <span className="text-sm text-muted-foreground line-through">
@@ -232,7 +249,7 @@ function PecannbeeProductCardImpl({
           )}
         </button>
       </div>
-    </div>
+    </article>
   );
 }
 

@@ -217,7 +217,7 @@ export function ShopChrome({ children }: { children: ReactNode }) {
           />
         </div>
       )}
-      <div data-zone="header">
+      <header role="banner" data-zone="header">
         <T.Header
           branding={branding}
           navigation={navigation}
@@ -227,9 +227,11 @@ export function ShopChrome({ children }: { children: ReactNode }) {
           urlPrefix={urlPrefix}
           utilityBar={utilityBar}
         />
-      </div>
-      <main className="flex-1">{children}</main>
-      <div data-zone="footer">
+      </header>
+      <main role="main" className="flex-1">
+        {children}
+      </main>
+      <footer role="contentinfo" data-zone="footer">
         <T.Footer
           branding={branding}
           contact={{
@@ -252,7 +254,7 @@ export function ShopChrome({ children }: { children: ReactNode }) {
           isRtl={isRtl}
           urlPrefix={urlPrefix}
         />
-      </div>
+      </footer>
       {/* afterFooter — empty placeholder so any merchant-injected text
           below the footer (cookie disclaimer, copyright, etc) inherits
           the typography zone. Kept zero-height when there's no content. */}
