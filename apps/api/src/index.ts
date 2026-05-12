@@ -206,16 +206,41 @@ app.use(
     },
     standardHeaders: true,
     legacyHeaders: false,
-    // Skip the limiter when a load test sends a valid bypass token.
-    // We only check when LOAD_TEST_BYPASS_TOKEN is set on Railway —
-    // unset means "no bypass possible", so production traffic is
-    // always rate limited regardless of header values. Use a long
-    // random value for the env var so the header isn't guessable.
+    // Skip the limiter for two cases:
+    //
+    // 1. Load test bypass token. We only check when LOAD_TEST_BYPASS_TOKEN
+    //    is set on Railway — unset means "no bypass possible", so
+    //    production traffic is always rate limited regardless of header
+    //    values. Use a long random value so the header isn't guessable.
+    //
+    // 2. Admin bulk-AI job-status polling (GET /api/v1/stores/.../ai/bulk
+    //    and /api/v1/stores/.../ai/bulk/<jobId>). These are read-only
+    //    one-row DB lookups that the admin UI polls every 4s while a
+    //    sweep is running. The downstream `authenticate` + `authorize`
+    //    middleware still enforce auth; this just lifts the global IP
+    //    rate cap so a logged-in merchant watching their job progress
+    //    doesn't 429 after ~3 minutes. Safe because:
+    //      - method is GET only (no writes)
+    //      - the auth chain still requires a valid store_admin/super_admin
+    //        JWT cookie, so unauthenticated traffic still hits the limiter
+    //        via the auth middleware's `authLimiter` 5-attempts-per-15min
+    //      - polling endpoints don't trigger expensive work (Gemini calls
+    //        happen inside Inngest, not in the GET handler)
     skip: req => {
+      // Bypass 1: load test
       const expected = process.env.LOAD_TEST_BYPASS_TOKEN;
-      if (!expected) return false;
-      const provided = req.header('x-load-test-token');
-      return Boolean(provided) && provided === expected;
+      if (expected) {
+        const provided = req.header('x-load-test-token');
+        if (provided && provided === expected) return true;
+      }
+      // Bypass 2: admin bulk-AI status polling
+      if (
+        req.method === 'GET' &&
+        /^\/api\/v1\/stores\/[^/]+\/ai\/bulk(\/[^/]+)?\/?$/.test(req.path)
+      ) {
+        return true;
+      }
+      return false;
     },
   })
 );

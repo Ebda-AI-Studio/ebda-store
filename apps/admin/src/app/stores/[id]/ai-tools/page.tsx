@@ -48,7 +48,14 @@ interface BulkAiJobDetail extends BulkAiJob {
   }> | null;
 }
 
-const POLL_MS = 1500;
+// Poll cadence for active bulk-AI jobs. 4s is the sweet spot:
+// - fast enough that progress feels live (UI ticks within 4s of each
+//   batch persist)
+// - slow enough to stay under the global 100 req / 15 min ip-keyed
+//   rate limiter (4s × 2 requests/tick = 30 req/min = 450 req per
+//   15min window; mitigated by the api-side skip rule for these
+//   exact polling endpoints — see middleware/security.ts)
+const POLL_MS = 4000;
 
 export default function AiToolsPage() {
   const params = useParams();
