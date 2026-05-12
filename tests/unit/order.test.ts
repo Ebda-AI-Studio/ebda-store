@@ -542,6 +542,7 @@ describe('OrderService', () => {
         await OrderService.updateStatus(mockStoreId, 'order-123', 'shipped');
 
         expect(EmailService.sendOrderShipped).toHaveBeenCalledWith(
+          mockStoreId,
           expect.objectContaining({
             customerEmail: mockCustomer.email,
             orderNumber: mockOrder.orderNumber,

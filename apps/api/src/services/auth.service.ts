@@ -322,11 +322,12 @@ export class AuthService {
       );
     }
 
-    // Send new verification email
+    // Send new verification email — forward storeId so the branded sender path is used
     await this.sendVerificationEmail(
       user.id,
       user.email,
-      `${user.firstName} ${user.lastName}`.trim() || user.email
+      `${user.firstName} ${user.lastName}`.trim() || user.email,
+      user.storeId
     );
 
     return { success: true, message: 'Verification email sent' };
