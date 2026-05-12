@@ -3052,7 +3052,9 @@
       "googleSiteVerificationHint": "Your store is already verified on store.forcemediakw.com — you only need this once you connect a custom domain (e.g. yourstore.com).\n1. Open Google Search Console and add your custom domain as a URL-prefix property.\n2. Pick the \"HTML tag\" verification method.\n3. Paste the whole meta tag (or just the content token) here and save.\n4. Click Verify in Search Console — your storefront will already be serving the tag.",
       "successMessage": "SEO settings saved successfully",
       "failedMessage": "Failed to save SEO settings",
-      "connectionError": "Unable to connect to the server"
+      "connectionError": "Unable to connect to the server",
+      "senderPrefix": "Email sender prefix",
+      "senderPrefixHint": "The part before the @ on outgoing emails. Default: noreply. Examples: hello, orders, support. Letters/digits/dot/hyphen/underscore only."
     }
   },
   "language": {

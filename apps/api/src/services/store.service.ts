@@ -542,6 +542,7 @@ export class StoreService {
       ogImage?: string;
       twitterHandle?: string;
       googleSiteVerification?: string;
+      emailSenderLocalPart?: string;
     }
   ) {
     const store = await this.getById(storeId);
@@ -556,6 +557,7 @@ export class StoreService {
         ogImage: seo.ogImage,
         twitterHandle: seo.twitterHandle,
         googleSiteVerification: seo.googleSiteVerification,
+        emailSenderLocalPart: seo.emailSenderLocalPart,
       },
     });
 

@@ -3052,7 +3052,9 @@
       "googleSiteVerificationHint": "متجرك موثّق بالفعل على store.forcemediakw.com — لا تحتاج إلى هذا الحقل إلا بعد ربط نطاق مخصص (مثل yourstore.com).\n1. افتح Google Search Console وأضف نطاقك المخصص كخاصية URL-prefix.\n2. اختر طريقة التحقق \"HTML tag\".\n3. الصق وسم meta كاملاً (أو رمز content فقط) هنا واحفظ.\n4. اضغط Verify في Search Console — المتجر سيكون قد بدأ بإصدار الوسم تلقائياً.",
       "successMessage": "تم حفظ إعدادات SEO بنجاح",
       "failedMessage": "تعذّر حفظ إعدادات SEO",
-      "connectionError": "تعذّر الاتصال بالخادم"
+      "connectionError": "تعذّر الاتصال بالخادم",
+      "senderPrefix": "بادئة البريد الإلكتروني",
+      "senderPrefixHint": "الجزء قبل @ في البريد الصادر. الافتراضي: noreply. أمثلة: hello, orders, support. حروف وأرقام ونقطة وشرطة وشرطة سفلية فقط."
     }
   },
   "language": {

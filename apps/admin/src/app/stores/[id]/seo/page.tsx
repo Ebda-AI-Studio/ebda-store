@@ -16,6 +16,7 @@ interface SeoSettings {
   ogImage: string;
   twitterHandle: string;
   googleSiteVerification: string;
+  emailSenderLocalPart: string;
 }
 
 const DEFAULT_SETTINGS: SeoSettings = {
@@ -26,6 +27,7 @@ const DEFAULT_SETTINGS: SeoSettings = {
   ogImage: '',
   twitterHandle: '',
   googleSiteVerification: '',
+  emailSenderLocalPart: 'noreply',
 };
 
 // Character limits for SEO best practices
@@ -88,6 +90,7 @@ export default function StoreSeoPage() {
           ogImage: seo.ogImage || '',
           twitterHandle: seo.twitterHandle || '',
           googleSiteVerification: seo.googleSiteVerification || '',
+          emailSenderLocalPart: seo.emailSenderLocalPart || 'noreply',
         });
       }
       // If 404 or no data, keep defaults
@@ -411,6 +414,32 @@ export default function StoreSeoPage() {
                   {`<meta name="google-site-verification" content="${settings.googleSiteVerification}" />`}
                 </pre>
               )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">
+                {t('senderPrefix')}
+              </label>
+              <div className="flex items-center rounded-lg border border-border overflow-hidden">
+                <input
+                  type="text"
+                  value={settings.emailSenderLocalPart}
+                  onChange={e =>
+                    setSettings(prev => ({
+                      ...prev,
+                      emailSenderLocalPart: e.target.value
+                        .toLowerCase()
+                        .replace(/[^a-z0-9._-]/g, ''),
+                    }))
+                  }
+                  placeholder="noreply"
+                  className="flex-1 px-3 py-2 text-sm focus:outline-none"
+                />
+                <span className="bg-muted px-3 py-2 text-sm text-muted-foreground">
+                  @forcemediakw.com
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">{t('senderPrefixHint')}</p>
             </div>
           </div>
         </div>

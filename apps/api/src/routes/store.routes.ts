@@ -93,6 +93,19 @@ const optionalEmail = z.preprocess(
   z.string().email().max(255).optional()
 );
 
+// Local-part for the from-line on per-store sender. Must be RFC-5321 safe.
+const optionalEmailLocalPart = z.preprocess(
+  v => (v === '' || v === null ? undefined : v),
+  z
+    .string()
+    .regex(
+      /^[a-z0-9._-]+$/,
+      'Sender prefix must be lowercase letters, numbers, dot/hyphen/underscore only'
+    )
+    .max(64)
+    .optional()
+);
+
 const seoSchema = z
   .object({
     metaTitle: optionalStr(200),
@@ -102,6 +115,7 @@ const seoSchema = z
     ogImage: optionalUrl,
     twitterHandle: optionalStr(50),
     googleSiteVerification: optionalGoogleVerification,
+    emailSenderLocalPart: optionalEmailLocalPart,
   })
   .strip();
 
@@ -614,6 +628,7 @@ router.get(
           ogImage: true,
           twitterHandle: true,
           googleSiteVerification: true,
+          emailSenderLocalPart: true,
         },
       });
 
