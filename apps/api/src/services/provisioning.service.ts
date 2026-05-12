@@ -4,6 +4,7 @@ import { prisma, Prisma, StoreStatus } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import { EmailService } from './email.service';
 import { VercelDomainService } from './vercel-domain.service';
+import { ResendService } from './resend.service';
 import logger from '../lib/logger';
 
 // ==========================================
@@ -201,6 +202,20 @@ export class ProvisioningService {
       // provision is never undone by a downstream error (e.g. welcome email
       // failure handled below).
       vercelAdded = false;
+
+      // Per-store Resend provisioning for the newly-created store. Best-effort:
+      // failures don't roll back the provisioning — storefront works on Vercel;
+      // email just falls back to platform sender until merchant adds DNS.
+      if (domain) {
+        try {
+          await ResendService.provisionStoreDomain(result.store.id);
+        } catch (err) {
+          logger.warn(
+            { err, storeId: result.store.id, domain },
+            'Resend domain provision failed during store provisioning (email stays on platform fallback)'
+          );
+        }
+      }
     } catch (error) {
       // Compensating action: if we registered the domain with Vercel but the
       // DB transaction failed, remove it so we don't strand a phantom domain

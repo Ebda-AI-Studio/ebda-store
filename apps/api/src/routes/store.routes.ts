@@ -792,6 +792,12 @@ router.put(
       const store = await StoreService.getById(id);
       const oldDomain = store.domain;
 
+      const previousEmailRow = await prisma.store.findUnique({
+        where: { id },
+        select: { emailDomainId: true },
+      });
+      const previousEmailDomainId = previousEmailRow?.emailDomainId ?? null;
+
       // Add new domain to Vercel FIRST (before touching the old one). If we
       // removed the old domain first and then add-new failed, the storefront
       // on the old domain would go dark AND the new domain wouldn't work —
@@ -874,6 +880,35 @@ router.put(
       // DB update committed — disarm the rollback so a successful change is
       // never undone by a downstream error (e.g. CORS-cache bust, status fetch).
       rollbackVercelAdd = null;
+
+      // Per-store Resend provisioning. Run only on actual domain change.
+      // Order matters: remove the OLD Resend record BEFORE provisioning the
+      // new one, otherwise provisionStoreDomain would overwrite the row's
+      // emailDomainId and we'd lose the reference to the old domain.
+      if (domain !== oldDomain) {
+        if (previousEmailDomainId) {
+          // Await the removal so the upcoming provision sees a clean row state
+          // (no stale emailDomainId that would cause provisionStoreDomain to
+          // refresh the old Resend domain instead of creating a new one).
+          await ResendService.removeStoreDomain(id).catch(error =>
+            logger.error(
+              { err: error instanceof Error ? error.message : 'Unknown error', storeId: id },
+              'Failed to remove old Resend domain after domain change'
+            )
+          );
+        }
+
+        if (domain) {
+          try {
+            await ResendService.provisionStoreDomain(id);
+          } catch (err) {
+            logger.warn(
+              { err, storeId: id, domain },
+              'Resend domain provision failed (storefront still works; email stays on platform fallback)'
+            );
+          }
+        }
+      }
 
       // Remove old domain from Vercel AFTER the DB commit. Doing this before
       // (and especially before adding the new domain) created a window where
