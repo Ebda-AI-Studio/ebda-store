@@ -5,22 +5,24 @@ import logger from '../lib/logger';
 
 interface CreateReviewData {
   productId: string;
+  orderId: string; // required — verified-purchase only
   rating: number;
   title?: string;
-  comment?: string;
-  orderId?: string;
+  body?: string;
+  language?: string;
 }
 
 interface UpdateReviewData {
   rating?: number;
   title?: string;
-  comment?: string;
-  isApproved?: boolean;
+  body?: string;
+  status?: string;
+  rejectionReason?: string;
 }
 
 export class ReviewService {
   /**
-   * List reviews for a product (public - only approved reviews)
+   * List reviews for a product (public - only published reviews)
    */
   static async listByProduct(
     storeId: string,
@@ -28,13 +30,12 @@ export class ReviewService {
     options: {
       page?: number;
       limit?: number;
-      sortBy?: 'newest' | 'highest' | 'lowest' | 'helpful';
+      sortBy?: 'newest' | 'highest' | 'lowest';
       /**
-       * When set, the viewer's own un-approved reviews are included
-       * alongside the public approved set. Lets the author see their
+       * When set, the viewer's own pending reviews are included
+       * alongside the public published set. Lets the author see their
        * just-submitted review with a "pending approval" indicator
-       * instead of an empty list ("لا توجد مراجعات بعد") that makes
-       * them think their submission was lost.
+       * instead of an empty list that makes them think it was lost.
        */
       viewerCustomerId?: string;
     } = {}
@@ -46,19 +47,18 @@ export class ReviewService {
       newest: { createdAt: 'desc' as const },
       highest: { rating: 'desc' as const },
       lowest: { rating: 'asc' as const },
-      helpful: { helpfulCount: 'desc' as const },
     }[sortBy];
 
     const where: Prisma.ReviewWhereInput = viewerCustomerId
       ? {
           storeId,
           productId,
-          OR: [{ isApproved: true }, { customerId: viewerCustomerId }],
+          OR: [{ status: 'published' }, { customerId: viewerCustomerId }],
         }
       : {
           storeId,
           productId,
-          isApproved: true,
+          status: 'published',
         };
 
     const [reviews, total, stats] = await Promise.all([
@@ -71,10 +71,14 @@ export class ReviewService {
           id: true,
           rating: true,
           title: true,
-          comment: true,
-          isVerified: true,
-          isApproved: true,
-          helpfulCount: true,
+          body: true,
+          language: true,
+          bodyTranslated: true,
+          verifiedPurchase: true,
+          status: true,
+          ownerResponse: true,
+          ownerResponseAr: true,
+          ownerResponseAt: true,
           createdAt: true,
           customerId: true,
         },
@@ -84,8 +88,7 @@ export class ReviewService {
     ]);
 
     // Anonymize customer names for public display. `isMine` flags the
-    // viewer's own review so the storefront can show a "pending approval"
-    // badge on it without exposing other customers' identities.
+    // viewer's own review so the storefront can show a "pending" badge.
     const anonymizedReviews = reviews.map(review => ({
       ...review,
       customerName: review.customerId ? 'Verified Buyer' : 'Anonymous',
@@ -109,7 +112,7 @@ export class ReviewService {
    * Get review statistics for a product
    */
   static async getProductReviewStats(storeId: string, productId: string) {
-    const where = { storeId, productId, isApproved: true };
+    const where = { storeId, productId, status: 'published' };
 
     const [aggregate, distribution] = await Promise.all([
       prisma.review.aggregate({
@@ -151,7 +154,7 @@ export class ReviewService {
     options: {
       page?: number;
       limit?: number;
-      status?: 'pending' | 'approved' | 'all';
+      status?: 'pending' | 'published' | 'rejected' | 'spam' | 'all';
       productId?: string;
     } = {}
   ) {
@@ -159,8 +162,7 @@ export class ReviewService {
     const skip = (page - 1) * limit;
 
     const where: Prisma.ReviewWhereInput = { storeId };
-    if (status === 'pending') where.isApproved = false;
-    if (status === 'approved') where.isApproved = true;
+    if (status !== 'all') where.status = status;
     if (productId) where.productId = productId;
 
     const [reviews, total] = await Promise.all([
@@ -193,12 +195,17 @@ export class ReviewService {
   }
 
   /**
-   * Create a review
+   * Create a review (verified-purchase only — requires a valid orderId)
    */
   static async create(storeId: string, customerId: string | null, data: CreateReviewData) {
     // Validate rating
     if (data.rating < 1 || data.rating > 5) {
       throw new AppError(400, 'VALIDATION_ERROR', 'Rating must be between 1 and 5');
+    }
+
+    // Validate body
+    if (!data.body || data.body.trim().length < 20) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Review body must be at least 20 characters');
     }
 
     // Check if product exists in this store
@@ -210,58 +217,46 @@ export class ReviewService {
       throw new AppError(404, 'NOT_FOUND', 'Product not found');
     }
 
-    // Check if customer has already reviewed this product
-    if (customerId) {
-      const existingReview = await prisma.review.findFirst({
-        where: {
-          storeId,
-          productId: data.productId,
-          customerId,
-        },
-      });
+    // Verify order exists, belongs to this store/customer, and is delivered
+    const order = await prisma.order.findFirst({
+      where: {
+        id: data.orderId,
+        storeId,
+        ...(customerId ? { customerId } : {}),
+        status: 'delivered',
+        items: { some: { productId: data.productId } },
+      },
+    });
 
-      if (existingReview) {
-        throw new AppError(409, 'ALREADY_EXISTS', 'You have already reviewed this product');
-      }
+    if (!order) {
+      throw new AppError(403, 'FORBIDDEN', 'Review requires a delivered order for this product');
     }
 
-    // Check if this is a verified purchase
-    let isVerified = false;
-    if (customerId && data.orderId) {
-      const order = await prisma.order.findFirst({
-        where: {
-          id: data.orderId,
-          storeId,
-          customerId,
-          status: 'delivered',
-          items: { some: { productId: data.productId } },
-        },
-      });
-      isVerified = !!order;
-    } else if (customerId) {
-      // Check if customer has purchased this product
-      const purchase = await prisma.order.findFirst({
-        where: {
-          storeId,
-          customerId,
-          status: 'delivered',
-          items: { some: { productId: data.productId } },
-        },
-      });
-      isVerified = !!purchase;
+    // Enforce unique (orderId, productId) — one review per buyer-product pair
+    const existingReview = await prisma.review.findFirst({
+      where: { orderId: data.orderId, productId: data.productId },
+    });
+
+    if (existingReview) {
+      throw new AppError(
+        409,
+        'ALREADY_EXISTS',
+        'You have already reviewed this product for this order'
+      );
     }
 
     const review = await prisma.review.create({
       data: {
         storeId,
         productId: data.productId,
-        customerId,
         orderId: data.orderId,
+        customerId,
         rating: data.rating,
         title: data.title,
-        comment: data.comment,
-        isVerified,
-        isApproved: false, // Requires admin approval
+        body: data.body.trim(),
+        language: data.language ?? 'en',
+        verifiedPurchase: true, // always true — enforced by order check above
+        status: 'pending', // awaits moderation
       },
     });
 
@@ -271,7 +266,7 @@ export class ReviewService {
         reviewId: review.id,
         productName: product.name,
         rating: data.rating,
-        customerName: 'Customer', // Anonymized for privacy
+        customerName: 'Customer',
       });
     } catch (notifyError) {
       logger.error({ err: notifyError }, 'Failed to send review notification');
@@ -297,14 +292,15 @@ export class ReviewService {
       data: {
         rating: data.rating,
         title: data.title,
-        comment: data.comment,
-        isApproved: data.isApproved,
+        body: data.body,
+        status: data.status,
+        rejectionReason: data.rejectionReason,
       },
     });
   }
 
   /**
-   * Approve a review
+   * Publish a review (admin approval)
    */
   static async approve(storeId: string, reviewId: string) {
     const review = await prisma.review.findFirst({
@@ -317,14 +313,14 @@ export class ReviewService {
 
     return prisma.review.update({
       where: { id: reviewId, storeId },
-      data: { isApproved: true },
+      data: { status: 'published' },
     });
   }
 
   /**
-   * Reject/unapprove a review
+   * Reject a review (admin)
    */
-  static async reject(storeId: string, reviewId: string) {
+  static async reject(storeId: string, reviewId: string, reason?: string) {
     const review = await prisma.review.findFirst({
       where: { id: reviewId, storeId },
     });
@@ -335,7 +331,7 @@ export class ReviewService {
 
     return prisma.review.update({
       where: { id: reviewId, storeId },
-      data: { isApproved: false },
+      data: { status: 'rejected', rejectionReason: reason },
     });
   }
 
@@ -359,24 +355,6 @@ export class ReviewService {
   }
 
   /**
-   * Mark review as helpful (increment helpful count)
-   */
-  static async markHelpful(storeId: string, reviewId: string) {
-    const review = await prisma.review.findFirst({
-      where: { id: reviewId, storeId, isApproved: true },
-    });
-
-    if (!review) {
-      throw new AppError(404, 'NOT_FOUND', 'Review not found');
-    }
-
-    return prisma.review.update({
-      where: { id: reviewId, storeId },
-      data: { helpfulCount: { increment: 1 } },
-    });
-  }
-
-  /**
    * Get reviews by customer
    */
   static async getCustomerReviews(storeId: string, customerId: string) {
@@ -393,10 +371,10 @@ export class ReviewService {
   }
 
   /**
-   * Check if customer can review a product
+   * Check if customer can review a product (verified-purchase check)
    */
   static async canReview(storeId: string, productId: string, customerId: string) {
-    // Check if already reviewed
+    // Check if already reviewed (any status — prevent duplicate pending submissions)
     const existingReview = await prisma.review.findFirst({
       where: { storeId, productId, customerId },
     });
@@ -405,7 +383,7 @@ export class ReviewService {
       return { canReview: false, reason: 'already_reviewed', existingReview };
     }
 
-    // Check if customer has purchased the product
+    // Require a delivered order for this product
     const purchase = await prisma.order.findFirst({
       where: {
         storeId,
@@ -415,9 +393,14 @@ export class ReviewService {
       },
     });
 
+    if (!purchase) {
+      return { canReview: false, reason: 'not_purchased' };
+    }
+
     return {
       canReview: true,
-      isVerifiedPurchase: !!purchase,
+      isVerifiedPurchase: true,
+      orderId: purchase.id,
     };
   }
 }

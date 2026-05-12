@@ -18,17 +18,19 @@ const router = Router({ mergeParams: true });
 // Validation schemas
 const createReviewSchema = z.object({
   productId: z.string().uuid('Invalid product ID'),
+  orderId: z.string().uuid('Invalid order ID'),
   rating: z.number().int().min(1).max(5),
   title: z.string().max(200).optional(),
-  comment: z.string().max(5000).optional(),
-  orderId: z.string().uuid().optional(),
+  body: z.string().min(20, 'Review body must be at least 20 characters').max(5000),
+  language: z.enum(['en', 'ar']).optional(),
 });
 
 const updateReviewSchema = z.object({
   rating: z.number().int().min(1).max(5).optional(),
   title: z.string().max(200).optional(),
-  comment: z.string().max(5000).optional(),
-  isApproved: z.boolean().optional(),
+  body: z.string().max(5000).optional(),
+  status: z.enum(['pending', 'published', 'rejected', 'spam']).optional(),
+  rejectionReason: z.string().max(500).optional(),
 });
 
 // ==========================================
@@ -53,7 +55,7 @@ router.get(
       const result = await ReviewService.listByProduct(req.storeId!, productId, {
         page: page ? parseInt(page as string) : undefined,
         limit: limit ? parseInt(limit as string) : undefined,
-        sortBy: sortBy as 'newest' | 'highest' | 'lowest' | 'helpful',
+        sortBy: sortBy as 'newest' | 'highest' | 'lowest',
         // customerUserId() ensures we only attach a viewer ID for actual
         // customer sessions. An admin browsing the storefront would
         // otherwise see "your pending review" markers keyed on their
@@ -122,25 +124,7 @@ router.post(
   }
 );
 
-// POST /reviews/:id/helpful - Mark review as helpful
-router.post(
-  '/:id/helpful',
-  requireStore,
-  requireFeature('reviews'),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const { id } = req.params;
-      const review = await ReviewService.markHelpful(req.storeId!, id);
-
-      res.json({
-        success: true,
-        data: { review },
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
-);
+// (helpful endpoint removed — helpfulCount was removed from the new review schema)
 
 // GET /reviews/can-review/:productId - Check if customer can review
 router.get(
@@ -218,7 +202,7 @@ router.get(
       const result = await ReviewService.listForStore(req.storeId!, {
         page: page ? parseInt(page as string) : undefined,
         limit: limit ? parseInt(limit as string) : undefined,
-        status: status as 'pending' | 'approved' | 'all',
+        status: status as 'pending' | 'published' | 'rejected' | 'spam' | 'all',
         productId: productId as string,
       });
 

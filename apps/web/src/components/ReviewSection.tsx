@@ -11,7 +11,14 @@ import { formatDate as formatStoreDate } from '../lib/format-date';
 interface Review {
   id: string;
   rating: number;
+  body?: string;
+  /** Legacy alias — API previously returned `comment`, now returns `body`.
+   *  Keep both so the component degrades gracefully during deploy roll. */
   comment?: string;
+  title?: string;
+  language?: string;
+  verifiedPurchase?: boolean;
+  status?: string;
   createdAt: string;
   reviewer?: {
     firstName?: string;
@@ -19,13 +26,10 @@ interface Review {
   };
   // Some APIs return name directly on the review object
   reviewerName?: string;
-  /** False when the merchant hasn't approved the review yet. The
-   *  storefront only ever receives un-approved reviews when the viewer
-   *  is the author (see review.service.ts viewerCustomerId branch). */
-  isApproved?: boolean;
-  /** True when this review was authored by the current viewer. Surfaced
-   *  so we can badge their own pending review instead of hiding it. */
+  /** When the review is pending, this is true only for the author. */
   isMine?: boolean;
+  /** Legacy compat — mapped from status !== 'published' in API response. */
+  isApproved?: boolean;
 }
 
 interface ReviewsResponse {
@@ -264,7 +268,8 @@ export default function ReviewSection({ storeId, productId }: Props) {
       {!isLoading && reviews.length > 0 && (
         <div className="mt-8 space-y-6">
           {reviews.map(review => {
-            const isPending = review.isMine && review.isApproved === false;
+            const isPending =
+              review.isMine && (review.status === 'pending' || review.isApproved === false);
             return (
               <div
                 key={review.id}
@@ -289,8 +294,10 @@ export default function ReviewSection({ storeId, productId }: Props) {
                     )}
                   </p>
                 )}
-                {review.comment && (
-                  <p className="mt-3 text-muted-foreground leading-relaxed">{review.comment}</p>
+                {(review.body || review.comment) && (
+                  <p className="mt-3 text-muted-foreground leading-relaxed">
+                    {review.body ?? review.comment}
+                  </p>
                 )}
               </div>
             );

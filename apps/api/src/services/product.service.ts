@@ -919,7 +919,7 @@ export class ProductService {
           images: { orderBy: { position: 'asc' }, take: 2 },
           categories: { include: { category: { select: { id: true, name: true, slug: true } } } },
           reviews: {
-            where: { isApproved: true },
+            where: { status: 'published' },
             select: { rating: true },
           },
         },

@@ -58,10 +58,9 @@ router.get(
       const reviews = await prisma.review.findMany({
         where: {
           storeId,
-          isApproved: true,
+          status: 'published',
           rating: { gte: minRating },
-          ...(verifiedOnly ? { isVerified: true } : {}),
-          NOT: { comment: null },
+          ...(verifiedOnly ? { verifiedPurchase: true } : {}),
         },
         include: {
           customer: {
@@ -76,7 +75,7 @@ router.get(
         id: r.id,
         rating: r.rating,
         title: r.title,
-        comment: r.comment ?? '',
+        comment: r.body,
         authorName: r.customer
           ? `${r.customer.firstName ?? ''} ${(r.customer.lastName ?? '').slice(0, 1).toUpperCase()}.`.trim()
           : 'Customer',

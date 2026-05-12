@@ -11,10 +11,13 @@ interface Review {
   id: string;
   rating: number;
   title: string | null;
-  comment: string | null;
-  isVerified: boolean;
-  isApproved: boolean;
-  helpfulCount: number;
+  body: string;
+  language: string;
+  verifiedPurchase: boolean;
+  status: 'pending' | 'published' | 'rejected' | 'spam';
+  rejectionReason: string | null;
+  spamScore: number | null;
+  ownerResponse: string | null;
   createdAt: string;
   product: {
     id: string;
@@ -60,7 +63,9 @@ export default function ReviewsPage() {
   const t = useT('reviews.page');
   const [reviews, setReviews] = useState<Review[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'pending' | 'approved'>('all');
+  const [filter, setFilter] = useState<'all' | 'pending' | 'published' | 'rejected' | 'spam'>(
+    'all'
+  );
   const [meta, setMeta] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const { success: toastSuccess, error: showError } = useToast();
@@ -156,11 +161,18 @@ export default function ReviewsPage() {
           {t('filterPending')}
         </Button>
         <Button
-          variant={filter === 'approved' ? 'default' : 'outline'}
+          variant={filter === 'published' ? 'default' : 'outline'}
           size="sm"
-          onClick={() => setFilter('approved')}
+          onClick={() => setFilter('published')}
         >
           {t('filterApproved')}
+        </Button>
+        <Button
+          variant={filter === 'rejected' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setFilter('rejected')}
+        >
+          {t('filterRejected')}
         </Button>
       </div>
 
@@ -196,10 +208,10 @@ export default function ReviewsPage() {
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
                       <StarRating rating={review.rating} />
-                      <Badge variant={review.isApproved ? 'default' : 'secondary'}>
-                        {review.isApproved ? t('approved') : t('pending')}
+                      <Badge variant={review.status === 'published' ? 'default' : 'secondary'}>
+                        {review.status === 'published' ? t('approved') : review.status}
                       </Badge>
-                      {review.isVerified && (
+                      {review.verifiedPurchase && (
                         <Badge variant="outline" className="text-success border-success/40">
                           {t('verifiedPurchase')}
                         </Badge>
@@ -210,8 +222,12 @@ export default function ReviewsPage() {
                       <h3 className="font-semibold text-foreground mb-1">{review.title}</h3>
                     )}
 
-                    {review.comment && (
-                      <p className="text-muted-foreground text-sm mb-3">{review.comment}</p>
+                    <p className="text-muted-foreground text-sm mb-3">{review.body}</p>
+
+                    {review.rejectionReason && (
+                      <p className="text-destructive text-xs mb-2">
+                        {t('rejectionReason')}: {review.rejectionReason}
+                      </p>
                     )}
 
                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
@@ -228,20 +244,16 @@ export default function ReviewsPage() {
                         </span>
                       </span>
                       <span>{formatDate(review.createdAt)}</span>
-                      <span>
-                        {review.helpfulCount}
-                        {t('helpfulSuffix')}
-                      </span>
                     </div>
                   </div>
 
                   <div className="flex gap-2">
-                    {!review.isApproved && (
+                    {review.status !== 'published' && (
                       <Button size="sm" onClick={() => handleApprove(review.id)}>
                         {t('approve')}
                       </Button>
                     )}
-                    {review.isApproved && (
+                    {review.status === 'published' && (
                       <Button variant="outline" size="sm" onClick={() => handleReject(review.id)}>
                         {t('unapprove')}
                       </Button>

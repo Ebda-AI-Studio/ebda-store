@@ -738,10 +738,11 @@ model Order {
   shippingAddress Json               @map("shipping_address")
   billingAddress  Json               @map("billing_address")
   shippedAt       DateTime?          @map("shipped_at")
-  deliveredAt     DateTime?          @map("delivered_at")
-  createdAt       DateTime           @default(now()) @map("created_at")
-  updatedAt       DateTime           @updatedAt @map("updated_at")
-  deletedAt       DateTime?          @map("deleted_at") // Soft delete support
+  deliveredAt          DateTime?          @map("delivered_at")
+  reviewRequestSentAt  DateTime?          @map("review_request_sent_at")
+  createdAt            DateTime           @default(now()) @map("created_at")
+  updatedAt            DateTime           @updatedAt @map("updated_at")
+  deletedAt            DateTime?          @map("deleted_at") // Soft delete support
 
   // Buyer's UI locale at checkout time ('en' | 'ar'). Used to send
   // transactional emails in the customer's language regardless of the
@@ -1687,31 +1688,42 @@ model NewsletterSubscriber {
 // ==========================================
 
 model Review {
-  id           String   @id @default(uuid())
-  storeId      String   @map("store_id")
-  productId    String   @map("product_id")
-  customerId   String?  @map("customer_id")
-  orderId      String?  @map("order_id")
-  rating       Int // 1-5
-  title        String?
-  comment      String?
-  isVerified   Boolean  @default(false) @map("is_verified") // Verified purchase
-  isApproved   Boolean  @default(false) @map("is_approved")
-  helpfulCount Int      @default(0) @map("helpful_count")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  id         String  @id @default(cuid())
+  productId  String  @map("product_id")
+  product    Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  storeId    String  @map("store_id")
+  store      Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  orderId    String  @map("order_id")
+  order      Order   @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  customerId String? @map("customer_id")
+  customer   User?   @relation(fields: [customerId], references: [id], onDelete: SetNull)
 
-  // Relations
-  store    Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  product  Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-  customer User?   @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  order    Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  // The review content itself
+  rating           Int      // 1-5
+  title            String?
+  body             String   @db.Text
+  language         String   @default("en") // 'en' | 'ar'
+  bodyTranslated   String?  @db.Text @map("body_translated") // AI translation of body
+  bodyTranslatedAt DateTime? @map("body_translated_at")
 
-  @@index([productId])
-  @@index([storeId])
-  @@index([customerId])
-  @@index([rating])
-  @@index([storeId, productId]) // Composite: reviews by store and product
+  // Verification + moderation
+  verifiedPurchase Boolean @default(true) @map("verified_purchase") // always true via this flow
+  status          String  @default("pending") // 'pending' | 'published' | 'rejected' | 'spam'
+  rejectionReason String? @map("rejection_reason")
+  spamScore       Float?  @map("spam_score") // 0-1, AI-flagged
+  spamReasons     Json?   @map("spam_reasons")
+
+  // Merchant response (optional)
+  ownerResponse   String?   @db.Text @map("owner_response")
+  ownerResponseAr String?   @db.Text @map("owner_response_ar")
+  ownerResponseAt DateTime? @map("owner_response_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([orderId, productId]) // one review per buyer-product pair
+  @@index([productId, status])
+  @@index([storeId, status])
   @@map("reviews")
 }
 
