@@ -77,6 +77,11 @@ const nextConfig = {
             value: 'max-age=31536000; includeSubDomains; preload',
           },
           { key: 'X-XSS-Protection', value: '1; mode=block' },
+          // Hard block all search engines at the HTTP-header layer too.
+          // Some crawlers honour the header even when robots.txt or the
+          // <meta> tag is overlooked (e.g. when the page is reached via
+          // a direct link from an indexed third-party site).
+          { key: 'X-Robots-Tag', value: 'noindex, nofollow, noarchive, nosnippet, noimageindex' },
           {
             // OneSignal needs:
             //   script-src + 'unsafe-eval' → SDK runtime checks

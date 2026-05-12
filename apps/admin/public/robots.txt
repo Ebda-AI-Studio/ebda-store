@@ -1,0 +1,6 @@
+# Admin domain — internal merchant dashboard, never to be indexed.
+# Blocks all crawlers including Googlebot, Bingbot, Baiduspider, etc.
+# Belt-and-suspenders with the `robots` Metadata in src/app/layout.tsx
+# and the `X-Robots-Tag: noindex, nofollow` header in next.config.js.
+User-agent: *
+Disallow: /

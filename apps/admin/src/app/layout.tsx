@@ -20,14 +20,31 @@ const ibmPlexArabic = IBM_Plex_Sans_Arabic({
 });
 
 export const metadata: Metadata = {
+  // Neutral title — leaked HTML/screenshots don't market the admin panel to
+  // would-be phishers. Force.* branding lives on the storefront, not here.
   title: {
-    default: 'Force Admin | Platform Management',
-    template: '%s | Force Admin',
+    default: 'Admin',
+    template: '%s | Admin',
   },
-  description: 'Force Website Builder - Enterprise E-commerce Platform Administration',
-  keywords: ['admin', 'dashboard', 'e-commerce', 'Force Media', 'Kuwait'],
-  authors: [{ name: 'Force Media' }],
-  creator: 'Force Media Kuwait',
+  description: 'Internal merchant dashboard. Not for public use.',
+  // Tell every crawler to skip this domain entirely. Belt-and-suspenders
+  // with `apps/admin/public/robots.txt` and the X-Robots-Tag header in
+  // next.config.js — any one of these layers is enough but Google
+  // sometimes ignores robots.txt for already-discovered URLs while
+  // honouring the meta tag, and vice-versa.
+  robots: {
+    index: false,
+    follow: false,
+    nocache: true,
+    googleBot: {
+      index: false,
+      follow: false,
+      noimageindex: true,
+      'max-snippet': -1,
+      'max-image-preview': 'none',
+      'max-video-preview': -1,
+    },
+  },
   // PWA install metadata. apple-* keys exist because iOS Safari requires
   // an installed PWA before granting Web Push permission, and the install
   // prompt picks up these tags rather than the manifest.
