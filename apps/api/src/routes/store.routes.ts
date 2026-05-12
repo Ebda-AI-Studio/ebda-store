@@ -1014,4 +1014,238 @@ router.post(
   }
 );
 
+// ===== Store FAQ CRUD =====
+
+const faqSchema = z.object({
+  question: z.string().min(1).max(500),
+  questionAr: z.string().max(500).optional().nullable(),
+  answer: z.string().min(1).max(5000),
+  answerAr: z.string().max(5000).optional().nullable(),
+  orderIndex: z.number().int().min(0).optional(),
+  isActive: z.boolean().optional(),
+});
+
+router.get(
+  '/:id/faqs',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const faqs = await prisma.storeFaq.findMany({
+        where: { storeId: req.params.id },
+        orderBy: [{ orderIndex: 'asc' }, { createdAt: 'asc' }],
+      });
+      res.json({ success: true, data: faqs });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.post(
+  '/:id/faqs',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = faqSchema.parse(req.body);
+      const faq = await prisma.storeFaq.create({
+        data: {
+          storeId: req.params.id,
+          question: body.question,
+          questionAr: body.questionAr ?? null,
+          answer: body.answer,
+          answerAr: body.answerAr ?? null,
+          orderIndex: body.orderIndex ?? 0,
+          isActive: body.isActive ?? true,
+          aiDrafted: false,
+          manuallyEdited: true,
+        },
+      });
+      res.status(201).json({ success: true, data: faq });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.put(
+  '/:id/faqs/:faqId',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = faqSchema.partial().parse(req.body);
+      const faq = await prisma.storeFaq.updateMany({
+        where: { id: req.params.faqId, storeId: req.params.id },
+        data: {
+          ...(body.question !== undefined && { question: body.question }),
+          ...(body.questionAr !== undefined && { questionAr: body.questionAr }),
+          ...(body.answer !== undefined && { answer: body.answer }),
+          ...(body.answerAr !== undefined && { answerAr: body.answerAr }),
+          ...(body.orderIndex !== undefined && { orderIndex: body.orderIndex }),
+          ...(body.isActive !== undefined && { isActive: body.isActive }),
+          manuallyEdited: true,
+        },
+      });
+      if (faq.count === 0) {
+        throw new AppError(404, 'NOT_FOUND', 'FAQ not found');
+      }
+      const updated = await prisma.storeFaq.findUnique({ where: { id: req.params.faqId } });
+      res.json({ success: true, data: updated });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.delete(
+  '/:id/faqs/:faqId',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const deleted = await prisma.storeFaq.deleteMany({
+        where: { id: req.params.faqId, storeId: req.params.id },
+      });
+      if (deleted.count === 0) {
+        throw new AppError(404, 'NOT_FOUND', 'FAQ not found');
+      }
+      res.json({ success: true, data: { message: 'FAQ deleted' } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// ===== Store HowTo CRUD =====
+
+const howtoStepSchema = z.object({
+  name: z.string().min(1).max(200),
+  text: z.string().min(1).max(2000),
+  image: z.string().url().optional(),
+});
+
+const howtoSchema = z.object({
+  title: z.string().min(1).max(200),
+  titleAr: z.string().max(200).optional().nullable(),
+  description: z.string().min(1).max(2000),
+  descriptionAr: z.string().max(2000).optional().nullable(),
+  steps: z.array(howtoStepSchema).min(1).max(20),
+  stepsAr: z.array(howtoStepSchema).optional().nullable(),
+  orderIndex: z.number().int().min(0).optional(),
+  isActive: z.boolean().optional(),
+});
+
+router.get(
+  '/:id/howtos',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const howtos = await prisma.storeHowto.findMany({
+        where: { storeId: req.params.id },
+        orderBy: [{ orderIndex: 'asc' }, { createdAt: 'asc' }],
+      });
+      res.json({ success: true, data: howtos });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.post(
+  '/:id/howtos',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = howtoSchema.parse(req.body);
+      const howto = await prisma.storeHowto.create({
+        data: {
+          storeId: req.params.id,
+          title: body.title,
+          titleAr: body.titleAr ?? null,
+          description: body.description,
+          descriptionAr: body.descriptionAr ?? null,
+          steps: body.steps as Prisma.InputJsonValue,
+          stepsAr: body.stepsAr != null ? (body.stepsAr as Prisma.InputJsonValue) : Prisma.DbNull,
+          orderIndex: body.orderIndex ?? 0,
+          isActive: body.isActive ?? true,
+          aiDrafted: false,
+          manuallyEdited: true,
+        },
+      });
+      res.status(201).json({ success: true, data: howto });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.put(
+  '/:id/howtos/:howtoId',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = howtoSchema.partial().parse(req.body);
+      // Verify ownership before update
+      const existing = await prisma.storeHowto.findFirst({
+        where: { id: req.params.howtoId, storeId: req.params.id },
+        select: { id: true },
+      });
+      if (!existing) {
+        throw new AppError(404, 'NOT_FOUND', 'HowTo not found');
+      }
+      const updateData: Prisma.StoreHowtoUpdateInput = { manuallyEdited: true };
+      if (body.title !== undefined) updateData.title = body.title;
+      if (body.titleAr !== undefined) updateData.titleAr = body.titleAr;
+      if (body.description !== undefined) updateData.description = body.description;
+      if (body.descriptionAr !== undefined) updateData.descriptionAr = body.descriptionAr;
+      if (body.steps !== undefined) updateData.steps = body.steps as Prisma.InputJsonValue;
+      if (body.stepsAr !== undefined) {
+        updateData.stepsAr =
+          body.stepsAr != null ? (body.stepsAr as Prisma.InputJsonValue) : Prisma.DbNull;
+      }
+      if (body.orderIndex !== undefined) updateData.orderIndex = body.orderIndex;
+      if (body.isActive !== undefined) updateData.isActive = body.isActive;
+      const updated = await prisma.storeHowto.update({
+        where: { id: req.params.howtoId },
+        data: updateData,
+      });
+      res.json({ success: true, data: updated });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.delete(
+  '/:id/howtos/:howtoId',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const deleted = await prisma.storeHowto.deleteMany({
+        where: { id: req.params.howtoId, storeId: req.params.id },
+      });
+      if (deleted.count === 0) {
+        throw new AppError(404, 'NOT_FOUND', 'HowTo not found');
+      }
+      res.json({ success: true, data: { message: 'HowTo deleted' } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 export default router;

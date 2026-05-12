@@ -291,6 +291,8 @@ model Store {
   bulkImportJobs           BulkImportJob[]
   aiUsage                  AiUsage[]
   bulkAiJobs               BulkAiJob[]
+  faqs                     StoreFaq[]
+  howtos                   StoreHowto[]
 
   @@index([ownerId])
   @@index([status])
@@ -474,6 +476,7 @@ model Product {
   relationsAsTarget ProductRelation[]          @relation("ProductRelationTarget")
   fbtAsProduct1     FrequentlyBoughtTogether[] @relation("FBTProduct1")
   fbtAsProduct2     FrequentlyBoughtTogether[] @relation("FBTProduct2")
+  faqs              ProductFaq[]
 
   @@unique([storeId, slug])
   @@unique([storeId, sku]) // Prevent duplicate SKUs within a store (null values are excluded)
@@ -1827,4 +1830,71 @@ model AiUsage {
   @@index([storeId, createdAt(sort: Desc)])
   @@index([feature])
   @@map("ai_usage")
+}
+
+// ==========================================
+// AEO / GEO content — FAQ + HowTo
+// ==========================================
+
+model StoreFaq {
+  id             String   @id @default(cuid())
+  storeId        String   @map("store_id")
+  store          Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  question       String   @map("question")
+  questionAr     String?  @map("question_ar")
+  answer         String   @db.Text @map("answer")
+  answerAr       String?  @db.Text @map("answer_ar")
+  // AI-draft state — smart-skip in the Gemini bulk sweep never overwrites
+  // a manually-edited entry.
+  aiDrafted      Boolean  @default(false) @map("ai_drafted")
+  manuallyEdited Boolean  @default(false) @map("manually_edited")
+  orderIndex     Int      @default(0) @map("order_index")
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@index([storeId, isActive, orderIndex])
+  @@map("store_faqs")
+}
+
+model StoreHowto {
+  id             String   @id @default(cuid())
+  storeId        String   @map("store_id")
+  store          Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  title          String   @map("title")
+  titleAr        String?  @map("title_ar")
+  description    String   @db.Text @map("description")
+  descriptionAr  String?  @db.Text @map("description_ar")
+  // HowTo.step is an array of HowToStep — stored as JSON.
+  // Format: [{ name, text, image? }, ...]
+  steps          Json     @map("steps")
+  // Arabic steps — same shape as steps but bilingual text values.
+  stepsAr        Json?    @map("steps_ar")
+  aiDrafted      Boolean  @default(false) @map("ai_drafted")
+  manuallyEdited Boolean  @default(false) @map("manually_edited")
+  orderIndex     Int      @default(0) @map("order_index")
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@index([storeId, isActive, orderIndex])
+  @@map("store_howtos")
+}
+
+// Per-product FAQs (e.g. "Does this ring come in size 7?") — separate
+// from store-level FAQs so Product schema can include them inline.
+model ProductFaq {
+  id             String   @id @default(cuid())
+  productId      String   @map("product_id")
+  product        Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  question       String
+  questionAr     String?  @map("question_ar")
+  answer         String   @db.Text
+  answerAr       String?  @db.Text @map("answer_ar")
+  aiDrafted      Boolean  @default(false) @map("ai_drafted")
+  manuallyEdited Boolean  @default(false) @map("manually_edited")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([productId])
+  @@map("product_faqs")
 }

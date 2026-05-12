@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
-import { apiGet, apiPost, apiPut } from '../../../../lib/api';
+import { apiGet, apiPost, apiPut, apiDelete } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
 
 interface SeoSettings {
@@ -18,6 +18,54 @@ interface SeoSettings {
   googleSiteVerification: string;
   emailSenderLocalPart: string;
 }
+
+interface StoreFaq {
+  id: string;
+  question: string;
+  questionAr: string | null;
+  answer: string;
+  answerAr: string | null;
+  orderIndex: number;
+  isActive: boolean;
+}
+
+interface HowtoStep {
+  name: string;
+  text: string;
+  image?: string;
+}
+
+interface StoreHowto {
+  id: string;
+  title: string;
+  titleAr: string | null;
+  description: string;
+  descriptionAr: string | null;
+  steps: HowtoStep[];
+  stepsAr: HowtoStep[] | null;
+  orderIndex: number;
+  isActive: boolean;
+}
+
+const EMPTY_FAQ: Omit<StoreFaq, 'id'> = {
+  question: '',
+  questionAr: null,
+  answer: '',
+  answerAr: null,
+  orderIndex: 0,
+  isActive: true,
+};
+
+const EMPTY_HOWTO: Omit<StoreHowto, 'id'> = {
+  title: '',
+  titleAr: null,
+  description: '',
+  descriptionAr: null,
+  steps: [{ name: '', text: '' }],
+  stepsAr: null,
+  orderIndex: 0,
+  isActive: true,
+};
 
 const DEFAULT_SETTINGS: SeoSettings = {
   metaTitle: '',
@@ -72,15 +120,31 @@ export default function StoreSeoPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  // FAQ state
+  const [faqs, setFaqs] = useState<StoreFaq[]>([]);
+  const [editingFaqId, setEditingFaqId] = useState<string | 'new' | null>(null);
+  const [faqDraft, setFaqDraft] = useState<Omit<StoreFaq, 'id'>>(EMPTY_FAQ);
+  const [isSavingFaq, setIsSavingFaq] = useState(false);
+
+  // HowTo state
+  const [howtos, setHowtos] = useState<StoreHowto[]>([]);
+  const [editingHowtoId, setEditingHowtoId] = useState<string | 'new' | null>(null);
+  const [howtoDraft, setHowtoDraft] = useState<Omit<StoreHowto, 'id'>>(EMPTY_HOWTO);
+  const [isSavingHowto, setIsSavingHowto] = useState(false);
+
   const fetchSeo = useCallback(async () => {
     if (!storeId) return;
     setIsLoading(true);
     try {
-      const { data } = await apiGet<{ seo?: Partial<SeoSettings> }>(
-        `/api/v1/stores/${storeId}/seo`
-      );
+      const [seoRes, faqsRes, howtosRes] = await Promise.all([
+        apiGet<{ seo?: Partial<SeoSettings> }>(`/api/v1/stores/${storeId}/seo`),
+        apiGet<StoreFaq[]>(`/api/v1/stores/${storeId}/faqs`),
+        apiGet<StoreHowto[]>(`/api/v1/stores/${storeId}/howtos`),
+      ]);
+
+      const seoData = seoRes.data;
       const seo: Partial<SeoSettings> | null =
-        (data?.seo ?? (data as unknown as Partial<SeoSettings>)) || null;
+        (seoData?.seo ?? (seoData as unknown as Partial<SeoSettings>)) || null;
       if (seo) {
         setSettings({
           metaTitle: seo.metaTitle || '',
@@ -93,13 +157,151 @@ export default function StoreSeoPage() {
           emailSenderLocalPart: seo.emailSenderLocalPart || 'noreply',
         });
       }
-      // If 404 or no data, keep defaults
+
+      if (faqsRes.data) {
+        setFaqs(Array.isArray(faqsRes.data) ? faqsRes.data : ((faqsRes.data as any).data ?? []));
+      }
+      if (howtosRes.data) {
+        setHowtos(
+          Array.isArray(howtosRes.data) ? howtosRes.data : ((howtosRes.data as any).data ?? [])
+        );
+      }
     } catch (err) {
       console.error('Failed to fetch SEO settings:', err);
     } finally {
       setIsLoading(false);
     }
   }, [storeId]);
+
+  // --- FAQ handlers ---
+  async function handleSaveFaq() {
+    if (!storeId) return;
+    setIsSavingFaq(true);
+    try {
+      if (editingFaqId === 'new') {
+        const { data, error } = await apiPost<StoreFaq>(`/api/v1/stores/${storeId}/faqs`, faqDraft);
+        if (error) throw new Error(error.message);
+        const created = (data as any)?.data ?? data;
+        if (created) setFaqs(prev => [...prev, created]);
+      } else if (editingFaqId) {
+        const { data, error } = await apiPut<StoreFaq>(
+          `/api/v1/stores/${storeId}/faqs/${editingFaqId}`,
+          faqDraft
+        );
+        if (error) throw new Error(error.message);
+        const updated = (data as any)?.data ?? data;
+        if (updated)
+          setFaqs(prev => prev.map(f => (f.id === editingFaqId ? (updated as StoreFaq) : f)));
+      }
+      setEditingFaqId(null);
+      setFaqDraft(EMPTY_FAQ);
+    } catch {
+      setMessage({ type: 'error', text: t('faqSaveError') });
+    } finally {
+      setIsSavingFaq(false);
+    }
+  }
+
+  async function handleDeleteFaq(faqId: string) {
+    if (!storeId) return;
+    try {
+      const { error } = await apiDelete(`/api/v1/stores/${storeId}/faqs/${faqId}`);
+      if (error) throw new Error(error.message);
+      setFaqs(prev => prev.filter(f => f.id !== faqId));
+    } catch {
+      setMessage({ type: 'error', text: t('faqDeleteError') });
+    }
+  }
+
+  async function handleToggleFaqActive(faq: StoreFaq) {
+    if (!storeId) return;
+    try {
+      const { data, error } = await apiPut<StoreFaq>(`/api/v1/stores/${storeId}/faqs/${faq.id}`, {
+        isActive: !faq.isActive,
+      });
+      if (error) throw new Error(error.message);
+      const updated = (data as any)?.data ?? data;
+      if (updated) setFaqs(prev => prev.map(f => (f.id === faq.id ? (updated as StoreFaq) : f)));
+    } catch {
+      setMessage({ type: 'error', text: t('faqSaveError') });
+    }
+  }
+
+  async function handleMoveFaq(faqId: string, direction: 'up' | 'down') {
+    const idx = faqs.findIndex(f => f.id === faqId);
+    if (idx === -1) return;
+    const newIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (newIdx < 0 || newIdx >= faqs.length) return;
+    const reordered = [...faqs];
+    [reordered[idx], reordered[newIdx]] = [reordered[newIdx], reordered[idx]];
+    const withIndex = reordered.map((f, i) => ({ ...f, orderIndex: i }));
+    setFaqs(withIndex);
+    // Persist updated order indices
+    await Promise.all(
+      withIndex.map(f =>
+        apiPut(`/api/v1/stores/${storeId}/faqs/${f.id}`, { orderIndex: f.orderIndex })
+      )
+    );
+  }
+
+  // --- HowTo handlers ---
+  async function handleSaveHowto() {
+    if (!storeId) return;
+    setIsSavingHowto(true);
+    try {
+      if (editingHowtoId === 'new') {
+        const { data, error } = await apiPost<StoreHowto>(
+          `/api/v1/stores/${storeId}/howtos`,
+          howtoDraft
+        );
+        if (error) throw new Error(error.message);
+        const created = (data as any)?.data ?? data;
+        if (created) setHowtos(prev => [...prev, created]);
+      } else if (editingHowtoId) {
+        const { data, error } = await apiPut<StoreHowto>(
+          `/api/v1/stores/${storeId}/howtos/${editingHowtoId}`,
+          howtoDraft
+        );
+        if (error) throw new Error(error.message);
+        const updated = (data as any)?.data ?? data;
+        if (updated)
+          setHowtos(prev => prev.map(h => (h.id === editingHowtoId ? (updated as StoreHowto) : h)));
+      }
+      setEditingHowtoId(null);
+      setHowtoDraft(EMPTY_HOWTO);
+    } catch {
+      setMessage({ type: 'error', text: t('howtoSaveError') });
+    } finally {
+      setIsSavingHowto(false);
+    }
+  }
+
+  async function handleDeleteHowto(howtoId: string) {
+    if (!storeId) return;
+    try {
+      const { error } = await apiDelete(`/api/v1/stores/${storeId}/howtos/${howtoId}`);
+      if (error) throw new Error(error.message);
+      setHowtos(prev => prev.filter(h => h.id !== howtoId));
+    } catch {
+      setMessage({ type: 'error', text: t('howtoDeleteError') });
+    }
+  }
+
+  async function handleToggleHowtoActive(howto: StoreHowto) {
+    if (!storeId) return;
+    try {
+      const { data, error } = await apiPut<StoreHowto>(
+        `/api/v1/stores/${storeId}/howtos/${howto.id}`,
+        { isActive: !howto.isActive }
+      );
+      if (error) throw new Error(error.message);
+      const updated = (data as any)?.data ?? data;
+      if (updated)
+        setHowtos(prev => prev.map(h => (h.id === howto.id ? (updated as StoreHowto) : h)));
+    } catch {
+      setMessage({ type: 'error', text: t('howtoSaveError') });
+    }
+  }
 
   useEffect(() => {
     fetchSeo();
@@ -444,6 +646,369 @@ export default function StoreSeoPage() {
           </div>
         </div>
 
+        {/* ===== Frequently Asked Questions ===== */}
+        <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="font-semibold text-foreground">{t('faqsTitle')}</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">{t('faqsSubtitle')}</p>
+            </div>
+            {editingFaqId === null && (
+              <button
+                type="button"
+                onClick={() => {
+                  setFaqDraft({ ...EMPTY_FAQ, orderIndex: faqs.length });
+                  setEditingFaqId('new');
+                }}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10"
+              >
+                + {t('addFaq')}
+              </button>
+            )}
+          </div>
+
+          {/* FAQ list */}
+          {faqs.map((faq, idx) => (
+            <div key={faq.id} className="rounded-lg border border-border p-4 space-y-3">
+              {editingFaqId === faq.id ? (
+                /* Inline edit form */
+                <div className="space-y-3">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="block text-xs font-medium text-foreground mb-1">
+                        {t('faqQuestion')}
+                      </label>
+                      <input
+                        type="text"
+                        value={faqDraft.question}
+                        onChange={e => setFaqDraft(d => ({ ...d, question: e.target.value }))}
+                        className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-foreground mb-1">
+                        {t('faqQuestionAr')}
+                      </label>
+                      <input
+                        type="text"
+                        lang="ar"
+                        dir="rtl"
+                        value={faqDraft.questionAr ?? ''}
+                        onChange={e =>
+                          setFaqDraft(d => ({ ...d, questionAr: e.target.value || null }))
+                        }
+                        className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="block text-xs font-medium text-foreground mb-1">
+                        {t('faqAnswer')}
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={faqDraft.answer}
+                        onChange={e => setFaqDraft(d => ({ ...d, answer: e.target.value }))}
+                        className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-foreground mb-1">
+                        {t('faqAnswerAr')}
+                      </label>
+                      <textarea
+                        rows={3}
+                        lang="ar"
+                        dir="rtl"
+                        value={faqDraft.answerAr ?? ''}
+                        onChange={e =>
+                          setFaqDraft(d => ({ ...d, answerAr: e.target.value || null }))
+                        }
+                        className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={isSavingFaq}
+                      onClick={handleSaveFaq}
+                      className="px-4 py-1.5 text-xs font-medium bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50"
+                    >
+                      {isSavingFaq ? '…' : t('faqSave')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingFaqId(null);
+                        setFaqDraft(EMPTY_FAQ);
+                      }}
+                      className="px-4 py-1.5 text-xs font-medium border border-border rounded-lg hover:bg-muted"
+                    >
+                      {t('faqCancel')}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* Read view */
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground line-clamp-1">
+                      {faq.question}
+                    </p>
+                    {faq.questionAr && (
+                      <p className="text-xs text-muted-foreground line-clamp-1" dir="rtl" lang="ar">
+                        {faq.questionAr}
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{faq.answer}</p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleMoveFaq(faq.id, 'up')}
+                      disabled={idx === 0}
+                      title={t('faqMoveUp')}
+                      className="rounded p-1 hover:bg-muted disabled:opacity-30 text-xs"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleMoveFaq(faq.id, 'down')}
+                      disabled={idx === faqs.length - 1}
+                      title={t('faqMoveDown')}
+                      className="rounded p-1 hover:bg-muted disabled:opacity-30 text-xs"
+                    >
+                      ↓
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleFaqActive(faq)}
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${faq.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground'}`}
+                    >
+                      {faq.isActive ? t('faqActive') : t('faqInactive')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFaqDraft({
+                          question: faq.question,
+                          questionAr: faq.questionAr,
+                          answer: faq.answer,
+                          answerAr: faq.answerAr,
+                          orderIndex: faq.orderIndex,
+                          isActive: faq.isActive,
+                        });
+                        setEditingFaqId(faq.id);
+                      }}
+                      className="rounded p-1.5 hover:bg-muted text-xs border border-border"
+                    >
+                      ✎
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteFaq(faq.id)}
+                      className="rounded p-1.5 hover:bg-destructive/10 text-destructive text-xs border border-border"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+
+          {/* New FAQ form */}
+          {editingFaqId === 'new' && (
+            <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="block text-xs font-medium text-foreground mb-1">
+                    {t('faqQuestion')}
+                  </label>
+                  <input
+                    type="text"
+                    value={faqDraft.question}
+                    onChange={e => setFaqDraft(d => ({ ...d, question: e.target.value }))}
+                    className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-foreground mb-1">
+                    {t('faqQuestionAr')}
+                  </label>
+                  <input
+                    type="text"
+                    lang="ar"
+                    dir="rtl"
+                    value={faqDraft.questionAr ?? ''}
+                    onChange={e => setFaqDraft(d => ({ ...d, questionAr: e.target.value || null }))}
+                    className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                </div>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="block text-xs font-medium text-foreground mb-1">
+                    {t('faqAnswer')}
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={faqDraft.answer}
+                    onChange={e => setFaqDraft(d => ({ ...d, answer: e.target.value }))}
+                    className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-foreground mb-1">
+                    {t('faqAnswerAr')}
+                  </label>
+                  <textarea
+                    rows={3}
+                    lang="ar"
+                    dir="rtl"
+                    value={faqDraft.answerAr ?? ''}
+                    onChange={e => setFaqDraft(d => ({ ...d, answerAr: e.target.value || null }))}
+                    className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                  />
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={isSavingFaq || !faqDraft.question || !faqDraft.answer}
+                  onClick={handleSaveFaq}
+                  className="px-4 py-1.5 text-xs font-medium bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50"
+                >
+                  {isSavingFaq ? '…' : t('faqSave')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingFaqId(null);
+                    setFaqDraft(EMPTY_FAQ);
+                  }}
+                  className="px-4 py-1.5 text-xs font-medium border border-border rounded-lg hover:bg-muted"
+                >
+                  {t('faqCancel')}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ===== How-To Guides ===== */}
+        <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="font-semibold text-foreground">{t('howtosTitle')}</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">{t('howtosSubtitle')}</p>
+            </div>
+            {editingHowtoId === null && (
+              <button
+                type="button"
+                onClick={() => {
+                  setHowtoDraft({ ...EMPTY_HOWTO, orderIndex: howtos.length });
+                  setEditingHowtoId('new');
+                }}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10"
+              >
+                + {t('addHowto')}
+              </button>
+            )}
+          </div>
+
+          {/* HowTo list */}
+          {howtos.map(howto => (
+            <div key={howto.id} className="rounded-lg border border-border p-4 space-y-3">
+              {editingHowtoId === howto.id ? (
+                /* Inline edit form */
+                <HowtoForm
+                  draft={howtoDraft}
+                  setDraft={setHowtoDraft}
+                  t={t}
+                  isSaving={isSavingHowto}
+                  onSave={handleSaveHowto}
+                  onCancel={() => {
+                    setEditingHowtoId(null);
+                    setHowtoDraft(EMPTY_HOWTO);
+                  }}
+                />
+              ) : (
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground line-clamp-1">
+                      {howto.title}
+                    </p>
+                    {howto.titleAr && (
+                      <p className="text-xs text-muted-foreground line-clamp-1" dir="rtl" lang="ar">
+                        {howto.titleAr}
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground mt-1">{howto.steps.length} steps</p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleToggleHowtoActive(howto)}
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${howto.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground'}`}
+                    >
+                      {howto.isActive ? t('howtoActive') : t('howtoInactive')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setHowtoDraft({
+                          title: howto.title,
+                          titleAr: howto.titleAr,
+                          description: howto.description,
+                          descriptionAr: howto.descriptionAr,
+                          steps: howto.steps,
+                          stepsAr: howto.stepsAr,
+                          orderIndex: howto.orderIndex,
+                          isActive: howto.isActive,
+                        });
+                        setEditingHowtoId(howto.id);
+                      }}
+                      className="rounded p-1.5 hover:bg-muted text-xs border border-border"
+                    >
+                      ✎
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteHowto(howto.id)}
+                      className="rounded p-1.5 hover:bg-destructive/10 text-destructive text-xs border border-border"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+
+          {/* New HowTo form */}
+          {editingHowtoId === 'new' && (
+            <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
+              <HowtoForm
+                draft={howtoDraft}
+                setDraft={setHowtoDraft}
+                t={t}
+                isSaving={isSavingHowto}
+                onSave={handleSaveHowto}
+                onCancel={() => {
+                  setEditingHowtoId(null);
+                  setHowtoDraft(EMPTY_HOWTO);
+                }}
+                autoFocus
+              />
+            </div>
+          )}
+        </div>
+
         {/* Save message */}
         {message && (
           <div
@@ -458,5 +1023,161 @@ export default function StoreSeoPage() {
         )}
       </div>
     </AdminLayout>
+  );
+}
+
+// ===== HowtoForm sub-component =====
+
+interface HowtoFormProps {
+  draft: Omit<StoreHowto, 'id'>;
+  setDraft: React.Dispatch<React.SetStateAction<Omit<StoreHowto, 'id'>>>;
+  t: (key: string) => string;
+  isSaving: boolean;
+  onSave: () => void;
+  onCancel: () => void;
+  autoFocus?: boolean;
+}
+
+function HowtoForm({ draft, setDraft, t, isSaving, onSave, onCancel, autoFocus }: HowtoFormProps) {
+  const canSave =
+    draft.title.trim() !== '' &&
+    draft.description.trim() !== '' &&
+    draft.steps.length > 0 &&
+    draft.steps.every(s => s.name.trim() !== '' && s.text.trim() !== '');
+
+  return (
+    <div className="space-y-3">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label className="block text-xs font-medium text-foreground mb-1">
+            {t('howtoGuideTitle')}
+          </label>
+          <input
+            type="text"
+            value={draft.title}
+            autoFocus={autoFocus}
+            onChange={e => setDraft(d => ({ ...d, title: e.target.value }))}
+            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-foreground mb-1">
+            {t('howtoGuideTitleAr')}
+          </label>
+          <input
+            type="text"
+            lang="ar"
+            dir="rtl"
+            value={draft.titleAr ?? ''}
+            onChange={e => setDraft(d => ({ ...d, titleAr: e.target.value || null }))}
+            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+        </div>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label className="block text-xs font-medium text-foreground mb-1">
+            {t('howtoDescription')}
+          </label>
+          <textarea
+            rows={2}
+            value={draft.description}
+            onChange={e => setDraft(d => ({ ...d, description: e.target.value }))}
+            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-foreground mb-1">
+            {t('howtoDescriptionAr')}
+          </label>
+          <textarea
+            rows={2}
+            lang="ar"
+            dir="rtl"
+            value={draft.descriptionAr ?? ''}
+            onChange={e => setDraft(d => ({ ...d, descriptionAr: e.target.value || null }))}
+            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+          />
+        </div>
+      </div>
+
+      {/* Steps */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <label className="text-xs font-medium text-foreground">{t('howtoSteps')}</label>
+          <button
+            type="button"
+            onClick={() => setDraft(d => ({ ...d, steps: [...d.steps, { name: '', text: '' }] }))}
+            className="text-xs text-primary hover:underline"
+          >
+            + {t('addStep')}
+          </button>
+        </div>
+        {draft.steps.map((step, i) => (
+          <div key={i} className="mb-2 rounded-lg border border-border p-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
+                {i + 1}
+              </span>
+              <input
+                type="text"
+                placeholder={t('stepName')}
+                value={step.name}
+                onChange={e =>
+                  setDraft(d => {
+                    const steps = [...d.steps];
+                    steps[i] = { ...steps[i], name: e.target.value };
+                    return { ...d, steps };
+                  })
+                }
+                className="flex-1 rounded-lg border border-border px-3 py-1.5 text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+              {draft.steps.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setDraft(d => ({ ...d, steps: d.steps.filter((_, idx) => idx !== i) }))
+                  }
+                  className="text-destructive hover:text-destructive/80 text-xs"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+            <textarea
+              rows={2}
+              placeholder={t('stepInstruction')}
+              value={step.text}
+              onChange={e =>
+                setDraft(d => {
+                  const steps = [...d.steps];
+                  steps[i] = { ...steps[i], text: e.target.value };
+                  return { ...d, steps };
+                })
+              }
+              className="w-full rounded-lg border border-border px-3 py-1.5 text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+            />
+          </div>
+        ))}
+      </div>
+
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          disabled={isSaving || !canSave}
+          onClick={onSave}
+          className="px-4 py-1.5 text-xs font-medium bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50"
+        >
+          {isSaving ? '…' : t('howtoSave')}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-4 py-1.5 text-xs font-medium border border-border rounded-lg hover:bg-muted"
+        >
+          {t('howtoCancel')}
+        </button>
+      </div>
+    </div>
   );
 }

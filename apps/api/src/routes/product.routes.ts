@@ -5,6 +5,8 @@ import { ProductService } from '../services/product.service';
 import { requirePermission } from '../middleware/rbac';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { requireStoreAccess } from '../middleware/store-access';
+import { prisma } from '@force/database';
+import { AppError } from '../middleware/error-handler';
 
 const router = Router({ mergeParams: true });
 
@@ -381,6 +383,108 @@ router.delete(
         success: true,
         data: { message: 'Product deleted successfully' },
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// ===== Product FAQ CRUD =====
+
+const productFaqSchema = z.object({
+  question: z.string().min(1).max(500),
+  questionAr: z.string().max(500).optional().nullable(),
+  answer: z.string().min(1).max(5000),
+  answerAr: z.string().max(5000).optional().nullable(),
+});
+
+router.get(
+  '/:id/faqs',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const faqs = await prisma.productFaq.findMany({
+        where: { productId: req.params.id },
+        orderBy: { createdAt: 'asc' },
+      });
+      res.json({ success: true, data: faqs });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.post(
+  '/:id/faqs',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = productFaqSchema.parse(req.body);
+      const faq = await prisma.productFaq.create({
+        data: {
+          productId: req.params.id,
+          question: body.question,
+          questionAr: body.questionAr ?? null,
+          answer: body.answer,
+          answerAr: body.answerAr ?? null,
+          aiDrafted: false,
+          manuallyEdited: true,
+        },
+      });
+      res.status(201).json({ success: true, data: faq });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.put(
+  '/:id/faqs/:faqId',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = productFaqSchema.partial().parse(req.body);
+      const result = await prisma.productFaq.updateMany({
+        where: { id: req.params.faqId, productId: req.params.id },
+        data: {
+          ...(body.question !== undefined && { question: body.question }),
+          ...(body.questionAr !== undefined && { questionAr: body.questionAr }),
+          ...(body.answer !== undefined && { answer: body.answer }),
+          ...(body.answerAr !== undefined && { answerAr: body.answerAr }),
+          manuallyEdited: true,
+        },
+      });
+      if (result.count === 0) {
+        throw new AppError(404, 'NOT_FOUND', 'FAQ not found');
+      }
+      const updated = await prisma.productFaq.findUnique({ where: { id: req.params.faqId } });
+      res.json({ success: true, data: updated });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.delete(
+  '/:id/faqs/:faqId',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const deleted = await prisma.productFaq.deleteMany({
+        where: { id: req.params.faqId, productId: req.params.id },
+      });
+      if (deleted.count === 0) {
+        throw new AppError(404, 'NOT_FOUND', 'FAQ not found');
+      }
+      res.json({ success: true, data: { message: 'FAQ deleted' } });
     } catch (error) {
       next(error);
     }
