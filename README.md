@@ -152,6 +152,16 @@ npm run db:seed
 npm run dev
 ```
 
+### Neon CLI (prod ops)
+
+For managing the production Neon DB from your machine (preview branches, snapshot restores, connection strings):
+
+```bash
+npx neonctl@latest init   # one-time per machine — opens browser, signs into the project's Neon account
+```
+
+After init, `npx neonctl@latest projects list`, `npx neonctl@latest branches create`, etc. work directly. The per-commit Neon snapshots in `.github/workflows/neon-snapshot.yml` use the same credentials via the `NEON_API_KEY` repo secret.
+
 ### Environment Variables
 
 **API (Railway)** — required:
