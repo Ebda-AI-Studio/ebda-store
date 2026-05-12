@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import { getStoreOrNotFound } from '../../lib/store-resolver';
 import { API_URL, type Category } from '@/lib/api';
+import { breadcrumbJsonLd, itemList, getSiteUrl } from '../../lib/structured-data';
+import { JsonLd } from '../../components/JsonLd';
 import CategoriesClient from './CategoriesClient';
 
 export const metadata: Metadata = {
@@ -50,5 +52,34 @@ export default async function CategoriesPage() {
   const store = await getStoreOrNotFound();
   const categories = await fetchCategories(store);
 
-  return <CategoriesClient categories={categories} />;
+  const siteUrl = getSiteUrl(store);
+
+  const categoriesBreadcrumb = breadcrumbJsonLd([
+    { name: 'Home', url: siteUrl },
+    { name: 'Categories', url: `${siteUrl}/categories` },
+  ]);
+
+  // Represent each category as an ItemList entry so AI agents understand
+  // the taxonomy without crawling each category page individually.
+  const categoriesItemList =
+    categories.length > 0
+      ? itemList(
+          categories.slice(0, 50).map((c: Category) => ({
+            name: c.name,
+            url: `${siteUrl}/categories/${c.slug}`,
+            image: c.image ?? null,
+            price: null,
+          })),
+          'Product Categories'
+        )
+      : null;
+
+  return (
+    <>
+      {/* JSON-LD: Breadcrumb + optional ItemList of categories */}
+      <JsonLd data={categoriesBreadcrumb} />
+      {categoriesItemList && <JsonLd data={categoriesItemList} />}
+      <CategoriesClient categories={categories} />
+    </>
+  );
 }

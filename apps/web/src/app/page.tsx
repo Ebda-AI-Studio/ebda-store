@@ -2,6 +2,8 @@ import { getStoreOrNotFound } from '../lib/store-resolver';
 import { API_URL } from '../lib/api';
 import type { Product, Category } from '../lib/api';
 import { resolveLayoutSettings, type StoreLayoutSettings } from '@force/shared';
+import { storeJsonLd, breadcrumbJsonLd, itemList, getSiteUrl } from '../lib/structured-data';
+import { JsonLd } from '../components/JsonLd';
 import { HomePageContent } from './HomePageContent';
 import { PlatformLanding } from '../components/PlatformLanding';
 
@@ -152,16 +154,58 @@ export default async function HomePage() {
   const { featuredProducts, newArrivals, bestSellers, categories, testimonials } =
     await fetchHomepageData(store, layout);
 
+  const siteUrl = getSiteUrl(store);
+  const socialUrls = store.socialLinks
+    ? (Object.values(store.socialLinks).filter(Boolean) as string[])
+    : undefined;
+
+  const homeStoreJsonLd = storeJsonLd({
+    name: store.name,
+    url: siteUrl,
+    logo: store.logo,
+    email: store.email,
+    phone: store.phone,
+    address: store.address,
+    description: store.description,
+    social: socialUrls,
+    inLanguage: (store.settings as Record<string, unknown>)?.defaultLanguage === 'ar' ? 'ar' : 'en',
+  });
+
+  const homeBreadcrumbJsonLd = breadcrumbJsonLd([{ name: 'Home', url: siteUrl }]);
+
+  // Emit featured products in an ItemList so AI/search agents see the
+  // product catalogue without following individual product URLs.
+  const homeItemListJsonLd =
+    featuredProducts.length > 0
+      ? itemList(
+          featuredProducts.slice(0, 50).map(p => ({
+            name: p.name,
+            url: `${siteUrl}/products/${p.slug}`,
+            image: p.images?.[0]?.url ?? null,
+            price: p.price,
+            currency: store.currency,
+            inStock: p.inventory === undefined || p.inventory > 0,
+          })),
+          'Featured Products'
+        )
+      : null;
+
   return (
-    <HomePageContent
-      templateId={store.template}
-      featuredProducts={featuredProducts}
-      newArrivals={newArrivals}
-      bestSellers={bestSellers}
-      categories={categories}
-      testimonials={testimonials}
-      storeName={store.name}
-      layout={layout}
-    />
+    <>
+      {/* JSON-LD: Store + Breadcrumb + optional ItemList */}
+      <JsonLd data={homeStoreJsonLd} />
+      <JsonLd data={homeBreadcrumbJsonLd} />
+      {homeItemListJsonLd && <JsonLd data={homeItemListJsonLd} />}
+      <HomePageContent
+        templateId={store.template}
+        featuredProducts={featuredProducts}
+        newArrivals={newArrivals}
+        bestSellers={bestSellers}
+        categories={categories}
+        testimonials={testimonials}
+        storeName={store.name}
+        layout={layout}
+      />
+    </>
   );
 }

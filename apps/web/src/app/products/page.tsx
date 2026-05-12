@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import { getStoreOrNotFound } from '../../lib/store-resolver';
 import { API_URL } from '../../lib/api';
+import { breadcrumbJsonLd, itemList, getSiteUrl } from '../../lib/structured-data';
+import { JsonLd } from '../../components/JsonLd';
 import ProductsClient from './ProductsClient';
 
 export const metadata: Metadata = {
@@ -73,19 +75,57 @@ export default async function ProductsPage({
   const category = Array.isArray(rawCategory) ? rawCategory[0] : rawCategory;
   const initialData = await fetchInitialData(store, { category });
 
+  const siteUrl = getSiteUrl(store);
+
+  const productsBreadcrumb = breadcrumbJsonLd([
+    { name: 'Home', url: siteUrl },
+    { name: 'Products', url: `${siteUrl}/products` },
+  ]);
+
+  // Cap at 50 — remaining products are discoverable via pagination links.
+  const productsItemList =
+    initialData.products.length > 0
+      ? itemList(
+          (
+            initialData.products as Array<{
+              name: string;
+              slug: string;
+              images: Array<{ url: string }>;
+              price: number;
+              inventory?: number;
+            }>
+          )
+            .slice(0, 50)
+            .map(p => ({
+              name: p.name,
+              url: `${siteUrl}/products/${p.slug}`,
+              image: p.images?.[0]?.url ?? null,
+              price: p.price,
+              currency: store.currency,
+              inStock: p.inventory === undefined || p.inventory > 0,
+            })),
+          'All Products'
+        )
+      : null;
+
   return (
-    <Suspense
-      fallback={
-        <main className="flex min-h-screen items-center justify-center bg-background">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-        </main>
-      }
-    >
-      <ProductsClient
-        initialCategories={initialData.categories}
-        initialProducts={initialData.products}
-        initialMeta={initialData.meta}
-      />
-    </Suspense>
+    <>
+      {/* JSON-LD: Breadcrumb + optional ItemList */}
+      <JsonLd data={productsBreadcrumb} />
+      {productsItemList && <JsonLd data={productsItemList} />}
+      <Suspense
+        fallback={
+          <main className="flex min-h-screen items-center justify-center bg-background">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          </main>
+        }
+      >
+        <ProductsClient
+          initialCategories={initialData.categories}
+          initialProducts={initialData.products}
+          initialMeta={initialData.meta}
+        />
+      </Suspense>
+    </>
   );
 }

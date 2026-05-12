@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { getStore, getStoreOrNotFound } from '../../../lib/store-resolver';
 import { API_URL } from '../../../lib/api';
 import { productJsonLd, breadcrumbJsonLd, getSiteUrl } from '../../../lib/structured-data';
+import { JsonLd } from '../../../components/JsonLd';
 import ProductDetailClient from './ProductDetailClient';
 
 /**
@@ -150,11 +151,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
   return (
     <>
       {jsonLdScripts.map((jsonLd, i) => (
-        <script
-          key={i}
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-        />
+        <JsonLd key={i} data={jsonLd} />
       ))}
       <ProductDetailClient initialProduct={initialProduct} />
     </>
