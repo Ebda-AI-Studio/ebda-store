@@ -141,13 +141,31 @@ export class MyFatoorahPaymentProvider implements IPaymentProvider {
 
     const paymentMethods = methodsResponse.Data.PaymentMethods;
 
+    // MyFatoorah's CustomerMobile is capped at 11 characters and must be
+    // digits only — Kuwait format is `965XXXXXXXX` (3 country + 8 local).
+    // Common inbound shapes that all need to land at 11 digits:
+    //   `+96541169141`   → strip `+`         → 11 ✓
+    //   `0096541169141`  → strip `00`        → 11 ✓
+    //   `965 4116 9141`  → strip non-digits  → 11 ✓
+    //   `96541169141`    → already correct   → 11 ✓
+    // We strip non-digit chars, drop an `00` international prefix, then
+    // keep the last 11 digits as a hard cap. If the result is empty (no
+    // phone provided), omit the field entirely — MyFatoorah accepts that.
+    const normalizeMobile = (raw: string | undefined): string | undefined => {
+      if (!raw) return undefined;
+      const digits = raw.replace(/\D/g, '');
+      const noIntlPrefix = digits.startsWith('00') ? digits.slice(2) : digits;
+      const trimmed = noIntlPrefix.slice(-11);
+      return trimmed.length > 0 ? trimmed : undefined;
+    };
+
     // Execute payment with all methods available
     const executeData = {
       PaymentMethodId: 0, // 0 means show all payment methods
       InvoiceValue: amountInKWD,
       CustomerName: request.customer.name,
       CustomerEmail: request.customer.email,
-      CustomerMobile: request.customer.phone,
+      CustomerMobile: normalizeMobile(request.customer.phone),
       CustomerReference: request.orderNumber,
       DisplayCurrencyIso: request.currency,
       CallBackUrl: request.callbackUrl,
