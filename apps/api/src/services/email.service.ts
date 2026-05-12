@@ -44,11 +44,33 @@ export interface EmailStoreContext {
   name: string;
   nameAr?: string | null;
   logo?: string | null;
-  theme?: { primary?: string | null } | null;
+  // Theme JSON stored on Store. Uses `primaryColor` in HSL-component format
+  // (e.g. "348 68% 25%") to match the storefront token system. Accepts
+  // legacy `primary` too so old admin payloads don't silently fall back.
+  theme?: { primaryColor?: string | null; primary?: string | null } | null;
   email?: string | null;
   phone?: string | null;
   address?: string | null;
   defaultLanguage?: 'en' | 'ar';
+}
+
+// Derive a low-alpha tint of the brand color for soft header backdrops.
+// Emits hsla() for HSL components, rgba() for hex inputs — keeps email
+// client compatibility (no color-mix() dependency).
+function brandTint(rawColor: string | null | undefined, alpha = 0.06): string {
+  if (!rawColor) return 'rgba(15,23,42,0.04)';
+  const hslComp = /^([0-9.]+)\s+([0-9.]+)%\s+([0-9.]+)%(?:\s*\/\s*[0-9.]+%?)?$/.exec(
+    rawColor.trim()
+  );
+  if (hslComp) return `hsla(${hslComp[1]} ${hslComp[2]}% ${hslComp[3]}% / ${alpha})`;
+  const hex = /^#([0-9a-fA-F]{6})$/.exec(rawColor.trim());
+  if (hex) {
+    const r = parseInt(hex[1].slice(0, 2), 16);
+    const g = parseInt(hex[1].slice(2, 4), 16);
+    const b = parseInt(hex[1].slice(4, 6), 16);
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+  return 'rgba(15,23,42,0.04)';
 }
 
 // Validate theme primary color (HSL components or hex). Mirrors the
@@ -67,12 +89,19 @@ function sanitizeThemeColor(value: string | null | undefined, fallback = '#ff6e0
 }
 
 export function renderBrandedShell(content: string, store: EmailStoreContext): string {
-  const dir = store.defaultLanguage === 'ar' ? 'rtl' : 'ltr';
-  const primary = sanitizeThemeColor(store.theme?.primary ?? null);
+  const isArabic = store.defaultLanguage === 'ar';
+  const dir = isArabic ? 'rtl' : 'ltr';
+  // Prefer canonical `primaryColor` token; fall back to legacy `primary` for
+  // any old admin payloads that pre-date the rename.
+  const rawBrand = store.theme?.primaryColor ?? store.theme?.primary ?? null;
+  const brand = sanitizeThemeColor(rawBrand);
+  const brandSoft = brandTint(rawBrand, 0.06);
   const storeName = escapeHtml(store.name);
+  // Logo OR name — never both. When a logo is set it's the brand mark;
+  // rendering the name underneath duplicates the visual identity.
   const header = store.logo
-    ? `<img src="${escapeHtml(store.logo)}" alt="${storeName}" style="max-height:48px;display:block;margin:0 auto;">`
-    : `<h1>${storeName}</h1>`;
+    ? `<img src="${escapeHtml(store.logo)}" alt="${storeName}" class="store-logo">`
+    : `<div class="store-name">${storeName}</div>`;
   const year = new Date().getFullYear();
   const footerLines: string[] = [];
   if (store.address) footerLines.push(escapeHtml(store.address));
@@ -80,34 +109,98 @@ export function renderBrandedShell(content: string, store: EmailStoreContext): s
   if (store.email) footerLines.push(escapeHtml(store.email));
 
   return `<!DOCTYPE html>
-<html dir="${dir}">
+<html dir="${dir}" lang="${isArabic ? 'ar' : 'en'}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${storeName}</title>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f5f5f5; }
-    .container { max-width: 600px; margin: 0 auto; background: #ffffff; }
-    .header { background: ${primary}; padding: 24px; text-align: center; }
-    .header h1 { color: #ffffff; margin: 0; font-size: 24px; }
-    .content { padding: 32px 24px; }
-    .footer { background: #f5f5f5; padding: 24px; text-align: center; font-size: 12px; color: #666; }
-    .button { display: inline-block; background: ${primary}; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: 600; }
-    .order-table { width: 100%; border-collapse: collapse; margin: 16px 0; }
-    .order-table th, .order-table td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
-    .order-table th { background: #f9f9f9; }
-    .total-row { font-weight: 600; font-size: 18px; }
-    .address-box { background: #f9f9f9; padding: 16px; border-radius: 4px; margin: 16px 0; }
+    :root {
+      --brand: ${brand};
+      --brand-soft: ${brandSoft};
+      --ink: #0f172a;
+      --ink-soft: #475569;
+      --ink-mute: #94a3b8;
+      --line: #e2e8f0;
+      --line-soft: #f1f5f9;
+      --bg: #ffffff;
+      --bg-soft: #f8fafc;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 24px 12px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: var(--bg-soft);
+      color: var(--ink);
+      line-height: 1.5;
+      font-size: 14px;
+      -webkit-font-smoothing: antialiased;
+    }
+    .page {
+      max-width: 640px;
+      margin: 0 auto;
+      background: var(--bg);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 8px 24px rgba(15,23,42,0.06);
+    }
+    .ribbon { height: 6px; background: var(--brand); }
+    .header {
+      padding: 32px 28px 24px;
+      text-align: center;
+      background: linear-gradient(180deg, var(--brand-soft) 0%, transparent 100%);
+      border-bottom: 1px solid var(--line-soft);
+    }
+    .store-logo { max-height: 56px; max-width: 220px; display: inline-block; }
+    .store-name { font-size: 22px; font-weight: 700; color: var(--ink); letter-spacing: -0.01em; }
+    .content { padding: 28px 28px 8px; }
+    .content h1, .content h2 { color: var(--ink); margin: 0 0 14px; }
+    .content h1 { font-size: 22px; }
+    .content h2 { font-size: 18px; }
+    .content h3 { font-size: 16px; margin: 22px 0 10px; color: var(--ink); }
+    .content p { margin: 0 0 14px; color: var(--ink-soft); }
+    .content a { color: var(--brand); }
+    .button {
+      display: inline-block;
+      background: var(--brand); color: #ffffff !important;
+      padding: 12px 22px; text-decoration: none;
+      border-radius: 10px; font-weight: 600; font-size: 14px;
+      margin: 8px 0;
+    }
+    .order-table { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 13px; }
+    .order-table th, .order-table td { padding: 12px 10px; text-align: start; border-bottom: 1px solid var(--line-soft); color: var(--ink); }
+    .order-table th { background: var(--bg-soft); font-weight: 600; color: var(--ink-soft); text-transform: uppercase; font-size: 11px; letter-spacing: 0.04em; }
+    .total-row { font-weight: 700; font-size: 16px; }
+    .total-row td { border-top: 2px solid var(--line); border-bottom: 0; padding-top: 14px; }
+    .address-box { background: var(--bg-soft); padding: 16px 18px; border-radius: 12px; margin: 14px 0; color: var(--ink-soft); }
+    .footer {
+      padding: 22px 28px 28px;
+      background: var(--bg-soft);
+      text-align: center;
+      font-size: 12px;
+      color: var(--ink-mute);
+      border-top: 1px solid var(--line-soft);
+    }
+    .footer p { margin: 4px 0; }
+    .footer .copyright { color: var(--ink-soft); font-weight: 500; }
+    .footer .powered { margin-top: 14px; font-size: 11px; color: var(--ink-mute); }
+    @media (max-width: 480px) {
+      .header { padding: 24px 18px 18px; }
+      .content { padding: 22px 18px 4px; }
+      .footer { padding: 18px 18px 22px; }
+      .store-logo { max-height: 48px; }
+    }
   </style>
 </head>
 <body>
-  <div class="container">
+  <div class="page">
+    <div class="ribbon"></div>
     <div class="header">${header}</div>
-    <div class="content">${content}</div>
+    <div class="content" dir="auto">${content}</div>
     <div class="footer">
-      <p>© ${year} ${storeName}. All rights reserved.</p>
+      <p class="copyright">© ${year} ${storeName}</p>
       ${footerLines.map(l => `<p>${l}</p>`).join('\n      ')}
-      <p style="margin-top:12px;font-size:11px;color:#999;">Powered by Force Store</p>
+      <p class="powered">Powered by Force Store</p>
     </div>
   </div>
 </body>
@@ -189,7 +282,7 @@ export class EmailService {
       name: store.name,
       nameAr: store.nameAr,
       logo: store.logo,
-      theme: store.theme as { primary?: string | null } | null,
+      theme: store.theme as { primaryColor?: string | null; primary?: string | null } | null,
       email: store.email,
       phone: store.phone,
       address: store.address,

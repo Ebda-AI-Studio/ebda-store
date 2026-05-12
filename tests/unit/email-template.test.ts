@@ -22,29 +22,52 @@ const baseStore = (overrides: Partial<EmailStoreContext> = {}): EmailStoreContex
 describe('renderBrandedShell', () => {
   it('uses store name in header when no logo', () => {
     const html = renderBrandedShell('<p>hi</p>', baseStore());
-    expect(html).toContain('<h1>Wady Aljuz</h1>');
+    expect(html).toContain('<div class="store-name">Wady Aljuz</div>');
     expect(html).toContain('© ' + new Date().getFullYear() + ' Wady Aljuz');
   });
 
-  it('renders logo img when logo url present', () => {
+  it('renders logo img when logo url present (no store-name fallback)', () => {
     const html = renderBrandedShell('<p>hi</p>', baseStore({ logo: 'https://r2.dev/logo.png' }));
     expect(html).toContain('<img src="https://r2.dev/logo.png"');
-    expect(html).not.toContain('<h1>Wady Aljuz</h1>');
+    expect(html).not.toContain('<div class="store-name">Wady Aljuz</div>');
   });
 
-  it('uses store theme primary color when set (hex)', () => {
-    const html = renderBrandedShell('<p>hi</p>', baseStore({ theme: { primary: '#2D1418' } }));
-    expect(html).toContain('background: #2D1418');
+  it('uses store theme primary color when set as hex (canonical primaryColor key)', () => {
+    const html = renderBrandedShell('<p>hi</p>', baseStore({ theme: { primaryColor: '#2D1418' } }));
+    expect(html).toContain('--brand: #2D1418');
+  });
+
+  it('uses HSL components when theme primaryColor is the Tailwind-token format', () => {
+    const html = renderBrandedShell(
+      '<p>hi</p>',
+      baseStore({ theme: { primaryColor: '348 68% 25%' } })
+    );
+    expect(html).toContain('--brand: hsl(348 68% 25%)');
+    // soft tint should derive an hsla from the same components
+    expect(html).toContain('hsla(348 68% 25% / 0.06)');
   });
 
   it('falls back to platform orange when theme color is invalid', () => {
-    const html = renderBrandedShell('<p>hi</p>', baseStore({ theme: { primary: 'rm -rf /' } }));
-    expect(html).toContain('background: #ff6e00');
+    const html = renderBrandedShell(
+      '<p>hi</p>',
+      baseStore({ theme: { primaryColor: 'rm -rf /' } })
+    );
+    expect(html).toContain('--brand: #ff6e00');
+  });
+
+  it('accepts legacy `primary` key for backward compat', () => {
+    const html = renderBrandedShell('<p>hi</p>', baseStore({ theme: { primary: '#2D1418' } }));
+    expect(html).toContain('--brand: #2D1418');
   });
 
   it('renders RTL when defaultLanguage is ar', () => {
     const html = renderBrandedShell('<p>hi</p>', baseStore({ defaultLanguage: 'ar' }));
     expect(html).toContain('dir="rtl"');
+  });
+
+  it('wraps content in dir="auto" so per-paragraph direction is preserved', () => {
+    const html = renderBrandedShell('<p>hi</p>', baseStore({ defaultLanguage: 'ar' }));
+    expect(html).toContain('class="content" dir="auto"');
   });
 
   it('includes powered-by line in footer', () => {
