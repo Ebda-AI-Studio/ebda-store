@@ -39,6 +39,80 @@ export interface EmailOptions {
   replyTo?: string;
 }
 
+export interface EmailStoreContext {
+  name: string;
+  nameAr?: string | null;
+  logo?: string | null;
+  theme?: { primary?: string | null } | null;
+  email?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  defaultLanguage?: 'en' | 'ar';
+}
+
+// Validate theme primary color (HSL components or hex). Mirrors the
+// `sanitizeThemeColor` helper in apps/web/src/app/layout.tsx so admin-
+// controlled theme strings can't break out of the CSS declaration.
+function sanitizeThemeColor(value: string | null | undefined, fallback = '#ff6e00'): string {
+  if (!value || typeof value !== 'string' || value.length === 0 || value.length > 50) {
+    return fallback;
+  }
+  if (/[{}]|url\s*\(|@import|expression\s*\(|javascript\s*:/i.test(value)) return fallback;
+  if (/^#[0-9a-fA-F]{3,8}$/.test(value)) return value;
+  const hsl =
+    /^[0-9]+(?:\.[0-9]+)?\s+[0-9]+(?:\.[0-9]+)?%\s+[0-9]+(?:\.[0-9]+)?%(?:\s*\/\s*[0-9]+(?:\.[0-9]+)?%?)?$/;
+  if (hsl.test(value)) return `hsl(${value})`;
+  return fallback;
+}
+
+export function renderBrandedShell(content: string, store: EmailStoreContext): string {
+  const dir = store.defaultLanguage === 'ar' ? 'rtl' : 'ltr';
+  const primary = sanitizeThemeColor(store.theme?.primary ?? null);
+  const storeName = escapeHtml(store.name);
+  const header = store.logo
+    ? `<img src="${escapeHtml(store.logo)}" alt="${storeName}" style="max-height:48px;display:block;margin:0 auto;">`
+    : `<h1>${storeName}</h1>`;
+  const year = new Date().getFullYear();
+  const footerLines: string[] = [];
+  if (store.address) footerLines.push(escapeHtml(store.address));
+  if (store.phone) footerLines.push(escapeHtml(store.phone));
+  if (store.email) footerLines.push(escapeHtml(store.email));
+
+  return `<!DOCTYPE html>
+<html dir="${dir}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${storeName}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f5f5f5; }
+    .container { max-width: 600px; margin: 0 auto; background: #ffffff; }
+    .header { background: ${primary}; padding: 24px; text-align: center; }
+    .header h1 { color: #ffffff; margin: 0; font-size: 24px; }
+    .content { padding: 32px 24px; }
+    .footer { background: #f5f5f5; padding: 24px; text-align: center; font-size: 12px; color: #666; }
+    .button { display: inline-block; background: ${primary}; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: 600; }
+    .order-table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+    .order-table th, .order-table td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+    .order-table th { background: #f9f9f9; }
+    .total-row { font-weight: 600; font-size: 18px; }
+    .address-box { background: #f9f9f9; padding: 16px; border-radius: 4px; margin: 16px 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">${header}</div>
+    <div class="content">${content}</div>
+    <div class="footer">
+      <p>© ${year} ${storeName}. All rights reserved.</p>
+      ${footerLines.map(l => `<p>${l}</p>`).join('\n      ')}
+      <p style="margin-top:12px;font-size:11px;color:#999;">Powered by Force Store</p>
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
 export interface EmailRetryOptions {
   maxAttempts?: number;
   delayMs?: number;
