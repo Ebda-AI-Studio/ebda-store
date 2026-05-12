@@ -2,6 +2,7 @@ import { Resend } from 'resend';
 import { prisma } from '@force/database';
 import { config } from '../config';
 import logger from '../lib/logger';
+import { resolveSender } from './email-sender';
 
 // Resend SDK wrapper — single platform-wide account. Merchant domains
 // live under it as verified senders. See spec at
@@ -155,6 +156,49 @@ export class ResendService {
       where: { id: storeId },
       data: { emailDomainId: null, emailDomainStatus: null, emailDomainVerifiedAt: null },
     });
+  }
+
+  /**
+   * Send a fully-rendered branded email on behalf of a store. Caller is
+   * responsible for producing the HTML — this method just resolves the
+   * sender and ships it through Resend.
+   */
+  static async sendBrandedEmail(
+    storeId: string,
+    opts: { to: string | string[]; subject: string; html: string; text?: string }
+  ): Promise<{ id: string }> {
+    const store = await prisma.store.findUnique({
+      where: { id: storeId },
+      select: {
+        id: true,
+        name: true,
+        domain: true,
+        email: true,
+        emailSenderLocalPart: true,
+        emailDomainStatus: true,
+      },
+    });
+    if (!store) throw new Error(`Store ${storeId} not found`);
+
+    const sender = resolveSender(store);
+    const client = ensureClient();
+
+    const sdkPayload: Record<string, unknown> = {
+      from: sender.from,
+      to: Array.isArray(opts.to) ? opts.to : [opts.to],
+      subject: opts.subject,
+      html: opts.html,
+    };
+    if (sender.replyTo) sdkPayload.replyTo = sender.replyTo;
+    if (opts.text) sdkPayload.text = opts.text;
+
+    const { data, error } = await client.emails.send(
+      sdkPayload as Parameters<typeof client.emails.send>[0]
+    );
+    if (error || !data) {
+      throw new Error(`Resend send failed: ${error?.message ?? 'unknown'}`);
+    }
+    return { id: data.id };
   }
 }
 

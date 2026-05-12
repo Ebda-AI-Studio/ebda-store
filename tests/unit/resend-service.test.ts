@@ -224,3 +224,86 @@ describe('ResendService.removeStoreDomain', () => {
     });
   });
 });
+
+describe('ResendService.sendBrandedEmail', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('resolves sender from store, sends via SDK, returns provider id', async () => {
+    prismaFindUniqueMock.mockResolvedValue({
+      id: 'store-1',
+      name: 'Wady Aljuz',
+      domain: 'wadyaljuz.com',
+      email: 'hi@wadyaljuz.com',
+      emailSenderLocalPart: 'noreply',
+      emailDomainStatus: 'verified',
+    });
+    mockEmailsSend.mockResolvedValue({ data: { id: 'em_abc' }, error: null });
+
+    const result = await ResendService.sendBrandedEmail('store-1', {
+      to: 'customer@example.com',
+      subject: 'Order #123 confirmed',
+      html: '<p>thanks</p>',
+    });
+
+    expect(mockEmailsSend).toHaveBeenCalledWith({
+      from: 'Wady Aljuz <noreply@wadyaljuz.com>',
+      to: ['customer@example.com'],
+      replyTo: 'hi@wadyaljuz.com',
+      subject: 'Order #123 confirmed',
+      html: '<p>thanks</p>',
+    });
+    expect(result).toEqual({ id: 'em_abc' });
+  });
+
+  it('falls back to platform domain when store has no verified custom domain', async () => {
+    prismaFindUniqueMock.mockResolvedValue({
+      id: 'store-1',
+      name: 'Palora',
+      domain: null,
+      email: null,
+      emailSenderLocalPart: 'noreply',
+      emailDomainStatus: null,
+    });
+    mockEmailsSend.mockResolvedValue({ data: { id: 'em_xyz' }, error: null });
+
+    await ResendService.sendBrandedEmail('store-1', {
+      to: 'customer@example.com',
+      subject: 'hi',
+      html: '<p>hi</p>',
+    });
+
+    expect(mockEmailsSend).toHaveBeenCalledWith(
+      expect.objectContaining({ from: 'Palora <noreply@forcemediakw.com>' })
+    );
+  });
+
+  it('throws when Resend send returns an error', async () => {
+    prismaFindUniqueMock.mockResolvedValue({
+      id: 'store-1',
+      name: 'Palora',
+      domain: null,
+      email: null,
+      emailSenderLocalPart: 'noreply',
+      emailDomainStatus: null,
+    });
+    mockEmailsSend.mockResolvedValue({
+      data: null,
+      error: { name: 'rate_limit_exceeded', message: 'Slow down' },
+    });
+
+    await expect(
+      ResendService.sendBrandedEmail('store-1', {
+        to: 'a@b.c',
+        subject: 's',
+        html: '<p>p</p>',
+      })
+    ).rejects.toThrow(/Slow down/);
+  });
+
+  it('throws when store not found', async () => {
+    prismaFindUniqueMock.mockResolvedValue(null);
+    await expect(
+      ResendService.sendBrandedEmail('nope', { to: 'a@b.c', subject: 's', html: '<p>p</p>' })
+    ).rejects.toThrow(/Store .* not found/);
+  });
+});
