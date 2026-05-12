@@ -1,3 +1,4 @@
+import type { InngestFunction } from 'inngest';
 import { inngest } from '../client';
 import { prisma } from '@force/database';
 import { translateReview, detectSpamReview } from '../../ai/review-tools';
@@ -20,7 +21,7 @@ import logger from '../../logger';
  *
  * Guard against Inngest sync UI test payloads (data: {}).
  */
-export const reviewModeration = inngest.createFunction(
+export const reviewModeration: InngestFunction.Any = inngest.createFunction(
   {
     id: 'review-moderation',
     name: 'AI review moderation — translate + spam check',

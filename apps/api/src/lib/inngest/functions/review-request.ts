@@ -2,6 +2,7 @@ import { prisma } from '@force/database';
 import { EmailService } from '../../../services/email.service';
 import { signReviewToken } from '../../review-token';
 import logger from '../../logger';
+import type { InngestFunction } from 'inngest';
 import { inngest } from '../client';
 
 /**
@@ -19,7 +20,7 @@ import { inngest } from '../client';
  *   - Order has no items
  *   - Store not found (deleted between fire and execution)
  */
-export const reviewRequest = inngest.createFunction(
+export const reviewRequest: InngestFunction.Any = inngest.createFunction(
   {
     id: 'review-request',
     name: 'Post-purchase review request — 7-day delay',

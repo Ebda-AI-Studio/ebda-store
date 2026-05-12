@@ -137,7 +137,7 @@ export const bulkAiFaqAeo: InngestFunction.Any = inngest.createFunction(
           take: 10,
         }),
         prisma.product.findMany({
-          where: { storeId, isActive: true, deletedAt: null },
+          where: { storeId, status: 'active', deletedAt: null },
           select: { name: true },
           take: 20,
         }),
@@ -351,7 +351,7 @@ export const bulkAiHowtoAeo: InngestFunction.Any = inngest.createFunction(
           take: 8,
         }),
         prisma.product.findMany({
-          where: { storeId, isActive: true, deletedAt: null },
+          where: { storeId, status: 'active', deletedAt: null },
           select: { name: true },
           take: 15,
         }),
