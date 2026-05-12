@@ -105,8 +105,20 @@ export function renderBrandedShell(content: string, store: EmailStoreContext): s
   const year = new Date().getFullYear();
   const footerLines: string[] = [];
   if (store.address) footerLines.push(escapeHtml(store.address));
-  if (store.phone) footerLines.push(escapeHtml(store.phone));
-  if (store.email) footerLines.push(escapeHtml(store.email));
+  if (store.phone) {
+    const safePhone = escapeHtml(store.phone);
+    // Strip non-digit chars from tel: target so it dials correctly on mobile
+    // while keeping the formatted version visible to readers.
+    const dial = store.phone.replace(/[^+\d]/g, '');
+    footerLines.push(
+      `<a href="tel:${escapeHtml(dial)}" style="color: var(--ink-soft); text-decoration: none;">${safePhone}</a>`
+    );
+  }
+  // Contact line — replaces the per-template "please reply to this email"
+  // sentence so every branded email has a canonical reachable contact.
+  const contactBlock = store.email
+    ? `<p class="contact-cta">Questions? Email us at <a href="mailto:${escapeHtml(store.email)}" style="color: var(--brand); text-decoration: none; font-weight: 600;">${escapeHtml(store.email)}</a></p>`
+    : '';
 
   return `<!DOCTYPE html>
 <html dir="${dir}" lang="${isArabic ? 'ar' : 'en'}">
@@ -151,7 +163,7 @@ export function renderBrandedShell(content: string, store: EmailStoreContext): s
       background: linear-gradient(180deg, var(--brand-soft) 0%, transparent 100%);
       border-bottom: 1px solid var(--line-soft);
     }
-    .store-logo { max-height: 56px; max-width: 220px; display: inline-block; }
+    .store-logo { max-height: 110px; max-width: 280px; display: inline-block; }
     .store-name { font-size: 22px; font-weight: 700; color: var(--ink); letter-spacing: -0.01em; }
     .content { padding: 28px 28px 8px; }
     .content h1, .content h2 { color: var(--ink); margin: 0 0 14px; }
@@ -183,6 +195,17 @@ export function renderBrandedShell(content: string, store: EmailStoreContext): s
     }
     .footer p { margin: 4px 0; }
     .footer .copyright { color: var(--ink-soft); font-weight: 500; }
+    .footer .contact-cta {
+      margin: 0 auto 14px;
+      padding: 12px 16px;
+      max-width: 460px;
+      background: var(--bg);
+      border: 1px solid var(--line-soft);
+      border-radius: 10px;
+      color: var(--ink-soft);
+      font-size: 13px;
+      line-height: 1.5;
+    }
     .footer .powered { margin-top: 14px; font-size: 11px; color: var(--ink-mute); }
     @media (max-width: 480px) {
       .header { padding: 24px 18px 18px; }
@@ -198,6 +221,7 @@ export function renderBrandedShell(content: string, store: EmailStoreContext): s
     <div class="header">${header}</div>
     <div class="content" dir="auto">${content}</div>
     <div class="footer">
+      ${contactBlock}
       <p class="copyright">© ${year} ${storeName}</p>
       ${footerLines.map(l => `<p>${l}</p>`).join('\n      ')}
       <p class="powered">Powered by Force Store</p>
@@ -793,8 +817,6 @@ export class EmailService {
         ${escapeHtml(d.shippingAddress.city)}, ${escapeHtml(d.shippingAddress.state)} ${escapeHtml(d.shippingAddress.postalCode)}<br>
         ${escapeHtml(d.shippingAddress.country)}
       </div>
-
-      <p>If you have any questions, please reply to this email.</p>
     `;
   }
 
