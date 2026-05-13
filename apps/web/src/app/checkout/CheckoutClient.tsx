@@ -1006,7 +1006,11 @@ export default function CheckoutClient() {
                         value={formData.notes}
                         onChange={e => updateField('notes', e.target.value)}
                         rows={3}
-                        className="min-h-24 w-full rounded-lg border border-border bg-background px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        // text-base on mobile prevents iOS Safari from
+                        // auto-zooming when this textarea receives focus
+                        // (any field <16px triggers it, won't auto-unzoom).
+                        // sm:text-sm restores the denser desktop appearance.
+                        className="min-h-24 w-full rounded-lg border border-border bg-background px-4 py-2 text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                         placeholder={t(
                           'Any special delivery instructions...',
                           '\u0623\u064a \u062a\u0639\u0644\u064a\u0645\u0627\u062a \u062e\u0627\u0635\u0629 \u0644\u0644\u062a\u0648\u0635\u064a\u0644...'

@@ -116,7 +116,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
             id={`products-sort-${mobile ? 'm' : 'd'}`}
             value={sortBy ?? ''}
             onChange={e => onSortChange(e.target.value)}
-            className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-base text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary sm:text-sm"
           >
             {sortOptions.map(opt => (
               <option key={opt.value} value={opt.value}>

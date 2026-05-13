@@ -557,7 +557,7 @@ export default function CartClient() {
                               onChange={e => setPromoCode(e.target.value)}
                               placeholder={t('Enter code', 'أدخل الكود')}
                               disabled={promoApplied}
-                              className="h-11 flex-1 rounded-lg border border-border bg-background px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
+                              className="h-11 flex-1 rounded-lg border border-border bg-background px-3 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
                             />
                             <button
                               onClick={applyPromoCode}
