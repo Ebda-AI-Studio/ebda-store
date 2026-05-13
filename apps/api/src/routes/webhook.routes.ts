@@ -330,10 +330,17 @@ router.post('/payment', async (req: Request, res: Response, next: NextFunction) 
     const rawBody: Buffer = req.body as Buffer;
     const payload = JSON.parse(rawBody.toString()) as Record<string, unknown>;
 
-    // Try to detect provider from payload
+    // Try to detect provider from payload.
+    //
+    // MyFatoorah wraps every webhook in `{Event, Data: {...}}` so the
+    // identifying fields live under `Data`, not at the root. Real
+    // production webhooks were being misdetected as 'tap' (the default
+    // fallback) before we added the nested check — see the synthetic
+    // test on 2026-05-13 which surfaced this latent bug.
     let provider: PaymentProvider = 'tap';
+    const data = payload.Data as Record<string, unknown> | undefined;
 
-    if (payload.InvoiceId !== undefined) {
+    if (payload.InvoiceId !== undefined || data?.InvoiceId !== undefined) {
       provider = 'myfatoorah';
     } else if (payload.paymentId && payload.resultCode) {
       provider = 'hesabe';
