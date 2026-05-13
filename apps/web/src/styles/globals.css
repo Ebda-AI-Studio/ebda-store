@@ -181,6 +181,36 @@
 
 @layer base {
 
+  /*
+   * Arabic shaping fix.
+   *
+   * The luxury templates (elegant + classic in particular) lean
+   * heavily on `tracking-[Xem]` for English typographic identity
+   * — 78+ instances across the elegant template alone. CSS
+   * letter-spacing on Arabic text breaks two things at once:
+   *
+   *   (1) The shaping engine selects isolated letter forms instead
+   *       of connecting forms, so "تــسـوق" renders as floating
+   *       glyphs rather than a single connected word.
+   *   (2) The text becomes much wider than the design intends, so
+   *       product-card buttons like "إضافة للسلة" wrap to two
+   *       lines on narrow mobile columns even when the English
+   *       label ("Add to Cart") fits comfortably.
+   *
+   * Reset letter-spacing + text-transform whenever the active
+   * language is Arabic. `:lang(ar)` keys on the `<html lang>`
+   * attribute (set per visitor by the locale cookie), so Hebrew
+   * (also RTL but with its own spacing conventions) is unaffected.
+   * `text-transform: none` undoes any `uppercase` utility — Arabic
+   * has no case, so the rule is a no-op visually, but it removes
+   * one more class of styling that combines badly with the shaper.
+   */
+  :lang(ar),
+  :lang(ar) * {
+    letter-spacing: normal !important;
+    text-transform: none !important;
+  }
+
   body {
     @apply bg-background text-foreground;
     font-family: 'Plus Jakarta Sans', system-ui, sans-serif;

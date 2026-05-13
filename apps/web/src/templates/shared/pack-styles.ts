@@ -60,7 +60,7 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
     productCardName: 'text-sm font-semibold text-foreground tracking-tight leading-snug',
     productCardPrice: 'text-base font-bold text-foreground tracking-tight',
     productCardCta:
-      'rounded-full bg-foreground px-5 py-3.5 text-sm font-semibold text-background hover:bg-foreground/90 transition-colors duration-300 ease-out min-h-[44px]',
+      'whitespace-nowrap rounded-full bg-foreground px-5 py-3.5 text-sm font-semibold text-background hover:bg-foreground/90 transition-colors duration-300 ease-out min-h-[44px]',
     sectionHeading:
       'text-3xl sm:text-4xl lg:text-[2.75rem] font-bold tracking-tight text-foreground leading-[1.1]',
     sectionSeeAll:
@@ -84,7 +84,7 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
     productCardPrice: 'text-base font-serif font-medium text-foreground tracking-tight',
     productCardBody: 'text-center',
     productCardCta:
-      'border-y border-foreground bg-foreground px-5 py-3.5 text-xs font-serif uppercase tracking-[0.22em] text-background hover:bg-foreground/85 transition-colors duration-500 ease-out min-h-[44px]',
+      'whitespace-nowrap border-y border-foreground bg-foreground px-5 py-3.5 text-xs font-serif uppercase tracking-[0.22em] text-background hover:bg-foreground/85 transition-colors duration-500 ease-out min-h-[44px]',
     sectionHeading:
       'text-3xl sm:text-4xl lg:text-5xl font-serif font-normal tracking-tight text-foreground leading-[1.1]',
     sectionSeeAll:
@@ -108,7 +108,7 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
     productCardPrice: 'text-[11px] tracking-wide font-light text-muted-foreground',
     productCardBody: 'text-center',
     productCardCta:
-      'mx-auto inline-block border-b border-foreground/70 pb-1 text-[11px] font-medium uppercase tracking-[0.28em] text-foreground hover:text-foreground/70 hover:border-foreground/40 bg-transparent transition-colors duration-500 ease-out min-h-[44px]',
+      'whitespace-nowrap mx-auto inline-block border-b border-foreground/70 pb-1 text-[11px] font-medium uppercase tracking-[0.28em] text-foreground hover:text-foreground/70 hover:border-foreground/40 bg-transparent transition-colors duration-500 ease-out min-h-[44px]',
     sectionHeading:
       'text-3xl sm:text-4xl lg:text-5xl font-light tracking-tight text-foreground leading-[1.1]',
     sectionSeeAll:
@@ -132,7 +132,7 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
     productCardName: 'text-sm font-black uppercase tracking-[0.02em] text-foreground leading-tight',
     productCardPrice: 'text-base font-black text-foreground tracking-tight',
     productCardCta:
-      'border-t-2 border-foreground bg-foreground px-5 py-3.5 text-sm font-black uppercase tracking-[0.18em] text-background hover:bg-primary hover:text-primary-foreground transition-colors duration-200 ease-out min-h-[44px]',
+      'whitespace-nowrap border-t-2 border-foreground bg-foreground px-5 py-3.5 text-sm font-black uppercase tracking-[0.18em] text-background hover:bg-primary hover:text-primary-foreground transition-colors duration-200 ease-out min-h-[44px]',
     sectionHeading:
       'text-3xl sm:text-4xl lg:text-5xl font-black uppercase tracking-tight text-foreground leading-[0.95]',
     sectionSeeAll:
@@ -158,7 +158,7 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
     productCardPrice: 'text-sm font-light tracking-wide text-foreground',
     productCardBody: 'text-center',
     productCardCta:
-      'border-t border-foreground/15 bg-transparent px-5 py-3.5 text-[11px] font-medium uppercase tracking-[0.32em] text-foreground hover:bg-foreground hover:text-background transition-all duration-700 ease-out min-h-[44px]',
+      'whitespace-nowrap border-t border-foreground/15 bg-transparent px-5 py-3.5 text-[11px] font-medium uppercase tracking-[0.32em] text-foreground hover:bg-foreground hover:text-background transition-all duration-700 ease-out min-h-[44px]',
     sectionHeading:
       'text-3xl sm:text-4xl lg:text-5xl font-extralight tracking-[-0.01em] text-foreground leading-[1.1]',
     sectionSeeAll:
