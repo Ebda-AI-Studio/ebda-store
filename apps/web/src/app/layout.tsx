@@ -20,6 +20,7 @@ import { StoreMaintenance } from '../components/StoreMaintenance';
 import { ConsentProvider, type ConsentState } from '../contexts/ConsentContext';
 import { CookieConsentBanner } from '../components/CookieConsentBanner';
 import { CookiePreferencesModal } from '../components/CookiePreferencesModal';
+import { CookiePreferencesLink } from '../components/CookiePreferencesLink';
 import { type MarketingPixels, themeToCssVars } from '@force/shared';
 import '../styles/globals.css';
 
@@ -544,6 +545,15 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 footer "Cookie preferences" link or banner Customize). */}
               <CookieConsentBanner />
               <CookiePreferencesModal />
+              {/* SSR-rendered compliance fallback so the "Cookie preferences"
+                  link is in the initial HTML even before the per-template
+                  footer hydrates. Required for GDPR Art. 7(3) parity with
+                  no-JS visitors and automated compliance audits. */}
+              <div data-zone="cookieFallback" className="border-t border-border/30 bg-background">
+                <div className="container mx-auto px-4 py-3 text-center">
+                  <CookiePreferencesLink className="text-xs text-muted-foreground/70 hover:text-foreground transition-colors duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2" />
+                </div>
+              </div>
             </ConsentProvider>
           </LanguageProvider>
         </StoreProvider>
