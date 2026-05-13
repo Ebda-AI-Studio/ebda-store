@@ -145,10 +145,15 @@ export default function MinimalFooter({
                   {isRtl ? 'الشحن' : 'Shipping'}
                 </Link>
               )}
-              <CookiePreferencesLink className="hover:text-foreground transition-colors duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2" />
             </div>
           </div>
         )}
+      </div>
+      {/* GDPR Art. 7(3): cookie-preferences link is always rendered. */}
+      <div className="border-t border-border/30">
+        <div className="container mx-auto px-4 py-4 text-center">
+          <CookiePreferencesLink className="text-xs text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2" />
+        </div>
       </div>
     </footer>
   );

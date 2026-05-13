@@ -374,10 +374,15 @@ export default function ModernFooter({
                   {isRtl ? 'الشحن' : 'Shipping'}
                 </Link>
               )}
-              <CookiePreferencesLink className="text-xs text-gray-500 hover:text-gray-300 transition-colors duration-300 ease-out cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2" />
             </div>
           </div>
         )}
+      </div>
+      {/* GDPR Art. 7(3): cookie-preferences link is always rendered. */}
+      <div className="border-t border-gray-800">
+        <div className="container mx-auto px-4 py-4 text-center">
+          <CookiePreferencesLink className="text-xs text-gray-500 hover:text-gray-300 transition-colors duration-300 ease-out cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2" />
+        </div>
       </div>
     </footer>
   );
