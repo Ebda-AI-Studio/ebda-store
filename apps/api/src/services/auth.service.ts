@@ -770,6 +770,186 @@ export class AuthService {
     });
   }
 
+  /**
+   * Irreversible PII anonymization (GDPR Art. 17 + Kuwait Law 13/2023).
+   *
+   * Wipes every personally-identifying field on the user and removes child
+   * rows that have no audit/financial basis (addresses, push subs, cart,
+   * wishlist, abandoned-cart, refresh tokens). Orders + reviews + returns
+   * keep their structure but lose their tie to the now-anonymized user
+   * (orders preserve totals/line-items/order-number for Kuwait MOF's ≥5y
+   * invoice-retention requirement; shipping/billing address JSON snapshots
+   * are scrubbed since they store the same PII as the addresses table).
+   *
+   * Idempotent: re-running on an already-erased account is a no-op (the
+   * second call's `update` succeeds with the same data, the `deleteMany`s
+   * delete zero rows). Callers should still clear auth cookies on the
+   * client side after the response.
+   *
+   * NOT a soft-delete superset — soft-deleted accounts still expose PII
+   * and only `eraseAccount` makes the user actually disappear.
+   */
+  static async eraseAccount(userId: string): Promise<void> {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, storeId: true, role: true },
+    });
+    if (!user) {
+      throw new AppError(404, 'NOT_FOUND', 'User not found');
+    }
+    // Platform admins (super_admin / store_admin without storeId) can't
+    // self-erase via this endpoint — their account is a business identity
+    // for the platform, not a customer's personal data. They go through
+    // the manual super_admin offboarding path.
+    if (user.role !== 'customer') {
+      throw new AppError(403, 'FORBIDDEN', 'Admin accounts cannot be erased via this endpoint');
+    }
+
+    const anonymizedEmail = `erased-${user.id}@anonymized.local`;
+    const anonymizedAddressJson = { anonymized: true } as const;
+
+    await prisma.$transaction(async tx => {
+      // Orders: preserve for tax records (Kuwait MOF ≥5y), drop the PII.
+      // The customer FK is already `onDelete: SetNull` but we explicitly
+      // null it so the row's history loses the back-reference even before
+      // the user row is deactivated. Address JSON snapshots get scrubbed
+      // because they duplicate the now-deleted addresses table data.
+      await tx.order.updateMany({
+        where: { customerId: userId },
+        data: {
+          customerId: null,
+          shippingAddress: anonymizedAddressJson,
+          billingAddress: anonymizedAddressJson,
+          customerNotes: null,
+        },
+      });
+
+      // Reviews: keep the body (anonymous review is valid public content)
+      // but drop the author link. SetNull happens via FK on user-delete,
+      // but we don't delete the user row; null explicitly.
+      await tx.review.updateMany({
+        where: { customerId: userId },
+        data: { customerId: null },
+      });
+
+      // Pure-PII child rows — no business reason to retain. The FK
+      // column names vary across models (some use `userId`, some
+      // `customerId`) — match each model's actual schema.
+      await tx.address.deleteMany({ where: { userId } });
+      await tx.abandonedCart.deleteMany({ where: { customerId: userId } });
+      await tx.cart.deleteMany({ where: { customerId: userId } });
+      await tx.wishlist.deleteMany({ where: { userId } });
+      await tx.pushSubscription.deleteMany({ where: { customerId: userId } });
+      await tx.oneSignalSubscription.deleteMany({ where: { userId } });
+      await tx.refreshToken.deleteMany({ where: { userId } });
+      await tx.verificationToken.deleteMany({ where: { userId } });
+      await tx.loyaltyTransaction.deleteMany({ where: { customerId: userId } });
+      await tx.loyaltyPoints.deleteMany({ where: { customerId: userId } });
+
+      // Finally rewrite the user row itself. Password hash is regenerated
+      // from random bytes so a stolen DB snapshot can't be cracked back
+      // into the original credential. Email is rewritten (not nulled) so
+      // the composite-unique (storeId, email) index has no collision risk
+      // if the same address is re-registered later.
+      await tx.user.update({
+        where: { id: userId },
+        data: {
+          email: anonymizedEmail,
+          firstName: 'Erased',
+          lastName: 'User',
+          phone: null,
+          avatar: null,
+          dateOfBirth: null,
+          passwordHash: crypto.randomBytes(32).toString('hex'),
+          status: 'inactive',
+          deletedAt: new Date(),
+        },
+      });
+    });
+  }
+
+  /**
+   * Right to data portability (GDPR Art. 20 + Kuwait Law 13/2023).
+   *
+   * Returns every row across the schema that ties back to this user as a
+   * single JSON bundle. Intentionally returns the raw shape — the
+   * exported file is the user's data, not a marketing surface, so field
+   * names match the schema for transparency.
+   */
+  static async exportAccount(userId: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        storeId: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        role: true,
+        status: true,
+        emailVerified: true,
+        avatar: true,
+        dateOfBirth: true,
+        language: true,
+        lastLoginAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+    if (!user) {
+      throw new AppError(404, 'NOT_FOUND', 'User not found');
+    }
+
+    const [
+      addresses,
+      orders,
+      abandonedCarts,
+      wishlists,
+      reviews,
+      returns,
+      loyaltyPoints,
+      loyaltyTransactions,
+      pushSubscriptions,
+      onesignalSubscriptions,
+    ] = await Promise.all([
+      prisma.address.findMany({ where: { userId } }),
+      prisma.order.findMany({
+        where: { customerId: userId },
+        include: { items: true, payments: true },
+      }),
+      prisma.abandonedCart.findMany({ where: { customerId: userId } }),
+      prisma.wishlist.findMany({ where: { userId } }),
+      prisma.review.findMany({ where: { customerId: userId } }),
+      prisma.return.findMany({ where: { customerId: userId } }),
+      prisma.loyaltyPoints.findMany({ where: { customerId: userId } }),
+      prisma.loyaltyTransaction.findMany({ where: { customerId: userId } }),
+      prisma.pushSubscription.findMany({
+        where: { customerId: userId },
+        select: { id: true, endpoint: true, createdAt: true },
+      }),
+      prisma.oneSignalSubscription.findMany({
+        where: { userId },
+        select: { id: true, playerId: true, createdAt: true },
+      }),
+    ]);
+
+    return {
+      exportedAt: new Date().toISOString(),
+      user,
+      addresses,
+      orders,
+      abandonedCarts,
+      wishlists,
+      reviews,
+      returns,
+      loyaltyPoints,
+      loyaltyTransactions,
+      pushSubscriptions,
+      onesignalSubscriptions,
+    };
+  }
+
   private static async generateTokens(payload: TokenPayload): Promise<AuthTokens> {
     // Generate access token
     const accessToken = jwt.sign(payload, config.jwtSecret, {

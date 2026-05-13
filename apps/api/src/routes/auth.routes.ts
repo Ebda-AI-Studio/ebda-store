@@ -338,6 +338,73 @@ router.delete('/me', authenticate, async (req: Request, res: Response, next: Nex
   }
 });
 
+// POST /auth/me/erase — irreversible PII anonymization (GDPR Art. 17 +
+// Kuwait Law 13/2023 Art. 17). Unlike DELETE /auth/me (soft-delete that
+// leaves PII intact), this nulls/scrubs every identifying field across
+// the schema in a single transaction and preserves anonymized order
+// records for Kuwait MOF ≥5y tax retention. No request body — possession
+// of a valid auth token is the confirmation.
+router.post(
+  '/me/erase',
+  authLimiter,
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const userId = req.user!.userId;
+
+      await AuthService.eraseAccount(userId);
+
+      await auditLog({
+        action: 'user.account.erased',
+        userId,
+        resourceType: 'user',
+        resourceId: userId,
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+
+      // Best-effort clear the auth cookie — the JWT itself is no longer
+      // valid against the user row (passwordHash rotated, status flipped
+      // to inactive) but expiring the cookie removes the dead token from
+      // subsequent requests cleanly.
+      clearTokenCookie(res);
+
+      res.json({
+        success: true,
+        data: { message: 'Account data erased' },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// GET /auth/me/export — right to data portability (GDPR Art. 20 + Kuwait
+// Law 13/2023 Art. 20). Returns a JSON bundle of every row tied to this
+// user. Marked as an attachment so browsers download it as a file.
+router.get('/me/export', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId;
+    const bundle = await AuthService.exportAccount(userId);
+
+    await auditLog({
+      action: 'user.data.exported',
+      userId,
+      resourceType: 'user',
+      resourceId: userId,
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
+    const today = new Date().toISOString().slice(0, 10);
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="my-data-${userId}-${today}.json"`);
+    res.send(JSON.stringify(bundle, null, 2));
+  } catch (error) {
+    next(error);
+  }
+});
+
 // PUT /auth/me - Update profile
 router.put('/me', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {

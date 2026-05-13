@@ -1,0 +1,126 @@
+/**
+ * GDPR Art. 17 + 20 + Kuwait Law 13/2023 Art. 17 + 20 endpoints:
+ *   POST /auth/me/erase  — irreversible PII anonymization
+ *   GET  /auth/me/export — right to data portability
+ *
+ * Hits the running API at http://localhost:4000 against the integration
+ * Postgres + Redis from tests/setup.ts. Each test owns its own freshly
+ * registered customer so erasing one doesn't poison the others.
+ */
+
+import { describe, it, expect } from 'vitest';
+
+const API_HOST = process.env.API_HOST || 'http://localhost:4000';
+const API_URL = `${API_HOST}/api/v1`;
+
+async function registerCustomer() {
+  const email = `gdpr-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.test`;
+  const res = await fetch(`${API_URL}/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email,
+      password: 'GdprTest!234',
+      firstName: 'Privacy',
+      lastName: 'Tester',
+    }),
+  });
+  if (res.status !== 201) {
+    const body = await res.text();
+    throw new Error(`register failed (${res.status}): ${body}`);
+  }
+  const json = await res.json();
+  return {
+    email,
+    userId: json.data.user.id as string,
+    accessToken: json.data.accessToken as string,
+  };
+}
+
+describe('GDPR erase + export endpoints', () => {
+  it('exports the authenticated user as a JSON bundle with all PII surfaces', async () => {
+    const u = await registerCustomer();
+
+    const res = await fetch(`${API_URL}/auth/me/export`, {
+      headers: { Authorization: `Bearer ${u.accessToken}` },
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type') ?? '').toContain('application/json');
+    expect(res.headers.get('content-disposition') ?? '').toContain('attachment');
+
+    const bundle = await res.json();
+    expect(bundle.exportedAt).toBeDefined();
+    expect(bundle.user?.id).toBe(u.userId);
+    expect(bundle.user?.email).toBe(u.email);
+    expect(Array.isArray(bundle.addresses)).toBe(true);
+    expect(Array.isArray(bundle.orders)).toBe(true);
+    expect(Array.isArray(bundle.abandonedCarts)).toBe(true);
+    expect(Array.isArray(bundle.wishlists)).toBe(true);
+    expect(Array.isArray(bundle.reviews)).toBe(true);
+    expect(Array.isArray(bundle.returns)).toBe(true);
+    expect(Array.isArray(bundle.loyaltyPoints)).toBe(true);
+    expect(Array.isArray(bundle.loyaltyTransactions)).toBe(true);
+    expect(Array.isArray(bundle.pushSubscriptions)).toBe(true);
+    expect(Array.isArray(bundle.onesignalSubscriptions)).toBe(true);
+  });
+
+  it('rejects unauthenticated export requests', async () => {
+    const res = await fetch(`${API_URL}/auth/me/export`);
+    expect(res.status).toBe(401);
+  });
+
+  it('erases PII irreversibly: email rewritten, deletedAt set, PII fields cleared', async () => {
+    const u = await registerCustomer();
+
+    const eraseRes = await fetch(`${API_URL}/auth/me/erase`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${u.accessToken}` },
+    });
+    expect(eraseRes.status).toBe(200);
+
+    // Re-export via the JWT — it's still valid (passwordHash rotates
+    // but the in-flight JWT signed against the old payload doesn't
+    // get revoked until expiry). The exported bundle should show the
+    // anonymized identity.
+    const exportRes = await fetch(`${API_URL}/auth/me/export`, {
+      headers: { Authorization: `Bearer ${u.accessToken}` },
+    });
+    expect(exportRes.status).toBe(200);
+    const bundle = await exportRes.json();
+    expect(bundle.user.email).toMatch(/^erased-.*@anonymized\.local$/);
+    expect(bundle.user.firstName).toBe('Erased');
+    expect(bundle.user.lastName).toBe('User');
+    expect(bundle.user.phone).toBeNull();
+    expect(bundle.user.avatar).toBeNull();
+    expect(bundle.user.dateOfBirth).toBeNull();
+    expect(bundle.user.status).toBe('inactive');
+    // PII-only child rows are gone — addresses, push, loyalty, etc.
+    expect(bundle.addresses).toHaveLength(0);
+    expect(bundle.pushSubscriptions).toHaveLength(0);
+    expect(bundle.onesignalSubscriptions).toHaveLength(0);
+    expect(bundle.loyaltyPoints).toHaveLength(0);
+    expect(bundle.loyaltyTransactions).toHaveLength(0);
+  });
+
+  it('erase is idempotent: a second call on the same account succeeds', async () => {
+    const u = await registerCustomer();
+
+    const first = await fetch(`${API_URL}/auth/me/erase`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${u.accessToken}` },
+    });
+    expect(first.status).toBe(200);
+
+    const second = await fetch(`${API_URL}/auth/me/erase`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${u.accessToken}` },
+    });
+    expect(second.status).toBe(200);
+  });
+
+  it('rejects unauthenticated erase requests', async () => {
+    const res = await fetch(`${API_URL}/auth/me/erase`, { method: 'POST' });
+    expect(res.status).toBe(401);
+  });
+});
