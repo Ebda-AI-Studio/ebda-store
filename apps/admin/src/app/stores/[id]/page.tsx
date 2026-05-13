@@ -14,7 +14,6 @@ import { useDashboardData } from './_hooks/useDashboardData';
 import { StatsGrid } from './_components/StatsGrid';
 import { StoreDetailsCard } from './_components/StoreDetailsCard';
 import { StoreOwnerCard } from './_components/StoreOwnerCard';
-import { DomainSection } from './_components/DomainSection';
 import { QuickActions } from './_components/QuickActions';
 import { SettingsLink } from './_components/SettingsLink';
 import { SuspendStoreModal } from './_components/SuspendStoreModal';
@@ -144,7 +143,9 @@ export default function StoreDetailPage() {
         <StoreOwnerCard owner={store.owner} />
       </div>
 
-      <DomainSection storeId={store.id} domain={store.domain} onDomainChange={fetchStore} />
+      {/* Custom Domain panel lives at /stores/[id]/domain — removed from the
+          dashboard 2026-05-14 to avoid duplicating the surface and to keep
+          the dashboard focused on quick-glance store overview + actions. */}
 
       <QuickActions
         store={store}
