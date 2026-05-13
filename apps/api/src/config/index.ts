@@ -151,6 +151,13 @@ export const config = {
   sentryDsn: process.env.SENTRY_DSN || '',
   sentryDebug: process.env.SENTRY_DEBUG === 'true',
 
+  // Out-of-band alerts (Telegram bot). Both empty = sendAlert() is a
+  // no-op + a single warn line at boot. Sentry catches errors but
+  // can't surface them when the process is dying (uncaughtException)
+  // or when the alert needs a real mobile push for 3am incidents.
+  telegramBotToken: process.env.TELEGRAM_BOT_TOKEN || '',
+  telegramAlertChatId: process.env.TELEGRAM_ALERT_CHAT_ID || '',
+
   // Vercel (for custom domain provisioning)
   vercelApiToken: process.env.VERCEL_API_TOKEN || '',
   vercelProjectId: process.env.VERCEL_PROJECT_ID || '',

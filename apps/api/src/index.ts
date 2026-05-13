@@ -27,6 +27,7 @@ import { shippingCarrierService } from './services/shipping-carrier.service';
 import { loyaltyAutomationService } from './services/loyalty-automation.service';
 import { AuthService } from './services/auth.service';
 import { SentryService } from './services/sentry.service';
+import { sendAlert } from './services/alerts.service';
 import { inngest } from './lib/inngest/client';
 import { inngestFunctions } from './lib/inngest/functions';
 import { serve as inngestServe } from 'inngest/express';
@@ -435,6 +436,16 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 process.on('uncaughtException', error => {
   logger.fatal({ err: error }, 'Uncaught exception');
   SentryService.captureException(error, { tags: { type: 'uncaughtException' } });
+  // Out-of-band Telegram alert — Sentry needs the process alive to phone
+  // home but uncaughtException is the path where it most often isn't.
+  // sendAlert is already try/catch-internal; the .catch is belt-and-
+  // suspenders so a rejected Promise warning can't race the shutdown.
+  void sendAlert({
+    level: 'p0',
+    title: 'uncaughtException',
+    body: error.message,
+    context: { stack: error.stack?.slice(0, 1500), name: error.name },
+  }).catch(() => undefined);
   gracefulShutdown('uncaughtException');
 });
 
