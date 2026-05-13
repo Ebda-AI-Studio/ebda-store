@@ -16,6 +16,7 @@ export default function ClassicCategoryCard({
   return (
     <Link
       href={`${urlPrefix}/products?category=${category.slug}`}
+      prefetch={false}
       className="group block text-center outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 cursor-pointer"
     >
       {/* Image with elegant border */}

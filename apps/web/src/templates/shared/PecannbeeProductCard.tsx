@@ -93,6 +93,7 @@ function PecannbeeProductCardImpl({
     >
       <Link
         href={href}
+        prefetch={false}
         className="group/img block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       >
         <div className="relative aspect-square overflow-hidden bg-muted">
@@ -179,7 +180,7 @@ function PecannbeeProductCardImpl({
       </Link>
 
       <div className={`flex flex-1 flex-col gap-3 p-5 sm:p-6 ${styles.productCardBody ?? ''}`}>
-        <Link href={href} className="focus:outline-none focus-visible:underline">
+        <Link href={href} prefetch={false} className="focus:outline-none focus-visible:underline">
           <p
             id={`prod-${product.id}-name`}
             className={`line-clamp-2 min-h-[3em] ${styles.productCardName}`}

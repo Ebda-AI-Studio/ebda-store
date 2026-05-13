@@ -192,6 +192,7 @@ export function ProductCarousel({
                   <div className={`overflow-hidden ${styles.card}`}>
                     <Link
                       href={href}
+                      prefetch={false}
                       className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                     >
                       <div className="group/img relative aspect-square overflow-hidden bg-muted">

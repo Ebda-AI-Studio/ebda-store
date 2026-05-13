@@ -49,7 +49,11 @@ function ClassicProductCard({
       itemType="https://schema.org/Product"
       aria-labelledby={`prod-${product.id}-name`}
     >
-      <Link href={`${urlPrefix}/products/${product.slug}`} className="group block cursor-pointer">
+      <Link
+        href={`${urlPrefix}/products/${product.slug}`}
+        prefetch={false}
+        className="group block cursor-pointer"
+      >
         {/* Image container — aspect-square, clean border */}
         <div className="relative aspect-square overflow-hidden bg-muted border border-border group-hover:border-foreground/35 group-hover:shadow-[0_18px_36px_-22px_hsl(var(--foreground)/0.20)] transition-all duration-500 ease-out mb-5">
           {onToggleCompare && (

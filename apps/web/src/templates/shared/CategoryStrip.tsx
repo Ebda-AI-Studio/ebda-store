@@ -54,6 +54,7 @@ export function CategoryStrip({
               >
                 <Link
                   href={href}
+                  prefetch={false}
                   className="group block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-4 rounded-2xl"
                 >
                   <div

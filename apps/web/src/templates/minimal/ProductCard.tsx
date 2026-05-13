@@ -41,7 +41,11 @@ function MinimalProductCard({
       itemType="https://schema.org/Product"
       aria-labelledby={`prod-${product.id}-name`}
     >
-      <Link href={`${urlPrefix}/products/${product.slug}`} className="group block cursor-pointer">
+      <Link
+        href={`${urlPrefix}/products/${product.slug}`}
+        prefetch={false}
+        className="group block cursor-pointer"
+      >
         {/* Image — no border, no shadow, subtle opacity on hover */}
         <div className="relative aspect-[3/4] overflow-hidden bg-muted/30 mb-6">
           {onToggleCompare && (

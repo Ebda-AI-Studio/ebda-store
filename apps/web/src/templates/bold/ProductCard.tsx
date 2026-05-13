@@ -50,6 +50,7 @@ function BoldProductCard({
     >
       <Link
         href={`${urlPrefix}/products/${product.slug}`}
+        prefetch={false}
         className="group block relative overflow-hidden rounded-2xl bg-background border-2 border-foreground/15 hover:border-foreground hover:translate-x-1 hover:-translate-y-1 hover:shadow-[6px_6px_0_0_hsl(var(--foreground)/0.92)] transition-all duration-200 ease-out cursor-pointer"
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}

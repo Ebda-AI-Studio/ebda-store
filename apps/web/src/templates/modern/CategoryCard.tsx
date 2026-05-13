@@ -17,6 +17,7 @@ export default function ModernCategoryCard({
   return (
     <Link
       href={`${urlPrefix}/products?category=${category.slug}`}
+      prefetch={false}
       className="group relative aspect-[4/3] rounded-2xl overflow-hidden bg-muted block cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 shadow-[0_10px_30px_-18px_hsl(var(--foreground)/0.15)] hover:shadow-[0_24px_48px_-20px_hsl(var(--foreground)/0.20)] transition-shadow duration-700 ease-out"
     >
       {/* Image */}

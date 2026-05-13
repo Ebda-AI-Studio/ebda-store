@@ -67,6 +67,7 @@ function ModernProductCard({
     >
       <Link
         href={`${urlPrefix}/products/${product.slug}`}
+        prefetch={false}
         className="group relative bg-background rounded-xl overflow-hidden border border-border/60 hover:border-foreground/15 hover:shadow-[0_24px_48px_-20px_hsl(var(--foreground)/0.12)] hover:-translate-y-0.5 transition-all duration-500 ease-out flex flex-col cursor-pointer"
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
