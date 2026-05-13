@@ -10,6 +10,7 @@ const STORE_STATIC_PAGES: Array<{ path: string; priority: number; freq: 'monthly
   { path: '/about', priority: 0.5, freq: 'monthly' },
   { path: '/contact', priority: 0.5, freq: 'monthly' },
   { path: '/faq', priority: 0.4, freq: 'monthly' },
+  { path: '/how-to-guides', priority: 0.5, freq: 'monthly' },
   { path: '/shipping', priority: 0.4, freq: 'monthly' },
   { path: '/returns', priority: 0.4, freq: 'monthly' },
   { path: '/privacy', priority: 0.3, freq: 'monthly' },

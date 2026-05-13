@@ -182,12 +182,23 @@ export default function FAQClient({ storeFaqs = [], storeHowtos = [] }: FAQClien
           ))}
         </div>
 
-        {/* HowTo guides — only rendered when store has authored them */}
+        {/* HowTo guides — only rendered when store has authored them.
+            "See all guides" links to the dedicated /how-to-guides page
+            so visitors who land here from search find the full set. */}
         {howtos.length > 0 && (
           <section aria-labelledby="howto-heading" className="mt-16">
-            <h2 id="howto-heading" className="mb-6 text-2xl font-bold text-foreground">
-              {t('How-To Guides', 'أدلة إرشادية')}
-            </h2>
+            <div className="mb-6 flex items-baseline justify-between gap-3">
+              <h2 id="howto-heading" className="text-2xl font-bold text-foreground">
+                {t('How-To Guides', 'أدلة إرشادية')}
+              </h2>
+              <Link
+                href="/how-to-guides"
+                prefetch={false}
+                className="inline-flex items-center min-h-11 text-sm font-medium text-primary hover:underline"
+              >
+                {t('See all guides →', 'كل الأدلة ←')}
+              </Link>
+            </div>
             <div className="space-y-4">
               {howtos.map((h, index) => (
                 <div key={index} className="rounded-xl border bg-card shadow-sm">

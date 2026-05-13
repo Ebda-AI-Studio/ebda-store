@@ -724,7 +724,7 @@ export default function StoreSeoPage() {
         </div>
 
         {/* ===== Frequently Asked Questions ===== */}
-        <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
+        <div id="faqs" className="scroll-mt-24 rounded-xl border bg-card p-6 shadow-sm space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="font-semibold text-foreground">{t('faqsTitle')}</h2>
@@ -978,7 +978,7 @@ export default function StoreSeoPage() {
         </div>
 
         {/* ===== How-To Guides ===== */}
-        <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
+        <div id="howtos" className="scroll-mt-24 rounded-xl border bg-card p-6 shadow-sm space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="font-semibold text-foreground">{t('howtosTitle')}</h2>

@@ -266,6 +266,8 @@ export default function AiToolsPage() {
             !!activeJob && activeJob.status !== 'completed' && activeJob.status !== 'failed'
           }
           onClick={startFaqAeo}
+          resultsHref={`/stores/${storeId}/seo#faqs`}
+          resultsLabel="View FAQs on SEO page"
         />
         <BulkActionCard
           title="Draft How-To Guides with AI"
@@ -276,6 +278,8 @@ export default function AiToolsPage() {
             !!activeJob && activeJob.status !== 'completed' && activeJob.status !== 'failed'
           }
           onClick={startHowtoAeo}
+          resultsHref={`/stores/${storeId}/seo#howtos`}
+          resultsLabel="View HowTos on SEO page"
         />
         <BulkActionCard
           title="Rewrite Meta Descriptions (AEO)"
@@ -286,6 +290,8 @@ export default function AiToolsPage() {
             !!activeJob && activeJob.status !== 'completed' && activeJob.status !== 'failed'
           }
           onClick={startMetaAeo}
+          resultsHref={`/stores/${storeId}/seo`}
+          resultsLabel="View meta on SEO page"
         />
       </div>
 
@@ -367,6 +373,8 @@ function BulkActionCard({
   loading,
   disabled,
   onClick,
+  resultsHref,
+  resultsLabel,
 }: {
   title: string;
   body: string;
@@ -374,6 +382,12 @@ function BulkActionCard({
   loading: boolean;
   disabled: boolean;
   onClick: () => void;
+  // Deep-link to where the AI-generated output ends up. Without this
+  // merchants finish a sweep and have no idea where the FAQs / HowTos /
+  // meta tags actually live — see [[ai-sweep-discoverability]] for the
+  // origin of this UX gap.
+  resultsHref?: string;
+  resultsLabel?: string;
 }) {
   return (
     <div className="rounded-xl border bg-card p-5 shadow-sm">
@@ -406,6 +420,15 @@ function BulkActionCard({
         )}
         <span>{loading ? 'Starting…' : buttonLabel}</span>
       </button>
+      {resultsHref && (
+        <Link
+          href={resultsHref}
+          className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+        >
+          {resultsLabel ?? 'View results'}
+          <span aria-hidden>→</span>
+        </Link>
+      )}
     </div>
   );
 }
