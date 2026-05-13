@@ -442,6 +442,8 @@ process.on('uncaughtException', error => {
   // suspenders so a rejected Promise warning can't race the shutdown.
   void sendAlert({
     level: 'p0',
+    scope: 'platform',
+    source: 'process.uncaughtException',
     title: 'uncaughtException',
     body: error.message,
     context: { stack: error.stack?.slice(0, 1500), name: error.name },

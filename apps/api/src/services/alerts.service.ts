@@ -30,9 +30,38 @@ import { redis } from './redis.service';
 
 export type AlertLevel = 'p0' | 'p1' | 'info';
 
+/**
+ * Scope distinguishes "the platform broke" from "one tenant broke".
+ * Platform alerts indicate something every store will feel (Railway,
+ * Neon, Redis, Inngest dispatcher). Store alerts isolate the blast
+ * radius to the named tenant so the operator can act on the right
+ * store without guessing.
+ */
+export type AlertScope = 'platform' | 'store';
+
+export interface AlertStoreContext {
+  /** Store.id — the UUID. Required so logs/joins resolve uniquely. */
+  id: string;
+  /** Store.name — what shows up in the Telegram header. */
+  name: string;
+  /** Store.slug — the URL-path identifier; renders in the header next to name. */
+  slug?: string;
+}
+
 export interface AlertOptions {
   /** P0 = wake someone now. P1 = degraded, can wait until morning. info = log-only style. */
   level: AlertLevel;
+  /** 'platform' (default) = infra/global. 'store' = single tenant; requires `store`. */
+  scope?: AlertScope;
+  /** Required when scope='store'. Identifies the tenant in the alert header + throttle key. */
+  store?: AlertStoreContext;
+  /**
+   * Canonical code location the alert originated from (e.g.
+   * `payment.webhook.hmac_fail`, `cron.abandoned-cart-purge`,
+   * `process.uncaughtException`). Surfaced in the header so an
+   * operator can grep the codebase or runbook instantly.
+   */
+  source?: string;
   /** Short human-readable headline. Used for de-duplication, so keep it stable per event class. */
   title: string;
   /** Free-form body. Newlines preserved. Truncated to 3500 chars (Telegram's 4096 cap minus headers). */
@@ -75,13 +104,39 @@ function isConfigured(): boolean {
  * MarkdownV2 needs every reserved character escaped, even inside code
  * blocks for some clients. We use plain text mode (no parse_mode) to
  * sidestep escaping bugs that would silently drop messages.
+ *
+ * Header shape:
+ *   🔴 [P0 PLATFORM] uncaughtException
+ *   env=production · source=process.uncaughtException
+ *
+ *   🔴 [P0 STORE] payment.webhook.hmac_fail
+ *   store=Wady Aljuz (wady-aljuz · dfc1c208…)
+ *   env=production · source=payment.webhook.hmac_fail
+ *
+ * The scope-prefixed tag (`PLATFORM` or `STORE`) makes "is this everyone
+ * or just one merchant?" the first thing the operator sees. Store
+ * identity gets its own line so the slug can be copy-pasted into an
+ * admin URL without parsing the rest of the message.
  */
 function buildMessage(opts: AlertOptions): string {
   const emoji = LEVEL_EMOJI[opts.level];
+  const scope = opts.scope ?? 'platform';
   const env = config.nodeEnv;
-  const header = `${emoji} [${opts.level.toUpperCase()}] ${opts.title}\nenv=${env}`;
 
-  const lines: string[] = [header];
+  const lines: string[] = [
+    `${emoji} [${opts.level.toUpperCase()} ${scope.toUpperCase()}] ${opts.title}`,
+  ];
+
+  if (scope === 'store' && opts.store) {
+    const idSuffix = opts.store.id.length > 8 ? `${opts.store.id.slice(0, 8)}…` : opts.store.id;
+    const slugPart = opts.store.slug ? `${opts.store.slug} · ` : '';
+    lines.push(`store=${opts.store.name} (${slugPart}${idSuffix})`);
+  }
+
+  const meta = [`env=${env}`];
+  if (opts.source) meta.push(`source=${opts.source}`);
+  lines.push(meta.join(' · '));
+
   if (opts.body) {
     const trimmed =
       opts.body.length > BODY_MAX_LEN ? `${opts.body.slice(0, BODY_MAX_LEN)}…` : opts.body;
@@ -100,8 +155,14 @@ function buildMessage(opts: AlertOptions): string {
   return message.length > TELEGRAM_MAX_LEN ? `${message.slice(0, TELEGRAM_MAX_LEN - 1)}…` : message;
 }
 
-function throttleKey(level: AlertLevel, title: string): string {
-  const hash = crypto.createHash('sha1').update(`${level}:${title}`).digest('hex').slice(0, 16);
+/**
+ * Throttle bucket includes storeId so a flapping store A doesn't
+ * suppress a genuinely-new alert for store B that happens to share
+ * a title. Platform alerts share a single bucket (no storeId).
+ */
+function throttleKey(level: AlertLevel, title: string, storeId?: string): string {
+  const seed = storeId ? `${level}:${title}:${storeId}` : `${level}:${title}`;
+  const hash = crypto.createHash('sha1').update(seed).digest('hex').slice(0, 16);
   return `alert-throttle:${hash}`;
 }
 
@@ -124,11 +185,22 @@ export async function sendAlert(
     return 'skipped';
   }
 
-  // Per-(level,title) Redis throttle. acquireLock returns true when the
-  // key didn't exist (we got the slot) and false when it did (someone
-  // else holds the cooldown). Fail-open when Redis is unavailable so a
-  // Redis outage doesn't suppress alerts about the Redis outage.
-  const lockName = throttleKey(opts.level, opts.title);
+  // Caller-side scope/store sanity. We log + degrade rather than throw
+  // because alert delivery must never break the calling code path —
+  // if a P0 firing site forgot to attach store context, the alert
+  // still goes out as platform-scoped (better than silent loss).
+  if (opts.scope === 'store' && !opts.store) {
+    logger.warn(
+      { level: opts.level, title: opts.title, source: opts.source },
+      'alerts.service: scope=store with no store context; degrading to platform'
+    );
+  }
+
+  // Per-(level, title, storeId?) Redis throttle. acquireLock returns
+  // true when the key didn't exist (we got the slot), false when held.
+  // Fail-open when Redis is unavailable so a Redis outage doesn't
+  // suppress alerts about the Redis outage itself.
+  const lockName = throttleKey(opts.level, opts.title, opts.store?.id);
   const slot = await redis.acquireLock(lockName, THROTTLE_TTL_SECONDS);
   if (!slot) {
     return 'throttled';

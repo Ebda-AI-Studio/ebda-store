@@ -114,7 +114,7 @@ describe('sendAlert — configured', () => {
     const body = JSON.parse(opts.body as string);
     expect(body.chat_id).toBe('-1001234567890');
     expect(body.text).toContain('🔴');
-    expect(body.text).toContain('[P0]');
+    expect(body.text).toContain('[P0 PLATFORM]'); // default scope when omitted
     expect(body.text).toContain('payment.webhook.hmac_fail');
     expect(body.text).toContain('tap provider HMAC fail');
     expect(body.text).toContain('"store": "wady-aljuz"');
@@ -181,5 +181,87 @@ describe('sendAlert — configured', () => {
     const calls = mockState.acquireLockMock.mock.calls;
     expect(calls).toHaveLength(2);
     expect(calls[0][0]).not.toBe(calls[1][0]);
+  });
+
+  it('renders platform-scoped header tag and includes source line', async () => {
+    mockState.acquireLockMock.mockResolvedValueOnce(true);
+    mockState.fetchMock.mockResolvedValueOnce(new Response('{"ok":true}', { status: 200 }));
+
+    const { sendAlert } = await loadService();
+    await sendAlert({
+      level: 'p0',
+      scope: 'platform',
+      source: 'process.uncaughtException',
+      title: 'uncaughtException',
+    });
+
+    const body = JSON.parse(mockState.fetchMock.mock.calls[0][1].body as string);
+    expect(body.text).toContain('[P0 PLATFORM]');
+    expect(body.text).toContain('source=process.uncaughtException');
+    expect(body.text).not.toContain('store=');
+  });
+
+  it('renders store-scoped header tag and store-identity line', async () => {
+    mockState.acquireLockMock.mockResolvedValueOnce(true);
+    mockState.fetchMock.mockResolvedValueOnce(new Response('{"ok":true}', { status: 200 }));
+
+    const { sendAlert } = await loadService();
+    await sendAlert({
+      level: 'p1',
+      scope: 'store',
+      store: { id: 'dfc1c208-1c30-4eba-9821-6f3be15e3506', name: 'Wady Aljuz', slug: 'wady-aljuz' },
+      source: 'payment.webhook.hmac_fail',
+      title: 'hmac fail',
+    });
+
+    const body = JSON.parse(mockState.fetchMock.mock.calls[0][1].body as string);
+    expect(body.text).toContain('[P1 STORE]');
+    expect(body.text).toContain('store=Wady Aljuz');
+    expect(body.text).toContain('wady-aljuz');
+    expect(body.text).toContain('dfc1c208'); // truncated id suffix
+    expect(body.text).toContain('source=payment.webhook.hmac_fail');
+  });
+
+  it('uses isolated throttle keys per store so a flapping store A does not suppress store B', async () => {
+    mockState.acquireLockMock.mockResolvedValue(true);
+    mockState.fetchMock.mockResolvedValue(new Response('{"ok":true}', { status: 200 }));
+
+    const { sendAlert } = await loadService();
+    await sendAlert({
+      level: 'p0',
+      scope: 'store',
+      store: { id: 'store-a-id', name: 'A' },
+      title: 'hmac fail',
+    });
+    await sendAlert({
+      level: 'p0',
+      scope: 'store',
+      store: { id: 'store-b-id', name: 'B' },
+      title: 'hmac fail', // same title, different store → must be separate key
+    });
+
+    const keys = mockState.acquireLockMock.mock.calls.map(c => c[0]);
+    expect(keys).toHaveLength(2);
+    expect(keys[0]).not.toBe(keys[1]);
+  });
+
+  it('logs a warn but still delivers when scope=store with no store context', async () => {
+    mockState.acquireLockMock.mockResolvedValueOnce(true);
+    mockState.fetchMock.mockResolvedValueOnce(new Response('{"ok":true}', { status: 200 }));
+
+    const { sendAlert } = await loadService();
+    const result = await sendAlert({
+      level: 'p0',
+      scope: 'store',
+      // store: undefined — caller-side mistake
+      title: 'broken-fan-out',
+    });
+
+    expect(result).toBe('sent'); // graceful degrade
+    expect(mockState.loggerWarn).toHaveBeenCalledTimes(1);
+    const body = JSON.parse(mockState.fetchMock.mock.calls[0][1].body as string);
+    // Header still says STORE (caller's intent) but no store= line because we have no data
+    expect(body.text).toContain('[P0 STORE]');
+    expect(body.text).not.toContain('store=');
   });
 });
