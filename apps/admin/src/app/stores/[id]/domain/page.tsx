@@ -249,62 +249,104 @@ export default function StoreDomainPage() {
                 </div>
               </div>
             ) : domain ? (
-              <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <p className="font-medium text-foreground">{domain}</p>
-                  <Badge variant={domainStatus?.verified ? 'default' : 'secondary'}>
-                    {domainStatus?.verified ? t('verified') : t('pending')}
-                  </Badge>
-                </div>
-
-                {!domainStatus?.verified && (
-                  <Alert variant="warning" title={t('dnsRequired')}>
-                    <p className="mt-1 text-sm">{t('dnsInstructions')}</p>
-                    <div className="mt-3 overflow-hidden rounded-md border border-warning/40 bg-background">
-                      <table className="w-full text-sm" aria-label={t('dnsTableLabel')}>
-                        <thead>
-                          <tr className="border-b border-warning/40 bg-warning/10">
-                            <th scope="col" className="px-3 py-2 text-start font-medium">
-                              {t('colType')}
-                            </th>
-                            <th scope="col" className="px-3 py-2 text-start font-medium">
-                              {t('colName')}
-                            </th>
-                            <th scope="col" className="px-3 py-2 text-start font-medium">
-                              {t('colValue')}
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {domainStatus?.dnsRecords?.map((record, i) => (
-                            <tr key={i} className="border-b border-warning/20 last:border-0">
-                              <td className="px-3 py-2 font-mono text-xs">{record.type}</td>
-                              <td className="px-3 py-2 font-mono text-xs">{record.name}</td>
-                              <td className="px-3 py-2 font-mono text-xs">{record.value}</td>
-                            </tr>
-                          )) || (
-                            <tr>
-                              <td className="px-3 py-2 font-mono text-xs">CNAME</td>
-                              <td className="px-3 py-2 font-mono text-xs">{domain}</td>
-                              <td className="px-3 py-2 font-mono text-xs">cname.vercel-dns.com</td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
+              (() => {
+                // Three states based on Vercel's domain API:
+                //   verified=false              → "pending" — DNS records not added yet
+                //   verified=true, misconfig=t  → "dns-not-pointing" — Vercel owns the
+                //                                  cert/config but the live A/CNAME
+                //                                  resolves elsewhere (registrar parking
+                //                                  page, old AWS pointer, etc.). The
+                //                                  Vercel UI calls this "configured by
+                //                                  another A record". Without this state
+                //                                  the admin would show a green "live at
+                //                                  https://X" message while customers
+                //                                  visiting X actually land on the
+                //                                  registrar parking page — what bit us
+                //                                  on wadyaljuz.com 2026-05-13.
+                //   verified=true, misconfig=f  → "live" — true end-to-end pointing at us
+                const isVerified = domainStatus?.verified === true;
+                const isMisconfigured = domainStatus?.misconfigured === true;
+                const isFullyLive = isVerified && !isMisconfigured;
+                const isDnsPointingWrong = isVerified && isMisconfigured;
+                return (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <p className="font-medium text-foreground">{domain}</p>
+                      <Badge
+                        variant={
+                          isFullyLive ? 'default' : isDnsPointingWrong ? 'secondary' : 'secondary'
+                        }
+                      >
+                        {isFullyLive
+                          ? t('verified')
+                          : isDnsPointingWrong
+                            ? t('dnsPointingTitle')
+                            : t('pending')}
+                      </Badge>
                     </div>
-                    <div className="mt-3 flex items-center justify-between">
-                      <p className="text-xs opacity-80">{t('dnsPropagation')}</p>
-                      <Button variant="outline" size="sm" onClick={checkDns} disabled={isChecking}>
-                        {isChecking ? t('checkingDns') : t('checkDns')}
-                      </Button>
-                    </div>
-                  </Alert>
-                )}
 
-                {domainStatus?.verified && (
-                  <p className="text-sm text-success">{t('verifiedMessage', { domain })}</p>
-                )}
-              </div>
+                    {!isFullyLive && (
+                      <Alert
+                        variant="warning"
+                        title={isDnsPointingWrong ? t('dnsPointingTitle') : t('dnsRequired')}
+                      >
+                        <p className="mt-1 text-sm">
+                          {isDnsPointingWrong ? t('dnsPointingMessage') : t('dnsInstructions')}
+                        </p>
+                        <div className="mt-3 overflow-hidden rounded-md border border-warning/40 bg-background">
+                          <table className="w-full text-sm" aria-label={t('dnsTableLabel')}>
+                            <thead>
+                              <tr className="border-b border-warning/40 bg-warning/10">
+                                <th scope="col" className="px-3 py-2 text-start font-medium">
+                                  {t('colType')}
+                                </th>
+                                <th scope="col" className="px-3 py-2 text-start font-medium">
+                                  {t('colName')}
+                                </th>
+                                <th scope="col" className="px-3 py-2 text-start font-medium">
+                                  {t('colValue')}
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {domainStatus?.dnsRecords?.map((record, i) => (
+                                <tr key={i} className="border-b border-warning/20 last:border-0">
+                                  <td className="px-3 py-2 font-mono text-xs">{record.type}</td>
+                                  <td className="px-3 py-2 font-mono text-xs">{record.name}</td>
+                                  <td className="px-3 py-2 font-mono text-xs">{record.value}</td>
+                                </tr>
+                              )) || (
+                                <tr>
+                                  <td className="px-3 py-2 font-mono text-xs">CNAME</td>
+                                  <td className="px-3 py-2 font-mono text-xs">{domain}</td>
+                                  <td className="px-3 py-2 font-mono text-xs">
+                                    cname.vercel-dns.com
+                                  </td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                        <div className="mt-3 flex items-center justify-between">
+                          <p className="text-xs opacity-80">{t('dnsPropagation')}</p>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={checkDns}
+                            disabled={isChecking}
+                          >
+                            {isChecking ? t('checkingDns') : t('checkDns')}
+                          </Button>
+                        </div>
+                      </Alert>
+                    )}
+
+                    {isFullyLive && (
+                      <p className="text-sm text-success">{t('verifiedMessage', { domain })}</p>
+                    )}
+                  </div>
+                );
+              })()
             ) : (
               <p className="text-sm text-muted-foreground">{t('noDomain')}</p>
             )}

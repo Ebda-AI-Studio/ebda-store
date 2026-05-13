@@ -3179,7 +3179,10 @@
       "statusPending": "Pending DNS verification",
       "statusFailed": "Verification failed",
       "statusNotConfigured": "Not configured",
-      "emailSenderError": "Failed to update email sender. Please try again."
+      "emailSenderError": "Failed to update email sender. Please try again.",
+      "dnsPointingTitle": "DNS not pointing at Vercel yet",
+      "dnsPointingMessage": "Vercel confirmed ownership of this domain, but the public A/CNAME records still point elsewhere. Customers visiting your domain right now will NOT land on your storefront. Update the records below at your registrar.",
+      "dnsPropagationConfirmed": "Your store is live at https://{domain}"
     }
   },
   "categories": {
