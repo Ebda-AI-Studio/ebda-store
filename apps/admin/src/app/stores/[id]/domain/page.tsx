@@ -467,14 +467,16 @@ export default function StoreDomainPage() {
                 variant={
                   domainStatus?.emailSender?.status === 'verified'
                     ? 'default'
-                    : domainStatus?.emailSender?.status === 'pending'
+                    : domainStatus?.emailSender?.status === 'pending' ||
+                        domainStatus?.emailSender?.status === 'not_started'
                       ? 'secondary'
                       : 'outline'
                 }
               >
                 {domainStatus?.emailSender?.status === 'verified'
                   ? t('statusVerified')
-                  : domainStatus?.emailSender?.status === 'pending'
+                  : domainStatus?.emailSender?.status === 'pending' ||
+                      domainStatus?.emailSender?.status === 'not_started'
                     ? t('statusPending')
                     : domainStatus?.emailSender?.status === 'failed'
                       ? t('statusFailed')
@@ -490,7 +492,31 @@ export default function StoreDomainPage() {
               </Button>
             )}
 
-            {domainStatus?.emailSender?.status === 'pending' && (
+            {/* Resend's domain status moves through not_started -> pending ->
+                verified (or failed). The provision endpoint creates the domain
+                row in `not_started` state — DNS records are returned but Resend
+                isn't yet polling. The merchant adds the DNS records at their
+                registrar, then clicks Verify which asks Resend to start the
+                verification cycle (status becomes 'pending' while DNS resolves,
+                then 'verified' once all three records check out). Showing the
+                Verify button on BOTH states means the merchant has a path from
+                either "I just set it up" or "Resend's still checking" — no
+                stuck state. */}
+            {(domainStatus?.emailSender?.status === 'pending' ||
+              domainStatus?.emailSender?.status === 'not_started') && (
+              <Button
+                variant="outline"
+                onClick={handleVerifyEmailSender}
+                disabled={isVerifyingEmail}
+              >
+                {isVerifyingEmail ? t('verifying') : t('verifyEmailSender')}
+              </Button>
+            )}
+
+            {/* Failed state: re-verify path. Resend marks failed when DNS
+                records didn't resolve during the verification window — the
+                merchant fixes them at their registrar and clicks Verify again. */}
+            {domainStatus?.emailSender?.status === 'failed' && (
               <Button
                 variant="outline"
                 onClick={handleVerifyEmailSender}
