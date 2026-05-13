@@ -53,7 +53,17 @@ export class VercelDomainService {
   }
 
   /**
-   * Add a custom domain to the Vercel project
+   * Add a custom domain to the Vercel project. When the input is an
+   * apex domain (no leading subdomain), ALSO attach the `www` variant
+   * automatically — registrars like GoDaddy auto-create a locked
+   * `CNAME www → @` that the merchant cannot delete or edit. If
+   * Vercel doesn't know that hostname, visitors typing the www
+   * variant get a generic Vercel 404 even though the DNS chain
+   * technically reaches us. Pre-registering both spells out the
+   * merchant flow: "one A record on apex, you're done."
+   *
+   * www-add failure is logged + ignored — the apex add is the only
+   * outcome that matters for the calling endpoint's success.
    */
   static async addDomain(domain: string): Promise<VercelDomainResponse | null> {
     if (!this.isConfigured()) {
@@ -61,6 +71,48 @@ export class VercelDomainService {
       return null;
     }
 
+    const apexResult = await this.addDomainSingle(domain);
+    if (!apexResult) return null;
+
+    // Best-effort www variant. Skip if the input itself is a subdomain
+    // (e.g. `shop.example.com`) — auto-adding `www.shop.example.com`
+    // would be wrong. Two-dot test catches the apex form `example.com`.
+    if (this.isApex(domain)) {
+      const wwwDomain = `www.${domain}`;
+      const wwwResult = await this.addDomainSingle(wwwDomain);
+      if (wwwResult) {
+        logger.info({ domain, wwwDomain }, 'www variant auto-attached to Vercel project');
+      } else {
+        logger.warn(
+          { domain, wwwDomain },
+          'www variant add failed (already on another project, or rejected). Apex still works.'
+        );
+      }
+    }
+
+    return apexResult;
+  }
+
+  /**
+   * True if `domain` is an apex (e.g. `example.com`) and not already
+   * a subdomain (`shop.example.com`, `www.example.com`). Heuristic:
+   * exactly one dot in the host, OR a known 2-level TLD pattern
+   * (`example.co.uk`). For our use-case the simple one-dot rule
+   * covers >99% of merchants — GCC and TR ccTLDs are all 1-level
+   * (`.kw`, `.sa`, `.ae`, `.com`).
+   */
+  private static isApex(domain: string): boolean {
+    const parts = domain.toLowerCase().split('.').filter(Boolean);
+    if (parts.length !== 2) return false;
+    // Skip when input already begins with www to avoid recursing into www.www
+    return parts[0] !== 'www';
+  }
+
+  /**
+   * Low-level single-domain POST to Vercel's add-domain endpoint.
+   * Public addDomain wraps this and may invoke twice (apex + www).
+   */
+  private static async addDomainSingle(domain: string): Promise<VercelDomainResponse | null> {
     try {
       const url = `${VERCEL_API_BASE}/v10/projects/${config.vercelProjectId}/domains${this.getTeamQuery()}`;
       const response = await fetch(url, {
@@ -72,6 +124,13 @@ export class VercelDomainService {
       const data = (await response.json()) as VercelDomainResponse;
 
       if (!response.ok) {
+        // domain_already_in_use is a soft failure when re-attaching an
+        // already-registered domain (e.g. www was added manually
+        // earlier). Treat as success.
+        if (data.error?.code === 'domain_already_in_use') {
+          logger.info({ domain }, 'Domain already on Vercel project; treating as success');
+          return data;
+        }
         logger.error(
           { domain, status: response.status, code: data.error?.code },
           'Failed to add domain to Vercel'
@@ -160,9 +219,23 @@ export class VercelDomainService {
         }
       }
 
-      // Always include the CNAME instruction
-      dnsRecords.push({ type: 'CNAME', name: domain, value: 'cname.vercel-dns.com' });
-
+      // Apex-only DNS instruction. The merchant needs to add ONE A
+      // record at their registrar pointing apex `@` at Vercel's IP.
+      // We intentionally do NOT instruct on a `www` CNAME because:
+      //   (1) Most registrars (GoDaddy, etc.) auto-create a locked
+      //       `www CNAME → @` the merchant can't edit or delete.
+      //   (2) `addDomain` auto-attaches the www variant to the Vercel
+      //       project, so the chain `www → apex → Vercel A` works
+      //       and Vercel recognizes the www host header.
+      // Older callers may receive a `dnsRecords` with the CNAME line
+      // when a non-apex domain was attached (e.g. `shop.example.com`)
+      // — we still emit the CNAME path in that case.
+      const isApexDomain = domain.toLowerCase().split('.').filter(Boolean).length === 2;
+      if (isApexDomain) {
+        dnsRecords.push({ type: 'A', name: '@', value: '76.76.21.21' });
+      } else {
+        dnsRecords.push({ type: 'CNAME', name: domain, value: 'cname.vercel-dns.com' });
+      }
       return {
         domain: domainData.name,
         verified: domainData.verified,

@@ -315,15 +315,29 @@ export default function StoreDomainPage() {
                                   <td className="px-3 py-2 font-mono text-xs">{record.name}</td>
                                   <td className="px-3 py-2 font-mono text-xs">{record.value}</td>
                                 </tr>
-                              )) || (
-                                <tr>
-                                  <td className="px-3 py-2 font-mono text-xs">CNAME</td>
-                                  <td className="px-3 py-2 font-mono text-xs">{domain}</td>
-                                  <td className="px-3 py-2 font-mono text-xs">
-                                    cname.vercel-dns.com
-                                  </td>
-                                </tr>
-                              )}
+                              )) ||
+                                // Fallback when the API returned no records (e.g.
+                                // Vercel unreachable). Apex domains get the simple
+                                // single A record — most registrars allow it
+                                // without lockouts. The www variant is auto-attached
+                                // at the Vercel project level, so the merchant
+                                // never needs to set a CNAME on `www` (which
+                                // GoDaddy and similar registrars often lock).
+                                (domain.split('.').filter(Boolean).length === 2 ? (
+                                  <tr>
+                                    <td className="px-3 py-2 font-mono text-xs">A</td>
+                                    <td className="px-3 py-2 font-mono text-xs">@</td>
+                                    <td className="px-3 py-2 font-mono text-xs">76.76.21.21</td>
+                                  </tr>
+                                ) : (
+                                  <tr>
+                                    <td className="px-3 py-2 font-mono text-xs">CNAME</td>
+                                    <td className="px-3 py-2 font-mono text-xs">{domain}</td>
+                                    <td className="px-3 py-2 font-mono text-xs">
+                                      cname.vercel-dns.com
+                                    </td>
+                                  </tr>
+                                ))}
                             </tbody>
                           </table>
                         </div>

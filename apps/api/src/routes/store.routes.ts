@@ -753,10 +753,18 @@ router.get(
 
       // Merge Vercel + Resend DNS records into one panel. The admin renders
       // this list under a neutral 'DNS records to add at your registrar'
-      // heading so merchants never see provider names.
-      const vercelRecords = vercelStatus?.dnsRecords ?? [
-        { type: 'CNAME', name: store.domain, value: 'cname.vercel-dns.com' },
-      ];
+      // heading so merchants never see provider names. The fallback when
+      // Vercel API is unreachable now mirrors the apex-vs-subdomain split
+      // from VercelDomainService: an apex like `wadyaljuz.com` gets the
+      // simple `A @ → 76.76.21.21` instruction; a subdomain like
+      // `shop.example.com` keeps the CNAME path. www handling is automatic
+      // (the service pre-attaches the www variant when an apex is added).
+      const isApexFallback = store.domain.split('.').filter(Boolean).length === 2;
+      const vercelRecords =
+        vercelStatus?.dnsRecords ??
+        (isApexFallback
+          ? [{ type: 'A', name: '@', value: '76.76.21.21' }]
+          : [{ type: 'CNAME', name: store.domain, value: 'cname.vercel-dns.com' }]);
       const mergedDns = [...vercelRecords, ...resendRecords];
 
       res.json({
