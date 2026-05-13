@@ -355,3 +355,61 @@ npx prisma migrate dev --name rollback_xxx
 - Railway: support@railway.app
 - Cloudflare: Enterprise support or community forums
 - Supabase: support@supabase.io
+
+---
+
+## Monitoring & Alerts
+
+Three orthogonal channels cover production failure modes per
+`~/.claude/CLAUDE.md` Production Reality gates rule #6. Each catches
+something the others can't.
+
+### 1. UptimeRobot — "process is gone / API unreachable"
+
+- **Dashboard**: https://uptimerobot.com
+- **Monitor**: `FWB API` → `https://store-api.forcemediakw.com/health`, HTTPS, 5-min interval, 30s timeout, alert on 2 consecutive failures
+- **Optional second monitor**: `https://store.forcemediakw.com/wady-aljuz` for the storefront SSR layer
+- **Alert contact**: Telegram (uses the same bot + chat_id as the in-API channel below)
+
+### 2. Sentry — "code threw"
+
+- **Wired**: `apps/api/src/services/sentry.service.ts` + `apps/api/src/index.ts` (boot init, captures `uncaughtException` + `unhandledRejection`)
+- **Env**: `SENTRY_DSN` on Railway. Falls back to log-only when missing.
+
+### 3. Telegram alerts service — "business logic P0"
+
+- **Bot**: `@ForceAI1_bot` (created via @BotFather, currently DMs Ahmad)
+- **Env vars (Railway)**:
+  - `TELEGRAM_BOT_TOKEN` — API token from @BotFather
+  - `TELEGRAM_ALERT_CHAT_ID` — chat to deliver to (DM = positive int; group = negative int)
+- **Code**: `apps/api/src/services/alerts.service.ts` exports `sendAlert({ level, title, body?, context? })`
+- **Levels**: `p0` (wake someone now) / `p1` (degraded, morning fine) / `info`
+- **Throttle**: Redis-keyed per `sha1(level + title)`, 5-min TTL — flapping events can't fan out 100 messages
+- **Graceful no-op**: missing env vars = single warn at boot + every send returns `'skipped'`
+- **Wired call sites**: `process.on('uncaughtException')` in `apps/api/src/index.ts`. Follow-ups deferred: payment HMAC repeated fail, Inngest dead-letter, `/api/v1/health` deep-check failure
+
+### Verifying end-to-end
+
+```bash
+# Fire a direct Telegram test (no API code involved)
+curl -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+  -H 'Content-Type: application/json' \
+  -d "{\"chat_id\":\"${TELEGRAM_ALERT_CHAT_ID}\",\"text\":\"smoke test\"}"
+
+# Confirm API health
+curl https://store-api.forcemediakw.com/health
+
+# Trigger UptimeRobot manually: dashboard → monitor → "Test" → expect OK within 30s
+```
+
+### Alert SLA
+
+- **P0** (server unreachable, payment HMAC repeated fail, data loss): respond within 15 min, 24/7
+- **P1** (degraded, AI quota exhausted, cron failed past final retry): respond within 4 hours
+- **Info** (deploy notifications, scheduled job summaries): no SLA
+
+### Log retention — still outstanding
+
+Railway stdout logs are ephemeral (~72h). A log drain to BetterStack /
+Logtail / Axiom must be configured before any merchant goes live per
+`~/.claude/CLAUDE.md` rule #7. Tracked as iceberg item #11.
