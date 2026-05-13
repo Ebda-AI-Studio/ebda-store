@@ -311,9 +311,36 @@ export default function StoreDomainPage() {
                             <tbody>
                               {domainStatus?.dnsRecords?.map((record, i) => (
                                 <tr key={i} className="border-b border-warning/20 last:border-0">
-                                  <td className="px-3 py-2 font-mono text-xs">{record.type}</td>
-                                  <td className="px-3 py-2 font-mono text-xs">{record.name}</td>
-                                  <td className="px-3 py-2 font-mono text-xs">{record.value}</td>
+                                  <td className="px-3 py-2 font-mono text-xs align-top whitespace-nowrap">
+                                    {record.type}
+                                  </td>
+                                  <td className="px-3 py-2 font-mono text-xs align-top whitespace-nowrap">
+                                    {record.name}
+                                  </td>
+                                  <td className="px-3 py-2 font-mono text-xs align-top break-all">
+                                    {/* DKIM TXT values (resend._domainkey) are ~400-char
+                                        base64 strings — without `break-all` the cell
+                                        either truncates with overflow:hidden or runs
+                                        off the right edge of the layout. `align-top`
+                                        keeps short cells (type, name) aligned with
+                                        the first line of the wrapped value. */}
+                                    <div className="flex items-start justify-between gap-2">
+                                      <span className="flex-1 min-w-0 select-all">
+                                        {record.value}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          void navigator.clipboard.writeText(record.value);
+                                        }}
+                                        className="shrink-0 rounded border border-border bg-background px-2 py-0.5 text-[10px] font-medium text-foreground hover:bg-muted transition-colors"
+                                        aria-label={`Copy ${record.type} value`}
+                                        title="Copy"
+                                      >
+                                        Copy
+                                      </button>
+                                    </div>
+                                  </td>
                                 </tr>
                               )) ||
                                 // Fallback when the API returned no records (e.g.
@@ -325,15 +352,25 @@ export default function StoreDomainPage() {
                                 // GoDaddy and similar registrars often lock).
                                 (domain.split('.').filter(Boolean).length === 2 ? (
                                   <tr>
-                                    <td className="px-3 py-2 font-mono text-xs">A</td>
-                                    <td className="px-3 py-2 font-mono text-xs">@</td>
-                                    <td className="px-3 py-2 font-mono text-xs">76.76.21.21</td>
+                                    <td className="px-3 py-2 font-mono text-xs align-top whitespace-nowrap">
+                                      A
+                                    </td>
+                                    <td className="px-3 py-2 font-mono text-xs align-top whitespace-nowrap">
+                                      @
+                                    </td>
+                                    <td className="px-3 py-2 font-mono text-xs align-top break-all">
+                                      76.76.21.21
+                                    </td>
                                   </tr>
                                 ) : (
                                   <tr>
-                                    <td className="px-3 py-2 font-mono text-xs">CNAME</td>
-                                    <td className="px-3 py-2 font-mono text-xs">{domain}</td>
-                                    <td className="px-3 py-2 font-mono text-xs">
+                                    <td className="px-3 py-2 font-mono text-xs align-top whitespace-nowrap">
+                                      CNAME
+                                    </td>
+                                    <td className="px-3 py-2 font-mono text-xs align-top whitespace-nowrap">
+                                      {domain}
+                                    </td>
+                                    <td className="px-3 py-2 font-mono text-xs align-top break-all">
                                       cname.vercel-dns.com
                                     </td>
                                   </tr>
