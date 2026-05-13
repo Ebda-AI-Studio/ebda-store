@@ -35,8 +35,12 @@ export default function StoreDomainPage() {
   } | null>(null);
   const [domainError, setDomainError] = useState('');
 
+  // Returns the latest fetched data so callers (e.g. the verify polling
+  // loop) can branch on the live response without dealing with React's
+  // state-update timing. Side effect: also pushes the data into local
+  // state so the UI re-renders.
   const checkDns = useCallback(async () => {
-    if (!store?.domain) return;
+    if (!store?.domain) return null;
     setIsChecking(true);
     try {
       const { data } = await apiGet<{
@@ -53,8 +57,10 @@ export default function StoreDomainPage() {
         emailSender?: { domainId: string | null; status: string | null; verifiedAt: string | null };
       }>(`/api/v1/stores/${storeId}/domain`);
       if (data) setDomainStatus(data);
+      return data ?? null;
     } catch {
       // non-critical
+      return null;
     } finally {
       setIsChecking(false);
     }
@@ -141,14 +147,41 @@ export default function StoreDomainPage() {
     setIsVerifyingEmail(true);
     setEmailSenderError('');
     try {
+      // Step 1: kick off Resend verification (POST /verify → POST to
+      // Resend's own /domains/:id/verify). Returns immediately; Resend
+      // then polls DNS asynchronously and flips status to 'verified'
+      // when all three records check out.
       const { error: apiError } = await apiPost(
         `/api/v1/stores/${storeId}/email-sender/verify`,
         {}
       );
       if (apiError) {
         setEmailSenderError(apiError.message || t('emailSenderError'));
-      } else {
-        await checkDns();
+        return;
+      }
+
+      // Step 2: poll for the resulting status. Resend's verification
+      // window is typically <30s when DNS is already published (common
+      // case — merchant added records, waited, then clicked Verify),
+      // and up to ~2 minutes when DNS just propagated. Polling at
+      // 3s/8s/15s/30s/60s gives 5 checks across ~2 minutes; we break
+      // as soon as status === 'verified'. Each tick uses checkDns()
+      // which also updates the local UI state, so the badge + Sending
+      // As line refresh in-place without a hard page reload.
+      const intervals = [3000, 8000, 15000, 30000, 60000];
+      for (const ms of intervals) {
+        await new Promise(resolve => setTimeout(resolve, ms));
+        const latest = await checkDns();
+        if (latest?.emailSender?.status === 'verified') {
+          break;
+        }
+        // 'failed' is terminal — Resend won't auto-retry. Surface the
+        // error and stop polling so the merchant can fix DNS + click
+        // Verify again to re-trigger.
+        if (latest?.emailSender?.status === 'failed') {
+          setEmailSenderError(t('emailSenderError'));
+          break;
+        }
       }
     } catch {
       setEmailSenderError(t('emailSenderError'));
