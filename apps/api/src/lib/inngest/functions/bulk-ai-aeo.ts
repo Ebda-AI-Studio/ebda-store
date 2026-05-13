@@ -57,6 +57,84 @@ function stripFences(text: string): string {
     .trim();
 }
 
+/**
+ * Auto-enable a footer "support" link for the store after a bulk-AI
+ * sweep populates the underlying content. Two real-world traps this
+ * closes:
+ *
+ *   1. The merchant's footerLinks default has the FAQ row with
+ *      `enabled: false` (hide-when-empty default — see
+ *      `feedback-fwb-cms-and-tenant-control.md`). Once the sweep
+ *      writes 8 FAQs, the link should obviously turn on; without
+ *      this helper it stays hidden until the merchant manually
+ *      toggles it in admin.
+ *   2. /how-to-guides isn't in the default footerLinks shape at all
+ *      (added 2026-05-13). For stores provisioned before then, the
+ *      row simply doesn't exist — this appends it.
+ *
+ * The whole operation is a no-op when the link is already correctly
+ * configured (enabled + present), so re-running the sweep doesn't
+ * re-toggle anything. Safe to call on every sweep completion.
+ */
+async function ensureFooterSupportLinkEnabled(
+  storeId: string,
+  href: string,
+  defaultName: string
+): Promise<void> {
+  try {
+    const store = await prisma.store.findUnique({
+      where: { id: storeId },
+      select: { settings: true },
+    });
+    if (!store) return;
+
+    const settings = (store.settings ?? {}) as Record<string, unknown>;
+    const footerLinks = (settings.footerLinks ?? {}) as Record<string, unknown>;
+    const supportRaw = footerLinks.support;
+    const support = Array.isArray(supportRaw)
+      ? (supportRaw as Array<{ href?: string; name?: string; enabled?: boolean }>)
+      : [];
+
+    const existingIdx = support.findIndex(e => e?.href === href);
+    let mutated = false;
+
+    if (existingIdx >= 0) {
+      if (support[existingIdx]?.enabled !== true) {
+        support[existingIdx] = { ...support[existingIdx], enabled: true };
+        mutated = true;
+      }
+    } else {
+      support.push({ href, name: defaultName, enabled: true });
+      mutated = true;
+    }
+
+    if (!mutated) return;
+
+    const nextSettings = {
+      ...settings,
+      footerLinks: { ...footerLinks, support },
+    };
+
+    await prisma.store.update({
+      where: { id: storeId },
+      data: { settings: nextSettings },
+    });
+
+    logger.info(
+      { storeId, href, defaultName },
+      'bulk-ai-aeo: enabled footer support link after content sweep'
+    );
+  } catch (err) {
+    // Never block the sweep result on a settings update — log + move on.
+    // The sweep itself succeeded; the worst case here is the link stays
+    // hidden until the merchant toggles it manually.
+    logger.warn(
+      { err, storeId, href },
+      'bulk-ai-aeo: failed to auto-enable footer link (sweep still succeeded)'
+    );
+  }
+}
+
 // -----------------------------------------------------------------------
 // Types
 // -----------------------------------------------------------------------
@@ -289,6 +367,13 @@ No other text, no markdown code fences — pure JSON only.`;
       },
     });
 
+    // Surface the new content: enable /faq in the footer support column.
+    // Only fires when this sweep actually wrote a row — re-running on an
+    // already-populated store is a no-op via the smart-skip path.
+    if (filled > 0) {
+      await ensureFooterSupportLinkEnabled(storeId, '/faq', 'FAQ');
+    }
+
     logger.info(
       { jobId, storeId, filled, skipped, failed, quotaReached },
       'bulk-ai-faq-aeo complete'
@@ -510,6 +595,14 @@ No markdown, no code fences — pure JSON only.`;
         completedAt: new Date(),
       },
     });
+
+    // Surface the new content: ensure /how-to-guides is in the footer
+    // support column AND enabled. For pre-2026-05-13 stores the entry
+    // doesn't exist at all — the helper appends it. For newer stores
+    // it just flips the existing entry's enabled flag.
+    if (filled > 0) {
+      await ensureFooterSupportLinkEnabled(storeId, '/how-to-guides', 'How-To Guides');
+    }
 
     logger.info(
       { jobId, storeId, filled, skipped, failed, quotaReached },
