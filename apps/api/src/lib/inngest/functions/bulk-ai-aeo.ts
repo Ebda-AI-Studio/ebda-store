@@ -79,7 +79,8 @@ function stripFences(text: string): string {
 async function ensureFooterSupportLinkEnabled(
   storeId: string,
   href: string,
-  defaultName: string
+  defaultName: string,
+  defaultNameAr: string
 ): Promise<void> {
   try {
     const store = await prisma.store.findUnique({
@@ -92,19 +93,34 @@ async function ensureFooterSupportLinkEnabled(
     const footerLinks = (settings.footerLinks ?? {}) as Record<string, unknown>;
     const supportRaw = footerLinks.support;
     const support = Array.isArray(supportRaw)
-      ? (supportRaw as Array<{ href?: string; name?: string; enabled?: boolean }>)
+      ? (supportRaw as Array<{
+          href?: string;
+          name?: string;
+          nameAr?: string;
+          enabled?: boolean;
+        }>)
       : [];
 
     const existingIdx = support.findIndex(e => e?.href === href);
     let mutated = false;
 
     if (existingIdx >= 0) {
-      if (support[existingIdx]?.enabled !== true) {
-        support[existingIdx] = { ...support[existingIdx], enabled: true };
+      // Patch in place: enable the entry, and backfill nameAr if missing
+      // (older stores have entries without it — without nameAr the AR
+      // storefront falls back to the English label).
+      const current = support[existingIdx];
+      const needsEnable = current?.enabled !== true;
+      const needsNameAr = !current?.nameAr;
+      if (needsEnable || needsNameAr) {
+        support[existingIdx] = {
+          ...current,
+          enabled: true,
+          ...(needsNameAr && { nameAr: defaultNameAr }),
+        };
         mutated = true;
       }
     } else {
-      support.push({ href, name: defaultName, enabled: true });
+      support.push({ href, name: defaultName, nameAr: defaultNameAr, enabled: true });
       mutated = true;
     }
 
@@ -404,7 +420,7 @@ No other text, no markdown code fences — pure JSON only.`;
     // Only fires when this sweep actually wrote a row — re-running on an
     // already-populated store is a no-op via the smart-skip path.
     if (filled > 0) {
-      await ensureFooterSupportLinkEnabled(storeId, '/faq', 'FAQ');
+      await ensureFooterSupportLinkEnabled(storeId, '/faq', 'FAQ', 'الأسئلة الشائعة');
     }
 
     logger.info(
@@ -634,7 +650,12 @@ No markdown, no code fences — pure JSON only.`;
     // doesn't exist at all — the helper appends it. For newer stores
     // it just flips the existing entry's enabled flag.
     if (filled > 0) {
-      await ensureFooterSupportLinkEnabled(storeId, '/how-to-guides', 'How-To Guides');
+      await ensureFooterSupportLinkEnabled(
+        storeId,
+        '/how-to-guides',
+        'How-To Guides',
+        'أدلة الاستخدام'
+      );
     }
 
     logger.info(

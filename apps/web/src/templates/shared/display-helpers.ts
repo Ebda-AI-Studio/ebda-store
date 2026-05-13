@@ -87,6 +87,7 @@ const ARABIC_LABEL_FALLBACK: Record<string, string> = {
   FAQ: 'الأسئلة الشائعة',
   'Shipping Info': 'معلومات الشحن',
   'Returns & Refunds': 'الإرجاع والاسترداد',
+  'How-To Guides': 'أدلة الاستخدام',
   // Company
   'About Us': 'من نحن',
   'Privacy Policy': 'سياسة الخصوصية',
