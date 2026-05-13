@@ -1,0 +1,32 @@
+#!/usr/bin/env sh
+# Pre-push backup gate — every push to main creates a local pg_dump
+# so a rollback never depends solely on Neon's snapshot branches being
+# reachable. Belt and suspenders: cloud snapshot via the per-commit
+# GitHub Action (.github/workflows/neon-snapshot.yml) + local dump here.
+#
+# Skip silently when pushing to a non-main branch (preview deploys
+# don't deploy migrations) or when the backup script isn't executable
+# (e.g. fresh clone before the user has run chmod).
+#
+# Doesn't BLOCK the push on backup failure — surface a warning instead,
+# because a flaky local Postgres or missing pg_dump shouldn't prevent
+# Ahmad from shipping a code-only fix.
+
+current_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+
+if [ "$current_branch" != "main" ]; then
+  exit 0
+fi
+
+if [ ! -x scripts/backup-db.sh ]; then
+  echo "⚠ pre-push: scripts/backup-db.sh not executable; skipping local DB backup"
+  echo "  (cloud snapshot via .github/workflows/neon-snapshot.yml still runs post-push)"
+  exit 0
+fi
+
+echo "→ pre-push: capturing local Neon dump before pushing to main"
+if ! bash scripts/backup-db.sh; then
+  echo "⚠ pre-push: local backup failed — pushing anyway (cloud snapshot still runs)"
+fi
+
+exit 0

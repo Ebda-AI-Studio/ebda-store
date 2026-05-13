@@ -326,7 +326,9 @@ jobs:
         run: npm ci
 
       - name: Run npm audit
-        run: npm audit --audit-level=critical
+        # Zero-vulns standing policy: fail on any severity.
+        # Override transitive vulns via package.json overrides (don't lower this).
+        run: npm audit --audit-level=low
 
       - name: Check for secrets
         uses: trufflesecurity/trufflehog@main
