@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { CookiePreferencesLink } from '../../components/CookiePreferencesLink';
 import {
   resolveAddressHref,
   resolveBottomBar,
@@ -230,6 +231,7 @@ export default function BoldFooter({
                   {isRtl ? 'الشحن' : 'Shipping'}
                 </Link>
               )}
+              <CookiePreferencesLink className="text-xs text-gray-400 hover:text-primary transition-colors duration-200 font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2" />
             </div>
           </div>
         )}

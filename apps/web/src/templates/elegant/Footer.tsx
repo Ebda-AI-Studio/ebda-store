@@ -5,6 +5,7 @@ import { useState } from 'react';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { api } from '../../lib/api';
+import { CookiePreferencesLink } from '../../components/CookiePreferencesLink';
 import {
   isNewsletterEnabled,
   resolveAddressHref,
@@ -335,6 +336,10 @@ export default function ElegantFooter({
                     {isRtl ? 'الشحن' : 'Shipping'}
                   </Link>
                 )}
+                {/* GDPR Art. 7(3) — withdrawing consent must be as easy
+                    as giving it. Always rendered, never hidden by store
+                    settings. */}
+                <CookiePreferencesLink className="hover:text-foreground transition-colors duration-700 ease-out cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2" />
               </div>
             </div>
           </div>

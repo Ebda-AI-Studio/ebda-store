@@ -17,6 +17,9 @@ import { OneSignalStorefrontInit } from '../components/OneSignalStorefrontInit';
 import { TypographyProbe } from '../components/TypographyProbe';
 import { AffiliateTracker } from '../components/AffiliateTracker';
 import { StoreMaintenance } from '../components/StoreMaintenance';
+import { ConsentProvider, type ConsentState } from '../contexts/ConsentContext';
+import { CookieConsentBanner } from '../components/CookieConsentBanner';
+import { CookiePreferencesModal } from '../components/CookiePreferencesModal';
 import { type MarketingPixels, themeToCssVars } from '@force/shared';
 import '../styles/globals.css';
 
@@ -288,6 +291,25 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const lang = resolvedLanguage;
   const dir = resolvedLanguage === 'ar' ? 'rtl' : 'ltr';
 
+  // Cookie consent — read server-side so MarketingPixelsProvider is only
+  // RENDERED into the HTML when the user has consented to marketing.
+  // GDPR Art. 6(a) + ePrivacy + Kuwait Law 13/2023 require prior consent
+  // BEFORE non-essential tracking scripts execute. Client-side gating
+  // alone leaks the script on first paint; SSR gating prevents that.
+  const consentCookieRaw = cookieStore.get('force-cookie-consent')?.value;
+  let resolvedConsent: ConsentState | null = null;
+  if (consentCookieRaw) {
+    try {
+      const parsed = JSON.parse(decodeURIComponent(consentCookieRaw)) as ConsentState;
+      if (parsed && typeof parsed.marketing === 'boolean' && parsed.v === 1) {
+        resolvedConsent = parsed;
+      }
+    } catch {
+      // Malformed cookie — treat as no consent (banner shows again).
+    }
+  }
+  const marketingConsentGranted = resolvedConsent?.marketing === true;
+
   // Organization JSON-LD for search engines
   const orgJsonLd = organizationJsonLd(store);
 
@@ -464,51 +486,65 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         </a>
         <StoreProvider initialStore={store}>
           <LanguageProvider defaultLanguage={resolvedLanguage}>
-            {store.status === 'suspended' ? (
-              // Suspended store — render the branded maintenance page in
-              // place of the entire normal storefront. We deliberately
-              // skip Cart/Auth/Feature providers, marketing pixels, the
-              // service worker, OneSignal, the affiliate tracker, etc.
-              // because they all make API calls (cart sync, /auth/me,
-              // pixel events) that would either 403 against a suspended
-              // store or pollute analytics. The maintenance screen only
-              // needs the store's branding + theme + language, all of
-              // which already live above this guard.
-              <div id="main-content">
-                <StoreMaintenance />
-              </div>
-            ) : (
-              <FeatureProvider>
-                <AuthProvider>
-                  <ToastProvider>
-                    <CartProvider>
-                      <div id="main-content">{children}</div>
-                      <PushNotificationPrompt />
-                      <OneSignalStorefrontInit />
-                      {/* Activates ONLY when ?probe=typography is on
+            <ConsentProvider initialConsent={resolvedConsent}>
+              {store.status === 'suspended' ? (
+                // Suspended store — render the branded maintenance page in
+                // place of the entire normal storefront. We deliberately
+                // skip Cart/Auth/Feature providers, marketing pixels, the
+                // service worker, OneSignal, the affiliate tracker, etc.
+                // because they all make API calls (cart sync, /auth/me,
+                // pixel events) that would either 403 against a suspended
+                // store or pollute analytics. The maintenance screen only
+                // needs the store's branding + theme + language, all of
+                // which already live above this guard.
+                <div id="main-content">
+                  <StoreMaintenance />
+                </div>
+              ) : (
+                <FeatureProvider>
+                  <AuthProvider>
+                    <ToastProvider>
+                      <CartProvider>
+                        <div id="main-content">{children}</div>
+                        <PushNotificationPrompt />
+                        <OneSignalStorefrontInit />
+                        {/* Activates ONLY when ?probe=typography is on
                           the URL and the page is in a trusted-admin
                           iframe. Measures real getComputedStyle()
                           values per data-zone and posts them back to
                           the admin so the typography form can show
                           real inherited defaults. */}
-                      <TypographyProbe />
-                    </CartProvider>
-                  </ToastProvider>
-                </AuthProvider>
-                {store.marketingPixels && Object.keys(store.marketingPixels).length > 0 && (
-                  <MarketingPixelsProvider pixels={store.marketingPixels as MarketingPixels} />
-                )}
-                {/* PWA is active only when BOTH the store toggle AND the
+                        <TypographyProbe />
+                      </CartProvider>
+                    </ToastProvider>
+                  </AuthProvider>
+                  {/* Marketing pixels render ONLY when the visitor has
+                    consented (read from the `force-cookie-consent` cookie
+                    server-side). No consent → scripts never reach the
+                    browser. GDPR/ePrivacy/Kuwait Law 13/2023 compliance. */}
+                  {marketingConsentGranted &&
+                    store.marketingPixels &&
+                    Object.keys(store.marketingPixels).length > 0 && (
+                      <MarketingPixelsProvider pixels={store.marketingPixels as MarketingPixels} />
+                    )}
+                  {/* PWA is active only when BOTH the store toggle AND the
                     platform feature flag are on. Without this gate, flipping
                     the per-store feature off had no observable effect. */}
-                {store.pwaEnabled === true && (store.enabledFeatures?.includes('pwa') ?? true) && (
-                  <ServiceWorkerRegistration />
-                )}
-                <Suspense fallback={null}>
-                  <AffiliateTracker />
-                </Suspense>
-              </FeatureProvider>
-            )}
+                  {store.pwaEnabled === true &&
+                    (store.enabledFeatures?.includes('pwa') ?? true) && (
+                      <ServiceWorkerRegistration />
+                    )}
+                  <Suspense fallback={null}>
+                    <AffiliateTracker />
+                  </Suspense>
+                </FeatureProvider>
+              )}
+              {/* Cookie consent UI — always mounted (banner self-hides
+                when the user has already decided; modal opens via the
+                footer "Cookie preferences" link or banner Customize). */}
+              <CookieConsentBanner />
+              <CookiePreferencesModal />
+            </ConsentProvider>
           </LanguageProvider>
         </StoreProvider>
       </body>

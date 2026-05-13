@@ -5,6 +5,7 @@ import { useState } from 'react';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { api } from '../../lib/api';
+import { CookiePreferencesLink } from '../../components/CookiePreferencesLink';
 import {
   getDisplayBranding,
   getDisplayText,
@@ -373,6 +374,7 @@ export default function ModernFooter({
                   {isRtl ? 'الشحن' : 'Shipping'}
                 </Link>
               )}
+              <CookiePreferencesLink className="text-xs text-gray-500 hover:text-gray-300 transition-colors duration-300 ease-out cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2" />
             </div>
           </div>
         )}

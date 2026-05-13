@@ -5,6 +5,7 @@ import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { resolveBottomBar, resolveFooterSections } from '../shared/display-helpers';
 import { getSocialLinks } from '../shared/icons';
+import { CookiePreferencesLink } from '../../components/CookiePreferencesLink';
 
 export default function MinimalFooter({
   branding,
@@ -144,6 +145,7 @@ export default function MinimalFooter({
                   {isRtl ? 'الشحن' : 'Shipping'}
                 </Link>
               )}
+              <CookiePreferencesLink className="hover:text-foreground transition-colors duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2" />
             </div>
           </div>
         )}

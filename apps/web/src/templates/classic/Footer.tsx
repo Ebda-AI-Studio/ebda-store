@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { CookiePreferencesLink } from '../../components/CookiePreferencesLink';
 import {
   getDisplayBranding,
   getDisplayText,
@@ -247,6 +248,7 @@ export default function ClassicFooter({
                     {isRtl ? 'الشحن' : 'Shipping'}
                   </Link>
                 )}
+                <CookiePreferencesLink className="hover:text-foreground transition-colors duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2" />
               </div>
             </div>
           </>
