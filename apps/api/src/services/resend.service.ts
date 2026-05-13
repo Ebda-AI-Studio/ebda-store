@@ -87,9 +87,66 @@ export class ResendService {
   }
 
   /**
+   * Kick off Resend DNS verification AND fetch the latest status. Two
+   * Resend endpoints exist: GET /domains/:id returns current state,
+   * POST /domains/:id/verify tells Resend to START verifying. Calling
+   * only GET leaves a freshly-provisioned domain at `not_started`
+   * forever — which is exactly what bit wadyaljuz.com 2026-05-13.
+   *
+   * Now the admin's "Verify" button trigger:
+   *   1. POST /domains/:id/verify (the kick-off — ignored if already verified)
+   *   2. GET /domains/:id (read back the resulting status + records)
+   *   3. Persist `emailDomainStatus` + `emailDomainVerifiedAt` on the store row
+   *
+   * Resend's verify endpoint is idempotent: calling it on an already-verified
+   * domain returns success without changing anything. So merchants can click
+   * Verify any time without worry.
+   */
+  static async verifyAndRefreshDomain(storeId: string): Promise<{
+    status: string;
+    records: DomainDnsRecord[];
+  }> {
+    const store = await prisma.store.findUnique({
+      where: { id: storeId },
+      select: { id: true, emailDomainId: true },
+    });
+    if (!store) throw new Error(`Store ${storeId} not found`);
+    if (!store.emailDomainId) {
+      throw new Error('Store email sender not provisioned yet — call provisionStoreDomain first');
+    }
+
+    // Step 1: kick off verification. Resend's SDK exposes this as
+    // `domains.verify(id)`. Failures here we log but don't throw — the
+    // GET below will still surface useful state to the merchant.
+    try {
+      const { error: verifyError } = await ensureClient().domains.verify(store.emailDomainId);
+      if (verifyError && verifyError.name !== 'not_found') {
+        logger.warn(
+          { storeId, domainId: store.emailDomainId, err: verifyError.message },
+          'Resend domains.verify returned error; continuing to GET to read current state'
+        );
+      }
+    } catch (err) {
+      logger.warn(
+        {
+          storeId,
+          domainId: store.emailDomainId,
+          err: err instanceof Error ? err.message : String(err),
+        },
+        'Resend domains.verify threw; continuing to GET'
+      );
+    }
+
+    // Step 2: read the resulting state.
+    return this.refreshDomainStatus(storeId);
+  }
+
+  /**
    * Fetch latest Resend status, persist it, and return status + DNS records.
-   * Admin "Verify" button calls this. Setting `emailDomainVerifiedAt` only on
-   * the verified→ transition so we have a stable timestamp.
+   * Used both by the public verify flow above (after kicking off verify) and
+   * standalone by GET /domain to refresh the records table without poking
+   * Resend to re-verify. Setting `emailDomainVerifiedAt` only on the
+   * verified→ transition so we have a stable timestamp.
    */
   static async refreshDomainStatus(storeId: string): Promise<{
     status: string;

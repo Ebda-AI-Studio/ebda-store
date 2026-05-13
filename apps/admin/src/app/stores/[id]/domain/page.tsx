@@ -280,6 +280,15 @@ export default function StoreDomainPage() {
                 const isMisconfigured = domainStatus?.misconfigured === true;
                 const isFullyLive = isVerified && !isMisconfigured;
                 const isDnsPointingWrong = isVerified && isMisconfigured;
+                // Records table visibility: show whenever ANY DNS work is
+                // pending — storefront (A/CNAME) OR email (MX/DKIM/SPF).
+                // The single panel mixes both record families; if we hide
+                // it the moment storefront goes live, the email DNS rows
+                // disappear too and the merchant loses the panel mid-setup
+                // (caught on wadyaljuz.com 2026-05-14 — records flashed
+                // in then disappeared on every page refresh).
+                const emailVerified = domainStatus?.emailSender?.status === 'verified';
+                const needsDnsRecords = !isFullyLive || !emailVerified;
                 return (
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
@@ -297,7 +306,7 @@ export default function StoreDomainPage() {
                       </Badge>
                     </div>
 
-                    {!isFullyLive && (
+                    {needsDnsRecords && (
                       <Alert
                         variant="warning"
                         title={isDnsPointingWrong ? t('dnsPointingTitle') : t('dnsRequired')}

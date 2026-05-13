@@ -1021,7 +1021,10 @@ router.post(
   }
 );
 
-// POST /stores/:id/email-sender/verify — refresh status from Resend.
+// POST /stores/:id/email-sender/verify — kick off Resend verification AND
+// refresh the local state. Previously called refreshDomainStatus which only
+// does a GET; without the POST-to-/verify the domain stays in `not_started`
+// forever. Caught on wadyaljuz.com 2026-05-13.
 router.post(
   '/:id/email-sender/verify',
   authenticate,
@@ -1029,7 +1032,7 @@ router.post(
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const result = await ResendService.refreshDomainStatus(req.params.id);
+      const result = await ResendService.verifyAndRefreshDomain(req.params.id);
       res.json({ success: true, data: result });
     } catch (error) {
       next(error);
