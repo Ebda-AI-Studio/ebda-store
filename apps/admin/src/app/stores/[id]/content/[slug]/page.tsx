@@ -301,6 +301,36 @@ export default function ContentEditorPage() {
           </div>
         ) : (
           <>
+            {/* Deep-link callout for the two slugs whose customer-facing
+                content actually lives in a different surface: the FAQ
+                accordion items live in `store_faqs` (managed at /seo)
+                and How-To Guides live in `store_howtos` (also /seo).
+                This page only edits the static block wrapper around
+                them; without the callout merchants run the AI bulk
+                sweep, come here looking for the generated content,
+                and see an empty editor. Fixes the recurring
+                "where did the data go?" confusion. */}
+            {(slug === 'faq' || slug === 'how-to-guides') && (
+              <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 text-sm text-foreground">
+                <p className="font-medium">
+                  {slug === 'faq'
+                    ? 'AI-generated FAQ items live in SEO Tools, not here.'
+                    : 'AI-generated How-To guides live in SEO Tools, not here.'}
+                </p>
+                <p className="mt-1 text-muted-foreground">
+                  This editor controls the static page wrapper (cover image, intro paragraphs,
+                  etc.). The accordion content the storefront actually renders comes from a separate
+                  surface.
+                </p>
+                <Link
+                  href={`/stores/${storeId}/seo#${slug === 'faq' ? 'faqs' : 'howtos'}`}
+                  className="mt-2 inline-flex items-center text-sm font-medium text-primary hover:underline"
+                >
+                  {slug === 'faq' ? 'Open FAQ items in SEO →' : 'Open How-To items in SEO →'}
+                </Link>
+              </div>
+            )}
+
             <SectionCard title={t('sectionDetails')}>
               <div className="grid gap-4 sm:grid-cols-2">
                 <FieldText

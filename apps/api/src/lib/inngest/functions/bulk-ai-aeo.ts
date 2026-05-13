@@ -204,7 +204,7 @@ export const bulkAiFaqAeo: InngestFunction.Any = inngest.createFunction(
         data: { status: 'running', startedAt: new Date(), total: count },
       });
 
-      const [store, sampleCats, sampleProds] = await Promise.all([
+      const [store, sampleCats, sampleProds, paymentConfigs] = await Promise.all([
         prisma.store.findUnique({
           where: { id: storeId },
           select: { name: true, nameAr: true, description: true },
@@ -218,6 +218,10 @@ export const bulkAiFaqAeo: InngestFunction.Any = inngest.createFunction(
           where: { storeId, status: 'active', deletedAt: null },
           select: { name: true },
           take: 20,
+        }),
+        prisma.paymentConfig.findMany({
+          where: { storeId, isEnabled: true },
+          select: { provider: true, supportedMethods: true },
         }),
       ]);
 
@@ -247,6 +251,35 @@ export const bulkAiFaqAeo: InngestFunction.Any = inngest.createFunction(
           .join(', ')
           .slice(0, 500) || 'none';
 
+      // Resolve the customer-facing payment methods this store actually
+      // supports. The previous hardcoded "(KNET, Tap, MyFatoorah, cash on
+      // delivery)" mixed customer methods with gateway company names and
+      // produced answers like "We accept payment through Tap and
+      // MyFatoorah" — meaningless to a shopper, since Tap / MyFatoorah
+      // are the back-end processors, not what they tap on the checkout
+      // page. Customers want method names: KNET, Visa, Mastercard, Apple
+      // Pay, Cash on Delivery.
+      //
+      // PROVIDER_METHODS holds the per-gateway default method set for
+      // Kuwait. Falls back to this when `paymentConfig.supportedMethods`
+      // is empty (most stores leave it unset and rely on the gateway's
+      // default).
+      const PROVIDER_METHODS: Record<string, string[]> = {
+        tap: ['KNET', 'Visa', 'Mastercard', 'Apple Pay'],
+        myfatoorah: ['KNET', 'Visa', 'Mastercard', 'Apple Pay'],
+        hesabe: ['KNET', 'Visa', 'Mastercard'],
+        upayments: ['KNET', 'Visa', 'Mastercard'],
+        cod: ['Cash on Delivery'],
+      };
+      const methodSet = new Set<string>();
+      for (const cfg of paymentConfigs) {
+        const overrides = cfg.supportedMethods?.length ? cfg.supportedMethods : null;
+        const list = overrides ?? PROVIDER_METHODS[cfg.provider] ?? [];
+        for (const m of list) methodSet.add(m);
+      }
+      const paymentMethodsList =
+        methodSet.size > 0 ? Array.from(methodSet).join(', ') : 'cash on delivery';
+
       const prompt = `You are an SEO + AEO expert helping a Kuwait-based e-commerce store author its FAQ page.
 
 Store name: "${store.name}"${store.nameAr ? ` / "${store.nameAr}"` : ''}
@@ -256,7 +289,7 @@ Sample products: ${prodNames}
 
 Draft exactly ${count} FAQs that real customers in Kuwait would ask. Cover:
 - Delivery / shipping (Kuwait city, governorates, GCC)
-- Payment methods (KNET, Tap, MyFatoorah, cash on delivery)
+- Payment methods. This store accepts EXACTLY: ${paymentMethodsList}. List those method names; do NOT name payment-gateway companies (Tap, MyFatoorah, Hesabe, UPayments) — customers tap KNET / Visa / Mastercard / Apple Pay buttons, they don't know which back-end gateway processes them.
 - Returns and exchanges policy
 - Product care / usage relevant to this store's category
 - Store hours / how to contact support
