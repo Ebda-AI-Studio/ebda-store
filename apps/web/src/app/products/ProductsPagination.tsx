@@ -1,6 +1,7 @@
 'use client';
 
 import type { PaginationMeta } from '@/lib/api';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface ProductsPaginationProps {
   meta: PaginationMeta;
@@ -9,6 +10,9 @@ interface ProductsPaginationProps {
 }
 
 export function ProductsPagination({ meta, page, onPageChange }: ProductsPaginationProps) {
+  const { language } = useLanguage();
+  const t = (en: string, ar: string) => (language === 'ar' ? ar : en);
+
   if (meta.totalPages <= 1) return null;
 
   return (
@@ -16,9 +20,9 @@ export function ProductsPagination({ meta, page, onPageChange }: ProductsPaginat
       <button
         onClick={() => onPageChange(Math.max(1, page - 1))}
         disabled={page === 1}
-        className="rounded-lg border border-border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
+        className="min-h-11 rounded-lg border border-border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        Previous
+        {t('Previous', 'السابق')}
       </button>
       {Array.from({ length: meta.totalPages }, (_, i) => i + 1)
         .filter(p => p === 1 || p === meta.totalPages || Math.abs(p - page) <= 1)
@@ -29,7 +33,7 @@ export function ProductsPagination({ meta, page, onPageChange }: ProductsPaginat
               {showEllipsis && <span className="px-1 text-muted-foreground">...</span>}
               <button
                 onClick={() => onPageChange(p)}
-                className={`flex h-10 w-10 items-center justify-center rounded-lg text-sm font-medium transition-colors ${
+                className={`flex h-11 w-11 items-center justify-center rounded-lg text-sm font-medium transition-colors ${
                   page === p ? 'bg-primary text-white' : 'border border-border hover:bg-muted'
                 }`}
               >
@@ -41,9 +45,9 @@ export function ProductsPagination({ meta, page, onPageChange }: ProductsPaginat
       <button
         onClick={() => onPageChange(Math.min(meta.totalPages, page + 1))}
         disabled={page === meta.totalPages}
-        className="rounded-lg border border-border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
+        className="min-h-11 rounded-lg border border-border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        Next
+        {t('Next', 'التالي')}
       </button>
     </div>
   );

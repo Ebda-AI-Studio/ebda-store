@@ -29,7 +29,11 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
             // h-11 (44px) is the minimum recommended tap target on mobile;
             // sm:h-10 keeps the denser appearance on desktop where pointer
             // accuracy isn't constrained.
-            'flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background transition-all duration-200 sm:h-10',
+            // text-base (16px) on mobile prevents iOS Safari from auto-zooming
+            // the viewport on focus — any input <16px triggers the zoom and
+            // it does not auto-unzoom. sm:text-sm restores the denser
+            // desktop appearance.
+            'flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background transition-all duration-200 sm:h-10 sm:text-sm',
             'file:border-0 file:bg-transparent file:text-sm file:font-medium',
             'placeholder:text-muted-foreground',
             'hover:bg-muted/30',

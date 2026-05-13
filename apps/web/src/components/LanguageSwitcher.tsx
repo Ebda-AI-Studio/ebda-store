@@ -14,7 +14,7 @@ export function LanguageSwitcher({ variant = 'default', className = '' }: Langua
     return (
       <button
         onClick={() => setLanguage(language === 'en' ? 'ar' : 'en')}
-        className={`flex h-10 w-10 items-center justify-center rounded-xl text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground ${className}`}
+        className={`flex h-11 w-11 items-center justify-center rounded-xl text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground ${className}`}
         aria-label={language === 'en' ? 'Switch to Arabic' : 'Switch to English'}
       >
         {language === 'en' ? 'ع' : 'En'}

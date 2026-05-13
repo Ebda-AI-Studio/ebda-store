@@ -63,6 +63,12 @@ function ElegantProductCard({
     >
       <Link
         href={`${urlPrefix}/products/${product.slug}`}
+        // RSC prefetch on every product card in a long grid hammered the API's
+        // publicLimiter (60/min/IP cap was tripping on routine browse — see
+        // mobile audit 2026-05-13 + security.ts publicLimiter bump). prefetch
+        // on hover/tap instead keeps PDP nav fast for *intended* clicks
+        // without firing N prefetches just from a customer scrolling past.
+        prefetch={false}
         className="group block cursor-pointer"
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}

@@ -191,7 +191,9 @@ export default function ElegantFooter({
                     <li key={link.href}>
                       <Link
                         href={link.href}
-                        className="text-sm text-foreground/70 hover:text-foreground transition-colors duration-700 ease-out tracking-wide cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                        // inline-flex + min-h-11 ensures a 44px tap target
+                        // on mobile (iOS HIG) without enlarging visible text.
+                        className="inline-flex items-center min-h-11 text-sm text-foreground/70 hover:text-foreground transition-colors duration-700 ease-out tracking-wide cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                       >
                         {link.label}
                       </Link>

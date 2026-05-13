@@ -26,7 +26,9 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(
           aria-describedby={error ? errorId : undefined}
           className={cn(
             // h-11 (44px) min tap target on mobile; sm:h-10 for desktop density.
-            'flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background sm:h-10',
+            // text-base on mobile prevents iOS Safari from auto-zooming the
+            // viewport on focus (any input <16px triggers it).
+            'flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background sm:h-10 sm:text-sm',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
             'disabled:cursor-not-allowed disabled:opacity-50',
             error && 'border-destructive focus-visible:ring-destructive',

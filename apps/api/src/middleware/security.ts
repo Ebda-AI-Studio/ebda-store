@@ -319,7 +319,14 @@ export const dailyUploadLimiter = rateLimit({
 // Public API rate limiter - protect public endpoints from abuse
 export const publicLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: 60, // 60 requests per minute per IP
+  // Storefront browsing burns through this fast on real mobile sessions:
+  // home + Next.js App Router RSC prefetches on link hover/viewport entry +
+  // product-list pagination + category filters easily clear 60 req/min on
+  // a routine browse. Mobile audit on 2026-05-13 reproduced the "Too many
+  // requests" banner during a normal customer flow. 300/min (~5/sec) is
+  // generous for human use + RSC fanout while still tripping on bots
+  // (typically >10/sec).
+  max: 300,
   message: {
     success: false,
     error: { code: 'RATE_LIMITED', message: 'Too many requests, please slow down.' },

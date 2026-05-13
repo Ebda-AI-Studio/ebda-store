@@ -529,7 +529,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                     type="button"
                     onClick={() => setQuantity(Math.max(1, quantity - 1))}
                     aria-label={t('Decrease quantity', 'تقليل الكمية')}
-                    className="px-4 py-2 text-muted-foreground hover:bg-muted cursor-pointer"
+                    className="flex h-11 min-w-11 items-center justify-center px-4 text-muted-foreground hover:bg-muted cursor-pointer"
                   >
                     -
                   </button>
@@ -546,7 +546,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                       setQuantity(Math.min(quantity + 1, maxQty));
                     }}
                     aria-label={t('Increase quantity', 'زيادة الكمية')}
-                    className="px-4 py-2 text-muted-foreground hover:bg-muted cursor-pointer"
+                    className="flex h-11 min-w-11 items-center justify-center px-4 text-muted-foreground hover:bg-muted cursor-pointer"
                   >
                     +
                   </button>
