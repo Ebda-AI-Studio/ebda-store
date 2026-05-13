@@ -94,10 +94,35 @@ const EMPTY_HOWTO: Omit<StoreHowto, 'id'> = {
   description: '',
   descriptionAr: null,
   steps: [{ name: '', text: '' }],
-  stepsAr: null,
+  // Pre-align stepsAr with steps so the editor always has both halves
+  // to render. Older rows (and rows from before bilingual editing was
+  // wired) can have stepsAr = null; the load path normalizes those.
+  stepsAr: [{ name: '', text: '' }],
   orderIndex: 0,
   isActive: true,
 };
+
+/**
+ * Normalize a `stepsAr` array to match the length of `steps`. Older
+ * HowTo rows can have `stepsAr = null` (single-language draft) or a
+ * length mismatch (e.g. someone added a step in English without the
+ * Arabic side existing yet). The editor renders one row per step
+ * with EN and AR fields side-by-side, so the arrays MUST be the
+ * same length while editing. The save path keeps `stepsAr = null`
+ * possible by passing through this same shape — only the editor
+ * cares about alignment.
+ */
+function alignStepsAr(steps: HowtoStep[], stepsAr: HowtoStep[] | null): HowtoStep[] {
+  const ar = Array.isArray(stepsAr) ? stepsAr : [];
+  if (ar.length === steps.length)
+    return ar.map(s => ({ name: s?.name ?? '', text: s?.text ?? '' }));
+  const out: HowtoStep[] = [];
+  for (let i = 0; i < steps.length; i++) {
+    const slot = ar[i];
+    out.push({ name: slot?.name ?? '', text: slot?.text ?? '' });
+  }
+  return out;
+}
 
 const DEFAULT_SETTINGS: SeoSettings = {
   metaTitle: '',
@@ -1044,7 +1069,10 @@ export default function StoreSeoPage() {
                           description: howto.description,
                           descriptionAr: howto.descriptionAr,
                           steps: howto.steps,
-                          stepsAr: howto.stepsAr,
+                          // Align AR steps to EN steps length so the editor
+                          // always has both halves to render even when the
+                          // row originated from a single-language source.
+                          stepsAr: alignStepsAr(howto.steps, howto.stepsAr),
                           orderIndex: howto.orderIndex,
                           isActive: howto.isActive,
                         });
@@ -1303,64 +1331,115 @@ function HowtoForm({ draft, setDraft, t, isSaving, onSave, onCancel, autoFocus }
         </div>
       </div>
 
-      {/* Steps */}
+      {/* Steps — each step has EN + AR side-by-side. The arrays
+          `steps` and `stepsAr` are kept aligned 1:1 so add/remove
+          always touches both. */}
       <div>
         <div className="flex items-center justify-between mb-2">
           <label className="text-xs font-medium text-foreground">{t('howtoSteps')}</label>
           <button
             type="button"
-            onClick={() => setDraft(d => ({ ...d, steps: [...d.steps, { name: '', text: '' }] }))}
+            onClick={() =>
+              setDraft(d => ({
+                ...d,
+                steps: [...d.steps, { name: '', text: '' }],
+                stepsAr: [...(d.stepsAr ?? []), { name: '', text: '' }],
+              }))
+            }
             className="text-xs text-primary hover:underline"
           >
             + {t('addStep')}
           </button>
         </div>
-        {draft.steps.map((step, i) => (
-          <div key={i} className="mb-2 rounded-lg border border-border p-3 space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
-                {i + 1}
-              </span>
-              <input
-                type="text"
-                placeholder={t('stepName')}
-                value={step.name}
-                onChange={e =>
-                  setDraft(d => {
-                    const steps = [...d.steps];
-                    steps[i] = { ...steps[i], name: e.target.value };
-                    return { ...d, steps };
-                  })
-                }
-                className="flex-1 rounded-lg border border-border px-3 py-1.5 text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              />
-              {draft.steps.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    setDraft(d => ({ ...d, steps: d.steps.filter((_, idx) => idx !== i) }))
+        {draft.steps.map((step, i) => {
+          const stepAr = draft.stepsAr?.[i] ?? { name: '', text: '' };
+          return (
+            <div key={i} className="mb-2 rounded-lg border border-border p-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
+                  {i + 1}
+                </span>
+                <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    placeholder={t('stepName')}
+                    value={step.name}
+                    onChange={e =>
+                      setDraft(d => {
+                        const steps = [...d.steps];
+                        steps[i] = { ...steps[i], name: e.target.value };
+                        return { ...d, steps };
+                      })
+                    }
+                    className="rounded-lg border border-border px-3 py-1.5 text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                  <input
+                    type="text"
+                    lang="ar"
+                    dir="rtl"
+                    placeholder={t('stepNameAr')}
+                    value={stepAr.name}
+                    onChange={e =>
+                      setDraft(d => {
+                        const stepsAr = [...(d.stepsAr ?? [])];
+                        while (stepsAr.length <= i) stepsAr.push({ name: '', text: '' });
+                        stepsAr[i] = { ...stepsAr[i], name: e.target.value };
+                        return { ...d, stepsAr };
+                      })
+                    }
+                    className="rounded-lg border border-border px-3 py-1.5 text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                </div>
+                {draft.steps.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setDraft(d => ({
+                        ...d,
+                        steps: d.steps.filter((_, idx) => idx !== i),
+                        stepsAr: (d.stepsAr ?? []).filter((_, idx) => idx !== i),
+                      }))
+                    }
+                    className="text-destructive hover:text-destructive/80 text-xs"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <textarea
+                  rows={2}
+                  placeholder={t('stepInstruction')}
+                  value={step.text}
+                  onChange={e =>
+                    setDraft(d => {
+                      const steps = [...d.steps];
+                      steps[i] = { ...steps[i], text: e.target.value };
+                      return { ...d, steps };
+                    })
                   }
-                  className="text-destructive hover:text-destructive/80 text-xs"
-                >
-                  ✕
-                </button>
-              )}
+                  className="rounded-lg border border-border px-3 py-1.5 text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                />
+                <textarea
+                  rows={2}
+                  lang="ar"
+                  dir="rtl"
+                  placeholder={t('stepInstructionAr')}
+                  value={stepAr.text}
+                  onChange={e =>
+                    setDraft(d => {
+                      const stepsAr = [...(d.stepsAr ?? [])];
+                      while (stepsAr.length <= i) stepsAr.push({ name: '', text: '' });
+                      stepsAr[i] = { ...stepsAr[i], text: e.target.value };
+                      return { ...d, stepsAr };
+                    })
+                  }
+                  className="rounded-lg border border-border px-3 py-1.5 text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                />
+              </div>
             </div>
-            <textarea
-              rows={2}
-              placeholder={t('stepInstruction')}
-              value={step.text}
-              onChange={e =>
-                setDraft(d => {
-                  const steps = [...d.steps];
-                  steps[i] = { ...steps[i], text: e.target.value };
-                  return { ...d, steps };
-                })
-              }
-              className="w-full rounded-lg border border-border px-3 py-1.5 text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
-            />
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <div className="flex items-center gap-2">
