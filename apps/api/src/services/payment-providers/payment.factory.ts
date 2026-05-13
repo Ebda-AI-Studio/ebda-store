@@ -4,6 +4,9 @@ import { AppError } from '../../middleware/error-handler';
 import logger from '../../lib/logger';
 import { encryption } from '../encryption.service';
 import { OrderService } from '../order.service';
+import { socketService } from '../socket.service';
+import { inngest } from '../../lib/inngest/client';
+import { OneSignalService } from '../onesignal.service';
 import {
   IPaymentProvider,
   PaymentProvider,
@@ -699,12 +702,23 @@ export class PaymentService {
     // Parse webhook using the structured payload object
     const webhookData = p.parseWebhook(payload);
 
-    // Find and update payment
+    // Find and update payment. Include `order.customer` + `order.store` so we
+    // can render the customer's name and store name in the post-status
+    // notifications fired below — order.service.ts deferred those for online-
+    // payment orders so they fire ONCE, AFTER the webhook confirms the
+    // payment outcome (success or failure), not at order-creation time.
     const payment = await prisma.payment.findFirst({
       where: {
         OR: [{ transactionId: webhookData.transactionId }, { invoiceId: webhookData.invoiceId }],
       },
-      include: { order: true },
+      include: {
+        order: {
+          include: {
+            customer: true,
+            store: { select: { name: true } },
+          },
+        },
+      },
     });
 
     if (!payment) {
@@ -759,6 +773,77 @@ export class PaymentService {
           paymentStatus: orderPaymentStatus,
         },
       });
+    }
+
+    // Online-payment notifications fire HERE, not at order creation. order.service.ts
+    // intentionally skips its inngest.send + socket emit for non-COD orders so a
+    // customer who abandons at the gateway doesn't produce a phantom "new order"
+    // ping on the merchant side. We fire on the FIRST transition out of pending:
+    //   - completed → "new order" fanout (emails, push, dispatcher, socket toast)
+    //   - failed / expired / cancelled → "payment failed" push to admins only
+    //     (customer sees the failure inline at the gateway / checkout error page)
+    // Idempotency lives upstream in the webhook route (checkIdempotency), so a
+    // duplicate webhook never reaches this code path twice.
+    const order = payment.order;
+    const shipping = (order.shippingAddress ?? {}) as Record<string, string | undefined>;
+    const customerName =
+      `${order.customer?.firstName ?? shipping.firstName ?? ''} ${order.customer?.lastName ?? shipping.lastName ?? ''}`.trim() ||
+      order.customer?.email ||
+      shipping.email ||
+      'Customer';
+
+    if (webhookData.status === 'completed') {
+      inngest
+        .send({
+          name: 'order/created',
+          data: {
+            orderId: order.id,
+            storeId: order.storeId,
+            paymentMethod: payment.provider,
+            locale: order.locale ?? undefined,
+          },
+        })
+        .catch(err =>
+          logger.error(
+            { err, orderId: order.id },
+            '[PAYMENT WEBHOOK] Failed to enqueue post-payment order/created'
+          )
+        );
+
+      try {
+        socketService.newOrderNotification(order.storeId, {
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          total: order.total,
+          customerName,
+        });
+      } catch (notifyError) {
+        logger.error(
+          { err: notifyError, orderId: order.id },
+          '[PAYMENT WEBHOOK] Socket emit failed'
+        );
+      }
+    } else if (
+      webhookData.status === 'failed' ||
+      webhookData.status === 'expired' ||
+      webhookData.status === 'cancelled'
+    ) {
+      OneSignalService.notifyAdminsOfPaymentFailure({
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        storeId: order.storeId,
+        storeName: order.store?.name ?? order.storeId,
+        customerName,
+        total: order.total,
+        currency: order.currency,
+        paymentMethod: payment.provider,
+        reason: webhookData.status,
+      }).catch(err =>
+        logger.error(
+          { err, orderId: order.id },
+          '[PAYMENT WEBHOOK] Payment-failure notification failed'
+        )
+      );
     }
 
     return { success: true, status: webhookData.status, orderId: payment.orderId };

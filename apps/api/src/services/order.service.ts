@@ -431,39 +431,39 @@ export class OrderService {
         .catch(err => logger.error({ err }, 'Affiliate referral link failed'));
     }
 
-    // Order is committed — fan out the email/push/dispatcher work onto
-    // the Inngest queue so a slow SMTP host or OneSignal hiccup can't
-    // block the checkout response (this previously caused 45s+
-    // "Processing…" hangs on the storefront). The order/created
-    // handler in lib/inngest/functions/order-created.ts re-fetches the
-    // order from Postgres and runs each side effect as its own
-    // retryable step.
-    inngest
-      .send({
-        name: 'order/created',
-        data: {
-          orderId: order.id,
-          storeId,
-          paymentMethod: data.paymentMethod,
-          locale: order.locale ?? undefined,
-        },
-      })
-      .catch(err => logger.error({ err, orderId: order.id }, 'Failed to enqueue order/created'));
+    // Notifications: only fire NOW for COD orders. For online-payment orders
+    // (Tap / MyFatoorah / Hesabe / UPayments) the customer hasn't actually
+    // paid yet at this point — firing emails / push / dispatcher here would
+    // produce "new order" pings that turn into ghosts when the customer
+    // abandons at the gateway and the order rolls back. Online-payment
+    // notifications fire from PaymentService.handleWebhook once payment
+    // transitions to 'completed' (see payment.factory.ts).
+    if (data.paymentMethod === 'cod') {
+      inngest
+        .send({
+          name: 'order/created',
+          data: {
+            orderId: order.id,
+            storeId,
+            paymentMethod: data.paymentMethod,
+            locale: order.locale ?? undefined,
+          },
+        })
+        .catch(err => logger.error({ err, orderId: order.id }, 'Failed to enqueue order/created'));
 
-    // WebSocket emit stays in-process — it's a free local dispatch and
-    // the admin page expects the toast within ~1s of order creation.
-    try {
-      socketService.newOrderNotification(storeId, {
-        orderId: order.id,
-        orderNumber: order.orderNumber,
-        total: order.total,
-        customerName:
-          `${order.customer?.firstName || ''} ${order.customer?.lastName || ''}`.trim() ||
-          order.customer?.email ||
-          'Customer',
-      });
-    } catch (notifyError) {
-      logger.error({ err: notifyError }, 'Failed to send order notification');
+      try {
+        socketService.newOrderNotification(storeId, {
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          total: order.total,
+          customerName:
+            `${order.customer?.firstName || ''} ${order.customer?.lastName || ''}`.trim() ||
+            order.customer?.email ||
+            'Customer',
+        });
+      } catch (notifyError) {
+        logger.error({ err: notifyError }, 'Failed to send order notification');
+      }
     }
 
     return order;

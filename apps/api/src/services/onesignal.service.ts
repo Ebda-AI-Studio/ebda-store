@@ -278,6 +278,99 @@ export class OneSignalService {
   }
 
   /**
+   * Push a payment-failure notification to admins of the store + super_admins.
+   * Fired from PaymentService.handleWebhook on status: failed / expired /
+   * cancelled. Customer is NOT notified — they see the failure inline at the
+   * gateway / on the checkout error page.
+   */
+  static async notifyAdminsOfPaymentFailure(
+    input: NotifyOrderInput & { reason?: string }
+  ): Promise<void> {
+    if (!isAdminConfigured()) {
+      logger.warn(
+        {
+          hasAppId: !!config.onesignalAdminAppId,
+          hasRestKey: !!config.onesignalAdminRestApiKey,
+        },
+        'Admin OneSignal not configured — skipping payment-failure notification'
+      );
+      return;
+    }
+
+    const url = adminOrderUrl(input.storeId, input.orderId);
+    const dataPayload = {
+      type: 'order.payment_failed',
+      orderId: input.orderId,
+      storeId: input.storeId,
+      storeName: input.storeName,
+      reason: input.reason,
+    };
+    const sharedFields = {
+      app_id: config.onesignalAdminAppId,
+      url,
+      web_buttons: [{ id: 'view-order', text: 'View order', url }],
+      data: dataPayload,
+    };
+    const moneyText = formatMoney(input.total, input.currency);
+    const reasonSuffix = input.reason ? ` (${input.reason})` : '';
+
+    const [storeAdminPlayerIds, superAdminPlayerIds] = await Promise.all([
+      this.getAdminPlayerIds({ role: 'store_admin', ownsStoreId: input.storeId }),
+      this.getAdminPlayerIds({ role: 'super_admin' }),
+    ]);
+
+    const storeAdminBody = {
+      ...sharedFields,
+      headings: { en: 'Payment failed', ar: 'فشل الدفع' },
+      contents: {
+        en: `${input.orderNumber} — ${input.customerName} — ${moneyText}${reasonSuffix}`,
+        ar: `${input.orderNumber} — ${input.customerName} — ${moneyText}${reasonSuffix}`,
+      },
+      ...(storeAdminPlayerIds.length > 0
+        ? { include_player_ids: storeAdminPlayerIds }
+        : { filters: [{ field: 'tag', key: 'store_id', relation: '=', value: input.storeId }] }),
+    };
+
+    const superAdminBody = {
+      ...sharedFields,
+      headings: { en: 'Payment failed', ar: 'فشل الدفع' },
+      contents: {
+        en: `${input.storeName} — ${input.orderNumber} — ${moneyText}${reasonSuffix}`,
+        ar: `${input.storeName} — ${input.orderNumber} — ${moneyText}${reasonSuffix}`,
+      },
+      ...(superAdminPlayerIds.length > 0
+        ? { include_player_ids: superAdminPlayerIds }
+        : { filters: [{ field: 'tag', key: 'role', relation: '=', value: 'super_admin' }] }),
+    };
+
+    const send = async (body: unknown, audience: 'store_admin' | 'super_admin') => {
+      try {
+        const res = await fetch(ENDPOINT, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Key ${config.onesignalAdminRestApiKey}`,
+          },
+          body: JSON.stringify(body),
+        });
+        const responseText = await res.text().catch(() => '');
+        if (!res.ok) {
+          logger.error(
+            { status: res.status, body: responseText, audience },
+            'OneSignal payment-failure push failed'
+          );
+          return;
+        }
+        logger.info({ audience }, 'OneSignal payment-failure push sent');
+      } catch (err) {
+        logger.error({ err, audience }, 'OneSignal payment-failure push threw');
+      }
+    };
+
+    await Promise.all([send(storeAdminBody, 'store_admin'), send(superAdminBody, 'super_admin')]);
+  }
+
+  /**
    * Resolve the OneSignal player_ids for a given admin audience by
    * joining `User` (filtered by role / store ownership) against
    * `OneSignalSubscription`. Used by `notifyAdminsOfOrder` to target
