@@ -734,7 +734,17 @@ router.get(
       // Best-effort: refresh Resend status alongside. Failure shouldn't block
       // the admin page from rendering — the storefront domain status is the
       // primary concern; the email DNS records are secondary.
-      let resendRecords: Array<{ type: string; name: string; value: string }> = [];
+      // `priority` (MX-only, Resend's AWS SES feedback MX defaults to 10)
+      // and `ttl` (string, e.g. "Auto" or seconds) are preserved through
+      // the merge. Without them merchants hit registrar fields they don't
+      // know how to fill — caught on wadyaljuz.com 2026-05-13.
+      let resendRecords: Array<{
+        type: string;
+        name: string;
+        value: string;
+        priority?: number;
+        ttl?: string;
+      }> = [];
       if (storeRow?.emailDomainId) {
         try {
           const refreshed = await ResendService.refreshDomainStatus(id);
@@ -742,6 +752,8 @@ router.get(
             type: r.type,
             name: r.name,
             value: r.value,
+            ...(typeof r.priority === 'number' ? { priority: r.priority } : {}),
+            ...(r.ttl ? { ttl: r.ttl } : {}),
           }));
         } catch (err) {
           logger.warn(

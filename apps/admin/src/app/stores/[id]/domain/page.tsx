@@ -24,7 +24,13 @@ export default function StoreDomainPage() {
     domain: string;
     verified: boolean;
     misconfigured: boolean;
-    dnsRecords: Array<{ type: string; name: string; value: string }>;
+    dnsRecords: Array<{
+      type: string;
+      name: string;
+      value: string;
+      priority?: number;
+      ttl?: string;
+    }>;
     emailSender?: { domainId: string | null; status: string | null; verifiedAt: string | null };
   } | null>(null);
   const [domainError, setDomainError] = useState('');
@@ -37,7 +43,13 @@ export default function StoreDomainPage() {
         domain: string;
         verified: boolean;
         misconfigured: boolean;
-        dnsRecords: Array<{ type: string; name: string; value: string }>;
+        dnsRecords: Array<{
+          type: string;
+          name: string;
+          value: string;
+          priority?: number;
+          ttl?: string;
+        }>;
         emailSender?: { domainId: string | null; status: string | null; verifiedAt: string | null };
       }>(`/api/v1/stores/${storeId}/domain`);
       if (data) setDomainStatus(data);
@@ -306,6 +318,12 @@ export default function StoreDomainPage() {
                                 <th scope="col" className="px-3 py-2 text-start font-medium">
                                   {t('colValue')}
                                 </th>
+                                <th scope="col" className="px-3 py-2 text-start font-medium">
+                                  {t('colPriority')}
+                                </th>
+                                <th scope="col" className="px-3 py-2 text-start font-medium">
+                                  {t('colTtl')}
+                                </th>
                               </tr>
                             </thead>
                             <tbody>
@@ -322,8 +340,8 @@ export default function StoreDomainPage() {
                                         base64 strings — without `break-all` the cell
                                         either truncates with overflow:hidden or runs
                                         off the right edge of the layout. `align-top`
-                                        keeps short cells (type, name) aligned with
-                                        the first line of the wrapped value. */}
+                                        keeps short cells (type, name, priority, ttl)
+                                        aligned with the first line of the wrapped value. */}
                                     <div className="flex items-start justify-between gap-2">
                                       <span className="flex-1 min-w-0 select-all">
                                         {record.value}
@@ -340,6 +358,22 @@ export default function StoreDomainPage() {
                                         Copy
                                       </button>
                                     </div>
+                                  </td>
+                                  {/* MX records require a priority at registrars; for
+                                      all other types the field is left empty so the
+                                      merchant doesn't try to enter something. */}
+                                  <td className="px-3 py-2 font-mono text-xs align-top whitespace-nowrap text-muted-foreground">
+                                    {typeof record.priority === 'number'
+                                      ? record.priority
+                                      : record.type === 'MX'
+                                        ? 10
+                                        : '—'}
+                                  </td>
+                                  {/* TTL defaults to 1 hour (3600) when the provider
+                                      didn't return one — that's the GoDaddy default
+                                      and the safe value for every DNS record. */}
+                                  <td className="px-3 py-2 font-mono text-xs align-top whitespace-nowrap text-muted-foreground">
+                                    {record.ttl ?? '1 Hour'}
                                   </td>
                                 </tr>
                               )) ||
@@ -361,6 +395,12 @@ export default function StoreDomainPage() {
                                     <td className="px-3 py-2 font-mono text-xs align-top break-all">
                                       76.76.21.21
                                     </td>
+                                    <td className="px-3 py-2 font-mono text-xs align-top whitespace-nowrap text-muted-foreground">
+                                      —
+                                    </td>
+                                    <td className="px-3 py-2 font-mono text-xs align-top whitespace-nowrap text-muted-foreground">
+                                      1 Hour
+                                    </td>
                                   </tr>
                                 ) : (
                                   <tr>
@@ -372,6 +412,12 @@ export default function StoreDomainPage() {
                                     </td>
                                     <td className="px-3 py-2 font-mono text-xs align-top break-all">
                                       cname.vercel-dns.com
+                                    </td>
+                                    <td className="px-3 py-2 font-mono text-xs align-top whitespace-nowrap text-muted-foreground">
+                                      —
+                                    </td>
+                                    <td className="px-3 py-2 font-mono text-xs align-top whitespace-nowrap text-muted-foreground">
+                                      1 Hour
                                     </td>
                                   </tr>
                                 ))}
