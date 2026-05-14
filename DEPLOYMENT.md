@@ -367,11 +367,13 @@ catches something the others can't.
 ### 1. UptimeRobot — "process is gone / URL unreachable"
 
 - **Dashboard**: https://uptimerobot.com
+- **Public status page**: https://stats.uptimerobot.com/23nuarbz3h — merchant-facing self-service for incident state (closes iceberg item "no public status page", 2026-05-15 audit)
 - **Active monitors**:
   - `FWB API` → `https://store-api.forcemediakw.com/health` — HTTPS, 5-min interval, 30s timeout, alert on 2 consecutive failures
   - `FWB store · wadyaljuz.com` → `https://wadyaljuz.com` — same settings
+  - `FWB admin` → `https://app.forcemediakw.com` — same settings (added 2026-05-15)
 - **Alert routing**: UptimeRobot mobile app push (instant on iPhone/Android, free tier, replaces Telegram which is paid-tier on UptimeRobot). The bridge to Telegram is via the in-API channel below for code-level alerts.
-- **Adding a new merchant**: clone the existing storefront monitor, swap the URL to the merchant's domain, name it `FWB store · <slug>`. Attach the same mobile-push alert contact.
+- **Adding a new merchant**: clone the existing storefront monitor, swap the URL to the merchant's domain, name it `FWB store · <slug>`. Attach the same mobile-push alert contact. Also add it to the public status page.
 
 ### 2. Sentry — "code threw"
 
@@ -416,7 +418,7 @@ Railway's stdout buffer is ephemeral (~72h on the Pro plan, less on Hobby). With
 
 **Why not Railway's native log drain feature**: Railway gates the dashboard "Log Drains" config behind the **Pro plan** ($20/mo per service). On Hobby/Trial the option isn't visible. To keep BetterStack working on any Railway plan, the API streams logs from inside the Node process via a pino transport — no Railway-level config required.
 
-- **Provider**: BetterStack Logs (free tier: 3 GB ingest/month, 3-day retention; swap to Axiom 500GB/30d free when scale demands)
+- **Provider**: BetterStack Logs free tier — **3 GB ingest/month, 3-day retention (verified 2026-05-15 against BetterStack pricing page)**. ⚠️ This violates CLAUDE.md rule 11 (≥30-day retention required). Migration path: Axiom free tier (500 GB/month, 30-day retention) using `@axiomhq/pino` transport — same env-var shape, drop-in replacement. Tracked in `docs/superpowers/plans/2026-05-15-iceberg-audit-followup.md` as Top-10 gap #1.
 - **Source**: `force-api-railway` (eu-fsn-3 region)
 - **Transport**: `@logtail/pino` in `apps/api/src/lib/logger.ts` — pino multi-transport sends every log line to stdout AND BetterStack in parallel (Railway logs UI keeps working untouched)
 - **Env vars (Railway)**:
@@ -477,6 +479,18 @@ curl https://store-api.forcemediakw.com/health
 - **P0** (server unreachable, payment HMAC repeated fail, data loss): respond within 15 min, 24/7
 - **P1** (degraded, AI quota exhausted, cron failed past final retry, deep-health degraded): respond within 4 hours
 - **Info** (deploy notifications, scheduled job summaries): no SLA
+
+### Cloud cost alerts (added 2026-05-15 per iceberg audit Quick Win #4)
+
+Each hosting/data provider's billing dashboard fires an email to the account owner when spend or usage crosses a threshold. A runaway AI sweep, bot scrape, or cron loop can otherwise spike costs 10× silently. Verified per-provider:
+
+| Provider | Alert           | Threshold                        |
+| -------- | --------------- | -------------------------------- |
+| Railway  | Budget alert    | spend > 80% of monthly budget    |
+| Neon     | Compute credits | usage > 80% of monthly credits   |
+| Vercel   | Spending limit  | hard cap configured in dashboard |
+
+Renewal verification: re-check these in the per-provider dashboard quarterly — providers occasionally migrate billing UIs and silently drop alert rules.
 
 ### Account ownership
 
