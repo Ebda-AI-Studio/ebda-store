@@ -7,6 +7,8 @@ import { OrderService } from '../order.service';
 import { socketService } from '../socket.service';
 import { inngest } from '../../lib/inngest/client';
 import { OneSignalService } from '../onesignal.service';
+import { redis } from '../redis.service';
+import { sendAlert } from '../alerts.service';
 import {
   IPaymentProvider,
   PaymentProvider,
@@ -695,6 +697,42 @@ export class PaymentService {
     if (signature) {
       const verifyTarget: unknown = rawBody !== undefined ? rawBody : payload;
       if (!p.verifyWebhook(verifyTarget, signature)) {
+        // HMAC verification failed — could be a single misconfigured test
+        // webhook (noise) or a real attacker / rotated credential (signal).
+        // Throttle via redis counter: 3+ failures from the same provider
+        // + store in 5 minutes = real, fire a P0 alert. Single fails just
+        // throw without alerting.
+        try {
+          const counterKey = `payment-hmac-fail:${provider}:${storeId ?? 'platform'}`;
+          const count = await redis.incrementRateLimit(counterKey, 300);
+          if (count >= 3) {
+            void sendAlert({
+              level: 'p0',
+              scope: storeId ? 'store' : 'platform',
+              ...(storeId
+                ? {
+                    store: {
+                      id: storeId,
+                      name:
+                        (
+                          await prisma.store.findUnique({
+                            where: { id: storeId },
+                            select: { name: true },
+                          })
+                        )?.name ?? storeId,
+                    },
+                  }
+                : {}),
+              source: 'payment.webhook.hmac_fail',
+              title: 'payment.webhook.hmac_fail',
+              body: `${provider} webhook signature failed ${count} times in 5 min — likely a rotated webhook secret on the provider side or an attacker.`,
+              context: { provider, storeId, failureCount: count },
+            }).catch(() => undefined);
+          }
+        } catch {
+          // Never let alert bookkeeping break the actual security check —
+          // the throw below is the load-bearing action.
+        }
         throw new AppError(400, 'INVALID_SIGNATURE', 'Invalid webhook signature');
       }
     }

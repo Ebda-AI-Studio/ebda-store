@@ -9,7 +9,12 @@ import { bulkAiSeo } from './bulk-ai-seo';
 import { bulkAiFaqAeo, bulkAiHowtoAeo, bulkAiMetaAeo } from './bulk-ai-aeo';
 import { reviewRequest } from './review-request';
 import { reviewModeration } from './review-moderation';
-import { abandonedCartPurge, softDeletedUserAnonymize } from './data-retention';
+import {
+  abandonedCartPurge,
+  softDeletedUserAnonymize,
+  orderAnonymizeAtFiveYears,
+} from './data-retention';
+import { alertsFailureWatch } from './alerts-failure-watch';
 
 /**
  * Registry of every Inngest function the API exposes. The serve
@@ -32,4 +37,6 @@ export const inngestFunctions: InngestFunction.Any[] = [
   reviewModeration,
   abandonedCartPurge,
   softDeletedUserAnonymize,
+  orderAnonymizeAtFiveYears,
+  alertsFailureWatch,
 ];

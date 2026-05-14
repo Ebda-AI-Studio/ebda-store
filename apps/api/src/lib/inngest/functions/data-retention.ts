@@ -29,11 +29,18 @@ import { auditLog } from '../../../middleware/security';
 
 const ABANDONED_CART_RETENTION_DAYS = 30;
 const SOFT_DELETED_USER_RETENTION_DAYS = 365;
+// Kuwait MOF tax record retention is 5 years from invoice issue.
+// After that the order row is no longer required for tax compliance
+// and its PII snapshots (already nullified at customer-erase time,
+// but not for orders whose customer never asked to be erased) need
+// to be scrubbed under Kuwait Law 13/2023 storage limitation.
+const ORDER_ANONYMIZE_RETENTION_DAYS = 365 * 5; // 1825 days
 
 // Caps per run so a one-time historical backlog doesn't open
 // thousands of Prisma transactions in a single tick.
 const ABANDONED_CART_BATCH_CAP = 10_000;
 const USER_ANONYMIZE_BATCH_CAP = 200;
+const ORDER_ANONYMIZE_BATCH_CAP = 500;
 
 export const abandonedCartPurge: InngestFunction.Any = inngest.createFunction(
   {
@@ -138,6 +145,98 @@ export const softDeletedUserAnonymize: InngestFunction.Any = inngest.createFunct
     logger.info(
       { cutoff, candidates: candidates.length, anonymized, failed },
       'soft-deleted-user-anonymize: completed'
+    );
+    return { anonymized, failed };
+  }
+);
+
+/**
+ * Order anonymization at 5 years.
+ *
+ * Kuwait MOF requires invoice retention ≥5 years for tax compliance.
+ * After that window the order ROW can still survive (financial record)
+ * but its PII snapshots must go (Kuwait Law 13/2023 + GDPR Art. 5(1)(e)
+ * storage limitation).
+ *
+ * The eraseAccount path already scrubs orders' shipping/billing JSON
+ * to `{ anonymized: true }` and nulls customerId AT CUSTOMER-ERASE TIME.
+ * But orders whose customer NEVER asked to be erased (most cases) keep
+ * their PII forever without this cron.
+ *
+ * Candidate: order.createdAt < now - 5y AND shippingAddress NOT already
+ * `{anonymized:true}` (idempotent — re-runs skip already-scrubbed rows).
+ * No-op until the first orders age into the 5y window (earliest FWB
+ * order is 2026-04-26 → first run with candidates lands ~2031-04-26).
+ *
+ * Schedule: monthly, 1st of month 03:30 UTC (offset from the user
+ * anonymization at 02:00 + audit-log archive at 03:00 to spread Neon I/O).
+ */
+export const orderAnonymizeAtFiveYears: InngestFunction.Any = inngest.createFunction(
+  {
+    id: 'order-anonymize-5y-monthly',
+    name: 'Anonymize orders older than 5 years (Kuwait MOF retention window)',
+    retries: 2,
+    triggers: [{ cron: '30 3 1 * *' }],
+  },
+  async ({ step }) => {
+    const cutoff = new Date(Date.now() - ORDER_ANONYMIZE_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+
+    const candidates = await step.run('find-candidates', () =>
+      prisma.order.findMany({
+        where: {
+          createdAt: { lt: cutoff },
+          // Skip rows already anonymized (idempotent re-runs).
+          // The eraseAccount path writes {anonymized: true}; checking
+          // for `path: ['anonymized'], equals: true` is the prisma
+          // way to query inside JSONB.
+          NOT: {
+            shippingAddress: {
+              path: ['anonymized'],
+              equals: true,
+            },
+          },
+        },
+        select: { id: true },
+        take: ORDER_ANONYMIZE_BATCH_CAP,
+        orderBy: { createdAt: 'asc' },
+      })
+    );
+
+    if (candidates.length === 0) {
+      logger.info({ cutoff }, 'order-anonymize-5y: nothing to anonymize');
+      return { anonymized: 0 };
+    }
+
+    let anonymized = 0;
+    let failed = 0;
+    const anonymizedJson = { anonymized: true } as const;
+
+    for (const { id } of candidates) {
+      try {
+        await step.run(`anonymize-${id}`, async () => {
+          await prisma.order.update({
+            where: { id },
+            data: {
+              customerId: null,
+              shippingAddress: anonymizedJson,
+              billingAddress: anonymizedJson,
+              customerNotes: null,
+            },
+          });
+        });
+        anonymized += 1;
+      } catch (err) {
+        failed += 1;
+        logger.error(
+          { err, orderId: id, cutoff },
+          'order-anonymize-5y: row failed, will retry next run'
+        );
+      }
+    }
+
+    logger.info(
+      { cutoff, candidates: candidates.length, anonymized, failed },
+      'order-anonymize-5y: completed'
     );
     return { anonymized, failed };
   }

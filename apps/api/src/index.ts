@@ -319,9 +319,25 @@ app.get(
     // Get email queue stats
     const emailStats = await emailQueue.getStats();
 
-    // Determine overall status
+    // Determine overall status. Database disconnect is treated as the
+    // load-bearing failure (we can't serve anything without it). Redis
+    // being unavailable degrades caching but the API still works.
     const isHealthy = checks.database.status === 'connected';
     const status = isHealthy ? 'healthy' : 'degraded';
+
+    // P1 alert when the deep health check reports degraded. Throttled
+    // via alerts.service so a flapping DB won't fire-storm Telegram —
+    // first alert lands, subsequent ones within 5min get suppressed.
+    if (!isHealthy) {
+      void sendAlert({
+        level: 'p1',
+        scope: 'platform',
+        source: 'api.health.deep_check',
+        title: 'health check degraded',
+        body: `Deep health check returned status=${status}. Investigate Neon / Railway / circuit breakers.`,
+        context: { checks, circuits, emailQueue: emailStats },
+      }).catch(() => undefined);
+    }
 
     res.status(isHealthy ? 200 : 503).json({
       success: true,
