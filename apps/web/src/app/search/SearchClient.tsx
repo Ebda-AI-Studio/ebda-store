@@ -246,7 +246,7 @@ function SearchContent() {
                     },
                     ...categories.map(cat => ({ value: cat.id, label: cat.name })),
                   ]}
-                  className="h-9 rounded-lg border border-border bg-background px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  className="h-11 rounded-lg border border-border bg-background px-3 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 sm:h-9 sm:text-sm"
                 />
               </div>
             )}
