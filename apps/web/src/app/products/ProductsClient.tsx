@@ -385,11 +385,16 @@ export default function ProductsClient({
                   </>
                 )}
               </p>
-              <div className="flex items-center gap-4">
+              {/* On mobile the two selects squeezed into a single row
+                  truncated their option text ("12" → "1<", "الأحدث" →
+                  "الأحد...") because each picked content-width inside
+                  the flex row. Stack column-on-mobile so each occupies
+                  a full line; restore side-by-side at sm. */}
+              <div className="flex w-full flex-col items-stretch gap-3 sm:w-auto sm:flex-row sm:items-center sm:gap-4">
                 {/* Per-page — shoppers can see more products on a single
                     page instead of paginating. Allow-list capped at 96.
                     Persisted to localStorage. */}
-                <div className="flex items-center gap-2">
+                <div className="flex flex-1 items-center gap-2 sm:flex-initial">
                   <Select
                     label={t('Show:', 'عرض:')}
                     value={String(perPage)}
@@ -408,7 +413,7 @@ export default function ProductsClient({
                 </div>
 
                 {/* Sort */}
-                <div className="flex items-center gap-2">
+                <div className="flex flex-1 items-center gap-2 sm:flex-initial">
                   <Select
                     label={t('Sort by:', '\u062a\u0631\u062a\u064a\u0628 \u062d\u0633\u0628:')}
                     value={sortBy}

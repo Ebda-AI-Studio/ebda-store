@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { Suspense } from 'react';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { Plus_Jakarta_Sans, IBM_Plex_Sans_Arabic } from 'next/font/google';
 import { ToastProvider } from '@force/ui';
 import { LanguageProvider } from '../contexts/LanguageContext';
@@ -110,6 +110,17 @@ export const viewport: Viewport = {
 export async function generateMetadata(): Promise<Metadata> {
   const store = await getStore();
   const siteUrl = getSiteUrl(store);
+
+  // Detect whether we're rendering for the merchant's custom domain
+  // (wadyaljuz.com) vs the platform path (store.forcemediakw.com/<slug>).
+  // The signal is the request host header. When on the custom domain,
+  // GSC verification needs the merchant's own token — emitting the
+  // platform token alongside breaks verification (GSC reads only the
+  // first meta tag) AND leaks "this site is hosted by Force" to crawlers
+  // that scan the meta tags. On the platform path, the platform token
+  // owns the domain and is what GSC verifies against.
+  const requestHost = (await headers()).get('host')?.toLowerCase() ?? '';
+  const isOnCustomDomain = !!(store.domain && requestHost === store.domain.toLowerCase());
 
   // Honour the admin's `defaultLanguage` setting when picking which SEO copy
   // to surface. The arabic meta fields existed in the resolver and admin form
@@ -254,15 +265,24 @@ export async function generateMetadata(): Promise<Metadata> {
           },
         }
       : {}),
-    // Platform-level Google Search Console verification for
-    // `store.forcemediakw.com`. The token is meant to be public (Google
-    // fetches the meta tag from a public URL), so it lives in source.
-    // Per-store tokens are layered on top so individual merchants can
-    // also verify their own custom domains independently.
+    // Google Search Console verification. Two layers:
+    //   - Platform token (`gzm3VDX...`) verifies the platform domain
+    //     `store.forcemediakw.com`. Applies on the platform path
+    //     (store.forcemediakw.com/<slug>) only.
+    //   - Per-store token (`Store.googleSiteVerification`) verifies the
+    //     merchant's own custom domain. Applies only when the request
+    //     is being served for that custom domain.
+    // The two domains have DIFFERENT GSC accounts that don't share
+    // ownership — emitting the wrong token on the wrong host breaks
+    // verification AND leaks the hosting relationship. Host-aware
+    // selection below: customer-facing domain ⇒ per-store only; platform
+    // path ⇒ platform + per-store (if set).
     verification: {
-      google: store.googleSiteVerification
-        ? ['gzm3VDXL0OakVx_Rf4ytQZSyWZeW4nHg0WLcvxsehVI', store.googleSiteVerification]
-        : 'gzm3VDXL0OakVx_Rf4ytQZSyWZeW4nHg0WLcvxsehVI',
+      google: isOnCustomDomain
+        ? (store.googleSiteVerification ?? undefined)
+        : store.googleSiteVerification
+          ? ['gzm3VDXL0OakVx_Rf4ytQZSyWZeW4nHg0WLcvxsehVI', store.googleSiteVerification]
+          : 'gzm3VDXL0OakVx_Rf4ytQZSyWZeW4nHg0WLcvxsehVI',
     },
   };
 }
