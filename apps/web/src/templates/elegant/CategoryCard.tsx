@@ -19,8 +19,11 @@ export default function ElegantCategoryCard({
       prefetch={false}
       className="group block outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 cursor-pointer"
     >
-      {/* Image container with elegant aspect ratio */}
-      <div className="relative aspect-[2/3] overflow-hidden bg-muted mb-6">
+      {/* Image container with elegant aspect ratio.
+          Mobile-tame: aspect-square (1:1) on phones so a 2-col grid of
+          categories doesn't blow past a screen height each. Original
+          tall 2/3 ratio kept on sm+ where there's room. */}
+      <div className="relative aspect-square sm:aspect-[2/3] overflow-hidden bg-muted mb-6">
         {category.image ? (
           <img
             src={category.image}

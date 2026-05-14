@@ -34,11 +34,17 @@ export default function ElegantHero({
       style={{ animation: 'elegantFadeIn 0.5s ease-out both' }}
     >
       {image ? (
-        /* Asymmetric layout: image 60% + text 40% */
-        <div className="flex flex-col lg:flex-row min-h-[85vh]">
+        /* Asymmetric layout: image 60% + text 40%.
+           Mobile heights tightened 2026-05-14: the previous min-h-[85vh] /
+           min-h-[50vh] combination meant mobile visitors saw a stack where
+           BOTH the image half and the text half could clear screen height,
+           so they'd scroll a full extra viewport before seeing categories /
+           products. Scaled the floors down for mobile + small tablets,
+           kept the desktop 85vh feel via lg: variant. */
+        <div className="flex flex-col lg:flex-row min-h-[60vh] sm:min-h-[75vh] lg:min-h-[85vh]">
           {/* Image side — 60% */}
           <div
-            className={`relative w-full lg:w-[60%] min-h-[50vh] lg:min-h-full ${isRtl ? 'lg:order-2' : 'lg:order-1'} overflow-hidden`}
+            className={`relative w-full lg:w-[60%] aspect-[4/3] sm:aspect-[16/10] lg:aspect-auto lg:min-h-full ${isRtl ? 'lg:order-2' : 'lg:order-1'} overflow-hidden`}
           >
             <Image
               src={image}

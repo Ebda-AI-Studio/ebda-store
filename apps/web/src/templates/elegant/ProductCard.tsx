@@ -73,8 +73,12 @@ function ElegantProductCard({
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        {/* Image — fashion portrait ratio */}
-        <div className="relative aspect-[3/4] overflow-hidden bg-gray-50 mb-4">
+        {/* Image — fashion portrait ratio.
+            Mobile-tame: aspect-square (1:1) on phones so 2-up grocery
+            grids don't push each card past 450px tall (especially with
+            the no-image fallback, which paints a huge empty area).
+            Original 3/4 portrait restored on sm+ where there's room. */}
+        <div className="relative aspect-square sm:aspect-[3/4] overflow-hidden bg-gray-50 mb-4">
           {onToggleCompare && (
             <CompareButton
               productId={product.id}
