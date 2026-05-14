@@ -1,0 +1,80 @@
+'use client';
+
+import { useEffect, type ReactNode } from 'react';
+import posthog from 'posthog-js';
+import { useConsent } from '../contexts/ConsentContext';
+
+/**
+ * PostHog product analytics — storefront side.
+ *
+ * Gated on the marketing consent cookie because PostHog captures
+ * page views + click data + visitor identifiers, which falls under
+ * the GDPR / Kuwait Law 13/2023 "analytics cookies" category and
+ * requires opt-in. Same gate as the Meta / GA / TikTok pixels.
+ *
+ * Init flow:
+ *   1. Visitor lands → consent banner shows (no PostHog loaded).
+ *   2. Visitor clicks "Accept all" or "Customize → marketing on".
+ *   3. setConsent({marketing:true}) writes the cookie + reloads.
+ *   4. After reload, this provider sees consent.marketing === true
+ *      and calls posthog.init() ONCE for the session.
+ *   5. Subsequent route changes auto-capture via posthog's
+ *      browser-router hook.
+ *
+ * No-op when NEXT_PUBLIC_POSTHOG_KEY is missing (dev / preview /
+ * pre-account-creation).
+ */
+
+interface Props {
+  children: ReactNode;
+}
+
+export function PostHogProvider({ children }: Props) {
+  const { consent } = useConsent();
+  const marketingConsentGranted = consent?.marketing === true;
+  const apiKey = process.env.NEXT_PUBLIC_POSTHOG_KEY;
+  const apiHost = process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://eu.i.posthog.com';
+
+  useEffect(() => {
+    if (!apiKey || !marketingConsentGranted) return;
+    // posthog-js is safe to init multiple times — internal guard,
+    // but we still skip the call when already initialised to avoid
+    // a console warning on hot reload.
+    if (typeof window === 'undefined') return;
+    if (posthog.__loaded) return;
+
+    posthog.init(apiKey, {
+      api_host: apiHost,
+      // Don't capture IP — the EU/GCC PoV: IPs are PII under GDPR
+      // and Kuwait Law 13/2023. Visitor identity comes from PostHog's
+      // distinct_id cookie (anonymous by default until we call
+      // posthog.identify(userId) at login).
+      ip: false,
+      // Capture pageviews automatically on route change (Next.js
+      // App Router doesn't fire window.history events the same way
+      // SPAs do; posthog has a config flag for this).
+      capture_pageview: 'history_change',
+      // Session recording off by default — we only want behavioural
+      // analytics, not session replay (which has bigger consent
+      // implications).
+      disable_session_recording: true,
+      // Respect Do Not Track + Global Privacy Control.
+      respect_dnt: true,
+      // Persistence type: cookie + localStorage. Cookie alone won't
+      // survive Safari ITP 7-day cap; localStorage backs it up.
+      persistence: 'localStorage+cookie',
+    });
+  }, [apiKey, apiHost, marketingConsentGranted]);
+
+  return <>{children}</>;
+}
+
+/**
+ * Helper for component-level event capture. No-op when posthog
+ * isn't loaded (consent not granted, key not configured).
+ */
+export function captureEvent(eventName: string, properties?: Record<string, unknown>): void {
+  if (typeof window === 'undefined') return;
+  if (!posthog.__loaded) return;
+  posthog.capture(eventName, properties);
+}

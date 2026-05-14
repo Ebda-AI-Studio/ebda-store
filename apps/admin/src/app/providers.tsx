@@ -7,6 +7,7 @@ import { StoreProvider } from '../contexts/StoreContext';
 import { NotificationProvider } from '../contexts/NotificationContext';
 import { OneSignalInit } from '../components/OneSignalInit';
 import { PwaInstallHint } from '../components/PwaInstallHint';
+import { PostHogProvider } from '../components/PostHogProvider';
 
 function AuthenticatedProviders({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -31,7 +32,9 @@ function AuthenticatedProviders({ children }: { children: ReactNode }) {
 export function Providers({ children }: { children: ReactNode }) {
   return (
     <AuthProvider>
-      <AuthenticatedProviders>{children}</AuthenticatedProviders>
+      <PostHogProvider>
+        <AuthenticatedProviders>{children}</AuthenticatedProviders>
+      </PostHogProvider>
     </AuthProvider>
   );
 }
