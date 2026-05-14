@@ -745,9 +745,25 @@ export class PaymentService {
     // notifications fired below — order.service.ts deferred those for online-
     // payment orders so they fire ONCE, AFTER the webhook confirms the
     // payment outcome (success or failure), not at order-creation time.
+    //
+    // Defense-in-depth: when storeId was resolved upfront by the route
+    // handler, scope the Payment lookup to that store. Provider-generated
+    // transaction IDs are globally unique in practice (separate merchant
+    // accounts per provider), but adding the storeId predicate means a
+    // payload that arrived with a forged/recycled transaction ID can never
+    // resolve to a different merchant's order than the one that owned the
+    // HMAC secret we just verified against.
     const payment = await prisma.payment.findFirst({
       where: {
-        OR: [{ transactionId: webhookData.transactionId }, { invoiceId: webhookData.invoiceId }],
+        AND: [
+          {
+            OR: [
+              { transactionId: webhookData.transactionId },
+              { invoiceId: webhookData.invoiceId },
+            ],
+          },
+          ...(storeId ? [{ order: { storeId } }] : []),
+        ],
       },
       include: {
         order: {
@@ -761,10 +777,26 @@ export class PaymentService {
 
     if (!payment) {
       logger.error(
-        { transactionId: webhookData.transactionId },
-        '[PAYMENT WEBHOOK] Payment not found'
+        { transactionId: webhookData.transactionId, storeId },
+        '[PAYMENT WEBHOOK] Payment not found (or storeId mismatch — defense-in-depth scope rejected lookup)'
       );
       return { success: true, orderId: undefined }; // Acknowledge webhook even if payment not found
+    }
+
+    // Belt-and-braces: even after the scoped lookup, assert the linked
+    // order's storeId matches the resolved storeId. Catches the (extremely
+    // unlikely) case where storeId resolution differed from payment.order
+    // by some bug in the resolver function.
+    if (storeId && payment.order && payment.order.storeId !== storeId) {
+      logger.error(
+        {
+          transactionId: webhookData.transactionId,
+          resolvedStoreId: storeId,
+          paymentStoreId: payment.order.storeId,
+        },
+        '[PAYMENT WEBHOOK] storeId mismatch between resolver and payment.order — refusing to process'
+      );
+      throw new AppError(400, 'STORE_MISMATCH', 'Webhook payload does not match resolved store');
     }
 
     // Map status to our payment status
