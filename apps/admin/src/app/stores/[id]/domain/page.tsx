@@ -483,6 +483,21 @@ export default function StoreDomainPage() {
                     {isFullyLive && (
                       <p className="text-sm text-success">{t('verifiedMessage', { domain })}</p>
                     )}
+
+                    {/* www auto-attach feedback — the platform's
+                        VercelDomainService.addDomain() attaches the www
+                        variant alongside the apex automatically (commit
+                        0e2ba67). without surfacing that here, merchants
+                        worry / try to set up www themselves at the
+                        registrar even though it just works. only show
+                        on apex domains (2-part: example.com), not on
+                        subdomain attachments where there's no implicit
+                        www variant. */}
+                    {domain.split('.').filter(Boolean).length === 2 && (
+                      <Alert variant="info" title={t('wwwAutoAttachedTitle')}>
+                        <p className="mt-1 text-sm">{t('wwwAutoAttachedMessage', { domain })}</p>
+                      </Alert>
+                    )}
                   </div>
                 );
               })()

@@ -3184,7 +3184,9 @@
       "dnsPointingMessage": "تم التأكد من ملكية النطاق، لكن سجلات A/CNAME العامة لا تزال تشير إلى مكان آخر. الزوار الذين يدخلون نطاقك الآن لن يصلوا إلى متجرك. حدّث السجلات أدناه لدى مزوّد النطاق.",
       "dnsPropagationConfirmed": "متجرك متاح الآن على https://{domain}",
       "colPriority": "الأولوية",
-      "colTtl": "TTL"
+      "colTtl": "TTL",
+      "wwwAutoAttachedTitle": "تم ربط النطاق الفرعي www تلقائياً",
+      "wwwAutoAttachedMessage": "سيصل الزوار الذين يكتبون www.{domain} إلى متجرك أيضاً. لا تحتاج إلى أي إعداد إضافي في DNS لـ www — نقوم بربطه تلقائياً على مستوى المنصة عند حفظ النطاق."
     }
   },
   "categories": {

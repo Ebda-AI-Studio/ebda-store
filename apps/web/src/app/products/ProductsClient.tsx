@@ -395,8 +395,10 @@ export default function ProductsClient({
                     page instead of paginating. Allow-list capped at 96.
                     Persisted to localStorage. */}
                 <div className="flex flex-1 items-center gap-2 sm:flex-initial">
+                  <span className="shrink-0 text-sm font-medium text-foreground">
+                    {t('Show:', 'عرض:')}
+                  </span>
                   <Select
-                    label={t('Show:', 'عرض:')}
                     value={String(perPage)}
                     onChange={e => {
                       const next = Number(e.target.value);
@@ -408,21 +410,23 @@ export default function ProductsClient({
                       }
                     }}
                     options={PER_PAGE_OPTIONS.map(n => ({ value: String(n), label: String(n) }))}
-                    className="h-9 rounded-lg border border-border bg-background px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    className="h-9 flex-1 rounded-lg border border-border bg-background px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 sm:flex-initial"
                   />
                 </div>
 
                 {/* Sort */}
                 <div className="flex flex-1 items-center gap-2 sm:flex-initial">
+                  <span className="shrink-0 text-sm font-medium text-foreground">
+                    {t('Sort by:', '\u062a\u0631\u062a\u064a\u0628 \u062d\u0633\u0628:')}
+                  </span>
                   <Select
-                    label={t('Sort by:', '\u062a\u0631\u062a\u064a\u0628 \u062d\u0633\u0628:')}
                     value={sortBy}
                     onChange={e => setSortBy(e.target.value)}
                     options={sortOptions.map(option => ({
                       value: option.value,
                       label: option.label,
                     }))}
-                    className="h-9 rounded-lg border border-border bg-background px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    className="h-9 flex-1 rounded-lg border border-border bg-background px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 sm:flex-initial"
                   />
                 </div>
 

@@ -42,16 +42,23 @@ export default function ElegantHero({
            products. Scaled the floors down for mobile + small tablets,
            kept the desktop 85vh feel via lg: variant. */
         <div className="flex flex-col lg:flex-row min-h-[60vh] sm:min-h-[75vh] lg:min-h-[85vh]">
-          {/* Image side — 60% */}
+          {/* Image side — 60%.
+              bg-muted backdrop fills the letterbox on mobile when the
+              merchant's banner is wider than the mobile aspect-[4/3]
+              container — object-contain on phones keeps the full
+              calligraphy / text design visible (Wady's "من الوادي
+              إلى الأيادي" was getting cut on both sides at object-cover).
+              At lg+ where the image area takes ~60vw, object-cover
+              fills the larger surface without losing meaningful pixels. */}
           <div
-            className={`relative w-full lg:w-[60%] aspect-[4/3] sm:aspect-[16/10] lg:aspect-auto lg:min-h-full ${isRtl ? 'lg:order-2' : 'lg:order-1'} overflow-hidden`}
+            className={`relative w-full lg:w-[60%] aspect-[4/3] sm:aspect-[16/10] lg:aspect-auto lg:min-h-full bg-muted ${isRtl ? 'lg:order-2' : 'lg:order-1'} overflow-hidden`}
           >
             <Image
               src={image}
               alt={displayTitle}
               fill
               sizes="(min-width: 1024px) 60vw, 100vw"
-              className="object-cover"
+              className="object-contain lg:object-cover"
               priority
             />
             <div className="absolute inset-0 bg-foreground/10" />

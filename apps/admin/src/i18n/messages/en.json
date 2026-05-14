@@ -3184,7 +3184,9 @@
       "dnsPointingMessage": "Vercel confirmed ownership of this domain, but the public A/CNAME records still point elsewhere. Customers visiting your domain right now will NOT land on your storefront. Update the records below at your registrar.",
       "dnsPropagationConfirmed": "Your store is live at https://{domain}",
       "colPriority": "Priority",
-      "colTtl": "TTL"
+      "colTtl": "TTL",
+      "wwwAutoAttachedTitle": "www subdomain handled automatically",
+      "wwwAutoAttachedMessage": "Visitors typing www.{domain} will also reach your storefront. No extra DNS action is needed for the www subdomain — we attach it at the platform level when you save the apex domain."
     }
   },
   "categories": {
