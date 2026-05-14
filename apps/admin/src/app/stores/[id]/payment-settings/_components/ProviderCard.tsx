@@ -1,7 +1,14 @@
 'use client';
 
+import { useState } from 'react';
 import { Alert } from '../../../../../components/Alert';
 import { useT } from '@/i18n/useT';
+
+function getWebhookUrl(providerId: string): string {
+  const apiBase = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000').replace(/\/$/, '');
+  const base = apiBase.endsWith('/api/v1') ? apiBase : `${apiBase}/api/v1`;
+  return `${base}/webhooks/payment/${providerId}`;
+}
 
 export interface StorePaymentConfig {
   id?: string;
@@ -123,7 +130,7 @@ export function ProviderCard({
           {provider.kind === 'cod' ? (
             <CodFields form={form} onUpdateField={onUpdateField} />
           ) : (
-            <GatewayFields form={form} onUpdateField={onUpdateField} />
+            <GatewayFields providerId={provider.id} form={form} onUpdateField={onUpdateField} />
           )}
 
           {message && (
@@ -223,13 +230,28 @@ function CodFields({
 }
 
 function GatewayFields({
+  providerId,
   form,
   onUpdateField,
 }: {
+  providerId: string;
   form: StorePaymentConfig;
   onUpdateField: (field: keyof StorePaymentConfig, value: string | number | boolean | null) => void;
 }) {
   const t = useT('paymentSettings.gateway');
+  const [copied, setCopied] = useState(false);
+  const webhookUrl = getWebhookUrl(providerId);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(webhookUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // clipboard blocked (e.g. insecure context, iframe) — input is
+      // still focus-to-select so the merchant can copy manually
+    }
+  };
 
   return (
     <>
@@ -281,6 +303,27 @@ function GatewayFields({
             placeholder={t('merchantIdPlaceholder')}
             className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           />
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm">
+        <p className="mb-1 font-medium text-blue-900">{t('webhookUrlLabel')}</p>
+        <p className="mb-2 text-xs text-blue-700">{t('webhookUrlDescription')}</p>
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={webhookUrl}
+            readOnly
+            onFocus={e => e.currentTarget.select()}
+            className="flex-1 rounded border border-blue-300 bg-white px-3 py-1.5 font-mono text-xs text-blue-900 focus:border-blue-500 focus:outline-none"
+          />
+          <button
+            type="button"
+            onClick={handleCopy}
+            className="rounded border border-blue-300 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
+          >
+            {copied ? t('webhookUrlCopied') : t('webhookUrlCopy')}
+          </button>
         </div>
       </div>
 

@@ -410,18 +410,45 @@ Three Sentry projects (one per app) so issues stay isolated in the dashboard UI:
   - Inngest function failure past final retry → P1 platform (`alerts-failure-watch.ts` listening on `inngest/function.failed`)
   - `/api/v1/health` deep-check degradation → P1 platform (`index.ts`)
 
-### 5. Log drain — BetterStack (persistent log retention)
+### 5. Log drain — BetterStack via `@logtail/pino` transport (persistent log retention)
 
 Railway's stdout buffer is ephemeral (~72h on the Pro plan, less on Hobby). Without a drain, any post-incident investigation older than 3 days is impossible.
 
-- **Provider**: BetterStack (free tier covers 3 GB ingest/month, 3-day retention; paid plan extends both)
-- **Setup** (one-time, ~10 min — Ahmad's account work):
-  1. Sign up at https://betterstack.com → create a "Logs" source
-  2. Copy the **HTTP ingestion URL** (looks like `https://s1234567.eu-nbg-2.betterstackdata.com`) and the **source token**
-  3. Railway dashboard → `api` service → Settings → **Log Drains** → Add → paste the HTTP URL with the token as a header
-  4. Verify ~5 min after: BetterStack Logs view shows live entries
-- **What to expect**: every stdout/stderr line from the Railway API service (request logs from pino, prisma errors, etc) lands in BetterStack within ~2 sec. Search + filter + 3-day retention free.
-- **Future**: add a second log drain for Vercel storefront + admin once the platform grows. Vercel offers its own log drains feature on Pro plan.
+**Why not Railway's native log drain feature**: Railway gates the dashboard "Log Drains" config behind the **Pro plan** ($20/mo per service). On Hobby/Trial the option isn't visible. To keep BetterStack working on any Railway plan, the API streams logs from inside the Node process via a pino transport — no Railway-level config required.
+
+- **Provider**: BetterStack Logs (free tier: 3 GB ingest/month, 3-day retention; swap to Axiom 500GB/30d free when scale demands)
+- **Source**: `force-api-railway` (eu-fsn-3 region)
+- **Transport**: `@logtail/pino` in `apps/api/src/lib/logger.ts` — pino multi-transport sends every log line to stdout AND BetterStack in parallel (Railway logs UI keeps working untouched)
+- **Env vars (Railway)**:
+  - `BETTERSTACK_SOURCE_TOKEN` — source token from BetterStack source page
+  - `BETTERSTACK_INGESTING_HOST` — full URL like `https://s2439512.eu-fsn-3.betterstackdata.com`
+- **Graceful no-op**: when either env var is missing the transport is omitted entirely; pino still writes to stdout
+- **Redaction**: same pino redact rules apply to BetterStack — auth headers, cookies, passwords, tokens, card numbers all masked before leaving the process
+- **Setup** (one-time):
+  1. Sign up at https://betterstack.com → Logs product → **Sources** → **Connect source** (pick Vector)
+  2. Name the source `force-api-railway`
+  3. Copy the **source token** + **ingesting host** from the source detail page
+  4. Set the two env vars on Railway and redeploy
+  5. Verify in BetterStack Live Tail within 30s — request log lines should land
+- **What to expect**: every pino log line lands in BetterStack within ~2 sec. Search by `request`, `Unhandled error`, request ID, etc.
+- **Retention upgrade path**: when free tier's 3-day window starts hurting incident investigation, swap `BETTERSTACK_INGESTING_HOST` to an Axiom source URL — same transport, 30-day retention on free tier.
+
+### 6. External-service-to-Telegram alert bridge
+
+Sentry / BetterStack / PostHog each have their own native notification channels (email, Slack, webhook), but none route to Telegram natively without paid plans. To keep the operator on **one notification channel** for everything, the API exposes a small translator that accepts each service's webhook payload and forwards via the existing `sendAlert()` Telegram pipeline.
+
+- **Endpoints** (`apps/api/src/routes/alert-webhooks.routes.ts`):
+  - `POST /api/v1/alerts/webhooks/sentry?token=<TOKEN>` — Sentry issue alert action → P1 platform
+  - `POST /api/v1/alerts/webhooks/betterstack?token=<TOKEN>` — BetterStack incident → P1 platform
+  - `POST /api/v1/alerts/webhooks/posthog?token=<TOKEN>` — PostHog insight alert → P1 platform
+  - `POST /api/v1/alerts/webhooks/generic?token=<TOKEN>` — `{title, body, level, source}` for any other service
+- **Auth**: shared-secret token via querystring `?token=...` or header `x-alerts-token: ...`; gated on `ALERTS_WEBHOOK_TOKEN` env var on Railway. Token rotation = single Railway var change, no code touch.
+- **Result**: regardless of which external service raised the alarm, it lands in the same `@ForceAI1_bot` Telegram chat with the same `[P1 PLATFORM]` header format as the internal call sites.
+- **Configure per external service**:
+  - **Sentry** → Project Settings → Alerts → Create Alert Rule → Action: "Send a notification via an integration" → Webhook → URL = `https://store-api.forcemediakw.com/api/v1/alerts/webhooks/sentry?token=<ALERTS_WEBHOOK_TOKEN>`
+  - **BetterStack** → Logs source → Alerts → Create → Webhook URL = `https://store-api.forcemediakw.com/api/v1/alerts/webhooks/betterstack?token=<ALERTS_WEBHOOK_TOKEN>`
+  - **PostHog** → Insights → Subscriptions → Webhook URL = `https://store-api.forcemediakw.com/api/v1/alerts/webhooks/posthog?token=<ALERTS_WEBHOOK_TOKEN>`
+- **What this does NOT do**: it doesn't replace each service's dashboard — Sentry issues still live in Sentry, etc. It only adds Telegram as a parallel notification channel for high-signal events.
 
 ### Verifying end-to-end
 
