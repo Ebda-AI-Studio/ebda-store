@@ -13,6 +13,7 @@ import { authenticate } from './middleware/auth';
 import { requireRole } from './middleware/rbac';
 import routes from './routes';
 import webhookRoutes from './routes/webhook.routes';
+import alertWebhookRoutes from './routes/alert-webhooks.routes';
 import { socketService } from './services/socket.service';
 import { setupSwagger } from './docs/swagger';
 import { prisma } from '@force/database';
@@ -252,6 +253,12 @@ app.use('/api/v1/webhooks', express.raw({ type: 'application/json' }), webhookRo
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// External-service-to-Telegram alert bridge. Sentry / BetterStack /
+// PostHog all POST to /api/v1/alerts/webhooks/<source> and we fan
+// out to the same Telegram chat via the internal alerts.service.
+// Protected by ALERTS_WEBHOOK_TOKEN env var (querystring or header).
+app.use('/api/v1/alerts/webhooks', alertWebhookRoutes);
 
 // Inngest serve handler. Mounted before auth/CSRF because Inngest's
 // platform calls this endpoint with its own request signature

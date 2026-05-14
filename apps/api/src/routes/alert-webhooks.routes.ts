@@ -1,0 +1,115 @@
+import { Router, type Request, type Response } from 'express';
+import logger from '../lib/logger';
+import { sendAlert } from '../services/alerts.service';
+
+const router = Router();
+
+const ALERTS_TOKEN = process.env.ALERTS_WEBHOOK_TOKEN;
+
+function requireToken(req: Request, res: Response): boolean {
+  if (!ALERTS_TOKEN) return true;
+  const token = (req.query.token as string) || req.header('x-alerts-token') || '';
+  if (token !== ALERTS_TOKEN) {
+    res.status(401).json({ ok: false, error: 'invalid_token' });
+    return false;
+  }
+  return true;
+}
+
+router.post('/sentry', async (req, res) => {
+  if (!requireToken(req, res)) return;
+  const body = (req.body ?? {}) as {
+    action?: string;
+    data?: {
+      issue?: { title?: string; web_url?: string; level?: string; project?: { slug?: string } };
+    };
+    event?: { title?: string; web_url?: string; level?: string; environment?: string };
+  };
+  const issue = body.data?.issue ?? body.event ?? {};
+  const title = ((issue as { title?: string }).title ?? 'sentry alert').slice(0, 200);
+  const url = (issue as { web_url?: string }).web_url ?? '';
+  const sentryLevel = ((issue as { level?: string }).level ?? '').toLowerCase();
+  const level = sentryLevel === 'fatal' || sentryLevel === 'error' ? 'p1' : 'info';
+  await sendAlert({
+    level,
+    scope: 'platform',
+    source: `sentry.${(body.data?.issue?.project?.slug as string | undefined) ?? 'unknown'}`,
+    title: `sentry: ${title}`,
+    body: url || 'no issue url',
+    context: { action: body.action, sentryLevel },
+  });
+  res.json({ ok: true });
+});
+
+router.post('/betterstack', async (req, res) => {
+  if (!requireToken(req, res)) return;
+  const body = (req.body ?? {}) as {
+    data?: { attributes?: { name?: string; cause?: string; url?: string; status?: string } };
+    name?: string;
+    cause?: string;
+  };
+  const attrs = body.data?.attributes ?? {};
+  const title = attrs.name ?? body.name ?? 'betterstack alert';
+  const cause = attrs.cause ?? body.cause ?? '';
+  await sendAlert({
+    level: 'p1',
+    scope: 'platform',
+    source: 'betterstack',
+    title: `betterstack: ${title}`,
+    body: cause || 'no cause field',
+    context: { url: attrs.url, status: attrs.status },
+  });
+  res.json({ ok: true });
+});
+
+router.post('/posthog', async (req, res) => {
+  if (!requireToken(req, res)) return;
+  const body = (req.body ?? {}) as {
+    insight?: { name?: string; short_id?: string };
+    alert?: { name?: string };
+    matches?: unknown[];
+  };
+  const title = body.alert?.name ?? body.insight?.name ?? 'posthog alert';
+  await sendAlert({
+    level: 'p1',
+    scope: 'platform',
+    source: 'posthog',
+    title: `posthog: ${title}`,
+    body: `insight ${body.insight?.short_id ?? '?'} fired`,
+    context: { matchCount: Array.isArray(body.matches) ? body.matches.length : 0 },
+  });
+  res.json({ ok: true });
+});
+
+router.post('/generic', async (req, res) => {
+  if (!requireToken(req, res)) return;
+  const body = (req.body ?? {}) as {
+    title?: string;
+    body?: string;
+    level?: 'p0' | 'p1' | 'info';
+    source?: string;
+  };
+  if (!body.title) {
+    res.status(400).json({ ok: false, error: 'missing_title' });
+    return;
+  }
+  await sendAlert({
+    level: body.level === 'p0' || body.level === 'info' ? body.level : 'p1',
+    scope: 'platform',
+    source: body.source || 'external.generic',
+    title: body.title.slice(0, 200),
+    body: body.body ?? '',
+  });
+  res.json({ ok: true });
+});
+
+router.get('/healthcheck', (_req, res) => {
+  res.json({ ok: true, tokenRequired: !!ALERTS_TOKEN });
+});
+
+export default router;
+
+logger.info(
+  { tokenRequired: !!ALERTS_TOKEN },
+  'alert-webhooks routes mounted at /api/v1/webhooks/alerts'
+);
