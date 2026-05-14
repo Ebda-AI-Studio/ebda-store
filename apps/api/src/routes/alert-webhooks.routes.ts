@@ -6,6 +6,18 @@ const router = Router();
 
 const ALERTS_TOKEN = process.env.ALERTS_WEBHOOK_TOKEN;
 
+// CLAUDE.md rule 12: a missing token in production means the bridge accepts
+// spoofed alerts from any IP — a single curl floods Telegram. Warn loudly at
+// boot so the misconfiguration is visible in the Railway logs instead of
+// silently allowed. Dev / preview without the env var still works (no token
+// required), same convenience the original `!ALERTS_TOKEN -> allow` gave.
+if (!ALERTS_TOKEN && process.env.NODE_ENV === 'production') {
+  logger.error(
+    { rule: 'CLAUDE.md#12', endpoint: '/api/v1/alerts/webhooks/*' },
+    'ALERTS_WEBHOOK_TOKEN is unset in production — webhook bridge accepts any payload. Set the env var on Railway immediately.'
+  );
+}
+
 function requireToken(req: Request, res: Response): boolean {
   if (!ALERTS_TOKEN) return true;
   const token = (req.query.token as string) || req.header('x-alerts-token') || '';

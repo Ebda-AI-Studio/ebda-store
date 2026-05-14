@@ -1,0 +1,84 @@
+# CLAUDE.md rule 13: Preview environment isolation
+#
+# Verifies that Vercel Preview env var NEXT_PUBLIC_API_URL does NOT match the
+# Production scope value. If they match, every PR preview build talks to the
+# production API and writes test data to live Neon — a documented data-
+# integrity gap (see project-fwb-test-stores-prod-db.md).
+#
+# Runs on every PR + on schedule (in case someone edits env vars in the
+# Vercel dashboard without re-merging anything). Fails the workflow with a
+# clear message + the offending value if isolation is broken.
+#
+# Required repo secret: VERCEL_API_TOKEN — already set for the per-merchant
+# domain provisioning service. Read-only scope is sufficient.
+# Required repo variables: VERCEL_PROJECT_ID_WEB, VERCEL_PROJECT_ID_ADMIN.
+
+name: Preview env isolation (rule 13)
+
+on:
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 6 * * 1' # Mondays 06:00 UTC — weekly drift check
+  workflow_dispatch: # manual trigger
+
+jobs:
+  verify-isolation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Pull Vercel env vars and compare scopes
+        env:
+          VERCEL_API_TOKEN: ${{ secrets.VERCEL_API_TOKEN }}
+          PROJECT_ID_WEB: ${{ vars.VERCEL_PROJECT_ID_WEB }}
+          PROJECT_ID_ADMIN: ${{ vars.VERCEL_PROJECT_ID_ADMIN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${VERCEL_API_TOKEN:-}" ]; then
+            echo "::warning::VERCEL_API_TOKEN secret not set — skipping rule 13 check"
+            exit 0
+          fi
+
+          check_project() {
+            local project_id="$1"
+            local project_name="$2"
+
+            local response prod preview
+            response=$(curl -sS -H "Authorization: Bearer $VERCEL_API_TOKEN" \
+              "https://api.vercel.com/v9/projects/${project_id}/env?decrypt=true")
+
+            prod=$(echo "$response" | jq -r '.envs[] | select(.key=="NEXT_PUBLIC_API_URL" and (.target | index("production"))) | .value' | head -1)
+            preview=$(echo "$response" | jq -r '.envs[] | select(.key=="NEXT_PUBLIC_API_URL" and (.target | index("preview"))) | .value' | head -1)
+
+            echo "=== $project_name ==="
+            echo "  production: ${prod:-<unset>}"
+            echo "  preview:    ${preview:-<unset>}"
+
+            if [ -z "$prod" ] || [ -z "$preview" ]; then
+              echo "::warning::$project_name — one of {production,preview} NEXT_PUBLIC_API_URL is unset"
+              return 0
+            fi
+
+            if [ "$prod" = "$preview" ]; then
+              echo "::error::$project_name violates CLAUDE.md rule 13 — preview NEXT_PUBLIC_API_URL ($preview) matches production. Preview builds will write to production data."
+              return 1
+            fi
+
+            echo "  ✓ isolated"
+            return 0
+          }
+
+          fail=0
+          if [ -n "${PROJECT_ID_WEB:-}" ]; then
+            check_project "$PROJECT_ID_WEB" "force-web" || fail=1
+          else
+            echo "::warning::vars.VERCEL_PROJECT_ID_WEB not set — skipping force-web"
+          fi
+
+          if [ -n "${PROJECT_ID_ADMIN:-}" ]; then
+            check_project "$PROJECT_ID_ADMIN" "force-admin" || fail=1
+          else
+            echo "::warning::vars.VERCEL_PROJECT_ID_ADMIN not set — skipping force-admin"
+          fi
+
+          exit $fail
