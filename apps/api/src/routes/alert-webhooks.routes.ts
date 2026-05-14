@@ -53,23 +53,35 @@ router.post('/sentry', async (req, res) => {
   res.json({ ok: true });
 });
 
-router.post('/betterstack', async (req, res) => {
+router.post('/axiom', async (req, res) => {
   if (!requireToken(req, res)) return;
+  // Axiom monitor webhook payload shape (per their notifier docs):
+  //   { monitor: { name, type, ... }, match: { count, value, ... },
+  //     description, url, ... }
+  // We pull the monitor name as the title, description+count as the body,
+  // and pass the dashboard url so the operator can drill in from Telegram.
   const body = (req.body ?? {}) as {
-    data?: { attributes?: { name?: string; cause?: string; url?: string; status?: string } };
-    name?: string;
-    cause?: string;
+    monitor?: { name?: string; type?: string; description?: string };
+    match?: { count?: number; value?: number };
+    description?: string;
+    url?: string;
+    timestamp?: string;
   };
-  const attrs = body.data?.attributes ?? {};
-  const title = attrs.name ?? body.name ?? 'betterstack alert';
-  const cause = attrs.cause ?? body.cause ?? '';
+  const title = body.monitor?.name ?? 'axiom alert';
+  const description = body.description ?? body.monitor?.description ?? '';
+  const matchInfo =
+    body.match?.count !== undefined
+      ? `count=${body.match.count}`
+      : body.match?.value !== undefined
+        ? `value=${body.match.value}`
+        : '';
   await sendAlert({
     level: 'p1',
     scope: 'platform',
-    source: 'betterstack',
-    title: `betterstack: ${title}`,
-    body: cause || 'no cause field',
-    context: { url: attrs.url, status: attrs.status },
+    source: 'axiom',
+    title: `axiom: ${title}`,
+    body: [description, matchInfo, body.url].filter(Boolean).join(' · ') || 'no description',
+    context: { url: body.url, monitorType: body.monitor?.type, timestamp: body.timestamp },
   });
   res.json({ ok: true });
 });

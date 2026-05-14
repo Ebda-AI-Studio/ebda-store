@@ -412,43 +412,44 @@ Three Sentry projects (one per app) so issues stay isolated in the dashboard UI:
   - Inngest function failure past final retry → P1 platform (`alerts-failure-watch.ts` listening on `inngest/function.failed`)
   - `/api/v1/health` deep-check degradation → P1 platform (`index.ts`)
 
-### 5. Log drain — BetterStack via `@logtail/pino` transport (persistent log retention)
+### 5. Log drain — Axiom via `@axiomhq/pino` transport (persistent log retention)
 
 Railway's stdout buffer is ephemeral (~72h on the Pro plan, less on Hobby). Without a drain, any post-incident investigation older than 3 days is impossible.
 
-**Why not Railway's native log drain feature**: Railway gates the dashboard "Log Drains" config behind the **Pro plan** ($20/mo per service). On Hobby/Trial the option isn't visible. To keep BetterStack working on any Railway plan, the API streams logs from inside the Node process via a pino transport — no Railway-level config required.
+**Why not Railway's native log drain feature**: Railway gates the dashboard "Log Drains" config behind the **Pro plan** ($20/mo per service). On Hobby/Trial the option isn't visible. To keep persistent logging working on any Railway plan, the API streams from inside the Node process via a pino transport — no Railway-level config required.
 
-- **Provider**: BetterStack Logs free tier — **3 GB ingest/month, 3-day retention (verified 2026-05-15 against BetterStack pricing page)**. ⚠️ This violates CLAUDE.md rule 11 (≥30-day retention required). Migration path: Axiom free tier (500 GB/month, 30-day retention) using `@axiomhq/pino` transport — same env-var shape, drop-in replacement. Tracked in `docs/superpowers/plans/2026-05-15-iceberg-audit-followup.md` as Top-10 gap #1.
-- **Source**: `force-api-railway` (eu-fsn-3 region)
-- **Transport**: `@logtail/pino` in `apps/api/src/lib/logger.ts` — pino multi-transport sends every log line to stdout AND BetterStack in parallel (Railway logs UI keeps working untouched)
+**Migration history**: Started on BetterStack 2026-05-14, migrated to Axiom 2026-05-15 because BetterStack's free tier retains only 3 days (violates CLAUDE.md rule 11). Axiom free tier retains 30 days at 500 GB/month, satisfying the rule at zero cost.
+
+- **Provider**: **Axiom** free tier — 500 GB ingest/month, **30-day retention** (verified 2026-05-15)
+- **Dataset**: `force-api-railway`
+- **Transport**: `@axiomhq/pino` in `apps/api/src/lib/logger.ts` — pino multi-transport sends every log line to stdout AND Axiom in parallel (Railway logs UI keeps working untouched)
 - **Env vars (Railway)**:
-  - `BETTERSTACK_SOURCE_TOKEN` — source token from BetterStack source page
-  - `BETTERSTACK_INGESTING_HOST` — full URL like `https://s2439512.eu-fsn-3.betterstackdata.com`
+  - `AXIOM_TOKEN` — API token with **Ingest** scope, from `app.axiom.co` → Settings → API tokens
+  - `AXIOM_DATASET` — dataset name, currently `force-api-railway`
 - **Graceful no-op**: when either env var is missing the transport is omitted entirely; pino still writes to stdout
-- **Redaction**: same pino redact rules apply to BetterStack — auth headers, cookies, passwords, tokens, card numbers all masked before leaving the process
+- **Redaction**: same pino redact rules apply to Axiom — auth headers, cookies, passwords, tokens, card numbers all masked before leaving the process
 - **Setup** (one-time):
-  1. Sign up at https://betterstack.com → Logs product → **Sources** → **Connect source** (pick Vector)
-  2. Name the source `force-api-railway`
-  3. Copy the **source token** + **ingesting host** from the source detail page
-  4. Set the two env vars on Railway and redeploy
-  5. Verify in BetterStack Live Tail within 30s — request log lines should land
-- **What to expect**: every pino log line lands in BetterStack within ~2 sec. Search by `request`, `Unhandled error`, request ID, etc.
-- **Retention upgrade path**: when free tier's 3-day window starts hurting incident investigation, swap `BETTERSTACK_INGESTING_HOST` to an Axiom source URL — same transport, 30-day retention on free tier.
+  1. Sign up at https://app.axiom.co/register → create dataset `force-api-railway`
+  2. Settings → API tokens → create token with **Ingest** scope (name: `FWB API ingest`)
+  3. Set `AXIOM_TOKEN` + `AXIOM_DATASET` env vars on Railway and redeploy
+  4. Verify in Axiom Stream view within 30s — request log lines should land
+- **What to expect**: every pino log line lands in Axiom within ~2 sec. Search by `request`, `Unhandled error`, request ID, etc. Axiom's APL query language is more powerful than BetterStack's for log filtering.
+- **Implementation note**: the transport target uses `require.resolve('@axiomhq/pino')` (not the bare specifier) because pino's worker_threads.Worker can't always resolve ESM/CJS exports maps when given a bare package name. The absolute path always loads.
 
 ### 6. External-service-to-Telegram alert bridge
 
-Sentry / BetterStack / PostHog each have their own native notification channels (email, Slack, webhook), but none route to Telegram natively without paid plans. To keep the operator on **one notification channel** for everything, the API exposes a small translator that accepts each service's webhook payload and forwards via the existing `sendAlert()` Telegram pipeline.
+Sentry / Axiom / PostHog each have their own native notification channels (email, Slack, webhook), but none route to Telegram natively without paid plans. To keep the operator on **one notification channel** for everything, the API exposes a small translator that accepts each service's webhook payload and forwards via the existing `sendAlert()` Telegram pipeline.
 
 - **Endpoints** (`apps/api/src/routes/alert-webhooks.routes.ts`):
   - `POST /api/v1/alerts/webhooks/sentry?token=<TOKEN>` — Sentry issue alert action → P1 platform
-  - `POST /api/v1/alerts/webhooks/betterstack?token=<TOKEN>` — BetterStack incident → P1 platform
+  - `POST /api/v1/alerts/webhooks/axiom?token=<TOKEN>` — Axiom monitor → P1 platform
   - `POST /api/v1/alerts/webhooks/posthog?token=<TOKEN>` — PostHog insight alert → P1 platform
   - `POST /api/v1/alerts/webhooks/generic?token=<TOKEN>` — `{title, body, level, source}` for any other service
 - **Auth**: shared-secret token via querystring `?token=...` or header `x-alerts-token: ...`; gated on `ALERTS_WEBHOOK_TOKEN` env var on Railway. Token rotation = single Railway var change, no code touch.
 - **Result**: regardless of which external service raised the alarm, it lands in the same `@ForceAI1_bot` Telegram chat with the same `[P1 PLATFORM]` header format as the internal call sites.
 - **Configure per external service**:
   - **Sentry** → Project Settings → Alerts → Create Alert Rule → Action: "Send a notification via an integration" → Webhook → URL = `https://store-api.forcemediakw.com/api/v1/alerts/webhooks/sentry?token=<ALERTS_WEBHOOK_TOKEN>`
-  - **BetterStack** → Logs source → Alerts → Create → Webhook URL = `https://store-api.forcemediakw.com/api/v1/alerts/webhooks/betterstack?token=<ALERTS_WEBHOOK_TOKEN>`
+  - **Axiom** → dataset → Monitors → New monitor → Notifier: Webhook → URL = `https://store-api.forcemediakw.com/api/v1/alerts/webhooks/axiom?token=<ALERTS_WEBHOOK_TOKEN>`
   - **PostHog** → Insights → Subscriptions → Webhook URL = `https://store-api.forcemediakw.com/api/v1/alerts/webhooks/posthog?token=<ALERTS_WEBHOOK_TOKEN>`
 - **What this does NOT do**: it doesn't replace each service's dashboard — Sentry issues still live in Sentry, etc. It only adds Telegram as a parallel notification channel for high-signal events.
 
@@ -502,6 +503,6 @@ Renewal verification: re-check these in the per-provider dashboard quarterly —
 | Sentry                 | (Ahmad's account)        | one org with three projects: `api`, `web`, `admin`    |
 | PostHog                | (Ahmad's account)        | EU region, single project covering web + admin        |
 | UptimeRobot            | (Ahmad's account)        | free tier, 2 monitors currently                       |
-| BetterStack            | (Ahmad's account)        | free tier — log source for `api` service              |
+| Axiom                  | (Ahmad's account)        | free tier (500GB/30d) — dataset `force-api-railway`   |
 | Resend                 | platform-wide            | one account; per-merchant domains added under it      |
 | @ForceAI1_bot Telegram | personal DM to Ahmad     | chat_id `1943728711`                                  |
