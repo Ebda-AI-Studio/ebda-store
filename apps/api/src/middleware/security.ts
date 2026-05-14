@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { prisma } from '@force/database';
 import { redis } from '../services/redis.service';
 import { BoundedMap } from '../lib/bounded-map';
-import { isPlatformOrigin } from '../lib/cors-cache';
+import { isPlatformOrigin, isAllowlistedMerchantOrigin } from '../lib/cors-cache';
 import { config } from '../config';
 import logger from '../lib/logger';
 
@@ -143,11 +143,12 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
   const isJsonOrXhr = contentType.includes('application/json') || !!xRequestedWith;
   if (
     isJsonOrXhr &&
-    isPlatformOrigin(origin, {
+    (isPlatformOrigin(origin, {
       webUrl: config.webUrl,
       adminUrl: config.adminUrl,
       nodeEnv: config.nodeEnv,
-    })
+    }) ||
+      isAllowlistedMerchantOrigin(origin))
   ) {
     return next();
   }
