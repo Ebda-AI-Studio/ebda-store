@@ -358,58 +358,109 @@ npx prisma migrate dev --name rollback_xxx
 
 ---
 
-## Monitoring & Alerts
+## Observability & Alerts
 
-Three orthogonal channels cover production failure modes per
-`~/.claude/CLAUDE.md` Production Reality gates rule #6. Each catches
-something the others can't.
+Five orthogonal channels cover production failure modes per
+`~/.claude/CLAUDE.md` Production Reality gates rules #6 + #7. Each
+catches something the others can't.
 
-### 1. UptimeRobot — "process is gone / API unreachable"
+### 1. UptimeRobot — "process is gone / URL unreachable"
 
 - **Dashboard**: https://uptimerobot.com
-- **Monitor**: `FWB API` → `https://store-api.forcemediakw.com/health`, HTTPS, 5-min interval, 30s timeout, alert on 2 consecutive failures
-- **Optional second monitor**: `https://store.forcemediakw.com/wady-aljuz` for the storefront SSR layer
-- **Alert contact**: Telegram (uses the same bot + chat_id as the in-API channel below)
+- **Active monitors**:
+  - `FWB API` → `https://store-api.forcemediakw.com/health` — HTTPS, 5-min interval, 30s timeout, alert on 2 consecutive failures
+  - `FWB store · wadyaljuz.com` → `https://wadyaljuz.com` — same settings
+- **Alert routing**: UptimeRobot mobile app push (instant on iPhone/Android, free tier, replaces Telegram which is paid-tier on UptimeRobot). The bridge to Telegram is via the in-API channel below for code-level alerts.
+- **Adding a new merchant**: clone the existing storefront monitor, swap the URL to the merchant's domain, name it `FWB store · <slug>`. Attach the same mobile-push alert contact.
 
 ### 2. Sentry — "code threw"
 
-- **Wired**: `apps/api/src/services/sentry.service.ts` + `apps/api/src/index.ts` (boot init, captures `uncaughtException` + `unhandledRejection`)
-- **Env**: `SENTRY_DSN` on Railway. Falls back to log-only when missing.
+Three Sentry projects (one per app) so issues stay isolated in the dashboard UI:
 
-### 3. Telegram alerts service — "business logic P0"
+- **API** — `apps/api/src/services/sentry.service.ts` + boot init. Captures `uncaughtException`, `unhandledRejection`, Express errors. Env: `SENTRY_DSN` on Railway.
+- **Storefront** (`apps/web`) — `sentry.{client,server,edge}.config.ts` + `instrumentation.ts`. Captures SSR throws, RSC errors, client hydration errors, browser uncaught errors, route-handler errors. Env: `NEXT_PUBLIC_SENTRY_DSN_WEB` on Vercel.
+- **Admin** (`apps/admin`) — same shape. Env: `NEXT_PUBLIC_SENTRY_DSN_ADMIN` on Vercel.
+- **No-op when DSN missing** (graceful in dev / preview / pre-account-creation).
+- **Sample rates**: storefront `tracesSampleRate=0.1` in prod (high traffic), admin `1.0` (low volume, every trace is signal). Session replays fire only on errors, not on healthy sessions.
 
-- **Bot**: `@ForceAI1_bot` (created via @BotFather, currently DMs Ahmad)
+### 3. PostHog — product analytics
+
+- **Apps wired**: `apps/web` (storefront) + `apps/admin`. SDK: `posthog-js` v1.373.4.
+- **Env**: `NEXT_PUBLIC_POSTHOG_KEY` on Vercel (both projects). Optional `NEXT_PUBLIC_POSTHOG_HOST` (defaults to `https://eu.i.posthog.com`).
+- **Consent gating**:
+  - Storefront: gated on the marketing cookie consent (`consent.marketing === true`). Same gate as Meta / GA / TikTok pixels. Init fires only after the visitor accepts marketing cookies.
+  - Admin: always-on (operator-only tool, no public visitors, no GDPR consent surface).
+- **Privacy posture**: `ip: false`, `disable_session_recording: true`, `respect_dnt: true`. Anonymous distinct_id by default; call `posthog.identify(userId)` post-login to link sessions.
+- **Captures**: pageviews on route change, autocapture clicks + form submits. Plus `captureEvent('event_name', {...})` helper for funnel instrumentation (checkout_started, add_to_cart, etc).
+
+### 4. Telegram alerts service — "business logic P0/P1"
+
+- **Bot**: `@ForceAI1_bot` (created via @BotFather, currently DMs Ahmad — chat_id `1943728711`)
 - **Env vars (Railway)**:
   - `TELEGRAM_BOT_TOKEN` — API token from @BotFather
   - `TELEGRAM_ALERT_CHAT_ID` — chat to deliver to (DM = positive int; group = negative int)
-- **Code**: `apps/api/src/services/alerts.service.ts` exports `sendAlert({ level, title, body?, context? })`
+- **Code**: `apps/api/src/services/alerts.service.ts` exports `sendAlert({ level, scope, store?, source, title, body?, context? })`
 - **Levels**: `p0` (wake someone now) / `p1` (degraded, morning fine) / `info`
-- **Throttle**: Redis-keyed per `sha1(level + title)`, 5-min TTL — flapping events can't fan out 100 messages
-- **Graceful no-op**: missing env vars = single warn at boot + every send returns `'skipped'`
-- **Wired call sites**: `process.on('uncaughtException')` in `apps/api/src/index.ts`. Follow-ups deferred: payment HMAC repeated fail, Inngest dead-letter, `/api/v1/health` deep-check failure
+- **Scope-aware headers**: `[P0 PLATFORM]` vs `[P0 STORE]` so the operator sees scope at a glance; store-scoped alerts name the merchant in the body.
+- **Throttle**: Redis-keyed per `sha1(level + title + storeId?)`, 5-min TTL — flapping events can't fan out 100 messages, and per-store throttling prevents store A's flaps from suppressing store B's genuinely-new alerts.
+- **Graceful no-op**: missing env vars = single warn at boot, every send returns `'skipped'`
+- **Wired call sites**:
+  - `process.on('uncaughtException')` in `apps/api/src/index.ts` → P0 platform
+  - Payment HMAC repeated fail (3+ in 5min via Redis counter) → P0 store-scoped (`payment.factory.ts`)
+  - Inngest function failure past final retry → P1 platform (`alerts-failure-watch.ts` listening on `inngest/function.failed`)
+  - `/api/v1/health` deep-check degradation → P1 platform (`index.ts`)
+
+### 5. Log drain — BetterStack (persistent log retention)
+
+Railway's stdout buffer is ephemeral (~72h on the Pro plan, less on Hobby). Without a drain, any post-incident investigation older than 3 days is impossible.
+
+- **Provider**: BetterStack (free tier covers 3 GB ingest/month, 3-day retention; paid plan extends both)
+- **Setup** (one-time, ~10 min — Ahmad's account work):
+  1. Sign up at https://betterstack.com → create a "Logs" source
+  2. Copy the **HTTP ingestion URL** (looks like `https://s1234567.eu-nbg-2.betterstackdata.com`) and the **source token**
+  3. Railway dashboard → `api` service → Settings → **Log Drains** → Add → paste the HTTP URL with the token as a header
+  4. Verify ~5 min after: BetterStack Logs view shows live entries
+- **What to expect**: every stdout/stderr line from the Railway API service (request logs from pino, prisma errors, etc) lands in BetterStack within ~2 sec. Search + filter + 3-day retention free.
+- **Future**: add a second log drain for Vercel storefront + admin once the platform grows. Vercel offers its own log drains feature on Pro plan.
 
 ### Verifying end-to-end
 
 ```bash
-# Fire a direct Telegram test (no API code involved)
+# 1. Fire a direct Telegram test (no API code involved)
 curl -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
   -H 'Content-Type: application/json' \
   -d "{\"chat_id\":\"${TELEGRAM_ALERT_CHAT_ID}\",\"text\":\"smoke test\"}"
 
-# Confirm API health
+# 2. Confirm API health
 curl https://store-api.forcemediakw.com/health
 
-# Trigger UptimeRobot manually: dashboard → monitor → "Test" → expect OK within 30s
+# 3. Trigger UptimeRobot manually: dashboard → monitor → "Test" → expect OK within 30s
+
+# 4. Trigger Sentry from the storefront (paste into browser console on wadyaljuz.com):
+#    throw new Error("sentry-storefront-smoke-test");
+#    Issue should appear in Sentry dashboard within ~30s.
+
+# 5. Trigger PostHog event capture from the admin (paste into browser console):
+#    window.posthog?.capture('admin_smoke_test', {at: new Date().toISOString()});
+#    Event lands in PostHog → Live Events within ~5s.
 ```
 
 ### Alert SLA
 
 - **P0** (server unreachable, payment HMAC repeated fail, data loss): respond within 15 min, 24/7
-- **P1** (degraded, AI quota exhausted, cron failed past final retry): respond within 4 hours
+- **P1** (degraded, AI quota exhausted, cron failed past final retry, deep-health degraded): respond within 4 hours
 - **Info** (deploy notifications, scheduled job summaries): no SLA
 
-### Log retention — still outstanding
+### Account ownership
 
-Railway stdout logs are ephemeral (~72h). A log drain to BetterStack /
-Logtail / Axiom must be configured before any merchant goes live per
-`~/.claude/CLAUDE.md` rule #7. Tracked as iceberg item #11.
+| Service                | Account email            | Project / org                                         |
+| ---------------------- | ------------------------ | ----------------------------------------------------- |
+| Vercel                 | ahmed0montaser@gmail.com | Hobby plan, sole owner                                |
+| Railway                | ahmed0montaser@gmail.com | personal project `force-website-builder`              |
+| Neon                   | ahmed0montaser@gmail.com | project `ep-falling-meadow-a1uq2yil` (ap-southeast-1) |
+| Sentry                 | (Ahmad's account)        | one org with three projects: `api`, `web`, `admin`    |
+| PostHog                | (Ahmad's account)        | EU region, single project covering web + admin        |
+| UptimeRobot            | (Ahmad's account)        | free tier, 2 monitors currently                       |
+| BetterStack            | (Ahmad's account)        | free tier — log source for `api` service              |
+| Resend                 | platform-wide            | one account; per-merchant domains added under it      |
+| @ForceAI1_bot Telegram | personal DM to Ahmad     | chat_id `1943728711`                                  |
