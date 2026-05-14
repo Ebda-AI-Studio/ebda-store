@@ -16,11 +16,26 @@ export class AppError extends Error {
 }
 
 export function errorHandler(err: Error, _req: Request, res: Response, _next: NextFunction): void {
-  // Log error
-  logger.error({ err }, 'Unhandled error');
-
-  // Handle known errors
+  // Log level is decided by error class + status code, NOT a blanket `error`
+  // log. AppError 4xx (auth required, validation failed, not found) is
+  // EXPECTED behavior — logging those at `error` floods Sentry / BetterStack
+  // / Telegram with non-actionable noise + makes "real errors" hard to find.
+  //
+  // Discipline:
+  //   - AppError 4xx → `debug` (visible in dev, silenced in prod)
+  //   - AppError 5xx → `error` (genuine server-side AppError throw)
+  //   - ZodError → `debug` (validation failure = client mistake)
+  //   - Prisma known errors → `error` (DB constraint, missing FK — actionable)
+  //   - Anything else (unhandled JS Error / TypeError / etc.) → `error`
+  //
+  // Matches the project's existing log-level discipline doc
+  // (feedback-fire-and-forget-bug-mask + feedback-status-polling-rate-limiter).
   if (err instanceof AppError) {
+    if (err.statusCode >= 500) {
+      logger.error({ err }, 'AppError (5xx)');
+    } else {
+      logger.debug({ err: { code: err.code, message: err.message } }, 'AppError (4xx)');
+    }
     res.status(err.statusCode).json({
       success: false,
       error: {
@@ -34,6 +49,7 @@ export function errorHandler(err: Error, _req: Request, res: Response, _next: Ne
 
   // Handle Zod validation errors
   if (err instanceof ZodError) {
+    logger.debug({ issues: err.issues }, 'Validation error');
     const details: Record<string, string[]> = {};
     for (const issue of err.issues) {
       const path = issue.path.join('.');
@@ -61,6 +77,7 @@ export function errorHandler(err: Error, _req: Request, res: Response, _next: Ne
   // error" diagnosable from the storefront console (and Railway log)
   // without exposing the full SQL or stack trace.
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
+    logger.error({ err }, 'Prisma known request error');
     res.status(500).json({
       success: false,
       error: {
@@ -81,7 +98,8 @@ export function errorHandler(err: Error, _req: Request, res: Response, _next: Ne
   // message in the response so the storefront / admin console shows
   // SOMETHING actionable instead of just "Internal server error". Stack
   // traces are NOT included in the response (they go only to the
-  // Railway log via the `Unhandled error` line above).
+  // Railway log via the `Unhandled error` line below).
+  logger.error({ err }, 'Unhandled error (5xx)');
   res.status(500).json({
     success: false,
     error: {
