@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { CookiePreferencesLink } from '../../components/CookiePreferencesLink';
 import {
   getDisplayBranding,
   getDisplayText,
@@ -252,14 +251,6 @@ export default function ClassicFooter({
             </div>
           </>
         )}
-      </div>
-      {/* GDPR Art. 7(3): withdrawing consent must be as easy as giving it,
-          so the cookie-preferences link is always rendered — never gated
-          on `bottomBar.enabled`. */}
-      <div className="border-t border-border/30">
-        <div className="container mx-auto px-4 py-4 text-center">
-          <CookiePreferencesLink className="text-xs text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2" />
-        </div>
       </div>
     </footer>
   );

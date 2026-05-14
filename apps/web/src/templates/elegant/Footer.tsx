@@ -5,7 +5,6 @@ import { useState } from 'react';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { api } from '../../lib/api';
-import { CookiePreferencesLink } from '../../components/CookiePreferencesLink';
 import {
   isNewsletterEnabled,
   resolveAddressHref,
@@ -341,16 +340,6 @@ export default function ElegantFooter({
           </div>
         </div>
       )}
-
-      {/* Cookie preferences link — ALWAYS rendered regardless of
-          `bottomBar.enabled` because GDPR Art. 7(3) requires
-          withdrawing consent to be as easy as giving it. A merchant
-          can't legally hide this link via store settings. */}
-      <div className="border-t border-border/30">
-        <div className="container mx-auto px-4 py-4 text-center">
-          <CookiePreferencesLink className="text-xs tracking-wide text-muted-foreground/70 hover:text-foreground transition-colors duration-500 ease-out cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2" />
-        </div>
-      </div>
     </footer>
   );
 }
