@@ -1,4 +1,5 @@
 import type { MetadataRoute } from 'next';
+import { headers } from 'next/headers';
 import { getSiteUrl } from '../lib/structured-data';
 import { API_URL } from '../lib/api';
 
@@ -50,6 +51,29 @@ async function fetchStores(): Promise<StoreListEntry[]> {
   return stores;
 }
 
+/**
+ * Resolve a custom-domain host (e.g. `wadyaljuz.com`) to its owning
+ * store via the dedicated /public/store/resolve endpoint. Returns null
+ * when the host isn't a known custom domain (e.g. platform path,
+ * preview deploy host, direct IP hit).
+ */
+async function resolveStoreByHost(host: string): Promise<StoreListEntry | null> {
+  if (!host) return null;
+  try {
+    const res = await fetch(`${API_URL}/public/store/resolve`, {
+      next: { revalidate: 3600 },
+      headers: { 'Content-Type': 'application/json', 'x-store-domain': host },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const store = data?.data?.store;
+    if (!store?.id || !store?.slug) return null;
+    return { id: store.id, slug: store.slug };
+  } catch {
+    return null;
+  }
+}
+
 async function fetchProducts(storeId: string): Promise<ProductEntry[]> {
   const res = await fetch(
     `${API_URL}/public/products?limit=1000&status=published&storeId=${storeId}`,
@@ -63,13 +87,67 @@ async function fetchProducts(storeId: string): Promise<ProductEntry[]> {
   return data?.data?.products ?? [];
 }
 
+/**
+ * Sitemap with host-aware tenant fan-out.
+ *
+ * The same Next.js sitemap route serves three different audiences
+ * depending on the host header:
+ *
+ *   - `wadyaljuz.com` (custom domain)
+ *     → ONLY Wady Aljuz's URLs, rooted at https://wadyaljuz.com
+ *     → submitted to Google Search Console for that merchant's property
+ *   - `store.forcemediakw.com` (platform path)
+ *     → master sitemap covering every store under /<slug>/, rooted
+ *       at https://store.forcemediakw.com
+ *     → submitted to the platform's GSC property
+ *   - any other host (preview deploys, IP-direct hits)
+ *     → falls through to the master sitemap shape with whatever
+ *       `getSiteUrl()` decides
+ *
+ * Without the host branch, the sitemap at wadyaljuz.com/sitemap.xml
+ * would list `https://store.forcemediakw.com/wady-aljuz/...` URLs,
+ * which causes Google to index the wrong domain when the merchant
+ * submits their own GSC property. Caught on wadyaljuz.com 2026-05-14.
+ */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const siteUrl = getSiteUrl();
   const now = new Date();
 
-  // Apex sitemap entry — the platform landing page lives at the root and is
-  // not per-tenant. Per-store URLs all sit under `/<slug>/...`, so that's the
-  // only apex URL worth listing.
+  const requestHost = (await headers()).get('host')?.toLowerCase() ?? '';
+
+  // Tenant branch: ask the API whether this host is a known custom
+  // domain. Avoids exposing the domain list via /public/stores. Falls
+  // through to the master sitemap on a non-match (platform path,
+  // preview deploys, etc.).
+  const tenant = await resolveStoreByHost(requestHost);
+  if (tenant) {
+    const base = `https://${requestHost}`;
+    const products = await fetchProducts(tenant.id).catch(() => [] as ProductEntry[]);
+    const entries: MetadataRoute.Sitemap = [];
+    for (const page of STORE_STATIC_PAGES) {
+      entries.push({
+        url: `${base}${page.path || '/'}`,
+        lastModified: now,
+        changeFrequency: page.freq,
+        priority: page.priority,
+      });
+    }
+    for (const product of products) {
+      entries.push({
+        url: `${base}/products/${product.slug}`,
+        lastModified: product.updatedAt
+          ? new Date(product.updatedAt)
+          : product.createdAt
+            ? new Date(product.createdAt)
+            : now,
+        changeFrequency: 'weekly',
+        priority: 0.7,
+      });
+    }
+    return entries;
+  }
+
+  // Master sitemap: platform path. Covers every store under /<slug>/...
+  const siteUrl = getSiteUrl();
   const apex: MetadataRoute.Sitemap = [
     {
       url: `${siteUrl}/`,
