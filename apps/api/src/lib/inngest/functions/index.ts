@@ -15,6 +15,7 @@ import {
   orderAnonymizeAtFiveYears,
 } from './data-retention';
 import { alertsFailureWatch } from './alerts-failure-watch';
+import { gmailAlertPoller } from './gmail-alert-poller';
 
 /**
  * Registry of every Inngest function the API exposes. The serve
@@ -39,4 +40,5 @@ export const inngestFunctions: InngestFunction.Any[] = [
   softDeletedUserAnonymize,
   orderAnonymizeAtFiveYears,
   alertsFailureWatch,
+  gmailAlertPoller,
 ];
