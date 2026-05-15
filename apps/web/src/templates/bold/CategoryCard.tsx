@@ -20,7 +20,7 @@ export default function BoldCategoryCard({
       className="group block relative outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
     >
       {/* Card with dynamic hover */}
-      <div className="relative aspect-[3/4] rounded-3xl overflow-hidden bg-primary shadow-[0_18px_44px_-18px_hsl(var(--foreground)/0.30)] transition-transform duration-300 ease-out group-hover:scale-[1.015] group-hover:-rotate-[0.5deg]">
+      <div className="relative aspect-square sm:aspect-[3/4] rounded-3xl overflow-hidden bg-primary shadow-[0_18px_44px_-18px_hsl(var(--foreground)/0.30)] transition-transform duration-300 ease-out group-hover:scale-[1.015] group-hover:-rotate-[0.5deg]">
         {/* Image */}
         {category.image ? (
           <img
