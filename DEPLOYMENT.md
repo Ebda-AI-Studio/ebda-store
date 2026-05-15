@@ -338,6 +338,30 @@ npx prisma migrate dev --name rollback_xxx
 
 ---
 
+## Environments & staging posture
+
+**Current posture (2026-05-15, "option C" — safe-by-default Preview)**: there is no separate staging Railway service. Instead, Vercel Preview deployments for force-web + force-admin have `NEXT_PUBLIC_API_URL=http://localhost:4000` so PR previews are **non-functional by default** — they can't talk to production. A contributor who wants their preview to reach an API must override the env var on their PR explicitly. This blocks the worst-case data-integrity gap (a PR preview from a contributor writing to prod Neon) at zero cost. The CI `preview-env-isolation.yml` rule-13 gate verifies the production-vs-preview value differs and passes.
+
+**Why not a real staging Railway service yet**: at single-merchant scale (wadyaljuz only) the operational cost of maintaining a parallel Railway + Neon-branch + per-provider sandbox account chain (~4-6h setup, ~$20/mo Railway Pro OR a separate Hobby project) outweighs the marginal risk reduction. The safe-by-default Preview value gives ~80% of the protection at 5 minutes of setup.
+
+**Upgrade trigger — when to graduate to real staging (option B)**:
+
+1. Merchant #2 actually signs and onboards
+2. A second developer joins (so PRs come from people other than Ahmad)
+3. A P0 incident occurs that staging would have caught
+4. The team is about to run a load test that needs realistic concurrent traffic
+
+When any of these fire, the path to real staging is:
+
+- New Railway project `fwb-staging` on Hobby plan (~$5/mo, separate from prod)
+- Neon branch `staging` from `main` + seed fixtures script at `scripts/seed-staging.mjs`
+- Custom domain `store-api-staging.forcemediakw.com` → CNAME → Railway service
+- Vercel Preview `NEXT_PUBLIC_API_URL` swap from `localhost:4000` → `https://store-api-staging.forcemediakw.com`
+- Per-provider sandbox credentials: Tap/MyFatoorah/Hesabe/UPayments test mode, OneSignal separate "staging" app, Cloudflare R2 separate bucket `force-uploads-staging`, Sentry environment tag `staging`, Inngest separate `INNGEST_DEPLOY_ID`, Axiom dataset `force-api-railway-staging`
+- Documentation in this section updated with the URLs + dashboards
+
+Estimated effort: ~4h focused session.
+
 ## Cost Summary
 
 | Service          | Plan          | Monthly Cost     |
