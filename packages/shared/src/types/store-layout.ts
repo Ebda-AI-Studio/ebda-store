@@ -141,7 +141,14 @@ export const DEFAULT_LAYOUT_SETTINGS: StoreLayoutSettings = {
     defaultOpen: true,
   },
   testimonials: {
-    enabled: true,
+    // Default OFF for new stores. The fake-reviews-illegal posture
+    // (KW Law 39/2014: 50K KWD/offense + closure; FTC 2024 rule; EU
+    // UCPD Art 6) makes auto-displaying a testimonials section risky
+    // when the merchant hasn't explicitly populated real ones. Merchant
+    // enables in admin → Layout → Testimonials once they have real
+    // customer feedback. Existing stores keep their saved setting via
+    // resolveLayoutSettings() merge — only NEW stores get this default.
+    enabled: false,
     minRating: 4,
     verifiedOnly: true,
   },
