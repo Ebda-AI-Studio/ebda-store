@@ -67,7 +67,12 @@ const ALLOWED_LOCAL_PARTS: Record<string, string[]> = {
   sentry: ['notifications', 'alerts', 'no-reply@sentry'], // explicit alert addresses only
   betterstack: ['alerts', 'incidents', 'notifications'],
   posthog: ['notifications', 'alerts'], // never hello@/help@/marketing@
-  uptimerobot: [], // single-sender service, allow any
+  // 2026-05-15: tightened from [] (allow-any) — uptimerobot promo emails
+  // come from `support@user.uptimerobot.com` (marketing subdomain). real
+  // alerts come from `noreply@uptimerobot.com` or `alerts@uptimerobot.com`.
+  // note: ahmad receives uptimerobot alerts via mobile push, not email —
+  // so email-side filtering can be strict.
+  uptimerobot: ['noreply', 'notifications', 'alerts'],
   vercel: ['alerts', 'notifications', 'security'], // skip noreply@vercel.com onboarding
   railway: ['alerts', 'notifications'], // skip team@railway.app
   neon: ['alerts', 'notifications'], // skip team@neon.tech
@@ -98,6 +103,20 @@ const SUBJECT_NOISE_PATTERNS = [
   /weekly\s+(report|summary)/i,
   /monthly\s+(report|summary)/i,
   /tips?\s+(and|&)\s+tricks/i,
+  // 2026-05-15: promo/discount language additions — surfaced by an
+  // uptimerobot "Get 25% OFF UptimeRobot upgrades!" email that slipped
+  // through. these patterns catch percentage discounts, limited-time
+  // offers, and generic save/sale promos.
+  /\d{1,3}\s?%\s+off\b/i, // "25% OFF", "25 % OFF", "25%off"
+  /\blimited[\s-]?time\b/i, // "limited time", "limited-time"
+  /\bdiscount\b/i,
+  /\bsave\s+\$?\d+/i, // "save 25", "save $50", "save 25%"
+  /\bspecial\s+offer\b/i,
+  /\bpromo(tion)?\b/i,
+  /\bsale\b/i,
+  /\bdeal\b/i,
+  /upgrade\s+(your|now|today)/i, // "upgrade your account", "upgrade now"
+  /\bcoupon\b/i,
 ];
 
 function resolveSource(fromAddress: string): string {
