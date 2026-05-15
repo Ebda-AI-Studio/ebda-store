@@ -47,7 +47,58 @@ const KNOWN_SENDERS: Record<string, string> = {
   'vercel.com': 'vercel',
   'railway.app': 'railway',
   'neon.tech': 'neon',
+  'axiom.co': 'axiom',
 };
+
+/**
+ * Sender-address allowlist — only forward emails from these specific
+ * sub-addresses, not just any address on the domain. Marketing senders
+ * (help@sentry.io, hello@posthog.com, marketing@vercel.com, …) live on
+ * the same root domain as alert senders (notifications@, alerts@, …)
+ * but emit onboarding/trial/upsell mail we explicitly DON'T want
+ * forwarding to Telegram as P1 alerts.
+ *
+ * Format: `key = sender-domain (matches KNOWN_SENDERS), value = array
+ * of allowed local-parts (case-insensitive substring). Empty array
+ * means "any address on the domain is fine" — useful for services
+ * where only one sender exists (uptimerobot).
+ */
+const ALLOWED_LOCAL_PARTS: Record<string, string[]> = {
+  sentry: ['notifications', 'alerts', 'no-reply@sentry'], // explicit alert addresses only
+  betterstack: ['alerts', 'incidents', 'notifications'],
+  posthog: ['notifications', 'alerts'], // never hello@/help@/marketing@
+  uptimerobot: [], // single-sender service, allow any
+  vercel: ['alerts', 'notifications', 'security'], // skip noreply@vercel.com onboarding
+  railway: ['alerts', 'notifications'], // skip team@railway.app
+  neon: ['alerts', 'notifications'], // skip team@neon.tech
+  axiom: ['alerts', 'notifications', 'monitors'],
+};
+
+/**
+ * Subject-line denylist — drop emails whose subject matches any of
+ * these patterns regardless of sender, because they're typically
+ * onboarding / trial / billing / feature-announce noise the operator
+ * doesn't need on Telegram. The poller still marks these as \Seen so
+ * they don't re-fire on the next cycle.
+ */
+const SUBJECT_NOISE_PATTERNS = [
+  /welcome\s+to/i,
+  /trial\s+(starts|ends|expires|extended)/i,
+  /your\s+(free\s+)?trial/i,
+  /verify\s+your\s+email/i,
+  /confirm\s+your\s+(email|account)/i,
+  /getting\s+started/i,
+  /onboard(ing)?/i,
+  /\bnewsletter\b/i,
+  /\bdigest\b/i,
+  /pricing\s+(change|update)/i,
+  /billing\s+(reminder|update)/i,
+  /upgrade\s+to/i,
+  /new\s+feature/i,
+  /weekly\s+(report|summary)/i,
+  /monthly\s+(report|summary)/i,
+  /tips?\s+(and|&)\s+tricks/i,
+];
 
 function resolveSource(fromAddress: string): string {
   const lower = fromAddress.toLowerCase();
@@ -57,8 +108,22 @@ function resolveSource(fromAddress: string): string {
   return 'gmail.unknown';
 }
 
-function buildSearchSenderClause(): string[] {
-  return Array.from(new Set(Object.values(KNOWN_SENDERS))).map(name => `@${name}`);
+/**
+ * Decide whether an email is actually an alert worth forwarding.
+ * Returns `true` to forward, `false` to skip (and mark \Seen so it
+ * doesn't keep re-firing on every cron tick).
+ */
+function isAlertEmail(source: string, fromAddress: string, subject: string): boolean {
+  // Subject-line denylist applies regardless of sender.
+  if (SUBJECT_NOISE_PATTERNS.some(rx => rx.test(subject))) return false;
+
+  // Sender-address allowlist — if the service has known alert addresses
+  // configured, the from-address must contain one of them.
+  const allowedParts = ALLOWED_LOCAL_PARTS[source];
+  if (allowedParts === undefined) return true; // unknown source — let it through
+  if (allowedParts.length === 0) return true; // single-sender service — any address is fine
+  const fromLower = fromAddress.toLowerCase();
+  return allowedParts.some(part => fromLower.includes(part.toLowerCase()));
 }
 
 export interface PollResult {
@@ -109,6 +174,18 @@ export async function pollGmailAlerts(): Promise<PollResult> {
             const fromAddr = msg.envelope.from?.[0]?.address ?? 'unknown@unknown';
             const subject = (msg.envelope.subject ?? 'untitled alert').slice(0, 200);
             const source = resolveSource(fromAddr);
+
+            // Noise filter: skip onboarding/trial/marketing emails from
+            // alert-sender domains. Still mark \Seen so they don't re-fire.
+            if (!isAlertEmail(source, fromAddr, subject)) {
+              await client.messageFlagsAdd(String(uid), ['\\Seen']);
+              result.skipped++;
+              logger.info(
+                { from: fromAddr, subject: subject.slice(0, 80), source },
+                'gmail-alert-poller: skipped noise (sender or subject pattern)'
+              );
+              continue;
+            }
 
             // Extract a short body excerpt — full MIME parsing isn't
             // worth the deps here; we just take the first 500 chars
