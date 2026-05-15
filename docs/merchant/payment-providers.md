@@ -1,0 +1,180 @@
+# Payment Provider Setup — إعداد بوابات الدفع
+
+Force Store integrates with 4 Kuwait-based payment providers + Cash on Delivery. You only need **one** provider account to accept online payments; multiple providers give your customers more checkout options.
+
+تتكامل Force Store مع 4 بوابات دفع كويتية + الدفع عند الاستلام. تحتاج حساب مع بوابة واحدة فقط — الباقي اختياري.
+
+## Comparison
+
+| Provider         | Cards | KNET (K-Net) | Apple Pay | Setup difficulty  | Fees (approx)                 |
+| ---------------- | ----- | ------------ | --------- | ----------------- | ----------------------------- |
+| **Tap Payments** | ✅    | ✅           | ✅        | Easy — 15 min     | 2.85% + 75 fils per txn       |
+| **MyFatoorah**   | ✅    | ✅           | ✅        | Easy — 15 min     | 2.5% + 100 fils per txn       |
+| **Hesabe**       | ✅    | ✅           | ❌        | Medium — 30 min   | Custom contract               |
+| **UPayments**    | ✅    | ✅           | ✅        | Easy — 15 min     | 2.65% + 90 fils per txn       |
+| **COD**          | n/a   | n/a          | n/a       | 0 min — toggle on | 0 (charge fixed handling fee) |
+
+Fees are approximate per public pricing pages 2026-05; confirm with each provider when you sign up.
+
+## Universal webhook URL
+
+**All four providers use the SAME webhook URL on Force Store:**
+
+```
+https://store-api.forcemediakw.com/api/v1/webhooks/payment/<provider>
+```
+
+Where `<provider>` is one of: `tap`, `myfatoorah`, `hesabe`, `upayments`.
+
+Force Store displays the exact URL inside each provider's panel in **Admin → Settings → Payment Settings** with a one-click Copy button — you don't need to construct it manually.
+
+كل بوابات الدفع تستخدم نفس صيغة الـ webhook URL — تجده مع زر نسخ بجانب كل مزوّد في لوحة إعدادات الدفع.
+
+---
+
+## Tap Payments setup
+
+1. Sign up at <https://www.tap.company/kw/en> (Kuwait business registration + CR required)
+2. Once approved, log into <https://dashboard.tap.company>
+3. Settings → **API Keys** → create a **Live Secret Key** (starts with `sk_live_`)
+4. Settings → **Webhooks** → Add new webhook:
+   - URL: `https://store-api.forcemediakw.com/api/v1/webhooks/payment/tap`
+   - Events: `charge.created`, `charge.updated`, `charge.captured`, `charge.failed`, `charge.refunded`
+   - Save → Tap shows the webhook secret — **copy it now, shown once**
+5. In Force Store: **Admin → Settings → Payment Settings → Tap**:
+   - Toggle: ON
+   - API Key: paste the secret key from step 3
+   - Webhook Secret: paste the webhook secret from step 4
+   - Test Mode: OFF for live, ON while testing
+   - **Save**
+6. Test: make a real ~1 KWD purchase from your storefront — confirm the order shows `payment_status=paid` in **Admin → Orders**
+
+---
+
+## MyFatoorah setup
+
+1. Sign up at <https://portal.myfatoorah.com> (Kuwait business registration required)
+2. Once approved, navigate to **Developer → API Keys**
+3. Generate a **Live Token** (long string, often base64-looking)
+4. Navigate to **Notifications → Web Hooks → Add**:
+   - URL: `https://store-api.forcemediakw.com/api/v1/webhooks/payment/myfatoorah`
+   - Secret: click Generate → copy the secret
+   - Events: tick all payment events (Paid, Failed, Refunded, etc.)
+5. In Force Store: **Admin → Settings → Payment Settings → MyFatoorah**:
+   - Toggle: ON
+   - API Key: paste the live token
+   - Webhook Secret: paste the webhook secret
+   - Test Mode: OFF for live
+   - **Save**
+6. Test: make a real purchase, confirm in **Admin → Orders**
+
+---
+
+## Hesabe setup
+
+Hesabe is contract-based — you'll receive credentials by email from your account manager rather than self-serve.
+
+1. Email <sales@hesabe.com> to open a merchant account
+2. After signing the contract, you receive:
+   - Merchant Code
+   - API Key
+   - Webhook Secret
+3. In Force Store: **Admin → Settings → Payment Settings → Hesabe**:
+   - Toggle: ON
+   - Merchant ID: paste the merchant code
+   - API Key: paste the key
+   - Webhook Secret: paste the secret
+   - Test Mode: OFF for live
+   - **Save**
+4. Email Hesabe support to register the webhook URL on their side:
+   `https://store-api.forcemediakw.com/api/v1/webhooks/payment/hesabe`
+
+---
+
+## UPayments setup
+
+1. Sign up at <https://www.upayments.com> (Kuwait business registration)
+2. Once approved, log into the merchant dashboard
+3. **Settings → API Credentials**:
+   - Copy the **Live API Key** (starts with `sk_live_`)
+4. **Settings → Webhooks**:
+   - URL: `https://store-api.forcemediakw.com/api/v1/webhooks/payment/upayments`
+   - Secret: copy
+5. In Force Store: **Admin → Settings → Payment Settings → UPayments**:
+   - Toggle: ON
+   - API Key + Webhook Secret: paste
+   - Test Mode: OFF for live
+   - **Save**
+
+---
+
+## Cash on Delivery (COD)
+
+No external account needed.
+
+1. **Admin → Settings → Payment Settings → Cash on Delivery**
+2. Toggle: ON
+3. Display Name: e.g. "Cash on Delivery" / "الدفع عند الاستلام"
+4. Fixed fee: optional (e.g. 1 KWD handling fee added to every COD order)
+5. **Save**
+
+COD orders are marked `payment_status=cod_pending` until you mark them paid in **Admin → Orders → [order] → Mark as Paid** after collecting cash on delivery.
+
+طلبات الدفع عند الاستلام تبقى بحالة `cod_pending` لحين استلام النقد ثم تضغط «تم الدفع» من صفحة الطلب.
+
+---
+
+## Test mode vs live mode
+
+Every provider has a "test mode" that uses fake credit cards (e.g. `4242 4242 4242 4242` for Tap, `5123 4500 0000 0008` for MyFatoorah). Test transactions don't bill real money.
+
+**Always test in test mode first**, then switch to live mode only after:
+
+1. A test order goes through end-to-end (order created in admin → payment status updates to `paid` → success page shows)
+2. You've configured your shipping zones
+3. You've set up your store profile fully
+
+كل مزوّد له «وضع اختبار» لبطاقات وهمية بدون مدفوعات حقيقية. اختبر دائمًا قبل التحويل للوضع المباشر.
+
+---
+
+## Multi-provider strategy
+
+If you enable multiple providers, your customer sees them as separate options at checkout. You can:
+
+- Set one as **default** (selected first at checkout)
+- Reorder them with the up/down arrows
+- Set a different fixed fee per provider (e.g. UPayments has lower fees → no extra fee; Hesabe contract has higher fees → pass 1 KWD to customer)
+
+لو فعّلت أكثر من بوابة، اختر واحدة افتراضية وأعد ترتيب الباقي. تقدر تضيف رسوم ثابتة مختلفة لكل بوابة.
+
+---
+
+## Multi-tenant safety (technical)
+
+You may wonder: "if every store uses the same webhook URL, can other merchants see my payment events?"
+
+**No.** Each store has its own per-tenant webhook secret. When a payment provider sends a webhook to `store-api.forcemediakw.com/api/v1/webhooks/payment/myfatoorah`, Force Store:
+
+1. Looks up the transaction ID inside the payload
+2. Finds which store's order it belongs to (via the `Order` table)
+3. Verifies the HMAC signature using **that specific store's** webhook secret
+4. Only then processes the payment — and only against that store's order
+
+A merchant configuring a different store's credentials can't intercept anyone else's payments — the HMAC verification fails and we fire a P0 security alert after 3 such failures in 5 minutes.
+
+سؤال مشروع: «هل تجار آخرون يقدرون يطّلعوا على مدفوعاتي إذا كل المتاجر تستخدم نفس رابط webhook؟» الجواب: لا. كل متجر له «سر webhook» خاص فيه، ولو حاول أحد التلاعب يفشل HMAC ويُرفع إنذار أمني فوريًا.
+
+---
+
+## What if a webhook fails?
+
+If Force Store can't reach your payment provider (or vice versa), the order stays in `payment_status=pending` until the webhook eventually arrives. Most providers retry automatically for 24h.
+
+If the order is stuck in `pending` for >1 hour:
+
+1. Check the provider's dashboard — was the payment actually completed?
+2. If yes: contact the Force Media team — we can manually mark the order paid after verifying the transaction ID
+3. If no: the payment likely failed silently; ask the customer to try again
+
+لو الطلب بقي في حالة `pending` أكثر من ساعة: تأكد من لوحة المزوّد إذا الدفع تمّ فعلًا، تواصل مع فريق Force Media لتعديل الحالة يدويًا بعد التحقّق.

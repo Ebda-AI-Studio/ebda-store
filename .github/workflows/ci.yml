@@ -116,8 +116,16 @@ jobs:
       - name: Build shared package
         run: npm run build -w packages/shared
 
-      - name: Run unit tests
-        run: npx vitest run tests/unit --reporter=verbose
+      - name: Run unit tests with coverage
+        run: npx vitest run tests/unit --coverage --reporter=verbose
+
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-coverage
+          path: coverage/
+          retention-days: 7
 
   test-integration:
     name: Integration Tests

@@ -1,0 +1,216 @@
+# FAQ — الأسئلة الشائعة
+
+The most common merchant questions, with concrete answers. أكثر الأسئلة شيوعًا بإجابات واضحة.
+
+## General
+
+### How much does Force Store cost? — كم تكلفة Force Store؟
+
+Pricing is set per merchant by Force Media. Contact your account manager. There's no per-transaction commission collected by Force Store itself — your payment provider's fees are separate (2.5–2.85% typically).
+
+السعر يُحدّد لكل تاجر على حدة من Force Media. لا توجد عمولة على المعاملات من Force Store؛ رسوم بوابة الدفع منفصلة (2.5%–2.85% تقريبًا).
+
+### What's the difference between Force Store and Shopify / Salla? — الفرق بين Force Store وShopify أو سلّة؟
+
+- **Built for Kuwait first**: KNET, all 4 Kuwait payment providers (Tap/MyFatoorah/Hesabe/UPayments) ship out of the box. Arabic + English are first-class, not afterthoughts.
+- **All AI features free**: translation, SEO meta tags, category suggestions, FAQ generation — built-in via Gemini, no AppStore add-ons.
+- **No commission on sales**: only the flat platform fee. Shopify Plus + a payment app would total 4–6% per sale.
+- **Operated by Force Media**: direct WhatsApp support, not a Western support ticket queue.
+
+مخصّصة للسوق الكويتي، كل خصائص AI مجانية، لا عمولة على المبيعات، دعم مباشر بالعربي من Force Media.
+
+### Can I export my data if I leave? — أقدر أنقل بياناتي لو غادرت؟
+
+Yes. **Admin → Settings → Data Export** generates a JSON bundle of your products, categories, orders, customers (GDPR Art. 20 portability). Your customer data is yours.
+
+نعم. تستطيع تصدير منتجاتك، فئاتك، طلباتك، عملاءك كملف JSON كامل من إعدادات الحساب.
+
+---
+
+## Products
+
+### How many products can I add? — كم منتج أقدر أضيف؟
+
+No hard limit at the platform level. We've tested with 10,000+ products per store. Stores with > 5,000 products may want to enable cursor-based pagination for catalog browse — contact support if you're growing past that.
+
+لا حدّ تقني عند المنصة. اختبرنا متاجر فيها أكثر من 10,000 منتج. لو تجاوزت 5,000، تواصل معنا لتفعيل تنقّل أسرع.
+
+### Can I bulk-import products from a spreadsheet? — أقدر أرفع منتجات من Excel؟
+
+Yes. **Admin → Products → Import**:
+
+- Download the CSV template
+- Fill it in (one row per product) — required columns: name, name_ar, price, category_slug, image_url
+- Upload — Force Store validates, then queues the import as a background job. Status visible in **Admin → Jobs**
+- Smart-skip: existing products (matched by SKU) are updated, new ones created. No duplicates.
+
+نعم — حمّل قالب CSV، عبّيه، ارفعه. الخلفية تعالج الاستيراد وتحدّث الموجود وتنشئ الجديد. مافي تكرار.
+
+### Why does my Arabic product name look wrong on the storefront? — لماذا اسم المنتج بالعربي يبان غريب؟
+
+Common causes:
+
+1. RTL (right-to-left) marks copied from a Word document — these invisible characters break alignment. Fix: re-type the name directly in the admin form.
+2. Mixed digits — Latin digits inside Arabic text look misaligned. Decision is yours: Force Store doesn't auto-convert. Stick to one digit system within a single field.
+3. Browser language vs. storefront language — the storefront toggle is independent of your browser. Hit the AR/EN toggle to confirm what your customer sees.
+
+الأسباب الشائعة: علامات RTL مخفية منسوخة من Word (أعد كتابة الاسم مباشرة)، أرقام لاتينية داخل نص عربي (اختر نظام واحد)، اختلاف لغة المتصفّح عن لغة المتجر (افحص بالتبديل من واجهة المتجر).
+
+---
+
+## Orders
+
+### Where do new orders appear? — وين الطلبات الجديدة؟
+
+**Admin → Orders** — sorted by newest first.
+
+Real-time push notification fires to your phone if you've installed Force Store as a PWA (Progressive Web App) and granted push permission. Setup: open the admin in Chrome/Safari, tap Share → Add to Home Screen, accept the notification prompt.
+
+تظهر في «الطلبات». لو ثبّت لوحة الإدارة كتطبيق على جوالك (PWA)، تصلك تنبيهات فورية لكل طلب جديد.
+
+### How do I refund an order? — كيف أعمل استرجاع؟
+
+**Admin → Orders → [order] → Refund**.
+
+- Select full or partial refund
+- Choose reason (optional)
+- Click Refund — Force Store calls the payment provider's refund API automatically
+
+Refunds appear in your customer's account within 5–7 business days depending on their bank. The Force Store order status updates to `refunded`.
+
+من صفحة الطلب اضغط «استرجاع». يحدث الاسترجاع تلقائيًا عند مزوّد الدفع. يظهر في حساب العميل خلال 5–7 أيام عمل.
+
+### Can I edit an order after it's been placed? — أقدر أعدّل طلب بعد ما يُسجَّل؟
+
+Limited editing only:
+
+- ✅ Update shipping address (before shipment)
+- ✅ Add tracking number
+- ✅ Update order status (processing → shipped → delivered)
+- ✅ Add internal notes (only you see them)
+- ❌ Change product quantities or prices — would require canceling + re-creating the order (and likely refunding)
+
+Force Store deliberately blocks price/quantity edits to maintain a clean audit trail. If a customer wants to change items, ask them to cancel and re-order.
+
+التعديل محدود: تقدر تغيّر عنوان الشحن، رقم التتبّع، الحالة. لا تقدر تعدّل الأسعار أو الكميات (للحفاظ على السجل). للتغييرات الكبيرة، الإلغاء وإعادة الطلب.
+
+---
+
+## Payments
+
+### A customer says they paid but I see status=pending. What now? — العميل دفع لكن الحالة pending؟
+
+This happens when the payment provider's webhook hasn't reached us yet (~1–60 min delay, very rare).
+
+1. Wait 5 min and refresh the order page
+2. If still pending: check the payment provider's dashboard — search by the customer's email or the order ID
+3. If the provider shows the payment as completed: contact Force Media support with the order ID + transaction ID; we can manually reconcile after verifying
+
+يحدث نادرًا لو تأخّر webhook المزوّد. انتظر 5 دقائق ثم افحص في لوحة بوابة الدفع. لو الدفع تمّ هناك لكن لم يصل لنا، تواصل مع الدعم بمعرف الطلب + معرف العملية.
+
+### My payment provider keeps failing. How do I diagnose? — مزوّد الدفع يرفض كل المحاولات؟
+
+Check in order:
+
+1. **Test mode**: is the toggle set correctly? Test mode rejects real cards; live mode rejects test cards.
+2. **Webhook secret**: was it copied correctly? A single character off and Force Store treats every webhook as forged.
+3. **API key permissions**: did the provider give you a "Public" key by mistake? Force Store needs the Secret/Live key.
+4. **Provider account status**: is your account in good standing? Tap, MyFatoorah etc. occasionally pause accounts pending compliance review.
+
+تحقّق بهذا الترتيب: وضع الاختبار/المباشر، صحة سر webhook، مفتاح API (سرّي وليس عام)، حالة حسابك عند المزوّد.
+
+---
+
+## Storefront
+
+### How do I change the storefront colors? — كيف أغيّر ألوان المتجر؟
+
+**Admin → Storefront → Brand Colors**
+
+Pick primary (main button color) + accent. Force Store auto-generates the full palette (hover states, disabled states, etc.) from those two. Preview live on the right pane.
+
+من «الواجهة → الألوان». اختر اللون الرئيسي + اللون الثانوي. باقي درجات الألوان تُولَّد تلقائيًا. معاينة مباشرة بجانب الاختيار.
+
+### Can I rearrange the home page sections? — أقدر أرتّب أقسام الصفحة الرئيسية؟
+
+Yes. **Admin → Storefront → Home Page Sections**:
+
+- Drag-and-drop the sections to reorder
+- Toggle visibility per section
+- Configure each section's content (featured categories: pick which; testimonials: pick which to show; etc.)
+
+نعم — اسحب وأفلت لإعادة الترتيب، فعّل أو أوقف أي قسم، اختر محتوى كل قسم.
+
+### Can I add a blog? — أقدر أضيف مدوّنة؟
+
+Pages are supported via **Admin → Pages**:
+
+- About Us
+- Shipping Policy
+- Return Policy
+- Privacy Policy
+- Custom pages (any title)
+
+Each page has bilingual rich-text editing. A full blog with category + author + RSS isn't built in yet — let us know if it'd help your store.
+
+الصفحات مدعومة (من نحن، الشحن، الإرجاع، سياسة الخصوصية، صفحات مخصّصة). المدوّنة الكاملة (تدوينات + كاتب + RSS) ليست موجودة حاليًا — أخبرنا لو تحتاجها.
+
+---
+
+## Customers
+
+### Are customer accounts required to checkout? — هل التسجيل إجباري للشراء؟
+
+No. Guest checkout is enabled by default — customers can complete an order with just an email + phone + delivery address. Optionally they can register an account on the confirmation page (Force Store offers one-tap registration to save the order to a new account).
+
+لا. الدفع كزائر متاح افتراضيًا — يكفي إيميل ورقم وعنوان. اختياريًا يقدر العميل يسجّل في صفحة التأكيد.
+
+### Can I see what my customers searched for? — أقدر أعرف وش بحثوا عنه عملائي؟
+
+**Admin → Analytics → Search Terms** — shows top search queries from your storefront over the last 30 days. Use this to identify products you don't yet stock that customers are looking for.
+
+من «التحليلات → كلمات البحث». تشوف أكثر العبارات اللي بحث عنها العملاء في آخر 30 يوم — مفيد لاكتشاف منتجات تحتاجها ما هي موجودة.
+
+---
+
+## Technical
+
+### Why does my storefront load slowly the first time? — لماذا المتجر بطيء أوّل مرة؟
+
+The first visitor every ~5 minutes "warms up" Force Store's edge cache. Subsequent visitors are served from cache (~50ms). If first-load is consistently >3 seconds, contact support — that's not normal.
+
+أول زائر كل 5 دقائق «يدفّي» الكاش. الزوار اللاحقون يحصلون على ردّ سريع (50 مللي ثانية). لو الأول-تحميل بطيء باستمرار (أكثر من 3 ثوان)، تواصل معنا.
+
+### Is my data backed up? — هل بياناتي محفوظة احتياطيًا؟
+
+Yes — at multiple layers:
+
+1. Every push to production triggers a Neon database branch snapshot (per-commit point-in-time)
+2. Daily database dumps are stored encrypted-at-rest
+3. The platform maintains 30-day log retention for incident investigation
+
+If you ever lose data (accidentally deleted a category, etc.), contact us within 7 days for restoration.
+
+نعم — نسخ احتياطية على عدّة طبقات: لقطة قاعدة بيانات مع كل نشر، نسخ يومية مشفّرة، احتفاظ بسجلات 30 يوم. لو حذفت شيء بالغلط، تواصل معنا خلال 7 أيام.
+
+### What happens if Force Store goes down? — وش يصير لو Force Store تعطّلت؟
+
+Status page: <https://stats.uptimerobot.com/23nuarbz3h> — check there first.
+
+If the platform is down:
+
+1. Storefront shows a friendly "we're back soon" message instead of an error
+2. Pending orders are queued and processed when service restores
+3. Email notifications continue (they're handled out-of-band by a queue)
+
+Recent uptime: > 99.9% (single-region, single-replica architecture — see [troubleshooting.md](./troubleshooting.md) for incident handling).
+
+في حالة عطل: المتجر يعرض رسالة «نعود قريبًا» بدلًا من خطأ، الطلبات المعلّقة تُعالج فور عودة الخدمة، الإيميلات تستمر. وقت التشغيل الفعلي > 99.9%.
+
+---
+
+## Still have a question? — لا زال عندك سؤال؟
+
+- WhatsApp: contact your Force Media account manager
+- Email: contact@forcemediakw.com
+- Check [troubleshooting.md](./troubleshooting.md) for specific error scenarios

@@ -102,7 +102,7 @@ const createOrderSchema = z.object({
 // GET /products - List all public products (cached 30s)
 router.get('/products', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { page, limit, category, search, featured, sort, minPrice, maxPrice } = req.query;
+    const { page, limit, category, search, featured, sort, minPrice, maxPrice, cursor } = req.query;
     const storeId = await getStoreIdFromRequest(req);
 
     const sortValue =
@@ -110,8 +110,16 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
         ? sort
         : undefined;
 
-    // Build a cache key from query params so different filters get their own entry
-    const cacheKey = `public:products:${storeId}:${page || 1}:${limit || 20}:${category || ''}:${search || ''}:${featured || ''}:${sortValue || ''}:${minPrice || ''}:${maxPrice || ''}`;
+    // Cursor MUST be a v4 UUID — refuse anything else so a malformed cursor
+    // can't bypass the offset cap or trigger a Prisma error path.
+    const validCursor =
+      typeof cursor === 'string' &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cursor)
+        ? cursor
+        : undefined;
+
+    // Cache key includes cursor — different cursor positions get distinct entries.
+    const cacheKey = `public:products:${storeId}:${page || 1}:${limit || 20}:${category || ''}:${search || ''}:${featured || ''}:${sortValue || ''}:${minPrice || ''}:${maxPrice || ''}:${validCursor || ''}`;
 
     const result = await getCached(cacheKey, 120, () =>
       ProductService.listPublic(storeId, {
@@ -123,6 +131,7 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
         sort: sortValue,
         minPrice: minPrice ? parseInt(minPrice as string, 10) : undefined,
         maxPrice: maxPrice ? parseInt(maxPrice as string, 10) : undefined,
+        cursor: validCursor,
       })
     );
 

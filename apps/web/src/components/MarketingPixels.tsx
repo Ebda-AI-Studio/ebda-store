@@ -5,6 +5,7 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import { useEffect, Suspense } from 'react';
 import type { MarketingPixels } from '@force/shared';
 import { useFeatures } from '../contexts/FeatureContext';
+import { useConsent } from '../contexts/ConsentContext';
 
 interface MarketingPixelsProps {
   pixels: MarketingPixels;
@@ -27,16 +28,25 @@ function isValidPixelId(id: string | undefined): id is string {
  */
 function MarketingPixelsInner({ pixels }: MarketingPixelsProps) {
   const { isEnabled } = useFeatures();
+  const { consent } = useConsent();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const featureEnabled = isEnabled('marketing_pixels');
+  // Defense-in-depth: today the outer SSR gate in layout.tsx doesn't render
+  // <MarketingPixelsProvider> at all without marketing consent. But if a
+  // future refactor moves this component outside that SSR gate, the inner
+  // `consent.marketing === true` check here prevents pixels from firing
+  // anyway. Belt-and-braces for the most sensitive surface in the app.
+  const marketingConsentGranted = consent?.marketing === true;
+  const allowFire = featureEnabled && marketingConsentGranted;
 
   // Track page views on route change. The hook MUST be unconditional —
   // moving the early-return above this useEffect violates rules-of-hooks.
-  // Instead we gate the body on `featureEnabled` so it no-ops when the
-  // feature is off, and short-circuit the render below the hook.
+  // Instead we gate the body on `allowFire` so it no-ops when either the
+  // feature or marketing consent is off, and short-circuit the render
+  // below the hook.
   useEffect(() => {
-    if (!featureEnabled) return;
+    if (!allowFire) return;
     if (typeof window === 'undefined') return;
 
     // Meta Pixel PageView
@@ -63,9 +73,9 @@ function MarketingPixelsInner({ pixels }: MarketingPixelsProps) {
     if (pixels.pinterest?.enabled && 'pintrk' in window) {
       (window as { pintrk: (...args: string[]) => void }).pintrk('page');
     }
-  }, [pathname, searchParams, pixels, featureEnabled]);
+  }, [pathname, searchParams, pixels, allowFire]);
 
-  if (!featureEnabled) return null;
+  if (!allowFire) return null;
 
   // Validate all pixel IDs before rendering
   const validMeta = pixels.meta?.enabled && isValidPixelId(pixels.meta.pixelId);

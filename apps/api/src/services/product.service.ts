@@ -395,12 +395,34 @@ export class ProductService {
     storeId: string,
     options: ListProductsOptions & {
       sort?: 'newest' | 'price_asc' | 'price_desc' | 'best_seller';
+      cursor?: string;
     } = {}
   ) {
-    const { status = 'active', category, search, featured, minPrice, maxPrice, sort } = options;
+    const {
+      status = 'active',
+      category,
+      search,
+      featured,
+      minPrice,
+      maxPrice,
+      sort,
+      cursor,
+    } = options;
     const page = Math.max(1, options.page || 1);
     const limit = Math.min(100, Math.max(1, options.limit || 20));
-    const skip = (page - 1) * limit;
+
+    // Scaling-cliff guard (CLAUDE.md rule 3): offset pagination is O(n) at the
+    // DB level — `?page=10000&limit=100` would force Postgres to scan the
+    // first 1M rows. A bot or crawler probing the catalog endpoint at that
+    // depth would burn the DB. Hard-cap the effective skip at 10000 rows so
+    // even adversarial query strings can't trigger the cliff. Legitimate
+    // pagination tops out around ~50 pages at any realistic catalog size;
+    // beyond that the storefront UX should switch to cursor anyway (see
+    // `cursor` param below).
+    const MAX_SKIP = 10_000;
+    const requestedSkip = (page - 1) * limit;
+    const skip = cursor ? 0 : Math.min(requestedSkip, MAX_SKIP);
+    const skipCapped = requestedSkip > MAX_SKIP;
 
     // Build a stable cache key from params (best-effort cache, 30s TTL)
     const cacheParams = JSON.stringify({
@@ -413,6 +435,7 @@ export class ProductService {
       sort,
       page,
       limit,
+      cursor,
     });
     const cacheKey = `products:store:${storeId}:${cacheParams}`;
     try {
@@ -476,28 +499,51 @@ export class ProductService {
     else if (sort === 'price_desc') orderBy = { price: 'desc' };
     else if (sort === 'best_seller') orderBy = [{ featured: 'desc' }, { updatedAt: 'desc' }];
 
-    const [products, total] = await Promise.all([
-      prisma.product.findMany({
-        where,
-        skip,
-        take: limit,
-        include: {
-          images: { orderBy: { position: 'asc' }, take: 1 },
-          categories: { include: { category: true } },
-          store: { select: { id: true, name: true, slug: true } },
-        },
-        orderBy,
-      }),
+    // Cursor pagination path — when caller passes ?cursor=<id>, use
+    // keyset pagination instead of offset. O(1) at the DB level regardless
+    // of how deep into the catalog. The cursor is an opaque product id;
+    // the frontend never constructs one, only forwards what we returned in
+    // the previous response's `meta.nextCursor`.
+    //
+    // Trade-off: cursor pagination supports "Next page" navigation but NOT
+    // arbitrary jumps. The storefront's page-number UI keeps using `page`
+    // for the first ~10000 rows (capped above); the cursor path is for
+    // "Load more" + crawler-safe deep scans.
+    const baseFindManyArgs = {
+      where,
+      take: limit + 1, // fetch one extra to know if there's a next page
+      include: {
+        images: { orderBy: { position: 'asc' } as const, take: 1 },
+        categories: { include: { category: true } },
+        store: { select: { id: true, name: true, slug: true } },
+      },
+      orderBy,
+    };
+
+    const findManyArgs = cursor
+      ? { ...baseFindManyArgs, cursor: { id: cursor }, skip: 1 }
+      : { ...baseFindManyArgs, skip, take: limit };
+
+    const [productsRaw, total] = await Promise.all([
+      prisma.product.findMany(findManyArgs),
       prisma.product.count({ where }),
     ]);
+
+    // When using cursor we fetched limit+1; slice to limit + extract next cursor.
+    const products =
+      cursor && productsRaw.length > limit ? productsRaw.slice(0, limit) : productsRaw;
+    const nextCursor =
+      cursor && productsRaw.length > limit ? (productsRaw[limit] as { id: string }).id : undefined;
 
     const result = {
       products,
       meta: {
-        page,
+        page: cursor ? undefined : page,
         limit,
         total,
-        totalPages: Math.ceil(total / limit),
+        totalPages: cursor ? undefined : Math.ceil(total / limit),
+        nextCursor,
+        skipCapped: skipCapped || undefined,
       },
     };
 

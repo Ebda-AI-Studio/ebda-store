@@ -16,6 +16,7 @@ import {
 } from './data-retention';
 import { alertsFailureWatch } from './alerts-failure-watch';
 import { gmailAlertPoller } from './gmail-alert-poller';
+import { queueDepthWatch } from './queue-depth-watch';
 
 /**
  * Registry of every Inngest function the API exposes. The serve
@@ -41,4 +42,5 @@ export const inngestFunctions: InngestFunction.Any[] = [
   orderAnonymizeAtFiveYears,
   alertsFailureWatch,
   gmailAlertPoller,
+  queueDepthWatch,
 ];

@@ -22,11 +22,14 @@ export default defineConfig({
         '**/coverage/**',
       ],
       thresholds: {
-        // Reduced thresholds for initial implementation
-        lines: 50,
-        functions: 50,
-        branches: 50,
-        statements: 50,
+        // Initial gate at 30% — surfaces coverage drops without blocking
+        // ongoing PRs while the suite is small. Ratchet up by ~5 points
+        // per quarter as tests grow. CI passes `--coverage` so the
+        // threshold enforces; without --coverage vitest skips it entirely.
+        lines: 30,
+        functions: 30,
+        branches: 30,
+        statements: 30,
       },
     },
     setupFiles: ['./tests/setup.ts', './tests/setup-e2e.ts'],
