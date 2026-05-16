@@ -73,7 +73,7 @@ function ModernProductCard({
         onMouseLeave={() => setIsHovered(false)}
       >
         {/* Image Container */}
-        <div className="relative aspect-[3/4] overflow-hidden bg-muted">
+        <div className="relative aspect-square sm:aspect-[3/4] overflow-hidden bg-muted">
           {product.images?.[0]?.url ? (
             <>
               <Image

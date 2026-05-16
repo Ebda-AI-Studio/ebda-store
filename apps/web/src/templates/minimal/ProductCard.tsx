@@ -47,7 +47,7 @@ function MinimalProductCard({
         className="group block cursor-pointer"
       >
         {/* Image — no border, no shadow, subtle opacity on hover */}
-        <div className="relative aspect-[3/4] overflow-hidden bg-muted/30 mb-6">
+        <div className="relative aspect-square sm:aspect-[3/4] overflow-hidden bg-muted/30 mb-6">
           {onToggleCompare && (
             <CompareButton
               productId={product.id}
