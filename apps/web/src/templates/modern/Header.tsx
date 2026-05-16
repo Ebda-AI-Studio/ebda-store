@@ -59,7 +59,33 @@ export default function ModernHeader({
         className={`sticky top-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg border-b border-border/60 transition-shadow duration-200 ${isScrolled ? 'shadow-sm' : 'shadow-none'}`}
       >
         <div className="container mx-auto px-4">
-          <div className="relative flex h-20 items-center justify-between gap-4 sm:h-24 md:h-28">
+          <div className="relative flex h-20 items-center justify-between gap-2 sm:h-24 md:h-28">
+            {/* Mobile-only hamburger (LEFT slot). Extracted from the actions
+                block so the layout matches the pecannbee + alkahraman target:
+                hamburger left, logo center, actions right. */}
+            <button
+              type="button"
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              className="md:hidden inline-flex h-11 w-11 items-center justify-center rounded-lg hover:bg-muted transition-colors duration-300 ease-out cursor-pointer"
+              aria-label={isRtl ? 'القائمة' : 'Menu'}
+              aria-expanded={isMenuOpen}
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 6h16M4 12h16M4 18h16"
+                />
+              </svg>
+            </button>
+
             {/* Logo — centered on mobile (per pecannbee + alkahraman target),
                 normal flex item on tablet+ (where the nav fills the middle). */}
             <Link
@@ -191,30 +217,6 @@ export default function ModernHeader({
                   </span>
                 )}
               </Link>
-
-              {/* Mobile Menu Button */}
-              <button
-                type="button"
-                onClick={() => setIsMenuOpen(!isMenuOpen)}
-                className="md:hidden inline-flex h-11 w-11 items-center justify-center rounded-lg hover:bg-muted transition-colors duration-300 ease-out cursor-pointer"
-                aria-label={isRtl ? 'القائمة' : 'Menu'}
-                aria-expanded={isMenuOpen}
-              >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 6h16M4 12h16M4 18h16"
-                  />
-                </svg>
-              </button>
             </div>
           </div>
 
