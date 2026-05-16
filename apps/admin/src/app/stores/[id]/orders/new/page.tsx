@@ -23,7 +23,10 @@ interface LineItem {
 }
 
 interface CustomerSearchResult {
+  /** UUID for registered customers, `guest:<key>` for past guests. */
   id: string;
+  /** True when sourced from order.shippingAddress (no User row). */
+  isGuest?: boolean;
   firstName: string;
   lastName: string;
   email: string;
@@ -126,12 +129,19 @@ export default function NewOrderPage() {
   };
 
   const selectCustomer = (c: CustomerSearchResult) => {
-    setSelectedCustomerId(c.id);
+    // Guest matches don't attach a User row — only pre-fill the form
+    // and leave customerId null so the new order persists as guest.
+    // Registered matches attach via the UUID.
+    setSelectedCustomerId(c.isGuest ? null : c.id);
     setFirstName(c.firstName);
     setLastName(c.lastName);
     setEmail(c.email);
     setPhone(c.phone ?? '');
-    setCustomerSearch(`${c.firstName} ${c.lastName} <${c.email}>`);
+    setCustomerSearch(
+      c.isGuest
+        ? `${c.firstName} ${c.lastName} <${c.email || c.phone}> (guest)`
+        : `${c.firstName} ${c.lastName} <${c.email}>`
+    );
     setCustomerResults([]);
   };
 
@@ -264,12 +274,17 @@ export default function NewOrderPage() {
                         className="w-full px-3 py-2 text-start text-sm hover:bg-muted"
                       >
                         <span className="font-medium">
-                          {c.firstName} {c.lastName}
+                          {c.firstName} {c.lastName || ''}
                         </span>
-                        <span className="ms-2 text-muted-foreground">{c.email}</span>
+                        {c.email && <span className="ms-2 text-muted-foreground">{c.email}</span>}
                         {c.phone && (
                           <span className="ms-2 text-muted-foreground" dir="ltr">
                             {c.phone}
+                          </span>
+                        )}
+                        {c.isGuest && (
+                          <span className="ms-2 inline-flex items-center rounded-full bg-warning/10 px-2 py-0.5 text-[10px] font-medium text-warning">
+                            guest
                           </span>
                         )}
                       </button>

@@ -336,9 +336,15 @@ router.get(
 /**
  * GET /stores/:storeId/customers/search?q=<query>
  *
- * Lightweight typeahead used by the admin "New order" form to attach
- * an existing customer (User row) to a phone order. Matches by first
- * name, last name, email, or phone. Limited to 10 results.
+ * Typeahead for the admin "New order" form. Matches both REGISTERED
+ * customers (User rows with at least one order at this store) AND
+ * GUEST customers (orders with customerId=null where the shipping
+ * address JSON contains a matching firstName/lastName/email/phone).
+ *
+ * Returns up to 10 results merged + deduped. Ahmad 2026-05-16: the
+ * customers PAGE shows both registered and guest — search must too,
+ * so the admin can find phone-order customers from prior calls who
+ * checked out as guests.
  */
 router.get(
   '/customers/search',
@@ -352,10 +358,8 @@ router.get(
         return;
       }
 
-      // Only return users who have placed at least one order at this
-      // store — keeps the search scoped to actual customers, not every
-      // user in the system.
-      const orders = await prisma.order.findMany({
+      // --- Registered customers (User table, joined via orders) ---
+      const registeredOrders = await prisma.order.findMany({
         where: {
           storeId,
           customerId: { not: null },
@@ -383,9 +387,72 @@ router.get(
         take: 10,
       });
 
-      const customers = orders
+      // Shape: { id (UUID), isGuest: false, firstName, lastName, email, phone }
+      const registered = registeredOrders
         .map(o => o.customer)
-        .filter((c): c is NonNullable<typeof c> => c !== null);
+        .filter((c): c is NonNullable<(typeof registeredOrders)[number]['customer']> => c !== null)
+        .map(c => ({
+          id: c.id,
+          isGuest: false as const,
+          firstName: c.firstName ?? '',
+          lastName: c.lastName ?? '',
+          email: c.email ?? '',
+          phone: c.phone ?? '',
+        }));
+
+      // --- Guest customers (raw SQL: JSON ILIKE) ---
+      // Prisma's JSON filter doesn't support partial-match (`contains`),
+      // only exact `equals`. For guest typeahead we need ILIKE on
+      // JSONB-extracted scalar fields, which is a `$queryRaw` job. The
+      // result is deduped by lowercased email when present, falling
+      // back to phone, then to order.id (each guest-order without
+      // either becomes its own row — same as the customers list page).
+      const like = `%${q}%`;
+      const guestRows = await prisma.$queryRaw<
+        Array<{
+          first_name: string | null;
+          last_name: string | null;
+          email: string | null;
+          phone: string | null;
+          order_id: string;
+        }>
+      >`
+        SELECT DISTINCT ON (
+          COALESCE(LOWER(shipping_address->>'email'), shipping_address->>'phone', id::text)
+        )
+          shipping_address->>'firstName' AS first_name,
+          shipping_address->>'lastName'  AS last_name,
+          shipping_address->>'email'     AS email,
+          shipping_address->>'phone'     AS phone,
+          id::text AS order_id
+        FROM orders
+        WHERE store_id = ${storeId}::uuid
+          AND customer_id IS NULL
+          AND deleted_at IS NULL
+          AND (
+                shipping_address->>'firstName' ILIKE ${like}
+             OR shipping_address->>'lastName'  ILIKE ${like}
+             OR shipping_address->>'email'     ILIKE ${like}
+             OR shipping_address->>'phone'     ILIKE ${like}
+          )
+        LIMIT 10
+      `;
+
+      const guests = guestRows.map(g => ({
+        // Synthetic id — frontend treats this as guest (no customerId
+        // sent on order create), pre-fills form fields from these
+        // values. Matches the customer-detail polymorphic key pattern.
+        id: g.email ? `guest:${g.email.toLowerCase()}` : `guest:${g.order_id}`,
+        isGuest: true as const,
+        firstName: g.first_name ?? '',
+        lastName: g.last_name ?? '',
+        email: g.email ?? '',
+        phone: g.phone ?? '',
+      }));
+
+      // Merge + cap at 10. Registered customers ranked first because
+      // they're more useful for repeat-order attribution.
+      const customers = [...registered, ...guests].slice(0, 10);
 
       res.json({ success: true, data: { customers } });
     } catch (error) {
