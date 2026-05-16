@@ -87,18 +87,18 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
     productCardPrice: 'text-base font-serif font-medium text-foreground tracking-tight',
     productCardBody: 'text-center',
     productCardCta:
-      'whitespace-nowrap border-y border-foreground bg-foreground px-5 py-3.5 text-xs font-serif uppercase tracking-[0.22em] text-background hover:bg-foreground/85 transition-colors duration-500 ease-out min-h-[44px]',
+      'whitespace-nowrap border-y border-foreground bg-foreground px-5 py-3.5 text-sm font-serif uppercase tracking-[0.22em] text-background hover:bg-foreground/85 transition-colors duration-500 ease-out min-h-[44px]',
     sectionHeading:
       'text-3xl sm:text-4xl lg:text-5xl font-serif font-normal tracking-tight text-foreground leading-[1.1]',
     sectionSeeAll:
-      'text-xs font-serif uppercase tracking-[0.22em] text-foreground/70 hover:text-foreground transition-colors duration-500',
+      'text-sm font-serif uppercase tracking-[0.22em] text-foreground/70 hover:text-foreground transition-colors duration-500',
     heroOverlay: 'bg-gradient-to-b from-foreground/10 via-foreground/15 to-foreground/40',
     heroHeadline:
       'text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-serif font-normal tracking-tight text-white drop-shadow-xl leading-[1.05]',
     heroCta:
       'border border-white bg-transparent px-10 py-4 font-serif text-sm tracking-[0.22em] uppercase text-white hover:bg-white hover:text-foreground transition-colors duration-500 ease-out min-h-[44px]',
     testimonialCard: 'border border-border bg-background p-7',
-    testimonialAuthor: 'text-xs font-serif uppercase tracking-[0.22em] text-foreground',
+    testimonialAuthor: 'text-sm font-serif uppercase tracking-[0.22em] text-foreground',
   },
   minimal: {
     // No chrome — whitespace IS the design. Slow restrained color shifts only.
@@ -115,11 +115,11 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
     productCardPrice: 'text-base tracking-wide font-light text-muted-foreground',
     productCardBody: 'text-center',
     productCardCta:
-      'whitespace-nowrap mx-auto inline-block border-b border-foreground/70 pb-1 text-[11px] font-medium uppercase tracking-[0.28em] text-foreground hover:text-foreground/70 hover:border-foreground/40 bg-transparent transition-colors duration-500 ease-out min-h-[44px]',
+      'whitespace-nowrap mx-auto inline-block border-b border-foreground/70 pb-1 text-sm font-medium uppercase tracking-[0.28em] text-foreground hover:text-foreground/70 hover:border-foreground/40 bg-transparent transition-colors duration-500 ease-out min-h-[44px]',
     sectionHeading:
       'text-3xl sm:text-4xl lg:text-5xl font-light tracking-tight text-foreground leading-[1.1]',
     sectionSeeAll:
-      'text-[11px] font-light uppercase tracking-[0.28em] text-muted-foreground hover:text-foreground transition-colors duration-500',
+      'text-sm font-light uppercase tracking-[0.28em] text-muted-foreground hover:text-foreground transition-colors duration-500',
     heroOverlay: 'bg-gradient-to-b from-transparent via-transparent to-foreground/30',
     heroHeadline:
       'text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extralight tracking-tight text-white drop-shadow-xl leading-[1.05]',
@@ -144,7 +144,7 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
     sectionHeading:
       'text-3xl sm:text-4xl lg:text-5xl font-black uppercase tracking-tight text-foreground leading-[0.95]',
     sectionSeeAll:
-      'text-xs font-black uppercase tracking-[0.18em] text-foreground hover:text-primary transition-colors duration-200',
+      'text-sm font-black uppercase tracking-[0.18em] text-foreground hover:text-primary transition-colors duration-200',
     heroOverlay: 'bg-gradient-to-b from-foreground/20 via-foreground/30 to-foreground/65',
     heroHeadline:
       'text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-black uppercase tracking-tight text-white drop-shadow-2xl leading-[0.9]',
@@ -169,18 +169,18 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
     productCardPrice: 'text-base font-light tracking-wide text-foreground',
     productCardBody: 'text-center',
     productCardCta:
-      'whitespace-nowrap border-t border-foreground/15 bg-transparent px-5 py-3.5 text-[11px] font-medium uppercase tracking-[0.32em] text-foreground hover:bg-foreground hover:text-background transition-all duration-700 ease-out min-h-[44px]',
+      'whitespace-nowrap border-t border-foreground/15 bg-transparent px-5 py-3.5 text-sm font-medium uppercase tracking-[0.32em] text-foreground hover:bg-foreground hover:text-background transition-all duration-700 ease-out min-h-[44px]',
     sectionHeading:
       'text-3xl sm:text-4xl lg:text-5xl font-extralight tracking-[-0.01em] text-foreground leading-[1.1]',
     sectionSeeAll:
-      'text-[11px] font-light uppercase tracking-[0.32em] text-foreground/60 hover:text-foreground transition-colors duration-700',
+      'text-sm font-light uppercase tracking-[0.32em] text-foreground/60 hover:text-foreground transition-colors duration-700',
     heroOverlay: 'bg-gradient-to-b from-foreground/0 via-foreground/10 to-foreground/30',
     heroHeadline:
       'text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extralight tracking-[-0.01em] text-white drop-shadow-xl leading-[1.05]',
     heroCta:
-      'border border-white bg-transparent px-10 py-4 text-xs font-medium uppercase tracking-[0.32em] text-white hover:bg-white hover:text-foreground transition-all duration-700 ease-out min-h-[44px]',
+      'border border-white bg-transparent px-10 py-4 text-sm font-medium uppercase tracking-[0.32em] text-white hover:bg-white hover:text-foreground transition-all duration-700 ease-out min-h-[44px]',
     testimonialCard: 'border-t border-foreground/15 bg-transparent py-10',
-    testimonialAuthor: 'text-xs font-light uppercase tracking-[0.22em] text-foreground/80',
+    testimonialAuthor: 'text-sm font-light uppercase tracking-[0.22em] text-foreground/80',
   },
 };
 

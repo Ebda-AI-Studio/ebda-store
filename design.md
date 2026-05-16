@@ -20,6 +20,39 @@ pecannbee + alkahraman + similar Kuwait/GCC stores.
 | Internal card padding          | p-3 mobile / p-4 desktop              | —            | Never p-5+ on cards                                                                                                                                                                                                                                                               |
 | Card content gap               | gap-2                                 | —            | Never gap-3+ between name/price/cta                                                                                                                                                                                                                                               |
 
+## Typography sizes (apply these across all 5 themes)
+
+Standing rule codified 2026-05-16: **main reading content is 16px floor.** Body, product names, prices, category captions all hit 16px minimum so legibility is consistent. Theme identity carries via font-weight + tracking + font-family (modern=semibold-sans, elegant=hairline-tracking-wide, bold=font-black-uppercase, classic=serif-normal, minimal=light-tracking-wide), NEVER via size-shrinking below 16.
+
+| Element (pack-styles token)                        | Mobile  | sm (640+) | md (768+) | lg (1024+) | Tailwind                                                       | Notes                                                                                                                                                   |
+| -------------------------------------------------- | ------- | --------- | --------- | ---------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Section title** (`sectionHeading`)               | 30px    | 36px      | —         | 48px       | `text-3xl sm:text-4xl lg:text-5xl`                             | Modern keeps `lg:text-[2.75rem]` (44px) — its only allowed deviation. Bold: same as others; brutalist scale lives on hero, not section titles           |
+| **Section kicker chip**                            | 11-13px | —         | —         | —          | `text-[11px]` / `text-xs`                                      | Small uppercase tracking-wide. Coloured chip overrides via Typography admin chip presets                                                                |
+| **Section subtitle** (tagline)                     | 14px    | 16px      | —         | —          | `text-sm sm:text-base`                                         | Sits under section title; muted color is fine; size is for readability                                                                                  |
+| **Section "see all" link**                         | 14px    | —         | —         | —          | `text-sm`                                                      | Standardize from previous text-xs / text-[11px] / text-sm mishmash → text-sm everywhere. Identity carries via weight/uppercase/tracking, not below 14px |
+| **Product card name** (`productCardName`)          | 16px    | —         | —         | —          | `text-base`                                                    | MAIN reading text. 16px floor — never below                                                                                                             |
+| **Product card price** (`productCardPrice`)        | 16px    | —         | —         | —          | `text-base`                                                    | MAIN reading text. 16px floor                                                                                                                           |
+| **Category caption** (`categoryCaption`)           | 16px    | 18px      | —         | —          | `text-base sm:text-lg` (modern/classic) / `text-base` (others) | MAIN reading text. Modern + classic can step up to 18 on desktop                                                                                        |
+| **Product CTA / button** (`productCardCta`, `cta`) | 14px    | —         | —         | —          | `text-sm`                                                      | Standardize from text-xs / text-[11px] / text-sm mishmash. 44px min-height already locked. Identity carries via weight + uppercase + tracking           |
+| **Hero headline** (`heroHeadline`)                 | 36px    | 48px      | 60px      | 72px       | `text-4xl sm:text-5xl md:text-6xl lg:text-7xl`                 | Bold can step to 48 / 60 / 72 / 96 (text-5xl sm:text-6xl md:text-7xl lg:text-8xl) — brutalist exception                                                 |
+| **Hero CTA**                                       | 14-16px | —         | —         | —          | `text-sm` or `text-base`                                       | text-sm minimum                                                                                                                                         |
+| **Header nav links**                               | 14px    | 16px      | —         | —          | `text-sm sm:text-base`                                         | iOS safari no-zoom requires 16px on focusable inputs; nav links aren't inputs but match the floor for consistency                                       |
+| **Footer fine print**                              | 12-14px | —         | —         | —          | `text-xs sm:text-sm`                                           | Copyright row, social icons labels — small print is OK here                                                                                             |
+| **Announcement bar** (`beforeHeader`)              | 12-13px | 14px      | —         | —          | `text-xs sm:text-sm`                                           | Promo banner, secondary to main content                                                                                                                 |
+| **Form input (mobile)**                            | 16px    | —         | —         | —          | `text-base sm:text-sm`                                         | iOS Safari force-zooms when an `<input>` under 16px gets focus. Standing rule, ESLint-enforced — see global memory `feedback-mobile-form-text-base`     |
+
+**Per-theme identity** stays via weight + tracking + family at these standardized sizes:
+
+| Theme   | Identity carriers                                                                  |
+| ------- | ---------------------------------------------------------------------------------- |
+| modern  | sans-serif semibold/bold + tight tracking + rounded-2xl frames                     |
+| classic | font-serif normal + sharp corners + uppercase tracking-[0.22em] on chrome controls |
+| minimal | font-light + tracking-[0.18-0.28em] + uppercase + muted-foreground until hover     |
+| bold    | font-black uppercase + tracking-tight + brutalist 2px borders                      |
+| elegant | font-extralight/light + tracking-[0.22-0.32em] + hairline borders + 700ms hovers   |
+
+**Anti-pattern**: shrinking a font BELOW the table to recreate "this theme uses tiny text" feel. The themes diverge on weight + tracking, NEVER on main-text size. The pre-2026-05-16 state where minimal used text-xs (12px) for product name was a legibility regression hidden as "design choice".
+
 ## Anti-patterns to refuse
 
 1. **Don't use `aspect-square` for product card images on mobile if it makes the card taller than 250px combined with content below.** Switch to `aspect-[4/3]` (landscape) or accept smaller cards via column count.
