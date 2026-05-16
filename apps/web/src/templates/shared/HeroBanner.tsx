@@ -57,7 +57,14 @@ export function HeroBanner({
             priority={priority}
             loading={priority ? undefined : 'lazy'}
             sizes="100vw"
-            className="object-cover"
+            // object-contain so the whole hero image shows without aggressive
+            // crop when the merchant's source image aspect doesn't match the
+            // container (3:2 mobile / 2.4:1 desktop). Trade-off: thin matte
+            // bars at sides/top when ratios diverge — preferable to losing
+            // the subject from the frame. `bg-muted` on the parent <section>
+            // fills the matte area so it reads as a neutral border, not a
+            // broken layout.
+            className="object-contain"
           />
         </picture>
       )}
