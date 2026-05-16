@@ -400,17 +400,20 @@ export default function StoreLayoutPage() {
                 onToggle={v => updateSection('reviewSection', s => ({ ...s, enabled: v }))}
               />
 
-              {/* Sizing contract */}
+              {/* Sizing contract — each field has a small visual preview
+                  showing the actual aspect ratio so merchants can see what
+                  they're picking before saving (ahmad's ask 2026-05-16:
+                  bare numbers like '2.45:1' weren't intuitive). */}
               <SectionCard
                 title={t('sections.sizing.title')}
                 description={t('sections.sizing.description')}
                 alwaysOn
               >
-                <div className="grid grid-cols-3 gap-3">
-                  <SelectField
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <SizingFieldWithPreview
                     label={t('sections.sizing.heroAspect')}
                     value={layout.sizing.heroAspect}
-                    options={['2.45:1', '16:9', '4:3'] as const}
+                    options={['2.45:1', '16:9', '4:3']}
                     onChange={v =>
                       updateSection('sizing', s => ({
                         ...s,
@@ -418,10 +421,10 @@ export default function StoreLayoutPage() {
                       }))
                     }
                   />
-                  <SelectField
+                  <SizingFieldWithPreview
                     label={t('sections.sizing.productImageAspect')}
                     value={layout.sizing.productImageAspect}
-                    options={['1:1', '3:4'] as const}
+                    options={['1:1', '3:4']}
                     onChange={v =>
                       updateSection('sizing', s => ({
                         ...s,
@@ -430,10 +433,10 @@ export default function StoreLayoutPage() {
                       }))
                     }
                   />
-                  <SelectField
+                  <SizingFieldWithPreview
                     label={t('sections.sizing.categoryImageAspect')}
                     value={layout.sizing.categoryImageAspect}
-                    options={['1:1', '3:4', '2:3'] as const}
+                    options={['1:1', '3:4', '2:3']}
                     onChange={v =>
                       updateSection('sizing', s => ({
                         ...s,
@@ -623,6 +626,54 @@ function SelectField<T extends string | number>({
         ))}
       </select>
     </label>
+  );
+}
+
+/**
+ * Parse an aspect-ratio string like '2.45:1' / '3:4' / '16:9' into CSS
+ * `aspect-ratio` value form (`w / h`). Used to render the live preview
+ * rectangle inside SizingFieldWithPreview.
+ */
+function parseAspect(ratio: string): string {
+  const [w, h] = ratio.split(':').map(Number);
+  if (!w || !h || Number.isNaN(w) || Number.isNaN(h)) return '1 / 1';
+  return `${w} / ${h}`;
+}
+
+/**
+ * Sizing field with a live aspect-ratio preview rectangle. Solves the
+ * 'I have no idea what 2.45:1 looks like' problem ahmad raised
+ * 2026-05-16. The preview rectangle is bounded to a max 120px width
+ * so heroes (wide) and product images (square) all fit consistently
+ * in the form column.
+ */
+function SizingFieldWithPreview({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: readonly string[];
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <SelectField label={label} value={value} options={options} onChange={onChange} />
+      <div className="flex items-start gap-3">
+        <div
+          className="flex-shrink-0 rounded-md border border-dashed border-border bg-muted/50"
+          style={{
+            aspectRatio: parseAspect(value),
+            width: '100%',
+            maxWidth: 120,
+          }}
+          aria-hidden
+        />
+        <span className="text-xs text-muted-foreground pt-1 font-mono">{value}</span>
+      </div>
+    </div>
   );
 }
 
