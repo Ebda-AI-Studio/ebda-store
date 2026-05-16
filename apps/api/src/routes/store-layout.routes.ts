@@ -25,6 +25,12 @@ const router = Router({ mergeParams: true });
 const heroSlideSchema = z.object({
   image: z.string().url().or(z.string().min(1)),
   imageAr: z.string().optional(),
+  // Mobile-specific images — without these listed in the Zod schema, the
+  // parse step silently strips them and saves succeed with the field
+  // gone. Bug found 2026-05-16 when merchants reported uploading mobile
+  // images that disappeared on refresh.
+  imageMobile: z.string().optional(),
+  imageMobileAr: z.string().optional(),
   alt: z.string().optional(),
   headline: z.string().optional(),
   headlineAr: z.string().optional(),
@@ -44,9 +50,16 @@ const layoutSchema = z
     categories: z.object({
       enabled: z.boolean(),
       layout: z.enum(['grid', 'horizontal']),
+      // 2026-05-16: split into per-breakpoint settings (see store-layout.ts
+      // CategoriesSettings). Mobile overrides are optional — fall back to
+      // the legacy single field when unset.
+      layoutMobile: z.enum(['grid', 'horizontal']).optional(),
       captionPosition: z.enum(['below', 'overlay']),
+      captionPositionMobile: z.enum(['below', 'overlay']).optional(),
       desktopColumns: z.union([z.literal(2), z.literal(3), z.literal(4)]),
-      mobileColumns: z.union([z.literal(1), z.literal(2)]),
+      // bumped from 1|2 to 1|2|3 — three-column mobile layout option for
+      // compact grids on stores with many categories.
+      mobileColumns: z.union([z.literal(1), z.literal(2), z.literal(3)]),
     }),
     newArrivals: z.object({
       enabled: z.boolean(),
@@ -65,6 +78,14 @@ const layoutSchema = z
       minRating: z.number().min(1).max(5),
       verifiedOnly: z.boolean(),
     }),
+    // sibling UGC section, added 2026-05-16. without listing here Zod
+    // would silently strip it on every save — same bug class as imageMobile
+    // above.
+    reviewSection: z
+      .object({
+        enabled: z.boolean(),
+      })
+      .optional(),
     sizing: z.object({
       heroAspect: z.enum(['2.45:1', '16:9', '4:3']),
       productImageAspect: z.enum(['1:1', '3:4']),
