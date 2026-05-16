@@ -537,6 +537,22 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       // having to be rewritten to read the variable.
       zoneRules.push(`[data-zone="${zone}"], [data-zone="${zone}"] *{${decls.join(';')}}`);
     }
+    // Override-safety for the sectionKicker divider design (Ahmad
+    // 2026-05-17): the default kicker rendering is an editorial divider
+    // (two hairline rules flanking the text). When a merchant explicitly
+    // configures chip styling on the sectionKicker zone (any of
+    // backgroundColor / padding / borderRadius), suppress the divider
+    // lines so the merchant's chip renders without the flanking rules.
+    const kickerCfg = typo.zones.sectionKicker;
+    if (
+      kickerCfg &&
+      typeof kickerCfg === 'object' &&
+      (sanitizeFontValue(kickerCfg.backgroundColor) ||
+        sanitizeFontValue(kickerCfg.padding) ||
+        sanitizeFontValue(kickerCfg.borderRadius))
+    ) {
+      zoneRules.push(`[data-kicker-divider-line]{display:none}`);
+    }
   }
   // Combine the typography rules into the same style tag the theme
   // already injects — keeps the surface area minimal and avoids

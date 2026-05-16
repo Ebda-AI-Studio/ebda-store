@@ -56,12 +56,32 @@ export function SectionHeading({
       <div className="flex items-end justify-between gap-4">
         <div className="flex flex-col gap-1.5 sm:gap-2">
           {kickerText && (
-            <span
-              className="self-start inline-flex items-center rounded-full bg-primary/10 text-primary px-3 py-1 text-base font-semibold uppercase tracking-[0.18em]"
-              data-zone="sectionKicker"
-            >
-              {kickerText}
-            </span>
+            // Editorial section divider — two hairline rules flanking the
+            // kicker text (Ahmad 2026-05-17). Replaces the previous
+            // `bg-primary/10 rounded-full` chip rendering. When a
+            // merchant explicitly sets chip styling on the sectionKicker
+            // zone (backgroundColor / padding / borderRadius), the
+            // typography emitter in apps/web/src/app/layout.tsx pairs the
+            // chip rule with `[data-kicker-divider-line]{display:none}`
+            // so the chip comes back without the surrounding lines.
+            <div className="self-stretch flex items-center justify-center gap-3 sm:gap-4">
+              <span
+                aria-hidden
+                data-kicker-divider-line
+                className="h-px flex-1 max-w-[120px] sm:max-w-[180px] bg-foreground/15"
+              />
+              <span
+                className="text-base font-semibold uppercase tracking-[0.18em] text-foreground/70"
+                data-zone="sectionKicker"
+              >
+                {kickerText}
+              </span>
+              <span
+                aria-hidden
+                data-kicker-divider-line
+                className="h-px flex-1 max-w-[120px] sm:max-w-[180px] bg-foreground/15"
+              />
+            </div>
           )}
           {text && (
             <h2 className={styles.sectionHeading} data-zone="sectionTitle">
