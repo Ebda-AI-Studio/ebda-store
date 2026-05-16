@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { PoweredByForce } from '../shared/PoweredByForce';
 import { useState } from 'react';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -376,6 +377,9 @@ export default function ModernFooter({
             </div>
           </div>
         )}
+      </div>
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <PoweredByForce />
       </div>
     </footer>
   );

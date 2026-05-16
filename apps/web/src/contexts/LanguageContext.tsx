@@ -212,6 +212,7 @@ export const translations = {
     'يخضع حالياً لأعمال الصيانة. يرجى المحاولة مرة أخرى لاحقاً.',
   'Need to reach us?': 'تحتاج للتواصل معنا؟',
   'Powered by Force': 'مدعوم من Force',
+  'Powered by Force AI': 'مدعوم من Force AI',
 } as const;
 
 export type TranslationKey = keyof typeof translations;
