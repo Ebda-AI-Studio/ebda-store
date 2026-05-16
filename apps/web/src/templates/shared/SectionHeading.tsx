@@ -69,7 +69,7 @@ export function SectionHeading({
             </h2>
           )}
           {subtitleText && (
-            <p className="text-base text-muted-foreground max-w-2xl" data-zone="sectionSubtitle">
+            <p className="text-xl text-muted-foreground max-w-2xl" data-zone="sectionSubtitle">
               {subtitleText}
             </p>
           )}

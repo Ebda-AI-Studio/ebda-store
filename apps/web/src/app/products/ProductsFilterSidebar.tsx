@@ -108,7 +108,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
         <div>
           <label
             htmlFor={`products-sort-${mobile ? 'm' : 'd'}`}
-            className="mb-2 block text-sm lg:text-base font-medium text-foreground"
+            className="mb-2 block text-base lg:text-lg font-medium text-foreground"
           >
             {t('Sort by', 'ترتيب')}
           </label>
@@ -146,7 +146,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
         priceMin !== undefined &&
         priceMax !== undefined && (
           <div>
-            <h3 className="mb-3 text-sm lg:text-base font-medium text-foreground">
+            <h3 className="mb-3 text-lg font-medium text-foreground">
               {t('Price range', 'مجال السعر')}
             </h3>
             <div className="space-y-3">
@@ -206,7 +206,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
       <form onSubmit={mobile ? closeAfter(onSearchSubmit) : onSearchSubmit}>
         <label
           htmlFor={`products-search-${mobile ? 'm' : 'd'}`}
-          className="mb-2 block text-sm lg:text-base font-medium text-foreground"
+          className="mb-2 block text-base lg:text-lg font-medium text-foreground"
         >
           {t('Search', translations['Search'])}
         </label>
@@ -237,7 +237,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
       </form>
 
       <div>
-        <h3 className="mb-3 text-sm lg:text-base font-medium text-foreground">
+        <h3 className="mb-3 text-lg font-medium text-foreground">
           {t('Categories', translations['Categories'])}
         </h3>
         <div className="space-y-2">
@@ -245,7 +245,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
             type="button"
             onClick={() => (mobile ? closeAfter(onCategoryChange)('') : onCategoryChange(''))}
             aria-pressed={!categoryFilter}
-            className={`flex w-full items-center justify-between rounded-xl px-4 py-2.5 text-sm lg:text-base transition-all ${
+            className={`flex w-full items-center justify-between rounded-xl px-4 py-2.5 text-base lg:text-lg transition-all ${
               !categoryFilter
                 ? 'bg-primary text-white shadow-md shadow-primary/25'
                 : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -272,7 +272,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
                   mobile ? closeAfter(onCategoryChange)(cat.slug) : onCategoryChange(cat.slug)
                 }
                 aria-pressed={categoryFilter === cat.slug}
-                className={`flex w-full items-center justify-between rounded-xl px-4 py-2.5 text-sm lg:text-base transition-all ${
+                className={`flex w-full items-center justify-between rounded-xl px-4 py-2.5 text-base lg:text-lg transition-all ${
                   categoryFilter === cat.slug
                     ? 'bg-primary text-white shadow-md shadow-primary/25'
                     : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground'
