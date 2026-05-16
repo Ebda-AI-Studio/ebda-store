@@ -516,6 +516,16 @@ export class ProductService {
         images: { orderBy: { position: 'asc' } as const, take: 1 },
         categories: { include: { category: true } },
         store: { select: { id: true, name: true, slug: true } },
+        // Variants are needed by the storefront card components to (a)
+        // pick between the inline "Add to cart" and "View" CTAs, and
+        // (b) compute the "From <min>" pricing for multi-variant
+        // products. Without this include, every product looks variant-
+        // less to the storefront and the View CTA never appears
+        // regardless of how many variants the merchant created.
+        // Light select (price + compareAtPrice) so the join stays cheap.
+        variants: {
+          select: { id: true, price: true, compareAtPrice: true },
+        },
       },
       orderBy,
     };
@@ -1014,6 +1024,12 @@ export class ProductService {
           reviews: {
             where: { status: 'published' },
             select: { rating: true },
+          },
+          // See listPublic note above — variants are needed for the
+          // dual-CTA (View vs Add to Cart) + "From <min>" pricing on
+          // the storefront card components.
+          variants: {
+            select: { id: true, price: true, compareAtPrice: true },
           },
         },
         orderBy,
