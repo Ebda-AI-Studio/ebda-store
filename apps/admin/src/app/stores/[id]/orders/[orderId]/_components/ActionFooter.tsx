@@ -5,6 +5,7 @@ import { useT } from '@/i18n/useT';
 import { VALID_TRANSITIONS } from '../../_components/types';
 import { PaymentLinkButton } from './PaymentLinkButton';
 import { RefreshPaymentButton } from './RefreshPaymentButton';
+import { RefundButton } from './RefundButton';
 import type { OrderDetail } from './types';
 
 interface ActionFooterProps {
@@ -50,6 +51,17 @@ export function ActionFooter({
   // merchant on this page from a "mark paid" deep link, so the action
   // must be one tap away, not buried behind a kebab.
   const showMarkPaid = order.paymentStatus !== 'paid';
+  // Refund-via-provider is only meaningful when:
+  //   - the order is paid (provider has money to give back)
+  //   - we have a completed online payment row with a transactionId
+  //     (rules out COD / manual-paid where the customer never gave
+  //     us their card)
+  //   - it hasn't already been refunded
+  const completedOnlinePayment = order.payments?.find(
+    p => p.status === 'completed' && p.transactionId && p.provider !== 'cod'
+  );
+  const showRefundViaProvider =
+    order.paymentStatus === 'paid' && !!completedOnlinePayment && order.status !== 'refunded';
 
   return (
     <div
@@ -107,6 +119,21 @@ export function ActionFooter({
             orderId={order.id}
             disabled={isUpdating}
             onRefreshed={onPaymentRefreshed}
+          />
+        )}
+        {/* Refund via provider — actually moves money back to the
+            customer's card. Distinct from the "Refunded" status menu
+            entry, which is only DB bookkeeping for already-refunded
+            COD / bank-transfer cases. */}
+        {showRefundViaProvider && (
+          <RefundButton
+            storeId={storeId}
+            orderId={order.id}
+            orderNumber={order.orderNumber}
+            total={order.total}
+            currency={order.currency}
+            disabled={isUpdating}
+            onRefunded={onPaymentRefreshed}
           />
         )}
         {showMarkPaid && (

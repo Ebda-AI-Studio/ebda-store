@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { Fragment, useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@force/ui';
@@ -31,6 +31,8 @@ interface CustomerDetail {
   pendingCount: number;
   cancelledCount: number;
   failedCount: number;
+  refundedCount: number;
+  totalRefunded: number;
   paymentMethods: string[];
   statuses: string[];
 }
@@ -47,6 +49,13 @@ interface PaymentRow {
   provider: string;
   status: string;
   amount: number;
+  refundedAmount?: number;
+  metadata?: {
+    refundId?: string;
+    refundReason?: string | null;
+    refundedAt?: string;
+  } | null;
+  updatedAt?: string;
 }
 
 interface OrderRow {
@@ -280,6 +289,17 @@ export default function CustomerDetailPage() {
                 Failed · {customer.failedCount}
               </span>
             )}
+            {customer.refundedCount > 0 && (
+              <span
+                title={`Total refunded: ${formatKwd(customer.totalRefunded)}`}
+                className="inline-flex items-center gap-1.5 rounded-full bg-destructive/10 px-3 py-1 text-xs font-medium text-destructive"
+              >
+                Refunded · {customer.refundedCount}
+                <span className="text-[10px] text-destructive/70">
+                  ({formatKwd(customer.totalRefunded)})
+                </span>
+              </span>
+            )}
             {customer.paymentMethods.length > 0 && (
               <span className="text-xs text-muted-foreground">
                 Payment methods: {customer.paymentMethods.join(', ')}
@@ -320,44 +340,80 @@ export default function CustomerDetailPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {orders.map(order => (
-                    <tr key={order.id} className="hover:bg-muted/30 transition-colors">
-                      <td className="px-6 py-4 text-sm font-medium text-foreground">
-                        {order.orderNumber || order.id.slice(0, 8)}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-muted-foreground">
-                        {formatDate(order.createdAt)}
-                      </td>
-                      <td className="px-6 py-4">
-                        <StatusChip status={order.status} />
-                      </td>
-                      <td className="px-6 py-4">
-                        <StatusChip status={order.paymentStatus} />
-                        {order.payments[0] && (
-                          <span className="ms-2 text-xs text-muted-foreground">
-                            via {order.payments[0].provider}
-                          </span>
+                  {orders.map(order => {
+                    // Find the refund payment (most-recent payment row with a
+                    // non-zero refundedAmount). Refund metadata travels on
+                    // the Payment row, not the Order, so the line below the
+                    // main row needs to dig it out for display.
+                    const refundedPayment = order.payments.find(
+                      p => (p.refundedAmount ?? 0) > 0 || p.status === 'refunded'
+                    );
+                    return (
+                      <Fragment key={order.id}>
+                        <tr className="hover:bg-muted/30 transition-colors">
+                          <td className="px-6 py-4 text-sm font-medium text-foreground">
+                            {order.orderNumber || order.id.slice(0, 8)}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-muted-foreground">
+                            {formatDate(order.createdAt)}
+                          </td>
+                          <td className="px-6 py-4">
+                            <StatusChip status={order.status} />
+                          </td>
+                          <td className="px-6 py-4">
+                            <StatusChip status={order.paymentStatus} />
+                            {order.payments[0] && (
+                              <span className="ms-2 text-xs text-muted-foreground">
+                                via {order.payments[0].provider}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 hidden md:table-cell text-sm text-muted-foreground">
+                            {order.items.length}{' '}
+                            <span className="text-xs">
+                              ({order.items.reduce((sum, it) => sum + it.quantity, 0)} units)
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-end text-sm font-bold text-foreground">
+                            {formatKwd(order.total)}
+                          </td>
+                          <td className="px-6 py-4 text-end">
+                            <Link
+                              href={`/stores/${storeId}/orders/${order.id}`}
+                              className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition-colors"
+                            >
+                              View
+                            </Link>
+                          </td>
+                        </tr>
+                        {refundedPayment && (
+                          <tr className="bg-destructive/5">
+                            <td
+                              colSpan={7}
+                              className="px-6 py-2 text-xs text-destructive border-t border-destructive/10"
+                            >
+                              <span className="font-semibold">Refunded</span>
+                              {' · '}-{formatKwd(refundedPayment.refundedAmount ?? order.total)}
+                              {' via '}
+                              {refundedPayment.provider}
+                              {refundedPayment.metadata?.refundedAt && (
+                                <>
+                                  {' on '}
+                                  {formatDate(refundedPayment.metadata.refundedAt)}
+                                </>
+                              )}
+                              {refundedPayment.metadata?.refundReason && (
+                                <>
+                                  {' · reason: '}
+                                  <em>{refundedPayment.metadata.refundReason}</em>
+                                </>
+                              )}
+                            </td>
+                          </tr>
                         )}
-                      </td>
-                      <td className="px-6 py-4 hidden md:table-cell text-sm text-muted-foreground">
-                        {order.items.length}{' '}
-                        <span className="text-xs">
-                          ({order.items.reduce((sum, it) => sum + it.quantity, 0)} units)
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-end text-sm font-bold text-foreground">
-                        {formatKwd(order.total)}
-                      </td>
-                      <td className="px-6 py-4 text-end">
-                        <Link
-                          href={`/stores/${storeId}/orders/${order.id}`}
-                          className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition-colors"
-                        >
-                          View
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
+                      </Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
