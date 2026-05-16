@@ -122,7 +122,7 @@ export default function ModernHeader({
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="px-4 py-2.5 text-sm font-medium tracking-tight text-foreground/75 hover:text-foreground hover:bg-muted rounded-lg transition-colors duration-300 ease-out"
+                  className="px-4 py-2.5 text-lg font-medium tracking-tight text-foreground/75 hover:text-foreground hover:bg-muted rounded-lg transition-colors duration-300 ease-out"
                 >
                   {isRtl && item.labelAr ? item.labelAr : item.label}
                 </Link>
@@ -355,7 +355,7 @@ export default function ModernHeader({
             <Link
               key={item.href}
               href={item.href}
-              className="px-4 py-3 text-sm font-medium text-foreground/80 hover:text-foreground hover:bg-muted rounded-lg transition-colors duration-300 ease-out"
+              className="px-4 py-3 text-lg font-medium text-foreground/80 hover:text-foreground hover:bg-muted rounded-lg transition-colors duration-300 ease-out"
               onClick={() => setIsMenuOpen(false)}
             >
               {isRtl && item.labelAr ? item.labelAr : item.label}

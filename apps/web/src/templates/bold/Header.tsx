@@ -81,7 +81,7 @@ export default function BoldHeader({
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="relative px-4 py-2 text-sm font-bold uppercase tracking-wider text-white/70 hover:text-white transition-colors duration-200 group cursor-pointer"
+                  className="relative px-4 py-2 text-lg font-bold uppercase tracking-wider text-white/70 hover:text-white transition-colors duration-200 group cursor-pointer"
                 >
                   {isRtl && item.labelAr ? item.labelAr : item.label}
                   <span className="absolute bottom-0 left-4 right-4 h-0.5 bg-primary scale-x-0 group-hover:scale-x-100 transition-transform duration-200 origin-left" />
@@ -311,7 +311,7 @@ export default function BoldHeader({
             <Link
               key={item.href}
               href={item.href}
-              className="px-4 py-3 text-sm font-bold uppercase tracking-wider text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors duration-200 cursor-pointer"
+              className="px-4 py-3 text-lg font-bold uppercase tracking-wider text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors duration-200 cursor-pointer"
               onClick={() => setIsMenuOpen(false)}
             >
               {isRtl && item.labelAr ? item.labelAr : item.label}

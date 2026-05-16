@@ -232,7 +232,7 @@ export default function ElegantHeader({
             <Link
               key={item.href}
               href={item.href}
-              className="text-sm tracking-[0.18em] uppercase text-muted-foreground hover:text-foreground transition-colors duration-500 ease-out cursor-pointer"
+              className="text-lg tracking-[0.18em] uppercase text-muted-foreground hover:text-foreground transition-colors duration-500 ease-out cursor-pointer"
             >
               {isRtl && item.labelAr ? item.labelAr : item.label}
             </Link>
@@ -309,7 +309,7 @@ export default function ElegantHeader({
                 <li key={item.href}>
                   <Link
                     href={item.href}
-                    className="inline-flex items-center justify-center min-h-11 text-sm tracking-[0.18em] uppercase text-muted-foreground hover:text-foreground transition-colors duration-500 ease-out cursor-pointer"
+                    className="inline-flex items-center justify-center min-h-11 text-lg tracking-[0.18em] uppercase text-muted-foreground hover:text-foreground transition-colors duration-500 ease-out cursor-pointer"
                     onClick={() => setIsMenuOpen(false)}
                   >
                     {isRtl && item.labelAr ? item.labelAr : item.label}
