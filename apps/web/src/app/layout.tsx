@@ -378,6 +378,18 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     if (/[{}]|url\s*\(|@import|expression\s*\(|javascript\s*:|<|>/i.test(v)) return null;
     return v;
   };
+  // Translate brand-color preset tokens to CSS that resolves against the
+  // store's theme CSS variables. Falls back to the raw value (already
+  // sanitised by sanitizeFontValue) for everything else.
+  const resolveColorValue = (v: string): string => {
+    if (v === 'brand-primary') return 'hsl(var(--primary))';
+    if (v === 'brand-secondary') return 'hsl(var(--secondary))';
+    if (v === 'brand-accent') return 'hsl(var(--accent))';
+    if (v === 'brand-foreground') return 'hsl(var(--foreground))';
+    if (v === 'brand-background') return 'hsl(var(--background))';
+    if (v === 'brand-muted') return 'hsl(var(--muted))';
+    return v;
+  };
   const sanitizeUrl = (v: unknown): string | null => {
     if (typeof v !== 'string' || v.length === 0 || v.length > 2048) return null;
     if (!/^https:\/\//.test(v)) return null;
@@ -451,7 +463,34 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       const ls = sanitizeFontValue(cfg.letterSpacing);
       if (ls) decls.push(`letter-spacing:${ls}`);
       const color = sanitizeFontValue(cfg.color);
-      if (color) decls.push(`color:${color}`);
+      if (color) decls.push(`color:${resolveColorValue(color)}`);
+
+      // Label / chip styling — backgroundColor, padding, borderRadius.
+      // When any of these are set on an inline-rendered zone (most zones
+      // are inline contexts like spans inside h2/p), padding doesn't
+      // visually apply. Auto-emit `display:inline-block` so the chip
+      // renders correctly without forcing the merchant to know that.
+      const bg = sanitizeFontValue(cfg.backgroundColor);
+      const padding = sanitizeFontValue(cfg.padding);
+      const radius = sanitizeFontValue(cfg.borderRadius);
+      if (bg) decls.push(`background-color:${resolveColorValue(bg)}`);
+      if (padding) decls.push(`padding:${padding}`);
+      if (radius) decls.push(`border-radius:${radius}`);
+      if ((bg || padding || radius) && !cfg.display) {
+        decls.push('display:inline-block');
+      }
+
+      // Text decoration — underline / line-through / none plus colour +
+      // thickness + offset for fine control.
+      const td = sanitizeFontValue(cfg.textDecoration);
+      if (td) decls.push(`text-decoration:${td}`);
+      const tdc = sanitizeFontValue(cfg.textDecorationColor);
+      if (tdc) decls.push(`text-decoration-color:${resolveColorValue(tdc)}`);
+      const tdt = sanitizeFontValue(cfg.textDecorationThickness);
+      if (tdt) decls.push(`text-decoration-thickness:${tdt}`);
+      const tuo = sanitizeFontValue(cfg.textUnderlineOffset);
+      if (tuo) decls.push(`text-underline-offset:${tuo}`);
+
       if (decls.length === 0) continue;
       // Apply to the zone container AND every descendant — that way
       // a merchant who picks "Header = Playfair" doesn't have to

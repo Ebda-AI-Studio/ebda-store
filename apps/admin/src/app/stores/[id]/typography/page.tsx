@@ -142,7 +142,74 @@ interface ZoneSettings {
   color?: string;
   lineHeight?: string;
   letterSpacing?: string;
+  // Colored-label / chip styling. backgroundColor accepts brand presets
+  // (`brand-primary`, `brand-secondary`, etc.) which the storefront
+  // resolves to the store's theme CSS variables.
+  backgroundColor?: string;
+  padding?: string;
+  borderRadius?: string;
+  // Text decoration — underline / line-through, plus optional colour +
+  // thickness + offset.
+  textDecoration?: string;
+  textDecorationColor?: string;
+  textDecorationThickness?: string;
+  textUnderlineOffset?: string;
 }
+
+// Brand-color preset tokens. The storefront translates these to
+// hsl(var(--primary)) etc. so the typography stays linked to the
+// store's brand palette — merchant doesn't have to copy hex values.
+const BRAND_COLOR_PRESETS: Array<{ value: string; label: string; labelAr: string }> = [
+  { value: 'brand-primary', label: 'Brand primary', labelAr: 'لون العلامة الرئيسي' },
+  { value: 'brand-secondary', label: 'Brand secondary', labelAr: 'لون العلامة الثانوي' },
+  { value: 'brand-accent', label: 'Brand accent', labelAr: 'لون التمييز' },
+  { value: 'brand-foreground', label: 'Brand foreground (text)', labelAr: 'لون النص الأساسي' },
+  { value: 'brand-muted', label: 'Brand muted', labelAr: 'لون مخفف' },
+];
+
+// Quick-apply chip presets — fill backgroundColor + padding + borderRadius
+// in one click so merchants don't have to figure out the right padding
+// or radius numbers themselves.
+const CHIP_STYLE_PRESETS: Array<{
+  id: string;
+  label: string;
+  labelAr: string;
+  values: Pick<ZoneSettings, 'backgroundColor' | 'padding' | 'borderRadius' | 'color'>;
+}> = [
+  {
+    id: 'pill-primary',
+    label: 'Pill — Brand primary',
+    labelAr: 'كبسولة — لون رئيسي',
+    values: {
+      backgroundColor: 'brand-primary',
+      padding: '4px 14px',
+      borderRadius: '9999px',
+      color: '#ffffff',
+    },
+  },
+  {
+    id: 'chip-primary-soft',
+    label: 'Soft chip — Brand primary tint',
+    labelAr: 'شارة ناعمة — لون رئيسي مخفف',
+    values: {
+      backgroundColor: 'brand-primary',
+      padding: '4px 12px',
+      borderRadius: '8px',
+      color: '#ffffff',
+    },
+  },
+  {
+    id: 'pill-secondary',
+    label: 'Pill — Brand secondary',
+    labelAr: 'كبسولة — لون ثانوي',
+    values: {
+      backgroundColor: 'brand-secondary',
+      padding: '4px 14px',
+      borderRadius: '9999px',
+      color: '#ffffff',
+    },
+  },
+];
 
 type FontSource =
   | { type: 'google'; url: string; family: string }
@@ -661,11 +728,32 @@ export default function TypographyPage() {
                               className="h-10 w-12 cursor-pointer rounded-lg border border-border bg-background"
                               aria-label="Pick color"
                             />
+                            <select
+                              value={
+                                BRAND_COLOR_PRESETS.some(p => p.value === cfg.color)
+                                  ? cfg.color
+                                  : ''
+                              }
+                              onChange={e =>
+                                e.target.value
+                                  ? updateZone(z.key, { color: e.target.value })
+                                  : undefined
+                              }
+                              className="rounded-lg border border-border bg-background px-2 py-2 text-xs"
+                              aria-label="Brand color preset"
+                            >
+                              <option value="">— brand preset —</option>
+                              {BRAND_COLOR_PRESETS.map(p => (
+                                <option key={p.value} value={p.value}>
+                                  {isAr ? p.labelAr : p.label}
+                                </option>
+                              ))}
+                            </select>
                             <input
                               type="text"
                               value={cfg.color ?? ''}
                               onChange={e => updateZone(z.key, { color: e.target.value })}
-                              placeholder="#000000 / hsl(...) / rgb(...)"
+                              placeholder="#000000 / brand-primary / hsl(...)"
                               className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm"
                             />
                           </div>
@@ -723,6 +811,270 @@ export default function TypographyPage() {
                             )}
                           </span>
                         </label>
+                      </div>
+
+                      {/* Colored label / chip styling — backgroundColor +
+                          padding + borderRadius. Quick-apply preset
+                          buttons fill all three at once so merchants
+                          don't have to figure out the right radius. */}
+                      <div className="mt-4 rounded-lg border border-dashed border-border/60 p-3">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                            {isAr ? 'شارة ملونة' : 'Colored label'}
+                          </h4>
+                          {(cfg.backgroundColor || cfg.padding || cfg.borderRadius) && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                updateZone(z.key, {
+                                  backgroundColor: '',
+                                  padding: '',
+                                  borderRadius: '',
+                                })
+                              }
+                              className="text-[11px] text-destructive hover:underline"
+                            >
+                              {isAr ? 'مسح' : 'Clear'}
+                            </button>
+                          )}
+                        </div>
+                        <p className="mt-0.5 text-[11px] text-muted-foreground">
+                          {isAr
+                            ? 'حوّل العنوان إلى شارة ملونة مع خلفية + هوامش داخلية + زوايا مستديرة. اختر إعدادًا جاهزًا أو خصصه يدويًا.'
+                            : 'Turn the heading into a coloured chip with background + padding + rounded corners. Pick a preset or customise the fields below.'}
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {CHIP_STYLE_PRESETS.map(p => (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => updateZone(z.key, p.values)}
+                              className="rounded-full border border-border bg-background px-3 py-1 text-[11px] font-medium text-foreground hover:bg-muted"
+                            >
+                              {isAr ? p.labelAr : p.label}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="mt-3 grid gap-3 md:grid-cols-3">
+                          <label className="flex flex-col gap-1">
+                            <span className="text-[11px] font-medium text-muted-foreground">
+                              {isAr ? 'لون الخلفية' : 'Background colour'}
+                            </span>
+                            <div className="flex gap-2">
+                              <input
+                                type="color"
+                                value={
+                                  cfg.backgroundColor && /^#[0-9a-f]{6}$/i.test(cfg.backgroundColor)
+                                    ? cfg.backgroundColor
+                                    : '#FF7700'
+                                }
+                                onChange={e =>
+                                  updateZone(z.key, { backgroundColor: e.target.value })
+                                }
+                                className="h-9 w-10 cursor-pointer rounded-lg border border-border bg-background"
+                                aria-label="Pick background color"
+                              />
+                              <select
+                                value={
+                                  BRAND_COLOR_PRESETS.some(p => p.value === cfg.backgroundColor)
+                                    ? cfg.backgroundColor
+                                    : ''
+                                }
+                                onChange={e =>
+                                  e.target.value
+                                    ? updateZone(z.key, { backgroundColor: e.target.value })
+                                    : undefined
+                                }
+                                className="flex-1 rounded-lg border border-border bg-background px-2 py-1.5 text-xs"
+                              >
+                                <option value="">— or pick brand preset —</option>
+                                {BRAND_COLOR_PRESETS.map(p => (
+                                  <option key={p.value} value={p.value}>
+                                    {isAr ? p.labelAr : p.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <input
+                              type="text"
+                              value={cfg.backgroundColor ?? ''}
+                              onChange={e => updateZone(z.key, { backgroundColor: e.target.value })}
+                              placeholder="#FF7700 / brand-primary"
+                              className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs"
+                            />
+                          </label>
+                          <label className="flex flex-col gap-1">
+                            <span className="text-[11px] font-medium text-muted-foreground">
+                              {isAr ? 'الهوامش الداخلية' : 'Padding'}
+                            </span>
+                            <input
+                              type="text"
+                              value={cfg.padding ?? ''}
+                              onChange={e => updateZone(z.key, { padding: e.target.value })}
+                              placeholder="4px 12px"
+                              className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs"
+                            />
+                            <span className="text-[10px] text-muted-foreground/80">
+                              {isAr
+                                ? 'الترتيب: علوي يمين سفلي يسار. مثال: "4px 12px"'
+                                : 'Top-right-bottom-left. e.g. "4px 12px" or "0.25rem 0.75rem".'}
+                            </span>
+                          </label>
+                          <label className="flex flex-col gap-1">
+                            <span className="text-[11px] font-medium text-muted-foreground">
+                              {isAr ? 'استدارة الزوايا' : 'Corner radius'}
+                            </span>
+                            <input
+                              type="text"
+                              value={cfg.borderRadius ?? ''}
+                              onChange={e => updateZone(z.key, { borderRadius: e.target.value })}
+                              placeholder="9999px (pill) / 8px (chip)"
+                              className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs"
+                            />
+                            <span className="text-[10px] text-muted-foreground/80">
+                              {isAr
+                                ? '"9999px" لشكل كبسولة، "8px" لشارة، "0" لزوايا حادة.'
+                                : '"9999px" pill, "8px" rounded chip, "0" sharp corners.'}
+                            </span>
+                          </label>
+                        </div>
+                      </div>
+
+                      {/* Text decoration — underline + line-through.
+                          Underline is the common case so we surface it as
+                          a toggle; advanced controls (colour, thickness,
+                          offset) live below for fine tuning. */}
+                      <div className="mt-3 rounded-lg border border-dashed border-border/60 p-3">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                            {isAr ? 'الزخرفة (تسطير)' : 'Text decoration'}
+                          </h4>
+                          {(cfg.textDecoration ||
+                            cfg.textDecorationColor ||
+                            cfg.textDecorationThickness ||
+                            cfg.textUnderlineOffset) && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                updateZone(z.key, {
+                                  textDecoration: '',
+                                  textDecorationColor: '',
+                                  textDecorationThickness: '',
+                                  textUnderlineOffset: '',
+                                })
+                              }
+                              className="text-[11px] text-destructive hover:underline"
+                            >
+                              {isAr ? 'مسح' : 'Clear'}
+                            </button>
+                          )}
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <label className="flex items-center gap-2 text-xs">
+                            <input
+                              type="radio"
+                              name={`decoration-${z.key}`}
+                              checked={!cfg.textDecoration || cfg.textDecoration === 'none'}
+                              onChange={() =>
+                                updateZone(z.key, { textDecoration: '', textDecorationColor: '' })
+                              }
+                            />
+                            {isAr ? 'بدون' : 'None'}
+                          </label>
+                          <label className="flex items-center gap-2 text-xs">
+                            <input
+                              type="radio"
+                              name={`decoration-${z.key}`}
+                              checked={cfg.textDecoration === 'underline'}
+                              onChange={() => updateZone(z.key, { textDecoration: 'underline' })}
+                            />
+                            {isAr ? 'تسطير' : 'Underline'}
+                          </label>
+                          <label className="flex items-center gap-2 text-xs">
+                            <input
+                              type="radio"
+                              name={`decoration-${z.key}`}
+                              checked={cfg.textDecoration === 'line-through'}
+                              onChange={() => updateZone(z.key, { textDecoration: 'line-through' })}
+                            />
+                            {isAr ? 'شطب' : 'Strike-through'}
+                          </label>
+                        </div>
+                        {cfg.textDecoration && cfg.textDecoration !== 'none' && (
+                          <div className="mt-3 grid gap-3 md:grid-cols-3">
+                            <label className="flex flex-col gap-1">
+                              <span className="text-[11px] font-medium text-muted-foreground">
+                                {isAr ? 'لون الخط' : 'Line colour'}
+                              </span>
+                              <div className="flex gap-2">
+                                <input
+                                  type="color"
+                                  value={
+                                    cfg.textDecorationColor &&
+                                    /^#[0-9a-f]{6}$/i.test(cfg.textDecorationColor)
+                                      ? cfg.textDecorationColor
+                                      : '#FF7700'
+                                  }
+                                  onChange={e =>
+                                    updateZone(z.key, { textDecorationColor: e.target.value })
+                                  }
+                                  className="h-9 w-10 cursor-pointer rounded-lg border border-border bg-background"
+                                  aria-label="Pick underline color"
+                                />
+                                <select
+                                  value={
+                                    BRAND_COLOR_PRESETS.some(
+                                      p => p.value === cfg.textDecorationColor
+                                    )
+                                      ? cfg.textDecorationColor
+                                      : ''
+                                  }
+                                  onChange={e =>
+                                    e.target.value
+                                      ? updateZone(z.key, { textDecorationColor: e.target.value })
+                                      : undefined
+                                  }
+                                  className="flex-1 rounded-lg border border-border bg-background px-2 py-1.5 text-xs"
+                                >
+                                  <option value="">— brand preset —</option>
+                                  {BRAND_COLOR_PRESETS.map(p => (
+                                    <option key={p.value} value={p.value}>
+                                      {isAr ? p.labelAr : p.label}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            </label>
+                            <label className="flex flex-col gap-1">
+                              <span className="text-[11px] font-medium text-muted-foreground">
+                                {isAr ? 'سماكة الخط' : 'Thickness'}
+                              </span>
+                              <input
+                                type="text"
+                                value={cfg.textDecorationThickness ?? ''}
+                                onChange={e =>
+                                  updateZone(z.key, { textDecorationThickness: e.target.value })
+                                }
+                                placeholder="auto / 1px / 0.1em"
+                                className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs"
+                              />
+                            </label>
+                            <label className="flex flex-col gap-1">
+                              <span className="text-[11px] font-medium text-muted-foreground">
+                                {isAr ? 'المسافة من النص' : 'Offset from text'}
+                              </span>
+                              <input
+                                type="text"
+                                value={cfg.textUnderlineOffset ?? ''}
+                                onChange={e =>
+                                  updateZone(z.key, { textUnderlineOffset: e.target.value })
+                                }
+                                placeholder="auto / 2px / 0.15em"
+                                className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs"
+                              />
+                            </label>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

@@ -54,12 +54,32 @@ export interface TypographyZoneSettings {
   fontSize?: string;
   /** Any valid CSS font-weight: `400`, `600`, `bold`. */
   fontWeight?: string;
-  /** Any valid CSS color value: hex, rgb, hsl, oklch. */
+  /** Any valid CSS color value: hex, rgb, hsl, oklch. Also accepts the
+   *  preset tokens `brand-primary` / `brand-secondary` which the
+   *  storefront translates to `hsl(var(--primary))` / `hsl(var(--secondary))`
+   *  so the colour stays linked to the store's brand palette. */
   color?: string;
   /** Any valid CSS line-height. Optional, falls back to template. */
   lineHeight?: string;
   /** Any valid CSS letter-spacing. Optional. */
   letterSpacing?: string;
+  /** Background colour — turns the zone into a "colored label" / chip.
+   *  Accepts the same preset tokens as `color` (`brand-primary` /
+   *  `brand-secondary`). When set, also drives `display:inline-block`
+   *  auto-emission so padding + radius render correctly on inline text. */
+  backgroundColor?: string;
+  /** Any valid CSS padding shorthand: `4px 12px`, `0.25rem 0.75rem`. */
+  padding?: string;
+  /** Any valid CSS border-radius: `9999px` for pill, `8px` for chip. */
+  borderRadius?: string;
+  /** Text decoration: `none` / `underline` / `line-through`. Optional. */
+  textDecoration?: string;
+  /** Decoration line colour. Accepts presets and any CSS colour. */
+  textDecorationColor?: string;
+  /** Decoration line thickness: `1px`, `0.1em`, `from-font`. */
+  textDecorationThickness?: string;
+  /** Decoration line offset from baseline: `2px`, `0.15em`. */
+  textUnderlineOffset?: string;
 }
 
 export interface TypographyFontSourceGoogle {

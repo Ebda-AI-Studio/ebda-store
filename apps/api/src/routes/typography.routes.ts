@@ -21,6 +21,18 @@ const zoneSchema = z.object({
   color: z.string().max(64).optional(),
   lineHeight: z.string().max(64).optional(),
   letterSpacing: z.string().max(64).optional(),
+  // Label / chip styling — backgroundColor turns the zone into a coloured
+  // label. padding + borderRadius shape the chip. The storefront CSS
+  // emitter auto-adds `display:inline-block` when any of these are set so
+  // padding renders correctly on inline text.
+  backgroundColor: z.string().max(64).optional(),
+  padding: z.string().max(64).optional(),
+  borderRadius: z.string().max(64).optional(),
+  // Text decoration — underline / line-through / none.
+  textDecoration: z.string().max(64).optional(),
+  textDecorationColor: z.string().max(64).optional(),
+  textDecorationThickness: z.string().max(32).optional(),
+  textUnderlineOffset: z.string().max(32).optional(),
 });
 
 // Library of fonts the storefront should load. Two flavors:
