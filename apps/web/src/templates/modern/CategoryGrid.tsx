@@ -16,17 +16,21 @@ export default function ModernCategoryGrid({
   }
 
   // Auto-size grid based on category count for balanced layouts.
-  // Bumped 2026-05-16 per Ahmad's reference images — desktop cards were
-  // too large (~320px wide at lg). Now caps at xl:grid-cols-6 so wide
-  // desktops show compact ~200px tiles matching the pecannbee/alkahraman
-  // target sizing.
+  // Bumped a second time 2026-05-16 per Ahmad: 'on desktop are huge must
+  // be smaller'. xl breakpoint (1280px+) was too late — most desktops are
+  // 1024-1440px wide, falling on lg or md. Now caps tile width earlier
+  // at md:grid-cols-4 / lg:grid-cols-6 so 1024+ desktops show compact
+  // ~150-180px tiles.
   const getGridCols = (count: number): string => {
     if (count === 1) return 'grid-cols-1';
     if (count === 2) return 'grid-cols-2';
     if (count === 3) return 'grid-cols-2 md:grid-cols-3';
     if (count === 4) return 'grid-cols-2 md:grid-cols-4';
-    if (count === 5) return 'grid-cols-2 md:grid-cols-3 lg:grid-cols-5';
-    return 'grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6';
+    if (count === 5) return 'grid-cols-2 sm:grid-cols-3 md:grid-cols-5';
+    // 6+ categories: 2/4/6/6 cols across breakpoints — desktop cards
+    // are ~170px wide at lg+ which matches the pecannbee reference
+    // images ahmad shared.
+    return 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6';
   };
 
   return (

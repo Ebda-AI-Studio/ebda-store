@@ -57,14 +57,15 @@ export function HeroBanner({
             priority={priority}
             loading={priority ? undefined : 'lazy'}
             sizes="100vw"
-            // object-contain so the whole hero image shows without aggressive
-            // crop when the merchant's source image aspect doesn't match the
-            // container (3:2 mobile / 2.4:1 desktop). Trade-off: thin matte
-            // bars at sides/top when ratios diverge — preferable to losing
-            // the subject from the frame. `bg-muted` on the parent <section>
-            // fills the matte area so it reads as a neutral border, not a
-            // broken layout.
-            className="object-contain"
+            // Back to object-cover after backend auto-resize landed (commit
+            // b463fed). New uploads through the admin are now resized to the
+            // exact container aspect (3:2 mobile / 2.4:1 desktop) via sharp
+            // before saving to R2, so object-cover trims zero pixels for
+            // any post-auto-resize upload. For images uploaded BEFORE the
+            // auto-resize feature (legacy R2 assets), object-cover will
+            // crop slightly — merchants can re-upload via admin → hero
+            // page to get edge-to-edge perfect fit.
+            className="object-cover"
           />
         </picture>
       )}
