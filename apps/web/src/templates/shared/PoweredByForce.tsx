@@ -20,7 +20,7 @@ export function PoweredByForce() {
   return (
     <div className="mt-6 border-t border-border/40 pt-4 text-center text-[11px] tracking-wide text-muted-foreground/70">
       <a
-        href="https://forcemediakw.com"
+        href="https://store.forcemediakw.com"
         target="_blank"
         rel="noopener noreferrer"
         className="hover:text-foreground/80 transition-colors"
