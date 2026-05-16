@@ -19,6 +19,10 @@ export function CategoryStrip({
   categories,
   title,
   titleAr,
+  kicker,
+  kickerAr,
+  subtitle,
+  subtitleAr,
   seeAllHref,
   isRtl,
   urlPrefix = '',
@@ -28,14 +32,15 @@ export function CategoryStrip({
   const styles = getPackStyles(pack);
 
   return (
-    // CategoryStrip is the homepage's primary category surface
-    // (CategoryGrid is a fallback). Add data-zone="categories" so the
-    // merchant's typography settings cascade to the strip too.
     <section className="px-4 sm:px-6 lg:px-8" dir={isRtl ? 'rtl' : 'ltr'} data-zone="categories">
       <div className="mx-auto max-w-7xl">
         <SectionHeading
           title={title}
           titleAr={titleAr}
+          kicker={kicker}
+          kickerAr={kickerAr}
+          subtitle={subtitle}
+          subtitleAr={subtitleAr}
           isRtl={isRtl}
           seeAllHref={seeAllHref}
           pack={pack}

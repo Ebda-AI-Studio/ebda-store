@@ -7,6 +7,12 @@ import { useLanguage } from '../../contexts/LanguageContext';
 export default function ModernCategoryGrid({
   categories,
   isRtl: isRtlProp,
+  title,
+  titleAr,
+  kicker,
+  kickerAr,
+  subtitle,
+  subtitleAr,
   urlPrefix = '',
 }: CategoryGridProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
@@ -14,6 +20,9 @@ export default function ModernCategoryGrid({
   if (categories.length === 0) {
     return null;
   }
+  const displayTitle = isRtl ? (titleAr ?? title) : (title ?? titleAr);
+  const displayKicker = isRtl ? (kickerAr ?? kicker) : (kicker ?? kickerAr);
+  const displaySubtitle = isRtl ? (subtitleAr ?? subtitle) : (subtitle ?? subtitleAr);
 
   // Auto-size grid based on category count for balanced layouts.
   // Bumped a second time 2026-05-16 per Ahmad: 'on desktop are huge must
@@ -34,14 +43,29 @@ export default function ModernCategoryGrid({
   };
 
   return (
-    <div
-      className={`grid gap-3 md:gap-4 ${getGridCols(categories.length)}`}
-      dir={isRtl ? 'rtl' : 'ltr'}
-      data-zone="categories"
-    >
-      {categories.map(category => (
-        <CategoryCard key={category.id} category={category} isRtl={isRtl} urlPrefix={urlPrefix} />
-      ))}
+    <div dir={isRtl ? 'rtl' : 'ltr'} data-zone="categories">
+      {(displayKicker || displayTitle || displaySubtitle) && (
+        <div className="mb-8 sm:mb-12 flex flex-col items-center text-center gap-3">
+          {displayKicker && (
+            <span className="inline-flex items-center rounded-full bg-primary/10 text-primary px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em]">
+              {displayKicker}
+            </span>
+          )}
+          {displayTitle && (
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground tracking-tight">
+              {displayTitle}
+            </h2>
+          )}
+          {displaySubtitle && (
+            <p className="text-sm md:text-base text-muted-foreground max-w-xl">{displaySubtitle}</p>
+          )}
+        </div>
+      )}
+      <div className={`grid gap-3 md:gap-4 ${getGridCols(categories.length)}`}>
+        {categories.map(category => (
+          <CategoryCard key={category.id} category={category} isRtl={isRtl} urlPrefix={urlPrefix} />
+        ))}
+      </div>
     </div>
   );
 }

@@ -62,6 +62,16 @@ export type CategoriesCaption = 'below' | 'overlay';
 export interface SectionTitleOverride {
   title?: string;
   titleAr?: string;
+  /**
+   * Optional small uppercase kicker badge rendered ABOVE the title in a
+   * primary-color chip. Used to add visual eyebrow context (e.g. "NEW",
+   * "EXPLORE", "BROWSE"). Empty → no chip rendered. Bilingual.
+   */
+  kicker?: string;
+  kickerAr?: string;
+  /** Optional tagline rendered as a small line BELOW the title. Bilingual. */
+  subtitle?: string;
+  subtitleAr?: string;
 }
 
 export interface CategoriesSettings extends SectionTitleOverride {

@@ -10,23 +10,39 @@ export default function MinimalCategoryGrid({
   isRtl: isRtlProp,
   title,
   titleAr,
+  kicker,
+  kickerAr,
+  subtitle,
+  subtitleAr,
   urlPrefix = '',
 }: CategoryGridProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const displayTitle = getDisplayTitle(isRtl, title, titleAr);
+  const displayKicker = isRtl ? (kickerAr ?? kicker) : (kicker ?? kickerAr);
+  const displaySubtitle = isRtl ? (subtitleAr ?? subtitle) : (subtitle ?? subtitleAr);
 
   return (
-    <section
-      className="py-24 md:py-32 bg-background"
-      dir={isRtl ? 'rtl' : 'ltr'}
-      data-zone="categories"
-    >
+    <section dir={isRtl ? 'rtl' : 'ltr'} data-zone="categories">
       <div className="container mx-auto px-4">
-        {displayTitle && (
-          <h2 className="text-sm tracking-[0.2em] uppercase text-muted-foreground mb-16 text-center">
-            {displayTitle}
-          </h2>
+        {(displayKicker || displayTitle || displaySubtitle) && (
+          <div className="mb-10 md:mb-12 flex flex-col items-center text-center gap-3">
+            {displayKicker && (
+              <span className="text-[10px] tracking-[0.3em] uppercase font-light text-foreground/60 border border-foreground/15 px-3 py-1">
+                {displayKicker}
+              </span>
+            )}
+            {displayTitle && (
+              <h2 className="text-sm tracking-[0.2em] uppercase text-muted-foreground font-light">
+                {displayTitle}
+              </h2>
+            )}
+            {displaySubtitle && (
+              <p className="text-[10px] tracking-[0.2em] uppercase font-light text-muted-foreground/70 max-w-xl">
+                {displaySubtitle}
+              </p>
+            )}
+          </div>
         )}
 
         {/* Grid - Simple 4 columns */}

@@ -60,6 +60,16 @@ const layoutSchema = z
       // bumped from 1|2 to 1|2|3 — three-column mobile layout option for
       // compact grids on stores with many categories.
       mobileColumns: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+      // SectionTitleOverride fields — title was already passing through
+      // because the outer schema uses `.passthrough()`, but listing them
+      // here documents the contract + lets Zod validate types. kicker +
+      // subtitle added 2026-05-16 (Ahmad: editable label + tagline).
+      title: z.string().optional(),
+      titleAr: z.string().optional(),
+      kicker: z.string().optional(),
+      kickerAr: z.string().optional(),
+      subtitle: z.string().optional(),
+      subtitleAr: z.string().optional(),
     }),
     newArrivals: z.object({
       enabled: z.boolean(),

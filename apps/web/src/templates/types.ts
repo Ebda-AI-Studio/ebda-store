@@ -330,6 +330,10 @@ export interface CategoryStripProps {
   categories: TemplateCategory[];
   title?: string;
   titleAr?: string;
+  kicker?: string;
+  kickerAr?: string;
+  subtitle?: string;
+  subtitleAr?: string;
   seeAllHref?: string;
   isRtl?: boolean;
   urlPrefix?: string;
@@ -426,6 +430,12 @@ export interface CategoryGridProps {
   /** Section title */
   title?: string;
   titleAr?: string;
+  /** Small uppercase eyebrow badge above the title (e.g. "EXPLORE"). */
+  kicker?: string;
+  kickerAr?: string;
+  /** Tagline rendered below the title. */
+  subtitle?: string;
+  subtitleAr?: string;
   urlPrefix?: string;
 }
 

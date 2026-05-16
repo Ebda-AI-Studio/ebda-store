@@ -10,27 +10,40 @@ export default function ClassicCategoryGrid({
   isRtl: isRtlProp,
   title,
   titleAr,
+  kicker,
+  kickerAr,
+  subtitle,
+  subtitleAr,
   urlPrefix = '',
 }: CategoryGridProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const displayTitle = getDisplayTitle(isRtl, title, titleAr);
+  const displayKicker = isRtl ? (kickerAr ?? kicker) : (kicker ?? kickerAr);
+  const displaySubtitle = isRtl ? (subtitleAr ?? subtitle) : (subtitle ?? subtitleAr);
 
   return (
-    <section
-      className="py-16 md:py-24 bg-background"
-      dir={isRtl ? 'rtl' : 'ltr'}
-      data-zone="categories"
-    >
+    <section dir={isRtl ? 'rtl' : 'ltr'} data-zone="categories">
       <div className="container mx-auto px-4">
-        {/* Section Header - Elegant centered */}
-        {displayTitle && (
-          <div className="text-center mb-12 md:mb-16">
-            <div className="w-12 h-px bg-border mx-auto mb-6" />
-            <h2 className="text-2xl md:text-3xl lg:text-4xl font-serif font-normal text-foreground">
-              {displayTitle}
-            </h2>
-            <div className="w-12 h-px bg-border mx-auto mt-6" />
+        {(displayKicker || displayTitle || displaySubtitle) && (
+          <div className="text-center mb-10 md:mb-14 flex flex-col items-center gap-3">
+            {displayKicker && (
+              <span className="inline-flex items-center rounded-none bg-foreground text-background px-3 py-1 font-serif text-[10px] uppercase tracking-[0.3em]">
+                {displayKicker}
+              </span>
+            )}
+            <div className="w-12 h-px bg-border" />
+            {displayTitle && (
+              <h2 className="text-2xl md:text-3xl lg:text-4xl font-serif font-normal text-foreground">
+                {displayTitle}
+              </h2>
+            )}
+            {displaySubtitle && (
+              <p className="font-serif text-sm md:text-base text-muted-foreground max-w-xl">
+                {displaySubtitle}
+              </p>
+            )}
+            <div className="w-12 h-px bg-border" />
           </div>
         )}
 

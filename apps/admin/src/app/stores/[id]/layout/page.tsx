@@ -288,6 +288,37 @@ export default function StoreLayoutPage() {
                   onChangeTitle={v => updateSection('categories', s => ({ ...s, title: v }))}
                   onChangeTitleAr={v => updateSection('categories', s => ({ ...s, titleAr: v }))}
                 />
+                {/* Kicker (eyebrow badge) + Subtitle — bilingual, optional.
+                    Kicker renders as a small colored chip above the title;
+                    subtitle as a tagline below. Ahmad 2026-05-16. */}
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <TextField
+                    label="Kicker label (EN)"
+                    placeholder="e.g. EXPLORE"
+                    value={layout.categories.kicker ?? ''}
+                    onChange={v => updateSection('categories', s => ({ ...s, kicker: v }))}
+                  />
+                  <TextField
+                    label="Kicker label (AR)"
+                    placeholder="مثال: استكشف"
+                    value={layout.categories.kickerAr ?? ''}
+                    onChange={v => updateSection('categories', s => ({ ...s, kickerAr: v }))}
+                    dir="rtl"
+                  />
+                  <TextField
+                    label="Subtitle (EN)"
+                    placeholder="e.g. Browse our top picks by category"
+                    value={layout.categories.subtitle ?? ''}
+                    onChange={v => updateSection('categories', s => ({ ...s, subtitle: v }))}
+                  />
+                  <TextField
+                    label="Subtitle (AR)"
+                    placeholder="مثال: تصفح أفضل اختياراتنا حسب الفئة"
+                    value={layout.categories.subtitleAr ?? ''}
+                    onChange={v => updateSection('categories', s => ({ ...s, subtitleAr: v }))}
+                    dir="rtl"
+                  />
+                </div>
               </SectionCard>
 
               {/* New arrivals */}

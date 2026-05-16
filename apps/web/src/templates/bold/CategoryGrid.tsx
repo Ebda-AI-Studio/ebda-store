@@ -10,15 +10,21 @@ export default function BoldCategoryGrid({
   isRtl: isRtlProp,
   title,
   titleAr,
+  kicker,
+  kickerAr,
+  subtitle,
+  subtitleAr,
   urlPrefix = '',
 }: CategoryGridProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const displayTitle = getDisplayTitle(isRtl, title, titleAr);
+  const displayKicker = isRtl ? (kickerAr ?? kicker) : (kicker ?? kickerAr);
+  const displaySubtitle = isRtl ? (subtitleAr ?? subtitle) : (subtitle ?? subtitleAr);
 
   return (
     <section
-      className="py-12 sm:py-16 md:py-28 bg-background relative overflow-hidden"
+      className="relative overflow-hidden"
       dir={isRtl ? 'rtl' : 'ltr'}
       data-zone="categories"
     >
@@ -26,13 +32,24 @@ export default function BoldCategoryGrid({
       <div className="absolute top-0 left-0 w-1/2 h-1/2 bg-primary/5 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
 
       <div className="container mx-auto px-4 relative z-10">
-        {/* Section Header - Bold */}
-        {displayTitle && (
-          <div className="text-center mb-10 sm:mb-12 md:mb-16">
-            <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black text-foreground tracking-tight">
-              {displayTitle}
-            </h2>
-            <div className="mt-4 w-24 h-2 bg-primary mx-auto rounded-full" />
+        {(displayKicker || displayTitle || displaySubtitle) && (
+          <div className="text-center mb-10 sm:mb-12 md:mb-14 flex flex-col items-center gap-3">
+            {displayKicker && (
+              <span className="inline-flex items-center bg-primary text-primary-foreground px-3 py-1 font-black text-xs uppercase tracking-[0.18em] rounded-none">
+                {displayKicker}
+              </span>
+            )}
+            {displayTitle && (
+              <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black text-foreground tracking-tight">
+                {displayTitle}
+              </h2>
+            )}
+            {displaySubtitle && (
+              <p className="text-sm md:text-base font-bold uppercase tracking-wider text-muted-foreground max-w-xl">
+                {displaySubtitle}
+              </p>
+            )}
+            <div className="mt-2 w-24 h-2 bg-primary rounded-full" />
           </div>
         )}
 

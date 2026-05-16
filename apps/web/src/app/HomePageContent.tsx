@@ -161,14 +161,23 @@ export function HomePageContent({
 
         return (
           <>
-            {/* Categories — grid or horizontal strip. */}
+            {/* Categories — grid or horizontal strip. Top padding kept
+                small (pt-6/pt-8) so the section sits right under the
+                hero with no awkward white gap — Ahmad 2026-05-16
+                'close the white gap between it and the hero banner'.
+                Bottom padding stays generous so the rhythm into "New
+                Arrivals" below feels balanced. */}
             {layout.categories.enabled && templateCategories.length > 0 && (
-              <section className="py-14 sm:py-16 lg:py-24">
+              <section className="pt-6 pb-14 sm:pt-8 sm:pb-16 lg:pt-10 lg:pb-20">
                 {layout.categories.layout === 'horizontal' && T.CategoryStrip ? (
                   <T.CategoryStrip
                     categories={templateCategories}
                     title={categoriesTitle}
                     titleAr={categoriesTitleAr}
+                    kicker={layout.categories.kicker}
+                    kickerAr={layout.categories.kickerAr}
+                    subtitle={layout.categories.subtitle}
+                    subtitleAr={layout.categories.subtitleAr}
                     seeAllHref={storeUrl('/products')}
                     isRtl={isRtl}
                     pack={templateId}
@@ -179,6 +188,10 @@ export function HomePageContent({
                       categories={templateCategories}
                       title={categoriesTitle}
                       titleAr={categoriesTitleAr}
+                      kicker={layout.categories.kicker}
+                      kickerAr={layout.categories.kickerAr}
+                      subtitle={layout.categories.subtitle}
+                      subtitleAr={layout.categories.subtitleAr}
                       isRtl={isRtl}
                     />
                   </div>
