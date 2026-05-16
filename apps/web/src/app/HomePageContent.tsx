@@ -181,6 +181,12 @@ export function HomePageContent({
                     seeAllHref={storeUrl('/products')}
                     isRtl={isRtl}
                     pack={templateId}
+                    cardSize={layout.categories.cardSize}
+                    cardAspect={layout.categories.cardAspect}
+                    cardShape={layout.categories.cardShape}
+                    cardGap={layout.categories.cardGap}
+                    showLabel={layout.categories.showLabel}
+                    showHover={layout.categories.showHover}
                   />
                 ) : (
                   <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">

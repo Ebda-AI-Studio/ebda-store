@@ -347,6 +347,15 @@ export interface CategoryStripProps {
   isRtl?: boolean;
   urlPrefix?: string;
   pack?: import('@force/shared').TemplateId;
+  // Per-store card customisation — 2026-05-17. Same controls as the
+  // CategoryGrid path so swapping a store from grid → horizontal in
+  // admin keeps every visual tuning the merchant already applied.
+  cardSize?: import('@force/shared').CardSize;
+  cardAspect?: import('@force/shared').CardAspect;
+  cardShape?: import('@force/shared').CardShape;
+  cardGap?: import('@force/shared').CardGap;
+  showLabel?: boolean;
+  showHover?: boolean;
 }
 
 /**

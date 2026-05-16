@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { SectionHeading } from './SectionHeading';
 import { getPackStyles } from './pack-styles';
+import { cardAspectClass, cardShapeClasses, categorySizeClass, gridGapClass } from './card-size';
 import type { CategoryStripProps } from '../types';
 
 /**
@@ -27,9 +28,18 @@ export function CategoryStrip({
   isRtl,
   urlPrefix = '',
   pack,
+  cardSize,
+  cardAspect,
+  cardShape,
+  cardGap,
+  showLabel = true,
+  showHover = true,
 }: CategoryStripProps) {
   if (categories.length === 0) return null;
   const styles = getPackStyles(pack);
+  const sizeCap = categorySizeClass(cardSize);
+  const shape = cardShapeClasses(cardShape);
+  const aspectCls = shape.aspect || cardAspectClass(cardAspect) || 'aspect-square';
 
   return (
     <section className="px-4 sm:px-6 lg:px-8" dir={isRtl ? 'rtl' : 'ltr'} data-zone="categories">
@@ -49,7 +59,7 @@ export function CategoryStrip({
           // touch-pan-x + overscroll-x-contain: iOS-stuck-scroll fix
           // (same pattern as ProductCarousel) — see 2026-05-16 commit
           // for the snap-x/iOS direction-detect explanation.
-          className="-mx-4 flex snap-x snap-mandatory gap-6 overflow-x-auto overscroll-x-contain touch-pan-x px-4 pb-6 sm:gap-8 lg:gap-10"
+          className={`-mx-4 flex snap-x snap-mandatory ${gridGapClass(cardGap)} overflow-x-auto overscroll-x-contain touch-pan-x px-4 pb-6`}
           style={{ scrollbarWidth: 'thin' }}
         >
           {categories.map(cat => {
@@ -58,7 +68,7 @@ export function CategoryStrip({
             return (
               <li
                 key={cat.id}
-                className="snap-start shrink-0 w-[60vw] sm:w-[36vw] md:w-[30vw] lg:w-[26vw] xl:w-[22vw] max-w-[400px]"
+                className={`snap-start shrink-0 w-[60vw] sm:w-[36vw] md:w-[30vw] lg:w-[26vw] xl:w-[22vw] ${sizeCap}`}
               >
                 <Link
                   href={href}
@@ -66,7 +76,7 @@ export function CategoryStrip({
                   className="group block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-4 rounded-2xl"
                 >
                   <div
-                    className={`relative aspect-square overflow-hidden transition-transform duration-700 ease-out group-hover:scale-[1.015] ${styles.categoryFrame}`}
+                    className={`relative ${aspectCls} ${shape.radius} overflow-hidden ${showHover ? 'transition-transform duration-700 ease-out group-hover:scale-[1.015]' : ''} ${styles.categoryFrame}`}
                   >
                     {cat.image ? (
                       <Image
@@ -74,7 +84,7 @@ export function CategoryStrip({
                         alt={name ?? ''}
                         fill
                         sizes="(max-width: 640px) 60vw, (max-width: 768px) 36vw, (max-width: 1024px) 30vw, (max-width: 1280px) 26vw, 400px"
-                        className="object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]"
+                        className={`object-cover ${showHover ? 'transition-transform duration-700 ease-out group-hover:scale-[1.04]' : ''}`}
                       />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center text-muted-foreground">
@@ -95,9 +105,11 @@ export function CategoryStrip({
                       </div>
                     )}
                   </div>
-                  <p className={`mt-5 text-center line-clamp-2 ${styles.categoryCaption}`}>
-                    {name}
-                  </p>
+                  {showLabel && (
+                    <p className={`mt-5 text-center line-clamp-2 ${styles.categoryCaption}`}>
+                      {name}
+                    </p>
+                  )}
                 </Link>
               </li>
             );

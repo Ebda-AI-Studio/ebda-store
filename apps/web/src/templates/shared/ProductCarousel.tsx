@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { SectionHeading } from './SectionHeading';
 import { getPackStyles } from './pack-styles';
+import { cardAspectClass, cardShapeClasses, gridGapClass, productSizeClass } from './card-size';
 import { OutOfStockRibbon } from './ProductCardCta';
 import type { ProductCarouselProps } from '../types';
 
@@ -33,8 +34,17 @@ export function ProductCarousel({
   onAddToCart,
   urlPrefix = '',
   pack,
+  cardSize,
+  cardAspect,
+  cardShape,
+  cardGap,
+  showLabel = true,
+  showHover = true,
 }: ProductCarouselProps) {
   const styles = getPackStyles(pack);
+  const sizeCap = productSizeClass(cardSize);
+  const shape = cardShapeClasses(cardShape);
+  const aspectCls = shape.aspect || cardAspectClass(cardAspect) || 'aspect-square';
   const scrollRef = useRef<HTMLUListElement>(null);
   const [canScrollPrev, setCanScrollPrev] = useState(false);
   const [canScrollNext, setCanScrollNext] = useState(false);
@@ -181,7 +191,11 @@ export function ProductCarousel({
             // bubble immediately to the page scroll without the typical
             // ~200ms direction-detect delay that felt like "scrolling
             // gets stuck then works" on the home page (Ahmad 2026-05-16).
-            className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain touch-pan-x px-4 pb-4 sm:gap-6 lg:gap-8 scroll-smooth"
+            //
+            // 2026-05-17: gap is now driven by the per-store cardGap
+            // setting on newArrivals + bestSellers; the previous hard-
+            // coded gap-4/6/8 ignored merchant saves entirely.
+            className={`-mx-4 flex snap-x snap-mandatory ${gridGapClass(cardGap)} overflow-x-auto overscroll-x-contain touch-pan-x px-4 pb-4 scroll-smooth`}
             style={{ scrollbarWidth: 'thin' }}
           >
             {products.map(product => {
@@ -203,16 +217,20 @@ export function ProductCarousel({
                   // Narrower mobile width so 2+ cards peek into the viewport,
                   // signalling the strip continues. Ahmad 2026-05-16: 'still
                   // products are huge'. 60vw → 44vw on mobile, slight tighten
-                  // at sm. Desktop sizes stay the same — they were fine.
-                  className="snap-start shrink-0 w-[44vw] sm:w-[28vw] md:w-[22vw] lg:w-[19vw] xl:w-[17vw] max-w-[260px]"
+                  // at sm. Desktop max cap now driven by per-store cardSize
+                  // (xs/sm/md/lg/xl) so a merchant can shrink or grow product
+                  // cards without theme code changes.
+                  className={`snap-start shrink-0 w-[44vw] sm:w-[28vw] md:w-[22vw] lg:w-[19vw] xl:w-[17vw] ${sizeCap}`}
                 >
-                  <div className={`overflow-hidden ${styles.card}`}>
+                  <div className={`overflow-hidden ${shape.radius} ${styles.card}`}>
                     <Link
                       href={href}
                       prefetch={false}
                       className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                     >
-                      <div className="group/img relative aspect-square overflow-hidden bg-muted">
+                      <div
+                        className={`group/img relative ${aspectCls} ${shape.radius} overflow-hidden bg-muted`}
+                      >
                         <OutOfStockRibbon inStock={inStock} isRtl={isRtl} />
                         {img ? (
                           <>
@@ -226,10 +244,12 @@ export function ProductCarousel({
                               // single-image products go transparent on
                               // hover and reveal the empty bg-muted box.
                               className={`object-cover transition-opacity duration-500 ${
-                                product.images?.[1]?.url ? 'group-hover/img:opacity-0' : ''
+                                showHover && product.images?.[1]?.url
+                                  ? 'group-hover/img:opacity-0'
+                                  : ''
                               }`}
                             />
-                            {product.images?.[1]?.url && (
+                            {showHover && product.images?.[1]?.url && (
                               <Image
                                 src={product.images[1].url}
                                 alt={name}
@@ -271,22 +291,26 @@ export function ProductCarousel({
                       {/* Tightened p-5/p-6 → p-3/p-4 + dropped min-h-[3em]
                           name reservation per ahmad 2026-05-16 size pass.
                           Carousel cards on the homepage were the biggest
-                          chrome offender. */}
-                      <div className={`p-3 sm:p-4 space-y-2 ${styles.productCardBody ?? ''}`}>
-                        <p className={`line-clamp-2 ${styles.productCardName}`}>{name}</p>
-                        <div
-                          className={`flex items-baseline gap-2 ${styles.productCardBody ? 'justify-center' : ''}`}
-                        >
-                          <span className={styles.productCardPrice}>
-                            {(product.price / 1000).toFixed(3)} {currency}
-                          </span>
-                          {onSale && product.compareAtPrice && (
-                            <span className="text-sm text-muted-foreground line-through">
-                              {(product.compareAtPrice / 1000).toFixed(3)}
+                          chrome offender. Whole block hides when the
+                          merchant turns 'Show label' off in admin
+                          (cardless / image-only product strips). */}
+                      {showLabel && (
+                        <div className={`p-3 sm:p-4 space-y-2 ${styles.productCardBody ?? ''}`}>
+                          <p className={`line-clamp-2 ${styles.productCardName}`}>{name}</p>
+                          <div
+                            className={`flex items-baseline gap-2 ${styles.productCardBody ? 'justify-center' : ''}`}
+                          >
+                            <span className={styles.productCardPrice}>
+                              {(product.price / 1000).toFixed(3)} {currency}
                             </span>
-                          )}
+                            {onSale && product.compareAtPrice && (
+                              <span className="text-sm text-muted-foreground line-through">
+                                {(product.compareAtPrice / 1000).toFixed(3)}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </Link>
                     {/* Platform-level dual CTA: variant products → View link
                         to PDP, single-variant products → Add to cart. OOS
