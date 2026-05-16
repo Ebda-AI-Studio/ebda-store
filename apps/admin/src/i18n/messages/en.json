@@ -945,6 +945,8 @@
         "categories": {
           "title": "Categories section",
           "description": "Browseable category cards under the hero",
+          "desktopLabel": "Desktop",
+          "mobileLabel": "Mobile",
           "layoutGrid": "Grid",
           "layoutHorizontal": "Horizontal scroll",
           "captionBelow": "Caption below image",

@@ -170,7 +170,11 @@ export default function StoreLayoutPage() {
                 enabled={layout.categories.enabled}
                 onToggle={v => updateSection('categories', s => ({ ...s, enabled: v }))}
               >
-                <div className="grid grid-cols-2 gap-2 mb-3">
+                {/* Desktop controls */}
+                <p className="mt-2 mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  {t('sections.categories.desktopLabel')}
+                </p>
+                <div className="grid grid-cols-2 gap-2 mb-2">
                   <ModeButton
                     active={layout.categories.layout === 'grid'}
                     onClick={() => updateSection('categories', s => ({ ...s, layout: 'grid' }))}
@@ -184,7 +188,7 @@ export default function StoreLayoutPage() {
                     label={t('sections.categories.layoutHorizontal')}
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-2 mb-3">
+                <div className="grid grid-cols-2 gap-2 mb-2">
                   <ModeButton
                     active={layout.categories.captionPosition === 'below'}
                     onClick={() =>
@@ -200,7 +204,7 @@ export default function StoreLayoutPage() {
                     label={t('sections.categories.captionOverlay')}
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="mb-4">
                   <SelectField
                     label={t('sections.categories.desktopColumns')}
                     value={layout.categories.desktopColumns}
@@ -212,14 +216,64 @@ export default function StoreLayoutPage() {
                       }))
                     }
                   />
+                </div>
+
+                {/* Mobile controls (split per 2026-05-16 mobile-ui-ship plan) */}
+                <p className="mt-2 mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  {t('sections.categories.mobileLabel')}
+                </p>
+                <div className="grid grid-cols-2 gap-2 mb-2">
+                  <ModeButton
+                    active={(layout.categories.layoutMobile ?? layout.categories.layout) === 'grid'}
+                    onClick={() =>
+                      updateSection('categories', s => ({ ...s, layoutMobile: 'grid' }))
+                    }
+                    label={t('sections.categories.layoutGrid')}
+                  />
+                  <ModeButton
+                    active={
+                      (layout.categories.layoutMobile ?? layout.categories.layout) === 'horizontal'
+                    }
+                    onClick={() =>
+                      updateSection('categories', s => ({ ...s, layoutMobile: 'horizontal' }))
+                    }
+                    label={t('sections.categories.layoutHorizontal')}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2 mb-2">
+                  <ModeButton
+                    active={
+                      (layout.categories.captionPositionMobile ??
+                        layout.categories.captionPosition) === 'below'
+                    }
+                    onClick={() =>
+                      updateSection('categories', s => ({ ...s, captionPositionMobile: 'below' }))
+                    }
+                    label={t('sections.categories.captionBelow')}
+                  />
+                  <ModeButton
+                    active={
+                      (layout.categories.captionPositionMobile ??
+                        layout.categories.captionPosition) === 'overlay'
+                    }
+                    onClick={() =>
+                      updateSection('categories', s => ({
+                        ...s,
+                        captionPositionMobile: 'overlay',
+                      }))
+                    }
+                    label={t('sections.categories.captionOverlay')}
+                  />
+                </div>
+                <div>
                   <SelectField
                     label={t('sections.categories.mobileColumns')}
                     value={layout.categories.mobileColumns}
-                    options={[1, 2]}
+                    options={[1, 2, 3]}
                     onChange={v =>
                       updateSection('categories', s => ({
                         ...s,
-                        mobileColumns: v as 1 | 2,
+                        mobileColumns: v as 1 | 2 | 3,
                       }))
                     }
                   />

@@ -945,6 +945,8 @@
         "categories": {
           "title": "قسم الفئات",
           "description": "بطاقات الفئات أسفل البانر",
+          "desktopLabel": "الشاشة الكبيرة",
+          "mobileLabel": "الجوال",
           "layoutGrid": "شبكة",
           "layoutHorizontal": "تمرير أفقي",
           "captionBelow": "اسم الفئة تحت الصورة",

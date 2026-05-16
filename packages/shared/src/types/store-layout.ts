@@ -66,10 +66,18 @@ export interface SectionTitleOverride {
 
 export interface CategoriesSettings extends SectionTitleOverride {
   enabled: boolean;
+  // 2026-05-16: split layout + captionPosition into desktop + mobile so
+  // merchants can choose e.g. grid on desktop + horizontal-scroll on
+  // mobile (pecannbee pattern), or caption-below on desktop + caption-
+  // over on mobile (compact card style). Legacy single-field `layout`
+  // and `captionPosition` retained for back-compat — when both new
+  // breakpoint fields are unset, the legacy field applies to both.
   layout: CategoriesLayout;
+  layoutMobile?: CategoriesLayout;
   captionPosition: CategoriesCaption;
+  captionPositionMobile?: CategoriesCaption;
   desktopColumns: 2 | 3 | 4;
-  mobileColumns: 1 | 2;
+  mobileColumns: 1 | 2 | 3;
 }
 
 export interface ProductCarouselSettings extends SectionTitleOverride {
