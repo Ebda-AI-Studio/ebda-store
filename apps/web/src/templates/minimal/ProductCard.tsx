@@ -10,7 +10,8 @@ import { Price } from '@force/ui';
 import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
 import { productCardPropsEqual } from '../shared/product-card-memo';
 import { getProductPricing } from '../../lib/product-pricing';
-import { OutOfStockRibbon } from '../shared/ProductCardCta';
+import { OutOfStockRibbon, ProductCardCta } from '../shared/ProductCardCta';
+import { cn } from '@force/ui';
 
 /**
  * Minimal Template - Product Card
@@ -23,6 +24,8 @@ function MinimalProductCard({
   product,
   isRtl: isRtlProp,
   currency = 'KWD',
+  quantityInCart = 0,
+  onAddToCart,
   urlPrefix = '',
 
   isInCompare = false,
@@ -36,6 +39,9 @@ function MinimalProductCard({
   // Variant-aware pricing — see lib/product-pricing.ts.
   const pricing = getProductPricing(product, undefined, 'card');
   const hasSale = !!pricing.displayCompare || pricing.hasVariantDiscount;
+  const handleAddToCart = async (productId: string) => {
+    await onAddToCart?.(productId);
+  };
   return (
     <article
       itemScope
@@ -96,6 +102,47 @@ function MinimalProductCard({
               </svg>
             </div>
           )}
+
+          {/* Desktop hover-only quick-add — minimal stays chrome-free by
+              default (no button visible). On lg+ pointer devices the
+              CTA fades in over the image bottom on hover. Mobile (no
+              hover) shows nothing — customers tap the card to land on
+              PDP. Compromise per Ahmad 2026-05-16: 'desktop converts
+              faster, mobile stays pure'. Text-only underlined link
+              vocabulary matches minimal's font-light tracking-[0.2em]
+              language. */}
+          <div
+            className={cn(
+              'hidden lg:flex absolute bottom-0 inset-x-0 items-center justify-center pb-4 pt-12',
+              'bg-gradient-to-t from-background/95 via-background/70 to-transparent',
+              'opacity-0 lg:group-hover:opacity-100 transition-opacity duration-500 ease-out'
+            )}
+            onClick={e => e.preventDefault()}
+          >
+            <ProductCardCta
+              productId={product.id}
+              inStock={product.inStock !== false}
+              hasVariants={!!product.variants && product.variants.length > 0}
+              viewHref={`${urlPrefix}/products/${product.slug}`}
+              quantityInCart={quantityInCart}
+              isRtl={isRtl}
+              onAddToCart={handleAddToCart}
+              variant="ghost"
+              className={cn(
+                'bg-transparent text-[10px] tracking-[0.28em] uppercase font-light text-foreground',
+                'underline underline-offset-4 decoration-foreground/30 hover:decoration-foreground',
+                'hover:bg-transparent hover:text-foreground transition-colors duration-300',
+                'py-1 h-auto cursor-pointer'
+              )}
+              labels={{
+                addToCart: isRtl ? 'أضف للسلة' : 'Add to Cart',
+                addedToCart: isRtl ? 'تمت الإضافة' : 'Added',
+                outOfStock: isRtl ? 'نفذت الكمية' : 'Sold Out',
+                adding: isRtl ? '...' : '...',
+                view: isRtl ? 'عرض' : 'View',
+              }}
+            />
+          </div>
         </div>
 
         {/* Text — name + price, ultra-minimal */}
