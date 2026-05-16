@@ -63,10 +63,16 @@ export default function MinimalHeader({
     >
       <div className="container mx-auto px-6">
         <div
-          className={`flex items-center justify-between py-3 ${isRtl ? 'flex-row-reverse' : ''}`}
+          className={`relative flex items-center justify-between py-3 ${isRtl ? 'flex-row-reverse' : ''}`}
         >
-          {/* Logo */}
-          <Link href={urlPrefix || '/'} className="flex-shrink-0">
+          {/* Logo — absolute-centered on mobile (visual middle of the
+              row regardless of asymmetric hamburger/actions widths),
+              normal flex item on lg+. Ahmad 2026-05-16 platform rule:
+              every theme's logo MUST center on mobile. */}
+          <Link
+            href={urlPrefix || '/'}
+            className="absolute left-1/2 -translate-x-1/2 lg:relative lg:left-auto lg:translate-x-0 flex items-center justify-center flex-shrink-0 max-w-[65%] lg:max-w-none"
+          >
             {displayLogo ? (
               <Image
                 src={displayLogo}

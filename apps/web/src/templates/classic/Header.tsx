@@ -76,9 +76,12 @@ export default function ClassicHeader({
         </div>
       )}
 
-      {/* Main header row */}
+      {/* Main header row — `relative` so the absolute-centered logo
+          below is positioned to this row (Ahmad 2026-05-16: logo must
+          truly center on mobile regardless of hamburger/actions
+          widths). */}
       <div className="container mx-auto px-4 py-5">
-        <div className="flex items-center justify-between gap-4">
+        <div className="relative flex items-center justify-between gap-4">
           {/* Mobile menu toggle */}
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
@@ -126,8 +129,15 @@ export default function ClassicHeader({
             ))}
           </nav>
 
-          {/* Logo — centered */}
-          <Link href={urlPrefix || '/'} className="flex-shrink-0 mx-auto md:mx-0">
+          {/* Logo — absolute-centered on mobile (visual middle between
+              hamburger + actions regardless of asymmetric widths),
+              normal flex item on md+. max-w-[65%] guard prevents
+              wide wordmarks from overflowing into the actions row at
+              320px viewports. */}
+          <Link
+            href={urlPrefix || '/'}
+            className="absolute left-1/2 -translate-x-1/2 md:relative md:left-auto md:translate-x-0 flex items-center justify-center flex-shrink-0 max-w-[65%] md:max-w-none"
+          >
             {displayLogo ? (
               <Image
                 src={displayLogo}

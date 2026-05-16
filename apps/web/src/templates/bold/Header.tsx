@@ -56,7 +56,7 @@ export default function BoldHeader({
                 on md+. Bumped mobile to h-20 per Ahmad 2026-05-16. */}
             <Link
               href={urlPrefix || '/'}
-              className="absolute left-1/2 -translate-x-1/2 md:relative md:left-auto md:translate-x-0 flex items-center gap-3 shrink-0 cursor-pointer"
+              className="absolute left-1/2 -translate-x-1/2 md:relative md:left-auto md:translate-x-0 flex items-center justify-center gap-3 shrink-0 cursor-pointer max-w-[65%] md:max-w-none"
             >
               {displayLogo ? (
                 <img
