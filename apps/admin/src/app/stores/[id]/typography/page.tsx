@@ -215,6 +215,73 @@ interface ZoneSettings {
   textUnderlineOffset?: string;
 }
 
+// Convert HSL component string (e.g. "220 13% 18%") to hex (#rrggbb).
+// Populates the native color picker swatch when a merchant selects a
+// brand preset — without this the picker shows #000000 regardless of
+// the actual brand colour. Returns null on parse failure.
+function hslComponentsToHex(s: string | undefined | null): string | null {
+  if (!s) return null;
+  const m = /^([0-9.]+)\s+([0-9.]+)%\s+([0-9.]+)%/.exec(s.trim());
+  if (!m) return null;
+  const h = parseFloat(m[1]);
+  const sat = parseFloat(m[2]) / 100;
+  const l = parseFloat(m[3]) / 100;
+  const c = (1 - Math.abs(2 * l - 1)) * sat;
+  const xc = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m2 = l - c / 2;
+  let r = 0,
+    g = 0,
+    b = 0;
+  if (h < 60) {
+    r = c;
+    g = xc;
+  } else if (h < 120) {
+    r = xc;
+    g = c;
+  } else if (h < 180) {
+    g = c;
+    b = xc;
+  } else if (h < 240) {
+    g = xc;
+    b = c;
+  } else if (h < 300) {
+    r = xc;
+    b = c;
+  } else {
+    r = c;
+    b = xc;
+  }
+  const to255 = (v: number) =>
+    Math.round((v + m2) * 255)
+      .toString(16)
+      .padStart(2, '0');
+  return `#${to255(r)}${to255(g)}${to255(b)}`;
+}
+
+// Translate a brand-preset token to the hex from the store's theme.
+// Storefront emits CSS using `hsl(var(--primary))`; the admin's native
+// color picker needs a literal hex to show a swatch. This bridges them
+// so the merchant SEES the brand colour on the picker when they pick
+// "Brand primary" from the dropdown.
+function resolveBrandPresetToHex(
+  token: string | undefined,
+  theme: Record<string, unknown> | undefined
+): string | null {
+  if (!token || !theme) return null;
+  const themeKeyMap: Record<string, string> = {
+    'brand-primary': 'primaryColor',
+    'brand-secondary': 'secondaryColor',
+    'brand-accent': 'accentColor',
+    'brand-foreground': 'foregroundColor',
+    'brand-muted': 'mutedColor',
+    'brand-background': 'backgroundColor',
+  };
+  const key = themeKeyMap[token];
+  if (!key) return null;
+  const val = theme[key];
+  return typeof val === 'string' ? hslComponentsToHex(val) : null;
+}
+
 // Brand-color preset tokens. The storefront translates these to
 // hsl(var(--primary)) etc. so the typography stays linked to the
 // store's brand palette — merchant doesn't have to copy hex values.
@@ -800,7 +867,8 @@ export default function TypographyPage() {
                               value={
                                 cfg.color && /^#[0-9a-f]{6}$/i.test(cfg.color)
                                   ? cfg.color
-                                  : '#000000'
+                                  : (resolveBrandPresetToHex(cfg.color, currentStore?.theme) ??
+                                    '#000000')
                               }
                               onChange={e => updateZone(z.key, { color: e.target.value })}
                               className="h-10 w-12 cursor-pointer rounded-lg border border-border bg-background"
@@ -946,7 +1014,10 @@ export default function TypographyPage() {
                                 value={
                                   cfg.backgroundColor && /^#[0-9a-f]{6}$/i.test(cfg.backgroundColor)
                                     ? cfg.backgroundColor
-                                    : '#FF7700'
+                                    : (resolveBrandPresetToHex(
+                                        cfg.backgroundColor,
+                                        currentStore?.theme
+                                      ) ?? '#FF7700')
                                 }
                                 onChange={e =>
                                   updateZone(z.key, { backgroundColor: e.target.value })
@@ -1093,7 +1164,10 @@ export default function TypographyPage() {
                                     cfg.textDecorationColor &&
                                     /^#[0-9a-f]{6}$/i.test(cfg.textDecorationColor)
                                       ? cfg.textDecorationColor
-                                      : '#FF7700'
+                                      : (resolveBrandPresetToHex(
+                                          cfg.textDecorationColor,
+                                          currentStore?.theme
+                                        ) ?? '#FF7700')
                                   }
                                   onChange={e =>
                                     updateZone(z.key, { textDecorationColor: e.target.value })
