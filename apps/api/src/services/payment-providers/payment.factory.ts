@@ -1,4 +1,4 @@
-import { prisma } from '@force/database';
+import { prisma, Prisma } from '@force/database';
 import { config } from '../../config';
 import { AppError } from '../../middleware/error-handler';
 import logger from '../../lib/logger';
@@ -569,6 +569,24 @@ export class PaymentService {
   }
 
   /**
+   * Get refund status — looks up a previously-submitted refund's current
+   * state at the provider. Used by the manual "Refresh refund status"
+   * button on the admin order detail page when the refund webhook didn't
+   * arrive or the merchant wants to confirm execution.
+   */
+  static async getRefundStatus(
+    refundId: string,
+    provider: PaymentProvider,
+    storeId: string
+  ): Promise<import('./types').RefundStatusResponse> {
+    const p = await factory.getProvider(provider, storeId);
+    if (!p.getRefundStatus) {
+      throw new AppError(400, 'NOT_SUPPORTED', `${provider} does not support refund status lookup`);
+    }
+    return p.getRefundStatus(refundId);
+  }
+
+  /**
    * Process refund
    */
   static async refund(
@@ -799,6 +817,89 @@ export class PaymentService {
         '[PAYMENT WEBHOOK] storeId mismatch between resolver and payment.order — refusing to process'
       );
       throw new AppError(400, 'STORE_MISMATCH', 'Webhook payload does not match resolved store');
+    }
+
+    // Refund webhook short-circuit. MyFatoorah delivers "RefundStatusChanged"
+    // events when their finance team executes (Refunded) or rejects (Canceled)
+    // a previously-submitted MakeRefund. parseWebhook tags these with the
+    // `refund` field. Route them through a separate path so we don't
+    // re-mutate the order's payment lifecycle every time a refund updates.
+    if (webhookData.refund) {
+      const prevMeta = (payment.metadata as Record<string, unknown>) || {};
+      const prevRefundStatus = (prevMeta.refundStatus as string | undefined) || 'pending';
+      const newStatus = webhookData.refund.status;
+
+      // Idempotent — duplicate webhooks (same final state) are no-ops.
+      if (prevRefundStatus === newStatus) {
+        logger.info(
+          {
+            paymentId: payment.id,
+            orderId: payment.orderId,
+            refundId: webhookData.refund.refundId,
+            status: newStatus,
+          },
+          '[PAYMENT WEBHOOK] refund event matches stored status — no-op'
+        );
+        return { success: true, status: newStatus, orderId: payment.orderId };
+      }
+
+      // Update Payment metadata with the latest provider-reported refund
+      // status. Done in one update so prevMeta + new fields land atomically.
+      await prisma.payment.update({
+        where: { id: payment.id },
+        data: {
+          metadata: {
+            ...prevMeta,
+            refundId: webhookData.refund.refundId,
+            refundStatus: newStatus,
+            refundReference:
+              webhookData.refund.refundReference ??
+              (prevMeta.refundReference as string | undefined) ??
+              null,
+            refundStatusUpdatedAt: new Date().toISOString(),
+          } as Prisma.InputJsonValue,
+          ...(newStatus === 'completed' && payment.status !== 'refunded'
+            ? { status: 'refunded' as const, refundedAmount: webhookData.refund.amount ?? 0 }
+            : {}),
+        },
+      });
+
+      // Out-of-band refund detection: if Payment.status was not already
+      // 'refunded' / 'partially_refunded' when the executed webhook arrived,
+      // the admin Refund-via-provider button never ran — someone refunded
+      // directly in MyFatoorah's portal. Fire applyRefundEffects so the
+      // side-effects (inventory restore, coupon decrement, loyalty reversal,
+      // customer email) still happen. When the admin button DID run, we
+      // skip — the side-effects fired the moment they clicked.
+      const wasAlreadyHandled =
+        payment.status === 'refunded' || payment.status === 'partially_refunded';
+      if (newStatus === 'completed' && !wasAlreadyHandled && payment.order) {
+        logger.info(
+          { paymentId: payment.id, orderId: payment.orderId },
+          '[PAYMENT WEBHOOK] out-of-band refund detected — running applyRefundEffects fresh'
+        );
+        await OrderService.applyRefundEffects(payment.order.storeId, payment.orderId).catch(err =>
+          logger.error(
+            { err, orderId: payment.orderId },
+            '[PAYMENT WEBHOOK] applyRefundEffects failed for out-of-band refund'
+          )
+        );
+        // Also flip the order's paymentStatus since OrderService.updateStatus
+        // is not the trigger here.
+        await prisma.order
+          .update({
+            where: { id: payment.orderId },
+            data: { status: 'refunded', paymentStatus: 'refunded' },
+          })
+          .catch(err =>
+            logger.error(
+              { err, orderId: payment.orderId },
+              '[PAYMENT WEBHOOK] order status update failed after out-of-band refund'
+            )
+          );
+      }
+
+      return { success: true, status: newStatus, orderId: payment.orderId };
     }
 
     // Map status to our payment status

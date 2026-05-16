@@ -7,6 +7,7 @@ import {
   PaymentStatusResponse,
   RefundRequest,
   RefundResponse,
+  RefundStatusResponse,
   WebhookPayload,
   AvailablePaymentMethod,
   Currency,
@@ -323,10 +324,66 @@ export class MyFatoorahPaymentProvider implements IPaymentProvider {
       refundId: response.Data.RefundId.toString(),
       transactionId: request.transactionId,
       amount: Math.round(response.Data.Amount * 1000),
-      status: 'completed',
+      // MyFatoorah refunds are queued for finance-team review before
+      // execution — so the response from MakeRefund means "submitted",
+      // not "settled at the card network". The settle event arrives
+      // later via webhook (or polled via GetRefundStatus).
+      status: 'pending',
       metadata: {
         refundReference: response.Data.RefundReference,
       },
+    };
+  }
+
+  /**
+   * MyFatoorah's GetRefundStatus — checks where a previously-submitted
+   * refund stands. Status flows Pending → Refunded (executed by finance
+   * team) | Canceled (rejected). Use the `refundId` returned from the
+   * MakeRefund call (we save it on `Payment.refundId`).
+   *
+   * Response shape per docs:
+   *   Data.RefundStatusResult: [{ RefundId, RefundStatus, Amount,
+   *     RefundReference, RefundAmount, InvoiceId }, ...]
+   * We return the first matching entry (refundId is unique).
+   */
+  async getRefundStatus(refundId: string): Promise<RefundStatusResponse> {
+    const response = await this.request<{
+      IsSuccess: boolean;
+      Data: {
+        RefundStatusResult: Array<{
+          RefundId: number;
+          RefundStatus: 'Refunded' | 'Pending' | 'Canceled';
+          InvoiceId: number;
+          Amount: number;
+          RefundReference: string;
+          RefundAmount: number;
+        }>;
+      };
+    }>('/v2/GetRefundStatus', 'POST', {
+      Key: refundId,
+      KeyType: 'refundid',
+    });
+
+    const result = response.Data.RefundStatusResult?.[0];
+    if (!result) {
+      throw new Error(`MyFatoorah returned no refund result for refundId ${refundId}`);
+    }
+
+    const statusMap: Record<string, RefundStatusResponse['status']> = {
+      Refunded: 'completed',
+      Pending: 'pending',
+      Canceled: 'failed',
+    };
+
+    return {
+      success: true,
+      provider: 'myfatoorah',
+      refundId: result.RefundId.toString(),
+      status: statusMap[result.RefundStatus] || 'pending',
+      amount: Math.round(result.Amount * 1000),
+      refundedAmount: Math.round(result.RefundAmount * 1000),
+      refundReference: result.RefundReference,
+      raw: result as unknown as Record<string, unknown>,
     };
   }
 
@@ -363,15 +420,65 @@ export class MyFatoorahPaymentProvider implements IPaymentProvider {
 
   parseWebhook(payload: unknown): WebhookPayload {
     const data = payload as {
-      Event: string;
+      Event?: string;
+      EventType?: number;
       Data: {
-        InvoiceId: number;
-        InvoiceStatus: string;
-        InvoiceValue: number;
-        Currency: string;
-        PaymentMethod: string;
+        // Invoice (payment) status webhook fields
+        InvoiceId?: number;
+        InvoiceStatus?: string;
+        InvoiceValue?: number;
+        Currency?: string;
+        PaymentMethod?: string;
+        // Refund webhook fields (MyFatoorah "Refund Status Changed" event)
+        RefundId?: number;
+        RefundStatus?: string;
+        RefundReference?: string;
+        Amount?: number;
+        RefundAmount?: number;
       };
     };
+
+    // MyFatoorah delivers two distinct webhook types over the same channel:
+    //   - "TransactionsStatusChanged" — invoice/payment lifecycle (Paid /
+    //     Failed / Expired / Pending) — what every existing checkout uses
+    //   - "RefundStatusChanged" — refund execution (Refunded / Canceled /
+    //     Pending) — fires when the finance team executes or rejects a
+    //     previously-submitted MakeRefund
+    // Distinguish by presence of RefundId in the Data block. EventType
+    // numeric codes vary between portal versions; the field-shape check
+    // is more reliable than parsing the type.
+    const isRefundEvent = data.Data.RefundId !== undefined;
+
+    if (isRefundEvent) {
+      const refundStatusMap: Record<string, 'pending' | 'completed' | 'failed'> = {
+        Refunded: 'completed',
+        Pending: 'pending',
+        Canceled: 'failed',
+      };
+      // Refund webhooks carry an InvoiceId too — the original payment's
+      // invoice. We use it as the transactionId so handleWebhook can find
+      // the right Payment row by invoiceId/transactionId.
+      return {
+        provider: 'myfatoorah',
+        event: data.Event || 'RefundStatusChanged',
+        transactionId: (data.Data.InvoiceId ?? data.Data.RefundId!).toString(),
+        invoiceId: data.Data.InvoiceId?.toString(),
+        // Keep status as the payment's status (unchanged by refund event) —
+        // the refund-specific data rides on the optional `refund` field.
+        // handleWebhook checks `refund` first and short-circuits before
+        // touching the payment's primary status.
+        status: 'completed',
+        amount: Math.round((data.Data.Amount ?? 0) * 1000),
+        currency: 'KWD' as Currency,
+        refund: {
+          refundId: data.Data.RefundId!.toString(),
+          refundReference: data.Data.RefundReference,
+          status: refundStatusMap[data.Data.RefundStatus || ''] || 'pending',
+          amount: Math.round((data.Data.RefundAmount ?? data.Data.Amount ?? 0) * 1000),
+        },
+        rawPayload: payload,
+      };
+    }
 
     const statusMap: Record<string, PaymentStatus> = {
       Paid: 'completed',
@@ -382,12 +489,12 @@ export class MyFatoorahPaymentProvider implements IPaymentProvider {
 
     return {
       provider: 'myfatoorah',
-      event: data.Event,
-      transactionId: data.Data.InvoiceId.toString(),
-      invoiceId: data.Data.InvoiceId.toString(),
-      status: statusMap[data.Data.InvoiceStatus] || 'pending',
-      amount: Math.round(data.Data.InvoiceValue * 1000),
-      currency: data.Data.Currency as Currency,
+      event: data.Event || 'TransactionsStatusChanged',
+      transactionId: data.Data.InvoiceId!.toString(),
+      invoiceId: data.Data.InvoiceId!.toString(),
+      status: statusMap[data.Data.InvoiceStatus || ''] || 'pending',
+      amount: Math.round((data.Data.InvoiceValue ?? 0) * 1000),
+      currency: (data.Data.Currency || 'KWD') as Currency,
       paymentMethod: data.Data.PaymentMethod,
       paidAt: data.Data.InvoiceStatus === 'Paid' ? new Date() : undefined,
       rawPayload: payload,

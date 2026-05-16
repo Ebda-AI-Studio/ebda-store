@@ -6,6 +6,7 @@ import { VALID_TRANSITIONS } from '../../_components/types';
 import { PaymentLinkButton } from './PaymentLinkButton';
 import { RefreshPaymentButton } from './RefreshPaymentButton';
 import { RefundButton } from './RefundButton';
+import { RefreshRefundStatusButton } from './RefreshRefundStatusButton';
 import type { OrderDetail } from './types';
 
 interface ActionFooterProps {
@@ -62,6 +63,18 @@ export function ActionFooter({
   );
   const showRefundViaProvider =
     order.paymentStatus === 'paid' && !!completedOnlinePayment && order.status !== 'refunded';
+  // Refresh refund status — visible whenever there's a provider-issued
+  // refund (any payment row with a non-null transactionId AND payment
+  // status of refunded / partially_refunded). The button calls the
+  // provider's GetRefundStatus to confirm whether the finance team has
+  // executed the refund yet. Safety net for missed refund webhooks.
+  const refundedPayment = order.payments?.find(
+    p =>
+      (p.status === 'refunded' || p.status === 'partially_refunded') &&
+      p.transactionId &&
+      p.provider !== 'cod'
+  );
+  const showRefreshRefundStatus = !!refundedPayment;
 
   return (
     <div
@@ -134,6 +147,21 @@ export function ActionFooter({
             currency={order.currency}
             disabled={isUpdating}
             onRefunded={onPaymentRefreshed}
+          />
+        )}
+        {/* Refresh refund status — diagnostic. Re-check provider status
+            for an already-submitted refund. MyFatoorah refunds queue
+            for 1-3 days; this button confirms when the finance team
+            has actually executed the refund (so the customer's card
+            reflects the credit). Same safety-net pattern as Refresh
+            Payment — autonomous webhook handles the common case, this
+            covers missed webhooks. */}
+        {showRefreshRefundStatus && (
+          <RefreshRefundStatusButton
+            storeId={storeId}
+            orderId={order.id}
+            disabled={isUpdating}
+            onRefreshed={onPaymentRefreshed}
           />
         )}
         {showMarkPaid && (

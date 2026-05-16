@@ -627,6 +627,154 @@ router.post(
 );
 
 /**
+ * POST /stores/:storeId/orders/:orderId/refresh-refund-status
+ *
+ * Manual sync — admin clicks "Refresh refund status" on the order detail
+ * page to ask the payment provider whether a previously-submitted refund
+ * has been executed yet. Safety net for when the refund webhook didn't
+ * arrive (provider portal misconfigured, signature mismatch, the merchant
+ * issued the refund out-of-band in the provider portal).
+ *
+ * MyFatoorah refunds start as Pending → finance team executes →
+ * "Refunded" (or rejects → "Canceled"). The provider notifies us via
+ * webhook, but this endpoint is the pull-side equivalent.
+ */
+router.post(
+  '/:orderId/refresh-refund-status',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, orderId } = req.params;
+      const user = getAuthUser(req);
+
+      // Find the most-recent payment row that has a refundId (i.e. has
+      // been refunded via the provider). Skips COD / status-button-only
+      // refunds which have no provider refund record to ask about.
+      const payment = await prisma.payment.findFirst({
+        where: {
+          orderId,
+          order: { storeId },
+          refundId: { not: null },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (!payment || !payment.refundId) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'NO_REFUND_RECORD',
+            message:
+              'No refund record found for this order. Issue a refund via provider first, then refresh.',
+          },
+        });
+        return;
+      }
+
+      // Call the provider's GetRefundStatus. Optional on IPaymentProvider —
+      // PaymentService.getRefundStatus refuses gracefully when the chosen
+      // provider doesn't implement it.
+      const status = await runInTenantContext(storeId, () =>
+        PaymentService.getRefundStatus(
+          payment.refundId!,
+          payment.provider as 'tap' | 'myfatoorah' | 'hesabe' | 'upayments',
+          storeId
+        )
+      );
+
+      const prevMeta = (payment.metadata as Record<string, unknown>) || {};
+      const prevStatus = (prevMeta.refundStatus as string | undefined) || 'pending';
+      const statusChanged = prevStatus !== status.status;
+
+      // Update Payment.metadata with the fresh status. If the provider
+      // says the refund completed and our Payment row isn't marked
+      // refunded yet (out-of-band path), promote it now.
+      const updateData: Record<string, unknown> = {
+        metadata: {
+          ...prevMeta,
+          refundStatus: status.status,
+          refundReference: status.refundReference ?? prevMeta.refundReference,
+          refundStatusCheckedAt: new Date().toISOString(),
+        },
+      };
+      if (
+        status.status === 'completed' &&
+        payment.status !== 'refunded' &&
+        payment.status !== 'partially_refunded'
+      ) {
+        updateData.status = 'refunded';
+        updateData.refundedAmount = status.refundedAmount ?? status.amount ?? 0;
+      }
+      await prisma.payment.update({
+        where: { id: payment.id },
+        data: updateData,
+      });
+
+      // If this is the first time we see the refund as executed AND no
+      // applyRefundEffects ever ran (Payment.status was still completed),
+      // fire it now — inventory restore + customer email + admin push.
+      const needsSideEffects =
+        status.status === 'completed' && statusChanged && payment.status === 'completed';
+      if (needsSideEffects) {
+        await OrderService.applyRefundEffects(storeId, orderId).catch(err =>
+          logger.error(
+            { err, orderId, storeId },
+            '[refresh-refund-status] applyRefundEffects failed'
+          )
+        );
+        await prisma.order
+          .update({
+            where: { id: orderId },
+            data: { status: 'refunded', paymentStatus: 'refunded' },
+          })
+          .catch(err =>
+            logger.error({ err, orderId }, '[refresh-refund-status] order status update failed')
+          );
+      }
+
+      await auditLog({
+        action: 'order.refund_status_refreshed',
+        userId: user.userId,
+        resourceType: 'order',
+        resourceId: orderId,
+        details: {
+          refundId: payment.refundId,
+          providerStatus: status.status,
+          statusChanged,
+        },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+
+      logger.info(
+        {
+          orderId,
+          refundId: payment.refundId,
+          providerStatus: status.status,
+          statusChanged,
+        },
+        '[Refund] manual refund-status sync'
+      );
+
+      res.json({
+        success: true,
+        data: {
+          providerStatus: status.status,
+          refundStatus: status.status,
+          refundedAmount: status.refundedAmount,
+          refundReference: status.refundReference,
+          statusChanged,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
  * POST /stores/:storeId/orders/:orderId/refund-via-provider
  *
  * Admin-initiated refund. Calls the payment provider's refund API

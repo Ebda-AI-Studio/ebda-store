@@ -135,6 +135,20 @@ export interface RefundResponse {
   metadata?: Record<string, unknown>;
 }
 
+export interface RefundStatusResponse {
+  success: boolean;
+  provider: PaymentProvider;
+  refundId: string;
+  /** Normalized status across providers. MyFatoorah's "Refunded" =>
+   *  completed, "Pending" => pending, "Canceled" => failed. */
+  status: 'pending' | 'completed' | 'failed';
+  amount?: number;
+  refundedAmount?: number;
+  refundReference?: string;
+  /** Original provider response for debugging / portal cross-reference. */
+  raw?: Record<string, unknown>;
+}
+
 export interface WebhookPayload {
   provider: PaymentProvider;
   event: string;
@@ -145,6 +159,21 @@ export interface WebhookPayload {
   currency: Currency;
   paymentMethod?: string;
   paidAt?: Date;
+  /** Set when the webhook event is a refund status change rather than
+   *  a payment status change. handleWebhook routes refund events to a
+   *  separate code path that updates Payment.metadata.refundStatus
+   *  without re-mutating the order's payment lifecycle. */
+  refund?: {
+    /** Provider's own refund ID (RefundId for MyFatoorah). Maps to
+     *  Payment.refundId we saved when MakeRefund returned. */
+    refundId: string;
+    refundReference?: string;
+    /** Normalized refund status: completed = funds returned to customer's
+     *  card; pending = queued (MyFatoorah finance team); failed = canceled. */
+    status: 'pending' | 'completed' | 'failed';
+    /** Refund amount in fils. */
+    amount?: number;
+  };
   rawPayload: unknown;
 }
 
@@ -179,6 +208,15 @@ export interface IPaymentProvider {
    * Process refund
    */
   refund(request: RefundRequest): Promise<RefundResponse>;
+
+  /**
+   * Look up refund status (for providers whose refunds are not instant —
+   * MyFatoorah queues refunds for finance team review). Returns the
+   * latest status of the refund identified by `refundId` (provider's own
+   * refund ID, NOT our internal Payment.id). Optional — providers whose
+   * refunds settle synchronously may not implement this.
+   */
+  getRefundStatus?(refundId: string): Promise<RefundStatusResponse>;
 
   /**
    * Verify webhook signature
