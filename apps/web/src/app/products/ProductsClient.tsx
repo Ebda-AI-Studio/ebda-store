@@ -371,13 +371,14 @@ export default function ProductsClient({
 
           {/* Products Grid */}
           <div className="flex-1">
-            {/* Toolbar — stacks fully below lg so the Sort + Show selects
-                always have room for their full option text (Arabic labels
-                like "السعر: من الأعلى للأقل" don't get ellipsis'd). Switches
-                to single-row only at lg+ where the sidebar has settled
-                into its column. Fixes the "الأحد..." truncation Ahmad
-                spotted on desktop 2026-05-16. */}
-            <div className="mb-6 flex flex-col items-stretch gap-3 rounded-xl bg-muted/30 p-4 lg:flex-row lg:flex-wrap lg:items-center lg:justify-between lg:gap-4">
+            {/* Toolbar — always stacked rows (mobile pattern applied to
+                desktop too, per Ahmad's 2026-05-16 standing rule 'apply
+                mobile's fix to desktop'). Each filter occupies its own
+                row so Arabic labels never truncate. The @force/ui Select
+                wraps its <select> in a w-full div which made the older
+                lg:flex-row layout fight itself — always-stacked sidesteps
+                the wrapper issue entirely. */}
+            <div className="mb-6 flex flex-col items-stretch gap-3 rounded-xl bg-muted/30 p-4">
               <p className="text-sm text-muted-foreground">
                 {isLoading ? (
                   t('Loading...', translations['Loading...'])
@@ -390,7 +391,7 @@ export default function ProductsClient({
                   </>
                 )}
               </p>
-              <div className="flex w-full flex-col items-stretch gap-3 lg:w-auto lg:flex-row lg:items-center lg:gap-4">
+              <div className="flex w-full flex-col items-stretch gap-3">
                 {/* Per-page — shoppers can see more products on a single
                     page instead of paginating. Allow-list capped at 96.
                     Persisted to localStorage. min-w-[6rem] reserves room
@@ -411,7 +412,7 @@ export default function ProductsClient({
                       }
                     }}
                     options={PER_PAGE_OPTIONS.map(n => ({ value: String(n), label: String(n) }))}
-                    className="h-11 min-w-[6rem] flex-1 rounded-lg border border-border bg-background px-3 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 lg:h-9 lg:flex-initial lg:text-sm"
+                    className="h-11 min-w-[6rem] flex-1 rounded-lg border border-border bg-background px-3 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                   />
                 </div>
 
@@ -428,7 +429,7 @@ export default function ProductsClient({
                       value: option.value,
                       label: option.label,
                     }))}
-                    className="h-11 min-w-[12rem] flex-1 rounded-lg border border-border bg-background px-3 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 lg:h-9 lg:flex-initial lg:text-sm"
+                    className="h-11 min-w-[12rem] flex-1 rounded-lg border border-border bg-background px-3 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                   />
                 </div>
 

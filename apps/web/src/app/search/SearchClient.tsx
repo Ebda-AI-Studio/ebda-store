@@ -206,7 +206,7 @@ function SearchContent() {
 
         {/* Search form */}
         <form onSubmit={handleSearch} role="search" className="mb-6">
-          <div className="flex gap-3 max-w-2xl">
+          <div className="flex gap-3 max-w-2xl mx-auto">
             <input
               type="text"
               value={searchTerm}
@@ -226,14 +226,22 @@ function SearchContent() {
           </div>
         </form>
 
-        {/* Filter & Sort bar */}
+        {/* Filter & Sort bar \u2014 uses the same stacked-with-inline-labels
+            pattern as the /products toolbar (commit 33abdf6) so Arabic
+            labels like "\u0627\u0644\u0633\u0639\u0631: \u0645\u0646 \u0627\u0644\u0623\u0639\u0644\u0649 \u0644\u0644\u0623\u0642\u0644" can't truncate. Each filter
+            occupies its own row at every breakpoint; min-w on each Select
+            guards the Arabic label width. 2026-05-16 ahmad standing rule:
+            'apply mobile's fix to desktop' \u2014 toolbar UX is identical
+            regardless of viewport. */}
         {(categories.length > 0 || committedQuery) && (
-          <div className="mb-6 flex flex-wrap items-center gap-3 rounded-xl bg-muted/30 p-4">
+          <div className="mb-6 max-w-2xl mx-auto rounded-xl bg-muted/30 p-4 flex flex-col gap-3">
             {categories.length > 0 && (
               <div className="flex items-center gap-2">
+                <span className="shrink-0 text-sm font-medium text-foreground">
+                  {t('Category:', '\u0627\u0644\u0641\u0626\u0629:')}
+                </span>
                 <Select
                   id="search-category"
-                  label={t('Category:', '\u0627\u0644\u0641\u0626\u0629:')}
                   value={categoryFilter}
                   onChange={e => handleCategoryChange(e.target.value)}
                   options={[
@@ -246,26 +254,28 @@ function SearchContent() {
                     },
                     ...categories.map(cat => ({ value: cat.id, label: cat.name })),
                   ]}
-                  className="h-11 rounded-lg border border-border bg-background px-3 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 sm:h-9 sm:text-sm"
+                  className="flex-1 min-w-[14rem] h-11 rounded-lg border border-border bg-background px-3 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 lg:h-10 lg:text-sm"
                 />
               </div>
             )}
 
             <div className="flex items-center gap-2">
+              <span className="shrink-0 text-sm font-medium text-foreground">
+                {t('Sort by:', '\u062a\u0631\u062a\u064a\u0628 \u062d\u0633\u0628:')}
+              </span>
               <Select
                 id="search-sort"
-                label={t('Sort by:', '\u062a\u0631\u062a\u064a\u0628 \u062d\u0633\u0628:')}
                 value={sortBy}
                 onChange={e => handleSortChange(e.target.value as SortValue)}
                 options={getSortOptions(t).map(opt => ({ value: opt.value, label: opt.label }))}
-                className="h-9 rounded-lg border border-border bg-background px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                className="flex-1 min-w-[12rem] h-11 rounded-lg border border-border bg-background px-3 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 lg:h-10 lg:text-sm"
               />
             </div>
 
             {categoryFilter && (
               <button
                 onClick={() => handleCategoryChange('')}
-                className="flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary hover:bg-primary/20 transition-colors"
+                className="self-start flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary hover:bg-primary/20 transition-colors"
               >
                 {categories.find(c => c.id === categoryFilter)?.name ?? categoryFilter}
                 <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -15,27 +15,81 @@ interface AggregatedCustomer {
   lastName: string;
   email: string;
   phone: string;
+  address: string;
+  /** Sub-fields of the latest shipping address, useful in spreadsheet. */
+  address1: string;
+  address2: string;
+  city: string;
+  area: string;
+  country: string;
+  postalCode: string;
   totalOrders: number;
   totalSpent: number;
+  /** Average order value = totalSpent / totalOrders, in fils. */
+  avgOrderValue: number;
+  lastOrderTotal: number;
   lastOrderDate: Date;
   lastOrderNumber: string;
+  lastOrderStatus: string;
+  lastOrderPaymentStatus: string;
+  /** Oldest order's createdAt — "customer since" date. */
+  firstOrderDate: Date;
+  /** Comma-joined list of order statuses the customer has touched. */
+  statuses: string;
+  /** Counts: paid + pending + cancelled + failed. */
+  paidCount: number;
+  pendingCount: number;
+  cancelledCount: number;
+  failedCount: number;
+  /** Comma-joined list of payment methods ever used. */
+  paymentMethods: string;
+  isGuest: boolean;
+}
+
+interface ShippingAddressShape {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phone?: string;
+  address1?: string;
+  address2?: string;
+  city?: string;
+  area?: string;
+  state?: string;
+  country?: string;
+  postalCode?: string;
+}
+
+function formatShippingAddress(addr: ShippingAddressShape | null): string {
+  if (!addr) return '';
+  return [addr.address1, addr.address2, addr.area, addr.city, addr.country]
+    .filter((p): p is string => typeof p === 'string' && p.trim().length > 0)
+    .join(', ');
 }
 
 /**
- * Aggregate customers from order history. The User row carries the
- * authoritative phone, but we fall back to the most recent order's
- * shippingAddress.phone — that's what merchants actually use to call
- * the customer.
+ * Aggregate customers from order history. Now includes:
+ * - guest orders (no User row) keyed by shipping email/phone
+ * - cancelled / unpaid orders (no status filter — Ahmad 2026-05-16:
+ *   'get the info even if cancelled or unpaid')
+ * - latest shipping address + per-order payment amount so the export
+ *   surfaces what the merchant needs to ship + reconcile
  */
 async function aggregateCustomers(storeId: string): Promise<AggregatedCustomer[]> {
   const orders = await prisma.order.findMany({
-    where: { storeId, customerId: { not: null } },
+    where: { storeId, deletedAt: null },
     select: {
       id: true,
       orderNumber: true,
       total: true,
+      status: true,
+      paymentStatus: true,
       createdAt: true,
       shippingAddress: true,
+      // Payment method lives on the Payment row(s), not the Order. Pull
+      // the provider field via the relation; first payment wins for the
+      // summary string.
+      payments: { select: { provider: true } },
       customer: {
         select: { id: true, email: true, firstName: true, lastName: true, phone: true },
       },
@@ -43,32 +97,114 @@ async function aggregateCustomers(storeId: string): Promise<AggregatedCustomer[]
     orderBy: { createdAt: 'desc' },
   });
 
+  // Per-key transient tracking sets so we can emit comma-joined fields
+  // after the loop without polluting the AggregatedCustomer shape.
+  const statusSets = new Map<string, Set<string>>();
+  const paymentMethodSets = new Map<string, Set<string>>();
+
   const map = new Map<string, AggregatedCustomer>();
   for (const order of orders) {
-    if (!order.customer) continue;
-    const shipping = (order.shippingAddress ?? null) as { phone?: string } | null;
-    const fallbackPhone = shipping?.phone ?? '';
-    const existing = map.get(order.customer.id);
+    const shipping = (order.shippingAddress ?? null) as ShippingAddressShape | null;
+    const isGuest = !order.customer?.id;
+    const key =
+      order.customer?.id ||
+      shipping?.email?.toLowerCase() ||
+      shipping?.phone ||
+      `guest:${order.id}`;
+
+    const firstName = order.customer?.firstName ?? shipping?.firstName ?? '';
+    const lastName = order.customer?.lastName ?? shipping?.lastName ?? '';
+    const email = order.customer?.email ?? shipping?.email ?? '';
+    const phone = order.customer?.phone ?? shipping?.phone ?? '';
+    const address = formatShippingAddress(shipping);
+    const status = order.status ?? '';
+    const paymentStatus = order.paymentStatus ?? '';
+    // First payment provider on the order — multi-payment orders pick
+    // the first record (matching the merchant-facing "this order paid
+    // by X" expectation).
+    const paymentMethod = order.payments?.[0]?.provider ?? '';
+
+    let statusSet = statusSets.get(key);
+    if (!statusSet) {
+      statusSet = new Set();
+      statusSets.set(key, statusSet);
+    }
+    if (status) statusSet.add(status);
+
+    let methodSet = paymentMethodSets.get(key);
+    if (!methodSet) {
+      methodSet = new Set();
+      paymentMethodSets.set(key, methodSet);
+    }
+    if (paymentMethod) methodSet.add(paymentMethod);
+
+    const existing = map.get(key);
     if (existing) {
       existing.totalOrders += 1;
       existing.totalSpent += order.total;
-      // findMany is ordered by createdAt desc, so the first row we see for
-      // this customer is the most recent. Keep that order's phone if the
-      // user record doesn't have one.
-      if (!existing.phone && fallbackPhone) existing.phone = fallbackPhone;
+      existing.firstOrderDate =
+        order.createdAt < existing.firstOrderDate ? order.createdAt : existing.firstOrderDate;
+      // findMany is ordered by createdAt desc, so the first row we see
+      // for this key is the most recent. Subsequent rows are older —
+      // only top up missing fields, never overwrite the newest snapshot.
+      if (!existing.phone && phone) existing.phone = phone;
+      if (!existing.address && address) {
+        existing.address = address;
+        existing.address1 = shipping?.address1 ?? '';
+        existing.address2 = shipping?.address2 ?? '';
+        existing.city = shipping?.city ?? '';
+        existing.area = shipping?.area ?? '';
+        existing.country = shipping?.country ?? '';
+        existing.postalCode = shipping?.postalCode ?? '';
+      }
+      if (paymentStatus === 'paid') existing.paidCount += 1;
+      else if (status === 'cancelled') existing.cancelledCount += 1;
+      else if (paymentStatus === 'failed') existing.failedCount += 1;
+      else existing.pendingCount += 1;
     } else {
-      map.set(order.customer.id, {
-        id: order.customer.id,
-        firstName: order.customer.firstName ?? '',
-        lastName: order.customer.lastName ?? '',
-        email: order.customer.email ?? '',
-        phone: order.customer.phone ?? fallbackPhone,
+      const newRow: AggregatedCustomer = {
+        id: order.customer?.id ?? key,
+        firstName,
+        lastName,
+        email,
+        phone,
+        address,
+        address1: shipping?.address1 ?? '',
+        address2: shipping?.address2 ?? '',
+        city: shipping?.city ?? '',
+        area: shipping?.area ?? '',
+        country: shipping?.country ?? '',
+        postalCode: shipping?.postalCode ?? '',
         totalOrders: 1,
         totalSpent: order.total,
+        avgOrderValue: order.total,
+        lastOrderTotal: order.total,
         lastOrderDate: order.createdAt,
         lastOrderNumber: order.orderNumber,
-      });
+        lastOrderStatus: status,
+        lastOrderPaymentStatus: paymentStatus,
+        firstOrderDate: order.createdAt,
+        statuses: '',
+        paidCount: paymentStatus === 'paid' ? 1 : 0,
+        pendingCount: 0,
+        cancelledCount: status === 'cancelled' ? 1 : 0,
+        failedCount: paymentStatus === 'failed' ? 1 : 0,
+        paymentMethods: '',
+        isGuest,
+      };
+      if (paymentStatus !== 'paid' && status !== 'cancelled' && paymentStatus !== 'failed') {
+        newRow.pendingCount = 1;
+      }
+      map.set(key, newRow);
     }
+  }
+
+  // Materialize comma-joined sets + recompute avgOrderValue after the
+  // full aggregation pass.
+  for (const [key, row] of map.entries()) {
+    row.statuses = Array.from(statusSets.get(key) ?? []).join(', ');
+    row.paymentMethods = Array.from(paymentMethodSets.get(key) ?? []).join(', ');
+    row.avgOrderValue = row.totalOrders > 0 ? Math.round(row.totalSpent / row.totalOrders) : 0;
   }
 
   return Array.from(map.values()).sort((a, b) => b.totalSpent - a.totalSpent);
@@ -105,10 +241,29 @@ router.get(
         { header: 'Last Name', key: 'lastName', width: 18 },
         { header: 'Email', key: 'email', width: 30 },
         { header: 'Phone', key: 'phone', width: 18 },
+        { header: 'Guest', key: 'isGuest', width: 8 },
+        { header: 'Address', key: 'address', width: 42 },
+        { header: 'Address Line 1', key: 'address1', width: 24 },
+        { header: 'Address Line 2', key: 'address2', width: 24 },
+        { header: 'Area', key: 'area', width: 18 },
+        { header: 'City', key: 'city', width: 18 },
+        { header: 'Country', key: 'country', width: 16 },
+        { header: 'Postal Code', key: 'postalCode', width: 14 },
         { header: 'Total Orders', key: 'totalOrders', width: 14 },
+        { header: 'Paid', key: 'paidCount', width: 8 },
+        { header: 'Pending', key: 'pendingCount', width: 10 },
+        { header: 'Cancelled', key: 'cancelledCount', width: 11 },
+        { header: 'Failed', key: 'failedCount', width: 9 },
         { header: 'Total Spent (KWD)', key: 'totalSpent', width: 18 },
-        { header: 'Last Order #', key: 'lastOrderNumber', width: 24 },
+        { header: 'Avg Order Value (KWD)', key: 'avgOrderValue', width: 20 },
+        { header: 'Last Order #', key: 'lastOrderNumber', width: 22 },
+        { header: 'Last Order (KWD)', key: 'lastOrderTotal', width: 18 },
+        { header: 'Last Order Status', key: 'lastOrderStatus', width: 18 },
+        { header: 'Last Payment Status', key: 'lastOrderPaymentStatus', width: 20 },
         { header: 'Last Order Date', key: 'lastOrderDate', width: 18 },
+        { header: 'First Order Date', key: 'firstOrderDate', width: 18 },
+        { header: 'Order Statuses', key: 'statuses', width: 28 },
+        { header: 'Payment Methods', key: 'paymentMethods', width: 24 },
       ];
       sheet.getRow(1).font = { bold: true };
       sheet.getRow(1).fill = {
@@ -123,19 +278,41 @@ router.get(
           lastName: c.lastName,
           email: c.email,
           phone: c.phone,
+          isGuest: c.isGuest ? 'Yes' : 'No',
+          address: c.address,
+          address1: c.address1,
+          address2: c.address2,
+          area: c.area,
+          city: c.city,
+          country: c.country,
+          postalCode: c.postalCode,
           totalOrders: c.totalOrders,
+          paidCount: c.paidCount,
+          pendingCount: c.pendingCount,
+          cancelledCount: c.cancelledCount,
+          failedCount: c.failedCount,
           // Convert fils → KWD with 3 decimals so the cell is numeric and
           // sortable in Excel rather than a formatted string.
           totalSpent: Number((c.totalSpent / 1000).toFixed(3)),
+          avgOrderValue: Number((c.avgOrderValue / 1000).toFixed(3)),
           lastOrderNumber: c.lastOrderNumber,
+          lastOrderTotal: Number((c.lastOrderTotal / 1000).toFixed(3)),
+          lastOrderStatus: c.lastOrderStatus,
+          lastOrderPaymentStatus: c.lastOrderPaymentStatus,
           lastOrderDate: c.lastOrderDate,
+          firstOrderDate: c.firstOrderDate,
+          statuses: c.statuses,
+          paymentMethods: c.paymentMethods,
         });
       }
 
       // Format the date + currency columns. Excel's "kwd" doesn't have a
       // built-in symbol, so we use a numeric format with 3 decimals.
       sheet.getColumn('totalSpent').numFmt = '0.000';
+      sheet.getColumn('avgOrderValue').numFmt = '0.000';
+      sheet.getColumn('lastOrderTotal').numFmt = '0.000';
       sheet.getColumn('lastOrderDate').numFmt = 'yyyy-mm-dd';
+      sheet.getColumn('firstOrderDate').numFmt = 'yyyy-mm-dd';
 
       const filenameSafe = (store.slug || store.name || 'customers').replace(/[^a-z0-9-]/gi, '-');
       const filename = `${filenameSafe}-customers-${new Date().toISOString().slice(0, 10)}.xlsx`;

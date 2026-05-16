@@ -17,14 +17,26 @@ interface OrderCustomer {
 }
 
 interface OrderShippingAddress {
+  firstName?: string;
+  lastName?: string;
   phone?: string;
+  email?: string;
+  address1?: string;
+  address2?: string;
+  city?: string;
+  area?: string;
+  state?: string;
+  country?: string;
+  postalCode?: string;
 }
 
 interface Order {
   id: string;
   orderNumber?: string;
-  customer: OrderCustomer;
+  customer: OrderCustomer | null;
   total: number;
+  status?: string;
+  paymentStatus?: string;
   createdAt: string;
   shippingAddress?: OrderShippingAddress | null;
 }
@@ -35,11 +47,44 @@ interface CustomerRow {
   lastName: string;
   email: string;
   phone: string;
+  /**
+   * Latest order's shipping address as a single human-readable string.
+   * Joined "address1, address2, area, city, country" with commas and
+   * the empty slots dropped. Empty when the merchant collected no
+   * address (e.g. digital-only orders).
+   */
+  address: string;
   totalOrders: number;
   totalSpent: number;
+  /**
+   * Total of the LATEST order (not the sum). Surfaces "what did this
+   * customer just spend?" — distinct from totalSpent which aggregates
+   * across all their orders. Per Ahmad 2026-05-16: 'add ... how much
+   * is the payment per order'.
+   */
+  lastOrderTotal: number;
   lastOrderDate: string;
   lastOrderId: string;
   lastOrderNumber?: string;
+  /** Status of the latest order so a 'cancelled' chip can show inline. */
+  lastOrderStatus?: string;
+  /** Payment status of the latest order. */
+  lastOrderPaymentStatus?: string;
+  /** True when the row was synthesized from a guest order (no customer User row). */
+  isGuest: boolean;
+}
+
+/**
+ * Pretty-print a shipping address. Returns "" if every slot is empty.
+ * Used to surface the latest delivery destination on the customers
+ * table per Ahmad 2026-05-16 ask.
+ */
+function formatShippingAddress(addr: OrderShippingAddress | null | undefined): string {
+  if (!addr) return '';
+  const parts = [addr.address1, addr.address2, addr.area, addr.city, addr.country].filter(
+    (p): p is string => typeof p === 'string' && p.trim().length > 0
+  );
+  return parts.join(', ');
 }
 
 function formatDate(dateString: string) {
@@ -77,10 +122,13 @@ export default function StoreCustomersPage() {
     try {
       const limit = 100;
 
-      // Fetch first page to learn total
+      // Fetch first page to learn total. API wraps paging in `meta`, NOT
+      // `pagination` — the previous shape mismatch silently capped this
+      // page at the first 100 orders forever (Ahmad 2026-05-16: 'why new
+      // orders customer info not loaded').
       const { data: firstData, error: firstError } = await apiGet<{
         orders: Order[];
-        pagination: { totalPages: number };
+        meta?: { totalPages: number };
       }>(`/api/v1/stores/${storeId}/orders?page=1&limit=${limit}`);
 
       if (firstError || !firstData) {
@@ -89,7 +137,7 @@ export default function StoreCustomersPage() {
       }
 
       const allOrders: Order[] = firstData.orders ?? [];
-      const totalPages: number = firstData.pagination?.totalPages ?? 1;
+      const totalPages: number = firstData.meta?.totalPages ?? 1;
 
       // Fetch remaining pages in parallel if there are more
       if (totalPages > 1) {
@@ -109,18 +157,32 @@ export default function StoreCustomersPage() {
         setIsFetchingAll(false);
       }
 
-      // Aggregate orders by customer
+      // Aggregate orders by customer. Two passes through the same loop:
+      // 1) registered customer (User row) keyed by customer.id
+      // 2) guest checkout (no User row) keyed by shippingAddress email
+      //    or phone — Ahmad 2026-05-16: 'get the info even if cancelled
+      //    or unpaid'. Cancelled / failed / pending orders still count
+      //    because the API doesn't filter by status either.
       const customerMap = new Map<string, CustomerRow>();
 
       for (const order of allOrders) {
-        if (!order.customer?.id) continue;
+        const ship = order.shippingAddress;
+        const isGuest = !order.customer?.id;
+        const key =
+          order.customer?.id ||
+          ship?.email?.toLowerCase() ||
+          ship?.phone ||
+          // last-resort synthetic key keeps each guest order as its own
+          // row instead of silently merging unrelated guest orders.
+          `guest:${order.id}`;
 
-        // Phone falls back to the shipping address's phone when the User
-        // record itself doesn't have one — that's where most checkout
-        // flows actually capture the customer's number.
-        const orderPhone = order.customer.phone || order.shippingAddress?.phone || '';
+        const firstName = order.customer?.firstName || ship?.firstName || '';
+        const lastName = order.customer?.lastName || ship?.lastName || '';
+        const email = order.customer?.email || ship?.email || '';
+        const phone = order.customer?.phone || ship?.phone || '';
+        const address = formatShippingAddress(ship);
 
-        const existing = customerMap.get(order.customer.id);
+        const existing = customerMap.get(key);
         if (existing) {
           existing.totalOrders += 1;
           existing.totalSpent += order.total;
@@ -129,23 +191,36 @@ export default function StoreCustomersPage() {
             existing.lastOrderDate = order.createdAt;
             existing.lastOrderId = order.id;
             existing.lastOrderNumber = order.orderNumber;
-            // Latest order's phone wins when newer
-            if (orderPhone) existing.phone = orderPhone;
-          } else if (!existing.phone && orderPhone) {
-            existing.phone = orderPhone;
+            existing.lastOrderTotal = order.total;
+            existing.lastOrderStatus = order.status;
+            existing.lastOrderPaymentStatus = order.paymentStatus;
+            // Latest order's address + phone + name win when newer
+            if (address) existing.address = address;
+            if (phone) existing.phone = phone;
+            if (firstName) existing.firstName = firstName;
+            if (lastName) existing.lastName = lastName;
+            if (email && !existing.email) existing.email = email;
+          } else {
+            if (!existing.phone && phone) existing.phone = phone;
+            if (!existing.address && address) existing.address = address;
           }
         } else {
-          customerMap.set(order.customer.id, {
-            id: order.customer.id,
-            firstName: order.customer.firstName,
-            lastName: order.customer.lastName,
-            email: order.customer.email,
-            phone: orderPhone,
+          customerMap.set(key, {
+            id: order.customer?.id || key,
+            firstName,
+            lastName,
+            email,
+            phone,
+            address,
             totalOrders: 1,
             totalSpent: order.total,
+            lastOrderTotal: order.total,
             lastOrderDate: order.createdAt,
             lastOrderId: order.id,
             lastOrderNumber: order.orderNumber,
+            lastOrderStatus: order.status,
+            lastOrderPaymentStatus: order.paymentStatus,
+            isGuest,
           });
         }
       }
@@ -377,6 +452,18 @@ export default function StoreCustomersPage() {
                   </th>
                   <th
                     scope="col"
+                    className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider hidden lg:table-cell"
+                  >
+                    Last Payment
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider hidden lg:table-cell"
+                  >
+                    Address
+                  </th>
+                  <th
+                    scope="col"
                     className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider hidden md:table-cell"
                   >
                     {t('colLastOrder')}
@@ -429,6 +516,38 @@ export default function StoreCustomersPage() {
                       <span className="font-bold text-foreground">
                         {(customer.totalSpent / 1000).toFixed(3)} KWD
                       </span>
+                    </td>
+                    <td className="px-6 py-4 hidden lg:table-cell text-sm text-foreground">
+                      <span className="font-medium">
+                        {(customer.lastOrderTotal / 1000).toFixed(3)} KWD
+                      </span>
+                      {customer.lastOrderPaymentStatus && (
+                        <span
+                          className={`ms-2 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                            customer.lastOrderPaymentStatus === 'paid'
+                              ? 'bg-success/10 text-success'
+                              : customer.lastOrderPaymentStatus === 'failed'
+                                ? 'bg-destructive/10 text-destructive'
+                                : 'bg-warning/10 text-warning'
+                          }`}
+                        >
+                          {customer.lastOrderPaymentStatus}
+                        </span>
+                      )}
+                      {customer.lastOrderStatus === 'cancelled' && (
+                        <span className="ms-2 inline-flex items-center rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-medium text-destructive">
+                          cancelled
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 hidden lg:table-cell text-sm text-muted-foreground max-w-xs">
+                      {customer.address ? (
+                        <span className="line-clamp-2" title={customer.address}>
+                          {customer.address}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground/60">—</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 hidden md:table-cell text-sm text-muted-foreground">
                       {formatDate(customer.lastOrderDate)}
