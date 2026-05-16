@@ -35,48 +35,62 @@ interface ZoneDef {
 }
 
 const ZONES: ZoneDef[] = [
-  // Broad zones — wrap whole storefront regions.
+  // Broad zones — wrap whole storefront regions. Descriptions point at
+  // concrete UI elements + give an example of what changes when the
+  // merchant tweaks this zone, so they know exactly which part of the
+  // store they're editing.
   {
     key: 'beforeHeader',
-    label: 'Before header (announcement bar)',
-    labelAr: 'قبل الهيدر (شريط الإعلان)',
-    description: 'The thin promo strip above the header.',
-    descriptionAr: 'الشريط الإعلاني فوق الهيدر.',
+    label: 'Announcement bar (top promo strip)',
+    labelAr: 'شريط الإعلان (أعلى الصفحة)',
+    description:
+      'The narrow promo banner at the very top of every page — typically "Free shipping over 30 KWD" or a discount code.',
+    descriptionAr:
+      'الشريط الترويجي الضيق في أعلى كل صفحة — عادةً مثل "شحن مجاني فوق 30 د.ك" أو كود خصم.',
   },
   {
     key: 'header',
-    label: 'Header',
-    labelAr: 'الهيدر',
-    description: 'Logo, navigation, search, cart icons.',
-    descriptionAr: 'الشعار، القائمة، البحث، أيقونات السلة.',
+    label: 'Page header (logo + nav + cart icons)',
+    labelAr: 'هيدر الصفحة (الشعار + القائمة + أيقونات السلة)',
+    description:
+      'Affects the store logo wordmark, the top navigation links ("Shop", "About", "Contact"), and any text next to the cart / search / account icons.',
+    descriptionAr:
+      'يؤثر على نص شعار المتجر، روابط القائمة العلوية (مثل "تسوّق"، "من نحن"، "تواصل")، والنصوص بجانب أيقونات السلة / البحث / الحساب.',
   },
   {
     key: 'categories',
-    label: 'Categories',
-    labelAr: 'الفئات',
-    description: 'The categories grid / strip on the homepage.',
-    descriptionAr: 'شبكة / شريط الفئات على الصفحة الرئيسية.',
+    label: 'Categories section (homepage "Shop by Category")',
+    labelAr: 'قسم الفئات (في الصفحة الرئيسية: "تسوّق حسب الفئة")',
+    description:
+      'The "Shop by Category" block on the homepage — the row of category tiles + their captions ("Sweets", "Drinks", etc.).',
+    descriptionAr:
+      'كتلة "تسوّق حسب الفئة" في الصفحة الرئيسية — صف بطاقات الفئات وأسماؤها (مثلاً "حلويات"، "مشروبات").',
   },
   {
     key: 'products',
-    label: 'Products',
-    labelAr: 'المنتجات',
-    description: 'Whole product surfaces — listing, detail, recommendations.',
-    descriptionAr: 'كل صفحات المنتجات — القائمة، التفاصيل، التوصيات.',
+    label: 'Products (listing, detail, carousels everywhere)',
+    labelAr: 'المنتجات (في صفحة القائمة، صفحة المنتج، وكل الكاروسيلات)',
+    description:
+      'The base font for every product surface: /products listing, single-product detail page, "New Arrivals" + "Best Sellers" carousels on the homepage, cart-recommendation cards. Sub-zones below override this for product name + price specifically.',
+    descriptionAr:
+      'الخط الأساسي لكل صفحات المنتجات: قائمة /products، صفحة المنتج الواحد، كاروسيلات "أحدث المنتجات" و"الأكثر مبيعاً" في الصفحة الرئيسية، وبطاقات اقتراحات السلة. الأقسام الفرعية أدناه تتجاوز هذا للاسم والسعر فقط.',
   },
   {
     key: 'footer',
-    label: 'Footer',
-    labelAr: 'الفوتر',
-    description: 'Footer columns, links, copyright row.',
-    descriptionAr: 'أعمدة الفوتر والروابط وسطر حقوق النشر.',
+    label: 'Footer (bottom links + copyright)',
+    labelAr: 'الفوتر (الروابط السفلية + حقوق النشر)',
+    description:
+      'The footer columns at the bottom of every page — "Shop", "Help", "About", social icons, and the copyright row.',
+    descriptionAr:
+      'أعمدة الفوتر في أسفل كل صفحة — "تسوّق"، "مساعدة"، "من نحن"، أيقونات السوشيال، وسطر حقوق النشر.',
   },
   {
     key: 'afterFooter',
-    label: 'After footer',
-    labelAr: 'بعد الفوتر',
-    description: 'Anything appended below the footer (cookie strip, etc.).',
-    descriptionAr: 'أي عنصر يظهر تحت الفوتر (شريط الكوكيز إلخ).',
+    label: 'Below footer (cookie consent, etc.)',
+    labelAr: 'تحت الفوتر (شريط الكوكيز ونحوه)',
+    description:
+      'Tiny elements that render below the footer — cookie consent banner, "Powered by Force" credit row.',
+    descriptionAr: 'العناصر الصغيرة أسفل الفوتر — شريط موافقة الكوكيز، سطر "مدعوم من Force".',
   },
   // Sub-zones — nested overrides.
   // Section heading sub-zones split SectionHeading into 4 individually
@@ -84,67 +98,82 @@ const ZONES: ZoneDef[] = [
   // bleed onto the "View All" link next to it (Ahmad 2026-05-16).
   {
     key: 'sectionKicker',
-    label: 'Section kicker (eyebrow label)',
-    labelAr: 'الشارة العلوية للقسم',
-    description: 'Small chip above section titles (e.g. "EXPLORE"). Style independently.',
-    descriptionAr: 'الشارة الصغيرة فوق عنوان القسم (مثل "استكشف"). يمكن تنسيقها بشكل مستقل.',
+    label: 'Section kicker (small chip above title)',
+    labelAr: 'الشارة العلوية للقسم (الكبسولة الصغيرة فوق العنوان)',
+    description:
+      'The small uppercase chip rendered ABOVE each section title — e.g. "EXPLORE" above "Shop by Category", or "DISCOVER" above "Best Sellers". Style independently of the title.',
+    descriptionAr:
+      'الكبسولة الصغيرة فوق عنوان كل قسم — مثل "استكشف" فوق "تسوّق حسب الفئة"، أو "اكتشف" فوق "الأكثر مبيعاً". يمكن تنسيقها باستقلال عن العنوان.',
     isSubZone: true,
   },
   {
     key: 'sectionTitle',
-    label: 'Section title',
-    labelAr: 'عنوان القسم',
-    description: 'Homepage section H2s ("New Arrivals", "Shop by Category") + listing-page H1.',
+    label: 'Section title ("Latest Products" / "أحدث المنتجات")',
+    labelAr: 'عنوان القسم ("أحدث المنتجات" / "Latest Products")',
+    description:
+      'The big H2 headline on every homepage section — "Shop by Category", "Latest Products", "Best Sellers" — plus the H1 at the top of the products listing page.',
     descriptionAr:
-      'عناوين أقسام الصفحة الرئيسية ("أحدث المنتجات"، "تسوق حسب الفئة") وعنوان صفحة القائمة.',
+      'العنوان الكبير (H2) في كل قسم بالصفحة الرئيسية — "تسوّق حسب الفئة"، "أحدث المنتجات"، "الأكثر مبيعاً" — بالإضافة إلى عنوان H1 في أعلى صفحة قائمة المنتجات.',
     isSubZone: true,
   },
   {
     key: 'sectionSubtitle',
-    label: 'Section subtitle (tagline)',
-    labelAr: 'العنوان الفرعي للقسم',
-    description: 'Tagline rendered below the section title.',
-    descriptionAr: 'النص الفرعي الذي يظهر تحت عنوان القسم.',
+    label: 'Section subtitle (tagline under title)',
+    labelAr: 'العنوان الفرعي للقسم (النص الوصفي تحت العنوان)',
+    description:
+      'The descriptive tagline rendered BELOW each section title — e.g. "Browse our top picks by category" under "Shop by Category".',
+    descriptionAr:
+      'النص الوصفي الذي يظهر تحت عنوان القسم — مثل "تصفّح أفضل اختياراتنا حسب الفئة" تحت "تسوّق حسب الفئة".',
     isSubZone: true,
   },
   {
     key: 'sectionSeeAll',
     label: 'Section "View All" link',
-    labelAr: 'رابط "عرض الكل"',
-    description: 'The "View All" / "See all" link at the end of each section heading row.',
-    descriptionAr: 'رابط "عرض الكل" الذي يظهر في نهاية صف عنوان القسم.',
+    labelAr: 'رابط "عرض الكل" في القسم',
+    description:
+      'The "View All" / "عرض الكل" link in the top-right of each homepage section — next to "Latest Products", "Best Sellers", "Shop by Category". Click jumps to the full listing.',
+    descriptionAr:
+      'رابط "عرض الكل" أعلى يسار كل قسم في الصفحة الرئيسية — بجانب "أحدث المنتجات"، "الأكثر مبيعاً"، "تسوّق حسب الفئة". ينقل المستخدم إلى القائمة الكاملة.',
     isSubZone: true,
   },
   {
     key: 'productName',
-    label: 'Product name',
-    labelAr: 'اسم المنتج',
-    description: 'Just the product name on a card. Overrides the broader "Products" font.',
-    descriptionAr: 'اسم المنتج فقط على البطاقة. يتجاوز إعدادات منطقة "المنتجات" الأشمل.',
+    label: 'Product name (on product cards)',
+    labelAr: 'اسم المنتج (على بطاقة المنتج)',
+    description:
+      'The product title text on every product card — homepage carousels, /products grid, search results, cart recommendations. Overrides the broader "Products" font when you want the name styled differently from the price.',
+    descriptionAr:
+      'اسم المنتج على كل بطاقة منتج — كاروسيلات الصفحة الرئيسية، شبكة /products، نتائج البحث، اقتراحات السلة. يتجاوز خط "المنتجات" العام عندما تريد تنسيق الاسم بشكل مختلف عن السعر.',
     isSubZone: true,
   },
   {
     key: 'productPrice',
-    label: 'Product price',
-    labelAr: 'سعر المنتج',
-    description: 'Just the price text on a product card.',
-    descriptionAr: 'نص السعر فقط على بطاقة المنتج.',
+    label: 'Product price (on product cards)',
+    labelAr: 'سعر المنتج (على بطاقة المنتج)',
+    description:
+      'The price text on every product card — e.g. "12.500 KWD". Affects all cards: homepage carousels, listing page, search results, cart recommendations.',
+    descriptionAr:
+      'نص السعر على كل بطاقة منتج — مثلاً "12.500 د.ك". يؤثر على كل البطاقات: كاروسيلات الصفحة الرئيسية، صفحة القائمة، نتائج البحث، اقتراحات السلة.',
     isSubZone: true,
   },
   {
     key: 'cta',
-    label: 'Buttons / CTAs',
-    labelAr: 'الأزرار',
-    description: '"Add to cart", "Subscribe", "View store", and similar action buttons.',
-    descriptionAr: 'أزرار "أضف للسلة"، "اشترك"، "عرض المتجر"، وما شابه.',
+    label: 'Buttons + CTAs (Add to cart, Subscribe, etc.)',
+    labelAr: 'الأزرار والدعوات للفعل (أضف للسلة، اشترك، ...)',
+    description:
+      'Every action button on the storefront — "Add to cart" on product cards, "Subscribe" in newsletter, "Place order" at checkout, "View store" everywhere.',
+    descriptionAr:
+      'كل أزرار الفعل في المتجر — "أضف للسلة" على بطاقات المنتج، "اشترك" في النشرة، "أكمل الطلب" في الدفع، "عرض المتجر" في كل مكان.',
     isSubZone: true,
   },
   {
     key: 'filters',
-    label: 'Filters',
-    labelAr: 'الفلاتر',
-    description: 'Filter sidebar on /products — sort, search, price range, category chips.',
-    descriptionAr: 'الشريط الجانبي للفلاتر — الترتيب، البحث، مجال السعر، رقاقات الفئات.',
+    label: 'Filter sidebar (on /products page)',
+    labelAr: 'الشريط الجانبي للفلاتر (في صفحة /products)',
+    description:
+      'The left sidebar on /products — sort dropdown, search field, price range slider, category chips, in-stock toggle.',
+    descriptionAr:
+      'الشريط الجانبي الأيسر في /products — قائمة الترتيب، حقل البحث، شريط نطاق السعر، رقاقات الفئات، مفتاح "متوفر فقط".',
     isSubZone: true,
   },
 ];
@@ -434,11 +463,21 @@ export default function TypographyPage() {
   // Apply the chosen family to every zone in one click. Saves the
   // merchant from picking the same dropdown value six times when they
   // just want one font everywhere — the common case.
+  //
+  // CRITICAL: preserve ALL existing zones from `typo.zones` even if a
+  // key isn't in the ZONES array (legacy keys, future-additions, etc.).
+  // The earlier implementation rebuilt `applied` from ZONES only, which
+  // wiped any zone not listed there — losing chip / underline settings
+  // when the merchant clicked "Apply to all zones" on a font.
   const applyFontToAllZones = (family: string) => {
     const applied: Typography['zones'] = {};
-    for (const z of ZONES) {
-      const existing = typo.zones[z.key] ?? {};
-      applied[z.key] = { ...existing, fontFamily: family };
+    const allKeys = new Set<ZoneKey>([
+      ...ZONES.map(z => z.key),
+      ...(Object.keys(typo.zones) as ZoneKey[]),
+    ]);
+    for (const key of allKeys) {
+      const existing = typo.zones[key] ?? {};
+      applied[key] = { ...existing, fontFamily: family };
     }
     setTypo(t => ({ ...t, zones: applied }));
     toastSuccess(`Set ${family} on every zone`);
@@ -670,10 +709,12 @@ export default function TypographyPage() {
                           </span>
                         )}
                       </div>
-                      <p className="mt-0.5 text-xs text-muted-foreground">{z.description}</p>
+                      <p className="mt-1 text-sm text-muted-foreground leading-relaxed">
+                        {isAr ? z.descriptionAr : z.description}
+                      </p>
                       <div className="mt-3 grid gap-3 md:grid-cols-3">
                         <label className="flex flex-col gap-1">
-                          <span className="text-xs font-medium text-muted-foreground">
+                          <span className="text-sm font-medium text-muted-foreground">
                             Font family
                           </span>
                           <select
@@ -687,7 +728,7 @@ export default function TypographyPage() {
                               </option>
                             ))}
                           </select>
-                          <span className="text-[11px] text-muted-foreground/80">
+                          <span className="text-xs text-muted-foreground/80">
                             {measured?.[z.key]?.fontFamily ? (
                               <>
                                 Currently inherits{' '}
@@ -699,7 +740,7 @@ export default function TypographyPage() {
                           </span>
                         </label>
                         <label className="flex flex-col gap-1">
-                          <span className="text-xs font-medium text-muted-foreground">
+                          <span className="text-sm font-medium text-muted-foreground">
                             Font size
                           </span>
                           <input
@@ -709,7 +750,7 @@ export default function TypographyPage() {
                             placeholder="e.g. 16 or 16px or 1rem"
                             className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
                           />
-                          <span className="text-[11px] text-muted-foreground/80">
+                          <span className="text-xs text-muted-foreground/80">
                             {measured?.[z.key]?.fontSize ? (
                               <>
                                 Currently inherits <strong>{fmt(measured[z.key].fontSize)}</strong>{' '}
@@ -722,7 +763,7 @@ export default function TypographyPage() {
                           </span>
                         </label>
                         <label className="flex flex-col gap-1">
-                          <span className="text-xs font-medium text-muted-foreground">
+                          <span className="text-sm font-medium text-muted-foreground">
                             Font weight
                           </span>
                           <input
@@ -732,7 +773,7 @@ export default function TypographyPage() {
                             placeholder="inherit"
                             className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
                           />
-                          <span className="text-[11px] text-muted-foreground/80">
+                          <span className="text-xs text-muted-foreground/80">
                             {measured?.[z.key]?.fontWeight ? (
                               <>
                                 Currently inherits{' '}
@@ -745,7 +786,14 @@ export default function TypographyPage() {
                           </span>
                         </label>
                         <label className="flex flex-col gap-1">
-                          <span className="text-xs font-medium text-muted-foreground">Color</span>
+                          <span className="text-sm font-medium text-muted-foreground">
+                            {isAr ? 'لون النص' : 'Text colour'}
+                          </span>
+                          {/* Two-row layout matches the colored-label
+                              backgroundColor field below — picker + brand
+                              preset on row 1, full-width text input on
+                              row 2. Single-row layout cramped the text
+                              input inside a 3-col parent grid. */}
                           <div className="flex gap-2">
                             <input
                               type="color"
@@ -756,7 +804,7 @@ export default function TypographyPage() {
                               }
                               onChange={e => updateZone(z.key, { color: e.target.value })}
                               className="h-10 w-12 cursor-pointer rounded-lg border border-border bg-background"
-                              aria-label="Pick color"
+                              aria-label={isAr ? 'اختر اللون' : 'Pick color'}
                             />
                             <select
                               value={
@@ -769,25 +817,27 @@ export default function TypographyPage() {
                                   ? updateZone(z.key, { color: e.target.value })
                                   : undefined
                               }
-                              className="rounded-lg border border-border bg-background px-2 py-2 text-xs"
-                              aria-label="Brand color preset"
+                              className="flex-1 rounded-lg border border-border bg-background px-2 py-2 text-xs"
+                              aria-label={isAr ? 'لون العلامة التجارية' : 'Brand color preset'}
                             >
-                              <option value="">— brand preset —</option>
+                              <option value="">
+                                {isAr ? '— اختر من ألوان العلامة —' : '— or pick brand preset —'}
+                              </option>
                               {BRAND_COLOR_PRESETS.map(p => (
                                 <option key={p.value} value={p.value}>
                                   {isAr ? p.labelAr : p.label}
                                 </option>
                               ))}
                             </select>
-                            <input
-                              type="text"
-                              value={cfg.color ?? ''}
-                              onChange={e => updateZone(z.key, { color: e.target.value })}
-                              placeholder="#000000 / brand-primary / hsl(...)"
-                              className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm"
-                            />
                           </div>
-                          <span className="text-[11px] text-muted-foreground/80">
+                          <input
+                            type="text"
+                            value={cfg.color ?? ''}
+                            onChange={e => updateZone(z.key, { color: e.target.value })}
+                            placeholder="#000000 / brand-primary / hsl(...)"
+                            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                          />
+                          <span className="text-xs text-muted-foreground/80">
                             {measured?.[z.key]?.color ? (
                               <>
                                 Currently inherits <strong>{fmt(measured[z.key].color)}</strong>.
@@ -798,7 +848,7 @@ export default function TypographyPage() {
                           </span>
                         </label>
                         <label className="flex flex-col gap-1">
-                          <span className="text-xs font-medium text-muted-foreground">
+                          <span className="text-sm font-medium text-muted-foreground">
                             Line height
                           </span>
                           <input
@@ -808,7 +858,7 @@ export default function TypographyPage() {
                             placeholder="auto (1.6)"
                             className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
                           />
-                          <span className="text-[11px] text-muted-foreground/80">
+                          <span className="text-xs text-muted-foreground/80">
                             {measured?.[z.key]?.lineHeight ? (
                               <>
                                 Currently inherits{' '}
@@ -820,7 +870,7 @@ export default function TypographyPage() {
                           </span>
                         </label>
                         <label className="flex flex-col gap-1">
-                          <span className="text-xs font-medium text-muted-foreground">
+                          <span className="text-sm font-medium text-muted-foreground">
                             Letter spacing
                           </span>
                           <input
@@ -830,7 +880,7 @@ export default function TypographyPage() {
                             placeholder="inherit"
                             className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
                           />
-                          <span className="text-[11px] text-muted-foreground/80">
+                          <span className="text-xs text-muted-foreground/80">
                             {measured?.[z.key]?.letterSpacing ? (
                               <>
                                 Currently inherits{' '}
@@ -887,7 +937,7 @@ export default function TypographyPage() {
                         </div>
                         <div className="mt-3 grid gap-3 md:grid-cols-3">
                           <label className="flex flex-col gap-1">
-                            <span className="text-[11px] font-medium text-muted-foreground">
+                            <span className="text-xs font-medium text-muted-foreground">
                               {isAr ? 'لون الخلفية' : 'Background colour'}
                             </span>
                             <div className="flex gap-2">
@@ -934,7 +984,7 @@ export default function TypographyPage() {
                             />
                           </label>
                           <label className="flex flex-col gap-1">
-                            <span className="text-[11px] font-medium text-muted-foreground">
+                            <span className="text-xs font-medium text-muted-foreground">
                               {isAr ? 'الهوامش الداخلية' : 'Padding'}
                             </span>
                             <input
@@ -944,14 +994,14 @@ export default function TypographyPage() {
                               placeholder="4px 12px"
                               className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs"
                             />
-                            <span className="text-[10px] text-muted-foreground/80">
+                            <span className="text-xs text-muted-foreground/80">
                               {isAr
                                 ? 'الترتيب: علوي يمين سفلي يسار. مثال: "4px 12px"'
                                 : 'Top-right-bottom-left. e.g. "4px 12px" or "0.25rem 0.75rem".'}
                             </span>
                           </label>
                           <label className="flex flex-col gap-1">
-                            <span className="text-[11px] font-medium text-muted-foreground">
+                            <span className="text-xs font-medium text-muted-foreground">
                               {isAr ? 'استدارة الزوايا' : 'Corner radius'}
                             </span>
                             <input
@@ -961,7 +1011,7 @@ export default function TypographyPage() {
                               placeholder="9999px (pill) / 8px (chip)"
                               className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs"
                             />
-                            <span className="text-[10px] text-muted-foreground/80">
+                            <span className="text-xs text-muted-foreground/80">
                               {isAr
                                 ? '"9999px" لشكل كبسولة، "8px" لشارة، "0" لزوايا حادة.'
                                 : '"9999px" pill, "8px" rounded chip, "0" sharp corners.'}
@@ -1033,7 +1083,7 @@ export default function TypographyPage() {
                         {cfg.textDecoration && cfg.textDecoration !== 'none' && (
                           <div className="mt-3 grid gap-3 md:grid-cols-3">
                             <label className="flex flex-col gap-1">
-                              <span className="text-[11px] font-medium text-muted-foreground">
+                              <span className="text-xs font-medium text-muted-foreground">
                                 {isAr ? 'لون الخط' : 'Line colour'}
                               </span>
                               <div className="flex gap-2">
@@ -1076,7 +1126,7 @@ export default function TypographyPage() {
                               </div>
                             </label>
                             <label className="flex flex-col gap-1">
-                              <span className="text-[11px] font-medium text-muted-foreground">
+                              <span className="text-xs font-medium text-muted-foreground">
                                 {isAr ? 'سماكة الخط' : 'Thickness'}
                               </span>
                               <input
@@ -1090,7 +1140,7 @@ export default function TypographyPage() {
                               />
                             </label>
                             <label className="flex flex-col gap-1">
-                              <span className="text-[11px] font-medium text-muted-foreground">
+                              <span className="text-xs font-medium text-muted-foreground">
                                 {isAr ? 'المسافة من النص' : 'Offset from text'}
                               </span>
                               <input
