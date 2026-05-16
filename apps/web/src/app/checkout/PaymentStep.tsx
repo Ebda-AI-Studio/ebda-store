@@ -13,7 +13,6 @@ interface FormData {
   phone: string;
   address: string;
   apartment: string;
-  city: string;
   area: string;
   notes: string;
 }
@@ -106,11 +105,15 @@ export default function PaymentStep({
           {formData.address}
           {formData.apartment && `, ${formData.apartment}`}
           <br />
-          {formData.area}, {formData.city}
+          {formData.area}
           <br />
           {formData.phone}
-          <br />
-          {formData.email}
+          {formData.email && (
+            <>
+              <br />
+              {formData.email}
+            </>
+          )}
         </p>
       </div>
 

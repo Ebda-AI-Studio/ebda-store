@@ -144,7 +144,6 @@ export default function CheckoutClient() {
     phone: '',
     address: '',
     apartment: '',
-    city: '',
     area: '',
     notes: '',
   });
@@ -214,7 +213,6 @@ export default function CheckoutClient() {
     phone?: string;
     area?: string;
     address?: string;
-    city?: string;
   }>({});
 
   // Checkout error state
@@ -317,10 +315,9 @@ export default function CheckoutClient() {
   const validateForm = (): boolean => {
     const errors: typeof formErrors = {};
 
-    // Email validation
-    if (!formData.email.trim()) {
-      errors.email = t('Email is required', 'البريد الإلكتروني مطلوب');
-    } else if (!isValidEmail(formData.email)) {
+    // Email validation — optional. Only validate format if the customer
+    // chose to enter one; empty is allowed and the order proceeds.
+    if (formData.email.trim() && !isValidEmail(formData.email)) {
       errors.email = t('Please enter a valid email address', 'يرجى إدخال بريد إلكتروني صحيح');
     }
 
@@ -370,11 +367,6 @@ export default function CheckoutClient() {
       errors.address = t('Block & Street address is required', 'عنوان القطعة والشارع مطلوب');
     } else if (formData.address.trim().length < 5) {
       errors.address = t('Please enter a complete address', 'يرجى إدخال عنوان كامل');
-    }
-
-    // City validation (optional but recommended)
-    if (!formData.city.trim()) {
-      errors.city = t('City is required', 'المدينة مطلوبة');
     }
 
     setFormErrors(errors);
@@ -494,7 +486,7 @@ export default function CheckoutClient() {
           lastName: formData.lastName,
           address1: formData.address,
           address2: formData.apartment,
-          city: formData.city,
+          city: '',
           state: formData.area,
           postalCode: '',
           country: 'KW',
@@ -591,7 +583,6 @@ export default function CheckoutClient() {
           'shippingAddress.lastName': 'lastName',
           'shippingAddress.phone': 'phone',
           'shippingAddress.address1': 'address',
-          'shippingAddress.city': 'city',
           'shippingAddress.state': 'area',
         };
         const inlineErrors: typeof formErrors = {};
@@ -804,31 +795,6 @@ export default function CheckoutClient() {
                   </h2>
 
                   <div className="mt-6 space-y-4">
-                    <div data-error={!!formErrors.email}>
-                      <Input
-                        label={t(
-                          'Email address',
-                          '\u0627\u0644\u0628\u0631\u064a\u062f \u0627\u0644\u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a'
-                        )}
-                        type="email"
-                        autoComplete="email"
-                        inputMode="email"
-                        value={formData.email}
-                        onChange={e => updateField('email', e.target.value)}
-                        aria-invalid={formErrors.email ? true : undefined}
-                        className={
-                          formErrors.email
-                            ? 'border-destructive focus:border-destructive focus:ring-destructive'
-                            : ''
-                        }
-                      />
-                      {formErrors.email && (
-                        <p role="alert" className="mt-1 text-sm text-destructive">
-                          {formErrors.email}
-                        </p>
-                      )}
-                    </div>
-
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div data-error={!!formErrors.firstName}>
                         <Input
@@ -895,6 +861,31 @@ export default function CheckoutClient() {
                       {formErrors.phone && (
                         <p role="alert" className="mt-1 text-sm text-destructive">
                           {formErrors.phone}
+                        </p>
+                      )}
+                    </div>
+
+                    <div data-error={!!formErrors.email}>
+                      <Input
+                        label={t(
+                          'Email (optional)',
+                          '\u0627\u0644\u0628\u0631\u064a\u062f \u0627\u0644\u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a (\u0627\u062e\u062a\u064a\u0627\u0631\u064a)'
+                        )}
+                        type="email"
+                        autoComplete="email"
+                        inputMode="email"
+                        value={formData.email}
+                        onChange={e => updateField('email', e.target.value)}
+                        aria-invalid={formErrors.email ? true : undefined}
+                        className={
+                          formErrors.email
+                            ? 'border-destructive focus:border-destructive focus:ring-destructive'
+                            : ''
+                        }
+                      />
+                      {formErrors.email && (
+                        <p role="alert" className="mt-1 text-sm text-destructive">
+                          {formErrors.email}
                         </p>
                       )}
                     </div>
@@ -966,30 +957,6 @@ export default function CheckoutClient() {
                       value={formData.apartment}
                       onChange={e => updateField('apartment', e.target.value)}
                     />
-
-                    <div data-error={!!formErrors.city}>
-                      <Input
-                        label={t('City', '\u0627\u0644\u0645\u062f\u064a\u0646\u0629')}
-                        autoComplete="address-level2"
-                        value={formData.city}
-                        onChange={e => updateField('city', e.target.value)}
-                        aria-invalid={formErrors.city ? true : undefined}
-                        placeholder={t(
-                          'e.g., Kuwait City',
-                          '\u0645\u062b\u0627\u0644: \u0645\u062f\u064a\u0646\u0629 \u0627\u0644\u0643\u0648\u064a\u062a'
-                        )}
-                        className={
-                          formErrors.city
-                            ? 'border-destructive focus:border-destructive focus:ring-destructive'
-                            : ''
-                        }
-                      />
-                      {formErrors.city && (
-                        <p role="alert" className="mt-1 text-sm text-destructive">
-                          {formErrors.city}
-                        </p>
-                      )}
-                    </div>
 
                     <div>
                       <label

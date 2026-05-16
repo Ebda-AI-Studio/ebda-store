@@ -20,24 +20,21 @@ const router = Router({ mergeParams: true });
 //
 // Kuwait-friendly address validation: state and postalCode are not universally
 // applicable (Kuwait uses governorate names but no postal codes for delivery).
-// We accept loose strings, allow Arabic + Latin characters via the generous
-// `min(1)` only on the truly-required fields (firstName, lastName, address1,
-// city, country), and make state/postalCode optional with empty defaults so a
-// missing value does not block checkout. Country accepts ISO-2 (e.g. "KW") or
-// a longer name; the web sends "KW" but addresses created via the API for
-// older accounts may use full country names.
+// City is also optional — Kuwait deliveries route on `area` (governorate /
+// district name) which we already capture in `state`. The storefront no
+// longer asks for a city; admin manual orders may still set one.
 const addressSchema = z.object({
   firstName: z.string().trim().min(1).max(100),
   lastName: z.string().trim().min(1).max(100),
   company: z.string().max(150).optional(),
   address1: z.string().trim().min(1).max(500),
   address2: z.string().max(500).optional(),
-  city: z.string().trim().min(1).max(150),
+  city: z.string().max(150).optional().default(''),
   state: z.string().max(150).optional().default(''),
   postalCode: z.string().max(30).optional().default(''),
   country: z.string().trim().min(2).max(60),
   phone: z.string().max(40).optional(),
-  email: z.string().email().optional(),
+  email: z.string().email().optional().or(z.literal('')),
 });
 
 const createOrderSchema = z.object({
