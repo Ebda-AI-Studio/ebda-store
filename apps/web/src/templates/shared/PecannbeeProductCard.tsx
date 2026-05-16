@@ -164,10 +164,12 @@ function PecannbeeProductCardImpl({
             </svg>
           </button>
 
-          {/* Sold-out ribbon top-END (RTL left, LTR right) */}
+          {/* Sold-out RED ribbon top-START (RTL right, LTR left) — pecannbee-
+              style high-visibility marker. Customer sees status at a glance
+              while scrolling, before parsing the dimmed button below. */}
           {!inStock && (
-            <span className="absolute top-3 end-3 rounded-full bg-foreground/90 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-background shadow-[0_8px_20px_-8px_hsl(var(--foreground)/0.35)]">
-              {isRtl ? 'نفدت الكمية' : 'Sold out'}
+            <span className="absolute top-3 start-3 rounded-md bg-red-600 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-white shadow-[0_8px_20px_-8px_rgb(220_38_38_/_0.5)]">
+              {isRtl ? 'نفدت الكمية' : 'Out Of Stock'}
             </span>
           )}
           {/* Sale chip top-END when in stock */}
@@ -213,42 +215,59 @@ function PecannbeeProductCardImpl({
         </div>
         <TaxInclusiveLabel className="block text-xs text-muted-foreground" />
 
-        <button
-          type="button"
-          disabled={!inStock || isAdding}
-          onClick={handleAdd}
-          className={`mt-auto inline-flex w-full items-center justify-center gap-2 min-h-[44px] ${styles.productCardCta} disabled:cursor-not-allowed disabled:opacity-60`}
-        >
-          {!inStock ? (
-            isRtl ? (
-              'نفدت الكمية'
-            ) : (
-              'Sold out'
-            )
-          ) : (
-            <>
-              {isAdding ? (
-                <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+        {/* Dual CTA pattern (per docs/superpowers/plans/2026-05-16-mobile-ui-
+            ship.md): products WITH variants can't be added to cart inline —
+            customer must pick a size/weight on the detail page, so the
+            button is "View" linking to the detail page. Products WITHOUT
+            variants add to cart directly. Matches pecannbee target IMG_7994
+            where two adjacent cards show different button texts based on
+            inventory state. */}
+        {product.variants && product.variants.length > 0 ? (
+          <Link
+            href={href}
+            prefetch={false}
+            className={`mt-auto inline-flex w-full items-center justify-center gap-2 min-h-[44px] ${styles.productCardCta}`}
+          >
+            {isRtl ? 'عرض' : 'View'}
+          </Link>
+        ) : (
+          <button
+            type="button"
+            disabled={!inStock || isAdding}
+            onClick={handleAdd}
+            className={`mt-auto inline-flex w-full items-center justify-center gap-2 min-h-[44px] ${styles.productCardCta} disabled:cursor-not-allowed disabled:opacity-60`}
+          >
+            {!inStock ? (
+              isRtl ? (
+                'نفدت الكمية'
               ) : (
-                <svg
-                  className="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  aria-hidden
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
-                  />
-                </svg>
-              )}
-              {isRtl ? 'إضافة للسلة' : 'Add to cart'}
-            </>
-          )}
-        </button>
+                'Out Of Stock'
+              )
+            ) : (
+              <>
+                {isAdding ? (
+                  <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                ) : (
+                  <svg
+                    className="h-4 w-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    aria-hidden
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
+                    />
+                  </svg>
+                )}
+                {isRtl ? 'إضافة للسلة' : 'Add to Cart'}
+              </>
+            )}
+          </button>
+        )}
       </div>
     </article>
   );
