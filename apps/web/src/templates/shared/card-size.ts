@@ -8,7 +8,7 @@
  * value never breaks render. Defaults match Ahmad's 2026-05-16
  * "smaller" preference (sm category, sm product).
  */
-import type { CardAspect, CardGap, CardSize } from '@force/shared';
+import type { CardAspect, CardGap, CardShape, CardSize } from '@force/shared';
 
 /**
  * Category card size → tailwind max-w classes (mobile + desktop).
@@ -72,6 +72,39 @@ export function gridGapClass(gap: CardGap | undefined): string {
     case 'normal':
     default:
       return 'gap-3 sm:gap-4';
+  }
+}
+
+/**
+ * Named card shape → tailwind class pair (aspect + rounding) for
+ * category tiles. When 'theme' or undefined, returns empty strings so
+ * the theme's own defaults (aspectClass + rounded-*) apply.
+ *
+ * Static-string enumeration so JIT keeps every class — don't refactor
+ * to dynamic concatenation.
+ */
+export function cardShapeClasses(shape: CardShape | undefined): {
+  aspect: string;
+  radius: string;
+} {
+  switch (shape) {
+    case 'circle':
+      return { aspect: 'aspect-square', radius: 'rounded-full' };
+    case 'rounded-square':
+      return { aspect: 'aspect-square', radius: 'rounded-2xl' };
+    case 'square':
+      return { aspect: 'aspect-square', radius: 'rounded-none' };
+    case 'soft':
+      return { aspect: 'aspect-[4/5]', radius: 'rounded-lg' };
+    case 'portrait':
+      return { aspect: 'aspect-[3/4]', radius: 'rounded-md' };
+    case 'landscape':
+      return { aspect: 'aspect-[4/3]', radius: 'rounded-md' };
+    case 'pill':
+      return { aspect: 'aspect-[2/1]', radius: 'rounded-full' };
+    case 'theme':
+    default:
+      return { aspect: '', radius: '' };
   }
 }
 

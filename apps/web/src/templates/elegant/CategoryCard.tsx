@@ -3,17 +3,23 @@
 import Link from 'next/link';
 import type { CategoryCardProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { categorySizeClass } from '../shared/card-size';
+import { categorySizeClass, cardShapeClasses } from '../shared/card-size';
 
 export default function ElegantCategoryCard({
   category,
   isRtl: isRtlProp,
   cardSize,
+  cardShape,
   urlPrefix = '',
 }: CategoryCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const displayName = isRtl && category.nameAr ? category.nameAr : category.name;
+  // Named shape overrides elegant's default aspect-square sm:aspect-[2/3]
+  // + rounded-md (added 2026-05-16). Falls back to elegant defaults.
+  const shape = cardShapeClasses(cardShape);
+  const aspectClass = shape.aspect || 'aspect-square sm:aspect-[2/3]';
+  const radiusClass = shape.radius || 'rounded-md';
 
   return (
     <Link
@@ -25,7 +31,7 @@ export default function ElegantCategoryCard({
           Mobile-tame: aspect-square (1:1) on phones so a 2-col grid of
           categories doesn't blow past a screen height each. Original
           tall 2/3 ratio kept on sm+ where there's room. */}
-      <div className="relative aspect-square sm:aspect-[2/3] overflow-hidden rounded-md bg-muted mb-3">
+      <div className={`relative ${aspectClass} overflow-hidden ${radiusClass} bg-muted mb-3`}>
         {category.image ? (
           <img
             src={category.image}

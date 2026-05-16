@@ -3,17 +3,23 @@
 import Link from 'next/link';
 import type { CategoryCardProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { categorySizeClass } from '../shared/card-size';
+import { categorySizeClass, cardShapeClasses } from '../shared/card-size';
 
 export default function MinimalCategoryCard({
   category,
   isRtl: isRtlProp,
   cardSize,
+  cardShape,
   urlPrefix = '',
 }: CategoryCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const displayName = isRtl && category.nameAr ? category.nameAr : category.name;
+  // Named shape overrides minimal's default aspect-square sm:aspect-[4/3]
+  // + rounded-md (added 2026-05-16). Falls back to minimal defaults.
+  const shape = cardShapeClasses(cardShape);
+  const aspectClass = shape.aspect || 'aspect-square sm:aspect-[4/3]';
+  const radiusClass = shape.radius || 'rounded-md';
 
   return (
     <Link
@@ -23,8 +29,8 @@ export default function MinimalCategoryCard({
     >
       {/* Image — clean square with subtle rounding. Minimal identity
           keeps the radius small (`rounded-md`) so corners read crisp
-          rather than soft. Caption is left-of-card centered by parent. */}
-      <div className="aspect-square sm:aspect-[4/3] bg-muted/30 overflow-hidden rounded-md mb-3">
+          rather than soft. Named cardShape overrides both aspect + radius. */}
+      <div className={`${aspectClass} bg-muted/30 overflow-hidden ${radiusClass} mb-3`}>
         {category.image ? (
           <img
             src={category.image}

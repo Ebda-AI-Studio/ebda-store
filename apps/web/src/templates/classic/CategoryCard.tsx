@@ -3,17 +3,23 @@
 import Link from 'next/link';
 import type { CategoryCardProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { categorySizeClass } from '../shared/card-size';
+import { categorySizeClass, cardShapeClasses } from '../shared/card-size';
 
 export default function ClassicCategoryCard({
   category,
   isRtl: isRtlProp,
   cardSize,
+  cardShape,
   urlPrefix = '',
 }: CategoryCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const displayName = isRtl && category.nameAr ? category.nameAr : category.name;
+  // Named shape overrides classic's default aspect-square sm:aspect-[3/4]
+  // + rounded-sm (added 2026-05-16). Falls back to classic defaults.
+  const shape = cardShapeClasses(cardShape);
+  const aspectClass = shape.aspect || 'aspect-square sm:aspect-[3/4]';
+  const radiusClass = shape.radius || 'rounded-sm';
 
   return (
     <Link
@@ -24,7 +30,9 @@ export default function ClassicCategoryCard({
       {/* Image with elegant border + subtle rounded corners (classic
           keeps the smallest radius of the 5 themes — restraint is its
           identity, so rounded-sm rather than rounded-md or larger). */}
-      <div className="relative aspect-square sm:aspect-[3/4] mb-3 overflow-hidden rounded-sm border border-border/60 bg-muted group-hover:border-foreground/35 transition-colors duration-700 ease-out">
+      <div
+        className={`relative ${aspectClass} mb-3 overflow-hidden ${radiusClass} border border-border/60 bg-muted group-hover:border-foreground/35 transition-colors duration-700 ease-out`}
+      >
         {category.image ? (
           <img
             src={category.image}

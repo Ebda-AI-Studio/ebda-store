@@ -422,6 +422,9 @@ export interface CategoryCardProps {
   cardSize?: import('@force/shared').CardSize;
   /** Per-store card aspect — admin-controlled. */
   cardAspect?: import('@force/shared').CardAspect;
+  /** Per-store named shape — when set (not 'theme'), bundles aspect +
+   *  rounding so the merchant doesn't tune each axis separately. */
+  cardShape?: import('@force/shared').CardShape;
   /** Show label below image. */
   showLabel?: boolean;
   /** Enable hover/zoom effects. */
@@ -448,6 +451,9 @@ export interface CategoryGridProps {
   cardSize?: import('@force/shared').CardSize;
   /** Per-store card aspect override. */
   cardAspect?: import('@force/shared').CardAspect;
+  /** Per-store named shape override (circle/rounded-square/square/soft/portrait/landscape/pill).
+   *  When set, bundles aspect + rounding so merchant doesn't tune each axis. */
+  cardShape?: import('@force/shared').CardShape;
   /** Per-store spacing between cards (tight/normal/loose/xloose). Default 'normal'. */
   cardGap?: import('@force/shared').CardGap;
   /** Show label below image (default true). */

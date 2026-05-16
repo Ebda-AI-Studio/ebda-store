@@ -194,6 +194,7 @@ export function HomePageContent({
                       subtitleAr={layout.categories.subtitleAr}
                       cardSize={layout.categories.cardSize}
                       cardAspect={layout.categories.cardAspect}
+                      cardShape={layout.categories.cardShape}
                       cardGap={layout.categories.cardGap}
                       showLabel={layout.categories.showLabel}
                       showHover={layout.categories.showHover}

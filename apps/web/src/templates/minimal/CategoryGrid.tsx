@@ -17,6 +17,7 @@ export default function MinimalCategoryGrid({
   subtitleAr,
   cardSize,
   cardAspect,
+  cardShape,
   cardGap,
   showLabel,
   showHover,
@@ -61,6 +62,7 @@ export default function MinimalCategoryGrid({
             <CategoryCard
               cardSize={cardSize}
               cardAspect={cardAspect}
+              cardShape={cardShape}
               showLabel={showLabel}
               showHover={showHover}
               key={category.id}

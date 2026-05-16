@@ -3,17 +3,23 @@
 import Link from 'next/link';
 import type { CategoryCardProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { categorySizeClass } from '../shared/card-size';
+import { categorySizeClass, cardShapeClasses } from '../shared/card-size';
 
 export default function BoldCategoryCard({
   category,
   isRtl: isRtlProp,
   cardSize,
+  cardShape,
   urlPrefix = '',
 }: CategoryCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const displayName = isRtl && category.nameAr ? category.nameAr : category.name;
+  // Named shape overrides bold's brutalist default aspect-square sm:aspect-[3/4]
+  // + rounded-3xl. Falls back to bold defaults.
+  const shape = cardShapeClasses(cardShape);
+  const aspectClass = shape.aspect || 'aspect-square sm:aspect-[3/4]';
+  const radiusClass = shape.radius || 'rounded-3xl';
 
   return (
     <Link
@@ -21,8 +27,11 @@ export default function BoldCategoryCard({
       prefetch={false}
       className={`group block relative outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 w-full mx-auto ${categorySizeClass(cardSize)}`}
     >
-      {/* Card with dynamic hover */}
-      <div className="relative aspect-square sm:aspect-[3/4] rounded-3xl overflow-hidden bg-primary shadow-[0_18px_44px_-18px_hsl(var(--foreground)/0.30)] transition-transform duration-300 ease-out group-hover:scale-[1.015] group-hover:-rotate-[0.5deg]">
+      {/* Card with dynamic hover. Aspect + radius come from cardShape
+          when set, else bold's brutalist defaults. */}
+      <div
+        className={`relative ${aspectClass} ${radiusClass} overflow-hidden bg-primary shadow-[0_18px_44px_-18px_hsl(var(--foreground)/0.30)] transition-transform duration-300 ease-out group-hover:scale-[1.015] group-hover:-rotate-[0.5deg]`}
+      >
         {/* Image */}
         {category.image ? (
           <img

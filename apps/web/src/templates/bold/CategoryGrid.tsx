@@ -17,6 +17,7 @@ export default function BoldCategoryGrid({
   subtitleAr,
   cardSize,
   cardAspect,
+  cardShape,
   cardGap,
   showLabel,
   showHover,
@@ -70,6 +71,7 @@ export default function BoldCategoryGrid({
               <CategoryCard
                 cardSize={cardSize}
                 cardAspect={cardAspect}
+                cardShape={cardShape}
                 showLabel={showLabel}
                 showHover={showHover}
                 category={category}

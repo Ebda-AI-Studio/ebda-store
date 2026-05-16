@@ -3,19 +3,24 @@
 import Link from 'next/link';
 import type { CategoryCardProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { categorySizeClass, cardAspectClass } from '../shared/card-size';
+import { categorySizeClass, cardAspectClass, cardShapeClasses } from '../shared/card-size';
 
 /**
  * Modern category card — image + label-below layout. Per-store
- * cardSize / cardAspect / showLabel / showHover overrides allow
- * merchants to tune via the admin Layout page. Defaults: sm /
- * theme / show / show (Ahmad 2026-05-16 "smaller by default").
+ * cardSize / cardAspect / cardShape / showLabel / showHover overrides
+ * allow merchants to tune via the admin Layout page. Defaults: sm /
+ * theme / theme / show / show (Ahmad 2026-05-16 "smaller by default").
+ *
+ * cardShape (when not 'theme') overrides BOTH cardAspect AND the
+ * theme's default rounded-xl. cardAspect remains as a finer-grained
+ * legacy control for merchants who only want to tweak aspect ratio.
  */
 export default function ModernCategoryCard({
   category,
   isRtl: isRtlProp,
   cardSize,
   cardAspect,
+  cardShape,
   showLabel = true,
   showHover = true,
   urlPrefix = '',
@@ -23,10 +28,13 @@ export default function ModernCategoryCard({
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const displayName = isRtl && category.nameAr ? category.nameAr : category.name;
-  const aspectOverride = cardAspectClass(cardAspect);
+  const shape = cardShapeClasses(cardShape);
+  const aspectOverride = shape.aspect || cardAspectClass(cardAspect);
   // No aspect override → keep the modern theme's default: square on
   // mobile, landscape 4:3 on sm+ for a balanced grid feel.
   const aspectClass = aspectOverride || 'aspect-square sm:aspect-[4/3]';
+  // Named shape's radius wins; otherwise modern's default rounded-xl.
+  const radiusClass = shape.radius || 'rounded-xl';
   const hoverShadow = showHover
     ? 'group-hover:shadow-[0_12px_28px_-12px_hsl(var(--foreground)/0.18)]'
     : '';
@@ -36,11 +44,11 @@ export default function ModernCategoryCard({
     <Link
       href={`${urlPrefix}/products?category=${category.slug}`}
       prefetch={false}
-      className={`group block outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-xl w-full mx-auto ${categorySizeClass(cardSize)}`}
+      className={`group block outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${radiusClass} w-full mx-auto ${categorySizeClass(cardSize)}`}
       dir={isRtl ? 'rtl' : 'ltr'}
     >
       <div
-        className={`relative ${aspectClass} rounded-xl overflow-hidden bg-muted shadow-[0_4px_12px_-6px_hsl(var(--foreground)/0.10)] ${hoverShadow} transition-shadow duration-500 ease-out`}
+        className={`relative ${aspectClass} ${radiusClass} overflow-hidden bg-muted shadow-[0_4px_12px_-6px_hsl(var(--foreground)/0.10)] ${hoverShadow} transition-shadow duration-500 ease-out`}
       >
         {category.image ? (
           <img

@@ -16,6 +16,7 @@ export default function ModernCategoryGrid({
   subtitleAr,
   cardSize,
   cardAspect,
+  cardShape,
   cardGap,
   showLabel,
   showHover,
@@ -71,6 +72,7 @@ export default function ModernCategoryGrid({
           <CategoryCard
             cardSize={cardSize}
             cardAspect={cardAspect}
+            cardShape={cardShape}
             showLabel={showLabel}
             showHover={showHover}
             key={category.id}

@@ -17,6 +17,7 @@ export default function ElegantCategoryGrid({
   subtitleAr,
   cardSize,
   cardAspect,
+  cardShape,
   cardGap,
   showLabel,
   showHover,
@@ -65,6 +66,7 @@ export default function ElegantCategoryGrid({
             <CategoryCard
               cardSize={cardSize}
               cardAspect={cardAspect}
+              cardShape={cardShape}
               showLabel={showLabel}
               showHover={showHover}
               key={category.id}

@@ -389,6 +389,39 @@ export default function StoreLayoutPage() {
                     </select>
                   </label>
                   <label className="flex flex-col gap-1 text-sm">
+                    <span className="text-muted-foreground">Card shape</span>
+                    <select
+                      value={layout.categories.cardShape ?? 'theme'}
+                      onChange={e =>
+                        updateSection('categories', s => ({
+                          ...s,
+                          cardShape: e.target.value as
+                            | 'theme'
+                            | 'circle'
+                            | 'rounded-square'
+                            | 'square'
+                            | 'soft'
+                            | 'portrait'
+                            | 'landscape'
+                            | 'pill',
+                        }))
+                      }
+                      className="rounded-lg border border-border bg-card px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    >
+                      <option value="theme">Theme default</option>
+                      <option value="circle">Circle (round, 1:1)</option>
+                      <option value="rounded-square">Rounded square (soft, 1:1)</option>
+                      <option value="square">Sharp square (1:1)</option>
+                      <option value="soft">Soft rectangle (4:5)</option>
+                      <option value="portrait">Portrait (3:4)</option>
+                      <option value="landscape">Landscape (4:3)</option>
+                      <option value="pill">Pill (horizontal, 2:1)</option>
+                    </select>
+                    <span className="text-[11px] text-muted-foreground/80">
+                      Overrides the aspect ratio + rounded corners with one preset.
+                    </span>
+                  </label>
+                  <label className="flex flex-col gap-1 text-sm">
                     <span className="text-muted-foreground">Card spacing</span>
                     <select
                       value={layout.categories.cardGap ?? 'normal'}

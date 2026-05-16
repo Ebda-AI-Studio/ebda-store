@@ -106,6 +106,31 @@ export type CardAspect = 'theme' | 'square' | 'portrait' | 'landscape';
  */
 export type CardGap = 'tight' | 'normal' | 'loose' | 'xloose';
 
+/**
+ * Named CARD SHAPE for category tiles. Bundles aspect ratio + corner
+ * rounding under one pickable identity — easier for merchants than
+ * tuning each axis separately. When set to anything but 'theme', it
+ * overrides both `cardAspect` and the theme's default rounding.
+ *
+ *   theme:          inherit the active template's defaults (current behavior)
+ *   circle:         rounded-full + aspect-square — Instagram-style icon tiles
+ *   rounded-square: rounded-2xl + aspect-square — modern soft tile
+ *   square:         rounded-none + aspect-square — brutalist sharp
+ *   soft:           rounded-lg + aspect-[4/5] — fashion / lifestyle
+ *   portrait:       rounded-md + aspect-[3/4] — taller, lookbook
+ *   landscape:      rounded-md + aspect-[4/3] — wider, banner-y
+ *   pill:           rounded-full + aspect-[2/1] — horizontal capsule
+ */
+export type CardShape =
+  | 'theme'
+  | 'circle'
+  | 'rounded-square'
+  | 'square'
+  | 'soft'
+  | 'portrait'
+  | 'landscape'
+  | 'pill';
+
 // Back-compat aliases — older code imports CategoryCardSize / CategoryCardAspect.
 export type CategoryCardSize = CardSize;
 export type CategoryCardAspect = CardAspect;
@@ -134,6 +159,10 @@ export interface CategoriesSettings extends SectionTitleOverride {
   showHover?: boolean;
   /** Spacing between category cards. Default 'normal'. */
   cardGap?: CardGap;
+  /** Named card shape (bundles aspect + rounding). When set to anything
+   *  but 'theme', overrides cardAspect + theme's default rounding.
+   *  Default 'theme'. */
+  cardShape?: CardShape;
 }
 
 export interface ProductCarouselSettings extends SectionTitleOverride {
