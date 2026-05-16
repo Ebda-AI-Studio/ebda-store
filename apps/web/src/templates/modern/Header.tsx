@@ -63,7 +63,7 @@ export default function ModernHeader({
               h-20 mobile keeps the row compact so it doesn't dominate
               the viewport; desktop stays h-28 for the bigger nav row.
               Logo recentered with a more permissive max-w cap below. */}
-          <div className="relative flex h-20 items-center justify-between gap-2 md:h-28">
+          <div className="relative flex h-24 items-center justify-between gap-2 md:h-28">
             {/* Mobile-only hamburger (LEFT slot). Extracted from the actions
                 block so the layout matches the pecannbee + alkahraman target:
                 hamburger left, logo center, actions right. */}
@@ -100,7 +100,7 @@ export default function ModernHeader({
                 trust the absolute positioning. */}
             <Link
               href={urlPrefix || '/'}
-              className="absolute left-1/2 -translate-x-1/2 md:relative md:left-auto md:translate-x-0 flex items-center justify-center gap-2 shrink-0 max-w-[50%] md:max-w-none"
+              className="absolute left-1/2 -translate-x-1/2 md:relative md:left-auto md:translate-x-0 flex items-center justify-center gap-2 shrink-0 max-w-[65%] md:max-w-none"
             >
               {displayLogo ? (
                 <Image
@@ -108,7 +108,7 @@ export default function ModernHeader({
                   alt={displayName}
                   width={320}
                   height={120}
-                  className="h-16 max-h-16 w-auto max-w-full object-contain md:h-24 md:max-h-24"
+                  className="h-20 max-h-20 w-auto max-w-full object-contain md:h-24 md:max-h-24"
                   priority
                 />
               ) : (
@@ -178,10 +178,13 @@ export default function ModernHeader({
               {/* Language toggle */}
               <LanguageSwitcher variant="compact" />
 
-              {/* Account */}
+              {/* Account — desktop only. Mobile UX puts account access
+                  inside the hamburger drawer; surfacing the icon here
+                  on a 320px viewport eats the room the centered logo
+                  needs to be readable. */}
               <Link
                 href={isLoggedIn ? `${urlPrefix}/account` : `${urlPrefix}/auth/login`}
-                className="inline-flex h-11 w-11 items-center justify-center rounded-lg hover:bg-muted transition-colors duration-300 ease-out"
+                className="hidden md:inline-flex h-11 w-11 items-center justify-center rounded-lg hover:bg-muted transition-colors duration-300 ease-out"
                 aria-label={isRtl ? 'الحساب' : 'Account'}
               >
                 <svg

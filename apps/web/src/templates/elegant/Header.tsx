@@ -119,7 +119,7 @@ export default function ElegantHeader({
                 alt={displayName}
                 width={320}
                 height={120}
-                className="h-16 max-h-16 w-auto max-w-full object-contain sm:h-24 sm:max-h-24"
+                className="h-20 max-h-20 w-auto max-w-full object-contain sm:h-24 sm:max-h-24"
                 priority
               />
             ) : (
