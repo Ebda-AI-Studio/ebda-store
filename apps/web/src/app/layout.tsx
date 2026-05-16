@@ -385,15 +385,20 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     return v;
   };
   // Translate brand-color preset tokens to CSS that resolves against the
-  // store's theme CSS variables. Falls back to the raw value (already
-  // sanitised by sanitizeFontValue) for everything else.
+  // store's theme CSS variables. Each var() ships with a HSL-component
+  // fallback so the chip renders SOMETHING when the store hasn't
+  // customised that color slot. Without the fallback, an undefined
+  // `--primary` would emit `hsl()` (invalid) and the browser would
+  // silently drop the whole `background-color` declaration — the
+  // merchant would see no colour on the chip even after saving.
+  // Fallback HSL values mirror @force/ui's default theme palette.
   const resolveColorValue = (v: string): string => {
-    if (v === 'brand-primary') return 'hsl(var(--primary))';
-    if (v === 'brand-secondary') return 'hsl(var(--secondary))';
-    if (v === 'brand-accent') return 'hsl(var(--accent))';
-    if (v === 'brand-foreground') return 'hsl(var(--foreground))';
-    if (v === 'brand-background') return 'hsl(var(--background))';
-    if (v === 'brand-muted') return 'hsl(var(--muted))';
+    if (v === 'brand-primary') return 'hsl(var(--primary, 220 13% 18%))';
+    if (v === 'brand-secondary') return 'hsl(var(--secondary, 220 14% 96%))';
+    if (v === 'brand-accent') return 'hsl(var(--accent, 220 14% 92%))';
+    if (v === 'brand-foreground') return 'hsl(var(--foreground, 220 13% 12%))';
+    if (v === 'brand-background') return 'hsl(var(--background, 0 0% 100%))';
+    if (v === 'brand-muted') return 'hsl(var(--muted, 220 14% 96%))';
     return v;
   };
   const sanitizeUrl = (v: unknown): string | null => {
