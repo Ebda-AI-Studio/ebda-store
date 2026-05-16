@@ -4,6 +4,7 @@ import { authenticate } from '../middleware/auth';
 import { checkStoreAccess } from '../middleware/store-access';
 import { requirePermission } from '../middleware/rbac';
 import { StorageService } from '../services/storage.service';
+import { resizeToAspect } from '../services/image-resize.service';
 import { uploadLimiter, dailyUploadLimiter, auditLog } from '../middleware/security';
 import { runInTenantContext } from '@force/database';
 
@@ -180,7 +181,15 @@ router.post(
         // context is mostly there for the audit log, but wrapping the
         // whole block keeps the boundary obvious — every per-tenant
         // side-effect of an upload happens under the SET LOCAL.
-        const uploaded = await StorageService.upload(req.file!.buffer, req.file!.originalname, {
+        //
+        // Auto-resize per ?aspect= query param (ahmad's ask 2026-05-16:
+        // 'if image not in recommended size, backend resizes to recommended').
+        // ImageUpload in admin sends its aspectRatio prop as ?aspect=.
+        // Falls back to original buffer when unset / unknown / sharp fails.
+        const aspectQuery = (req.query.aspect as string | undefined) ?? undefined;
+        const resizedBuffer = await resizeToAspect(req.file!.buffer, aspectQuery);
+
+        const uploaded = await StorageService.upload(resizedBuffer, req.file!.originalname, {
           folder: resolved.folder,
           storeId: resolved.storeId,
         });

@@ -23,14 +23,27 @@ export function useImageUpload() {
    * flat key shape. Callers should NOT bake `stores/<id>/...` into the
    * `folder` value — that would double-prefix.
    */
-  const buildUploadUrl = (path: 'image' | 'images', folder: string, storeId?: string) => {
+  const buildUploadUrl = (
+    path: 'image' | 'images',
+    folder: string,
+    storeId?: string,
+    aspect?: string
+  ) => {
     const params = new URLSearchParams({ folder });
     if (storeId) params.set('storeId', storeId);
+    // 2026-05-16: pass the caller's aspect-ratio hint to the API so the
+    // upload pipeline auto-resizes via sharp to the recommended dims.
+    if (aspect) params.set('aspect', aspect);
     return `${getApiUrl()}/api/v1/uploads/${path}?${params.toString()}`;
   };
 
   const uploadSingle = useCallback(
-    async (file: File, folder: string, storeId?: string): Promise<string | null> => {
+    async (
+      file: File,
+      folder: string,
+      storeId?: string,
+      aspect?: string
+    ): Promise<string | null> => {
       setError(null);
       setUploading(true);
       setProgress(0);
@@ -41,7 +54,7 @@ export function useImageUpload() {
       try {
         const url = await runXhr<string>({
           t,
-          url: buildUploadUrl('image', folder, storeId),
+          url: buildUploadUrl('image', folder, storeId, aspect),
           formData,
           onProgress: setProgress,
           parse: data => {

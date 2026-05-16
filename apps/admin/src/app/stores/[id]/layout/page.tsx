@@ -891,6 +891,7 @@ function SlidesEditor({ slides, storeId, onChange }: SlidesEditorProps) {
                     value={slide.imageMobile || undefined}
                     folder="hero"
                     storeId={storeId}
+                    aspectRatio="3/4"
                     onUpload={url => updateSlide(index, { imageMobile: url })}
                     onRemove={() => updateSlide(index, { imageMobile: '' })}
                   />
@@ -902,6 +903,7 @@ function SlidesEditor({ slides, storeId, onChange }: SlidesEditorProps) {
                       value={slide.imageMobileAr || undefined}
                       folder="hero"
                       storeId={storeId}
+                      aspectRatio="3/4"
                       onUpload={url => updateSlide(index, { imageMobileAr: url })}
                       onRemove={() => updateSlide(index, { imageMobileAr: '' })}
                     />

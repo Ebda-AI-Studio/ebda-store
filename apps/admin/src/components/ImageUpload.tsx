@@ -81,11 +81,17 @@ interface ImageUploadProps {
    * render at this ratio so the merchant sees exactly how their image
    * will be cropped on the storefront. Values mirror the storefront
    * aspects per docs/superpowers/plans/2026-05-16-mobile-ui-ship.md:
-   *   - '3/2'  → hero banner (recommend 1200×800)
+   *   - '3/2'  → hero desktop (recommend 1200×800)
+   *   - '3/4'  → hero MOBILE (recommend 1080×1440)
    *   - '1/1'  → category tile + product image (recommend 800×800 / 1000×1000)
    *   - 'free' → no aspect lock (default, legacy behavior)
+   *
+   * Server-side: when set to any non-'free' value, the upload pipeline
+   * (apps/api/src/services/image-resize.service.ts) auto-resizes the
+   * uploaded image to the recommended dimensions via sharp before saving
+   * to R2 — even if the merchant uploads a wrong-aspect file.
    */
-  aspectRatio?: '3/2' | '1/1' | 'free';
+  aspectRatio?: '3/2' | '3/4' | '1/1' | 'free';
   /**
    * Optional recommended-dimensions hint shown under the dropzone, e.g.
    * "Recommended: 1200×800px (3:2 landscape)". Caller composes the
@@ -124,7 +130,13 @@ export function ImageUpload({
   // and the post-upload preview so the merchant sees the same rectangle
   // shape the storefront will render in.
   const aspectClass =
-    aspectRatio === '3/2' ? 'aspect-[3/2]' : aspectRatio === '1/1' ? 'aspect-square' : '';
+    aspectRatio === '3/2'
+      ? 'aspect-[3/2]'
+      : aspectRatio === '3/4'
+        ? 'aspect-[3/4] max-w-xs'
+        : aspectRatio === '1/1'
+          ? 'aspect-square'
+          : '';
   const t = useT('components.imageUpload');
   const resolvedLabel = label ?? t('label');
   const { uploading, progress, error, setError, uploadSingle } = useImageUpload();
@@ -150,10 +162,20 @@ export function ImageUpload({
 
       setLocalError(null);
       setError(null);
-      const url = await uploadSingle(file, folder, storeId);
+      // Map our '3/2' / '3/4' / '1/1' prop values to '3:2' / '3:4' / '1:1'
+      // for the API (the resize service's ASPECT_TARGETS keys use ':' notation).
+      const aspectQuery =
+        aspectRatio === '3/2'
+          ? '3:2'
+          : aspectRatio === '3/4'
+            ? '3:4'
+            : aspectRatio === '1/1'
+              ? '1:1'
+              : undefined;
+      const url = await uploadSingle(file, folder, storeId, aspectQuery);
       if (url) onUpload(url);
     },
-    [accept, folder, onUpload, setError, storeId, t, uploadSingle]
+    [accept, aspectRatio, folder, onUpload, setError, storeId, t, uploadSingle]
   );
 
   // Wrap the caller's onRemove so we ALSO delete the R2 object server-side
