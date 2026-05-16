@@ -6,11 +6,12 @@ import Image from 'next/image';
 import type { ProductCardProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions';
-import { Price, ProductBadge, ProductBadgeGroup, AddToCartButton, cn } from '@force/ui';
+import { Price, ProductBadge, ProductBadgeGroup, cn } from '@force/ui';
 import { calculateDiscount } from '../shared/display-helpers';
 import { PlaceholderImageIcon } from '../shared/icons';
 import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
 import { productCardPropsEqual } from '../shared/product-card-memo';
+import { ProductCardCta, OutOfStockRibbon } from '../shared/ProductCardCta';
 
 /**
  * Bold Template - Product Card
@@ -57,6 +58,9 @@ function BoldProductCard({
       >
         {/* Image */}
         <div className="relative aspect-square overflow-hidden bg-muted">
+          {/* Platform-level OOS ribbon (red, prominent) — same visual
+              across every theme (2026-05-16). */}
+          <OutOfStockRibbon inStock={product.inStock !== false} isRtl={isRtl} />
           {onToggleCompare && (
             <CompareButton
               productId={product.id}
@@ -123,15 +127,16 @@ function BoldProductCard({
             )}
             onClick={e => e.preventDefault()}
           >
-            <AddToCartButton
+            <ProductCardCta
               productId={product.id}
               inStock={product.inStock !== false}
+              hasVariants={!!product.variants && product.variants.length > 0}
+              viewHref={`${urlPrefix}/products/${product.slug}`}
               quantityInCart={quantityInCart}
               isRtl={isRtl}
               onAddToCart={handleAddToCart}
-              showQuantityBadge={false}
               className={cn(
-                'w-full py-4 rounded-none font-black uppercase tracking-wider text-sm',
+                'w-full py-4 rounded-none font-black uppercase tracking-wider text-sm cursor-pointer inline-flex items-center justify-center',
                 'bg-gray-950 text-white hover:bg-primary hover:text-primary-foreground transition-colors duration-200'
               )}
               labels={{
@@ -139,6 +144,7 @@ function BoldProductCard({
                 addedToCart: isRtl ? 'تمت الإضافة' : 'Added to cart',
                 outOfStock: isRtl ? 'نفد المخزون' : 'Out of stock',
                 adding: isRtl ? '...' : '...',
+                view: isRtl ? 'عرض' : 'View',
               }}
             />
           </div>

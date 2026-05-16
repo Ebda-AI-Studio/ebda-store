@@ -59,7 +59,11 @@ export default function ModernHeader({
         className={`sticky top-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg border-b border-border/60 transition-shadow duration-200 ${isScrolled ? 'shadow-sm' : 'shadow-none'}`}
       >
         <div className="container mx-auto px-4">
-          <div className="relative flex h-20 items-center justify-between gap-2 sm:h-24 md:h-28">
+          {/* Row 1: hamburger | logo | actions — pecannbee mobile layout.
+              h-24 on mobile gives the logo room to breathe at h-20 (was h-16
+              and Ahmad said 'logo must be bigger as well'). Desktop h-28
+              retains the comfortable spacing for nav + search-toggle. */}
+          <div className="relative flex h-24 items-center justify-between gap-2 sm:h-24 md:h-28">
             {/* Mobile-only hamburger (LEFT slot). Extracted from the actions
                 block so the layout matches the pecannbee + alkahraman target:
                 hamburger left, logo center, actions right. */}
@@ -87,7 +91,9 @@ export default function ModernHeader({
             </button>
 
             {/* Logo — centered on mobile (per pecannbee + alkahraman target),
-                normal flex item on tablet+ (where the nav fills the middle). */}
+                normal flex item on tablet+. Bumped mobile h-16 → h-20 per
+                Ahmad's 2026-05-16 ask 'logo must be bigger'. Desktop h-24
+                unchanged. */}
             <Link
               href={urlPrefix || '/'}
               className="absolute left-1/2 -translate-x-1/2 md:relative md:left-auto md:translate-x-0 flex items-center gap-2 shrink-0"
@@ -98,7 +104,7 @@ export default function ModernHeader({
                   alt={displayName}
                   width={320}
                   height={120}
-                  className="h-16 max-h-16 w-auto object-contain sm:h-20 sm:max-h-20 md:h-24 md:max-h-24"
+                  className="h-20 max-h-20 w-auto object-contain md:h-24 md:max-h-24"
                   priority
                 />
               ) : (
@@ -121,11 +127,14 @@ export default function ModernHeader({
 
             {/* Actions */}
             <div className={`flex items-center gap-1 ${isRtl ? 'flex-row-reverse' : ''}`}>
-              {/* Search Button */}
+              {/* Search Button — desktop-only. On mobile the search bar is
+                  always visible as its own row below this one (pecannbee
+                  target layout), so the toggle button there would be
+                  redundant. */}
               <button
                 type="button"
                 onClick={() => setIsSearchOpen(!isSearchOpen)}
-                className="inline-flex h-11 w-11 items-center justify-center rounded-lg hover:bg-muted transition-colors duration-300 ease-out cursor-pointer"
+                className="hidden md:inline-flex h-11 w-11 items-center justify-center rounded-lg hover:bg-muted transition-colors duration-300 ease-out cursor-pointer"
                 aria-label={isRtl ? 'بحث' : 'Search'}
                 aria-expanded={isSearchOpen}
               >
@@ -220,9 +229,51 @@ export default function ModernHeader({
             </div>
           </div>
 
-          {/* Search Bar (Expandable) */}
+          {/* Mobile Row 2: persistent search bar under the logo row (pecannbee
+              target layout). Always visible on mobile, hidden on md+ where
+              the expandable search-toggle handles it instead.
+
+              Inline magnifying-glass icon on the start side mirrors the
+              pecannbee pill shape — single icon-in-input, no separate
+              submit button on mobile (form still submits on Enter). */}
+          <div className="md:hidden pb-3 border-t border-border/40 pt-3" data-zone="mobile-search">
+            <form onSubmit={handleSearch} className="relative">
+              <svg
+                className={`absolute top-1/2 -translate-y-1/2 ${isRtl ? 'right-3' : 'left-3'} w-5 h-5 text-muted-foreground pointer-events-none`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder={isRtl ? 'ابحث...' : 'Search'}
+                className={`w-full ${isRtl ? 'pr-11 pl-4' : 'pl-11 pr-4'} py-3 bg-muted rounded-full border border-border focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-base sm:text-sm transition-colors duration-300 ease-out`}
+                dir={isRtl ? 'rtl' : 'ltr'}
+                aria-label={isRtl ? 'بحث عن المنتجات' : 'Search products'}
+              />
+              <SearchAutocomplete
+                query={searchQuery}
+                onSelect={() => {
+                  setSearchQuery('');
+                }}
+              />
+            </form>
+          </div>
+
+          {/* Desktop Search Bar (Expandable) — md+ only, triggered by the
+              search-toggle icon in the actions row above. */}
           <div
-            className={`overflow-visible transition-all duration-300 ${isSearchOpen ? 'max-h-20 opacity-100 py-3 border-t border-border/60' : 'max-h-0 opacity-0 py-0 pointer-events-none'}`}
+            className={`hidden md:block overflow-visible transition-all duration-300 ${isSearchOpen ? 'max-h-20 opacity-100 py-3 border-t border-border/60' : 'max-h-0 opacity-0 py-0 pointer-events-none'}`}
           >
             <form onSubmit={handleSearch} className="relative flex gap-2">
               <input
@@ -230,7 +281,7 @@ export default function ModernHeader({
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder={isRtl ? 'ابحث عن المنتجات...' : 'Search products...'}
-                className="flex-1 px-4 py-2.5 bg-muted rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm transition-colors duration-300 ease-out"
+                className="flex-1 px-4 py-2.5 bg-muted rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-base sm:text-sm transition-colors duration-300 ease-out"
                 dir={isRtl ? 'rtl' : 'ltr'}
                 autoFocus={isSearchOpen}
                 aria-label={isRtl ? 'بحث عن المنتجات' : 'Search products'}

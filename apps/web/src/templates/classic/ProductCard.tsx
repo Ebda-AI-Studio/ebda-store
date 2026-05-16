@@ -6,11 +6,12 @@ import Image from 'next/image';
 import type { ProductCardProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions';
-import { Price, ProductBadge, AddToCartButton, cn } from '@force/ui';
+import { Price, ProductBadge, cn } from '@force/ui';
 import { PlaceholderImageIcon } from '../shared/icons';
 import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
 import { productCardPropsEqual } from '../shared/product-card-memo';
 import { getProductPricing } from '../../lib/product-pricing';
+import { ProductCardCta, OutOfStockRibbon } from '../shared/ProductCardCta';
 
 /**
  * Classic Template - Product Card
@@ -92,24 +93,26 @@ function ClassicProductCard({
             className="absolute bottom-0 inset-x-0 bg-foreground/90 py-3 translate-y-0 lg:translate-y-full lg:group-hover:translate-y-0 transition-transform duration-300 ease-out"
             onClick={e => e.preventDefault()}
           >
-            <AddToCartButton
+            <ProductCardCta
               productId={product.id}
               inStock={product.inStock !== false}
+              hasVariants={!!product.variants && product.variants.length > 0}
+              viewHref={`${urlPrefix}/products/${product.slug}`}
               quantityInCart={quantityInCart}
               isRtl={isRtl}
               onAddToCart={handleAddToCart}
-              showQuantityBadge={false}
               variant="ghost"
               className={cn(
-                'text-background font-serif text-xs tracking-widest uppercase w-full',
+                'text-background font-serif text-xs tracking-widest uppercase w-full cursor-pointer',
                 'hover:text-primary hover:bg-transparent transition-colors duration-200',
-                'py-0 h-auto'
+                'py-0 h-auto inline-flex items-center justify-center'
               )}
               labels={{
                 addToCart: isRtl ? 'أضف للسلة' : 'Add to Bag',
                 addedToCart: isRtl ? 'تمت الإضافة' : 'Added',
                 outOfStock: isRtl ? 'نفذت الكمية' : 'Sold Out',
                 adding: isRtl ? 'جاري الإضافة...' : 'Adding...',
+                view: isRtl ? 'عرض' : 'View',
               }}
             />
           </div>
@@ -139,16 +142,10 @@ function ClassicProductCard({
               />
             )
           )}
-          {product.inStock === false && (
-            <ProductBadge
-              variant="soldOut"
-              isRtl={isRtl}
-              size="sm"
-              absolute
-              position={isRtl ? 'top-right' : 'top-left'}
-              className="font-serif tracking-widest uppercase rounded-none text-[10px]"
-            />
-          )}
+          {/* Platform-level OOS ribbon (red, prominent) — replaces the
+              theme-local soldOut badge for visual consistency across
+              every theme (2026-05-16). */}
+          <OutOfStockRibbon inStock={product.inStock !== false} isRtl={isRtl} />
         </div>
 
         {/* Product info */}

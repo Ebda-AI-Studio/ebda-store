@@ -6,11 +6,12 @@ import Image from 'next/image';
 import type { ProductCardProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions';
-import { Price, ProductBadge, ProductBadgeGroup, AddToCartButton, cn } from '@force/ui';
+import { Price, ProductBadge, ProductBadgeGroup, cn } from '@force/ui';
 import { PlaceholderImageIcon } from '../shared/icons';
 import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
 import { productCardPropsEqual } from '../shared/product-card-memo';
 import { getProductPricing } from '../../lib/product-pricing';
+import { ProductCardCta, OutOfStockRibbon } from '../shared/ProductCardCta';
 
 /**
  * Elegant Template - Product Card
@@ -79,6 +80,9 @@ function ElegantProductCard({
             the no-image fallback, which paints a huge empty area).
             Original 3/4 portrait restored on sm+ where there's room. */}
         <div className="relative aspect-square sm:aspect-[3/4] overflow-hidden bg-gray-50 mb-4">
+          {/* Platform-level OOS ribbon (red, prominent) — same visual
+              across every theme, see templates/shared/ProductCardCta.tsx */}
+          <OutOfStockRibbon inStock={product.inStock !== false} isRtl={isRtl} />
           {onToggleCompare && (
             <CompareButton
               productId={product.id}
@@ -192,16 +196,17 @@ function ElegantProductCard({
             )}
             onClick={e => e.preventDefault()}
           >
-            <AddToCartButton
+            <ProductCardCta
               productId={product.id}
               inStock={product.inStock !== false}
+              hasVariants={!!product.variants && product.variants.length > 0}
+              viewHref={`${urlPrefix}/products/${product.slug}`}
               quantityInCart={quantityInCart}
               isRtl={isRtl}
               onAddToCart={handleAddToCart}
-              showQuantityBadge={false}
               variant="ghost"
               className={cn(
-                'w-full py-4 text-[10px] tracking-[0.25em] uppercase font-normal rounded-none',
+                'w-full py-4 text-[10px] tracking-[0.25em] uppercase font-normal rounded-none cursor-pointer',
                 'hover:bg-foreground hover:text-background transition-colors duration-300'
               )}
               labels={{
@@ -209,6 +214,7 @@ function ElegantProductCard({
                 addedToCart: isRtl ? 'تمت الإضافة' : 'Added',
                 outOfStock: isRtl ? 'نفذت الكمية' : 'Sold Out',
                 adding: isRtl ? 'جاري...' : 'Adding...',
+                view: isRtl ? 'عرض' : 'View',
               }}
             />
           </div>

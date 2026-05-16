@@ -5,12 +5,13 @@ import Link from 'next/link';
 import Image from 'next/image';
 import type { ProductCardProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { Price, ProductBadge, ProductBadgeGroup, Rating, AddToCartButton, cn } from '@force/ui';
+import { Price, ProductBadge, ProductBadgeGroup, Rating, cn } from '@force/ui';
 import { calculateDiscount } from '../shared/display-helpers';
 import { PlaceholderImageIcon } from '../shared/icons';
 import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions';
 import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
 import { productCardPropsEqual } from '../shared/product-card-memo';
+import { ProductCardCta, OutOfStockRibbon } from '../shared/ProductCardCta';
 
 /**
  * Modern Template - Product Card
@@ -105,16 +106,20 @@ function ModernProductCard({
             </div>
           )}
 
-          {/* Badges */}
+          {/* Badges — sale + new only. Out-of-stock now uses the shared
+              prominent red ribbon (OutOfStockRibbon below) to match the
+              pecannbee/alkahraman target across every theme. */}
           <ProductBadgeGroup absolute position={isRtl ? 'top-right' : 'top-left'} isRtl={isRtl}>
             {discount > 0 && (
               <ProductBadge variant="sale" discount={discount} isRtl={isRtl} size="sm" />
             )}
             {product.isNew && <ProductBadge variant="new" isRtl={isRtl} size="sm" />}
-            {product.inStock === false && (
-              <ProductBadge variant="soldOut" isRtl={isRtl} size="sm" />
-            )}
           </ProductBadgeGroup>
+
+          {/* Platform-level OOS ribbon (top-start, red, bold) — same visual
+              treatment Ahmad shipped on PecannbeeProductCard, now in every
+              theme via the shared component (2026-05-16). */}
+          <OutOfStockRibbon inStock={product.inStock !== false} isRtl={isRtl} />
 
           {/* Per-card actions (compare / wishlist). When a card lives on the
             /wishlist page, `onRemoveFromWishlist` is provided; the "add to
@@ -184,14 +189,19 @@ function ModernProductCard({
             onClick={e => e.preventDefault()}
           >
             <div className="bg-gradient-to-t from-black/50 via-black/20 to-transparent pt-8 px-3 pb-3">
-              <AddToCartButton
+              {/* Platform-level dual CTA — products with variants show
+                  "View" → PDP; single-variant products keep the inline
+                  AddToCart. See templates/shared/ProductCardCta.tsx and
+                  2026-05-16-mobile-ui-ship.md. */}
+              <ProductCardCta
                 productId={product.id}
                 inStock={product.inStock !== false}
+                hasVariants={!!product.variants && product.variants.length > 0}
+                viewHref={`${urlPrefix}/products/${product.slug}`}
                 quantityInCart={quantityInCart}
                 isRtl={isRtl}
                 onAddToCart={handleAddToCart}
-                showQuantityBadge={false}
-                className="w-full py-2.5 text-sm font-semibold rounded-lg"
+                className="w-full py-2.5 text-sm font-semibold rounded-lg inline-flex items-center justify-center bg-primary text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer"
               />
             </div>
           </div>

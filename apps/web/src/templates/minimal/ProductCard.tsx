@@ -10,6 +10,7 @@ import { Price } from '@force/ui';
 import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
 import { productCardPropsEqual } from '../shared/product-card-memo';
 import { getProductPricing } from '../../lib/product-pricing';
+import { OutOfStockRibbon } from '../shared/ProductCardCta';
 
 /**
  * Minimal Template - Product Card
@@ -48,6 +49,10 @@ function MinimalProductCard({
       >
         {/* Image — no border, no shadow, subtle opacity on hover */}
         <div className="relative aspect-square sm:aspect-[3/4] overflow-hidden bg-muted/30 mb-6">
+          {/* Platform-level OOS ribbon — minimal pack stays chrome-free
+              elsewhere, but the OOS state needs unambiguous communication
+              regardless of pack philosophy (2026-05-16). */}
+          <OutOfStockRibbon inStock={product.inStock !== false} isRtl={isRtl} />
           {onToggleCompare && (
             <CompareButton
               productId={product.id}
