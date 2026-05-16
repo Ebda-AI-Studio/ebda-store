@@ -22,7 +22,20 @@ pecannbee + alkahraman + similar Kuwait/GCC stores.
 
 ## Typography sizes (apply these across all 5 themes)
 
-Standing rule codified 2026-05-16: **main reading content is 16px floor.** Body, product names, prices, category captions all hit 16px minimum so legibility is consistent. Theme identity carries via font-weight + tracking + font-family (modern=semibold-sans, elegant=hairline-tracking-wide, bold=font-black-uppercase, classic=serif-normal, minimal=light-tracking-wide), NEVER via size-shrinking below 16.
+Standing rule updated 2026-05-16 (second pass) per Ahmad's Wady Aljuz baseline:
+**every text zone defaults to 16px (text-base) at the theme level.** Headings,
+body, kickers, subtitles, seeAll links, CTAs — all 16px platform defaults.
+Theme identity carries via font-weight + tracking + font-family ONLY
+(modern=semibold-sans, elegant=hairline-tracking-wide, bold=font-black-
+uppercase, classic=serif-normal, minimal=light-tracking-wide), NEVER via
+size differentiation. Hero headline remains the only intentional scale
+exception (36-72px responsive) because hero is the brand statement.
+
+Merchants can override any zone via Typography admin (per-store).
+Earlier responsive heading scales (text-3xl → text-5xl, etc.) were
+reverted to text-base on 2026-05-16 after Ahmad's "make those the main
+sizes of everything" directive — flat hierarchy by default; merchant
+opts up via admin if their brand needs heading prominence.
 
 | Element (pack-styles token)                        | Mobile  | sm (640+) | md (768+) | lg (1024+) | Tailwind                                                       | Notes                                                                                                                                                   |
 | -------------------------------------------------- | ------- | --------- | --------- | ---------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |

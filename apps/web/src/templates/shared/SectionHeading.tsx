@@ -57,7 +57,7 @@ export function SectionHeading({
         <div className="flex flex-col gap-1.5 sm:gap-2">
           {kickerText && (
             <span
-              className="self-start inline-flex items-center rounded-full bg-primary/10 text-primary px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em]"
+              className="self-start inline-flex items-center rounded-full bg-primary/10 text-primary px-3 py-1 text-base font-semibold uppercase tracking-[0.18em]"
               data-zone="sectionKicker"
             >
               {kickerText}
@@ -69,10 +69,7 @@ export function SectionHeading({
             </h2>
           )}
           {subtitleText && (
-            <p
-              className="text-sm text-muted-foreground sm:text-base max-w-2xl"
-              data-zone="sectionSubtitle"
-            >
+            <p className="text-base text-muted-foreground max-w-2xl" data-zone="sectionSubtitle">
               {subtitleText}
             </p>
           )}
