@@ -553,9 +553,12 @@ export default function StoreCustomersPage() {
                       {formatDate(customer.lastOrderDate)}
                     </td>
                     <td className="px-6 py-4 text-end">
-                      {/* Link to store orders filtered by this customer's name/email */}
+                      {/* Link to the customer detail page (full profile +
+                          every order). The route param accepts either a
+                          User.id UUID or a guest synthetic key (email /
+                          phone). Encoded because email keys contain @. */}
                       <Link
-                        href={`/stores/${storeId}/orders`}
+                        href={`/stores/${storeId}/customers/${encodeURIComponent(customer.id)}`}
                         className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-foreground border border-border rounded-lg hover:bg-muted transition-colors"
                         title={t('viewOrdersTitle')}
                       >

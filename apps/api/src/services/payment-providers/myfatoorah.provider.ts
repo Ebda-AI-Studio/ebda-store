@@ -169,8 +169,17 @@ export class MyFatoorahPaymentProvider implements IPaymentProvider {
     //     hosted multi-method selection page. The user picks method THERE.
     // FWB's UX is "select MyFatoorah at checkout → redirect to MyFatoorah →
     // pick method on their page", which is the SendPayment flow.
+    // MyFatoorah NotificationOption mapping:
+    //   LNK = return URL only (default; merchant copies/shares manually)
+    //   EML = provider sends email with the link
+    //   ALL = provider sends via SMS + email
+    // Caller picks via request.notifyVia. SMS-only intentionally NOT
+    // exposed yet (Ahmad 2026-05-16). Falls back to LNK on unknown
+    // values so a typo doesn't silently dispatch unwanted comms.
+    const notificationOption =
+      request.notifyVia === 'email' ? 'EML' : request.notifyVia === 'all' ? 'ALL' : 'LNK';
     const sendData = {
-      NotificationOption: 'LNK', // return URL only, no SMS/email
+      NotificationOption: notificationOption,
       InvoiceValue: amountInKWD,
       CustomerName: request.customer.name,
       CustomerEmail: request.customer.email,

@@ -3,10 +3,12 @@
 import { useState, useRef, useEffect } from 'react';
 import { useT } from '@/i18n/useT';
 import { VALID_TRANSITIONS } from '../../_components/types';
+import { PaymentLinkButton } from './PaymentLinkButton';
 import type { OrderDetail } from './types';
 
 interface ActionFooterProps {
   order: OrderDetail;
+  storeId: string;
   isUpdating: boolean;
   onStatusChange: (newStatus: string) => void;
   onMarkPaid: () => void;
@@ -15,6 +17,7 @@ interface ActionFooterProps {
 
 export function ActionFooter({
   order,
+  storeId,
   isUpdating,
   onStatusChange,
   onMarkPaid,
@@ -81,6 +84,19 @@ export function ActionFooter({
               </>
             )}
           </button>
+        )}
+        {/* Payment Link — issue MyFatoorah pay-by-link for unpaid orders.
+            Lives next to "Mark paid" because both are merchant-side
+            payment-collection actions; the difference is mark-paid
+            records a manual cash/transfer, payment-link generates a
+            new online-pay URL for the customer. */}
+        {showMarkPaid && (
+          <PaymentLinkButton
+            storeId={storeId}
+            orderId={order.id}
+            orderNumber={order.orderNumber}
+            disabled={isUpdating}
+          />
         )}
         {showMarkPaid && (
           <button

@@ -215,6 +215,7 @@ export default function OrderDetailPage() {
 
             <ActionFooter
               order={order}
+              storeId={storeId}
               isUpdating={isUpdating}
               onStatusChange={handleStatusChange}
               onMarkPaid={() => setConfirmMarkPaidOpen(true)}

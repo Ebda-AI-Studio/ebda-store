@@ -1,5 +1,30 @@
 # Force Website Builder - Project Guidelines
 
+## Platform-level fixes — applies to every change in this repo
+
+**Every UI/UX/feature change MUST be platform-level. NEVER tenant-scoped, NEVER theme-specific without an explicit reason.**
+
+When Ahmad reports a bug or asks for a feature, the fix MUST land in a place where every store inherits it automatically. Concrete enforcement:
+
+1. **Product-card UX changes** → must hit ALL 3 render paths:
+   - `apps/web/src/templates/shared/PecannbeeProductCard.tsx` (PLP / search / category listings)
+   - `apps/web/src/templates/{modern,elegant,classic,minimal,bold}/ProductCard.tsx` (5 theme grids)
+   - `apps/web/src/templates/shared/ProductCarousel.tsx` (HOMEPAGE new-arrivals + best-sellers carousels)
+
+   Grep the 7 files; if the new pattern doesn't appear in all 7, it isn't shipped. See `feedback-fwb-three-product-render-paths.md`.
+
+2. **Header / footer / nav changes** → must hit ALL 5 themes (`modern/elegant/classic/minimal/bold`). Modern is wadyaljuz's theme so it ships first, but the same commit batch or an immediate follow-up MUST land the same pattern in the other 4.
+
+3. **Storefront copy / labels** → goes in `apps/web/src/contexts/LanguageContext.tsx` (the `translations` map) so EN + AR are platform-level. Never hardcode user-facing strings in a theme.
+
+4. **Schema / API / business-logic changes** → live in `apps/api` + `packages/database` and serve every tenant via the existing per-store scoping (`storeId` everywhere). Never branch on a specific `store.slug`.
+
+5. **Admin tooling** → built once in `apps/admin` and works for every store the admin owns. Never wire a feature to a specific tenant ID.
+
+**The rule's purpose:** stores inherit improvements automatically. A merchant who joins next month gets every fix shipped before they signed up. No tenant should ever ask "can you fix that for my store?" — the fix is already live for them.
+
+**Anti-patterns to refuse:** "let's just ship this on wadyaljuz first and roll it out later", "make this a setting for store X only", "hardcode this for the demo tenant". If a request would create tenant-specific code, pause and flag it. The exception is per-tenant CONFIG (theme choice, brand colors, hero image) which is data, not code.
+
 ## Tech Stack
 
 - **API**: Express.js + TypeScript (apps/api)

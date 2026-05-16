@@ -10,6 +10,9 @@ import { getAuthUser } from '../utils/store-helpers';
 import { prisma } from '@force/database';
 import { inngest } from '../lib/inngest/client';
 import logger from '../lib/logger';
+import { PaymentService } from '../services/payment-providers/payment.factory';
+import { config } from '../config';
+import type { Currency } from '../services/payment-providers/types';
 
 const router = Router({ mergeParams: true });
 
@@ -458,6 +461,166 @@ router.post(
           message: `${codOrders.length} order(s) marked as paid`,
           updated: codOrders.length,
           skipped: orderIds.length - codOrders.length,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /stores/:storeId/orders/:orderId/payment-link
+ *
+ * Issue a MyFatoorah payment link for an existing order. Used by the
+ * merchant when a customer couldn't complete checkout on the original
+ * payment flow (e.g. KNET timeout, gateway blocked, customer abandoned
+ * and asked for the link via WhatsApp).
+ *
+ * Body:
+ *   - notifyVia: 'link' | 'email' | 'all'  (default 'link')
+ *     'link'  → return URL only, merchant copies + sends manually
+ *     'email' → MyFatoorah sends email to the customer
+ *     'all'   → MyFatoorah sends SMS + email (NB: SMS not surfaced in
+ *               UI yet, but the provider supports it natively)
+ *
+ * The endpoint reuses the same `PaymentService.createPayment` path as
+ * the public checkout — same per-store credentials, same callback +
+ * webhook URLs — so a paid link still triggers the existing webhook +
+ * order-status pipeline.
+ */
+const issuePaymentLinkSchema = z.object({
+  notifyVia: z.enum(['link', 'email', 'all']).optional().default('link'),
+});
+
+router.post(
+  '/:orderId/payment-link',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, orderId } = req.params;
+      const user = getAuthUser(req);
+      const { notifyVia } = issuePaymentLinkSchema.parse(req.body ?? {});
+
+      const order = await prisma.order.findFirst({
+        where: { id: orderId, storeId, deletedAt: null },
+        include: {
+          items: true,
+          customer: {
+            select: { id: true, email: true, firstName: true, lastName: true, phone: true },
+          },
+          store: {
+            select: { id: true, slug: true, domain: true, name: true, nameAr: true },
+          },
+        },
+      });
+
+      if (!order) {
+        res.status(404).json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'Order not found' },
+        });
+        return;
+      }
+
+      if (order.paymentStatus === 'paid') {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'ALREADY_PAID',
+            message: 'Order is already paid — no need to issue a new link',
+          },
+        });
+        return;
+      }
+
+      // Same storefront URL resolution the public checkout uses, so the
+      // payment-success / payment-error callbacks land on the correct
+      // tenant domain whether they have a custom domain or platform slug.
+      const storefrontBaseUrl = order.store?.domain
+        ? `https://${order.store.domain}`
+        : order.store?.slug
+          ? `${config.webUrl}/${order.store.slug}`
+          : config.webUrl;
+
+      const shipping = (order.shippingAddress ?? {}) as Record<string, string | undefined>;
+      const customerName =
+        `${order.customer?.firstName ?? shipping.firstName ?? ''} ${order.customer?.lastName ?? shipping.lastName ?? ''}`.trim() ||
+        'Customer';
+      const customerEmail = order.customer?.email || shipping.email || '';
+      const customerPhone = order.customer?.phone || shipping.phone || undefined;
+
+      // MyFatoorah rejects empty email with 400 — bail early with a
+      // friendly error so the merchant knows they need an email on the
+      // order before they can issue a link.
+      if (notifyVia !== 'link' && !customerEmail) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'NO_CUSTOMER_EMAIL',
+            message:
+              'Cannot send the link via email — this order has no customer email on file. Pick "Copy link" and share it manually.',
+          },
+        });
+        return;
+      }
+
+      const result = await PaymentService.createPayment(
+        {
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          amount: order.total,
+          currency: order.currency as Currency,
+          customer: {
+            id: order.customer?.id ?? `guest-${order.id}`,
+            name: customerName,
+            email: customerEmail,
+            phone: customerPhone,
+          },
+          items: order.items.map(item => ({
+            name: item.productName,
+            quantity: item.quantity,
+            unitPrice: item.price,
+            sku: item.sku || undefined,
+          })),
+          callbackUrl: `${storefrontBaseUrl}/checkout/success`,
+          errorUrl: `${storefrontBaseUrl}/checkout/error`,
+          webhookUrl: `${config.apiUrl}/webhooks/payment`,
+          notifyVia,
+        },
+        'myfatoorah',
+        storeId
+      );
+
+      await auditLog({
+        action: 'order.payment_link_issued',
+        userId: user.userId,
+        resourceType: 'order',
+        resourceId: orderId,
+        details: {
+          orderNumber: order.orderNumber,
+          notifyVia,
+          invoiceId: result.invoiceId ?? null,
+        },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+
+      logger.info(
+        { orderId, orderNumber: order.orderNumber, notifyVia, invoiceId: result.invoiceId },
+        '[Payment-Link] issued by merchant'
+      );
+
+      res.json({
+        success: true,
+        data: {
+          paymentUrl: result.paymentUrl,
+          invoiceId: result.invoiceId,
+          notifyVia,
+          customerEmail: notifyVia !== 'link' ? customerEmail : undefined,
         },
       });
     } catch (error) {

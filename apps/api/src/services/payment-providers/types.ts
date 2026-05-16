@@ -66,6 +66,19 @@ export interface CreatePaymentRequest {
   errorUrl: string;
   webhookUrl?: string;
   metadata?: Record<string, string>;
+  /**
+   * Optional channels the provider should use to notify the customer
+   * about the generated payment URL. Defaults to 'link' (just return
+   * the URL, no provider-side send). MyFatoorah supports this natively
+   * via `NotificationOption`; other providers may ignore it.
+   *
+   *   - 'link': return URL only, merchant copies/shares manually
+   *   - 'email': provider sends email with the link
+   *   - 'all': provider sends via every available channel
+   *
+   * SMS intentionally NOT exposed yet (Ahmad 2026-05-16).
+   */
+  notifyVia?: 'link' | 'email' | 'all';
 }
 
 export interface PaymentResponse {

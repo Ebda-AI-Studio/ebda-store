@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import ExcelJS from 'exceljs';
-import { prisma } from '@force/database';
+import { prisma, Prisma } from '@force/database';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { AppError } from '../middleware/error-handler';
@@ -327,6 +327,148 @@ router.get(
       // stream; piping into res lets the response close cleanly.
       await workbook.xlsx.write(res);
       res.end();
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * GET /stores/:storeId/customers/:customerKey
+ * Returns a single customer's full profile + every order they've placed.
+ *
+ * `customerKey` is one of:
+ *   - a User.id (UUID) for registered customers
+ *   - a lowercased email for guest customers
+ *   - a phone number for guest customers with no email
+ *
+ * The lookup mirrors the aggregation key logic in the page.tsx + the
+ * XLSX export's aggregateCustomers() so a row clicked in the listing
+ * always resolves cleanly.
+ */
+router.get(
+  '/customers/:customerKey',
+  ...adminMiddleware,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, customerKey } = req.params;
+      const decodedKey = decodeURIComponent(customerKey);
+
+      // UUID v4 detection — `Order.customerId` is a uuid string when
+      // present. Guest keys are emails / phones / synthetic IDs.
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        decodedKey
+      );
+
+      // Single query that handles both registered + guest in one OR.
+      // For registered customers `customerId` matches directly; for
+      // guests we fall back to the shipping address JSON path.
+      // Avoiding a UUID-only first query keeps the type stable for
+      // TypeScript's narrowing of the conditional include shape.
+      const orConditions: Prisma.OrderWhereInput[] = [
+        { shippingAddress: { path: ['email'], equals: decodedKey } },
+        { shippingAddress: { path: ['phone'], equals: decodedKey } },
+      ];
+      if (isUuid) {
+        orConditions.unshift({ customerId: decodedKey });
+      }
+
+      const orders = await prisma.order.findMany({
+        where: {
+          storeId,
+          deletedAt: null,
+          OR: orConditions,
+        },
+        include: {
+          customer: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              phone: true,
+              createdAt: true,
+            },
+          },
+          items: {
+            select: {
+              id: true,
+              productName: true,
+              quantity: true,
+              price: true,
+              total: true,
+            },
+          },
+          payments: { select: { provider: true, status: true, amount: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      if (orders.length === 0) {
+        throw new AppError(404, 'NOT_FOUND', 'Customer not found');
+      }
+
+      // Aggregate stats from the full order list. The first order
+      // (newest) wins for current-snapshot fields (latest address,
+      // phone, etc.). Mirror the listing-page logic exactly so the
+      // detail view's totals match what the merchant saw in the list.
+      const newest = orders[0];
+      const oldest = orders[orders.length - 1];
+      const newestShipping = (newest.shippingAddress ?? null) as ShippingAddressShape | null;
+
+      let totalSpent = 0;
+      let paidCount = 0;
+      let pendingCount = 0;
+      let cancelledCount = 0;
+      let failedCount = 0;
+      const paymentMethodSet = new Set<string>();
+      const statusSet = new Set<string>();
+
+      for (const o of orders) {
+        totalSpent += o.total;
+        statusSet.add(o.status);
+        const ps = o.paymentStatus;
+        if (ps === 'paid') paidCount += 1;
+        else if (o.status === 'cancelled') cancelledCount += 1;
+        else if (ps === 'failed') failedCount += 1;
+        else pendingCount += 1;
+
+        const method = o.payments?.[0]?.provider;
+        if (method) paymentMethodSet.add(method);
+      }
+
+      const customer = {
+        id: newest.customer?.id ?? decodedKey,
+        isGuest: !newest.customer?.id,
+        firstName: newest.customer?.firstName ?? newestShipping?.firstName ?? '',
+        lastName: newest.customer?.lastName ?? newestShipping?.lastName ?? '',
+        email: newest.customer?.email ?? newestShipping?.email ?? '',
+        phone: newest.customer?.phone ?? newestShipping?.phone ?? '',
+        address: formatShippingAddress(newestShipping),
+        address1: newestShipping?.address1 ?? '',
+        address2: newestShipping?.address2 ?? '',
+        city: newestShipping?.city ?? '',
+        area: newestShipping?.area ?? '',
+        country: newestShipping?.country ?? '',
+        postalCode: newestShipping?.postalCode ?? '',
+        accountCreatedAt: newest.customer?.createdAt ?? null,
+        firstOrderDate: oldest.createdAt,
+        lastOrderDate: newest.createdAt,
+        totalOrders: orders.length,
+        totalSpent,
+        avgOrderValue: orders.length > 0 ? Math.round(totalSpent / orders.length) : 0,
+        paidCount,
+        pendingCount,
+        cancelledCount,
+        failedCount,
+        paymentMethods: Array.from(paymentMethodSet),
+        statuses: Array.from(statusSet),
+      };
+
+      res.json({
+        success: true,
+        data: { customer, orders },
+      });
     } catch (error) {
       next(error);
     }
