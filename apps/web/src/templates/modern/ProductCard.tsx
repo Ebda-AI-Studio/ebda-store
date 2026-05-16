@@ -207,8 +207,10 @@ function ModernProductCard({
           </div>
         </div>
 
-        {/* Content */}
-        <div className="p-5 flex flex-col gap-2.5 flex-1">
+        {/* Content — tightened p-5→p-3 sm:p-4 + gap-2.5→gap-2 per ahmad
+            2026-05-16 'products are too big as ui'. Modern theme card
+            chrome was the heaviest of the 5 packs. */}
+        <div className="p-3 sm:p-4 flex flex-col gap-2 flex-1">
           {product.rating !== undefined && (
             <Rating
               value={product.rating}

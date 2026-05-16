@@ -150,8 +150,8 @@ function BoldProductCard({
           </div>
         </div>
 
-        {/* Content */}
-        <div className="p-5">
+        {/* Content — tightened p-5 → p-3 sm:p-4 (2026-05-16 size reduction). */}
+        <div className="p-3 sm:p-4">
           <h3
             id={`prod-${product.id}-name`}
             data-zone="productName"

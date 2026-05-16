@@ -20,7 +20,7 @@ export default function MinimalCategoryCard({
       className="group block outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 cursor-pointer"
     >
       {/* Image - Clean square */}
-      <div className="aspect-square bg-muted/30 overflow-hidden mb-5">
+      <div className="aspect-square bg-muted/30 overflow-hidden mb-3">
         {category.image ? (
           <img
             src={category.image}

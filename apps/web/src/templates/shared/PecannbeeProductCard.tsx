@@ -181,11 +181,16 @@ function PecannbeeProductCardImpl({
         </div>
       </Link>
 
-      <div className={`flex flex-1 flex-col gap-3 p-5 sm:p-6 ${styles.productCardBody ?? ''}`}>
+      {/* Card chrome tightened 2026-05-16 per ahmad 'products are too big':
+          p-5/p-6 → p-3/p-4 (~10px smaller padding × 4 sides), gap-3 → gap-2,
+          and dropped the min-h-[3em] name reservation so the card shrinks
+          to whatever the actual content needs. Net effect: ~20-30px shorter
+          per card on mobile, denser grid feel matches the pecannbee target. */}
+      <div className={`flex flex-1 flex-col gap-2 p-3 sm:p-4 ${styles.productCardBody ?? ''}`}>
         <Link href={href} prefetch={false} className="focus:outline-none focus-visible:underline">
           <p
             id={`prod-${product.id}-name`}
-            className={`line-clamp-2 min-h-[3em] ${styles.productCardName}`}
+            className={`line-clamp-2 ${styles.productCardName}`}
             style={{ textWrap: 'balance' }}
             itemProp="name"
           >

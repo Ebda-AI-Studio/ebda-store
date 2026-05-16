@@ -20,7 +20,7 @@ export default function ClassicCategoryCard({
       className="group block text-center outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 cursor-pointer"
     >
       {/* Image with elegant border */}
-      <div className="relative aspect-square sm:aspect-[3/4] mb-6 overflow-hidden border border-border/60 bg-muted group-hover:border-foreground/35 transition-colors duration-700 ease-out">
+      <div className="relative aspect-square sm:aspect-[3/4] mb-3 overflow-hidden border border-border/60 bg-muted group-hover:border-foreground/35 transition-colors duration-700 ease-out">
         {category.image ? (
           <img
             src={category.image}

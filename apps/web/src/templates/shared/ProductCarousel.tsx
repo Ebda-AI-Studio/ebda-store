@@ -195,7 +195,11 @@ export function ProductCarousel({
               return (
                 <li
                   key={product.id}
-                  className="snap-start shrink-0 w-[60vw] sm:w-[30vw] md:w-[24vw] lg:w-[20vw] xl:w-[18vw] max-w-[300px]"
+                  // Narrower mobile width so 2+ cards peek into the viewport,
+                  // signalling the strip continues. Ahmad 2026-05-16: 'still
+                  // products are huge'. 60vw → 44vw on mobile, slight tighten
+                  // at sm. Desktop sizes stay the same — they were fine.
+                  className="snap-start shrink-0 w-[44vw] sm:w-[28vw] md:w-[22vw] lg:w-[19vw] xl:w-[17vw] max-w-[260px]"
                 >
                   <div className={`overflow-hidden ${styles.card}`}>
                     <Link
@@ -259,10 +263,12 @@ export function ProductCarousel({
                           </span>
                         )}
                       </div>
-                      <div className={`p-5 sm:p-6 space-y-3 ${styles.productCardBody ?? ''}`}>
-                        <p className={`line-clamp-2 min-h-[3em] ${styles.productCardName}`}>
-                          {name}
-                        </p>
+                      {/* Tightened p-5/p-6 → p-3/p-4 + dropped min-h-[3em]
+                          name reservation per ahmad 2026-05-16 size pass.
+                          Carousel cards on the homepage were the biggest
+                          chrome offender. */}
+                      <div className={`p-3 sm:p-4 space-y-2 ${styles.productCardBody ?? ''}`}>
+                        <p className={`line-clamp-2 ${styles.productCardName}`}>{name}</p>
                         <div
                           className={`flex items-baseline gap-2 ${styles.productCardBody ? 'justify-center' : ''}`}
                         >
