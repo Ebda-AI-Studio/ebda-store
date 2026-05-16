@@ -32,6 +32,13 @@ interface ZoneDef {
   /** Marks the row visually as a sub-zone (rendered as a nested
    *  override of one of the broad zones). */
   isSubZone?: boolean;
+  /** Sample text shown in the live preview block so the merchant can
+   *  see what the zone's text actually looks like with the current
+   *  settings. Should mirror what the storefront actually renders in
+   *  that zone (e.g. "Latest Products" for sectionTitle). Bilingual so
+   *  Arabic merchants see Arabic preview when toggled. */
+  previewText: string;
+  previewTextAr: string;
 }
 
 const ZONES: ZoneDef[] = [
@@ -47,6 +54,8 @@ const ZONES: ZoneDef[] = [
       'The narrow promo banner at the very top of every page — typically "Free shipping over 30 KWD" or a discount code.',
     descriptionAr:
       'الشريط الترويجي الضيق في أعلى كل صفحة — عادةً مثل "شحن مجاني فوق 30 د.ك" أو كود خصم.',
+    previewText: 'Free shipping on orders over 30 KWD — use code SAFFRON10',
+    previewTextAr: 'شحن مجاني للطلبات فوق 30 د.ك — استخدم كود SAFFRON10',
   },
   {
     key: 'header',
@@ -56,6 +65,8 @@ const ZONES: ZoneDef[] = [
       'Affects the store logo wordmark, the top navigation links ("Shop", "About", "Contact"), and any text next to the cart / search / account icons.',
     descriptionAr:
       'يؤثر على نص شعار المتجر، روابط القائمة العلوية (مثل "تسوّق"، "من نحن"، "تواصل")، والنصوص بجانب أيقونات السلة / البحث / الحساب.',
+    previewText: 'Wady Aljuz · Shop · About · Contact',
+    previewTextAr: 'وادي الجوز · تسوّق · من نحن · تواصل',
   },
   {
     key: 'categories',
@@ -65,6 +76,8 @@ const ZONES: ZoneDef[] = [
       'The "Shop by Category" block on the homepage — the row of category tiles + their captions ("Sweets", "Drinks", etc.).',
     descriptionAr:
       'كتلة "تسوّق حسب الفئة" في الصفحة الرئيسية — صف بطاقات الفئات وأسماؤها (مثلاً "حلويات"، "مشروبات").',
+    previewText: 'Sweets · Drinks · Bakery · Spices',
+    previewTextAr: 'حلويات · مشروبات · مخبوزات · بهارات',
   },
   {
     key: 'products',
@@ -74,6 +87,8 @@ const ZONES: ZoneDef[] = [
       'The base font for every product surface: /products listing, single-product detail page, "New Arrivals" + "Best Sellers" carousels on the homepage, cart-recommendation cards. Sub-zones below override this for product name + price specifically.',
     descriptionAr:
       'الخط الأساسي لكل صفحات المنتجات: قائمة /products، صفحة المنتج الواحد، كاروسيلات "أحدث المنتجات" و"الأكثر مبيعاً" في الصفحة الرئيسية، وبطاقات اقتراحات السلة. الأقسام الفرعية أدناه تتجاوز هذا للاسم والسعر فقط.',
+    previewText: 'Premium Saffron Tea — 12.500 KWD — In stock',
+    previewTextAr: 'شاي الزعفران الفاخر — 12.500 د.ك — متوفر',
   },
   {
     key: 'footer',
@@ -83,6 +98,8 @@ const ZONES: ZoneDef[] = [
       'The footer columns at the bottom of every page — "Shop", "Help", "About", social icons, and the copyright row.',
     descriptionAr:
       'أعمدة الفوتر في أسفل كل صفحة — "تسوّق"، "مساعدة"، "من نحن"، أيقونات السوشيال، وسطر حقوق النشر.',
+    previewText: '© 2026 Wady Aljuz · Privacy · Terms · Contact',
+    previewTextAr: '© 2026 وادي الجوز · الخصوصية · الشروط · تواصل معنا',
   },
   {
     key: 'afterFooter',
@@ -91,6 +108,8 @@ const ZONES: ZoneDef[] = [
     description:
       'Tiny elements that render below the footer — cookie consent banner, "Powered by Force" credit row.',
     descriptionAr: 'العناصر الصغيرة أسفل الفوتر — شريط موافقة الكوكيز، سطر "مدعوم من Force".',
+    previewText: 'Powered by Force',
+    previewTextAr: 'مدعوم من فورس',
   },
   // Sub-zones — nested overrides.
   // Section heading sub-zones split SectionHeading into 4 individually
@@ -104,6 +123,8 @@ const ZONES: ZoneDef[] = [
       'The small uppercase chip rendered ABOVE each section title — e.g. "EXPLORE" above "Shop by Category", or "DISCOVER" above "Best Sellers". Style independently of the title.',
     descriptionAr:
       'الكبسولة الصغيرة فوق عنوان كل قسم — مثل "استكشف" فوق "تسوّق حسب الفئة"، أو "اكتشف" فوق "الأكثر مبيعاً". يمكن تنسيقها باستقلال عن العنوان.',
+    previewText: 'EXPLORE',
+    previewTextAr: 'استكشف',
     isSubZone: true,
   },
   {
@@ -114,6 +135,8 @@ const ZONES: ZoneDef[] = [
       'The big H2 headline on every homepage section — "Shop by Category", "Latest Products", "Best Sellers" — plus the H1 at the top of the products listing page.',
     descriptionAr:
       'العنوان الكبير (H2) في كل قسم بالصفحة الرئيسية — "تسوّق حسب الفئة"، "أحدث المنتجات"، "الأكثر مبيعاً" — بالإضافة إلى عنوان H1 في أعلى صفحة قائمة المنتجات.',
+    previewText: 'Latest Products',
+    previewTextAr: 'أحدث المنتجات',
     isSubZone: true,
   },
   {
@@ -124,6 +147,8 @@ const ZONES: ZoneDef[] = [
       'The descriptive tagline rendered BELOW each section title — e.g. "Browse our top picks by category" under "Shop by Category".',
     descriptionAr:
       'النص الوصفي الذي يظهر تحت عنوان القسم — مثل "تصفّح أفضل اختياراتنا حسب الفئة" تحت "تسوّق حسب الفئة".',
+    previewText: 'Browse our top picks by category',
+    previewTextAr: 'تصفّح أفضل اختياراتنا حسب الفئة',
     isSubZone: true,
   },
   {
@@ -134,6 +159,8 @@ const ZONES: ZoneDef[] = [
       'The "View All" / "عرض الكل" link in the top-right of each homepage section — next to "Latest Products", "Best Sellers", "Shop by Category". Click jumps to the full listing.',
     descriptionAr:
       'رابط "عرض الكل" أعلى يسار كل قسم في الصفحة الرئيسية — بجانب "أحدث المنتجات"، "الأكثر مبيعاً"، "تسوّق حسب الفئة". ينقل المستخدم إلى القائمة الكاملة.',
+    previewText: 'View All →',
+    previewTextAr: '← عرض الكل',
     isSubZone: true,
   },
   {
@@ -144,6 +171,8 @@ const ZONES: ZoneDef[] = [
       'The product title text on every product card — homepage carousels, /products grid, search results, cart recommendations. Overrides the broader "Products" font when you want the name styled differently from the price.',
     descriptionAr:
       'اسم المنتج على كل بطاقة منتج — كاروسيلات الصفحة الرئيسية، شبكة /products، نتائج البحث، اقتراحات السلة. يتجاوز خط "المنتجات" العام عندما تريد تنسيق الاسم بشكل مختلف عن السعر.',
+    previewText: 'Premium Saffron Tea',
+    previewTextAr: 'شاي الزعفران الفاخر',
     isSubZone: true,
   },
   {
@@ -154,6 +183,8 @@ const ZONES: ZoneDef[] = [
       'The price text on every product card — e.g. "12.500 KWD". Affects all cards: homepage carousels, listing page, search results, cart recommendations.',
     descriptionAr:
       'نص السعر على كل بطاقة منتج — مثلاً "12.500 د.ك". يؤثر على كل البطاقات: كاروسيلات الصفحة الرئيسية، صفحة القائمة، نتائج البحث، اقتراحات السلة.',
+    previewText: '12.500 KWD',
+    previewTextAr: '12.500 د.ك',
     isSubZone: true,
   },
   {
@@ -164,6 +195,8 @@ const ZONES: ZoneDef[] = [
       'Every action button on the storefront — "Add to cart" on product cards, "Subscribe" in newsletter, "Place order" at checkout, "View store" everywhere.',
     descriptionAr:
       'كل أزرار الفعل في المتجر — "أضف للسلة" على بطاقات المنتج، "اشترك" في النشرة، "أكمل الطلب" في الدفع، "عرض المتجر" في كل مكان.',
+    previewText: 'Add to Cart',
+    previewTextAr: 'أضف للسلة',
     isSubZone: true,
   },
   {
@@ -174,6 +207,8 @@ const ZONES: ZoneDef[] = [
       'The left sidebar on /products — sort dropdown, search field, price range slider, category chips, in-stock toggle.',
     descriptionAr:
       'الشريط الجانبي الأيسر في /products — قائمة الترتيب، حقل البحث، شريط نطاق السعر، رقاقات الفئات، مفتاح "متوفر فقط".',
+    previewText: 'Sort by: Popular',
+    previewTextAr: 'الترتيب: الأكثر شعبية',
     isSubZone: true,
   },
 ];
@@ -280,6 +315,49 @@ function resolveBrandPresetToHex(
   if (!key) return null;
   const val = theme[key];
   return typeof val === 'string' ? hslComponentsToHex(val) : null;
+}
+
+// Same color resolution as the storefront's resolveColorValue + the
+// admin's resolveBrandPresetToHex — used by the live preview block to
+// emit React inline styles that mirror what the storefront will render
+// once the merchant saves. Brand presets resolve to actual hex from the
+// store theme so the preview shows the store's brand colour, not a CSS
+// var that won't compute inside an inline-style attribute.
+function resolveColorForPreview(
+  v: string | undefined,
+  theme: Record<string, unknown> | undefined
+): string | undefined {
+  if (!v) return undefined;
+  const hex = resolveBrandPresetToHex(v, theme);
+  return hex ?? v;
+}
+
+// Build a React inline-style object from a zone's settings. Mirrors the
+// storefront emitter logic so what the merchant SEES in the live preview
+// matches what they GET on the storefront after saving — including the
+// inline-block auto-emit when chip props are set.
+function cfgToInlineStyle(
+  cfg: ZoneSettings,
+  theme: Record<string, unknown> | undefined
+): React.CSSProperties {
+  const s: React.CSSProperties = {};
+  if (cfg.fontFamily) s.fontFamily = cfg.fontFamily;
+  if (cfg.fontSize) s.fontSize = cfg.fontSize;
+  if (cfg.fontWeight) s.fontWeight = cfg.fontWeight;
+  if (cfg.color) s.color = resolveColorForPreview(cfg.color, theme);
+  if (cfg.lineHeight) s.lineHeight = cfg.lineHeight;
+  if (cfg.letterSpacing) s.letterSpacing = cfg.letterSpacing;
+  if (cfg.backgroundColor) s.backgroundColor = resolveColorForPreview(cfg.backgroundColor, theme);
+  if (cfg.padding) s.padding = cfg.padding;
+  if (cfg.borderRadius) s.borderRadius = cfg.borderRadius;
+  if (cfg.backgroundColor || cfg.padding || cfg.borderRadius) s.display = 'inline-block';
+  if (cfg.textDecoration && cfg.textDecoration !== 'none')
+    s.textDecoration = cfg.textDecoration as React.CSSProperties['textDecoration'];
+  if (cfg.textDecorationColor)
+    s.textDecorationColor = resolveColorForPreview(cfg.textDecorationColor, theme);
+  if (cfg.textDecorationThickness) s.textDecorationThickness = cfg.textDecorationThickness;
+  if (cfg.textUnderlineOffset) s.textUnderlineOffset = cfg.textUnderlineOffset;
+  return s;
 }
 
 // Brand-color preset tokens. The storefront translates these to
@@ -779,6 +857,35 @@ export default function TypographyPage() {
                       <p className="mt-1 text-sm text-muted-foreground leading-relaxed">
                         {isAr ? z.descriptionAr : z.description}
                       </p>
+
+                      {/* Live preview — mirrors the storefront emitter
+                          so the merchant SEES the result of every field
+                          edit immediately, without saving + reloading.
+                          The preview text matches a real storefront
+                          string for the zone (e.g. "Latest Products"
+                          for sectionTitle) so the merchant can also
+                          gauge real-world line length. */}
+                      <div
+                        className="mt-3 rounded-lg border border-dashed border-primary/30 bg-primary/[0.03] p-4"
+                        dir={isAr ? 'rtl' : 'ltr'}
+                      >
+                        <div className="mb-2 flex items-center justify-between">
+                          <span className="text-[10px] uppercase tracking-wider text-primary/70 font-semibold">
+                            {isAr ? 'معاينة مباشرة' : 'Live preview'}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground/60">
+                            {isAr
+                              ? 'يتحدّث فوريًا مع كل تعديل'
+                              : 'updates instantly with each change'}
+                          </span>
+                        </div>
+                        <div className="min-h-[2rem] flex items-center">
+                          <span style={cfgToInlineStyle(cfg, currentStore?.theme)}>
+                            {isAr ? z.previewTextAr : z.previewText}
+                          </span>
+                        </div>
+                      </div>
+
                       <div className="mt-3 grid gap-3 md:grid-cols-3">
                         <label className="flex flex-col gap-1">
                           <span className="text-sm font-medium text-muted-foreground">
