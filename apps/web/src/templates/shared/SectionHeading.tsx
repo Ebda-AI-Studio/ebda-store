@@ -68,7 +68,7 @@ export function SectionHeading({
               <span
                 aria-hidden
                 data-kicker-divider-line
-                className="h-px flex-1 max-w-[120px] sm:max-w-[180px] bg-foreground/15"
+                className="h-px flex-1 max-w-[140px] sm:max-w-[200px] bg-foreground/30"
               />
               <span
                 className="text-base font-semibold uppercase tracking-[0.18em] text-foreground/70"
@@ -79,7 +79,7 @@ export function SectionHeading({
               <span
                 aria-hidden
                 data-kicker-divider-line
-                className="h-px flex-1 max-w-[120px] sm:max-w-[180px] bg-foreground/15"
+                className="h-px flex-1 max-w-[140px] sm:max-w-[200px] bg-foreground/30"
               />
             </div>
           )}
