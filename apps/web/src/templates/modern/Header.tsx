@@ -59,16 +59,20 @@ export default function ModernHeader({
         className={`sticky top-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg border-b border-border/60 transition-shadow duration-200 ${isScrolled ? 'shadow-sm' : 'shadow-none'}`}
       >
         <div className="container mx-auto px-4">
-          <div className="flex h-24 items-center justify-between gap-4 sm:h-28">
-            {/* Logo */}
-            <Link href={urlPrefix || '/'} className="flex items-center gap-2 shrink-0">
+          <div className="relative flex h-20 items-center justify-between gap-4 sm:h-24 md:h-28">
+            {/* Logo — centered on mobile (per pecannbee + alkahraman target),
+                normal flex item on tablet+ (where the nav fills the middle). */}
+            <Link
+              href={urlPrefix || '/'}
+              className="absolute left-1/2 -translate-x-1/2 md:relative md:left-auto md:translate-x-0 flex items-center gap-2 shrink-0"
+            >
               {displayLogo ? (
                 <Image
                   src={displayLogo}
                   alt={displayName}
                   width={320}
                   height={120}
-                  className="h-20 max-h-20 w-auto object-contain sm:h-24 sm:max-h-24"
+                  className="h-16 max-h-16 w-auto object-contain sm:h-20 sm:max-h-20 md:h-24 md:max-h-24"
                   priority
                 />
               ) : (
