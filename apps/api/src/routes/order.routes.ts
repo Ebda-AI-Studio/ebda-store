@@ -470,6 +470,56 @@ router.post(
 );
 
 /**
+ * POST /stores/:storeId/orders/admin
+ *
+ * Admin-initiated order creation. Used for phone orders / merchant-
+ * placed orders where the customer isn't checking out themselves.
+ * Skips the cart entirely; admin submits line items directly.
+ * After save, the merchant can issue a payment link via the
+ * existing /payment-link endpoint.
+ */
+const adminOrderItemSchema = z.object({
+  productId: z.string().uuid(),
+  variantId: z.string().uuid().optional(),
+  quantity: z.number().int().min(1).max(999),
+});
+const adminOrderSchema = z.object({
+  customerId: z.string().uuid().optional(),
+  shippingAddress: z.record(z.unknown()),
+  billingAddress: z.record(z.unknown()).optional(),
+  items: z.array(adminOrderItemSchema).min(1),
+  paymentMethod: z.enum(['online', 'cod']).optional(),
+  paymentProvider: z.enum(['tap', 'myfatoorah', 'hesabe', 'upayments', 'cod']).optional(),
+  notes: z.string().optional(),
+  couponCode: z.string().optional(),
+  currency: z.string().optional(),
+});
+
+router.post(
+  '/admin',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const user = getAuthUser(req);
+      const data = adminOrderSchema.parse(req.body ?? {});
+
+      const order = await OrderService.createAdminOrder(storeId, user.userId, data);
+
+      res.json({
+        success: true,
+        data: { order },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
  * POST /stores/:storeId/orders/:orderId/payment-link
  *
  * Issue a MyFatoorah payment link for an existing order. Used by the

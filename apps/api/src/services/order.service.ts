@@ -12,6 +12,7 @@ import { shippingCarrierService } from './shipping-carrier.service';
 import { ShippingService } from './shipping.service';
 import { LoyaltyService } from './loyalty.service';
 import { affiliateService } from './affiliate.service';
+import { auditLog } from '../middleware/security';
 import logger from '../lib/logger';
 
 interface CreateOrderData {
@@ -951,5 +952,215 @@ export class OrderService {
         totalPages: Math.ceil(total / limit),
       },
     };
+  }
+
+  /**
+   * Admin-initiated order. Used when a merchant takes a phone order on
+   * behalf of a customer who couldn't / didn't complete checkout
+   * themselves. Skips cart resolution (no client cart involved) and
+   * validates product prices server-side against the catalog —
+   * NEVER trust client-asserted price/total.
+   *
+   * Creates the order in 'pending' / 'unpaid' state; the admin can
+   * then issue a MyFatoorah payment link via the existing
+   * /orders/:id/payment-link endpoint, OR mark it COD-paid, OR call
+   * mark-paid once cash is collected. Ahmad 2026-05-16: 'admin can
+   * land an order ... and copy the payment link'.
+   */
+  static async createAdminOrder(
+    storeId: string,
+    adminUserId: string,
+    data: {
+      // Customer: either an existing User.id OR guest contact info on
+      // shippingAddress (firstName/lastName/email/phone).
+      customerId?: string;
+      shippingAddress: Record<string, unknown>;
+      billingAddress?: Record<string, unknown>;
+      items: Array<{
+        productId: string;
+        variantId?: string;
+        quantity: number;
+      }>;
+      paymentMethod?: 'online' | 'cod';
+      paymentProvider?: 'tap' | 'myfatoorah' | 'hesabe' | 'upayments' | 'cod';
+      notes?: string;
+      couponCode?: string;
+      currency?: string;
+    }
+  ) {
+    if (data.items.length === 0) {
+      throw new AppError(400, 'NO_ITEMS', 'Order must have at least one item');
+    }
+
+    // Hydrate product + variant prices from the DB. Admin form
+    // submits only productId + quantity; we look up the canonical
+    // price here so a tampered or stale price never persists.
+    const productIds = Array.from(new Set(data.items.map(it => it.productId)));
+    const products = await prisma.product.findMany({
+      where: { id: { in: productIds }, storeId, status: 'active' },
+      include: {
+        variants: true,
+      },
+    });
+    const productMap = new Map(products.map(p => [p.id, p]));
+
+    const resolved = data.items.map(it => {
+      const product = productMap.get(it.productId);
+      if (!product) {
+        throw new AppError(404, 'PRODUCT_NOT_FOUND', `Product ${it.productId} not found`);
+      }
+      let unitPrice = product.price;
+      let variantSku: string | undefined;
+      let variantTitle: string | undefined;
+      if (it.variantId) {
+        const variant = product.variants.find(v => v.id === it.variantId);
+        if (!variant) {
+          throw new AppError(
+            404,
+            'VARIANT_NOT_FOUND',
+            `Variant ${it.variantId} not found for product ${product.name}`
+          );
+        }
+        if (typeof variant.price === 'number') unitPrice = variant.price;
+        variantSku = variant.sku ?? undefined;
+        variantTitle = variant.title ?? undefined;
+      }
+      const quantity = Math.max(1, Math.floor(it.quantity));
+      const lineTotal = unitPrice * quantity;
+      return {
+        productId: product.id,
+        productName: product.name,
+        sku: variantSku ?? product.sku ?? undefined,
+        variantId: it.variantId,
+        variantTitle,
+        unitPrice,
+        quantity,
+        lineTotal,
+      };
+    });
+
+    const subtotal = resolved.reduce((sum, r) => sum + r.lineTotal, 0);
+
+    // Tax: same store-level resolution as the public checkout path.
+    const taxRates = await prisma.taxRate.findMany({ where: { storeId, isActive: true } });
+    const taxRate = taxRates.length > 0 ? Number(taxRates[0].rate) / 100 : 0;
+    const tax = Math.round(subtotal * taxRate);
+
+    // Shipping: try to resolve via ShippingService; fall back to 0 on
+    // error (same defensive posture as public checkout).
+    const shippingArea =
+      typeof data.shippingAddress.area === 'string'
+        ? (data.shippingAddress.area as string)
+        : ((data.shippingAddress.city as string) ?? '');
+    let shipping = 0;
+    try {
+      const res = await ShippingService.calculateShipping(storeId, shippingArea, subtotal);
+      shipping = res.freeShipping ? 0 : res.shippingCost;
+    } catch (err) {
+      logger.warn(
+        { err: err instanceof Error ? err.message : err, storeId, shippingArea },
+        '[Admin-Order] shipping calculation failed; defaulting to 0'
+      );
+    }
+
+    // Coupon: resolved server-side via CouponService just like the
+    // public flow.
+    let couponDiscount = 0;
+    let couponCode: string | undefined;
+    if (data.couponCode) {
+      const coupon = await CouponService.getByCode(storeId, data.couponCode);
+      if (coupon.minOrderAmount && subtotal < coupon.minOrderAmount) {
+        throw new AppError(
+          400,
+          'MIN_ORDER_NOT_MET',
+          `Minimum order amount of ${(coupon.minOrderAmount / 1000).toFixed(3)} KWD required for this coupon`
+        );
+      }
+      if (coupon.type === 'free_shipping') {
+        shipping = 0;
+      } else {
+        couponDiscount = CouponService.calculateDiscount(
+          {
+            type: coupon.type,
+            value: coupon.value,
+            maxDiscount: coupon.maxDiscount,
+          },
+          subtotal
+        );
+      }
+      couponCode = coupon.code;
+    }
+
+    const total = Math.max(0, subtotal + tax + shipping - couponDiscount);
+    const orderNumber = `ORD-${Date.now()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+
+    // Create the order + items in one transaction. Inventory is NOT
+    // decremented for admin orders by default — the merchant
+    // confirms physical availability before placing. The mark-paid
+    // path elsewhere decrements as needed when payment lands.
+    const order = await prisma.$transaction(async tx => {
+      const created = await tx.order.create({
+        data: {
+          orderNumber,
+          storeId,
+          customerId: data.customerId ?? null,
+          status: 'pending',
+          paymentStatus: 'unpaid',
+          subtotal,
+          tax,
+          shipping,
+          discount: couponDiscount,
+          total,
+          currency: data.currency ?? 'KWD',
+          couponCode: couponCode ?? null,
+          shippingAddress: data.shippingAddress as Prisma.InputJsonValue,
+          billingAddress: (data.billingAddress ?? data.shippingAddress) as Prisma.InputJsonValue,
+          notes: data.notes ?? null,
+          items: {
+            create: resolved.map(r => ({
+              productId: r.productId,
+              productName: r.productName,
+              sku: r.sku,
+              variantId: r.variantId,
+              variantTitle: r.variantTitle,
+              price: r.unitPrice,
+              quantity: r.quantity,
+              total: r.lineTotal,
+            })),
+          },
+        },
+        include: {
+          items: true,
+          customer: {
+            select: { id: true, firstName: true, lastName: true, email: true, phone: true },
+          },
+        },
+      });
+      return created;
+    });
+
+    await auditLog({
+      action: 'order.admin_created',
+      userId: adminUserId,
+      resourceType: 'order',
+      resourceId: order.id,
+      details: {
+        orderNumber: order.orderNumber,
+        itemsCount: resolved.length,
+        total,
+      },
+    });
+
+    logger.info(
+      {
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        adminUserId,
+        itemsCount: resolved.length,
+      },
+      '[Admin-Order] created on behalf of customer'
+    );
+
+    return order;
   }
 }

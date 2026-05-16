@@ -334,6 +334,67 @@ router.get(
 );
 
 /**
+ * GET /stores/:storeId/customers/search?q=<query>
+ *
+ * Lightweight typeahead used by the admin "New order" form to attach
+ * an existing customer (User row) to a phone order. Matches by first
+ * name, last name, email, or phone. Limited to 10 results.
+ */
+router.get(
+  '/customers/search',
+  ...adminMiddleware,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const q = (req.query.q as string | undefined)?.trim();
+      if (!q || q.length < 2) {
+        res.json({ success: true, data: { customers: [] } });
+        return;
+      }
+
+      // Only return users who have placed at least one order at this
+      // store — keeps the search scoped to actual customers, not every
+      // user in the system.
+      const orders = await prisma.order.findMany({
+        where: {
+          storeId,
+          customerId: { not: null },
+          customer: {
+            OR: [
+              { firstName: { contains: q, mode: 'insensitive' } },
+              { lastName: { contains: q, mode: 'insensitive' } },
+              { email: { contains: q, mode: 'insensitive' } },
+              { phone: { contains: q, mode: 'insensitive' } },
+            ],
+          },
+        },
+        select: {
+          customer: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phone: true,
+            },
+          },
+        },
+        distinct: ['customerId'],
+        take: 10,
+      });
+
+      const customers = orders
+        .map(o => o.customer)
+        .filter((c): c is NonNullable<typeof c> => c !== null);
+
+      res.json({ success: true, data: { customers } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
  * GET /stores/:storeId/customers/:customerKey
  * Returns a single customer's full profile + every order they've placed.
  *
