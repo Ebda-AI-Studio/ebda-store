@@ -102,11 +102,12 @@ export default function MinimalHeader({
 
           {/* Actions */}
           <div className={`flex items-center gap-2 ${isRtl ? 'flex-row-reverse' : ''}`}>
-            {/* Search */}
+            {/* Desktop-only search toggle — mobile has a persistent search
+                bar below the logo row so a toggle here would be redundant. */}
             <button
               type="button"
               onClick={() => setIsSearchOpen(!isSearchOpen)}
-              className="inline-flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer"
+              className="hidden lg:inline-flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer"
               aria-label={isRtl ? 'بحث' : 'Search'}
               aria-expanded={isSearchOpen}
             >
@@ -210,9 +211,47 @@ export default function MinimalHeader({
           </div>
         </div>
 
-        {/* Search field — smooth expand */}
+        {/* Mobile persistent search bar — always visible under the logo
+            row on mobile (pecannbee target layout). Hidden on lg+ where
+            the expandable search-toggle in the actions row handles it. */}
+        <div className="lg:hidden pb-3" data-zone="mobile-search">
+          <form onSubmit={handleSearch} className="relative">
+            <svg
+              className={`absolute top-1/2 -translate-y-1/2 ${isRtl ? 'right-3' : 'left-3'} w-4 h-4 text-muted-foreground pointer-events-none`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              strokeWidth={1}
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder={isRtl ? 'بحث' : 'Search'}
+              className={`w-full ${isRtl ? 'pr-10 pl-3' : 'pl-10 pr-3'} py-2.5 text-base sm:text-xs tracking-wide bg-transparent border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors duration-200 rounded`}
+              dir={isRtl ? 'rtl' : 'ltr'}
+              aria-label={isRtl ? 'بحث عن المنتجات' : 'Search products'}
+            />
+            <SearchAutocomplete
+              query={searchQuery}
+              onSelect={() => {
+                setSearchQuery('');
+              }}
+            />
+          </form>
+        </div>
+
+        {/* Desktop search field — smooth expand toggled by the search icon
+            in the actions row. lg+ only since mobile has its own row above. */}
         <div
-          className={`overflow-visible transition-all duration-300 ${
+          className={`hidden lg:block overflow-visible transition-all duration-300 ${
             isSearchOpen ? 'max-h-16 opacity-100 pb-4' : 'max-h-0 opacity-0 pointer-events-none'
           }`}
         >
@@ -222,7 +261,7 @@ export default function MinimalHeader({
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder={isRtl ? 'بحث...' : 'Search...'}
-              className="w-full text-center text-xs tracking-wide bg-transparent border-b border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground pb-2 transition-colors duration-200"
+              className="w-full text-center text-base sm:text-xs tracking-wide bg-transparent border-b border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground pb-2 transition-colors duration-200"
               dir={isRtl ? 'rtl' : 'ltr'}
               autoFocus={isSearchOpen}
               aria-label={isRtl ? 'بحث عن المنتجات' : 'Search products'}

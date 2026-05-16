@@ -227,9 +227,46 @@ export default function ElegantHeader({
           ))}
         </nav>
 
-        {/* Search field — expands below nav */}
+        {/* Mobile persistent search bar — always visible under the logo
+            row on mobile (pecannbee target). Hidden on md+ where the
+            expandable search toggle in the actions row handles it. */}
+        <div className="md:hidden pb-4 -mt-2" data-zone="mobile-search">
+          <form onSubmit={handleSearch} className="relative">
+            <svg
+              className={`absolute top-1/2 -translate-y-1/2 ${isRtl ? 'right-3' : 'left-3'} w-5 h-5 text-foreground/40 pointer-events-none`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              strokeWidth={1}
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder={isRtl ? 'بحث' : 'Search'}
+              className={`w-full ${isRtl ? 'pr-11 pl-4' : 'pl-11 pr-4'} py-3 bg-transparent border-b border-border focus:outline-none focus:border-foreground text-base sm:text-sm tracking-[0.08em] placeholder:text-muted-foreground/50 transition-colors duration-500`}
+              dir={isRtl ? 'rtl' : 'ltr'}
+              aria-label={isRtl ? 'بحث عن المنتجات' : 'Search products'}
+            />
+            <SearchAutocomplete
+              query={searchQuery}
+              onSelect={() => {
+                setSearchQuery('');
+              }}
+            />
+          </form>
+        </div>
+
+        {/* Desktop search field — expands below nav on md+ only. */}
         <div
-          className={`overflow-visible transition-all duration-500 ${isSearchOpen ? 'max-h-24 opacity-100 py-6 border-t border-border/50' : 'max-h-0 opacity-0 py-0 pointer-events-none'}`}
+          className={`hidden md:block overflow-visible transition-all duration-500 ${isSearchOpen ? 'max-h-24 opacity-100 py-6 border-t border-border/50' : 'max-h-0 opacity-0 py-0 pointer-events-none'}`}
         >
           <form onSubmit={handleSearch} className="relative max-w-lg mx-auto">
             <input
@@ -237,7 +274,7 @@ export default function ElegantHeader({
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder={isRtl ? 'ما الذي تبحث عنه؟' : 'What are you looking for?'}
-              className="w-full px-0 py-3 bg-transparent border-0 border-b border-border focus:outline-none focus:border-foreground text-center text-sm tracking-[0.1em] placeholder:text-muted-foreground/50 transition-colors duration-500"
+              className="w-full px-0 py-3 bg-transparent border-0 border-b border-border focus:outline-none focus:border-foreground text-center text-base sm:text-sm tracking-[0.1em] placeholder:text-muted-foreground/50 transition-colors duration-500"
               dir={isRtl ? 'rtl' : 'ltr'}
               autoFocus={isSearchOpen}
               aria-label={isRtl ? 'بحث عن المنتجات' : 'Search products'}

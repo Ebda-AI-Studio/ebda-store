@@ -49,17 +49,20 @@ export default function BoldHeader({
     <>
       <header className="bg-gray-950 text-white sticky top-0 z-50 border-b border-white/10">
         <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between h-24 gap-4 sm:h-28">
-            {/* Logo */}
+          {/* Row 1: hamburger | logo | actions — pecannbee-aligned mobile
+              layout. Logo absolute-centered on mobile, normal flex on md+. */}
+          <div className="relative flex items-center justify-between h-24 gap-4 sm:h-28">
+            {/* Logo — centered on mobile (pecannbee target), normal flex
+                on md+. Bumped mobile to h-20 per Ahmad 2026-05-16. */}
             <Link
               href={urlPrefix || '/'}
-              className="flex items-center gap-3 shrink-0 cursor-pointer"
+              className="absolute left-1/2 -translate-x-1/2 md:relative md:left-auto md:translate-x-0 flex items-center gap-3 shrink-0 cursor-pointer"
             >
               {displayLogo ? (
                 <img
                   src={displayLogo}
                   alt={displayName}
-                  className="h-20 max-h-20 w-auto brightness-0 invert sm:h-24 sm:max-h-24"
+                  className="h-20 max-h-20 w-auto brightness-0 invert md:h-24 md:max-h-24"
                 />
               ) : (
                 <span className="text-xl font-black uppercase tracking-wider text-white">
@@ -84,10 +87,11 @@ export default function BoldHeader({
 
             {/* Actions */}
             <div className={`flex items-center gap-2 ${isRtl ? 'flex-row-reverse' : ''}`}>
-              {/* Search */}
+              {/* Desktop-only search toggle. Mobile has a persistent search
+                  bar below the logo row (pecannbee target). */}
               <button
                 onClick={() => setIsSearchOpen(!isSearchOpen)}
-                className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors duration-200 cursor-pointer"
+                className="hidden md:inline-flex h-11 w-11 items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors duration-200 cursor-pointer"
                 aria-label={isRtl ? 'بحث' : 'Search'}
               >
                 <svg
@@ -188,9 +192,46 @@ export default function BoldHeader({
             </div>
           </div>
 
-          {/* Search Bar */}
+          {/* Mobile persistent search bar — pecannbee target. Always visible
+              under the logo row on mobile, hidden on md+. */}
+          <div className="md:hidden pb-3 border-t border-white/10 pt-3" data-zone="mobile-search">
+            <form onSubmit={handleSearch} className="relative">
+              <svg
+                className={`absolute top-1/2 -translate-y-1/2 ${isRtl ? 'right-3' : 'left-3'} w-5 h-5 text-white/50 pointer-events-none`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder={isRtl ? 'بحث' : 'Search'}
+                className={`w-full ${isRtl ? 'pr-11 pl-4' : 'pl-11 pr-4'} py-3 bg-white/10 text-white placeholder:text-white/40 rounded-lg border border-white/20 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-base sm:text-sm font-medium transition-colors duration-200`}
+                dir={isRtl ? 'rtl' : 'ltr'}
+                aria-label={isRtl ? 'بحث عن المنتجات' : 'Search products'}
+              />
+              <SearchAutocomplete
+                query={searchQuery}
+                onSelect={() => {
+                  setSearchQuery('');
+                }}
+              />
+            </form>
+          </div>
+
+          {/* Desktop expandable search bar — md+ only, toggled via the
+              search icon in the actions row. */}
           <div
-            className={`overflow-visible transition-all duration-200 ${isSearchOpen ? 'max-h-20 opacity-100 py-3 border-t border-white/10' : 'max-h-0 opacity-0 py-0 pointer-events-none'}`}
+            className={`hidden md:block overflow-visible transition-all duration-200 ${isSearchOpen ? 'max-h-20 opacity-100 py-3 border-t border-white/10' : 'max-h-0 opacity-0 py-0 pointer-events-none'}`}
           >
             <form onSubmit={handleSearch} className="relative flex gap-2">
               <input
@@ -198,7 +239,7 @@ export default function BoldHeader({
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder={isRtl ? 'ابحث...' : 'Search products...'}
-                className="flex-1 px-4 py-2.5 bg-white/10 text-white placeholder:text-white/40 rounded-lg border border-white/20 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm font-medium transition-colors duration-200"
+                className="flex-1 px-4 py-2.5 bg-white/10 text-white placeholder:text-white/40 rounded-lg border border-white/20 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-base sm:text-sm font-medium transition-colors duration-200"
                 dir={isRtl ? 'rtl' : 'ltr'}
                 autoFocus={isSearchOpen}
                 aria-label={isRtl ? 'بحث عن المنتجات' : 'Search products'}

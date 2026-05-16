@@ -288,7 +288,39 @@ export default function ClassicHeader({
         </div>
       </div>
 
-      {/* Search bar */}
+      {/* Mobile persistent search bar — pecannbee target layout. Always
+          visible under the main header row on mobile so customers don't
+          have to open the menu to search. Hidden on md+. */}
+      <div className="md:hidden border-t border-border/40 py-3" data-zone="mobile-search">
+        <form onSubmit={handleSearch} className="relative container mx-auto px-4">
+          <svg
+            className={`absolute top-1/2 -translate-y-1/2 ${isRtl ? 'right-7' : 'left-7'} w-5 h-5 text-muted-foreground pointer-events-none`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.5}
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+            />
+          </svg>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder={isRtl ? 'بحث' : 'Search'}
+            className={`w-full ${isRtl ? 'pr-11 pl-4' : 'pl-11 pr-4'} py-2.5 border border-border bg-transparent font-serif text-base sm:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors duration-500 rounded`}
+            dir={isRtl ? 'rtl' : 'ltr'}
+            aria-label={isRtl ? 'بحث عن المنتجات' : 'Search products'}
+          />
+          <SearchAutocomplete query={searchQuery} onSelect={() => setSearchQuery('')} />
+        </form>
+      </div>
+
+      {/* Desktop search bar — centered under the header on md+. */}
       <div className="hidden md:block border-t border-border/40 py-3">
         <form onSubmit={handleSearch} className="relative container mx-auto px-4 max-w-md">
           <input
@@ -297,7 +329,7 @@ export default function ClassicHeader({
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder={isRtl ? 'ابحث في مجموعتنا...' : 'Search our collection...'}
-            className="w-full py-1.5 px-0 border-b border-border bg-transparent font-serif text-sm text-center text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors duration-500"
+            className="w-full py-1.5 px-0 border-b border-border bg-transparent font-serif text-base sm:text-sm text-center text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors duration-500"
             dir={isRtl ? 'rtl' : 'ltr'}
             aria-label={isRtl ? 'بحث عن المنتجات' : 'Search products'}
           />
