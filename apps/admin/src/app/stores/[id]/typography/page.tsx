@@ -79,6 +79,17 @@ const ZONES: ZoneDef[] = [
     descriptionAr: 'أي عنصر يظهر تحت الفوتر (شريط الكوكيز إلخ).',
   },
   // Sub-zones — nested overrides.
+  // Section heading sub-zones split SectionHeading into 4 individually
+  // styleable parts — so a coloured-pill style on the title doesn't
+  // bleed onto the "View All" link next to it (Ahmad 2026-05-16).
+  {
+    key: 'sectionKicker',
+    label: 'Section kicker (eyebrow label)',
+    labelAr: 'الشارة العلوية للقسم',
+    description: 'Small chip above section titles (e.g. "EXPLORE"). Style independently.',
+    descriptionAr: 'الشارة الصغيرة فوق عنوان القسم (مثل "استكشف"). يمكن تنسيقها بشكل مستقل.',
+    isSubZone: true,
+  },
   {
     key: 'sectionTitle',
     label: 'Section title',
@@ -86,6 +97,22 @@ const ZONES: ZoneDef[] = [
     description: 'Homepage section H2s ("New Arrivals", "Shop by Category") + listing-page H1.',
     descriptionAr:
       'عناوين أقسام الصفحة الرئيسية ("أحدث المنتجات"، "تسوق حسب الفئة") وعنوان صفحة القائمة.',
+    isSubZone: true,
+  },
+  {
+    key: 'sectionSubtitle',
+    label: 'Section subtitle (tagline)',
+    labelAr: 'العنوان الفرعي للقسم',
+    description: 'Tagline rendered below the section title.',
+    descriptionAr: 'النص الفرعي الذي يظهر تحت عنوان القسم.',
+    isSubZone: true,
+  },
+  {
+    key: 'sectionSeeAll',
+    label: 'Section "View All" link',
+    labelAr: 'رابط "عرض الكل"',
+    description: 'The "View All" / "See all" link at the end of each section heading row.',
+    descriptionAr: 'رابط "عرض الكل" الذي يظهر في نهاية صف عنوان القسم.',
     isSubZone: true,
   },
   {
@@ -129,7 +156,10 @@ type ZoneKey =
   | 'products'
   | 'footer'
   | 'afterFooter'
+  | 'sectionKicker'
   | 'sectionTitle'
+  | 'sectionSubtitle'
+  | 'sectionSeeAll'
   | 'productName'
   | 'productPrice'
   | 'cta'

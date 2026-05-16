@@ -73,6 +73,24 @@ const layoutSchema = z
       // 2026-05-16: per-store card size / aspect / visual toggles.
       cardSize: z.enum(['xs', 'sm', 'md', 'lg', 'xl']).optional(),
       cardAspect: z.enum(['theme', 'square', 'portrait', 'landscape']).optional(),
+      // 2026-05-16 batch 2: cardGap (spacing between cards) + cardShape
+      // (named preset that bundles aspect + radius). Must be listed here
+      // or Zod silently strips on PUT — exact same trap that bit
+      // reviewSection earlier this same day. Keep in sync with
+      // CategoriesSettings in packages/shared/src/types/store-layout.ts.
+      cardGap: z.enum(['tight', 'normal', 'loose', 'xloose']).optional(),
+      cardShape: z
+        .enum([
+          'theme',
+          'circle',
+          'rounded-square',
+          'square',
+          'soft',
+          'portrait',
+          'landscape',
+          'pill',
+        ])
+        .optional(),
       showLabel: z.boolean().optional(),
       showHover: z.boolean().optional(),
     }),

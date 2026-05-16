@@ -25,7 +25,18 @@ export type TypographyZone =
   // so e.g. `productName` overrides `products` for the actual product
   // name text, while everything else inside `products` keeps inheriting
   // from the broad `products` rule.
+  //
+  // Section heading sub-zones (added 2026-05-16) split SectionHeading
+  // into 4 independently-styleable parts so a coloured-pill on the
+  // title doesn't bleed onto the "View All" link next to it:
+  //   sectionKicker   = the eyebrow chip above (e.g. "EXPLORE")
+  //   sectionTitle    = the H2 (e.g. "أحدث المنتجات")
+  //   sectionSubtitle = the tagline below (e.g. "Browse top picks…")
+  //   sectionSeeAll   = the "View All" link at the row's end
+  | 'sectionKicker'
   | 'sectionTitle'
+  | 'sectionSubtitle'
+  | 'sectionSeeAll'
   | 'productName'
   | 'productPrice'
   | 'cta'
@@ -38,7 +49,10 @@ export const TYPOGRAPHY_ZONES: TypographyZone[] = [
   'products',
   'footer',
   'afterFooter',
+  'sectionKicker',
   'sectionTitle',
+  'sectionSubtitle',
+  'sectionSeeAll',
   'productName',
   'productPrice',
   'cta',

@@ -366,8 +366,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     'afterFooter',
     // Sub-zones — nested inside the broad ones; emitted last so a
     // tied selector still wins on source order, on top of having
-    // (usually) the same specificity.
+    // (usually) the same specificity. Section heading sub-zones
+    // (sectionKicker / sectionTitle / sectionSubtitle / sectionSeeAll)
+    // tag the 4 individual elements inside SectionHeading so a chip /
+    // underline on the title doesn't bleed onto the "View All" link.
+    'sectionKicker',
     'sectionTitle',
+    'sectionSubtitle',
+    'sectionSeeAll',
     'productName',
     'productPrice',
     'cta',

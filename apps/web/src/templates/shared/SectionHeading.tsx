@@ -41,22 +41,48 @@ export function SectionHeading({
   if (!text && !seeAllHref && !kickerText && !subtitleText) return null;
   const styles = getPackStyles(pack);
 
+  // IMPORTANT: data-zone tags are scoped to the SPECIFIC element each
+  // typography zone targets — never the outer wrapper. Tagging the
+  // wrapper makes the CSS rule `[data-zone="sectionTitle"] *` cascade
+  // to the kicker chip, subtitle, AND seeAll link. Merchants who set
+  // sectionTitle to a coloured pill or underline then saw the "View
+  // all" link turn into a pill too (Ahmad 2026-05-16).
+  //
+  // Layout: kicker → title h2 → subtitle on the left, seeAll on the right.
+  // Each text element gets its own data-zone so merchants can style them
+  // independently from the Typography admin.
   return (
-    <div className="mb-8 flex flex-col gap-2 sm:mb-12 sm:gap-3" data-zone="sectionTitle">
+    <div className="mb-8 flex flex-col gap-2 sm:mb-12 sm:gap-3">
       <div className="flex items-end justify-between gap-4">
         <div className="flex flex-col gap-1.5 sm:gap-2">
           {kickerText && (
-            <span className="self-start inline-flex items-center rounded-full bg-primary/10 text-primary px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em]">
+            <span
+              className="self-start inline-flex items-center rounded-full bg-primary/10 text-primary px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em]"
+              data-zone="sectionKicker"
+            >
               {kickerText}
             </span>
           )}
-          {text && <h2 className={styles.sectionHeading}>{text}</h2>}
+          {text && (
+            <h2 className={styles.sectionHeading} data-zone="sectionTitle">
+              {text}
+            </h2>
+          )}
           {subtitleText && (
-            <p className="text-sm text-muted-foreground sm:text-base max-w-2xl">{subtitleText}</p>
+            <p
+              className="text-sm text-muted-foreground sm:text-base max-w-2xl"
+              data-zone="sectionSubtitle"
+            >
+              {subtitleText}
+            </p>
           )}
         </div>
         {seeAllHref && (
-          <Link href={seeAllHref} className={`shrink-0 ${styles.sectionSeeAll}`}>
+          <Link
+            href={seeAllHref}
+            className={`shrink-0 ${styles.sectionSeeAll}`}
+            data-zone="sectionSeeAll"
+          >
             {isRtl ? 'عرض الكل' : 'See all'}
           </Link>
         )}

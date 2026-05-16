@@ -66,7 +66,10 @@ const typographySchema = z.object({
       footer: zoneSchema.optional(),
       afterFooter: zoneSchema.optional(),
       // Sub-zones (nested inside broad zones; CSS specificity wins)
+      sectionKicker: zoneSchema.optional(),
       sectionTitle: zoneSchema.optional(),
+      sectionSubtitle: zoneSchema.optional(),
+      sectionSeeAll: zoneSchema.optional(),
       productName: zoneSchema.optional(),
       productPrice: zoneSchema.optional(),
       cta: zoneSchema.optional(),
