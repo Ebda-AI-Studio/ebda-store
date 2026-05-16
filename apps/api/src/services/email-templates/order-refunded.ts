@@ -3,17 +3,18 @@ import type { OrderRefundEmailData } from '../email.service';
 
 export const orderRefundedTemplate = {
   subject: {
-    en: (d: OrderRefundEmailData) => `Refund Issued — Order #${d.orderNumber}`,
-    ar: (d: OrderRefundEmailData) => `تم استرداد المبلغ — طلب رقم ${d.orderNumber}`,
+    en: (d: OrderRefundEmailData) => `Refund Requested — Order #${d.orderNumber}`,
+    ar: (d: OrderRefundEmailData) => `تم طلب الاسترداد — طلب رقم ${d.orderNumber}`,
   },
 
   en: (d: OrderRefundEmailData) => `
-    <h2>Your refund has been issued</h2>
+    <h2>Your refund has been requested</h2>
     <p>Hi ${escapeHtml(d.customerName)},</p>
     <p>
-      We've processed a refund of <strong>${(d.refundAmount / 1000).toFixed(3)} KWD</strong>
-      for order <strong>#${escapeHtml(d.orderNumber)}</strong>. The amount will appear on
-      your original payment method within 5–10 business days, depending on your bank.
+      A refund of <strong>${(d.refundAmount / 1000).toFixed(3)} KWD</strong>
+      for order <strong>#${escapeHtml(d.orderNumber)}</strong> has been submitted to the
+      payment provider. The amount will appear on your original payment method within
+      1–3 business days, depending on the provider and your bank.
     </p>
 
     ${

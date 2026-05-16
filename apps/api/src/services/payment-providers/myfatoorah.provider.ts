@@ -260,35 +260,52 @@ export class MyFatoorahPaymentProvider implements IPaymentProvider {
   }
 
   async refund(request: RefundRequest): Promise<RefundResponse> {
-    // First get payment details. MyFatoorah's MakeRefund needs the
-    // *PaymentId* (per-transaction identifier), not the InvoiceId we
-    // stored at create time. If PaymentId is missing from metadata
-    // (older payments / partial-data responses), fall back to InvoiceId
-    // with KeyType:InvoiceId so the request still validates instead of
-    // 400-ing on a Key/KeyType mismatch.
+    // First get payment details. MyFatoorah's MakeRefund needs:
+    //   - Key + KeyType (PaymentId preferred, InvoiceId fallback)
+    //   - Amount: REQUIRED per docs even for full refunds. Default to the
+    //     paid amount from GetPaymentStatus so a full-refund call (where
+    //     the caller passes no amount) still satisfies the API.
+    // Note: MyFatoorah refunds are NOT instant — they create a refund
+    // *request* that's reviewed and executed by MyFatoorah's finance team
+    // (typically 1-3 business days). The API returns success on submission,
+    // not on settlement.
     const status = await this.getPaymentStatus(request.transactionId);
     const paymentId = status.metadata?.paymentId as string | undefined;
     const refundKey = paymentId || request.transactionId;
-    const refundKeyType = paymentId ? 'PaymentId' : 'InvoiceId';
+    // MyFatoorah's working sample (and PHP/C#/Python SDKs) use lowercase
+    // KeyType values — `paymentid` / `invoiceid`. The endpoint accepts
+    // both casings in practice, but matching their canonical form rules
+    // out case-sensitivity-related rejections that have bitten others.
+    const refundKeyType = paymentId ? 'paymentid' : 'invoiceid';
+
+    // Default to the full paid amount when the caller didn't specify a
+    // partial refund. `request.amount` is in fils; MyFatoorah's API
+    // expects the account's default currency unit (KWD for Wady Aljuz).
+    const amountFils = request.amount ?? status.paidAmount ?? status.amount;
+    if (!amountFils || amountFils <= 0) {
+      throw new Error('Cannot determine refund amount — payment has no paid amount on record');
+    }
+    const amountKwd = amountFils / 1000;
 
     const refundData: Record<string, unknown> = {
       Key: refundKey,
       KeyType: refundKeyType,
-      RefundChargeOnCustomer: false,
+      Amount: amountKwd,
       ServiceChargeOnCustomer: false,
       Comment: request.reason || 'Refund requested',
+      // Correlate our order with MyFatoorah's refund record so the finance
+      // team (and us later, via GetRefundStatus) can map refunds back to
+      // our internal IDs without manual cross-referencing. Matches the
+      // pattern in MyFatoorah's working sample response.
+      ExternalIdentifier: `order:${request.transactionId}`,
     };
-
-    if (request.amount) {
-      refundData.Amount = request.amount / 1000;
-    }
 
     logger.info(
       {
         keyType: refundKeyType,
         invoiceId: request.transactionId,
-        amountFils: request.amount,
-        amountKwd: refundData.Amount,
+        amountFils,
+        amountKwd,
         testMode: this.config.isTestMode,
       },
       '[MyFatoorah] MakeRefund request'

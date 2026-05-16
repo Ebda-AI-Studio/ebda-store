@@ -66,8 +66,12 @@ export function RefundButton({
         toastError('Refund failed', error?.message ?? '');
         return;
       }
+      // MyFatoorah refunds are queued for their finance team's review,
+      // so "issued" is misleading — the customer's card hasn't moved yet.
+      // Same wording works for Tap/Hesabe/UPayments which are typically
+      // faster but still asynchronous on the provider side.
       toastSuccess(
-        `Refunded ${(data.refundAmount / 1000).toFixed(3)} ${currency} via ${data.provider}`
+        `Refund of ${(data.refundAmount / 1000).toFixed(3)} ${currency} requested via ${data.provider} — customer's card will reflect in 1-3 business days`
       );
       onRefunded?.();
       setReason('');
@@ -101,13 +105,17 @@ export function RefundButton({
 
       <Modal isOpen={open} onClose={closeIfIdle} title={`Refund order ${orderNumber}?`} size="sm">
         <p className="text-sm text-muted-foreground">
-          The full amount of{' '}
+          A refund request of{' '}
           <strong className="text-foreground">
             {(total / 1000).toFixed(3)} {currency}
           </strong>{' '}
-          will be refunded to the customer&apos;s original payment method. Inventory will be
-          restored, coupon usage decremented, loyalty points reversed, and the customer will be
-          emailed. This cannot be undone.
+          will be sent to the payment provider. The customer&apos;s card typically reflects the
+          refund in 1-3 business days (MyFatoorah refunds are reviewed by their finance team before
+          execution).
+        </p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Inventory will be restored, coupon usage decremented, loyalty points reversed, and the
+          customer will be notified by email. This cannot be undone.
         </p>
 
         <div className="mt-4">
