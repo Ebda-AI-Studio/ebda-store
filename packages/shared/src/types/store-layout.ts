@@ -100,6 +100,17 @@ export interface SizingContract {
   categoryImageAspect: '1:1' | '3:4' | '2:3';
 }
 
+/**
+ * User-generated-content sections (testimonials on home + reviews on product
+ * detail) share an admin section and a fake-reviews-illegal posture (KW Law
+ * 39/2014, FTC 2024, EU UCPD). Both default off so a brand-new store doesn't
+ * silently show "be the first to review" empty states that read like staged
+ * placeholders. Merchants explicitly opt-in once they have real UGC.
+ */
+export interface ReviewSectionSettings {
+  enabled: boolean;
+}
+
 export interface StoreLayoutSettings {
   hero: HeroSettings;
   categories: CategoriesSettings;
@@ -107,6 +118,7 @@ export interface StoreLayoutSettings {
   bestSellers: ProductCarouselSettings;
   filterSidebar: FilterSidebarSettings;
   testimonials: TestimonialsSettings;
+  reviewSection: ReviewSectionSettings;
   sizing: SizingContract;
 }
 
@@ -152,6 +164,14 @@ export const DEFAULT_LAYOUT_SETTINGS: StoreLayoutSettings = {
     minRating: 4,
     verifiedOnly: true,
   },
+  reviewSection: {
+    // Sibling of testimonials above — controls the product-detail-page
+    // ReviewSection. Default off so new stores don't ship with a
+    // "no reviews yet, be the first" placeholder reading as staged
+    // content. Combined with the platform-level `isEnabled('reviews')`
+    // feature flag via AND: both must be on for the section to render.
+    enabled: false,
+  },
   sizing: {
     heroAspect: '2.45:1',
     productImageAspect: '1:1',
@@ -175,6 +195,7 @@ export function resolveLayoutSettings(input: unknown): StoreLayoutSettings {
     bestSellers: { ...DEFAULT_LAYOUT_SETTINGS.bestSellers, ...(raw.bestSellers ?? {}) },
     filterSidebar: { ...DEFAULT_LAYOUT_SETTINGS.filterSidebar, ...(raw.filterSidebar ?? {}) },
     testimonials: { ...DEFAULT_LAYOUT_SETTINGS.testimonials, ...(raw.testimonials ?? {}) },
+    reviewSection: { ...DEFAULT_LAYOUT_SETTINGS.reviewSection, ...(raw.reviewSection ?? {}) },
     sizing: { ...DEFAULT_LAYOUT_SETTINGS.sizing, ...(raw.sizing ?? {}) },
   };
 }

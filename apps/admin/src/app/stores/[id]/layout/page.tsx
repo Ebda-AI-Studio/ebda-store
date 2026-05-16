@@ -338,6 +338,14 @@ export default function StoreLayoutPage() {
                 />
               </SectionCard>
 
+              {/* Product reviews (sibling of testimonials — both UGC) */}
+              <SectionCard
+                title={t('sections.reviewSection.title')}
+                description={t('sections.reviewSection.description')}
+                enabled={layout.reviewSection.enabled}
+                onToggle={v => updateSection('reviewSection', s => ({ ...s, enabled: v }))}
+              />
+
               {/* Sizing contract */}
               <SectionCard
                 title={t('sections.sizing.title')}

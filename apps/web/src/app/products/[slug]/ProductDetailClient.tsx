@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import dynamic from 'next/dynamic';
 import { Button, Badge, useToast } from '@force/ui';
+import type { StoreLayoutSettings } from '@force/shared';
 import { api, type Product, type ProductVariant } from '@/lib/api';
 import { getProductPricing } from '@/lib/product-pricing';
 import { useCart } from '../../../contexts/CartContext';
@@ -121,9 +122,10 @@ function ProductSkeleton() {
 
 interface ProductDetailClientProps {
   initialProduct?: Product | null;
+  layout?: StoreLayoutSettings;
 }
 
-export default function ProductDetailClient({ initialProduct }: ProductDetailClientProps) {
+export default function ProductDetailClient({ initialProduct, layout }: ProductDetailClientProps) {
   const params = useParams();
   const slug = params?.slug as string;
 
@@ -617,10 +619,19 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
           <ProductFAQSection faqs={product.faqs} language={language} t={t} />
         )}
 
-        {/* Product Reviews */}
-        {isEnabled('reviews') && product && store.id && store.id !== 'demo' && (
-          <ReviewSection storeId={store.id} productId={product.id} />
-        )}
+        {/* Product Reviews — gated on BOTH the platform feature flag
+            (isEnabled('reviews'): is the reviews feature unlocked at all?)
+            AND the per-store layout toggle (layout.reviewSection.enabled:
+            does THIS store want to display a reviews section?). Default
+            for new stores is enabled=false (see store-layout.ts
+            DEFAULT_LAYOUT_SETTINGS comment) so a brand-new store doesn't
+            show a "be the first to review" placeholder that reads as
+            staged content under the fake-reviews-illegal posture. */}
+        {isEnabled('reviews') &&
+          layout?.reviewSection?.enabled &&
+          product &&
+          store.id &&
+          store.id !== 'demo' && <ReviewSection storeId={store.id} productId={product.id} />}
 
         {/* Upsell / Cross-sell recommendations */}
         {isEnabled('upsell_crosssell') && product && store.id && store.id !== 'demo' && (

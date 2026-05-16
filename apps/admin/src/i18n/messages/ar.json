@@ -989,6 +989,10 @@
           "headingPlaceholder": "Customer Reviews",
           "headingArPlaceholder": "آراء العملاء"
         },
+        "reviewSection": {
+          "title": "مراجعات المنتج",
+          "description": "إظهار قسم المراجعات في صفحة كل منتج. الافتراضي: مغلق — فعّله عند توفّر مراجعات حقيقية من عملائك."
+        },
         "sizing": {
           "title": "مقاسات موحّدة",
           "description": "مقفلة على جميع القوالب الخمسة لضمان تناسق الشعار والصور والمسافات",

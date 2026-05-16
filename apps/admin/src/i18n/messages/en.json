@@ -989,6 +989,10 @@
           "headingPlaceholder": "Customer Reviews",
           "headingArPlaceholder": "آراء العملاء"
         },
+        "reviewSection": {
+          "title": "Product reviews",
+          "description": "Show the reviews section on each product detail page. Default off — turn on once you have real customer reviews to display."
+        },
         "sizing": {
           "title": "Sizing contract",
           "description": "Locked across all 5 templates so logos, images, and spacing stay consistent",

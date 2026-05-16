@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { resolveLayoutSettings, type StoreLayoutSettings } from '@force/shared';
 import { getStore, getStoreOrNotFound } from '../../../lib/store-resolver';
 import { API_URL } from '../../../lib/api';
 import {
@@ -9,6 +10,26 @@ import {
 } from '../../../lib/structured-data';
 import { JsonLd } from '../../../components/JsonLd';
 import ProductDetailClient from './ProductDetailClient';
+
+/**
+ * Fetch the store's layout settings server-side so the client component
+ * can gate the ReviewSection on `layout.reviewSection.enabled` without a
+ * round-trip. Mirrors the home page pattern. Falls back to defaults if
+ * the API call fails — the section will then be hidden (default-off).
+ */
+async function fetchLayoutSettings(storeId: string): Promise<StoreLayoutSettings> {
+  if (!storeId || storeId === 'demo') return resolveLayoutSettings({});
+  try {
+    const res = await fetch(`${API_URL}/public/stores/${storeId}/layout`, {
+      next: { revalidate: 60 },
+    });
+    if (!res.ok) return resolveLayoutSettings({});
+    const json = await res.json();
+    return resolveLayoutSettings(json?.data?.layout ?? {});
+  } catch {
+    return resolveLayoutSettings({});
+  }
+}
 
 /**
  * Server-side metadata for product pages.
@@ -139,7 +160,10 @@ async function fetchInitialProduct(slug: string, store: { id: string; domain?: s
 
 export default async function ProductDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const [{ slug }, store] = await Promise.all([params, getStoreOrNotFound()]);
-  const initialProduct = await fetchInitialProduct(slug, store);
+  const [initialProduct, layout] = await Promise.all([
+    fetchInitialProduct(slug, store),
+    fetchLayoutSettings(store.id),
+  ]);
 
   const siteUrl = getSiteUrl(store);
 
@@ -207,7 +231,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
       {jsonLdScripts.map((jsonLd, i) => (
         <JsonLd key={i} data={jsonLd} />
       ))}
-      <ProductDetailClient initialProduct={initialProduct} />
+      <ProductDetailClient initialProduct={initialProduct} layout={layout} />
     </>
   );
 }
