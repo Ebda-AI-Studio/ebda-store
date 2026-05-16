@@ -399,6 +399,93 @@ const BRAND_COLOR_PRESETS: Array<{ value: string; label: string; labelAr: string
 // Quick-apply chip presets — fill backgroundColor + padding + borderRadius
 // in one click so merchants don't have to figure out the right padding
 // or radius numbers themselves.
+// Static theme-default font sizes per zone. Used by the "Current"
+// badge as a 3rd-tier fallback when neither (a) merchant override
+// nor (b) live storefront probe measurement is available. Probe can
+// fail to measure a zone if the homepage doesn't render that element
+// at iframe load time (e.g. productName before products hydrate),
+// leaving the badge with nothing to show — which was the bug Ahmad
+// hit 2026-05-16 "green badge is not showing so how can i know the
+// default font size".
+//
+// Values mirror the per-theme tokens in pack-styles.ts + the hardcoded
+// data-zone classes in SectionHeading.tsx. Keep in sync with design.md's
+// typography size table. Responsive ladders shown as "30→48px" so the
+// merchant sees the full range without us picking a viewport for them.
+const THEME_DEFAULT_SIZES: Record<string, Partial<Record<ZoneKey, string>>> = {
+  // Modern theme defaults (apps/web/src/templates/shared/pack-styles.ts → modern).
+  modern: {
+    sectionTitle: '30 → 48px',
+    sectionKicker: '16px',
+    sectionSubtitle: '16px',
+    sectionSeeAll: '16px',
+    productName: '16px',
+    productPrice: '16px',
+    categories: '16 → 18px',
+    cta: '14px',
+    header: '16px',
+    footer: '16px',
+    products: '16px',
+  },
+  classic: {
+    sectionTitle: '30 → 48px',
+    sectionKicker: '16px',
+    sectionSubtitle: '16px',
+    sectionSeeAll: '16px',
+    productName: '16px',
+    productPrice: '16px',
+    categories: '16 → 18px',
+    cta: '14px',
+    header: '16px',
+    footer: '16px',
+    products: '16px',
+  },
+  minimal: {
+    sectionTitle: '30 → 48px',
+    sectionKicker: '16px',
+    sectionSubtitle: '16px',
+    sectionSeeAll: '16px',
+    productName: '16px',
+    productPrice: '16px',
+    categories: '16px',
+    cta: '14px',
+    header: '16px',
+    footer: '16px',
+    products: '16px',
+  },
+  bold: {
+    sectionTitle: '30 → 48px',
+    sectionKicker: '16px',
+    sectionSubtitle: '16px',
+    sectionSeeAll: '16px',
+    productName: '16px',
+    productPrice: '16px',
+    categories: '16px',
+    cta: '14px',
+    header: '16px',
+    footer: '16px',
+    products: '16px',
+  },
+  elegant: {
+    sectionTitle: '30 → 48px',
+    sectionKicker: '16px',
+    sectionSubtitle: '16px',
+    sectionSeeAll: '16px',
+    productName: '16px',
+    productPrice: '16px',
+    categories: '16px',
+    cta: '14px',
+    header: '16px',
+    footer: '16px',
+    products: '16px',
+  },
+};
+
+function getThemeDefaultSize(template: string | undefined, zone: ZoneKey): string | undefined {
+  if (!template) return undefined;
+  return THEME_DEFAULT_SIZES[template]?.[zone];
+}
+
 const CHIP_STYLE_PRESETS: Array<{
   id: string;
   label: string;
@@ -1219,34 +1306,61 @@ export default function TypographyPage() {
                               Lets merchant see at-a-glance what's actually
                               rendering vs the theme default. */}
                           {(() => {
+                            // Three-tier resolution + static fallback:
+                            //   1. cfg.fontSize    — merchant's saved override (YELLOW)
+                            //   2. measured        — probe iframe getComputedStyle (GREEN)
+                            //   3. theme default   — static lookup from THEME_DEFAULT_SIZES (NEUTRAL gray)
+                            // The static fallback covers the case where the probe
+                            // can't measure a zone (no element rendered on the
+                            // probed page) so the badge always shows SOMETHING.
                             const overrideSize = cfg.fontSize;
                             const measuredSize = measured?.[z.key]?.fontSize;
-                            const display = overrideSize || measuredSize;
+                            const themeDefault = getThemeDefaultSize(currentStore?.template, z.key);
+                            const display = overrideSize || measuredSize || themeDefault;
                             if (!display) return null;
-                            const isOverride = !!overrideSize;
+                            const state: 'override' | 'measured' | 'default' = overrideSize
+                              ? 'override'
+                              : measuredSize
+                                ? 'measured'
+                                : 'default';
+                            const colorClass =
+                              state === 'override'
+                                ? 'bg-warning/15 text-warning'
+                                : state === 'measured'
+                                  ? 'bg-success/15 text-success'
+                                  : 'bg-muted text-muted-foreground';
+                            const stateLabel = isAr
+                              ? state === 'override'
+                                ? '· مُخصَّص'
+                                : state === 'default'
+                                  ? '· افتراضي القالب'
+                                  : ''
+                              : state === 'override'
+                                ? '· override'
+                                : state === 'default'
+                                  ? '· theme default'
+                                  : '';
+                            const titleText =
+                              state === 'override'
+                                ? isAr
+                                  ? 'حجم مُخصَّص محفوظ. القالب الافتراضي يُعرض حين تترك الحقل فارغًا.'
+                                  : 'Custom override saved. Clear the size field to fall back to the theme default.'
+                                : state === 'measured'
+                                  ? isAr
+                                    ? 'محسوب مباشرة من القالب النشط على المتجر.'
+                                    : 'Measured live from the active template on your storefront.'
+                                  : isAr
+                                    ? 'الحجم الافتراضي للقالب — لم يصل القياس المباشر بعد، اترك الحقل فارغًا للحصول على هذه القيمة.'
+                                    : 'Theme default size — live measurement not available; leave the field blank to render at this value.';
                             return (
                               <span
-                                title={
-                                  isOverride
-                                    ? isAr
-                                      ? `حجم مُخصَّص محفوظ. القالب الافتراضي يُعرض حين تترك الحقل فارغًا.`
-                                      : `Custom override saved. Clear the size field to fall back to the theme default.`
-                                    : isAr
-                                      ? 'محسوب من القالب النشط — لا يوجد تخصيص محفوظ.'
-                                      : 'Computed from the active template — no override saved.'
-                                }
-                                className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                                  isOverride
-                                    ? 'bg-warning/15 text-warning'
-                                    : 'bg-success/15 text-success'
-                                }`}
+                                title={titleText}
+                                className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${colorClass}`}
                               >
                                 {isAr ? 'الحالي' : 'Current'}:{' '}
                                 <span className="font-bold">{display}</span>
-                                {isOverride && (
-                                  <span className="ms-1 opacity-70">
-                                    {isAr ? '· مُخصَّص' : '· override'}
-                                  </span>
+                                {stateLabel && (
+                                  <span className="ms-1 opacity-70">{stateLabel}</span>
                                 )}
                               </span>
                             );
