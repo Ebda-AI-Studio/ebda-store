@@ -470,6 +470,165 @@ router.post(
 );
 
 /**
+ * POST /stores/:storeId/orders/:orderId/refresh-payment-status
+ *
+ * Manual sync — admin clicks "refresh" on the order detail page to
+ * re-check payment status with the provider (MyFatoorah / Tap /
+ * etc.) and update our DB accordingly. Use when a webhook didn't
+ * fire (provider portal misconfigured, signature mismatch, etc.)
+ * but the customer says they paid.
+ *
+ * Mirrors the webhook handler's state-transition logic so manual
+ * refresh produces the same Order + Payment + downstream side
+ * effects (Inngest fanout, socket emit) as a regular webhook.
+ */
+router.post(
+  '/:orderId/refresh-payment-status',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, orderId } = req.params;
+      const user = getAuthUser(req);
+
+      const order = await prisma.order.findFirst({
+        where: { id: orderId, storeId, deletedAt: null },
+        include: { payments: { orderBy: { createdAt: 'desc' }, take: 1 } },
+      });
+      if (!order) {
+        res.status(404).json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'Order not found' },
+        });
+        return;
+      }
+
+      const payment = order.payments[0];
+      if (!payment || !payment.transactionId) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'NO_PAYMENT_RECORD',
+            message:
+              'No payment record found for this order. Issue a payment link first, then retry.',
+          },
+        });
+        return;
+      }
+
+      // Hit the provider directly (PaymentService picks the right provider
+      // from the stored payment row).
+      const status = await PaymentService.getPaymentStatus(
+        payment.transactionId,
+        payment.provider as 'tap' | 'myfatoorah' | 'hesabe' | 'upayments',
+        storeId
+      );
+
+      const statusChanged =
+        status.status === 'completed'
+          ? order.paymentStatus !== 'paid'
+          : status.status === 'failed' ||
+              status.status === 'expired' ||
+              status.status === 'cancelled'
+            ? order.paymentStatus !== 'failed'
+            : false;
+
+      if (status.status === 'completed') {
+        await prisma.$transaction([
+          prisma.payment.update({
+            where: { id: payment.id },
+            data: {
+              status: 'completed',
+              paidAt: status.paidAt ?? new Date(),
+              metadata: {
+                ...((payment.metadata as object) || {}),
+                refreshedManually: true,
+                refreshedBy: user.userId,
+                refreshedAt: new Date().toISOString(),
+              },
+            },
+          }),
+          prisma.order.update({
+            where: { id: order.id },
+            data: { status: 'confirmed', paymentStatus: 'paid' },
+          }),
+        ]);
+
+        // Fire the same post-payment fanout the webhook handler does so
+        // notifications + analytics catch up on the missed webhook event.
+        if (statusChanged) {
+          inngest
+            .send({
+              name: 'order/created',
+              data: {
+                orderId: order.id,
+                storeId: order.storeId,
+                paymentMethod: payment.provider,
+                locale: undefined,
+              },
+            })
+            .catch(err =>
+              logger.error(
+                { err, orderId: order.id },
+                '[Refresh] Failed to enqueue post-payment order/created'
+              )
+            );
+        }
+      } else if (status.status === 'failed' || status.status === 'expired') {
+        await prisma.$transaction([
+          prisma.payment.update({
+            where: { id: payment.id },
+            data: { status: status.status },
+          }),
+          prisma.order.update({
+            where: { id: order.id },
+            data: { paymentStatus: 'failed' },
+          }),
+        ]);
+      }
+
+      await auditLog({
+        action: 'order.payment_refreshed',
+        userId: user.userId,
+        resourceType: 'order',
+        resourceId: orderId,
+        details: {
+          orderNumber: order.orderNumber,
+          providerStatus: status.status,
+          statusChanged,
+          previousPaymentStatus: order.paymentStatus,
+        },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+
+      logger.info(
+        {
+          orderId,
+          orderNumber: order.orderNumber,
+          providerStatus: status.status,
+          statusChanged,
+        },
+        '[Refresh] manual payment-status sync'
+      );
+
+      res.json({
+        success: true,
+        data: {
+          providerStatus: status.status,
+          paymentStatus: status.status === 'completed' ? 'paid' : status.status,
+          statusChanged,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
  * POST /stores/:storeId/orders/admin
  *
  * Admin-initiated order creation. Used for phone orders / merchant-

@@ -220,6 +220,7 @@ export default function OrderDetailPage() {
               onStatusChange={handleStatusChange}
               onMarkPaid={() => setConfirmMarkPaidOpen(true)}
               onPrintInvoice={openInvoice}
+              onPaymentRefreshed={fetchOrder}
             />
           </>
         )}

@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useT } from '@/i18n/useT';
 import { VALID_TRANSITIONS } from '../../_components/types';
 import { PaymentLinkButton } from './PaymentLinkButton';
+import { RefreshPaymentButton } from './RefreshPaymentButton';
 import type { OrderDetail } from './types';
 
 interface ActionFooterProps {
@@ -13,6 +14,7 @@ interface ActionFooterProps {
   onStatusChange: (newStatus: string) => void;
   onMarkPaid: () => void;
   onPrintInvoice: () => void;
+  onPaymentRefreshed?: () => void;
 }
 
 export function ActionFooter({
@@ -22,6 +24,7 @@ export function ActionFooter({
   onStatusChange,
   onMarkPaid,
   onPrintInvoice,
+  onPaymentRefreshed,
 }: ActionFooterProps) {
   const t = useT('orders.detail.actions');
   const tStatus = useT('orders.status');
@@ -85,17 +88,25 @@ export function ActionFooter({
             )}
           </button>
         )}
-        {/* Payment Link — issue MyFatoorah pay-by-link for unpaid orders.
-            Lives next to "Mark paid" because both are merchant-side
-            payment-collection actions; the difference is mark-paid
-            records a manual cash/transfer, payment-link generates a
-            new online-pay URL for the customer. */}
+        {/* Payment Link — issue MyFatoorah pay-by-link for unpaid orders. */}
         {showMarkPaid && (
           <PaymentLinkButton
             storeId={storeId}
             orderId={order.id}
             orderNumber={order.orderNumber}
             disabled={isUpdating}
+          />
+        )}
+        {/* Refresh payment — diagnostic. Re-check provider status when
+            webhook didn't fire (provider portal misconfigured /
+            signature mismatch / network blip). Same fanout as the
+            real webhook so notifications catch up. */}
+        {showMarkPaid && (
+          <RefreshPaymentButton
+            storeId={storeId}
+            orderId={order.id}
+            disabled={isUpdating}
+            onRefreshed={onPaymentRefreshed}
           />
         )}
         {showMarkPaid && (
