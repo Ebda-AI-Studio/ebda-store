@@ -108,7 +108,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
         <div>
           <label
             htmlFor={`products-sort-${mobile ? 'm' : 'd'}`}
-            className="mb-2 block text-sm font-medium text-foreground"
+            className="mb-2 block text-sm lg:text-base font-medium text-foreground"
           >
             {t('Sort by', 'ترتيب')}
           </label>
@@ -128,11 +128,13 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
       )}
 
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-foreground">{t('Filters', 'فلاتر')}</h3>
+        <h3 className="text-sm lg:text-base font-semibold text-foreground">
+          {t('Filters', 'فلاتر')}
+        </h3>
         <button
           type="button"
           onClick={onClearAll}
-          className="text-xs font-medium text-primary hover:underline"
+          className="text-xs lg:text-sm font-medium text-primary hover:underline"
         >
           {t('Remove filters', 'إزالة الفلاتر')}
         </button>
@@ -144,11 +146,11 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
         priceMin !== undefined &&
         priceMax !== undefined && (
           <div>
-            <h3 className="mb-3 text-sm font-medium text-foreground">
+            <h3 className="mb-3 text-sm lg:text-base font-medium text-foreground">
               {t('Price range', 'مجال السعر')}
             </h3>
             <div className="space-y-3">
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <div className="flex items-center justify-between text-xs lg:text-sm text-muted-foreground">
                 <span>
                   {priceMin.toFixed(3)} {t('KWD', 'د.ك')}
                 </span>
@@ -204,7 +206,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
       <form onSubmit={mobile ? closeAfter(onSearchSubmit) : onSearchSubmit}>
         <label
           htmlFor={`products-search-${mobile ? 'm' : 'd'}`}
-          className="mb-2 block text-sm font-medium text-foreground"
+          className="mb-2 block text-sm lg:text-base font-medium text-foreground"
         >
           {t('Search', translations['Search'])}
         </label>
@@ -235,7 +237,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
       </form>
 
       <div>
-        <h3 className="mb-3 text-sm font-medium text-foreground">
+        <h3 className="mb-3 text-sm lg:text-base font-medium text-foreground">
           {t('Categories', translations['Categories'])}
         </h3>
         <div className="space-y-2">
@@ -243,7 +245,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
             type="button"
             onClick={() => (mobile ? closeAfter(onCategoryChange)('') : onCategoryChange(''))}
             aria-pressed={!categoryFilter}
-            className={`flex w-full items-center justify-between rounded-xl px-4 py-2.5 text-sm transition-all ${
+            className={`flex w-full items-center justify-between rounded-xl px-4 py-2.5 text-sm lg:text-base transition-all ${
               !categoryFilter
                 ? 'bg-primary text-white shadow-md shadow-primary/25'
                 : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -270,7 +272,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
                   mobile ? closeAfter(onCategoryChange)(cat.slug) : onCategoryChange(cat.slug)
                 }
                 aria-pressed={categoryFilter === cat.slug}
-                className={`flex w-full items-center justify-between rounded-xl px-4 py-2.5 text-sm transition-all ${
+                className={`flex w-full items-center justify-between rounded-xl px-4 py-2.5 text-sm lg:text-base transition-all ${
                   categoryFilter === cat.slug
                     ? 'bg-primary text-white shadow-md shadow-primary/25'
                     : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground'
