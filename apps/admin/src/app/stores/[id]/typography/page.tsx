@@ -1205,15 +1205,58 @@ export default function TypographyPage() {
                       </div>
                     )}
                     <div className="rounded-xl border border-border/60 bg-background p-4">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
                         <h3 className="text-sm font-semibold text-foreground">
                           {isAr ? z.labelAr : z.label}
                         </h3>
-                        {z.isSubZone && (
-                          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
-                            sub-zone
-                          </span>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {/* Prominent "Current applied size" badge — shows
+                              the actual rendered font-size on the live
+                              storefront for this zone. Combines:
+                                1. Merchant's saved override (cfg.fontSize)
+                                2. Measured computed style from probe iframe
+                                3. Falls back to "—" if neither known yet
+                              Lets merchant see at-a-glance what's actually
+                              rendering vs the theme default. */}
+                          {(() => {
+                            const overrideSize = cfg.fontSize;
+                            const measuredSize = measured?.[z.key]?.fontSize;
+                            const display = overrideSize || measuredSize;
+                            if (!display) return null;
+                            const isOverride = !!overrideSize;
+                            return (
+                              <span
+                                title={
+                                  isOverride
+                                    ? isAr
+                                      ? `حجم مُخصَّص محفوظ. القالب الافتراضي يُعرض حين تترك الحقل فارغًا.`
+                                      : `Custom override saved. Clear the size field to fall back to the theme default.`
+                                    : isAr
+                                      ? 'محسوب من القالب النشط — لا يوجد تخصيص محفوظ.'
+                                      : 'Computed from the active template — no override saved.'
+                                }
+                                className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                                  isOverride
+                                    ? 'bg-warning/15 text-warning'
+                                    : 'bg-success/15 text-success'
+                                }`}
+                              >
+                                {isAr ? 'الحالي' : 'Current'}:{' '}
+                                <span className="font-bold">{display}</span>
+                                {isOverride && (
+                                  <span className="ms-1 opacity-70">
+                                    {isAr ? '· مُخصَّص' : '· override'}
+                                  </span>
+                                )}
+                              </span>
+                            );
+                          })()}
+                          {z.isSubZone && (
+                            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+                              sub-zone
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <p className="mt-1 text-sm text-muted-foreground leading-relaxed">
                         {isAr ? z.descriptionAr : z.description}
