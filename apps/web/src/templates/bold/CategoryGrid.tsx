@@ -37,7 +37,7 @@ export default function BoldCategoryGrid({
         )}
 
         {/* Grid - Staggered layout for dynamism */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-4">
           {categories.map((category, index) => (
             <div key={category.id} className={index % 2 === 1 ? 'lg:translate-y-8' : ''}>
               <CategoryCard category={category} isRtl={isRtl} urlPrefix={urlPrefix} />

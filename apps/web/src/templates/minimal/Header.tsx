@@ -71,7 +71,7 @@ export default function MinimalHeader({
               every theme's logo MUST center on mobile. */}
           <Link
             href={urlPrefix || '/'}
-            className="absolute left-1/2 -translate-x-1/2 lg:relative lg:left-auto lg:translate-x-0 flex items-center justify-center flex-shrink-0 max-w-[65%] lg:max-w-none"
+            className="absolute left-1/2 -translate-x-1/2 md:relative md:left-auto md:translate-x-0 flex items-center justify-center flex-shrink-0 max-w-[65%] md:max-w-none"
           >
             {displayLogo ? (
               <Image
@@ -143,7 +143,7 @@ export default function MinimalHeader({
             {/* Account */}
             <Link
               href={isLoggedIn ? `${urlPrefix}/account` : `${urlPrefix}/auth/login`}
-              className="hidden sm:inline-flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-foreground transition-colors duration-200"
+              className="hidden md:inline-flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-foreground transition-colors duration-200"
               aria-label={isRtl ? 'الحساب' : 'Account'}
             >
               <svg

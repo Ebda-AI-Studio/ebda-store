@@ -62,7 +62,7 @@ export default function ModernProductGrid({
 
   return (
     <div
-      className={cn('grid gap-4 md:gap-6', gridCols[columns])}
+      className={cn('grid gap-3 md:gap-4', gridCols[columns])}
       role="list"
       aria-label={isRtl ? 'قائمة المنتجات' : 'Product list'}
       dir={isRtl ? 'rtl' : 'ltr'}

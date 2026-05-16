@@ -40,7 +40,7 @@ export default function MinimalProductGrid({
         )}
 
         {/* Products Grid */}
-        <div className={`grid ${gridCols} gap-6 md:gap-8`}>
+        <div className={`grid ${gridCols} gap-3 md:gap-4`}>
           {products.map(product => (
             <ProductCard
               key={product.id}

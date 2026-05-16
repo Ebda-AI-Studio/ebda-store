@@ -103,9 +103,7 @@ export default function ClassicHero({
 
           {/* Image column — only render when an image is configured. */}
           {image && (
-            <div
-              className={`relative hidden lg:block self-stretch ${isRtl ? 'lg:order-1' : 'lg:order-2'}`}
-            >
+            <div className={`relative self-stretch ${isRtl ? 'lg:order-1' : 'lg:order-2'}`}>
               <div className="absolute inset-0 m-6">
                 <Image
                   src={image}

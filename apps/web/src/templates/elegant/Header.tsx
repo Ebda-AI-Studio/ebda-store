@@ -63,7 +63,10 @@ export default function ElegantHeader({
   const showUtilityBar = utilityBarEnabled && utilityBarLinks.length > 0;
 
   return (
-    <header className="bg-background border-b border-border" dir={isRtl ? 'rtl' : 'ltr'}>
+    <header
+      className="sticky top-0 z-50 bg-background/95 backdrop-blur-md border-b border-border"
+      dir={isRtl ? 'rtl' : 'ltr'}
+    >
       <div className="container mx-auto px-4">
         {/* Top utility bar — links sourced from `store.settings.utilityBar`
             with a Contact + Wishlist fallback so legacy Elegant stores

@@ -45,7 +45,7 @@ export default function ElegantProductGrid({
         )}
 
         {/* Products Grid */}
-        <div className={`grid ${gridCols} gap-8 md:gap-12`}>
+        <div className={`grid ${gridCols} gap-3 md:gap-4`}>
           {products.map(product => (
             <ProductCard
               key={product.id}

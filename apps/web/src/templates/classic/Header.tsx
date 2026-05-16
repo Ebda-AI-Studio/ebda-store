@@ -54,7 +54,10 @@ export default function ClassicHeader({
   const showUtilityBar = utilityBarEnabled && utilityBarLinks.length > 0;
 
   return (
-    <header className="bg-background shadow-sm" dir={isRtl ? 'rtl' : 'ltr'}>
+    <header
+      className="sticky top-0 z-50 bg-background/95 backdrop-blur-md shadow-sm"
+      dir={isRtl ? 'rtl' : 'ltr'}
+    >
       {/* Top utility bar — links sourced from `store.settings.utilityBar`
           with a Contact + About fallback so legacy Classic stores keep
           theirs. Hidden entirely when the merchant disables it. */}
@@ -245,28 +248,11 @@ export default function ClassicHeader({
             </div>
           </nav>
 
-          {/* Mobile: action icons */}
+          {/* Mobile: action icons — Account moved into hamburger drawer
+              to free row width for the centered logo. Only Cart visible
+              here. Platform rule: Account hidden on mobile across all
+              themes. */}
           <div className={`flex md:hidden items-center gap-1 ${isRtl ? 'flex-row-reverse' : ''}`}>
-            <Link
-              href={isLoggedIn ? `${urlPrefix}/account` : `${urlPrefix}/auth/login`}
-              className="inline-flex h-11 w-11 items-center justify-center text-foreground/60 hover:text-foreground transition-colors duration-500"
-              aria-label={isRtl ? 'الحساب' : 'Account'}
-            >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                />
-              </svg>
-            </Link>
             <Link
               href={`${urlPrefix}/cart`}
               className="relative inline-flex h-11 w-11 items-center justify-center text-foreground/60 hover:text-foreground transition-colors duration-500 cursor-pointer"
