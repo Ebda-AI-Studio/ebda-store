@@ -527,7 +527,17 @@ router.get(
               total: true,
             },
           },
-          payments: { select: { provider: true, status: true, amount: true } },
+          payments: {
+            select: {
+              provider: true,
+              status: true,
+              amount: true,
+              refundedAmount: true,
+              metadata: true,
+              updatedAt: true,
+            },
+            orderBy: { createdAt: 'desc' },
+          },
         },
         orderBy: { createdAt: 'desc' },
       });
@@ -545,10 +555,12 @@ router.get(
       const newestShipping = (newest.shippingAddress ?? null) as ShippingAddressShape | null;
 
       let totalSpent = 0;
+      let totalRefunded = 0;
       let paidCount = 0;
       let pendingCount = 0;
       let cancelledCount = 0;
       let failedCount = 0;
+      let refundedCount = 0;
       const paymentMethodSet = new Set<string>();
       const statusSet = new Set<string>();
 
@@ -556,7 +568,12 @@ router.get(
         totalSpent += o.total;
         statusSet.add(o.status);
         const ps = o.paymentStatus;
-        if (ps === 'paid') paidCount += 1;
+        // Refund takes precedence — a refunded order shouldn't double-count
+        // as paid + refunded in the customer header.
+        if (ps === 'refunded' || o.status === 'refunded') {
+          refundedCount += 1;
+          for (const p of o.payments ?? []) totalRefunded += p.refundedAmount ?? 0;
+        } else if (ps === 'paid') paidCount += 1;
         else if (o.status === 'cancelled') cancelledCount += 1;
         else if (ps === 'failed') failedCount += 1;
         else pendingCount += 1;
@@ -589,6 +606,8 @@ router.get(
         pendingCount,
         cancelledCount,
         failedCount,
+        refundedCount,
+        totalRefunded,
         paymentMethods: Array.from(paymentMethodSet),
         statuses: Array.from(statusSet),
       };

@@ -11,6 +11,7 @@ import { prisma } from '@force/database';
 import { inngest } from '../lib/inngest/client';
 import logger from '../lib/logger';
 import { PaymentService } from '../services/payment-providers/payment.factory';
+import { runInTenantContext } from '@force/database';
 import { config } from '../config';
 import type { Currency } from '../services/payment-providers/types';
 
@@ -626,6 +627,130 @@ router.post(
 );
 
 /**
+ * POST /stores/:storeId/orders/:orderId/refund-via-provider
+ *
+ * Admin-initiated refund. Calls the payment provider's refund API
+ * (MyFatoorah / Tap / etc.), then PaymentService.refund handles the
+ * DB transaction (Payment.status -> refunded, Order.status -> refunded)
+ * and OrderService.applyRefundEffects fans out side effects:
+ *   - inventory restore (track_inventory products)
+ *   - coupon usage decrement
+ *   - affiliate commission reversal
+ *   - loyalty points reversal (NEW — was missing before)
+ *   - order/refunded Inngest event → customer refund email + admin push
+ *
+ * Defaults to full refund. Partial refunds: pass `amount` (in fils).
+ */
+const refundViaProviderSchema = z.object({
+  amount: z.number().int().positive().optional(),
+  reason: z.string().max(500).optional(),
+});
+
+router.post(
+  '/:orderId/refund-via-provider',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, orderId } = req.params;
+      const user = getAuthUser(req);
+      const data = refundViaProviderSchema.parse(req.body ?? {});
+
+      const order = await prisma.order.findFirst({
+        where: { id: orderId, storeId, deletedAt: null },
+        include: {
+          payments: {
+            where: { status: 'completed' },
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+          },
+        },
+      });
+      if (!order) {
+        res.status(404).json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'Order not found' },
+        });
+        return;
+      }
+
+      const payment = order.payments[0];
+      if (!payment || !payment.transactionId) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'NO_COMPLETED_PAYMENT',
+            message:
+              'No completed online payment found for this order. COD orders cannot be refunded via the provider — use the manual "Refunded" status instead.',
+          },
+        });
+        return;
+      }
+
+      if (order.paymentStatus === 'refunded') {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'ALREADY_REFUNDED',
+            message: 'This order has already been fully refunded.',
+          },
+        });
+        return;
+      }
+
+      const result = await runInTenantContext(storeId, async () =>
+        PaymentService.refund({
+          transactionId: payment.transactionId!,
+          amount: data.amount,
+          reason: data.reason,
+        })
+      );
+
+      await auditLog({
+        action: 'order.refund_via_provider',
+        userId: user.userId,
+        resourceType: 'order',
+        resourceId: orderId,
+        details: {
+          orderNumber: order.orderNumber,
+          refundId: result.refundId,
+          refundAmount: result.amount,
+          provider: payment.provider,
+          reason: data.reason ?? null,
+        },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+
+      logger.info(
+        {
+          orderId,
+          orderNumber: order.orderNumber,
+          refundId: result.refundId,
+          refundAmount: result.amount,
+          provider: payment.provider,
+        },
+        '[Refund] admin-initiated provider refund'
+      );
+
+      res.json({
+        success: true,
+        data: {
+          refundId: result.refundId,
+          refundAmount: result.amount,
+          provider: result.provider,
+          status: result.status,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
  * POST /stores/:storeId/orders/admin
  *
  * Admin-initiated order creation. Used for phone orders / merchant-
@@ -794,7 +919,7 @@ router.post(
           })),
           callbackUrl: `${storefrontBaseUrl}/checkout/success`,
           errorUrl: `${storefrontBaseUrl}/checkout/error`,
-          webhookUrl: `${config.apiUrl}/webhooks/payment`,
+          webhookUrl: `${config.apiUrl}/api/v1/webhooks/payment/myfatoorah`,
           notifyVia,
         },
         'myfatoorah',

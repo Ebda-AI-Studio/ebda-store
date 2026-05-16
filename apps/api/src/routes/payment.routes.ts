@@ -379,7 +379,7 @@ router.post(
                 ? `${storefrontBaseUrl}${data.errorUrl}`
                 : data.errorUrl
               : `${storefrontBaseUrl}/checkout/error`,
-            webhookUrl: `${config.apiUrl}/webhooks/payment`,
+            webhookUrl: `${config.apiUrl}/api/v1/webhooks/payment/${data.provider}`,
           },
           data.provider,
           order.storeId

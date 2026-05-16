@@ -911,6 +911,28 @@ export class OrderService {
           '[OrderService] Affiliate commission reversal failed during refund'
         )
       );
+
+    // Reverse loyalty points credited at delivery. No-op for orders that
+    // never reached delivered (no earn transaction) or guest checkout
+    // (no customerId). Idempotent — repeat refund calls don't double-revoke.
+    if (order.customerId) {
+      await LoyaltyService.reverseEarnedPointsFromOrder(storeId, orderId).catch(err =>
+        logger.error(
+          { err, storeId, orderId },
+          '[OrderService] Loyalty reversal failed during refund'
+        )
+      );
+    }
+
+    // Fire the refund fanout AFTER all reversals committed. Same event
+    // shape as order/created so the Inngest handler can mirror that
+    // function's structure (email + push + dispatcher) without juggling
+    // mid-refund state.
+    inngest
+      .send({ name: 'order/refunded', data: { orderId, storeId } })
+      .catch(err =>
+        logger.error({ err, orderId, storeId }, '[OrderService] Failed to enqueue order/refunded')
+      );
   }
 
   static async getCustomerOrders(

@@ -1,5 +1,6 @@
 import type { InngestFunction } from 'inngest';
 import { orderCreated } from './order-created';
+import { orderRefunded } from './order-refunded';
 import { bulkImportProducts } from './bulk-import';
 import { invoiceEmail } from './invoice-email';
 import { heartbeat } from './heartbeat';
@@ -26,6 +27,7 @@ import { queueDepthWatch } from './queue-depth-watch';
  */
 export const inngestFunctions: InngestFunction.Any[] = [
   orderCreated,
+  orderRefunded,
   bulkImportProducts,
   invoiceEmail,
   heartbeat,

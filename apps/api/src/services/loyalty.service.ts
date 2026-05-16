@@ -1,5 +1,6 @@
 import { prisma, Prisma, LoyaltyTransactionType } from '@force/database';
 import { AppError } from '../middleware/error-handler';
+import logger from '../lib/logger';
 import { featureService } from './feature.service';
 
 // Default loyalty settings structure
@@ -361,6 +362,104 @@ export class LoyaltyService {
       pointsEarned,
       newBalance: updated.points,
     };
+  }
+
+  /**
+   * Reverse the points that were credited when this order was delivered.
+   *
+   * Idempotent: looks up the original `earn_purchase` transaction for
+   * (orderId, customerId) — if none exists (order never reached delivered,
+   * loyalty was disabled at the time, or this method already ran), it's
+   * a no-op. Otherwise it decrements `points` + `totalEarned` by the same
+   * amount (floored at 0 so a partial redeem since earn can't push the
+   * balance negative), logs an inverse `adjust` transaction tagged with
+   * the order id, and recomputes the tier from the new totalEarned.
+   *
+   * Called from `OrderService.applyRefundEffects` so every refund path —
+   * status-button refund, gateway-initiated webhook refund, manual admin
+   * "Refund via MyFatoorah" — reverses the loyalty credit consistently.
+   */
+  static async reverseEarnedPointsFromOrder(
+    storeId: string,
+    orderId: string
+  ): Promise<{ pointsReversed: number; newBalance: number } | null> {
+    // Find the original earn transaction. If loyalty was disabled at delivery
+    // time, this returns null and we short-circuit.
+    const earn = await prisma.loyaltyTransaction.findFirst({
+      where: { storeId, orderId, type: 'earn_purchase' },
+    });
+    if (!earn || earn.points <= 0) return null;
+
+    // Idempotency: refuse to revoke twice. We tag the inverse transaction
+    // with the original earn's id in `description` so a second refund call
+    // (e.g. partial-then-full) won't double-decrement.
+    const tag = `refund-revoke:${earn.id}`;
+    const already = await prisma.loyaltyTransaction.findFirst({
+      where: { storeId, orderId, type: 'adjust', description: tag },
+    });
+    if (already) {
+      const current = await prisma.loyaltyPoints.findUnique({
+        where: { storeId_customerId: { storeId, customerId: earn.customerId } },
+      });
+      return { pointsReversed: 0, newBalance: current?.points ?? 0 };
+    }
+
+    const [store, loyaltyEnabled] = await Promise.all([
+      prisma.store.findUnique({
+        where: { id: storeId },
+        select: { loyaltySettings: true },
+      }),
+      featureService.isFeatureEnabled(storeId, 'loyalty'),
+    ]);
+    if (!store) return null;
+
+    const settings = {
+      ...DEFAULT_LOYALTY_SETTINGS,
+      ...((store.loyaltySettings as Partial<LoyaltySettings>) ?? {}),
+    };
+
+    const loyalty = await prisma.loyaltyPoints.findUnique({
+      where: { storeId_customerId: { storeId, customerId: earn.customerId } },
+    });
+    if (!loyalty) return null;
+
+    // Floor at zero — a customer who redeemed their points already shouldn't
+    // go into negative balance from the reversal.
+    const pointsToReverse = Math.min(earn.points, loyalty.points);
+    const newPoints = loyalty.points - pointsToReverse;
+    const newTotalEarned = Math.max(0, loyalty.totalEarned - earn.points);
+
+    const [updated] = await prisma.$transaction([
+      prisma.loyaltyPoints.update({
+        where: { id: loyalty.id },
+        data: {
+          points: newPoints,
+          totalEarned: newTotalEarned,
+          tier: this.calculateTier(newTotalEarned, settings),
+        },
+      }),
+      prisma.loyaltyTransaction.create({
+        data: {
+          storeId,
+          customerId: earn.customerId,
+          orderId,
+          type: 'adjust',
+          points: -pointsToReverse,
+          description: tag,
+        },
+      }),
+    ]);
+
+    // Loyalty disabled at refund time still reverses — the points were
+    // earned under the program and should come back out. Logged for clarity.
+    if (!loyaltyEnabled) {
+      logger.info(
+        { storeId, orderId, pointsReversed: pointsToReverse },
+        '[Loyalty] reversed earned points despite loyalty currently disabled'
+      );
+    }
+
+    return { pointsReversed: pointsToReverse, newBalance: updated.points };
   }
 
   /**

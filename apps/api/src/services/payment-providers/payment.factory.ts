@@ -619,6 +619,8 @@ export class PaymentService {
               ...((payment.metadata as object) || {}),
               refundId: response.refundId,
               refundStatus: response.status,
+              refundReason: request.reason ?? null,
+              refundedAt: new Date().toISOString(),
             },
           },
         }),
@@ -986,7 +988,7 @@ export class PaymentService {
         })),
         callbackUrl: `${config.webUrl}/checkout/success`,
         errorUrl: `${config.webUrl}/checkout/error`,
-        webhookUrl: `${config.apiUrl}/webhooks/payment`,
+        webhookUrl: `${config.apiUrl}/api/v1/webhooks/payment/${provider || payment.provider}`,
       },
       provider || (payment.provider as PaymentProvider),
       order.storeId

@@ -8,6 +8,7 @@ import { emailVerificationTemplate } from './email-templates/email-verification'
 import { resendVerificationTemplate } from './email-templates/resend-verification';
 import { duplicateRegistrationTemplate } from './email-templates/duplicate-registration';
 import { orderConfirmationTemplate } from './email-templates/order-confirmation';
+import { orderRefundedTemplate } from './email-templates/order-refunded';
 import { paymentSuccessTemplate } from './email-templates/payment-success';
 import { paymentFailedTemplate } from './email-templates/payment-failed';
 import { orderShippedTemplate } from './email-templates/order-shipped';
@@ -270,6 +271,18 @@ export interface OrderEmailData {
   };
 }
 
+export interface OrderRefundEmailData {
+  orderNumber: string;
+  customerName: string;
+  customerEmail: string;
+  /** Total of the original order in fils. */
+  orderTotal: number;
+  /** Refunded amount in fils — equals orderTotal for full refunds. */
+  refundAmount: number;
+  /** Optional admin-supplied reason shown to the customer. */
+  reason?: string;
+}
+
 // Lazy platform-sender Resend client. Shared between sendPlatform +
 // sendPlatformRaw so we don't instantiate the SDK on every admin email.
 let _platformResend: import('resend').Resend | null = null;
@@ -434,6 +447,33 @@ export class EmailService {
         : 'en');
     const subject = orderConfirmationTemplate.subject[lang](data, store.name);
     const content = orderConfirmationTemplate[lang](data, store.name);
+    await this.sendForStore(storeId, { to: data.customerEmail, subject, content, language: lang });
+  }
+
+  /**
+   * Order Refund Email — sent when a refund is issued (gateway-initiated,
+   * admin "Refund via MyFatoorah", or status-button refund). Always fires
+   * from the order/refunded Inngest fanout AFTER the DB transaction
+   * settled, so a Resend outage can't roll the refund back.
+   */
+  static async sendOrderRefunded(
+    storeId: string,
+    data: OrderRefundEmailData,
+    language?: 'en' | 'ar'
+  ): Promise<void> {
+    if (!data.customerEmail) return;
+    const store = await prisma.store.findUnique({
+      where: { id: storeId },
+      select: { name: true, settings: true },
+    });
+    if (!store) throw new Error(`Store ${storeId} not found`);
+    const lang: 'en' | 'ar' =
+      language ??
+      ((store.settings as { defaultLanguage?: string } | null)?.defaultLanguage === 'ar'
+        ? 'ar'
+        : 'en');
+    const subject = orderRefundedTemplate.subject[lang](data);
+    const content = orderRefundedTemplate[lang](data);
     await this.sendForStore(storeId, { to: data.customerEmail, subject, content, language: lang });
   }
 
