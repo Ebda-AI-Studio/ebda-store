@@ -20,7 +20,9 @@ export default function ClassicFormCard({
   return (
     <div dir={isRtl ? 'rtl' : 'ltr'} className="w-full max-w-md">
       <header className="mb-8 text-center">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">{displayTitle}</h1>
+        <h1 className="text-2xl font-serif font-normal tracking-tight text-foreground">
+          {displayTitle}
+        </h1>
         {displaySubtitle && (
           <p className="mt-3 text-xs uppercase tracking-widest text-muted-foreground">
             {displaySubtitle}

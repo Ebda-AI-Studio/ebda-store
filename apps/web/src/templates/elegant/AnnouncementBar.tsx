@@ -17,12 +17,14 @@ export default function ElegantAnnouncementBar({
   if (!displayText) return null;
 
   const content = (
-    <span className="text-xs tracking-[0.25em] uppercase font-light">{displayText}</span>
+    <span className="text-[10px] tracking-[0.3em] uppercase font-extralight text-foreground/70">
+      {displayText}
+    </span>
   );
 
   return (
     <div
-      className="bg-primary text-primary-foreground py-2.5 px-4 text-center"
+      className="bg-background border-b border-foreground/10 py-2.5 px-4 text-center"
       dir={isRtl ? 'rtl' : 'ltr'}
     >
       {link ? (

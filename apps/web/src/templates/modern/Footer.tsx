@@ -100,7 +100,7 @@ export default function ModernFooter({
           : 'lg:grid-cols-3';
 
   return (
-    <footer className="bg-gray-950 text-gray-300 mt-auto" dir={isRtl ? 'rtl' : 'ltr'}>
+    <footer className="bg-gray-900 text-gray-300 mt-auto" dir={isRtl ? 'rtl' : 'ltr'}>
       <div className="container mx-auto px-4 py-16 lg:py-20">
         <div className={`grid grid-cols-1 md:grid-cols-2 ${lgColsClass} gap-10 lg:gap-12`}>
           {/* Brand Column */}

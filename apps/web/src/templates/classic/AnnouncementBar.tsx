@@ -17,11 +17,11 @@ export default function ClassicAnnouncementBar({
   if (!displayText) return null;
 
   const content = (
-    <div className="flex items-center justify-center gap-3 text-sm">
+    <div className="flex items-center justify-center gap-3 text-sm font-serif">
       {/* Decorative dash */}
       <span className="hidden sm:inline text-current/50">—</span>
 
-      <span className="tracking-wide">{displayText}</span>
+      <span className="tracking-widest font-serif">{displayText}</span>
 
       {link && (
         <svg

@@ -90,7 +90,7 @@ export default function BoldFooter({
                     href={url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-10 h-10 flex items-center justify-center bg-white/10 hover:bg-primary rounded-lg transition-colors duration-200 cursor-pointer"
+                    className="w-10 h-10 flex items-center justify-center bg-white/10 hover:bg-primary rounded-none transition-colors duration-200 cursor-pointer"
                     aria-label={key}
                   >
                     <svg

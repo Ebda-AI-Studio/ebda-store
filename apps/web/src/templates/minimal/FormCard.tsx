@@ -20,7 +20,9 @@ export default function MinimalFormCard({
   return (
     <div dir={isRtl ? 'rtl' : 'ltr'} className="w-full max-w-md space-y-8">
       <header>
-        <h1 className="text-2xl text-foreground">{displayTitle}</h1>
+        <h1 className="text-sm tracking-[0.22em] uppercase font-light text-foreground">
+          {displayTitle}
+        </h1>
         {displaySubtitle && <p className="mt-2 text-sm text-muted-foreground">{displaySubtitle}</p>}
       </header>
       <div>{children}</div>

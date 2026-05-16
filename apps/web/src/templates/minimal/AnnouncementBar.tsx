@@ -16,11 +16,15 @@ export default function MinimalAnnouncementBar({
 
   if (!displayText) return null;
 
-  const content = <span className="text-xs tracking-[0.15em] uppercase">{displayText}</span>;
+  const content = (
+    <span className="text-[10px] tracking-[0.28em] uppercase font-light text-foreground/80">
+      {displayText}
+    </span>
+  );
 
   return (
     <div
-      className="bg-foreground text-background py-2 px-4 text-center"
+      className="bg-background border-b border-border py-2 px-4 text-center"
       dir={isRtl ? 'rtl' : 'ltr'}
     >
       {link ? (
