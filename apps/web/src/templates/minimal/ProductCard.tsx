@@ -49,7 +49,7 @@ function MinimalProductCard({
         className="group block cursor-pointer"
       >
         {/* Image — no border, no shadow, subtle opacity on hover */}
-        <div className="relative aspect-square sm:aspect-[3/4] overflow-hidden bg-muted/30 mb-6">
+        <div className="relative aspect-square sm:aspect-[3/4] overflow-hidden bg-muted/30 mb-3">
           {/* Platform-level OOS ribbon — minimal pack stays chrome-free
               elsewhere, but the OOS state needs unambiguous communication
               regardless of pack philosophy (2026-05-16). */}
@@ -99,7 +99,7 @@ function MinimalProductCard({
         </div>
 
         {/* Text — name + price, ultra-minimal */}
-        <div className={`space-y-1.5 ${isRtl ? 'text-right' : 'text-left'}`}>
+        <div className={`flex flex-col gap-2 p-3 sm:p-4 ${isRtl ? 'text-right' : 'text-left'}`}>
           <h3
             id={`prod-${product.id}-name`}
             data-zone="productName"

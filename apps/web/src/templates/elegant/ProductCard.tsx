@@ -80,7 +80,7 @@ function ElegantProductCard({
             grids don't push each card past 450px tall (especially with
             the no-image fallback, which paints a huge empty area).
             Original 3/4 portrait restored on sm+ where there's room. */}
-        <div className="relative aspect-square sm:aspect-[3/4] overflow-hidden bg-gray-50 mb-4">
+        <div className="relative aspect-square sm:aspect-[3/4] overflow-hidden bg-gray-50 mb-3">
           {/* Platform-level OOS ribbon (red, prominent) — same visual
               across every theme, see templates/shared/ProductCardCta.tsx */}
           <OutOfStockRibbon inStock={product.inStock !== false} isRtl={isRtl} />
@@ -222,7 +222,7 @@ function ElegantProductCard({
         </div>
 
         {/* Content — refined, centered */}
-        <div className="text-center space-y-1.5">
+        <div className="text-center flex flex-col gap-2 p-3 sm:p-4">
           <h3
             id={`prod-${product.id}-name`}
             data-zone="productName"

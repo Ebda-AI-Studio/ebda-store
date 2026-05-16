@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import type { HeaderProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { LanguageSwitcher } from '../../components/LanguageSwitcher';
@@ -59,10 +60,13 @@ export default function BoldHeader({
               className="absolute left-1/2 -translate-x-1/2 md:relative md:left-auto md:translate-x-0 flex items-center justify-center gap-3 shrink-0 cursor-pointer max-w-[65%] md:max-w-none"
             >
               {displayLogo ? (
-                <img
+                <Image
                   src={displayLogo}
                   alt={displayName}
+                  width={320}
+                  height={120}
                   className="h-20 max-h-20 w-auto max-w-full object-contain brightness-0 invert md:h-24 md:max-h-24"
+                  priority
                 />
               ) : (
                 <span className="text-xl font-black uppercase tracking-wider text-white">

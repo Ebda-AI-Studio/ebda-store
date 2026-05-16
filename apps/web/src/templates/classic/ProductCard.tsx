@@ -57,7 +57,7 @@ function ClassicProductCard({
         className="group block cursor-pointer"
       >
         {/* Image container — aspect-square, clean border */}
-        <div className="relative aspect-square overflow-hidden bg-muted border border-border group-hover:border-foreground/35 group-hover:shadow-[0_18px_36px_-22px_hsl(var(--foreground)/0.20)] transition-all duration-500 ease-out mb-5">
+        <div className="relative aspect-square overflow-hidden bg-muted border border-border group-hover:border-foreground/35 group-hover:shadow-[0_18px_36px_-22px_hsl(var(--foreground)/0.20)] transition-all duration-500 ease-out mb-3">
           {onToggleCompare && (
             <CompareButton
               productId={product.id}
@@ -150,7 +150,9 @@ function ClassicProductCard({
         </div>
 
         {/* Product info */}
-        <div className={`text-center ${isRtl ? 'direction-rtl' : ''}`}>
+        <div
+          className={`text-center flex flex-col gap-2 p-3 sm:p-4 ${isRtl ? 'direction-rtl' : ''}`}
+        >
           <h3
             id={`prod-${product.id}-name`}
             data-zone="productName"

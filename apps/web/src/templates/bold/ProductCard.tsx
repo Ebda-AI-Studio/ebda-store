@@ -152,7 +152,7 @@ function BoldProductCard({
         </div>
 
         {/* Content — tightened p-5 → p-3 sm:p-4 (2026-05-16 size reduction). */}
-        <div className="p-3 sm:p-4">
+        <div className="flex flex-col gap-2 p-3 sm:p-4">
           <h3
             id={`prod-${product.id}-name`}
             data-zone="productName"
@@ -172,9 +172,9 @@ function BoldProductCard({
             isRtl={isRtl}
             size="lg"
             showDiscount={false}
-            className="mt-2.5 font-black"
+            className="font-black"
           />
-          <TaxInclusiveLabel className="mt-1.5 block text-xs uppercase tracking-wide text-muted-foreground" />
+          <TaxInclusiveLabel className="block text-xs uppercase tracking-wide text-muted-foreground" />
         </div>
       </Link>
     </article>
