@@ -903,19 +903,38 @@ export default function TypographyPage() {
             type="button"
             onClick={async () => {
               const confirmMsg = isAr
-                ? 'سيتم حذف كل خطوط Google + كل إعدادات الأقسام (الألوان، الشارات، التسطير، الخطوط) والعودة لإعدادات القالب الافتراضية. هل أنت متأكد؟'
-                : 'This will remove ALL Google fonts + every zone setting (colours, chips, underlines, fonts) and revert to your template defaults. Are you sure?';
+                ? 'سيتم حذف كل خطوط Google + كل إعدادات الأقسام (الألوان، الشارات، التسطير، الخطوط) والعودة لإعدادات القالب الافتراضية. سيتم تحديث الصفحة بعد ذلك. هل أنت متأكد؟'
+                : 'This will remove ALL Google fonts + every zone setting (colours, chips, underlines, fonts) and revert to your template defaults. The page will reload after. Are you sure?';
               if (!confirm(confirmMsg)) return;
+              // EMPTY_TYPOGRAPHY = { fonts: [], zones: {} } — explicit
+              // truly-blank state. No baked defaults, so storefront falls
+              // back to the active template's CSS for every zone.
               const blank: Typography = { fonts: [], zones: {} };
               setTypo(blank);
               const ok = await save(blank);
               if (ok) {
+                // Hard reload after reset:
+                //   1. Forces every <input type="color"> swatch to
+                //      re-render from the now-empty state. React's
+                //      controlled inputs occasionally keep a stale
+                //      swatch on some browsers when value flips
+                //      undefined → string-fallback.
+                //   2. Re-fetches the live storefront probe iframe so
+                //      its measured values match the reset state.
+                //   3. Drops any stale closure references to the
+                //      previous `typo` state inside event handlers.
+                //   4. Belt-and-braces alongside the API's redis cache
+                //      invalidation — guarantees the next page render
+                //      sees the truly-blank state.
                 toastSuccess(
                   isAr ? 'تم إعادة الضبط' : 'Typography reset',
                   isAr
                     ? 'كل الإعدادات الآن تورث من القالب النشط'
                     : 'All settings now inherit from the active template'
                 );
+                // Brief delay so the merchant sees the success toast
+                // before the page reloads.
+                setTimeout(() => window.location.reload(), 600);
               }
             }}
             disabled={saving}

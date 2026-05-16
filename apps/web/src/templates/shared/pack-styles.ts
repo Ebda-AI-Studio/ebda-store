@@ -57,7 +57,10 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
     categoryFrame:
       'rounded-2xl bg-muted shadow-[0_10px_30px_-18px_hsl(var(--foreground)/0.10)] group-hover:shadow-[0_24px_48px_-20px_hsl(var(--foreground)/0.14)] transition-shadow duration-700 ease-out',
     categoryCaption: 'text-base sm:text-lg font-semibold text-foreground tracking-tight',
-    productCardName: 'text-sm font-semibold text-foreground tracking-tight leading-snug',
+    // 2026-05-16: Ahmad standing rule — main reading text minimum 16px
+    // across all themes for legibility. Theme identity stays via weight
+    // and tracking, not size shrinking.
+    productCardName: 'text-base font-semibold text-foreground tracking-tight leading-snug',
     productCardPrice: 'text-base font-bold text-foreground tracking-tight',
     productCardCta:
       'whitespace-nowrap rounded-full bg-foreground px-5 py-3.5 text-sm font-semibold text-background hover:bg-foreground/90 transition-colors duration-300 ease-out min-h-[44px]',
@@ -80,7 +83,7 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
     categoryFrame:
       'rounded-sm border border-border bg-muted group-hover:border-foreground/35 transition-colors duration-700 ease-out',
     categoryCaption: 'text-base sm:text-lg font-serif font-normal text-foreground tracking-tight',
-    productCardName: 'text-sm font-serif font-normal text-foreground tracking-tight leading-snug',
+    productCardName: 'text-base font-serif font-normal text-foreground tracking-tight leading-snug',
     productCardPrice: 'text-base font-serif font-medium text-foreground tracking-tight',
     productCardBody: 'text-center',
     productCardCta:
@@ -101,11 +104,15 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
     // No chrome — whitespace IS the design. Slow restrained color shifts only.
     card: 'bg-transparent',
     categoryFrame: 'rounded-md bg-muted/40',
+    // Minimal's identity is whitespace + tiny tracking — but main text
+    // (name + price + category caption) still hits 16px floor for
+    // legibility. Letter-spacing + light weight carry the minimal
+    // voice; size carries the readability.
     categoryCaption:
-      'text-xs sm:text-sm font-light tracking-[0.22em] uppercase text-muted-foreground group-hover:text-foreground transition-colors duration-500',
+      'text-base font-light tracking-[0.22em] uppercase text-muted-foreground group-hover:text-foreground transition-colors duration-500',
     productCardName:
-      'text-xs tracking-[0.18em] uppercase font-light text-muted-foreground group-hover:text-foreground transition-colors duration-500',
-    productCardPrice: 'text-[11px] tracking-wide font-light text-muted-foreground',
+      'text-base tracking-[0.18em] uppercase font-light text-muted-foreground group-hover:text-foreground transition-colors duration-500',
+    productCardPrice: 'text-base tracking-wide font-light text-muted-foreground',
     productCardBody: 'text-center',
     productCardCta:
       'whitespace-nowrap mx-auto inline-block border-b border-foreground/70 pb-1 text-[11px] font-medium uppercase tracking-[0.28em] text-foreground hover:text-foreground/70 hover:border-foreground/40 bg-transparent transition-colors duration-500 ease-out min-h-[44px]',
@@ -128,8 +135,9 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
     card: 'border-2 border-foreground bg-card hover:translate-x-1 hover:-translate-y-1 hover:shadow-[6px_6px_0_0_hsl(var(--foreground)/0.92)] transition-all duration-200 ease-out',
     categoryFrame:
       'rounded-2xl border-2 border-foreground bg-muted group-hover:shadow-[6px_6px_0_0_hsl(var(--foreground)/0.92)] transition-shadow duration-200 ease-out',
-    categoryCaption: 'text-sm sm:text-base font-black uppercase tracking-[0.05em] text-foreground',
-    productCardName: 'text-sm font-black uppercase tracking-[0.02em] text-foreground leading-tight',
+    categoryCaption: 'text-base font-black uppercase tracking-[0.05em] text-foreground',
+    productCardName:
+      'text-base font-black uppercase tracking-[0.02em] text-foreground leading-tight',
     productCardPrice: 'text-base font-black text-foreground tracking-tight',
     productCardCta:
       'whitespace-nowrap border-t-2 border-foreground bg-foreground px-5 py-3.5 text-sm font-black uppercase tracking-[0.18em] text-background hover:bg-primary hover:text-primary-foreground transition-colors duration-200 ease-out min-h-[44px]',
@@ -151,11 +159,14 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
     card: 'border border-foreground/10 bg-card hover:border-foreground/25 transition-colors duration-700 ease-out',
     categoryFrame:
       'rounded-md border border-foreground/10 bg-muted group-hover:border-foreground/25 transition-colors duration-700 ease-out',
+    // Elegant's identity is hairline weight + wide tracking — but main
+    // text still hits 16px floor. Tracking + extralight weight carry
+    // the elegant voice; size carries the legibility.
     categoryCaption:
-      'text-xs sm:text-sm font-extralight uppercase tracking-[0.28em] text-foreground/75 group-hover:text-foreground transition-colors duration-700',
+      'text-base font-extralight uppercase tracking-[0.28em] text-foreground/75 group-hover:text-foreground transition-colors duration-700',
     productCardName:
-      'text-xs font-light uppercase tracking-[0.22em] text-foreground/75 group-hover:text-foreground transition-colors duration-700',
-    productCardPrice: 'text-sm font-light tracking-wide text-foreground',
+      'text-base font-light uppercase tracking-[0.22em] text-foreground/75 group-hover:text-foreground transition-colors duration-700',
+    productCardPrice: 'text-base font-light tracking-wide text-foreground',
     productCardBody: 'text-center',
     productCardCta:
       'whitespace-nowrap border-t border-foreground/15 bg-transparent px-5 py-3.5 text-[11px] font-medium uppercase tracking-[0.32em] text-foreground hover:bg-foreground hover:text-background transition-all duration-700 ease-out min-h-[44px]',
