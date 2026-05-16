@@ -17,7 +17,7 @@ export default function ElegantCategoryCard({
     <Link
       href={`${urlPrefix}/products?category=${category.slug}`}
       prefetch={false}
-      className="group block outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 cursor-pointer w-full max-w-[220px] md:max-w-[240px] mx-auto"
+      className="group block outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 cursor-pointer w-full max-w-[150px] md:max-w-[170px] mx-auto"
     >
       {/* Image container with elegant aspect ratio.
           Mobile-tame: aspect-square (1:1) on phones so a 2-col grid of

@@ -89,7 +89,7 @@ function PecannbeeProductCardImpl({
       // balloon to 300+px each. Mobile (2 cols, narrow viewport) doesn't
       // hit the cap. Ahmad 2026-05-16 'products as well' after the
       // category cap landed.
-      className={`flex flex-col overflow-hidden w-full md:max-w-[260px] mx-auto ${styles.card}`}
+      className={`flex flex-col overflow-hidden w-full md:max-w-[200px] mx-auto ${styles.card}`}
       dir={isRtl ? 'rtl' : 'ltr'}
       itemScope
       itemType="https://schema.org/Product"

@@ -17,7 +17,7 @@ export default function MinimalCategoryCard({
     <Link
       href={`${urlPrefix}/products?category=${category.slug}`}
       prefetch={false}
-      className="group block outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 cursor-pointer w-full max-w-[200px] md:max-w-[220px] mx-auto"
+      className="group block outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 cursor-pointer w-full max-w-[140px] md:max-w-[160px] mx-auto"
     >
       {/* Image - Clean square */}
       <div className="aspect-square bg-muted/30 overflow-hidden mb-3">

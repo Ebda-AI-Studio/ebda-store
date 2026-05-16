@@ -1,5 +1,23 @@
 # Force Website Builder - Project Guidelines
 
+## Sizing rules — read `design.md` FIRST
+
+Ahmad's standing preference (codified 2026-05-16): **default to compact ecommerce
+sizing on both desktop and mobile.** Cards, logos, paddings, gaps — when in
+doubt, lean smaller. Industry benchmark is pecannbee.com.kw + bank-alkahraman.com
+
+- similar Kuwait/GCC stores.
+
+**Before changing any size-related class (max-w, h-, p-, gap-, aspect-),
+read `design.md` in the repo root.** That file is the single source of truth
+for size baselines (product card 180-220px desktop / 150-180px mobile,
+category card 140-180px, logo h-14 mobile / h-20 desktop, etc.). Anti-patterns
+and the "still too big" diagnosis recipe are documented there too.
+
+If `design.md` is missing from a future session's project root, recreate it
+from the project memory `feedback-fwb-sizing-rules.md` (or ask Ahmad to point
+to the latest version).
+
 ## Platform-level fixes — applies to every change in this repo
 
 **Every UI/UX/feature change MUST be platform-level. NEVER tenant-scoped, NEVER theme-specific without an explicit reason.**
