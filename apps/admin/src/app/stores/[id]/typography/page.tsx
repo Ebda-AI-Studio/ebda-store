@@ -415,6 +415,160 @@ const CHIP_STYLE_PRESETS: Array<{
   },
 ];
 
+// Multi-zone heading-style presets — one click applies a coherent look
+// across the 4 section-heading sub-zones (kicker + title + subtitle +
+// seeAll). Best-of-both-worlds: merchant gets a polished default in 1
+// click, can still tweak any single zone afterwards (per-zone settings
+// keep working as before — the preset just seeds them).
+//
+// "Main parts" per Ahmad 2026-05-16: section heading sub-zones are the
+// most-visible per-section text on every storefront page; styling all 4
+// coherently is the difference between "looks designed" and "looks like
+// a config form." Other zones (header, footer, products) stay
+// individually-controlled — overriding everything at once for the whole
+// store would be too coarse.
+const HEADING_STYLE_PRESETS: Array<{
+  id: string;
+  label: string;
+  labelAr: string;
+  description: string;
+  descriptionAr: string;
+  zoneSettings: Partial<Record<ZoneKey, ZoneSettings>>;
+}> = [
+  {
+    id: 'brand-pill-heading',
+    label: 'Brand pill heading',
+    labelAr: 'عنوان بشارة العلامة',
+    description: 'Primary-colour pill on kicker, bold dark title, muted subtitle, accent seeAll.',
+    descriptionAr: 'كبسولة بلون العلامة الرئيسي للشارة، عنوان جريء داكن، نص فرعي مخفف.',
+    zoneSettings: {
+      sectionKicker: {
+        backgroundColor: 'brand-primary',
+        color: '#ffffff',
+        padding: '4px 14px',
+        borderRadius: '9999px',
+        fontWeight: '600',
+        letterSpacing: '0.1em',
+      },
+      sectionTitle: {
+        fontWeight: '700',
+        color: 'brand-foreground',
+      },
+      sectionSubtitle: {
+        color: 'brand-muted',
+      },
+      sectionSeeAll: {
+        color: 'brand-primary',
+        textDecoration: 'underline',
+        textDecorationColor: 'brand-primary',
+        textUnderlineOffset: '4px',
+      },
+    },
+  },
+  {
+    id: 'editorial-elegant',
+    label: 'Editorial elegant',
+    labelAr: 'تحريري أنيق',
+    description: 'Tiny tracking-wide kicker, light large title, italic subtitle. Luxury feel.',
+    descriptionAr: 'شارة دقيقة بتباعد واسع، عنوان كبير خفيف، نص فرعي مائل. شعور فاخر.',
+    zoneSettings: {
+      sectionKicker: {
+        backgroundColor: '',
+        color: 'brand-muted',
+        padding: '',
+        borderRadius: '',
+        fontWeight: '400',
+        letterSpacing: '0.32em',
+      },
+      sectionTitle: {
+        fontWeight: '300',
+        letterSpacing: '-0.01em',
+        color: 'brand-foreground',
+      },
+      sectionSubtitle: {
+        color: 'brand-muted',
+        fontWeight: '300',
+      },
+      sectionSeeAll: {
+        color: 'brand-foreground',
+        textDecoration: '',
+        letterSpacing: '0.22em',
+        fontWeight: '500',
+      },
+    },
+  },
+  {
+    id: 'bold-uppercase',
+    label: 'Bold uppercase',
+    labelAr: 'جريء بأحرف كبيرة',
+    description: 'Brand-foreground chip + black uppercase title, tight subtitle. Strong, modern.',
+    descriptionAr: 'شارة بلون النص الأساسي + عنوان أسود بأحرف كبيرة. قوي وعصري.',
+    zoneSettings: {
+      sectionKicker: {
+        backgroundColor: 'brand-foreground',
+        color: 'brand-background',
+        padding: '3px 10px',
+        borderRadius: '4px',
+        fontWeight: '900',
+        letterSpacing: '0.08em',
+      },
+      sectionTitle: {
+        fontWeight: '900',
+        letterSpacing: '-0.01em',
+        color: 'brand-foreground',
+      },
+      sectionSubtitle: {
+        color: 'brand-muted',
+        fontWeight: '500',
+      },
+      sectionSeeAll: {
+        color: 'brand-foreground',
+        textDecoration: '',
+        fontWeight: '700',
+        letterSpacing: '0.18em',
+      },
+    },
+  },
+  {
+    id: 'soft-pastel',
+    label: 'Soft pastel',
+    labelAr: 'باستيل ناعم',
+    description: 'Tinted-muted chip, medium title, no underline. Calm, friendly.',
+    descriptionAr: 'شارة بلون مخفف، عنوان متوسط، بدون تسطير. هادئ وودود.',
+    zoneSettings: {
+      sectionKicker: {
+        backgroundColor: 'brand-muted',
+        color: 'brand-foreground',
+        padding: '4px 12px',
+        borderRadius: '6px',
+        fontWeight: '600',
+        letterSpacing: '0.08em',
+      },
+      sectionTitle: {
+        fontWeight: '600',
+        color: 'brand-foreground',
+      },
+      sectionSubtitle: {
+        color: 'brand-muted',
+      },
+      sectionSeeAll: {
+        color: 'brand-primary',
+        textDecoration: 'underline',
+        textUnderlineOffset: '3px',
+      },
+    },
+  },
+];
+
+// Which zones the multi-zone preset buttons touch + reset together.
+// "Main parts" of the section heading per Ahmad 2026-05-16.
+const HEADING_PRESET_ZONES: ZoneKey[] = [
+  'sectionKicker',
+  'sectionTitle',
+  'sectionSubtitle',
+  'sectionSeeAll',
+];
+
 type FontSource =
   | { type: 'google'; url: string; family: string }
   | {
@@ -628,6 +782,58 @@ export default function TypographyPage() {
     toastSuccess(`Set ${family} on every zone`);
   };
 
+  // Apply a multi-zone heading-style preset across kicker + title +
+  // subtitle + seeAll in one shot. Merges the preset's zoneSettings
+  // into each target zone (preserves any unrelated fields like
+  // fontFamily that the merchant set earlier) — so picking a preset
+  // never wipes a font choice. Merchant can still tweak any single
+  // zone afterwards.
+  const applyHeadingPreset = (presetId: string) => {
+    const preset = HEADING_STYLE_PRESETS.find(p => p.id === presetId);
+    if (!preset) return;
+    const nextZones = { ...typo.zones };
+    for (const [zoneKey, settings] of Object.entries(preset.zoneSettings) as [
+      ZoneKey,
+      ZoneSettings,
+    ][]) {
+      const existing = nextZones[zoneKey] ?? {};
+      // Empty strings explicitly clear that field (e.g. preset wants
+      // to clear backgroundColor). Spread existing first, then preset.
+      nextZones[zoneKey] = { ...existing, ...settings };
+      // Clean empty-string values so the API zod schema accepts the
+      // payload (zod-trip on empty strings depending on field shape).
+      const cleaned: ZoneSettings = {};
+      for (const [k, v] of Object.entries(nextZones[zoneKey] ?? {})) {
+        if (typeof v === 'string' && v.trim()) {
+          cleaned[k as keyof ZoneSettings] = v;
+        }
+      }
+      nextZones[zoneKey] = cleaned;
+    }
+    setTypo(t => ({ ...t, zones: nextZones }));
+    toastSuccess(
+      isAr ? 'تم تطبيق النمط' : 'Style applied',
+      isAr
+        ? `${preset.labelAr} — يمكنك تعديل أي قسم منفردًا`
+        : `${preset.label} — tweak any zone individually after`
+    );
+  };
+
+  // Reset just the heading sub-zones to their inherit-from-template
+  // defaults. Useful when the merchant wants to start fresh on the
+  // heading styling without nuking unrelated zones (header, footer, etc.).
+  const clearHeadingStyles = () => {
+    const nextZones = { ...typo.zones };
+    for (const zoneKey of HEADING_PRESET_ZONES) {
+      delete nextZones[zoneKey];
+    }
+    setTypo(t => ({ ...t, zones: nextZones }));
+    toastSuccess(
+      isAr ? 'تم مسح أنماط العناوين' : 'Heading styles cleared',
+      isAr ? 'العناوين عادت إلى الخط الافتراضي للقالب' : 'Headings reverted to template default'
+    );
+  };
+
   const onFontFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -821,11 +1027,84 @@ export default function TypographyPage() {
 
           {/* Per-zone controls */}
           <section className="rounded-2xl border border-border bg-card p-5">
-            <h2 className="text-base font-semibold text-foreground">Zones</h2>
+            <h2 className="text-base font-semibold text-foreground">
+              {isAr ? 'الأقسام' : 'Zones'}
+            </h2>
             <p className="mt-1 text-xs text-muted-foreground">
-              Each zone wraps a region of every template via the storefront's <code>data-zone</code>{' '}
-              attributes. Leave a field blank to inherit from the active template.
+              {isAr
+                ? 'كل قسم يلف منطقة في كل قالب عبر سمات data-zone في المتجر. اترك أي حقل فارغًا ليرث من القالب النشط.'
+                : "Each zone wraps a region of every template via the storefront's data-zone attributes. Leave a field blank to inherit from the active template."}
             </p>
+
+            {/* Quick heading style presets — one click applies a coherent
+                look across kicker + title + subtitle + seeAll. Best-of-both
+                onboarding: merchant gets a polished section heading
+                without editing 4 zones one by one, can still tweak each
+                zone afterwards if they want a custom touch. */}
+            <div className="mt-4 rounded-xl border border-primary/20 bg-primary/[0.02] p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground">
+                    {isAr ? 'أنماط جاهزة للعناوين' : 'Quick heading styles'}
+                  </h3>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {isAr
+                      ? 'انقر نمطًا لتطبيقه على الشارة + العنوان + النص الفرعي + رابط "عرض الكل" دفعة واحدة. يمكنك بعدها تعديل أي قسم منفردًا.'
+                      : 'Click a style to apply it across kicker + title + subtitle + seeAll at once. Tweak any zone individually after.'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={clearHeadingStyles}
+                  className="shrink-0 rounded-lg border border-destructive/40 px-2.5 py-1 text-xs font-medium text-destructive hover:bg-destructive/5"
+                >
+                  {isAr ? 'مسح أنماط العناوين' : 'Clear heading styles'}
+                </button>
+              </div>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {HEADING_STYLE_PRESETS.map(p => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => applyHeadingPreset(p.id)}
+                    className="group rounded-lg border border-border bg-background p-3 text-start hover:border-primary hover:bg-primary/[0.04] transition-colors"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      {/* Mini preview of the preset's kicker chip
+                          rendered using the actual preset's kicker
+                          settings — gives the merchant an at-a-glance
+                          read of what the preset looks like before
+                          clicking. */}
+                      <span
+                        style={cfgToInlineStyle(
+                          p.zoneSettings.sectionKicker ?? {},
+                          currentStore?.theme
+                        )}
+                        className="text-[10px]"
+                      >
+                        {isAr ? 'استكشف' : 'EXPLORE'}
+                      </span>
+                      <span
+                        style={cfgToInlineStyle(
+                          p.zoneSettings.sectionTitle ?? {},
+                          currentStore?.theme
+                        )}
+                        className="text-sm truncate flex-1 text-end"
+                      >
+                        {isAr ? 'أحدث المنتجات' : 'Latest Products'}
+                      </span>
+                    </div>
+                    <div className="mt-2 text-xs font-semibold text-foreground">
+                      {isAr ? p.labelAr : p.label}
+                    </div>
+                    <div className="mt-0.5 text-[11px] text-muted-foreground leading-snug">
+                      {isAr ? p.descriptionAr : p.description}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="mt-4 space-y-5">
               {ZONES.map((z, i) => {
                 const cfg = typo.zones[z.key] ?? {};
