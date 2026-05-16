@@ -3,10 +3,55 @@
 import { useCallback, useState } from 'react';
 import { useT } from '@/i18n/useT';
 import { useImageUpload } from '../hooks/useImageUpload';
+import { apiDelete } from '../lib/api';
 import { UploadDropzone } from './image-upload/UploadDropzone';
 import { UploadPreview } from './image-upload/UploadPreview';
 import { UploadProgress } from './image-upload/UploadProgress';
 import { MultiImageGrid } from './image-upload/MultiImageGrid';
+
+/**
+ * Extract the R2 object key from a stored URL. Both the public CDN URL
+ * (`*.r2.dev/<key>`) and the legacy r2.cloudflarestorage.com hostname are
+ * handled. Returns null when the URL doesn't match a known R2 pattern
+ * (e.g. external image URLs from a different bucket — we shouldn't try
+ * to delete those).
+ */
+function extractR2Key(url: string | undefined | null): string | null {
+  if (!url) return null;
+  try {
+    const u = new URL(url);
+    // r2.dev pattern: <bucket>.r2.dev/<key> — key is the full path
+    if (u.hostname.endsWith('.r2.dev')) {
+      return u.pathname.replace(/^\/+/, '') || null;
+    }
+    // r2.cloudflarestorage.com pattern: <accountId>.r2.cloudflarestorage.com/<bucket>/<key>
+    // first path segment is the bucket name; key = rest
+    if (u.hostname.endsWith('.r2.cloudflarestorage.com')) {
+      const parts = u.pathname.replace(/^\/+/, '').split('/');
+      return parts.slice(1).join('/') || null;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Call the API to delete the underlying R2 object. Fire-and-forget by
+ * design — if the delete fails we DON'T block the merchant's UI flow
+ * because the local state (image cleared from the form) is what matters
+ * for their workflow. Worst case is orphan R2 object that the per-store
+ * r2-cleanup cron will sweep later. Errors logged to console only.
+ */
+async function deleteR2Object(url: string | undefined | null): Promise<void> {
+  const key = extractR2Key(url);
+  if (!key) return;
+  try {
+    await apiDelete(`/api/v1/uploads/${key}`);
+  } catch (err) {
+    console.warn('[ImageUpload] R2 delete failed (orphan will be swept later):', err);
+  }
+}
 
 interface ImageUploadProps {
   value?: string;
@@ -111,11 +156,21 @@ export function ImageUpload({
     [accept, folder, onUpload, setError, storeId, t, uploadSingle]
   );
 
+  // Wrap the caller's onRemove so we ALSO delete the R2 object server-side
+  // (per ahmad's 2026-05-16 ask: 'r2 must be bidirectional — if i delete
+  // from admin it's deleted from storage'). The delete fires before the
+  // local state clears so it happens against the still-current URL.
+  // fire-and-forget — caller's onRemove runs regardless of network state.
+  const handleRemoveWithR2 = useCallback(() => {
+    void deleteR2Object(value);
+    onRemove?.();
+  }, [value, onRemove]);
+
   if (value) {
     return (
       <div className={className}>
         <div className={aspectClass}>
-          <UploadPreview value={value} alt={resolvedLabel} onRemove={onRemove} />
+          <UploadPreview value={value} alt={resolvedLabel} onRemove={handleRemoveWithR2} />
         </div>
         {recommendedSizeHint && (
           <p className="mt-2 text-xs text-muted-foreground">{recommendedSizeHint}</p>
@@ -206,6 +261,9 @@ export function MultiImageUpload({
 
   const removeImage = useCallback(
     (index: number) => {
+      // Bidirectional delete — same posture as ImageUpload.handleRemoveWithR2.
+      // Fires R2 delete before local state clear; local always wins on UI.
+      void deleteR2Object(values[index]);
       onChange(values.filter((_, i) => i !== index));
     },
     [onChange, values]
