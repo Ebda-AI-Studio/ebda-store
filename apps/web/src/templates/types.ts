@@ -448,6 +448,8 @@ export interface CategoryGridProps {
   cardSize?: import('@force/shared').CardSize;
   /** Per-store card aspect override. */
   cardAspect?: import('@force/shared').CardAspect;
+  /** Per-store spacing between cards (tight/normal/loose/xloose). Default 'normal'. */
+  cardGap?: import('@force/shared').CardGap;
   /** Show label below image (default true). */
   showLabel?: boolean;
   /** Enable hover/zoom (default true). */

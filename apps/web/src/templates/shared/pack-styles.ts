@@ -78,7 +78,7 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
     // Sharp corners, solid borders, slow restrained hovers (500ms).
     card: 'border border-border bg-card hover:border-foreground/40 hover:shadow-[0_18px_36px_-22px_hsl(var(--foreground)/0.18)] transition-all duration-500 ease-out',
     categoryFrame:
-      'border border-border bg-muted group-hover:border-foreground/35 transition-colors duration-700 ease-out',
+      'rounded-sm border border-border bg-muted group-hover:border-foreground/35 transition-colors duration-700 ease-out',
     categoryCaption: 'text-base sm:text-lg font-serif font-normal text-foreground tracking-tight',
     productCardName: 'text-sm font-serif font-normal text-foreground tracking-tight leading-snug',
     productCardPrice: 'text-base font-serif font-medium text-foreground tracking-tight',
@@ -100,7 +100,7 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
   minimal: {
     // No chrome — whitespace IS the design. Slow restrained color shifts only.
     card: 'bg-transparent',
-    categoryFrame: 'bg-muted/40',
+    categoryFrame: 'rounded-md bg-muted/40',
     categoryCaption:
       'text-xs sm:text-sm font-light tracking-[0.22em] uppercase text-muted-foreground group-hover:text-foreground transition-colors duration-500',
     productCardName:
@@ -127,7 +127,7 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
     // light/dark theme — not a flat black drop. Bold's voice keeps 200ms.
     card: 'border-2 border-foreground bg-card hover:translate-x-1 hover:-translate-y-1 hover:shadow-[6px_6px_0_0_hsl(var(--foreground)/0.92)] transition-all duration-200 ease-out',
     categoryFrame:
-      'border-2 border-foreground bg-muted group-hover:shadow-[6px_6px_0_0_hsl(var(--foreground)/0.92)] transition-shadow duration-200 ease-out',
+      'rounded-2xl border-2 border-foreground bg-muted group-hover:shadow-[6px_6px_0_0_hsl(var(--foreground)/0.92)] transition-shadow duration-200 ease-out',
     categoryCaption: 'text-sm sm:text-base font-black uppercase tracking-[0.05em] text-foreground',
     productCardName: 'text-sm font-black uppercase tracking-[0.02em] text-foreground leading-tight',
     productCardPrice: 'text-base font-black text-foreground tracking-tight',
@@ -150,7 +150,7 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
     // weight range. Long 500–700ms transitions for unhurried hovers.
     card: 'border border-foreground/10 bg-card hover:border-foreground/25 transition-colors duration-700 ease-out',
     categoryFrame:
-      'border border-foreground/10 bg-muted group-hover:border-foreground/25 transition-colors duration-700 ease-out',
+      'rounded-md border border-foreground/10 bg-muted group-hover:border-foreground/25 transition-colors duration-700 ease-out',
     categoryCaption:
       'text-xs sm:text-sm font-extralight uppercase tracking-[0.28em] text-foreground/75 group-hover:text-foreground transition-colors duration-700',
     productCardName:

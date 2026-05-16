@@ -3,7 +3,7 @@
 import CategoryCard from './CategoryCard';
 import type { CategoryGridProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { gridColsClass } from '../shared/card-size';
+import { gridColsClass, gridGapClass } from '../shared/card-size';
 
 export default function ModernCategoryGrid({
   categories,
@@ -16,6 +16,7 @@ export default function ModernCategoryGrid({
   subtitleAr,
   cardSize,
   cardAspect,
+  cardGap,
   showLabel,
   showHover,
   mobileColumns,
@@ -63,7 +64,9 @@ export default function ModernCategoryGrid({
           )}
         </div>
       )}
-      <div className={`grid gap-3 md:gap-4 ${gridColsClass(cappedMobile, cappedDesktop)}`}>
+      <div
+        className={`grid ${gridGapClass(cardGap)} ${gridColsClass(cappedMobile, cappedDesktop)}`}
+      >
         {categories.map(category => (
           <CategoryCard
             cardSize={cardSize}

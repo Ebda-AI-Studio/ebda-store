@@ -95,6 +95,17 @@ export type CardSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
  */
 export type CardAspect = 'theme' | 'square' | 'portrait' | 'landscape';
 
+/**
+ * Generic per-store CARD GAP — the spacing between cards in a grid /
+ * carousel. Lets a merchant pack cards tight (tile-grid look) or breathe
+ * (gallery look) without us having to bake a single value per theme.
+ *   tight:   gap-1.5 / gap-2  — compact tile grid
+ *   normal:  gap-3 / gap-4    — default, balanced (Ahmad 2026-05-16 "smaller")
+ *   loose:   gap-5 / gap-6    — airy, premium gallery feel
+ *   xloose:  gap-8 / gap-10   — magazine, single-tenant flagship
+ */
+export type CardGap = 'tight' | 'normal' | 'loose' | 'xloose';
+
 // Back-compat aliases — older code imports CategoryCardSize / CategoryCardAspect.
 export type CategoryCardSize = CardSize;
 export type CategoryCardAspect = CardAspect;
@@ -121,6 +132,8 @@ export interface CategoriesSettings extends SectionTitleOverride {
   showLabel?: boolean;
   /** Show subtle hover effects (zoom, shadow). Default true. */
   showHover?: boolean;
+  /** Spacing between category cards. Default 'normal'. */
+  cardGap?: CardGap;
 }
 
 export interface ProductCarouselSettings extends SectionTitleOverride {

@@ -21,8 +21,10 @@ export default function ClassicCategoryCard({
       prefetch={false}
       className={`group block text-center outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 cursor-pointer w-full mx-auto ${categorySizeClass(cardSize)}`}
     >
-      {/* Image with elegant border */}
-      <div className="relative aspect-square sm:aspect-[3/4] mb-3 overflow-hidden border border-border/60 bg-muted group-hover:border-foreground/35 transition-colors duration-700 ease-out">
+      {/* Image with elegant border + subtle rounded corners (classic
+          keeps the smallest radius of the 5 themes — restraint is its
+          identity, so rounded-sm rather than rounded-md or larger). */}
+      <div className="relative aspect-square sm:aspect-[3/4] mb-3 overflow-hidden rounded-sm border border-border/60 bg-muted group-hover:border-foreground/35 transition-colors duration-700 ease-out">
         {category.image ? (
           <img
             src={category.image}

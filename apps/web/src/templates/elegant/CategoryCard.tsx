@@ -25,7 +25,7 @@ export default function ElegantCategoryCard({
           Mobile-tame: aspect-square (1:1) on phones so a 2-col grid of
           categories doesn't blow past a screen height each. Original
           tall 2/3 ratio kept on sm+ where there's room. */}
-      <div className="relative aspect-square sm:aspect-[2/3] overflow-hidden bg-muted mb-3">
+      <div className="relative aspect-square sm:aspect-[2/3] overflow-hidden rounded-md bg-muted mb-3">
         {category.image ? (
           <img
             src={category.image}
@@ -54,8 +54,11 @@ export default function ElegantCategoryCard({
         </div>
       </div>
 
-      {/* Title - Refined typography */}
-      <div className={`text-center ${isRtl ? 'text-right' : 'text-left'}`}>
+      {/* Title — always centered. Caption text reads cleanly under a
+          centered category card regardless of language direction; mixing
+          text-center with RTL/LTR aligns to a side which fights the
+          centered image above. */}
+      <div className="text-center">
         <h3 className="text-base font-light text-foreground tracking-[-0.005em] group-hover:text-foreground/70 transition-colors duration-700">
           {displayName}
         </h3>

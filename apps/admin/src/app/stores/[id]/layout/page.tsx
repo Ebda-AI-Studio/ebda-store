@@ -388,6 +388,24 @@ export default function StoreLayoutPage() {
                       <option value="landscape">Landscape 4:3</option>
                     </select>
                   </label>
+                  <label className="flex flex-col gap-1 text-sm">
+                    <span className="text-muted-foreground">Card spacing</span>
+                    <select
+                      value={layout.categories.cardGap ?? 'normal'}
+                      onChange={e =>
+                        updateSection('categories', s => ({
+                          ...s,
+                          cardGap: e.target.value as 'tight' | 'normal' | 'loose' | 'xloose',
+                        }))
+                      }
+                      className="rounded-lg border border-border bg-card px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    >
+                      <option value="tight">Tight (6-8px)</option>
+                      <option value="normal">Normal (12-16px) — default</option>
+                      <option value="loose">Loose (20-24px)</option>
+                      <option value="xloose">Extra loose (32-40px)</option>
+                    </select>
+                  </label>
                   <RowToggle
                     label="Show category labels"
                     checked={layout.categories.showLabel !== false}

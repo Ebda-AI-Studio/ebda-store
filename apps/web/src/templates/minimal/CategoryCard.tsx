@@ -19,10 +19,12 @@ export default function MinimalCategoryCard({
     <Link
       href={`${urlPrefix}/products?category=${category.slug}`}
       prefetch={false}
-      className={`group block outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 cursor-pointer w-full mx-auto ${categorySizeClass(cardSize)}`}
+      className={`group block text-center outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 cursor-pointer w-full mx-auto ${categorySizeClass(cardSize)}`}
     >
-      {/* Image - Clean square */}
-      <div className="aspect-square sm:aspect-[4/3] bg-muted/30 overflow-hidden mb-3">
+      {/* Image — clean square with subtle rounding. Minimal identity
+          keeps the radius small (`rounded-md`) so corners read crisp
+          rather than soft. Caption is left-of-card centered by parent. */}
+      <div className="aspect-square sm:aspect-[4/3] bg-muted/30 overflow-hidden rounded-md mb-3">
         {category.image ? (
           <img
             src={category.image}

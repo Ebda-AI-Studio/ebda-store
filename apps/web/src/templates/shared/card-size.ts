@@ -8,7 +8,7 @@
  * value never breaks render. Defaults match Ahmad's 2026-05-16
  * "smaller" preference (sm category, sm product).
  */
-import type { CardAspect, CardSize } from '@force/shared';
+import type { CardAspect, CardGap, CardSize } from '@force/shared';
 
 /**
  * Category card size → tailwind max-w classes (mobile + desktop).
@@ -49,6 +49,29 @@ export function productSizeClass(size: CardSize | undefined): string {
     case 'sm':
     default:
       return 'max-w-[170px] md:max-w-[200px]';
+  }
+}
+
+/**
+ * Map per-store gap setting → Tailwind `gap-*` classes for category /
+ * product grids + carousels. Mobile + desktop tiers so a tight phone
+ * grid can still breathe on desktop. Default 'normal' keeps the prior
+ * baseline (gap-3 sm:gap-4) when the field is unset.
+ *
+ * Static-string enumeration so JIT keeps every class — don't refactor
+ * to dynamic interpolation.
+ */
+export function gridGapClass(gap: CardGap | undefined): string {
+  switch (gap) {
+    case 'tight':
+      return 'gap-1.5 sm:gap-2';
+    case 'loose':
+      return 'gap-5 sm:gap-6';
+    case 'xloose':
+      return 'gap-8 sm:gap-10';
+    case 'normal':
+    default:
+      return 'gap-3 sm:gap-4';
   }
 }
 

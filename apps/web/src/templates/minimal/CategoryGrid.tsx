@@ -2,7 +2,7 @@
 
 import type { CategoryGridProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { gridColsClass } from '../shared/card-size';
+import { gridColsClass, gridGapClass } from '../shared/card-size';
 import { getDisplayTitle } from '../shared';
 import CategoryCard from './CategoryCard';
 
@@ -17,6 +17,7 @@ export default function MinimalCategoryGrid({
   subtitleAr,
   cardSize,
   cardAspect,
+  cardGap,
   showLabel,
   showHover,
   mobileColumns,
@@ -53,7 +54,9 @@ export default function MinimalCategoryGrid({
         )}
 
         {/* Grid - Simple 4 columns */}
-        <div className={`grid gap-3 md:gap-4 ${gridColsClass(mobileColumns, desktopColumns)}`}>
+        <div
+          className={`grid ${gridGapClass(cardGap)} ${gridColsClass(mobileColumns, desktopColumns)}`}
+        >
           {categories.map(category => (
             <CategoryCard
               cardSize={cardSize}

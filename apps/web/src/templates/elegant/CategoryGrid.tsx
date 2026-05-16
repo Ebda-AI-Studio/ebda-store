@@ -2,7 +2,7 @@
 
 import type { CategoryGridProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { gridColsClass } from '../shared/card-size';
+import { gridColsClass, gridGapClass } from '../shared/card-size';
 import { getDisplayTitle } from '../shared';
 import CategoryCard from './CategoryCard';
 
@@ -17,6 +17,7 @@ export default function ElegantCategoryGrid({
   subtitleAr,
   cardSize,
   cardAspect,
+  cardGap,
   showLabel,
   showHover,
   mobileColumns,
@@ -57,7 +58,9 @@ export default function ElegantCategoryGrid({
         )}
 
         {/* Grid - 3 columns for elegant spacing */}
-        <div className={`grid gap-3 md:gap-4 ${gridColsClass(mobileColumns, desktopColumns)}`}>
+        <div
+          className={`grid ${gridGapClass(cardGap)} ${gridColsClass(mobileColumns, desktopColumns)}`}
+        >
           {categories.map(category => (
             <CategoryCard
               cardSize={cardSize}
