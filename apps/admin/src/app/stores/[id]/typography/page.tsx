@@ -817,6 +817,30 @@ export default function TypographyPage() {
     load();
   }, [load]);
 
+  // Hash-deep-link handler — when the page is opened via
+  // /typography#zone-<key> (eg from a "Tune typography for this section"
+  // link inside the Layout page), scroll the matching zone block into
+  // view and pulse it with a primary-coloured ring for ~2.5s so the
+  // merchant sees which controls correspond to the section they came
+  // from. Re-runs after `loading` flips false so we wait for the zone
+  // blocks to actually render before scrolling.
+  useEffect(() => {
+    if (loading) return;
+    if (typeof window === 'undefined') return;
+    const hash = window.location.hash;
+    if (!hash.startsWith('#zone-')) return;
+    const el = document.getElementById(hash.slice(1));
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const block = el.querySelector<HTMLDivElement>('[data-zone-block]');
+    if (!block) return;
+    block.classList.add('ring-2', 'ring-primary', 'ring-offset-2', 'shadow-lg');
+    const t = window.setTimeout(() => {
+      block.classList.remove('ring-2', 'ring-primary', 'ring-offset-2', 'shadow-lg');
+    }, 2500);
+    return () => window.clearTimeout(t);
+  }, [loading]);
+
   const save = useCallback(
     async (next: Typography) => {
       setSaving(true);
@@ -1287,7 +1311,7 @@ export default function TypographyPage() {
                 // override layer on top of the broad zones above.
                 const isFirstSubZone = z.isSubZone && !ZONES[i - 1]?.isSubZone;
                 return (
-                  <div key={z.key}>
+                  <div key={z.key} id={`zone-${z.key}`} className="scroll-mt-24">
                     {isFirstSubZone && (
                       <div className="mb-5 rounded-xl border border-dashed border-border bg-muted/30 p-3 text-xs text-muted-foreground">
                         <strong className="text-foreground">Fine-grained overrides</strong> — these
@@ -1296,7 +1320,10 @@ export default function TypographyPage() {
                         <em>Products</em> setting for product names only.
                       </div>
                     )}
-                    <div className="rounded-xl border border-border/60 bg-background p-4">
+                    <div
+                      data-zone-block={z.key}
+                      className="rounded-xl border border-border/60 bg-background p-4 transition-[box-shadow,border-color] duration-300"
+                    >
                       <div className="flex items-center justify-between gap-2 flex-wrap">
                         <h3 className="text-sm font-semibold text-foreground">
                           {isAr ? z.labelAr : z.label}
