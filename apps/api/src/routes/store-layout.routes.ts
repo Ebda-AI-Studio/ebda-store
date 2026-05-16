@@ -94,13 +94,57 @@ const layoutSchema = z
       showLabel: z.boolean().optional(),
       showHover: z.boolean().optional(),
     }),
+    // Product carousels — newArrivals + bestSellers. 2026-05-16: extended
+    // to mirror the categories block so merchants can tune product card
+    // size / aspect / named shape / spacing / labels / hover the same
+    // way they tune category cards. Without listing the new fields here
+    // Zod silently strips them on save (the trap documented in
+    // feedback-fwb-zod-silent-strip-trap.md).
     newArrivals: z.object({
       enabled: z.boolean(),
       limit: z.number().int().min(1).max(48),
+      title: z.string().optional(),
+      titleAr: z.string().optional(),
+      cardSize: z.enum(['xs', 'sm', 'md', 'lg', 'xl']).optional(),
+      cardAspect: z.enum(['theme', 'square', 'portrait', 'landscape']).optional(),
+      cardShape: z
+        .enum([
+          'theme',
+          'circle',
+          'rounded-square',
+          'square',
+          'soft',
+          'portrait',
+          'landscape',
+          'pill',
+        ])
+        .optional(),
+      cardGap: z.enum(['tight', 'normal', 'loose', 'xloose']).optional(),
+      showLabel: z.boolean().optional(),
+      showHover: z.boolean().optional(),
     }),
     bestSellers: z.object({
       enabled: z.boolean(),
       limit: z.number().int().min(1).max(48),
+      title: z.string().optional(),
+      titleAr: z.string().optional(),
+      cardSize: z.enum(['xs', 'sm', 'md', 'lg', 'xl']).optional(),
+      cardAspect: z.enum(['theme', 'square', 'portrait', 'landscape']).optional(),
+      cardShape: z
+        .enum([
+          'theme',
+          'circle',
+          'rounded-square',
+          'square',
+          'soft',
+          'portrait',
+          'landscape',
+          'pill',
+        ])
+        .optional(),
+      cardGap: z.enum(['tight', 'normal', 'loose', 'xloose']).optional(),
+      showLabel: z.boolean().optional(),
+      showHover: z.boolean().optional(),
     }),
     filterSidebar: z.object({
       enabled: z.boolean(),

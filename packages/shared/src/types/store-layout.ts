@@ -173,6 +173,14 @@ export interface ProductCarouselSettings extends SectionTitleOverride {
   cardSize?: CardSize;
   /** Per-store card aspect override. Default 'theme'. */
   cardAspect?: CardAspect;
+  /** Per-store named shape override (circle / rounded-square / square /
+   *  soft / portrait / landscape / pill). When set to anything but 'theme',
+   *  bundles aspect + rounding so merchant doesn't tune each axis separately. */
+  cardShape?: CardShape;
+  /** Spacing between product cards in the grid / carousel. Default 'normal'. */
+  cardGap?: CardGap;
+  /** Show the product name + price below the image. Default true. */
+  showLabel?: boolean;
   /** Show subtle hover effects (zoom, shadow). Default true. */
   showHover?: boolean;
 }

@@ -319,6 +319,15 @@ export interface ProductCarouselProps {
   onAddToCart?: (productId: string) => Promise<void> | void;
   urlPrefix?: string;
   pack?: import('@force/shared').TemplateId;
+  // Per-store card customisation — 2026-05-16. Mirrors CategoryGridProps so
+  // newArrivals + bestSellers admin forms expose the same controls
+  // (size + aspect + named shape + spacing + label/hover toggles).
+  cardSize?: import('@force/shared').CardSize;
+  cardAspect?: import('@force/shared').CardAspect;
+  cardShape?: import('@force/shared').CardShape;
+  cardGap?: import('@force/shared').CardGap;
+  showLabel?: boolean;
+  showHover?: boolean;
 }
 
 /**

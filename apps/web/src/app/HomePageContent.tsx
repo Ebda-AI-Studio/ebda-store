@@ -220,6 +220,12 @@ export function HomePageContent({
                     currency={store.currency}
                     onAddToCart={handleAddToCart}
                     pack={templateId}
+                    cardSize={layout.newArrivals.cardSize}
+                    cardAspect={layout.newArrivals.cardAspect}
+                    cardShape={layout.newArrivals.cardShape}
+                    cardGap={layout.newArrivals.cardGap}
+                    showLabel={layout.newArrivals.showLabel}
+                    showHover={layout.newArrivals.showHover}
                   />
                 ) : (
                   <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -250,6 +256,12 @@ export function HomePageContent({
                     currency={store.currency}
                     onAddToCart={handleAddToCart}
                     pack={templateId}
+                    cardSize={layout.bestSellers.cardSize}
+                    cardAspect={layout.bestSellers.cardAspect}
+                    cardShape={layout.bestSellers.cardShape}
+                    cardGap={layout.bestSellers.cardGap}
+                    showLabel={layout.bestSellers.showLabel}
+                    showHover={layout.bestSellers.showHover}
                   />
                 ) : (
                   <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">

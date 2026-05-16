@@ -477,6 +477,10 @@ export default function StoreLayoutPage() {
                   onChangeTitle={v => updateSection('newArrivals', s => ({ ...s, title: v }))}
                   onChangeTitleAr={v => updateSection('newArrivals', s => ({ ...s, titleAr: v }))}
                 />
+                <ProductCardControls
+                  values={layout.newArrivals}
+                  onChange={patch => updateSection('newArrivals', s => ({ ...s, ...patch }))}
+                />
               </SectionCard>
 
               {/* Best sellers */}
@@ -503,6 +507,10 @@ export default function StoreLayoutPage() {
                   placeholderAr={t('sections.bestSellers.headingArPlaceholder')}
                   onChangeTitle={v => updateSection('bestSellers', s => ({ ...s, title: v }))}
                   onChangeTitleAr={v => updateSection('bestSellers', s => ({ ...s, titleAr: v }))}
+                />
+                <ProductCardControls
+                  values={layout.bestSellers}
+                  onChange={patch => updateSection('bestSellers', s => ({ ...s, ...patch }))}
                 />
               </SectionCard>
 
@@ -562,53 +570,15 @@ export default function StoreLayoutPage() {
                 onToggle={v => updateSection('reviewSection', s => ({ ...s, enabled: v }))}
               />
 
-              {/* Sizing contract — each field has a small visual preview
-                  showing the actual aspect ratio so merchants can see what
-                  they're picking before saving (ahmad's ask 2026-05-16:
-                  bare numbers like '2.45:1' weren't intuitive). */}
-              <SectionCard
-                title={t('sections.sizing.title')}
-                description={t('sections.sizing.description')}
-                alwaysOn
-              >
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <SizingFieldWithPreview
-                    label={t('sections.sizing.heroAspect')}
-                    value={layout.sizing.heroAspect}
-                    options={['2.45:1', '16:9', '4:3']}
-                    onChange={v =>
-                      updateSection('sizing', s => ({
-                        ...s,
-                        heroAspect: v as StoreLayoutSettings['sizing']['heroAspect'],
-                      }))
-                    }
-                  />
-                  <SizingFieldWithPreview
-                    label={t('sections.sizing.productImageAspect')}
-                    value={layout.sizing.productImageAspect}
-                    options={['1:1', '3:4']}
-                    onChange={v =>
-                      updateSection('sizing', s => ({
-                        ...s,
-                        productImageAspect:
-                          v as StoreLayoutSettings['sizing']['productImageAspect'],
-                      }))
-                    }
-                  />
-                  <SizingFieldWithPreview
-                    label={t('sections.sizing.categoryImageAspect')}
-                    value={layout.sizing.categoryImageAspect}
-                    options={['1:1', '3:4', '2:3']}
-                    onChange={v =>
-                      updateSection('sizing', s => ({
-                        ...s,
-                        categoryImageAspect:
-                          v as StoreLayoutSettings['sizing']['categoryImageAspect'],
-                      }))
-                    }
-                  />
-                </div>
-              </SectionCard>
+              {/* Sizing contract section removed 2026-05-16 — its 3 fields
+                  (heroAspect / productImageAspect / categoryImageAspect)
+                  were never consumed by the storefront. The per-section
+                  cardAspect / cardShape controls on Categories +
+                  NewArrivals + BestSellers are the actual source of truth
+                  for image aspect ratios. The underlying type field
+                  (`layout.sizing.*`) stays in DEFAULT_LAYOUT_SETTINGS for
+                  back-compat with existing stores' saved JSON but isn't
+                  surfaced in admin or read by render code. */}
             </>
           )}
         </div>
@@ -674,6 +644,117 @@ interface SectionCardProps {
   alwaysOn?: boolean;
   onToggle?: (v: boolean) => void;
   children?: React.ReactNode;
+}
+
+/**
+ * Card-control row for sections that render image+text cards
+ * (categories, newArrivals, bestSellers). Bundles size + aspect +
+ * shape + spacing dropdowns and showLabel + showHover toggles.
+ *
+ * Values shape matches both `CategoriesSettings` and
+ * `ProductCarouselSettings` — both have the same card-tuning fields,
+ * so one component covers all 3 mount points.
+ */
+type CardControlsValues = {
+  cardSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+  cardAspect?: 'theme' | 'square' | 'portrait' | 'landscape';
+  cardShape?:
+    | 'theme'
+    | 'circle'
+    | 'rounded-square'
+    | 'square'
+    | 'soft'
+    | 'portrait'
+    | 'landscape'
+    | 'pill';
+  cardGap?: 'tight' | 'normal' | 'loose' | 'xloose';
+  showLabel?: boolean;
+  showHover?: boolean;
+};
+
+function ProductCardControls({
+  values,
+  onChange,
+}: {
+  values: CardControlsValues;
+  onChange: (patch: Partial<CardControlsValues>) => void;
+}) {
+  return (
+    <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <label className="flex flex-col gap-1 text-sm">
+        <span className="text-muted-foreground">Card size</span>
+        <select
+          value={values.cardSize ?? 'sm'}
+          onChange={e => onChange({ cardSize: e.target.value as CardControlsValues['cardSize'] })}
+          className="rounded-lg border border-border bg-card px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+        >
+          <option value="xs">Extra small (120/140px)</option>
+          <option value="sm">Small (150/180px) — default</option>
+          <option value="md">Medium (200/240px)</option>
+          <option value="lg">Large (240/300px)</option>
+          <option value="xl">Extra large (280/360px)</option>
+        </select>
+      </label>
+      <label className="flex flex-col gap-1 text-sm">
+        <span className="text-muted-foreground">Image aspect</span>
+        <select
+          value={values.cardAspect ?? 'theme'}
+          onChange={e =>
+            onChange({ cardAspect: e.target.value as CardControlsValues['cardAspect'] })
+          }
+          className="rounded-lg border border-border bg-card px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+        >
+          <option value="theme">Theme default</option>
+          <option value="square">Square 1:1</option>
+          <option value="portrait">Portrait 3:4</option>
+          <option value="landscape">Landscape 4:3</option>
+        </select>
+      </label>
+      <label className="flex flex-col gap-1 text-sm">
+        <span className="text-muted-foreground">Card shape</span>
+        <select
+          value={values.cardShape ?? 'theme'}
+          onChange={e => onChange({ cardShape: e.target.value as CardControlsValues['cardShape'] })}
+          className="rounded-lg border border-border bg-card px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+        >
+          <option value="theme">Theme default</option>
+          <option value="circle">Circle (round, 1:1)</option>
+          <option value="rounded-square">Rounded square (soft, 1:1)</option>
+          <option value="square">Sharp square (1:1)</option>
+          <option value="soft">Soft rectangle (4:5)</option>
+          <option value="portrait">Portrait (3:4)</option>
+          <option value="landscape">Landscape (4:3)</option>
+          <option value="pill">Pill (horizontal, 2:1)</option>
+        </select>
+        <span className="text-[11px] text-muted-foreground/80">
+          Overrides the aspect ratio + rounded corners with one preset.
+        </span>
+      </label>
+      <label className="flex flex-col gap-1 text-sm">
+        <span className="text-muted-foreground">Card spacing</span>
+        <select
+          value={values.cardGap ?? 'normal'}
+          onChange={e => onChange({ cardGap: e.target.value as CardControlsValues['cardGap'] })}
+          className="rounded-lg border border-border bg-card px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+        >
+          <option value="tight">Tight (6-8px)</option>
+          <option value="normal">Normal (12-16px) — default</option>
+          <option value="loose">Loose (20-24px)</option>
+          <option value="xloose">Extra loose (32-40px)</option>
+        </select>
+      </label>
+      <RowToggle
+        label="Show labels"
+        checked={values.showLabel !== false}
+        onChange={v => onChange({ showLabel: v })}
+      />
+      <RowToggle
+        label="Hover effects"
+        checked={values.showHover !== false}
+        onChange={v => onChange({ showHover: v })}
+      />
+    </div>
+  );
 }
 
 function SectionCard({
@@ -791,53 +872,11 @@ function SelectField<T extends string | number>({
   );
 }
 
-/**
- * Parse an aspect-ratio string like '2.45:1' / '3:4' / '16:9' into CSS
- * `aspect-ratio` value form (`w / h`). Used to render the live preview
- * rectangle inside SizingFieldWithPreview.
- */
-function parseAspect(ratio: string): string {
-  const [w, h] = ratio.split(':').map(Number);
-  if (!w || !h || Number.isNaN(w) || Number.isNaN(h)) return '1 / 1';
-  return `${w} / ${h}`;
-}
-
-/**
- * Sizing field with a live aspect-ratio preview rectangle. Solves the
- * 'I have no idea what 2.45:1 looks like' problem ahmad raised
- * 2026-05-16. The preview rectangle is bounded to a max 120px width
- * so heroes (wide) and product images (square) all fit consistently
- * in the form column.
- */
-function SizingFieldWithPreview({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  options: readonly string[];
-  onChange: (v: string) => void;
-}) {
-  return (
-    <div className="flex flex-col gap-2">
-      <SelectField label={label} value={value} options={options} onChange={onChange} />
-      <div className="flex items-start gap-3">
-        <div
-          className="flex-shrink-0 rounded-md border border-dashed border-border bg-muted/50"
-          style={{
-            aspectRatio: parseAspect(value),
-            width: '100%',
-            maxWidth: 120,
-          }}
-          aria-hidden
-        />
-        <span className="text-xs text-muted-foreground pt-1 font-mono">{value}</span>
-      </div>
-    </div>
-  );
-}
+// parseAspect + SizingFieldWithPreview removed 2026-05-16 alongside the
+// Sizing contract SectionCard (heroAspect / productImageAspect /
+// categoryImageAspect fields never consumed by the storefront — the
+// per-section cardAspect / cardShape controls are the real source of
+// truth for image aspect ratios).
 
 function SectionTitleFields({
   title,
