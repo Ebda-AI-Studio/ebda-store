@@ -474,7 +474,11 @@ const HEADING_STYLE_PRESETS: Array<{
     zoneSettings: {
       sectionKicker: {
         backgroundColor: '',
-        color: 'brand-muted',
+        // brand-foreground (dark text) — was brand-muted which is so
+        // light it disappears on a white-ish bg. Editorial's quiet
+        // feel comes from the wide tracking + light weight, not from
+        // the color. Keep the color readable.
+        color: 'brand-foreground',
         padding: '',
         borderRadius: '',
         fontWeight: '400',
@@ -892,16 +896,45 @@ export default function TypographyPage() {
         <div className="flex gap-2">
           <Link href={`/stores/${storeId}`}>
             <Button type="button" variant="outline">
-              Back to Store
+              {isAr ? 'العودة للمتجر' : 'Back to Store'}
             </Button>
           </Link>
+          <button
+            type="button"
+            onClick={async () => {
+              const confirmMsg = isAr
+                ? 'سيتم حذف كل خطوط Google + كل إعدادات الأقسام (الألوان، الشارات، التسطير، الخطوط) والعودة لإعدادات القالب الافتراضية. هل أنت متأكد؟'
+                : 'This will remove ALL Google fonts + every zone setting (colours, chips, underlines, fonts) and revert to your template defaults. Are you sure?';
+              if (!confirm(confirmMsg)) return;
+              const blank: Typography = { fonts: [], zones: {} };
+              setTypo(blank);
+              const ok = await save(blank);
+              if (ok) {
+                toastSuccess(
+                  isAr ? 'تم إعادة الضبط' : 'Typography reset',
+                  isAr
+                    ? 'كل الإعدادات الآن تورث من القالب النشط'
+                    : 'All settings now inherit from the active template'
+                );
+              }
+            }}
+            disabled={saving}
+            className="px-3 py-2 text-sm border border-destructive/40 text-destructive rounded-lg hover:bg-destructive/5 font-medium disabled:opacity-60"
+            title={
+              isAr
+                ? 'حذف كل إعدادات الطباعة والعودة لإعدادات القالب الافتراضية'
+                : 'Reset every typography setting to template defaults'
+            }
+          >
+            {isAr ? 'إعادة تعيين الكل' : 'Reset all'}
+          </button>
           <button
             type="button"
             onClick={() => save(typo)}
             disabled={saving}
             className="px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 font-medium disabled:opacity-60"
           >
-            {saving ? 'Saving…' : 'Save changes'}
+            {saving ? (isAr ? 'جاري الحفظ…' : 'Saving…') : isAr ? 'حفظ التغييرات' : 'Save changes'}
           </button>
         </div>
       }
@@ -1067,14 +1100,19 @@ export default function TypographyPage() {
                     key={p.id}
                     type="button"
                     onClick={() => applyHeadingPreset(p.id)}
-                    className="group rounded-lg border border-border bg-background p-3 text-start hover:border-primary hover:bg-primary/[0.04] transition-colors"
+                    className="group rounded-lg border border-border bg-background p-3 text-start hover:border-primary transition-colors"
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      {/* Mini preview of the preset's kicker chip
-                          rendered using the actual preset's kicker
-                          settings — gives the merchant an at-a-glance
-                          read of what the preset looks like before
-                          clicking. */}
+                    {/* Mini preview rendered on a CHECKERED neutral
+                        canvas so previews with light text (e.g. "Editorial
+                        elegant" using brand-muted on the kicker) don't
+                        vanish on a white card. The bg-foreground/[0.04]
+                        tint gives enough contrast for any preset variation
+                        while still reading as "preview canvas" not "real
+                        UI". */}
+                    <div
+                      className="flex items-center justify-between gap-2 rounded-md bg-foreground/[0.05] px-3 py-2 ring-1 ring-foreground/5"
+                      dir={isAr ? 'rtl' : 'ltr'}
+                    >
                       <span
                         style={cfgToInlineStyle(
                           p.zoneSettings.sectionKicker ?? {},
@@ -1144,8 +1182,15 @@ export default function TypographyPage() {
                           string for the zone (e.g. "Latest Products"
                           for sectionTitle) so the merchant can also
                           gauge real-world line length. */}
+                      {/* Preview canvas uses a foreground-tinted bg so
+                          previews with LIGHT text (brand-muted color,
+                          white-on-tint chips, etc.) stay readable. The
+                          previous bg-primary/[0.03] was too close to
+                          white — "Editorial elegant" merging a muted
+                          kicker into a near-white card disappeared into
+                          the bg. */}
                       <div
-                        className="mt-3 rounded-lg border border-dashed border-primary/30 bg-primary/[0.03] p-4"
+                        className="mt-3 rounded-lg border border-dashed border-primary/30 bg-foreground/[0.05] ring-1 ring-foreground/5 p-4"
                         dir={isAr ? 'rtl' : 'ltr'}
                       >
                         <div className="mb-2 flex items-center justify-between">
