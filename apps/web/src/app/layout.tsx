@@ -392,13 +392,39 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // silently drop the whole `background-color` declaration — the
   // merchant would see no colour on the chip even after saving.
   // Fallback HSL values mirror @force/ui's default theme palette.
-  const resolveColorValue = (v: string): string => {
+  //
+  // SMART CONTEXT (Ahmad 2026-05-16): some brand tokens are BACKGROUND-
+  // semantic (brand-muted, brand-background) — using them as text colour
+  // makes the text disappear on default-color pages (white on white).
+  // When the merchant picks one of these for a text field, auto-flip to
+  // a readable variant (--muted-foreground / --foreground). Same flip
+  // in reverse for brand-foreground when used as background (text-color
+  // on text-color background = invisible). Background fields use the
+  // raw value as-is — that's the merchant's explicit choice.
+  type ColorFieldContext = 'text' | 'background';
+  const resolveColorValue = (v: string, context: ColorFieldContext = 'background'): string => {
     if (v === 'brand-primary') return 'hsl(var(--primary, 220 13% 18%))';
     if (v === 'brand-secondary') return 'hsl(var(--secondary, 220 14% 96%))';
     if (v === 'brand-accent') return 'hsl(var(--accent, 220 14% 92%))';
-    if (v === 'brand-foreground') return 'hsl(var(--foreground, 220 13% 12%))';
-    if (v === 'brand-background') return 'hsl(var(--background, 0 0% 100%))';
-    if (v === 'brand-muted') return 'hsl(var(--muted, 220 14% 96%))';
+    if (v === 'brand-foreground') {
+      // brand-foreground IS the page text color. Using it as background
+      // creates dark-on-dark text invisibility. Flip to background.
+      if (context === 'background') return 'hsl(var(--background, 0 0% 100%))';
+      return 'hsl(var(--foreground, 220 13% 12%))';
+    }
+    if (v === 'brand-background') {
+      // brand-background IS the page bg. Using it as text creates
+      // white-on-white. Flip to foreground.
+      if (context === 'text') return 'hsl(var(--foreground, 220 13% 12%))';
+      return 'hsl(var(--background, 0 0% 100%))';
+    }
+    if (v === 'brand-muted') {
+      // brand-muted is a BACKGROUND tint (light gray surface). As text
+      // it'd be near-white on white. Substitute muted-foreground
+      // (semantically "muted text" — gray text on white) so readable.
+      if (context === 'text') return 'hsl(var(--muted-foreground, 220 9% 46%))';
+      return 'hsl(var(--muted, 220 14% 96%))';
+    }
     return v;
   };
   const sanitizeUrl = (v: unknown): string | null => {
@@ -474,7 +500,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       const ls = sanitizeFontValue(cfg.letterSpacing);
       if (ls) decls.push(`letter-spacing:${ls}`);
       const color = sanitizeFontValue(cfg.color);
-      if (color) decls.push(`color:${resolveColorValue(color)}`);
+      if (color) decls.push(`color:${resolveColorValue(color, 'text')}`);
 
       // Label / chip styling — backgroundColor, padding, borderRadius.
       // When any of these are set on an inline-rendered zone (most zones
@@ -484,7 +510,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       const bg = sanitizeFontValue(cfg.backgroundColor);
       const padding = sanitizeFontValue(cfg.padding);
       const radius = sanitizeFontValue(cfg.borderRadius);
-      if (bg) decls.push(`background-color:${resolveColorValue(bg)}`);
+      if (bg) decls.push(`background-color:${resolveColorValue(bg, 'background')}`);
       if (padding) decls.push(`padding:${padding}`);
       if (radius) decls.push(`border-radius:${radius}`);
       if ((bg || padding || radius) && !cfg.display) {
@@ -492,11 +518,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       }
 
       // Text decoration — underline / line-through / none plus colour +
-      // thickness + offset for fine control.
+      // thickness + offset for fine control. Decoration colour follows
+      // the same text-context substitution as color above.
       const td = sanitizeFontValue(cfg.textDecoration);
       if (td) decls.push(`text-decoration:${td}`);
       const tdc = sanitizeFontValue(cfg.textDecorationColor);
-      if (tdc) decls.push(`text-decoration-color:${resolveColorValue(tdc)}`);
+      if (tdc) decls.push(`text-decoration-color:${resolveColorValue(tdc, 'text')}`);
       const tdt = sanitizeFontValue(cfg.textDecorationThickness);
       if (tdt) decls.push(`text-decoration-thickness:${tdt}`);
       const tuo = sanitizeFontValue(cfg.textUnderlineOffset);

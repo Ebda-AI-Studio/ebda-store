@@ -298,22 +298,45 @@ function hslComponentsToHex(s: string | undefined | null): string | null {
 // color picker needs a literal hex to show a swatch. This bridges them
 // so the merchant SEES the brand colour on the picker when they pick
 // "Brand primary" from the dropdown.
+//
+// SMART CONTEXT (Ahmad 2026-05-16): mirrors the storefront's resolveColorValue
+// — when a background-semantic token (brand-muted, brand-background) is
+// used as TEXT color, substitute with a readable variant so the picker
+// swatch shows what will actually render, not the invisible literal.
+// Same for brand-foreground as background.
 function resolveBrandPresetToHex(
   token: string | undefined,
-  theme: Record<string, unknown> | undefined
+  theme: Record<string, unknown> | undefined,
+  context: 'text' | 'background' = 'background'
 ): string | null {
   if (!token || !theme) return null;
+  // Context-aware substitution: keep the resolved color in sync with
+  // what the storefront actually renders.
+  let effectiveToken = token;
+  if (token === 'brand-muted' && context === 'text') {
+    effectiveToken = 'brand-muted-foreground';
+  } else if (token === 'brand-foreground' && context === 'background') {
+    effectiveToken = 'brand-background';
+  } else if (token === 'brand-background' && context === 'text') {
+    effectiveToken = 'brand-foreground';
+  }
   const themeKeyMap: Record<string, string> = {
     'brand-primary': 'primaryColor',
     'brand-secondary': 'secondaryColor',
     'brand-accent': 'accentColor',
     'brand-foreground': 'foregroundColor',
     'brand-muted': 'mutedColor',
+    'brand-muted-foreground': 'mutedForegroundColor',
     'brand-background': 'backgroundColor',
   };
-  const key = themeKeyMap[token];
+  const key = themeKeyMap[effectiveToken];
   if (!key) return null;
   const val = theme[key];
+  // Theme may not define mutedForegroundColor; fall back to a sensible
+  // gray (`220 9% 46%` — slate-500) so the picker still shows SOMETHING.
+  if (effectiveToken === 'brand-muted-foreground' && typeof val !== 'string') {
+    return hslComponentsToHex('220 9% 46%');
+  }
   return typeof val === 'string' ? hslComponentsToHex(val) : null;
 }
 
@@ -325,10 +348,11 @@ function resolveBrandPresetToHex(
 // var that won't compute inside an inline-style attribute.
 function resolveColorForPreview(
   v: string | undefined,
-  theme: Record<string, unknown> | undefined
+  theme: Record<string, unknown> | undefined,
+  context: 'text' | 'background' = 'background'
 ): string | undefined {
   if (!v) return undefined;
-  const hex = resolveBrandPresetToHex(v, theme);
+  const hex = resolveBrandPresetToHex(v, theme, context);
   return hex ?? v;
 }
 
@@ -344,17 +368,18 @@ function cfgToInlineStyle(
   if (cfg.fontFamily) s.fontFamily = cfg.fontFamily;
   if (cfg.fontSize) s.fontSize = cfg.fontSize;
   if (cfg.fontWeight) s.fontWeight = cfg.fontWeight;
-  if (cfg.color) s.color = resolveColorForPreview(cfg.color, theme);
+  if (cfg.color) s.color = resolveColorForPreview(cfg.color, theme, 'text');
   if (cfg.lineHeight) s.lineHeight = cfg.lineHeight;
   if (cfg.letterSpacing) s.letterSpacing = cfg.letterSpacing;
-  if (cfg.backgroundColor) s.backgroundColor = resolveColorForPreview(cfg.backgroundColor, theme);
+  if (cfg.backgroundColor)
+    s.backgroundColor = resolveColorForPreview(cfg.backgroundColor, theme, 'background');
   if (cfg.padding) s.padding = cfg.padding;
   if (cfg.borderRadius) s.borderRadius = cfg.borderRadius;
   if (cfg.backgroundColor || cfg.padding || cfg.borderRadius) s.display = 'inline-block';
   if (cfg.textDecoration && cfg.textDecoration !== 'none')
     s.textDecoration = cfg.textDecoration as React.CSSProperties['textDecoration'];
   if (cfg.textDecorationColor)
-    s.textDecorationColor = resolveColorForPreview(cfg.textDecorationColor, theme);
+    s.textDecorationColor = resolveColorForPreview(cfg.textDecorationColor, theme, 'text');
   if (cfg.textDecorationThickness) s.textDecorationThickness = cfg.textDecorationThickness;
   if (cfg.textUnderlineOffset) s.textUnderlineOffset = cfg.textUnderlineOffset;
   return s;
@@ -1317,8 +1342,11 @@ export default function TypographyPage() {
                               value={
                                 cfg.color && /^#[0-9a-f]{6}$/i.test(cfg.color)
                                   ? cfg.color
-                                  : (resolveBrandPresetToHex(cfg.color, currentStore?.theme) ??
-                                    '#000000')
+                                  : (resolveBrandPresetToHex(
+                                      cfg.color,
+                                      currentStore?.theme,
+                                      'text'
+                                    ) ?? '#000000')
                               }
                               onChange={e => updateZone(z.key, { color: e.target.value })}
                               className="h-10 w-12 cursor-pointer rounded-lg border border-border bg-background"
@@ -1466,7 +1494,8 @@ export default function TypographyPage() {
                                     ? cfg.backgroundColor
                                     : (resolveBrandPresetToHex(
                                         cfg.backgroundColor,
-                                        currentStore?.theme
+                                        currentStore?.theme,
+                                        'background'
                                       ) ?? '#FF7700')
                                 }
                                 onChange={e =>
@@ -1616,7 +1645,8 @@ export default function TypographyPage() {
                                       ? cfg.textDecorationColor
                                       : (resolveBrandPresetToHex(
                                           cfg.textDecorationColor,
-                                          currentStore?.theme
+                                          currentStore?.theme,
+                                          'text'
                                         ) ?? '#FF7700')
                                   }
                                   onChange={e =>
