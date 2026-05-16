@@ -260,12 +260,20 @@ export class MyFatoorahPaymentProvider implements IPaymentProvider {
   }
 
   async refund(request: RefundRequest): Promise<RefundResponse> {
-    // First get payment details
+    // First get payment details. MyFatoorah's MakeRefund needs the
+    // *PaymentId* (per-transaction identifier), not the InvoiceId we
+    // stored at create time. If PaymentId is missing from metadata
+    // (older payments / partial-data responses), fall back to InvoiceId
+    // with KeyType:InvoiceId so the request still validates instead of
+    // 400-ing on a Key/KeyType mismatch.
     const status = await this.getPaymentStatus(request.transactionId);
+    const paymentId = status.metadata?.paymentId as string | undefined;
+    const refundKey = paymentId || request.transactionId;
+    const refundKeyType = paymentId ? 'PaymentId' : 'InvoiceId';
 
     const refundData: Record<string, unknown> = {
-      Key: status.metadata?.paymentId || request.transactionId,
-      KeyType: 'PaymentId',
+      Key: refundKey,
+      KeyType: refundKeyType,
       RefundChargeOnCustomer: false,
       ServiceChargeOnCustomer: false,
       Comment: request.reason || 'Refund requested',
@@ -274,6 +282,17 @@ export class MyFatoorahPaymentProvider implements IPaymentProvider {
     if (request.amount) {
       refundData.Amount = request.amount / 1000;
     }
+
+    logger.info(
+      {
+        keyType: refundKeyType,
+        invoiceId: request.transactionId,
+        amountFils: request.amount,
+        amountKwd: refundData.Amount,
+        testMode: this.config.isTestMode,
+      },
+      '[MyFatoorah] MakeRefund request'
+    );
 
     const response = await this.request<MyFatoorahRefundResponse>(
       '/v2/MakeRefund',

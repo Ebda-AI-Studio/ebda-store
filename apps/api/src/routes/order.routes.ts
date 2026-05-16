@@ -700,13 +700,51 @@ router.post(
         return;
       }
 
-      const result = await runInTenantContext(storeId, async () =>
-        PaymentService.refund({
-          transactionId: payment.transactionId!,
-          amount: data.amount,
-          reason: data.reason,
-        })
-      );
+      // Capture provider errors specifically so the admin sees what the
+      // gateway actually said instead of a generic 500. MyFatoorah refunds
+      // need explicit "Refund" permission enabled on the merchant account
+      // in the provider portal — first attempt commonly fails with that.
+      let result;
+      try {
+        result = await runInTenantContext(storeId, async () =>
+          PaymentService.refund({
+            transactionId: payment.transactionId!,
+            amount: data.amount,
+            reason: data.reason,
+          })
+        );
+      } catch (providerError) {
+        const providerMessage =
+          providerError instanceof Error ? providerError.message : 'Unknown provider error';
+        logger.error(
+          {
+            err: providerError,
+            orderId,
+            orderNumber: order.orderNumber,
+            transactionId: payment.transactionId,
+            provider: payment.provider,
+            amount: data.amount,
+          },
+          '[Refund] provider refund call failed'
+        );
+        // Surface the provider's own message in the customer-visible
+        // error string so the admin doesn't have to dig through Railway
+        // logs to know what went wrong. Append a hint for the common
+        // "permission not enabled" case which is the #1 first-time
+        // failure mode on MyFatoorah accounts.
+        const hint =
+          payment.provider === 'myfatoorah'
+            ? ' (verify Refund permission is enabled on this account in the MyFatoorah portal: Settings → API Permissions → MakeRefund)'
+            : '';
+        res.status(502).json({
+          success: false,
+          error: {
+            code: 'REFUND_PROVIDER_ERROR',
+            message: `${providerMessage}${hint}`,
+          },
+        });
+        return;
+      }
 
       await auditLog({
         action: 'order.refund_via_provider',
