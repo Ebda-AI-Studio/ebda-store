@@ -176,7 +176,12 @@ export function ProductCarousel({
 
           <ul
             ref={scrollRef}
-            className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-4 sm:gap-6 lg:gap-8 scroll-smooth"
+            // touch-pan-x + overscroll-x-contain tell iOS Safari this
+            // strip ONLY handles horizontal swipes — vertical swipes
+            // bubble immediately to the page scroll without the typical
+            // ~200ms direction-detect delay that felt like "scrolling
+            // gets stuck then works" on the home page (Ahmad 2026-05-16).
+            className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain touch-pan-x px-4 pb-4 sm:gap-6 lg:gap-8 scroll-smooth"
             style={{ scrollbarWidth: 'thin' }}
           >
             {products.map(product => {

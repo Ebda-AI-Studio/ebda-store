@@ -41,7 +41,10 @@ export function CategoryStrip({
           pack={pack}
         />
         <ul
-          className="-mx-4 flex snap-x snap-mandatory gap-6 overflow-x-auto px-4 pb-6 sm:gap-8 lg:gap-10"
+          // touch-pan-x + overscroll-x-contain: iOS-stuck-scroll fix
+          // (same pattern as ProductCarousel) — see 2026-05-16 commit
+          // for the snap-x/iOS direction-detect explanation.
+          className="-mx-4 flex snap-x snap-mandatory gap-6 overflow-x-auto overscroll-x-contain touch-pan-x px-4 pb-6 sm:gap-8 lg:gap-10"
           style={{ scrollbarWidth: 'thin' }}
         >
           {categories.map(cat => {
