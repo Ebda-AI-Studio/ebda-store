@@ -35,7 +35,7 @@ export default function ModernCategoryGrid({
 
   return (
     <div
-      className={`grid gap-4 md:gap-6 ${getGridCols(categories.length)}`}
+      className={`grid gap-3 md:gap-4 ${getGridCols(categories.length)}`}
       dir={isRtl ? 'rtl' : 'ltr'}
       data-zone="categories"
     >

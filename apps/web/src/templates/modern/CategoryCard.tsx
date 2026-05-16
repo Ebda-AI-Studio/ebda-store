@@ -35,7 +35,7 @@ export default function ModernCategoryCard({
       // breathing room. Mobile (small viewport) doesn't hit the cap.
       // Ahmad 2026-05-16: 'category grid denser on mobile is good, I'm
       // talking about desktop'.
-      className="group block outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-xl w-full max-w-[140px] md:max-w-[160px] mx-auto"
+      className="group block outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-xl w-full max-w-[170px] md:max-w-[190px] mx-auto"
       dir={isRtl ? 'rtl' : 'ltr'}
     >
       <div className="relative aspect-square sm:aspect-[4/3] rounded-xl overflow-hidden bg-muted shadow-[0_4px_12px_-6px_hsl(var(--foreground)/0.10)] group-hover:shadow-[0_12px_28px_-12px_hsl(var(--foreground)/0.18)] transition-shadow duration-500 ease-out">

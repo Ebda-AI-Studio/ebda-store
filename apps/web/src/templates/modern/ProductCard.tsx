@@ -65,6 +65,10 @@ function ModernProductCard({
       itemScope
       itemType="https://schema.org/Product"
       aria-labelledby={`prod-${product.id}-name`}
+      // max-w cap matches PecannbeeProductCard so theme grids (PDP related
+      // products, category pages) render at the same size as the main
+      // listings. Ahmad 2026-05-16 design.md baseline.
+      className="w-full md:max-w-[200px] mx-auto"
     >
       <Link
         href={`${urlPrefix}/products/${product.slug}`}

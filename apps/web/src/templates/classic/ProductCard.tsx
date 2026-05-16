@@ -49,6 +49,7 @@ function ClassicProductCard({
       itemScope
       itemType="https://schema.org/Product"
       aria-labelledby={`prod-${product.id}-name`}
+      className="w-full md:max-w-[200px] mx-auto"
     >
       <Link
         href={`${urlPrefix}/products/${product.slug}`}
