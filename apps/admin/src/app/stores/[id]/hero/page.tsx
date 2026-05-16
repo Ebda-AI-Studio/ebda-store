@@ -266,8 +266,9 @@ export default function StoreHeroPage() {
               storeId={storeId}
               label={t('uploadHeroImage')}
               accept="image/jpeg,image/png,image/webp"
+              aspectRatio="3/2"
+              recommendedSizeHint={t('heroImageHint')}
             />
-            <p className="mt-2 text-xs text-muted-foreground">{t('heroImageHint')}</p>
           </div>
         </div>
       </div>

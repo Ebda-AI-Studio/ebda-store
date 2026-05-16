@@ -30,6 +30,23 @@ interface ImageUploadProps {
   label?: string;
   accept?: string;
   className?: string;
+  /**
+   * Visual aspect ratio for the upload preview, matching the storefront
+   * render. When set, both the empty dropzone AND the post-upload preview
+   * render at this ratio so the merchant sees exactly how their image
+   * will be cropped on the storefront. Values mirror the storefront
+   * aspects per docs/superpowers/plans/2026-05-16-mobile-ui-ship.md:
+   *   - '3/2'  → hero banner (recommend 1200×800)
+   *   - '1/1'  → category tile + product image (recommend 800×800 / 1000×1000)
+   *   - 'free' → no aspect lock (default, legacy behavior)
+   */
+  aspectRatio?: '3/2' | '1/1' | 'free';
+  /**
+   * Optional recommended-dimensions hint shown under the dropzone, e.g.
+   * "Recommended: 1200×800px (3:2 landscape)". Caller composes the
+   * localized string; this just renders it.
+   */
+  recommendedSizeHint?: string;
 }
 
 interface MultiImageUploadProps {
@@ -55,7 +72,14 @@ export function ImageUpload({
   label,
   accept = 'image/jpeg,image/png,image/webp,image/gif',
   className = '',
+  aspectRatio = 'free',
+  recommendedSizeHint,
 }: ImageUploadProps) {
+  // Map aspect ratio to a Tailwind class. Used on both the empty dropzone
+  // and the post-upload preview so the merchant sees the same rectangle
+  // shape the storefront will render in.
+  const aspectClass =
+    aspectRatio === '3/2' ? 'aspect-[3/2]' : aspectRatio === '1/1' ? 'aspect-square' : '';
   const t = useT('components.imageUpload');
   const resolvedLabel = label ?? t('label');
   const { uploading, progress, error, setError, uploadSingle } = useImageUpload();
@@ -89,7 +113,14 @@ export function ImageUpload({
 
   if (value) {
     return (
-      <UploadPreview value={value} alt={resolvedLabel} onRemove={onRemove} className={className} />
+      <div className={className}>
+        <div className={aspectClass}>
+          <UploadPreview value={value} alt={resolvedLabel} onRemove={onRemove} />
+        </div>
+        {recommendedSizeHint && (
+          <p className="mt-2 text-xs text-muted-foreground">{recommendedSizeHint}</p>
+        )}
+      </div>
     );
   }
 
@@ -97,33 +128,38 @@ export function ImageUpload({
 
   return (
     <div className={className}>
-      <UploadDropzone accept={accept} onFiles={handleFiles} paddingClass="p-6">
-        {uploading ? (
-          <UploadProgress
-            progress={progress}
-            label={t('uploadingPercent', { progress })}
-            trackWidthClass="w-32"
-          />
-        ) : (
-          <>
-            <svg
-              className="mx-auto h-10 w-10 text-muted-foreground"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.5}
-                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-              />
-            </svg>
-            <p className="mt-1 text-sm text-muted-foreground">{resolvedLabel}</p>
-            <p className="text-xs text-muted-foreground">{t('browse')}</p>
-          </>
-        )}
-      </UploadDropzone>
+      <div className={aspectClass}>
+        <UploadDropzone accept={accept} onFiles={handleFiles} paddingClass="p-6">
+          {uploading ? (
+            <UploadProgress
+              progress={progress}
+              label={t('uploadingPercent', { progress })}
+              trackWidthClass="w-32"
+            />
+          ) : (
+            <>
+              <svg
+                className="mx-auto h-10 w-10 text-muted-foreground"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                />
+              </svg>
+              <p className="mt-1 text-sm text-muted-foreground">{resolvedLabel}</p>
+              <p className="text-xs text-muted-foreground">{t('browse')}</p>
+            </>
+          )}
+        </UploadDropzone>
+      </div>
+      {recommendedSizeHint && (
+        <p className="mt-2 text-xs text-muted-foreground">{recommendedSizeHint}</p>
+      )}
 
       {displayError && <p className="mt-1 text-xs text-destructive">{displayError}</p>}
     </div>

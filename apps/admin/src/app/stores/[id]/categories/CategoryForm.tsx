@@ -236,6 +236,8 @@ export function CategoryForm({
             folder="categories"
             storeId={storeId}
             label={t('uploadCategoryImage')}
+            aspectRatio="1/1"
+            recommendedSizeHint={t('categoryImageHint')}
           />
         </div>
 
