@@ -17,6 +17,11 @@ interface RecommendedProduct {
   price: number;
   compareAtPrice?: number;
   images: Array<{ id: string; url: string; alt?: string }>;
+  /** Variants of this product (added 2026-05-16 to gate Add-all-to-cart
+   *  for variant-parent products — those need the customer to pick a
+   *  size/colour/etc. before adding, so the storefront can't add them
+   *  silently from a recommendation card). Empty / missing = simple SKU. */
+  variants?: Array<{ id: string; price: number }>;
 }
 
 interface FrequentlyBoughtTogetherProps {
@@ -45,8 +50,15 @@ export function FrequentlyBoughtTogether({ storeId, productId }: FrequentlyBough
   const { store } = useStore();
   const storeUrl = useStoreUrl();
   const { components: T, isLoading: templateLoading } = useTemplateComponents();
-  const { success: toastSuccess } = useToast();
+  const { success: toastSuccess, error: toastError, info: toastInfo } = useToast();
   const isRtl = language === 'ar';
+
+  // Variant-parent products can't be added to cart silently from a
+  // recommendation card — the customer has to open the product detail
+  // page and pick a size/colour/SKU first. Helper here so single-add and
+  // add-all share the same detection logic.
+  const hasVariants = (p: RecommendedProduct): boolean =>
+    Array.isArray(p.variants) && p.variants.length > 0;
 
   useEffect(() => {
     if (!storeId || !productId) return;
@@ -90,6 +102,20 @@ export function FrequentlyBoughtTogether({ storeId, productId }: FrequentlyBough
   const handleAddToCart = async (pid: string) => {
     const p = products.find(x => x.id === pid);
     if (!p) return;
+    // Variant-parent: redirect to PDP instead of trying to add. The card
+    // can't know which variant the customer wants — surface the message,
+    // open the product so they can pick.
+    if (hasVariants(p)) {
+      toastInfo(
+        t('Choose a variant first', 'اختر نوع المنتج أولاً'),
+        t(
+          `"${p.name}" has options — open the product to pick one.`,
+          `"${p.nameAr ?? p.name}" يحتوي على خيارات — افتح المنتج لاختيار النوع.`
+        )
+      );
+      window.location.href = storeUrl(`/products/${p.slug}`);
+      return;
+    }
     await addItem({
       id: p.id,
       name: p.name,
@@ -103,13 +129,19 @@ export function FrequentlyBoughtTogether({ storeId, productId }: FrequentlyBough
   };
 
   const handleAddAllToCart = async () => {
+    // Partition: variant-parent products can't be added blind (need
+    // a SKU pick). Add the simple ones, then tell the merchant about
+    // the ones that need a variant pick so they're not silently lost.
+    const simple = products.filter(p => !hasVariants(p));
+    const needVariant = products.filter(p => hasVariants(p));
+
     // Serialize the addItem calls instead of firing them in parallel.
     // The previous Promise.all racing the calls meant the cart-context
     // POSTs hit the API with stale local state — the second add saw
     // the cart pre-first-add, so the API ended up with only one of
     // the items merged in. Sequential awaits guarantee each addItem
     // sees the post-previous-add cart state.
-    for (const p of products) {
+    for (const p of simple) {
       await addItem({
         id: p.id,
         name: p.name,
@@ -119,10 +151,38 @@ export function FrequentlyBoughtTogether({ storeId, productId }: FrequentlyBough
         image: p.images?.[0]?.url,
       });
     }
-    toastSuccess(
-      t('Added all to cart!', 'أضيفت جميعها إلى السلة!'),
-      `${products.length} ${t('items added to your cart', 'منتجات أضيفت إلى سلتك')}`
-    );
+
+    if (simple.length > 0) {
+      toastSuccess(
+        t('Added to cart', 'تمت الإضافة إلى السلة'),
+        `${simple.length} ${t('items added to your cart', 'منتجات أضيفت إلى سلتك')}`
+      );
+    }
+
+    if (needVariant.length > 0) {
+      const names = needVariant
+        .map(p => (isRtl ? (p.nameAr ?? p.name) : p.name))
+        .join(isRtl ? '، ' : ', ');
+      toastInfo(
+        t(
+          `${needVariant.length} item${needVariant.length > 1 ? 's' : ''} need${needVariant.length > 1 ? '' : 's'} a variant`,
+          `${needVariant.length} ${needVariant.length > 1 ? 'منتجات تحتاج' : 'منتج يحتاج'} إلى اختيار نوع`
+        ),
+        t(
+          `${names} — open each to pick a variant before adding.`,
+          `${names} — افتح كل منتج لاختيار النوع قبل الإضافة.`
+        )
+      );
+    }
+
+    // Nothing added AND nothing flagged — defensive, shouldn't happen
+    // since products.length > 0 by the guard above, but covers edge cases.
+    if (simple.length === 0 && needVariant.length === 0) {
+      toastError(
+        t('Nothing to add', 'لا يوجد ما يضاف'),
+        t('No items were available to add.', 'لا توجد منتجات متاحة للإضافة.')
+      );
+    }
   };
 
   return (

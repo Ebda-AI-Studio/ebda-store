@@ -26,6 +26,12 @@ const productSelect = {
     orderBy: { position: 'asc' as const },
     select: { url: true, alt: true },
   },
+  // Include variants so the storefront can detect variant-parent products
+  // and gate the "Add to cart" / "Add all to cart" flows accordingly —
+  // without this, the FBT "Add all" button silently adds the parent SKU
+  // (no variant chosen) which either errors out or creates ambiguous
+  // cart lines. Same gap fixed earlier on listPublic in commit `8c55a73`.
+  variants: { select: { id: true, price: true } },
 };
 
 // FBT cron handle
