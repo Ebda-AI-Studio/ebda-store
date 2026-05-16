@@ -17,7 +17,7 @@ export default function ClassicCategoryCard({
     <Link
       href={`${urlPrefix}/products?category=${category.slug}`}
       prefetch={false}
-      className="group block text-center outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 cursor-pointer w-full max-w-[170px] md:max-w-[190px] mx-auto"
+      className="group block text-center outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 cursor-pointer w-full max-w-[200px] md:max-w-[220px] mx-auto"
     >
       {/* Image with elegant border */}
       <div className="relative aspect-square sm:aspect-[3/4] mb-3 overflow-hidden border border-border/60 bg-muted group-hover:border-foreground/35 transition-colors duration-700 ease-out">
