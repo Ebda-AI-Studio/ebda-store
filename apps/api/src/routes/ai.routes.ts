@@ -54,6 +54,70 @@ const seoSchema = z.object({
   id: z.string().uuid().optional(),
 });
 
+/**
+ * POST /stores/:storeId/ai/section-content
+ * Generate kicker + subtitle for a homepage section, bilingual EN+AR.
+ * Used by the admin Layout page's "Generate with AI" button next to
+ * the kicker/subtitle fields (Ahmad 2026-05-16).
+ */
+const sectionSchema = z.object({
+  section: z.enum(['categories', 'newArrivals', 'bestSellers', 'featured', 'testimonials']),
+  existingTitle: z.string().optional(),
+  existingTitleAr: z.string().optional(),
+});
+
+router.post(
+  '/section-content',
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const { section, existingTitle, existingTitleAr } = sectionSchema.parse(req.body);
+
+      const store = await prisma.store.findUnique({
+        where: { id: storeId },
+        select: { name: true, nameAr: true, description: true, descriptionAr: true },
+      });
+      if (!store) {
+        res
+          .status(404)
+          .json({ success: false, error: { code: 'NOT_FOUND', message: 'Store not found' } });
+        return;
+      }
+
+      // For categories section, pass sample category names so the AI
+      // grounds copy in the merchant's actual catalog rather than
+      // inventing generic "fashion / accessories / lifestyle" lines.
+      let categoryNames: string[] | undefined;
+      if (section === 'categories') {
+        const cats = await prisma.category.findMany({
+          where: { storeId },
+          select: { name: true },
+          take: 8,
+          orderBy: { position: 'asc' },
+        });
+        categoryNames = cats.map(c => c.name).filter(Boolean);
+      }
+
+      const result = await AIService.suggestSectionContent({
+        storeId,
+        section,
+        storeName: store.name,
+        storeNameAr: store.nameAr,
+        storeDescription: store.description,
+        storeDescriptionAr: store.descriptionAr,
+        categoryNames,
+        existingTitle,
+        existingTitleAr,
+      });
+
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 router.post('/seo', writeLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { storeId } = req.params;

@@ -24,7 +24,7 @@ import { AppError } from '../middleware/error-handler';
 import { assertAiQuota } from '../lib/ai-quota';
 import logger from '../lib/logger';
 
-type Feature = 'translate' | 'seo' | 'categorize';
+type Feature = 'translate' | 'seo' | 'categorize' | 'section';
 type Lang = 'en' | 'ar';
 
 export type TranslationKind =
@@ -326,6 +326,120 @@ export class AIService {
     await recordUsage(
       input.storeId,
       'seo',
+      usage?.promptTokenCount ?? 0,
+      usage?.candidatesTokenCount ?? 0,
+      false
+    );
+
+    await redis.set(key, JSON.stringify(parsed), CACHE_TTL_SECONDS);
+    return { suggestion: parsed, cached: false };
+  }
+
+  /**
+   * Generate kicker (short uppercase eyebrow badge) + subtitle (one-
+   * line tagline) for a homepage section. Used by the admin Layout
+   * page's "Generate with AI" button next to those fields. Bilingual
+   * EN+AR in one call. Ahmad 2026-05-16: AI sweep for the new
+   * section-content fields.
+   */
+  static async suggestSectionContent(input: {
+    storeId: string;
+    section: 'categories' | 'newArrivals' | 'bestSellers' | 'featured' | 'testimonials';
+    storeName: string;
+    storeNameAr?: string | null;
+    storeDescription?: string | null;
+    storeDescriptionAr?: string | null;
+    /** Sample category names to ground "explore by category" copy. */
+    categoryNames?: string[];
+    /** Existing title so the AI generates kicker/subtitle consistent with the
+     *  merchant's chosen heading rather than fighting it. Optional. */
+    existingTitle?: string;
+    existingTitleAr?: string;
+  }): Promise<{
+    suggestion: { kicker: string; kickerAr: string; subtitle: string; subtitleAr: string };
+    cached: boolean;
+  }> {
+    ensureEnabled();
+
+    const key = cacheKey('section', input);
+    const hit = await redis.get(key);
+    if (hit) {
+      await recordUsage(input.storeId, 'section', 0, 0, true);
+      return {
+        suggestion: JSON.parse(hit) as {
+          kicker: string;
+          kickerAr: string;
+          subtitle: string;
+          subtitleAr: string;
+        },
+        cached: true,
+      };
+    }
+
+    await assertAiQuota();
+    await checkBudget(input.storeId);
+
+    const systemInstruction =
+      'You write homepage section copy for Kuwaiti e-commerce stores. Output only ' +
+      'valid JSON matching this shape exactly: {"kicker": string, "kickerAr": string, ' +
+      '"subtitle": string, "subtitleAr": string}. ' +
+      'kicker: 1-2 short uppercase words, max 16 chars (e.g. "EXPLORE", "JUST IN", ' +
+      '"SHOP NOW"). Will render in a small colored chip above the title. ' +
+      'subtitle: one short tagline, max 80 chars, sentence case. Will render as a ' +
+      'muted line below the title. ' +
+      'Both fields must work alongside the merchant-chosen title without repeating it. ' +
+      'Match how Kuwaiti shoppers actually talk (informal but professional, no fake hype).';
+
+    const detailLines = [
+      `Store: ${input.storeName}${input.storeNameAr ? ` / ${input.storeNameAr}` : ''}`,
+      input.storeDescription && `About: ${input.storeDescription}`,
+      input.storeDescriptionAr && `About (AR): ${input.storeDescriptionAr}`,
+      `Section: ${input.section}`,
+      input.existingTitle && `Existing title: ${input.existingTitle}`,
+      input.existingTitleAr && `Existing title (AR): ${input.existingTitleAr}`,
+      input.categoryNames?.length &&
+        `Sample categories: ${input.categoryNames.slice(0, 8).join(', ')}`,
+    ].filter(Boolean);
+
+    const userPrompt = `Write kicker + subtitle for this homepage section:\n\n${detailLines.join('\n')}`;
+
+    const model = getClient().getGenerativeModel({
+      model: MODEL,
+      systemInstruction,
+      generationConfig: { responseMimeType: 'application/json' },
+    });
+    let res;
+    try {
+      res = await model.generateContent(userPrompt);
+    } catch (err) {
+      rethrowAsAppError(err, 'AI section content generation failed');
+    }
+    const raw = stripJsonFences(res.response.text());
+
+    let parsed: { kicker: string; kickerAr: string; subtitle: string; subtitleAr: string };
+    try {
+      parsed = JSON.parse(raw) as typeof parsed;
+    } catch (err) {
+      logger.error(
+        { err, raw, storeId: input.storeId },
+        'Gemini returned non-JSON for section content'
+      );
+      throw new AppError(502, 'AI_BAD_RESPONSE', 'AI returned an unexpected response format.');
+    }
+
+    if (
+      typeof parsed.kicker !== 'string' ||
+      typeof parsed.kickerAr !== 'string' ||
+      typeof parsed.subtitle !== 'string' ||
+      typeof parsed.subtitleAr !== 'string'
+    ) {
+      throw new AppError(502, 'AI_BAD_RESPONSE', 'AI returned an incomplete section suggestion.');
+    }
+
+    const usage = res.response.usageMetadata;
+    await recordUsage(
+      input.storeId,
+      'section',
       usage?.promptTokenCount ?? 0,
       usage?.candidatesTokenCount ?? 0,
       false

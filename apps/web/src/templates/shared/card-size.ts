@@ -69,3 +69,34 @@ export function cardAspectClass(aspect: CardAspect | undefined): string {
       return '';
   }
 }
+
+/**
+ * Compose tailwind grid-cols classes from the merchant's admin-picked
+ * mobile + desktop column counts. Mobile cap is 3, desktop cap is 4
+ * (per CategoriesSettings union types). sm/md breakpoints scale up
+ * proportionally so the transition between mobile↔desktop column
+ * counts is smooth on tablet viewports.
+ *
+ * Tailwind static-class enumeration: classes appear here so the JIT
+ * scanner picks them up. Don't refactor to dynamic concatenation.
+ */
+export function gridColsClass(
+  mobileColumns: 1 | 2 | 3 | undefined,
+  desktopColumns: 2 | 3 | 4 | undefined
+): string {
+  const mobile = mobileColumns ?? 2;
+  const desktop = desktopColumns ?? 4;
+
+  // Intermediate sm/md columns interpolate between mobile and desktop
+  // so the grid doesn't jump from 2 to 6 in one breakpoint.
+  const sm = Math.min(desktop, Math.max(mobile + 1, 2));
+  const md = Math.min(desktop, Math.max(mobile + 1, desktop));
+
+  const mobileCls = mobile === 1 ? 'grid-cols-1' : mobile === 2 ? 'grid-cols-2' : 'grid-cols-3';
+  const smCls = sm === 2 ? 'sm:grid-cols-2' : sm === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-4';
+  const mdCls = md === 2 ? 'md:grid-cols-2' : md === 3 ? 'md:grid-cols-3' : 'md:grid-cols-4';
+  const lgCls =
+    desktop === 2 ? 'lg:grid-cols-2' : desktop === 3 ? 'lg:grid-cols-3' : 'lg:grid-cols-4';
+
+  return `${mobileCls} ${smCls} ${mdCls} ${lgCls}`;
+}

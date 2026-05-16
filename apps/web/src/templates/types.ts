@@ -452,6 +452,9 @@ export interface CategoryGridProps {
   showLabel?: boolean;
   /** Enable hover/zoom (default true). */
   showHover?: boolean;
+  /** Merchant-picked column counts from admin Layout page. */
+  mobileColumns?: 1 | 2 | 3;
+  desktopColumns?: 2 | 3 | 4;
   urlPrefix?: string;
 }
 

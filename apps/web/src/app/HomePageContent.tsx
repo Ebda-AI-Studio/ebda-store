@@ -196,6 +196,8 @@ export function HomePageContent({
                       cardAspect={layout.categories.cardAspect}
                       showLabel={layout.categories.showLabel}
                       showHover={layout.categories.showHover}
+                      mobileColumns={layout.categories.mobileColumns}
+                      desktopColumns={layout.categories.desktopColumns}
                       isRtl={isRtl}
                     />
                   </div>

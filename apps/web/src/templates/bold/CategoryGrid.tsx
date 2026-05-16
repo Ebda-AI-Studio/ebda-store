@@ -2,6 +2,7 @@
 
 import type { CategoryGridProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { gridColsClass } from '../shared/card-size';
 import { getDisplayTitle } from '../shared';
 import CategoryCard from './CategoryCard';
 
@@ -18,6 +19,8 @@ export default function BoldCategoryGrid({
   cardAspect,
   showLabel,
   showHover,
+  mobileColumns,
+  desktopColumns,
   urlPrefix = '',
 }: CategoryGridProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
@@ -58,7 +61,7 @@ export default function BoldCategoryGrid({
         )}
 
         {/* Grid - Staggered layout for dynamism */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-4">
+        <div className={`grid gap-3 md:gap-4 ${gridColsClass(mobileColumns, desktopColumns)}`}>
           {categories.map((category, index) => (
             <div key={category.id} className={index % 2 === 1 ? 'lg:translate-y-8' : ''}>
               <CategoryCard

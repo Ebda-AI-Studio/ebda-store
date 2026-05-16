@@ -3,6 +3,7 @@
 import CategoryCard from './CategoryCard';
 import type { CategoryGridProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { gridColsClass } from '../shared/card-size';
 
 export default function ModernCategoryGrid({
   categories,
@@ -17,6 +18,8 @@ export default function ModernCategoryGrid({
   cardAspect,
   showLabel,
   showHover,
+  mobileColumns,
+  desktopColumns,
   urlPrefix = '',
 }: CategoryGridProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
@@ -28,23 +31,18 @@ export default function ModernCategoryGrid({
   const displayKicker = isRtl ? (kickerAr ?? kicker) : (kicker ?? kickerAr);
   const displaySubtitle = isRtl ? (subtitleAr ?? subtitle) : (subtitle ?? subtitleAr);
 
-  // Auto-size grid based on category count for balanced layouts.
-  // Bumped a second time 2026-05-16 per Ahmad: 'on desktop are huge must
-  // be smaller'. xl breakpoint (1280px+) was too late — most desktops are
-  // 1024-1440px wide, falling on lg or md. Now caps tile width earlier
-  // at md:grid-cols-4 / lg:grid-cols-6 so 1024+ desktops show compact
-  // ~150-180px tiles.
-  const getGridCols = (count: number): string => {
-    if (count === 1) return 'grid-cols-1';
-    if (count === 2) return 'grid-cols-2';
-    if (count === 3) return 'grid-cols-2 md:grid-cols-3';
-    if (count === 4) return 'grid-cols-2 md:grid-cols-4';
-    if (count === 5) return 'grid-cols-2 sm:grid-cols-3 md:grid-cols-5';
-    // 6+ categories: 2/4/6/6 cols across breakpoints — desktop cards
-    // are ~170px wide at lg+ which matches the pecannbee reference
-    // images ahmad shared.
-    return 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6';
-  };
+  // Honor the merchant's admin-picked desktop + mobile column counts.
+  // Previously this used a count-based auto-size that ignored the admin
+  // setting (Ahmad 2026-05-16: 'Categories do not follow the Desktop
+  // columns number selected'). gridColsClass also caps mobile to
+  // min(mobileColumns, categories.length) so a 1-cat store doesn't
+  // try to render 4 cols.
+  const cappedDesktop = (
+    desktopColumns ? Math.min(desktopColumns, Math.max(1, categories.length)) : undefined
+  ) as 2 | 3 | 4 | undefined;
+  const cappedMobile = (
+    mobileColumns ? Math.min(mobileColumns, Math.max(1, categories.length)) : undefined
+  ) as 1 | 2 | 3 | undefined;
 
   return (
     <div dir={isRtl ? 'rtl' : 'ltr'} data-zone="categories">
@@ -65,7 +63,7 @@ export default function ModernCategoryGrid({
           )}
         </div>
       )}
-      <div className={`grid gap-3 md:gap-4 ${getGridCols(categories.length)}`}>
+      <div className={`grid gap-3 md:gap-4 ${gridColsClass(cappedMobile, cappedDesktop)}`}>
         {categories.map(category => (
           <CategoryCard
             cardSize={cardSize}
