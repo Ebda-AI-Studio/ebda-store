@@ -16,9 +16,12 @@ import { useLanguage } from '../../contexts/LanguageContext';
  * size) so it reads as platform attribution, not store branding.
  */
 export function PoweredByForce() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const align = language === 'ar' ? 'text-right' : 'text-left';
   return (
-    <div className="mt-6 border-t border-border/40 pt-4 text-center text-[11px] tracking-wide text-muted-foreground/70">
+    <div
+      className={`mt-6 border-t border-border/40 pt-4 text-[11px] tracking-wide text-muted-foreground/70 ${align}`}
+    >
       <a
         href="https://store.forcemediakw.com"
         target="_blank"

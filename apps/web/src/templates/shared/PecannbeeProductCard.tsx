@@ -85,7 +85,11 @@ function PecannbeeProductCardImpl({
 
   return (
     <article
-      className={`flex flex-col overflow-hidden ${styles.card}`}
+      // max-w cap on desktop so product cards in a 4-col grid don't
+      // balloon to 300+px each. Mobile (2 cols, narrow viewport) doesn't
+      // hit the cap. Ahmad 2026-05-16 'products as well' after the
+      // category cap landed.
+      className={`flex flex-col overflow-hidden w-full md:max-w-[260px] mx-auto ${styles.card}`}
       dir={isRtl ? 'rtl' : 'ltr'}
       itemScope
       itemType="https://schema.org/Product"

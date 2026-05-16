@@ -575,20 +575,20 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 footer "Cookie preferences" link or banner Customize). */}
                 <CookieConsentBanner />
                 <CookiePreferencesModal />
-                {/* SSR-rendered compliance fallback — the "Cookie
-                  preferences" link MUST appear in the initial HTML for
-                  GDPR Art. 7(3) parity with no-JS visitors and
-                  automated compliance audits (crawlers parse HTML
-                  source, not DOM after hydration). But visually we
-                  hide it on JS-enabled visitors because the per-
-                  template footer renders the same link in the right
-                  spot — Ahmad 2026-05-16 saw the duplicate showing on
-                  loading screens above the spinner. `sr-only` keeps
-                  the link in the accessibility tree + HTML source,
-                  audits still pass, and human users only ever see the
-                  footer copy. */}
-                <div data-zone="cookieFallback" aria-hidden="false" className="sr-only">
-                  <CookiePreferencesLink className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer" />
+                {/* SSR-rendered compliance fallback (GDPR Art. 7(3) —
+                  link must be reachable in initial HTML for no-JS
+                  visitors + crawlers). Visible on regular pages, hidden
+                  on loading screens via the [data-loading] body marker
+                  set by loading.tsx files. Ahmad 2026-05-16: 'return
+                  [the cookies] but keep it out of any loading screen as
+                  the rest of items'. */}
+                <div
+                  data-zone="cookieFallback"
+                  className="border-t border-border/30 bg-background [body:has([data-loading])_&]:hidden"
+                >
+                  <div className="container mx-auto px-4 py-3 text-center">
+                    <CookiePreferencesLink className="text-xs text-muted-foreground/70 hover:text-foreground transition-colors duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2" />
+                  </div>
                 </div>
               </PostHogProvider>
             </ConsentProvider>

@@ -60,9 +60,10 @@ export default function ModernHeader({
       >
         <div className="container mx-auto px-4">
           {/* Row 1: hamburger | logo | actions — pecannbee mobile layout.
-              h-28 mobile / md:h-28 to give the bigger h-24 logo headroom
-              (Ahmad 2026-05-16: 'logo must be bigger'). */}
-          <div className="relative flex h-28 items-center justify-between gap-2 md:h-28">
+              h-20 mobile keeps the row compact so it doesn't dominate
+              the viewport; desktop stays h-28 for the bigger nav row.
+              Logo recentered with a more permissive max-w cap below. */}
+          <div className="relative flex h-20 items-center justify-between gap-2 md:h-28">
             {/* Mobile-only hamburger (LEFT slot). Extracted from the actions
                 block so the layout matches the pecannbee + alkahraman target:
                 hamburger left, logo center, actions right. */}
@@ -99,7 +100,7 @@ export default function ModernHeader({
                 trust the absolute positioning. */}
             <Link
               href={urlPrefix || '/'}
-              className="absolute left-1/2 -translate-x-1/2 md:relative md:left-auto md:translate-x-0 flex items-center gap-2 shrink-0 max-w-[55%] md:max-w-none"
+              className="absolute left-1/2 -translate-x-1/2 md:relative md:left-auto md:translate-x-0 flex items-center justify-center gap-2 shrink-0 max-w-[50%] md:max-w-none"
             >
               {displayLogo ? (
                 <Image
@@ -107,7 +108,7 @@ export default function ModernHeader({
                   alt={displayName}
                   width={320}
                   height={120}
-                  className="h-24 max-h-24 w-auto object-contain md:h-24 md:max-h-24"
+                  className="h-14 max-h-14 w-auto max-w-full object-contain md:h-20 md:max-h-20"
                   priority
                 />
               ) : (

@@ -28,7 +28,14 @@ export default function ModernCategoryCard({
     <Link
       href={`${urlPrefix}/products?category=${category.slug}`}
       prefetch={false}
-      className="group block outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-xl"
+      // max-w cap on the link itself so each card is bounded regardless
+      // of how few categories there are. For stores with 4-5 cats the
+      // grid stretched each card to ~300-400px on desktop; now capped at
+      // 220px with mx-auto so the card centers in its grid column with
+      // breathing room. Mobile (small viewport) doesn't hit the cap.
+      // Ahmad 2026-05-16: 'category grid denser on mobile is good, I'm
+      // talking about desktop'.
+      className="group block outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-xl w-full max-w-[200px] md:max-w-[220px] mx-auto"
       dir={isRtl ? 'rtl' : 'ltr'}
     >
       <div className="relative aspect-square sm:aspect-[4/3] rounded-xl overflow-hidden bg-muted shadow-[0_4px_12px_-6px_hsl(var(--foreground)/0.10)] group-hover:shadow-[0_12px_28px_-12px_hsl(var(--foreground)/0.18)] transition-shadow duration-500 ease-out">

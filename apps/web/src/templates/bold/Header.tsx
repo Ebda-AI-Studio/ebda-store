@@ -62,7 +62,7 @@ export default function BoldHeader({
                 <img
                   src={displayLogo}
                   alt={displayName}
-                  className="h-20 max-h-20 w-auto brightness-0 invert md:h-24 md:max-h-24"
+                  className="h-14 max-h-14 w-auto max-w-full object-contain brightness-0 invert md:h-20 md:max-h-20"
                 />
               ) : (
                 <span className="text-xl font-black uppercase tracking-wider text-white">
