@@ -82,8 +82,14 @@ export default function ElegantHeader({
           </div>
         )}
 
-        {/* Main header row */}
-        <div className="flex items-center justify-between py-6 gap-6">
+        {/* Main header row — absolute-centered logo on mobile so it's
+            visually balanced between hamburger (left) + actions (right)
+            regardless of asymmetric widths. Desktop falls back to the
+            spacer pattern with normal flex flow. Ahmad 2026-05-16
+            'logo still small and not on the middle' — wadyaljuz uses
+            this elegant template, my prior modern-only fixes didn't
+            apply. */}
+        <div className="relative flex items-center justify-between py-6 gap-6">
           {/* Mobile menu trigger */}
           <button
             type="button"
@@ -111,8 +117,11 @@ export default function ElegantHeader({
           {/* Spacer for logo centering on desktop */}
           <div className="hidden md:flex flex-1" />
 
-          {/* Logo — center */}
-          <Link href={urlPrefix || '/'} className="flex-shrink-0 cursor-pointer">
+          {/* Logo — absolute-centered on mobile, normal flex on md+. */}
+          <Link
+            href={urlPrefix || '/'}
+            className="absolute left-1/2 -translate-x-1/2 md:relative md:left-auto md:translate-x-0 flex items-center justify-center flex-shrink-0 cursor-pointer max-w-[65%] md:max-w-none"
+          >
             {displayLogo ? (
               <Image
                 src={displayLogo}
