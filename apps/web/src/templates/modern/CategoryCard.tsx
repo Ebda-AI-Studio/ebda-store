@@ -3,8 +3,18 @@
 import Link from 'next/link';
 import type { CategoryCardProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { ArrowIcon } from '../shared/icons';
 
+/**
+ * Modern category card — image + label-below layout matching the
+ * pecannbee/alkahraman target sizing (see docs/superpowers/plans/
+ * 2026-05-16-mobile-ui-ship.md). Previous version used a heavy dark
+ * gradient overlay + arrow button + thick shadow that made tiles
+ * read as premium feature cards rather than compact nav tiles.
+ *
+ * Now: square image at top (1:1 mobile, 4:3 desktop), plain text
+ * label centered below. No overlay, no arrow, modest shadow. Tiles
+ * feel like navigation, not editorial.
+ */
 export default function ModernCategoryCard({
   category,
   isRtl: isRtlProp,
@@ -18,45 +28,24 @@ export default function ModernCategoryCard({
     <Link
       href={`${urlPrefix}/products?category=${category.slug}`}
       prefetch={false}
-      className="group relative aspect-square sm:aspect-[4/3] rounded-2xl overflow-hidden bg-muted block cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 shadow-[0_10px_30px_-18px_hsl(var(--foreground)/0.15)] hover:shadow-[0_24px_48px_-20px_hsl(var(--foreground)/0.20)] transition-shadow duration-700 ease-out"
+      className="group block outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-xl"
+      dir={isRtl ? 'rtl' : 'ltr'}
     >
-      {/* Image */}
-      {category.image ? (
-        <img
-          src={category.image}
-          alt={displayName}
-          className="absolute inset-0 w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-700 ease-out"
-          loading="lazy"
-        />
-      ) : (
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/15 via-primary/8 to-muted" />
-      )}
-
-      {/* Gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/15 to-transparent group-hover:from-black/75 transition-colors duration-500" />
-
-      {/* Content */}
-      <div
-        className={`absolute inset-0 flex flex-col justify-end p-5 md:p-6 ${isRtl ? 'items-end text-right' : 'items-start text-left'}`}
-      >
-        <div className="transform transition-transform duration-500 ease-out group-hover:-translate-y-0.5">
-          <h3 className="text-base md:text-lg font-bold text-white leading-tight tracking-tight mb-0.5">
-            {displayName}
-          </h3>
-          {category.productCount !== undefined && (
-            <p className="text-white/85 text-xs font-medium tracking-wide">
-              {isRtl ? `${category.productCount} منتج` : `${category.productCount} products`}
-            </p>
-          )}
-        </div>
+      <div className="relative aspect-square sm:aspect-[4/3] rounded-xl overflow-hidden bg-muted shadow-[0_4px_12px_-6px_hsl(var(--foreground)/0.10)] group-hover:shadow-[0_12px_28px_-12px_hsl(var(--foreground)/0.18)] transition-shadow duration-500 ease-out">
+        {category.image ? (
+          <img
+            src={category.image}
+            alt={displayName}
+            className="absolute inset-0 w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500 ease-out"
+            loading="lazy"
+          />
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/15 via-primary/8 to-muted" />
+        )}
       </div>
-
-      {/* Arrow button */}
-      <div
-        className={`absolute bottom-5 ${isRtl ? 'left-5' : 'right-5'} w-10 h-10 rounded-full bg-white/15 backdrop-blur-sm flex items-center justify-center text-white group-hover:bg-white group-hover:text-foreground transition-all duration-500 ease-out`}
-      >
-        <ArrowIcon className="w-4 h-4" isRtl={isRtl} />
-      </div>
+      <p className="mt-2 text-center text-sm md:text-base font-medium text-foreground line-clamp-1">
+        {displayName}
+      </p>
     </Link>
   );
 }
