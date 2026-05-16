@@ -70,6 +70,11 @@ const layoutSchema = z
       kickerAr: z.string().optional(),
       subtitle: z.string().optional(),
       subtitleAr: z.string().optional(),
+      // 2026-05-16: per-store card size / aspect / visual toggles.
+      cardSize: z.enum(['xs', 'sm', 'md', 'lg', 'xl']).optional(),
+      cardAspect: z.enum(['theme', 'square', 'portrait', 'landscape']).optional(),
+      showLabel: z.boolean().optional(),
+      showHover: z.boolean().optional(),
     }),
     newArrivals: z.object({
       enabled: z.boolean(),

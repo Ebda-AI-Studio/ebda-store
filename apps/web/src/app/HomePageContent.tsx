@@ -192,6 +192,10 @@ export function HomePageContent({
                       kickerAr={layout.categories.kickerAr}
                       subtitle={layout.categories.subtitle}
                       subtitleAr={layout.categories.subtitleAr}
+                      cardSize={layout.categories.cardSize}
+                      cardAspect={layout.categories.cardAspect}
+                      showLabel={layout.categories.showLabel}
+                      showHover={layout.categories.showHover}
                       isRtl={isRtl}
                     />
                   </div>

@@ -3,10 +3,12 @@
 import Link from 'next/link';
 import type { CategoryCardProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { categorySizeClass } from '../shared/card-size';
 
 export default function ElegantCategoryCard({
   category,
   isRtl: isRtlProp,
+  cardSize,
   urlPrefix = '',
 }: CategoryCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
@@ -17,7 +19,7 @@ export default function ElegantCategoryCard({
     <Link
       href={`${urlPrefix}/products?category=${category.slug}`}
       prefetch={false}
-      className="group block outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 cursor-pointer w-full max-w-[200px] md:max-w-[280px] mx-auto"
+      className={`group block outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 cursor-pointer w-full mx-auto ${categorySizeClass(cardSize)}`}
     >
       {/* Image container with elegant aspect ratio.
           Mobile-tame: aspect-square (1:1) on phones so a 2-col grid of

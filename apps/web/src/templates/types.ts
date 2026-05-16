@@ -418,6 +418,14 @@ export interface ProductGridProps {
 export interface CategoryCardProps {
   category: TemplateCategory;
   isRtl?: boolean;
+  /** Per-store card size — admin-controlled. */
+  cardSize?: import('@force/shared').CardSize;
+  /** Per-store card aspect — admin-controlled. */
+  cardAspect?: import('@force/shared').CardAspect;
+  /** Show label below image. */
+  showLabel?: boolean;
+  /** Enable hover/zoom effects. */
+  showHover?: boolean;
   urlPrefix?: string;
 }
 
@@ -436,6 +444,14 @@ export interface CategoryGridProps {
   /** Tagline rendered below the title. */
   subtitle?: string;
   subtitleAr?: string;
+  /** Per-store card size override. */
+  cardSize?: import('@force/shared').CardSize;
+  /** Per-store card aspect override. */
+  cardAspect?: import('@force/shared').CardAspect;
+  /** Show label below image (default true). */
+  showLabel?: boolean;
+  /** Enable hover/zoom (default true). */
+  showHover?: boolean;
   urlPrefix?: string;
 }
 

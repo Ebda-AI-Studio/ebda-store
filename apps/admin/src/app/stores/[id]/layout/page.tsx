@@ -319,6 +319,64 @@ export default function StoreLayoutPage() {
                     dir="rtl"
                   />
                 </div>
+                {/* Card size, aspect, and visual toggles — Ahmad 2026-05-16
+                    'make categories smaller + add options through admin'. */}
+                {/* Card size / aspect / toggles — native selects with
+                    descriptive labels (SelectField only accepts flat
+                    string arrays). */}
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <label className="flex flex-col gap-1 text-sm">
+                    <span className="text-muted-foreground">Card size</span>
+                    <select
+                      value={layout.categories.cardSize ?? 'sm'}
+                      onChange={e =>
+                        updateSection('categories', s => ({
+                          ...s,
+                          cardSize: e.target.value as 'xs' | 'sm' | 'md' | 'lg' | 'xl',
+                        }))
+                      }
+                      className="rounded-lg border border-border bg-card px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    >
+                      <option value="xs">Extra small (120/140px)</option>
+                      <option value="sm">Small (150/180px) — default</option>
+                      <option value="md">Medium (200/240px)</option>
+                      <option value="lg">Large (240/300px)</option>
+                      <option value="xl">Extra large (280/360px)</option>
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-1 text-sm">
+                    <span className="text-muted-foreground">Image aspect</span>
+                    <select
+                      value={layout.categories.cardAspect ?? 'theme'}
+                      onChange={e =>
+                        updateSection('categories', s => ({
+                          ...s,
+                          cardAspect: e.target.value as
+                            | 'theme'
+                            | 'square'
+                            | 'portrait'
+                            | 'landscape',
+                        }))
+                      }
+                      className="rounded-lg border border-border bg-card px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    >
+                      <option value="theme">Theme default</option>
+                      <option value="square">Square 1:1</option>
+                      <option value="portrait">Portrait 3:4</option>
+                      <option value="landscape">Landscape 4:3</option>
+                    </select>
+                  </label>
+                  <RowToggle
+                    label="Show category labels"
+                    checked={layout.categories.showLabel !== false}
+                    onChange={v => updateSection('categories', s => ({ ...s, showLabel: v }))}
+                  />
+                  <RowToggle
+                    label="Hover effects"
+                    checked={layout.categories.showHover !== false}
+                    onChange={v => updateSection('categories', s => ({ ...s, showHover: v }))}
+                  />
+                </div>
               </SectionCard>
 
               {/* New arrivals */}

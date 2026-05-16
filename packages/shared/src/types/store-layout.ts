@@ -74,6 +74,31 @@ export interface SectionTitleOverride {
   subtitleAr?: string;
 }
 
+/**
+ * Generic per-store CARD SIZE — used across categories, products,
+ * carousels. Drives the `max-w-*` cap each card applies.
+ *   xs:  120 / 140    (compact icon-tile)
+ *   sm:  150 / 180    (Ahmad 2026-05-16 default — "smaller")
+ *   md:  200 / 240    (medium balanced)
+ *   lg:  240 / 300    (hero feature tile)
+ *   xl:  280 / 360    (oversized, marketing-page only)
+ */
+export type CardSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+
+/**
+ * Generic per-store CARD ASPECT RATIO. Overrides the per-theme default
+ * when set to anything other than 'theme'.
+ *   theme: keep the theme's built-in default
+ *   square: 1:1 — clean, photo grid feel
+ *   portrait: 3:4 — taller, fashion / lookbook
+ *   landscape: 4:3 — wider, lifestyle / banner-y
+ */
+export type CardAspect = 'theme' | 'square' | 'portrait' | 'landscape';
+
+// Back-compat aliases — older code imports CategoryCardSize / CategoryCardAspect.
+export type CategoryCardSize = CardSize;
+export type CategoryCardAspect = CardAspect;
+
 export interface CategoriesSettings extends SectionTitleOverride {
   enabled: boolean;
   // 2026-05-16: split layout + captionPosition into desktop + mobile so
@@ -88,12 +113,26 @@ export interface CategoriesSettings extends SectionTitleOverride {
   captionPositionMobile?: CategoriesCaption;
   desktopColumns: 2 | 3 | 4;
   mobileColumns: 1 | 2 | 3;
+  /** Per-store category card size — admin-controlled. Default 'sm'. */
+  cardSize?: CategoryCardSize;
+  /** Per-store category card aspect — admin-controlled. Default 'theme'. */
+  cardAspect?: CategoryCardAspect;
+  /** Show the category label below/over the image. Default true. */
+  showLabel?: boolean;
+  /** Show subtle hover effects (zoom, shadow). Default true. */
+  showHover?: boolean;
 }
 
 export interface ProductCarouselSettings extends SectionTitleOverride {
   enabled: boolean;
   /** Max products to load */
   limit: number;
+  /** Per-store card size override. Default 'sm'. */
+  cardSize?: CardSize;
+  /** Per-store card aspect override. Default 'theme'. */
+  cardAspect?: CardAspect;
+  /** Show subtle hover effects (zoom, shadow). Default true. */
+  showHover?: boolean;
 }
 
 export interface FilterSidebarSettings {

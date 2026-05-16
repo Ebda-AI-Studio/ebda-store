@@ -13,6 +13,10 @@ export default function ModernCategoryGrid({
   kickerAr,
   subtitle,
   subtitleAr,
+  cardSize,
+  cardAspect,
+  showLabel,
+  showHover,
   urlPrefix = '',
 }: CategoryGridProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
@@ -63,7 +67,16 @@ export default function ModernCategoryGrid({
       )}
       <div className={`grid gap-3 md:gap-4 ${getGridCols(categories.length)}`}>
         {categories.map(category => (
-          <CategoryCard key={category.id} category={category} isRtl={isRtl} urlPrefix={urlPrefix} />
+          <CategoryCard
+            cardSize={cardSize}
+            cardAspect={cardAspect}
+            showLabel={showLabel}
+            showHover={showHover}
+            key={category.id}
+            category={category}
+            isRtl={isRtl}
+            urlPrefix={urlPrefix}
+          />
         ))}
       </div>
     </div>

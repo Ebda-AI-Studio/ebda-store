@@ -3,56 +3,61 @@
 import Link from 'next/link';
 import type { CategoryCardProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { categorySizeClass, cardAspectClass } from '../shared/card-size';
 
 /**
- * Modern category card — image + label-below layout matching the
- * pecannbee/alkahraman target sizing (see docs/superpowers/plans/
- * 2026-05-16-mobile-ui-ship.md). Previous version used a heavy dark
- * gradient overlay + arrow button + thick shadow that made tiles
- * read as premium feature cards rather than compact nav tiles.
- *
- * Now: square image at top (1:1 mobile, 4:3 desktop), plain text
- * label centered below. No overlay, no arrow, modest shadow. Tiles
- * feel like navigation, not editorial.
+ * Modern category card — image + label-below layout. Per-store
+ * cardSize / cardAspect / showLabel / showHover overrides allow
+ * merchants to tune via the admin Layout page. Defaults: sm /
+ * theme / show / show (Ahmad 2026-05-16 "smaller by default").
  */
 export default function ModernCategoryCard({
   category,
   isRtl: isRtlProp,
+  cardSize,
+  cardAspect,
+  showLabel = true,
+  showHover = true,
   urlPrefix = '',
 }: CategoryCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const displayName = isRtl && category.nameAr ? category.nameAr : category.name;
+  const aspectOverride = cardAspectClass(cardAspect);
+  // No aspect override → keep the modern theme's default: square on
+  // mobile, landscape 4:3 on sm+ for a balanced grid feel.
+  const aspectClass = aspectOverride || 'aspect-square sm:aspect-[4/3]';
+  const hoverShadow = showHover
+    ? 'group-hover:shadow-[0_12px_28px_-12px_hsl(var(--foreground)/0.18)]'
+    : '';
+  const hoverScale = showHover ? 'group-hover:scale-[1.03]' : '';
 
   return (
     <Link
       href={`${urlPrefix}/products?category=${category.slug}`}
       prefetch={false}
-      // max-w cap on the link itself so each card is bounded regardless
-      // of how few categories there are. For stores with 4-5 cats the
-      // grid stretched each card to ~300-400px on desktop; now capped at
-      // 220px with mx-auto so the card centers in its grid column with
-      // breathing room. Mobile (small viewport) doesn't hit the cap.
-      // Ahmad 2026-05-16: 'category grid denser on mobile is good, I'm
-      // talking about desktop'.
-      className="group block outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-xl w-full max-w-[200px] md:max-w-[280px] mx-auto"
+      className={`group block outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-xl w-full mx-auto ${categorySizeClass(cardSize)}`}
       dir={isRtl ? 'rtl' : 'ltr'}
     >
-      <div className="relative aspect-square sm:aspect-[4/3] rounded-xl overflow-hidden bg-muted shadow-[0_4px_12px_-6px_hsl(var(--foreground)/0.10)] group-hover:shadow-[0_12px_28px_-12px_hsl(var(--foreground)/0.18)] transition-shadow duration-500 ease-out">
+      <div
+        className={`relative ${aspectClass} rounded-xl overflow-hidden bg-muted shadow-[0_4px_12px_-6px_hsl(var(--foreground)/0.10)] ${hoverShadow} transition-shadow duration-500 ease-out`}
+      >
         {category.image ? (
           <img
             src={category.image}
             alt={displayName}
-            className="absolute inset-0 w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500 ease-out"
+            className={`absolute inset-0 w-full h-full object-cover ${hoverScale} transition-transform duration-500 ease-out`}
             loading="lazy"
           />
         ) : (
           <div className="absolute inset-0 bg-gradient-to-br from-primary/15 via-primary/8 to-muted" />
         )}
       </div>
-      <p className="mt-2 text-center text-sm md:text-base font-medium text-foreground line-clamp-1">
-        {displayName}
-      </p>
+      {showLabel && (
+        <p className="mt-2 text-center text-sm md:text-base font-medium text-foreground line-clamp-1">
+          {displayName}
+        </p>
+      )}
     </Link>
   );
 }

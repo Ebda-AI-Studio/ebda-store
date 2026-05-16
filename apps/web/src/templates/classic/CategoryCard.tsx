@@ -3,10 +3,12 @@
 import Link from 'next/link';
 import type { CategoryCardProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { categorySizeClass } from '../shared/card-size';
 
 export default function ClassicCategoryCard({
   category,
   isRtl: isRtlProp,
+  cardSize,
   urlPrefix = '',
 }: CategoryCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
@@ -17,7 +19,7 @@ export default function ClassicCategoryCard({
     <Link
       href={`${urlPrefix}/products?category=${category.slug}`}
       prefetch={false}
-      className="group block text-center outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 cursor-pointer w-full max-w-[200px] md:max-w-[280px] mx-auto"
+      className={`group block text-center outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 cursor-pointer w-full mx-auto ${categorySizeClass(cardSize)}`}
     >
       {/* Image with elegant border */}
       <div className="relative aspect-square sm:aspect-[3/4] mb-3 overflow-hidden border border-border/60 bg-muted group-hover:border-foreground/35 transition-colors duration-700 ease-out">
