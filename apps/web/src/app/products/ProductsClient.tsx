@@ -371,8 +371,13 @@ export default function ProductsClient({
 
           {/* Products Grid */}
           <div className="flex-1">
-            {/* Toolbar */}
-            <div className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-xl bg-muted/30 p-4">
+            {/* Toolbar — stacks fully below lg so the Sort + Show selects
+                always have room for their full option text (Arabic labels
+                like "السعر: من الأعلى للأقل" don't get ellipsis'd). Switches
+                to single-row only at lg+ where the sidebar has settled
+                into its column. Fixes the "الأحد..." truncation Ahmad
+                spotted on desktop 2026-05-16. */}
+            <div className="mb-6 flex flex-col items-stretch gap-3 rounded-xl bg-muted/30 p-4 lg:flex-row lg:flex-wrap lg:items-center lg:justify-between lg:gap-4">
               <p className="text-sm text-muted-foreground">
                 {isLoading ? (
                   t('Loading...', translations['Loading...'])
@@ -385,16 +390,12 @@ export default function ProductsClient({
                   </>
                 )}
               </p>
-              {/* On mobile the two selects squeezed into a single row
-                  truncated their option text ("12" → "1<", "الأحدث" →
-                  "الأحد...") because each picked content-width inside
-                  the flex row. Stack column-on-mobile so each occupies
-                  a full line; restore side-by-side at sm. */}
-              <div className="flex w-full flex-col items-stretch gap-3 sm:w-auto sm:flex-row sm:items-center sm:gap-4">
+              <div className="flex w-full flex-col items-stretch gap-3 lg:w-auto lg:flex-row lg:items-center lg:gap-4">
                 {/* Per-page — shoppers can see more products on a single
                     page instead of paginating. Allow-list capped at 96.
-                    Persisted to localStorage. */}
-                <div className="flex flex-1 items-center gap-2 sm:flex-initial">
+                    Persisted to localStorage. min-w-[6rem] reserves room
+                    for any value 12/24/48/96. */}
+                <div className="flex items-center gap-2">
                   <span className="shrink-0 text-sm font-medium text-foreground">
                     {t('Show:', 'عرض:')}
                   </span>
@@ -410,12 +411,13 @@ export default function ProductsClient({
                       }
                     }}
                     options={PER_PAGE_OPTIONS.map(n => ({ value: String(n), label: String(n) }))}
-                    className="h-11 flex-1 rounded-lg border border-border bg-background px-3 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 sm:h-9 sm:flex-initial sm:text-sm"
+                    className="h-11 min-w-[6rem] flex-1 rounded-lg border border-border bg-background px-3 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 lg:h-9 lg:flex-initial lg:text-sm"
                   />
                 </div>
 
-                {/* Sort */}
-                <div className="flex flex-1 items-center gap-2 sm:flex-initial">
+                {/* Sort — min-w-[12rem] keeps room for the longest Arabic
+                    label without truncation. */}
+                <div className="flex items-center gap-2">
                   <span className="shrink-0 text-sm font-medium text-foreground">
                     {t('Sort by:', '\u062a\u0631\u062a\u064a\u0628 \u062d\u0633\u0628:')}
                   </span>
@@ -426,7 +428,7 @@ export default function ProductsClient({
                       value: option.value,
                       label: option.label,
                     }))}
-                    className="h-11 flex-1 rounded-lg border border-border bg-background px-3 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 sm:h-9 sm:flex-initial sm:text-sm"
+                    className="h-11 min-w-[12rem] flex-1 rounded-lg border border-border bg-background px-3 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 lg:h-9 lg:flex-initial lg:text-sm"
                   />
                 </div>
 

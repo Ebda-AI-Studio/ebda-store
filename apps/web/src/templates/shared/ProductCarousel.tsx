@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { SectionHeading } from './SectionHeading';
 import { getPackStyles } from './pack-styles';
+import { OutOfStockRibbon } from './ProductCardCta';
 import type { ProductCarouselProps } from '../types';
 
 /**
@@ -183,6 +184,13 @@ export function ProductCarousel({
               const href = `${urlPrefix}/products/${product.slug}`;
               const img = product.images?.[0]?.url;
               const onSale = product.compareAtPrice && product.compareAtPrice > product.price;
+              // Dual-CTA + OOS state for the carousel cards (platform-level
+              // 2026-05-16). Products with variants can't add inline because
+              // the carousel can't pick a variant — they get a "View" link
+              // to the PDP instead. Out-of-stock products show a red ribbon
+              // and disable the cart button.
+              const hasVariants = !!product.variants && product.variants.length > 0;
+              const inStock = product.inStock !== false;
 
               return (
                 <li
@@ -196,6 +204,7 @@ export function ProductCarousel({
                       className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                     >
                       <div className="group/img relative aspect-square overflow-hidden bg-muted">
+                        <OutOfStockRibbon inStock={inStock} isRtl={isRtl} />
                         {img ? (
                           <>
                             <Image
@@ -268,14 +277,35 @@ export function ProductCarousel({
                         </div>
                       </div>
                     </Link>
-                    {onAddToCart && (
-                      <button
-                        type="button"
-                        onClick={() => onAddToCart(product.id)}
+                    {/* Platform-level dual CTA: variant products → View link
+                        to PDP, single-variant products → Add to cart. OOS
+                        forces a disabled button regardless. */}
+                    {hasVariants ? (
+                      <Link
+                        href={href}
+                        prefetch={false}
                         className={`block w-full text-center cursor-pointer ${styles.productCardCta}`}
                       >
-                        {isRtl ? 'إضافة للسلة' : 'Add to cart'}
+                        {isRtl ? 'عرض' : 'View'}
+                      </Link>
+                    ) : !inStock ? (
+                      <button
+                        type="button"
+                        disabled
+                        className={`block w-full text-center opacity-60 cursor-not-allowed ${styles.productCardCta}`}
+                      >
+                        {isRtl ? 'نفدت الكمية' : 'Out Of Stock'}
                       </button>
+                    ) : (
+                      onAddToCart && (
+                        <button
+                          type="button"
+                          onClick={() => onAddToCart(product.id)}
+                          className={`block w-full text-center cursor-pointer ${styles.productCardCta}`}
+                        >
+                          {isRtl ? 'إضافة للسلة' : 'Add to cart'}
+                        </button>
+                      )
                     )}
                   </div>
                 </li>

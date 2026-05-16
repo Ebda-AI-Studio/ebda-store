@@ -60,10 +60,9 @@ export default function ModernHeader({
       >
         <div className="container mx-auto px-4">
           {/* Row 1: hamburger | logo | actions — pecannbee mobile layout.
-              h-24 on mobile gives the logo room to breathe at h-20 (was h-16
-              and Ahmad said 'logo must be bigger as well'). Desktop h-28
-              retains the comfortable spacing for nav + search-toggle. */}
-          <div className="relative flex h-24 items-center justify-between gap-2 sm:h-24 md:h-28">
+              h-28 mobile / md:h-28 to give the bigger h-24 logo headroom
+              (Ahmad 2026-05-16: 'logo must be bigger'). */}
+          <div className="relative flex h-28 items-center justify-between gap-2 md:h-28">
             {/* Mobile-only hamburger (LEFT slot). Extracted from the actions
                 block so the layout matches the pecannbee + alkahraman target:
                 hamburger left, logo center, actions right. */}
@@ -91,12 +90,16 @@ export default function ModernHeader({
             </button>
 
             {/* Logo — centered on mobile (per pecannbee + alkahraman target),
-                normal flex item on tablet+. Bumped mobile h-16 → h-20 per
-                Ahmad's 2026-05-16 ask 'logo must be bigger'. Desktop h-24
-                unchanged. */}
+                normal flex item on tablet+. Bumped to h-24 mobile per Ahmad's
+                follow-up ('still not bigger'). max-w-[60%] keeps a wide
+                wordmark from overlapping the hamburger/actions at very
+                small viewports. pointer-events-none on the wrapper while
+                making the inner Image clickable would lose the parent
+                Link, so instead we let the centered Link share space and
+                trust the absolute positioning. */}
             <Link
               href={urlPrefix || '/'}
-              className="absolute left-1/2 -translate-x-1/2 md:relative md:left-auto md:translate-x-0 flex items-center gap-2 shrink-0"
+              className="absolute left-1/2 -translate-x-1/2 md:relative md:left-auto md:translate-x-0 flex items-center gap-2 shrink-0 max-w-[55%] md:max-w-none"
             >
               {displayLogo ? (
                 <Image
@@ -104,7 +107,7 @@ export default function ModernHeader({
                   alt={displayName}
                   width={320}
                   height={120}
-                  className="h-20 max-h-20 w-auto object-contain md:h-24 md:max-h-24"
+                  className="h-24 max-h-24 w-auto object-contain md:h-24 md:max-h-24"
                   priority
                 />
               ) : (
