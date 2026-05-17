@@ -52,7 +52,7 @@ export default function BoldHeader({
         <div className="container mx-auto px-4">
           {/* Row 1: hamburger | logo | actions — pecannbee-aligned mobile
               layout. Logo absolute-centered on mobile, normal flex on md+. */}
-          <div className="relative flex items-center justify-between h-24 overflow-hidden gap-4 md:h-28">
+          <div className="relative flex items-center justify-between h-32 overflow-hidden gap-4 md:h-44">
             {/* Logo — centered on mobile (pecannbee target), normal flex
                 on md+. Bumped mobile to h-20 per Ahmad 2026-05-16. */}
             <Link
@@ -65,7 +65,7 @@ export default function BoldHeader({
                   alt={displayName}
                   width={320}
                   height={120}
-                  className="h-20 max-h-20 w-auto max-w-full object-contain brightness-0 invert md:h-24 md:max-h-24"
+                  className="h-24 max-h-24 w-auto max-w-full object-contain brightness-0 invert md:h-36 md:max-h-36"
                   priority
                 />
               ) : (
