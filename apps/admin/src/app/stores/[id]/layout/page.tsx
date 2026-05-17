@@ -423,6 +423,30 @@ export default function StoreLayoutPage() {
                     checked={!!layout.categories.showCardFrame}
                     onChange={v => updateSection('categories', s => ({ ...s, showCardFrame: v }))}
                   />
+                  {layout.categories.showCardFrame && (
+                    <label className="flex flex-col gap-1 text-sm">
+                      <span className="text-muted-foreground">Frame style</span>
+                      <select
+                        value={layout.categories.cardFrameStyle ?? 'soft'}
+                        onChange={e =>
+                          updateSection('categories', s => ({
+                            ...s,
+                            cardFrameStyle: e.target.value as
+                              | 'soft'
+                              | 'outline'
+                              | 'shadow'
+                              | 'paper',
+                          }))
+                        }
+                        className="rounded-lg border border-border bg-card px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                      >
+                        <option value="soft">Soft (rounded + light shadow) — default</option>
+                        <option value="outline">Outline (2px border, no shadow)</option>
+                        <option value="shadow">Shadow (larger drop shadow, no border)</option>
+                        <option value="paper">Paper (editorial, larger padding)</option>
+                      </select>
+                    </label>
+                  )}
                 </div>
                 <TypographyJumpLinks
                   storeId={storeId}
@@ -710,6 +734,7 @@ type CardControlsValues = {
   showLabel?: boolean;
   showHover?: boolean;
   showCardFrame?: boolean;
+  cardFrameStyle?: 'soft' | 'outline' | 'shadow' | 'paper';
 };
 
 function ProductCardControls({
@@ -798,6 +823,25 @@ function ProductCardControls({
         checked={!!values.showCardFrame}
         onChange={v => onChange({ showCardFrame: v })}
       />
+      {values.showCardFrame && (
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="text-muted-foreground">Frame style</span>
+          <select
+            value={values.cardFrameStyle ?? 'soft'}
+            onChange={e =>
+              onChange({
+                cardFrameStyle: e.target.value as CardControlsValues['cardFrameStyle'],
+              })
+            }
+            className="rounded-lg border border-border bg-card px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          >
+            <option value="soft">Soft (rounded + light shadow) — default</option>
+            <option value="outline">Outline (2px border, no shadow)</option>
+            <option value="shadow">Shadow (larger drop shadow, no border)</option>
+            <option value="paper">Paper (editorial, larger padding)</option>
+          </select>
+        </label>
+      )}
     </div>
   );
 }

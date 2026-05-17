@@ -30,6 +30,7 @@ export default function BoldCategoryGrid({
   showLabel,
   showHover,
   showCardFrame,
+  cardFrameStyle,
   mobileColumns,
   desktopColumns,
   urlPrefix = '',
@@ -65,7 +66,7 @@ export default function BoldCategoryGrid({
         >
           {categories.map((category, index) => {
             const stagger = index % 2 === 1 ? 'lg:translate-y-8' : '';
-            const frame = cardFrameClass(showCardFrame);
+            const frame = cardFrameClass(showCardFrame, cardFrameStyle);
             return (
               <div key={category.id} className={`${stagger} ${frame}`.trim()}>
                 <CategoryCard

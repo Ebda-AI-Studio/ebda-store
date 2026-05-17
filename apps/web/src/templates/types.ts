@@ -351,8 +351,10 @@ export interface ProductCarouselProps {
   cardGap?: import('@force/shared').CardGap;
   showLabel?: boolean;
   showHover?: boolean;
-  /** Wrap each card in a rounded-2xl bg-card border + shadow frame. Default false. */
+  /** Wrap each card in a frame. Default false. Pair with cardFrameStyle. */
   showCardFrame?: boolean;
+  /** Frame personality. soft / outline / shadow / paper. Default 'soft'. */
+  cardFrameStyle?: 'soft' | 'outline' | 'shadow' | 'paper';
 }
 
 /**
@@ -385,8 +387,10 @@ export interface CategoryStripProps {
   cardGap?: import('@force/shared').CardGap;
   showLabel?: boolean;
   showHover?: boolean;
-  /** Wrap each card in a rounded-2xl bg-card border + shadow frame. Default false. */
+  /** Wrap each card in a frame. Default false. Pair with cardFrameStyle. */
   showCardFrame?: boolean;
+  /** Frame personality. soft / outline / shadow / paper. Default 'soft'. */
+  cardFrameStyle?: 'soft' | 'outline' | 'shadow' | 'paper';
 }
 
 /**
@@ -513,8 +517,10 @@ export interface CategoryGridProps {
   showLabel?: boolean;
   /** Enable hover/zoom (default true). */
   showHover?: boolean;
-  /** Wrap each card in a rounded-2xl bg-card border + shadow frame. Default false. */
+  /** Wrap each card in a frame. Default false. Pair with cardFrameStyle. */
   showCardFrame?: boolean;
+  /** Frame personality. soft / outline / shadow / paper. Default 'soft'. */
+  cardFrameStyle?: 'soft' | 'outline' | 'shadow' | 'paper';
   /** Merchant-picked column counts from admin Layout page. */
   mobileColumns?: 1 | 2 | 3;
   desktopColumns?: 2 | 3 | 4;

@@ -106,6 +106,7 @@ const layoutSchema = z
       showKickerLines: z.boolean().optional(),
       showSubtitleLines: z.boolean().optional(),
       showCardFrame: z.boolean().optional(),
+      cardFrameStyle: z.enum(['soft', 'outline', 'shadow', 'paper']).optional(),
     }),
     // Product carousels — newArrivals + bestSellers. 2026-05-16: extended
     // to mirror the categories block so merchants can tune product card
@@ -143,6 +144,7 @@ const layoutSchema = z
       showKickerLines: z.boolean().optional(),
       showSubtitleLines: z.boolean().optional(),
       showCardFrame: z.boolean().optional(),
+      cardFrameStyle: z.enum(['soft', 'outline', 'shadow', 'paper']).optional(),
     }),
     bestSellers: z.object({
       enabled: z.boolean(),
@@ -174,6 +176,7 @@ const layoutSchema = z
       showKickerLines: z.boolean().optional(),
       showSubtitleLines: z.boolean().optional(),
       showCardFrame: z.boolean().optional(),
+      cardFrameStyle: z.enum(['soft', 'outline', 'shadow', 'paper']).optional(),
     }),
     filterSidebar: z.object({
       enabled: z.boolean(),

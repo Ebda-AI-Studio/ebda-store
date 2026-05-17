@@ -188,14 +188,19 @@ export interface CategoriesSettings extends SectionTitleOverride {
    *  Default 'theme'. */
   cardShape?: CardShape;
   /**
-   * Wrap each card in a rounded-2xl border + bg-card + subtle shadow frame.
-   * Default undefined / false = no frame (current behavior; cards sit
-   * directly on the section background). Set true for an opt-in "framed"
-   * look that gives each card a contained card-on-paper feel. Useful for
-   * merchants whose category photos have white/transparent backgrounds
-   * and visually float against the page bg without a frame.
+   * Wrap each card in a frame for an opt-in "card-on-paper" look. Default
+   * undefined / false = no frame (cards sit directly on section bg).
+   * Pair with `cardFrameStyle` for personality control.
    */
   showCardFrame?: boolean;
+  /**
+   * Frame personality when `showCardFrame` is on. Default 'soft'.
+   *   - `'soft'`   rounded-2xl + bg-card + subtle shadow (modern / SaaS)
+   *   - `'outline'` rounded-xl + 2px border, no bg, no shadow (classic / minimal)
+   *   - `'shadow'` rounded-2xl + bg-card + larger shadow, no border (premium)
+   *   - `'paper'`  rounded-lg + bg-card + paper-style shadow + larger padding (editorial)
+   */
+  cardFrameStyle?: 'soft' | 'outline' | 'shadow' | 'paper';
 }
 
 export interface ProductCarouselSettings extends SectionTitleOverride {
@@ -217,13 +222,16 @@ export interface ProductCarouselSettings extends SectionTitleOverride {
   /** Show subtle hover effects (zoom, shadow). Default true. */
   showHover?: boolean;
   /**
-   * Wrap each product card in a rounded-2xl border + bg-card + subtle
-   * shadow frame. Default undefined / false = no extra frame (current
-   * behavior — the theme's own ProductCard chrome applies). Useful when
-   * the merchant wants product cards to read as contained tiles against
-   * a busy page background.
+   * Wrap each product card in a frame for an opt-in contained-tile look.
+   * Default undefined / false = no extra frame (the theme's own
+   * ProductCard chrome applies). Pair with `cardFrameStyle`.
    */
   showCardFrame?: boolean;
+  /**
+   * Frame personality when `showCardFrame` is on. Default 'soft'. See
+   * CategoriesSettings.cardFrameStyle for the 4-value enum.
+   */
+  cardFrameStyle?: 'soft' | 'outline' | 'shadow' | 'paper';
 }
 
 export interface FilterSidebarSettings {

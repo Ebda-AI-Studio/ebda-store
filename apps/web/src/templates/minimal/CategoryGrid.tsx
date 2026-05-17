@@ -30,6 +30,7 @@ export default function MinimalCategoryGrid({
   showLabel,
   showHover,
   showCardFrame,
+  cardFrameStyle,
   mobileColumns,
   desktopColumns,
   urlPrefix = '',
@@ -57,7 +58,7 @@ export default function MinimalCategoryGrid({
           className={`grid ${gridGapClass(cardGap)} ${gridColsClass(mobileColumns, desktopColumns)}`}
         >
           {categories.map(category => {
-            const frame = cardFrameClass(showCardFrame);
+            const frame = cardFrameClass(showCardFrame, cardFrameStyle);
             return frame ? (
               <div key={category.id} className={frame}>
                 <CategoryCard

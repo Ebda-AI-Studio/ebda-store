@@ -109,17 +109,37 @@ export function cardShapeClasses(shape: CardShape | undefined): {
 }
 
 /**
- * Optional per-card "framed" wrapper. When the merchant turns on
- * `showCardFrame` in admin, each category / product card sits inside a
- * rounded-2xl + bg-card + subtle shadow frame. Returns `''` when off so
- * the wrapper renders as a no-op div (template stays the same). Used by
- * CategoryStrip, per-theme CategoryGrid, and ProductCarousel. Added
- * 2026-05-17 night (Ahmad: "opt-in frames around categories + products").
+ * Optional per-card "framed" wrapper. Returns '' when off (no-op div) or
+ * a tailwind class string per the chosen style. Used by CategoryStrip,
+ * per-theme CategoryGrid, and ProductCarousel.
+ *
+ *   soft    — rounded-2xl + bg-card + subtle shadow (modern / SaaS feel)
+ *   outline — rounded-xl + 2px border, no bg, no shadow (classic / minimal)
+ *   shadow  — rounded-2xl + bg-card + larger shadow, no border (premium)
+ *   paper   — rounded-lg + bg-card + paper shadow + larger padding (editorial)
+ *
+ * Default style when `showCardFrame` is true but no style picked: 'soft'.
+ * Added 2026-05-17 night; styles enum added 2026-05-18 per Ahmad's ask
+ * for customization options.
  */
-export function cardFrameClass(on: boolean | undefined): string {
-  return on
-    ? 'rounded-2xl border border-border bg-card p-3 shadow-sm transition-shadow duration-300 hover:shadow-md'
-    : '';
+export type CardFrameStyle = 'soft' | 'outline' | 'shadow' | 'paper';
+
+export function cardFrameClass(
+  on: boolean | undefined,
+  style: CardFrameStyle | undefined = 'soft'
+): string {
+  if (!on) return '';
+  switch (style) {
+    case 'outline':
+      return 'rounded-xl border-2 border-border p-3 transition-colors duration-300 hover:border-foreground/40';
+    case 'shadow':
+      return 'rounded-2xl bg-card p-3 shadow-md transition-shadow duration-300 hover:shadow-lg';
+    case 'paper':
+      return 'rounded-lg bg-card p-4 shadow-[0_8px_24px_-12px_hsl(var(--foreground)/0.18)] transition-shadow duration-300 hover:shadow-[0_12px_32px_-12px_hsl(var(--foreground)/0.22)]';
+    case 'soft':
+    default:
+      return 'rounded-2xl border border-border bg-card p-3 shadow-sm transition-shadow duration-300 hover:shadow-md';
+  }
 }
 
 /**
