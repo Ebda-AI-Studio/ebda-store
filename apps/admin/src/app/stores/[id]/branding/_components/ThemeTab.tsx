@@ -108,6 +108,48 @@ export function ThemeTab({ branding, onChange }: ThemeTabProps) {
         />
       </label>
 
+      {/* Homepage section toggles (2026-05-17 evening) — added after Ahmad
+          asked "where to toggle this off" about the brand story block. */}
+      <label className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card p-4 cursor-pointer">
+        <span className="flex-1 min-w-0">
+          <span className="block text-sm font-semibold text-foreground">
+            {t('brandStory.title')}
+          </span>
+          <span className="mt-0.5 block text-xs text-muted-foreground">{t('brandStory.hint')}</span>
+        </span>
+        <input
+          type="checkbox"
+          checked={branding.theme.showBrandStory !== false}
+          onChange={e =>
+            onChange({
+              ...branding,
+              theme: { ...branding.theme, showBrandStory: e.target.checked },
+            })
+          }
+          className="h-5 w-5 cursor-pointer accent-primary"
+        />
+      </label>
+
+      <label className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card p-4 cursor-pointer">
+        <span className="flex-1 min-w-0">
+          <span className="block text-sm font-semibold text-foreground">
+            {t('trustStrip.title')}
+          </span>
+          <span className="mt-0.5 block text-xs text-muted-foreground">{t('trustStrip.hint')}</span>
+        </span>
+        <input
+          type="checkbox"
+          checked={branding.theme.showTrustStrip !== false}
+          onChange={e =>
+            onChange({
+              ...branding,
+              theme: { ...branding.theme, showTrustStrip: e.target.checked },
+            })
+          }
+          className="h-5 w-5 cursor-pointer accent-primary"
+        />
+      </label>
+
       <BrandPreview theme={branding.theme} />
     </div>
   );

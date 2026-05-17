@@ -32,6 +32,10 @@ export interface StoreTheme {
    * Single-tap add-to-cart without leaving the page. Default false.
    */
   showQuickAdd?: boolean;
+  /** Show the "Our Story" homepage block. Default true (uses heroImage + description). */
+  showBrandStory?: boolean;
+  /** Show the 3-up trust strip above the footer. Default true. */
+  showTrustStrip?: boolean;
 }
 
 export interface StoreBranding {
@@ -97,6 +101,8 @@ export const DEFAULT_THEME: StoreTheme = {
   backgroundPreset: 'none',
   showBrandBadge: false,
   showQuickAdd: false,
+  showBrandStory: true,
+  showTrustStrip: true,
 };
 
 /**

@@ -1316,6 +1316,14 @@
       "blog": {
         "title": "Enable blog",
         "hint": "Turns on the /blog section on your storefront and the From-the-Blog carousel on your homepage. Manage posts under Blog in the sidebar."
+      },
+      "brandStory": {
+        "title": "Show \"Our Story\" section",
+        "hint": "Inline brand-story block on the homepage. Uses your store description as the body and your hero image as the visual. Builds customer connection beyond product listings. Auto-hides when both are empty."
+      },
+      "trustStrip": {
+        "title": "Show trust strip",
+        "hint": "Three icon-and-text blocks above the footer (Fast Delivery / Quality Guarantee / 24/7 Support) with platform-default bilingual copy."
       }
     },
     "preview": {

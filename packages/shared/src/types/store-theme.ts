@@ -149,6 +149,15 @@ export interface StoreTheme {
   // DEFAULT_DIVIDER_SETTINGS (enabled, solid, 1px, contained, auto color).
   dividers?: DividerSettings;
 
+  // Homepage section toggles (2026-05-17 evening) — added after Ahmad
+  // asked "where to toggle this off" about the brand story block.
+  // Both default true so existing behavior is preserved; merchant opts
+  // OUT in admin if they don't want the section.
+  /** Show the inline "Our Story / قصتنا" block on the homepage (uses store.heroImage + store.description). */
+  showBrandStory?: boolean;
+  /** Show the 3-up trust strip (Fast Delivery / Quality / Support) above the footer. */
+  showTrustStrip?: boolean;
+
   // Custom CSS (for advanced users)
   customCss?: string;
 }
@@ -246,6 +255,8 @@ export const DEFAULT_THEME: StoreTheme = {
   showBrandBadge: false,
   showQuickAdd: false,
   dividers: DEFAULT_DIVIDER_SETTINGS,
+  showBrandStory: true,
+  showTrustStrip: true,
 };
 
 /**

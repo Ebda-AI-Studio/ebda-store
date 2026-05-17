@@ -312,16 +312,26 @@ export function HomePageContent({
                 strip ships 3 universal items (Fast Delivery / Quality /
                 Support) with bilingual platform copy. Both auto-hide
                 when their data isn't present. */}
-            <SectionDivider />
-            <BrandStoryBlock
-              image={store.heroImage ?? undefined}
-              body={store.description ?? undefined}
-              bodyAr={store.descriptionAr ?? undefined}
-            />
+            {/* Brand story + trust strip are per-store toggles (default
+                on) — Ahmad 2026-05-17 evening. Set via Branding -> Theme. */}
+            {store.theme?.showBrandStory !== false && (
+              <>
+                <SectionDivider />
+                <BrandStoryBlock
+                  image={store.heroImage ?? undefined}
+                  body={store.description ?? undefined}
+                  bodyAr={store.descriptionAr ?? undefined}
+                />
+              </>
+            )}
             <SectionDivider />
             <HomeBlogCarousel />
-            <SectionDivider />
-            <TrustStrip />
+            {store.theme?.showTrustStrip !== false && (
+              <>
+                <SectionDivider />
+                <TrustStrip />
+              </>
+            )}
 
             <SectionDivider />
 
