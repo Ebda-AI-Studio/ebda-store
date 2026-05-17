@@ -48,6 +48,10 @@ const layoutSchema = z
       mode: z.enum(['single', 'slider']),
       autoplayMs: z.number().int().min(1000).max(30000),
       slides: z.array(heroSlideSchema).max(10),
+      // 2026-05-18: framed vs full-bleed presentation. Without this listed
+      // Zod silently strips the field on PUT — same trap as
+      // feedback-fwb-zod-silent-strip-trap.md. Keep in sync with HeroSettings.
+      presentation: z.enum(['full-bleed', 'framed']).optional(),
     }),
     categories: z.object({
       enabled: z.boolean(),
@@ -95,6 +99,13 @@ const layoutSchema = z
         .optional(),
       showLabel: z.boolean().optional(),
       showHover: z.boolean().optional(),
+      // 2026-05-17 night + 2026-05-18: per-section heading-line toggles +
+      // opt-in card frame wrapper. All three silently stripped by Zod
+      // before this fix because they weren't listed — bug Ahmad spotted
+      // 2026-05-18 ("toggled them on and I don't see anything").
+      showKickerLines: z.boolean().optional(),
+      showSubtitleLines: z.boolean().optional(),
+      showCardFrame: z.boolean().optional(),
     }),
     // Product carousels — newArrivals + bestSellers. 2026-05-16: extended
     // to mirror the categories block so merchants can tune product card
@@ -124,6 +135,14 @@ const layoutSchema = z
       cardGap: z.enum(['tight', 'normal', 'loose', 'xloose']).optional(),
       showLabel: z.boolean().optional(),
       showHover: z.boolean().optional(),
+      // 2026-05-17 night + 2026-05-18 — see categories above for trap notes.
+      kicker: z.string().optional(),
+      kickerAr: z.string().optional(),
+      subtitle: z.string().optional(),
+      subtitleAr: z.string().optional(),
+      showKickerLines: z.boolean().optional(),
+      showSubtitleLines: z.boolean().optional(),
+      showCardFrame: z.boolean().optional(),
     }),
     bestSellers: z.object({
       enabled: z.boolean(),
@@ -147,6 +166,14 @@ const layoutSchema = z
       cardGap: z.enum(['tight', 'normal', 'loose', 'xloose']).optional(),
       showLabel: z.boolean().optional(),
       showHover: z.boolean().optional(),
+      // 2026-05-17 night + 2026-05-18 — see categories above for trap notes.
+      kicker: z.string().optional(),
+      kickerAr: z.string().optional(),
+      subtitle: z.string().optional(),
+      subtitleAr: z.string().optional(),
+      showKickerLines: z.boolean().optional(),
+      showSubtitleLines: z.boolean().optional(),
+      showCardFrame: z.boolean().optional(),
     }),
     filterSidebar: z.object({
       enabled: z.boolean(),
