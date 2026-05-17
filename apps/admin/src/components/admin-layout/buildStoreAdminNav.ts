@@ -91,6 +91,16 @@ export function buildStoreAdminNav(storeId: string, labels: NavLabels): NavItem[
       icon: 'M4 7V4h16v3M9 20h6M12 4v16',
     },
     {
+      // Section dividers (2026-05-17 evening) — dedicated page for the
+      // horizontal lines between homepage sections. Lives next to
+      // Typography because both are visual-rhythm settings; kept
+      // separate because dividers aren't a font concept.
+      name: 'Dividers',
+      href: `/stores/${storeId}/dividers`,
+      // Three-stacked-lines icon
+      icon: 'M4 6h16M4 12h16M4 18h16',
+    },
+    {
       name: labels.content,
       href: `/stores/${storeId}/content`,
       icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',

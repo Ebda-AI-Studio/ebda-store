@@ -32,6 +32,52 @@ export type BorderRadius = 'none' | 'sm' | 'md' | 'lg' | 'xl';
 export type BackgroundPreset = 'none' | 'warmSand' | 'coolGrey' | 'pureWhite' | 'brandColor';
 
 /**
+ * Section-divider settings (2026-05-17 evening). Independent of
+ * `backgroundPreset` — a horizontal line drawn between homepage
+ * sections. Default ON per Ahmad's directive ("by default visible for
+ * all stores"). Merchants tune in Admin → Dividers, not Theme, because
+ * dividers are a separator concept and don't belong with font / color.
+ */
+export type DividerStyle = 'solid' | 'dashed' | 'dotted' | 'double';
+export type DividerThickness = 1 | 2 | 3;
+export type DividerWidth = 'full' | 'contained' | 'short';
+export type DividerColorMode = 'auto' | 'foreground' | 'accent' | 'custom';
+export type DividerSpacing = 'tight' | 'normal' | 'loose';
+
+export interface DividerSettings {
+  /** Master on/off. Default true. */
+  enabled: boolean;
+  /** CSS border-style. Default 'solid'. */
+  style: DividerStyle;
+  /** Line thickness in px (border-top width). Default 1. */
+  thickness: DividerThickness;
+  /** Line span: edge-to-edge ('full'), within max-w-7xl container ('contained'), or short centered accent ('short'). Default 'contained'. */
+  width: DividerWidth;
+  /**
+   * Color mode:
+   *  - 'auto'        → theme's --border token (subtle, blends in)
+   *  - 'foreground'  → high-contrast --foreground at 25% opacity
+   *  - 'accent'      → store's primary brand color
+   *  - 'custom'      → user-picked hex via `customColor`
+   * Default 'auto'.
+   */
+  color: DividerColorMode;
+  /** Hex string when `color === 'custom'`. Ignored otherwise. */
+  customColor?: string;
+  /** Vertical padding around the divider. Default 'normal'. */
+  spacing: DividerSpacing;
+}
+
+export const DEFAULT_DIVIDER_SETTINGS: DividerSettings = {
+  enabled: true,
+  style: 'solid',
+  thickness: 1,
+  width: 'contained',
+  color: 'auto',
+  spacing: 'normal',
+};
+
+/**
  * Store theme configuration - colors stored as HSL values
  */
 export interface StoreTheme {
@@ -97,6 +143,11 @@ export interface StoreTheme {
   // some stores prefer routing every add through the PDP (clearer
   // conversion funnel + lets the customer see ingredients/spec first).
   showQuickAdd?: boolean;
+
+  // Section dividers (2026-05-17 evening) — see DividerSettings + admin
+  // /stores/<id>/dividers page. Optional; missing defaults to
+  // DEFAULT_DIVIDER_SETTINGS (enabled, solid, 1px, contained, auto color).
+  dividers?: DividerSettings;
 
   // Custom CSS (for advanced users)
   customCss?: string;
@@ -194,6 +245,7 @@ export const DEFAULT_THEME: StoreTheme = {
   backgroundPreset: 'none',
   showBrandBadge: false,
   showQuickAdd: false,
+  dividers: DEFAULT_DIVIDER_SETTINGS,
 };
 
 /**

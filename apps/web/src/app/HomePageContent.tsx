@@ -8,6 +8,7 @@ import { ShopChrome } from '../components';
 import { BrandStoryBlock } from '../templates/shared/BrandStoryBlock';
 import { TrustStrip } from '../templates/shared/TrustStrip';
 import { HomeBlogCarousel } from '../templates/shared/HomeBlogCarousel';
+import { SectionDivider } from '../templates/shared/SectionDivider';
 import { toTemplateProduct, toTemplateCategory } from '../templates/adapters';
 import { getHomepageTemplate } from '../lib/serverTemplate';
 import type { TemplateId, StoreLayoutSettings } from '@force/shared';
@@ -222,6 +223,8 @@ export function HomePageContent({
               </section>
             )}
 
+            <SectionDivider />
+
             {/* New Arrivals — pack ProductCarousel or ProductGrid fallback.
                 Sprint 1: bg-[hsl(var(--bg-section-alt))] alternates with
                 the categories section above. */}
@@ -259,6 +262,8 @@ export function HomePageContent({
                 )}
               </section>
             )}
+
+            <SectionDivider />
 
             {/* Best Sellers carousel.
                 Sprint 1: was `bg-muted/30` (a hardcoded muted tone);
@@ -307,13 +312,18 @@ export function HomePageContent({
                 strip ships 3 universal items (Fast Delivery / Quality /
                 Support) with bilingual platform copy. Both auto-hide
                 when their data isn't present. */}
+            <SectionDivider />
             <BrandStoryBlock
               image={store.heroImage ?? undefined}
               body={store.description ?? undefined}
               bodyAr={store.descriptionAr ?? undefined}
             />
+            <SectionDivider />
             <HomeBlogCarousel />
+            <SectionDivider />
             <TrustStrip />
+
+            <SectionDivider />
 
             {/* Testimonials — auto-hides when no qualifying reviews.
                 Sprint 1: bg-[hsl(var(--bg-section-alt))] alternates
