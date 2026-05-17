@@ -130,10 +130,16 @@ export function HomePageContent({
           autoplayMs={layout.hero.autoplayMs}
           isRtl={isRtl}
           pack={templateId}
+          presentation={layout.hero.presentation}
         />
       )}
       {layout.hero.enabled && bannerEligible && T.HeroBanner && (
-        <T.HeroBanner {...layout.hero.slides[0]} isRtl={isRtl} pack={templateId} />
+        <T.HeroBanner
+          {...layout.hero.slides[0]}
+          isRtl={isRtl}
+          pack={templateId}
+          presentation={layout.hero.presentation}
+        />
       )}
       {layout.hero.enabled && !sliderEligible && !bannerEligible && legacyHeroHasContent && (
         <T.Hero
@@ -199,6 +205,7 @@ export function HomePageContent({
                     cardGap={layout.categories.cardGap}
                     showLabel={layout.categories.showLabel}
                     showHover={layout.categories.showHover}
+                    showCardFrame={layout.categories.showCardFrame}
                   />
                 ) : (
                   <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -210,12 +217,15 @@ export function HomePageContent({
                       kickerAr={layout.categories.kickerAr}
                       subtitle={layout.categories.subtitle}
                       subtitleAr={layout.categories.subtitleAr}
+                      showKickerLines={layout.categories.showKickerLines}
+                      showSubtitleLines={layout.categories.showSubtitleLines}
                       cardSize={layout.categories.cardSize}
                       cardAspect={layout.categories.cardAspect}
                       cardShape={layout.categories.cardShape}
                       cardGap={layout.categories.cardGap}
                       showLabel={layout.categories.showLabel}
                       showHover={layout.categories.showHover}
+                      showCardFrame={layout.categories.showCardFrame}
                       mobileColumns={layout.categories.mobileColumns}
                       desktopColumns={layout.categories.desktopColumns}
                       isRtl={isRtl}
@@ -254,6 +264,7 @@ export function HomePageContent({
                     cardGap={layout.newArrivals.cardGap}
                     showLabel={layout.newArrivals.showLabel}
                     showHover={layout.newArrivals.showHover}
+                    showCardFrame={layout.newArrivals.showCardFrame}
                   />
                 ) : (
                   <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -303,6 +314,7 @@ export function HomePageContent({
                     cardGap={layout.bestSellers.cardGap}
                     showLabel={layout.bestSellers.showLabel}
                     showHover={layout.bestSellers.showHover}
+                    showCardFrame={layout.bestSellers.showCardFrame}
                   />
                 ) : (
                   <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">

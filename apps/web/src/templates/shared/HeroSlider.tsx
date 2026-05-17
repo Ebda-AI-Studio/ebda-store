@@ -12,7 +12,13 @@ import type { HeroSliderProps } from '../types';
  * Autoplay pauses while the user holds focus on a dot and on tab visibility
  * change so we don't burn the LCP image budget when the page is hidden.
  */
-export function HeroSlider({ slides, autoplayMs = 5000, isRtl, pack }: HeroSliderProps) {
+export function HeroSlider({
+  slides,
+  autoplayMs = 5000,
+  isRtl,
+  pack,
+  presentation = 'full-bleed',
+}: HeroSliderProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const pausedRef = useRef(false);
   const touchStartXRef = useRef<number | null>(null);
@@ -57,7 +63,9 @@ export function HeroSlider({ slides, autoplayMs = 5000, isRtl, pack }: HeroSlide
 
   if (slides.length === 0) return null;
   if (slides.length === 1) {
-    return <HeroBanner {...slides[0]} isRtl={isRtl} pack={pack} priority />;
+    return (
+      <HeroBanner {...slides[0]} isRtl={isRtl} pack={pack} priority presentation={presentation} />
+    );
   }
 
   // Mobile aspect tracks the merchant's content: if ANY slide ships a
@@ -109,7 +117,13 @@ export function HeroSlider({ slides, autoplayMs = 5000, isRtl, pack }: HeroSlide
           >
             {/* Priority on slide 0 only — that's the LCP image. The rest
                 lazy-load so we don't preload 6 banners on every page view. */}
-            <HeroBanner {...slide} isRtl={isRtl} pack={pack} priority={i === 0} />
+            <HeroBanner
+              {...slide}
+              isRtl={isRtl}
+              pack={pack}
+              priority={i === 0}
+              presentation={presentation}
+            />
           </div>
         ))}
       </div>

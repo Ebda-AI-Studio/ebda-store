@@ -48,6 +48,18 @@ export interface HeroSettings {
   /** Autoplay interval in ms; ignored when mode === 'single' */
   autoplayMs: number;
   slides: HeroSlide[];
+  /**
+   * Presentation mode:
+   *   - `'full-bleed'` (default) — hero spans 100vw, image fills via
+   *     object-cover (may crop top/bottom if image aspect ≠ container).
+   *   - `'framed'` — hero sits inside a max-w-7xl container with padding
+   *     + rounded corners + neutral bg; image renders with object-contain
+   *     so the WHOLE image shows (may letterbox). Pick this when merchant
+   *     uploaded an image they want to display in full without crop.
+   * Merchants pick via Admin → Layout → Hero. Optional — undefined
+   * preserves the existing full-bleed default for back-compat.
+   */
+  presentation?: 'full-bleed' | 'framed';
 }
 
 export type CategoriesLayout = 'grid' | 'horizontal';
@@ -175,6 +187,15 @@ export interface CategoriesSettings extends SectionTitleOverride {
    *  but 'theme', overrides cardAspect + theme's default rounding.
    *  Default 'theme'. */
   cardShape?: CardShape;
+  /**
+   * Wrap each card in a rounded-2xl border + bg-card + subtle shadow frame.
+   * Default undefined / false = no frame (current behavior; cards sit
+   * directly on the section background). Set true for an opt-in "framed"
+   * look that gives each card a contained card-on-paper feel. Useful for
+   * merchants whose category photos have white/transparent backgrounds
+   * and visually float against the page bg without a frame.
+   */
+  showCardFrame?: boolean;
 }
 
 export interface ProductCarouselSettings extends SectionTitleOverride {
@@ -195,6 +216,14 @@ export interface ProductCarouselSettings extends SectionTitleOverride {
   showLabel?: boolean;
   /** Show subtle hover effects (zoom, shadow). Default true. */
   showHover?: boolean;
+  /**
+   * Wrap each product card in a rounded-2xl border + bg-card + subtle
+   * shadow frame. Default undefined / false = no extra frame (current
+   * behavior — the theme's own ProductCard chrome applies). Useful when
+   * the merchant wants product cards to read as contained tiles against
+   * a busy page background.
+   */
+  showCardFrame?: boolean;
 }
 
 export interface FilterSidebarSettings {

@@ -3,7 +3,8 @@
 import CategoryCard from './CategoryCard';
 import type { CategoryGridProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { gridColsClass, gridGapClass } from '../shared/card-size';
+import { cardFrameClass, gridColsClass, gridGapClass } from '../shared/card-size';
+import { SectionHeading } from '../shared/SectionHeading';
 
 export default function ModernCategoryGrid({
   categories,
@@ -14,12 +15,15 @@ export default function ModernCategoryGrid({
   kickerAr,
   subtitle,
   subtitleAr,
+  showKickerLines,
+  showSubtitleLines,
   cardSize,
   cardAspect,
   cardShape,
   cardGap,
   showLabel,
   showHover,
+  showCardFrame,
   mobileColumns,
   desktopColumns,
   urlPrefix = '',
@@ -29,16 +33,12 @@ export default function ModernCategoryGrid({
   if (categories.length === 0) {
     return null;
   }
-  const displayTitle = isRtl ? (titleAr ?? title) : (title ?? titleAr);
-  const displayKicker = isRtl ? (kickerAr ?? kicker) : (kicker ?? kickerAr);
-  const displaySubtitle = isRtl ? (subtitleAr ?? subtitle) : (subtitle ?? subtitleAr);
 
   // Honor the merchant's admin-picked desktop + mobile column counts.
   // Previously this used a count-based auto-size that ignored the admin
-  // setting (Ahmad 2026-05-16: 'Categories do not follow the Desktop
-  // columns number selected'). gridColsClass also caps mobile to
-  // min(mobileColumns, categories.length) so a 1-cat store doesn't
-  // try to render 4 cols.
+  // setting (Ahmad 2026-05-16). gridColsClass caps mobile to
+  // min(mobileColumns, categories.length) so a 1-cat store doesn't try
+  // to render 4 cols.
   const cappedDesktop = (
     desktopColumns ? Math.min(desktopColumns, Math.max(1, categories.length)) : undefined
   ) as 2 | 3 | 4 | undefined;
@@ -46,41 +46,58 @@ export default function ModernCategoryGrid({
     mobileColumns ? Math.min(mobileColumns, Math.max(1, categories.length)) : undefined
   ) as 1 | 2 | 3 | undefined;
 
+  // 2026-05-17 night: heading rendering moved to the shared SectionHeading
+  // so the editorial hairline toggles (showKickerLines / showSubtitleLines)
+  // wired through SectionTitleOverride actually apply. Previously the
+  // per-theme grid drew its own chip-style heading + the toggles were a
+  // no-op here. Pack-styles supplies the per-theme h2 styling so the
+  // title still looks modern; only kicker + subtitle chrome changes.
   return (
     <div dir={isRtl ? 'rtl' : 'ltr'} data-zone="categories">
-      {(displayKicker || displayTitle || displaySubtitle) && (
-        <div className="mb-8 sm:mb-12 flex flex-col items-center text-center gap-3">
-          {displayKicker && (
-            <span className="inline-flex items-center rounded-full bg-primary/10 text-primary px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em]">
-              {displayKicker}
-            </span>
-          )}
-          {displayTitle && (
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground tracking-tight">
-              {displayTitle}
-            </h2>
-          )}
-          {displaySubtitle && (
-            <p className="text-sm md:text-base text-muted-foreground max-w-xl">{displaySubtitle}</p>
-          )}
-        </div>
-      )}
+      <SectionHeading
+        title={title}
+        titleAr={titleAr}
+        kicker={kicker}
+        kickerAr={kickerAr}
+        subtitle={subtitle}
+        subtitleAr={subtitleAr}
+        showKickerLines={showKickerLines}
+        showSubtitleLines={showSubtitleLines}
+        isRtl={isRtl}
+        pack="modern"
+      />
       <div
         className={`grid ${gridGapClass(cardGap)} ${gridColsClass(cappedMobile, cappedDesktop)}`}
       >
-        {categories.map(category => (
-          <CategoryCard
-            cardSize={cardSize}
-            cardAspect={cardAspect}
-            cardShape={cardShape}
-            showLabel={showLabel}
-            showHover={showHover}
-            key={category.id}
-            category={category}
-            isRtl={isRtl}
-            urlPrefix={urlPrefix}
-          />
-        ))}
+        {categories.map(category => {
+          const frame = cardFrameClass(showCardFrame);
+          return frame ? (
+            <div key={category.id} className={frame}>
+              <CategoryCard
+                cardSize={cardSize}
+                cardAspect={cardAspect}
+                cardShape={cardShape}
+                showLabel={showLabel}
+                showHover={showHover}
+                category={category}
+                isRtl={isRtl}
+                urlPrefix={urlPrefix}
+              />
+            </div>
+          ) : (
+            <CategoryCard
+              cardSize={cardSize}
+              cardAspect={cardAspect}
+              cardShape={cardShape}
+              showLabel={showLabel}
+              showHover={showHover}
+              key={category.id}
+              category={category}
+              isRtl={isRtl}
+              urlPrefix={urlPrefix}
+            />
+          );
+        })}
       </div>
     </div>
   );

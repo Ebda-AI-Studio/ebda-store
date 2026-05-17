@@ -28,7 +28,9 @@ export function HeroBanner({
   isRtl,
   pack,
   priority = true,
+  presentation = 'full-bleed',
 }: HeroBannerProps) {
+  const isFramed = presentation === 'framed';
   const desktopSrc = (isRtl && imageAr) || image;
   // Mobile-specific source falls back to the desktop image when not set.
   const dedicatedMobileSrc = (isRtl && imageMobileAr) || imageMobile;
@@ -52,11 +54,22 @@ export function HeroBanner({
   const showOverlay = !!(text || subtitleText || cta);
   const styles = getPackStyles(pack);
 
-  return (
-    <section
-      className={`relative w-full overflow-hidden bg-muted ${mobileAspectClass} sm:aspect-[1920/700]`}
-      dir={isRtl ? 'rtl' : 'ltr'}
-    >
+  // Framed mode (Ahmad 2026-05-17 night): merchant uploaded an image
+  // they want shown in FULL without crop. Sit the hero inside a
+  // max-w-7xl container with horizontal padding + rounded-2xl frame +
+  // neutral bg, render image with object-contain so the whole asset
+  // displays (may letterbox at the sides on portrait-ish sources).
+  // Full-bleed mode (default, pre-existing behavior): edge-to-edge,
+  // object-cover. Both modes share the same aspect ratio wrappers.
+  const containerClass = isFramed
+    ? 'relative w-full overflow-hidden rounded-2xl bg-muted ' +
+      mobileAspectClass +
+      ' sm:aspect-[1920/700]'
+    : 'relative w-full overflow-hidden bg-muted ' + mobileAspectClass + ' sm:aspect-[1920/700]';
+  const imageObjectClass = isFramed ? 'object-contain' : 'object-cover';
+
+  const heroSection = (
+    <section className={containerClass} dir={isRtl ? 'rtl' : 'ltr'}>
       {desktopSrc && (
         <picture>
           <source media="(max-width: 639px)" srcSet={mobileSrc} />
@@ -67,15 +80,15 @@ export function HeroBanner({
             priority={priority}
             loading={priority ? undefined : 'lazy'}
             sizes="100vw"
-            // Back to object-cover after backend auto-resize landed (commit
-            // b463fed). New uploads through the admin are now resized to the
-            // exact container aspect (3:2 mobile / 2.4:1 desktop) via sharp
-            // before saving to R2, so object-cover trims zero pixels for
-            // any post-auto-resize upload. For images uploaded BEFORE the
-            // auto-resize feature (legacy R2 assets), object-cover will
-            // crop slightly — merchants can re-upload via admin → hero
-            // page to get edge-to-edge perfect fit.
-            className="object-cover"
+            // object-cover (full-bleed): backend auto-resize lands every new
+            // upload at the exact container aspect (3:2 mobile / 1920×700
+            // desktop) via sharp before R2, so cover trims zero pixels for
+            // post-auto-resize uploads. Pre-feature legacy assets may crop
+            // slightly.
+            // object-contain (framed): whole image displays inside the
+            // container, letterbox bars fill with the neutral bg above.
+            // Pick by `presentation` prop / merchant admin toggle.
+            className={imageObjectClass}
           />
         </picture>
       )}
@@ -99,5 +112,11 @@ export function HeroBanner({
         </div>
       )}
     </section>
+  );
+
+  return isFramed ? (
+    <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-6">{heroSection}</div>
+  ) : (
+    heroSection
   );
 }

@@ -288,6 +288,17 @@ export interface HeroBannerProps {
    * for non-active slides so we don't burn the priority budget on 6 images.
    */
   priority?: boolean;
+  /**
+   * Presentation mode:
+   *   - `'full-bleed'` (default) — section spans 100vw, image fills via
+   *     object-cover (may crop if image aspect ≠ container aspect).
+   *   - `'framed'` — section sits inside a max-w-7xl container with
+   *     horizontal padding + rounded-2xl + neutral bg, image renders with
+   *     object-contain (whole image always shows, may letterbox).
+   * Merchants pick via Admin → Layout → Hero. Default preserves the
+   * existing edge-to-edge look for stores that already shipped that way.
+   */
+  presentation?: 'full-bleed' | 'framed';
 }
 
 /**
@@ -301,6 +312,8 @@ export interface HeroSliderProps {
   autoplayMs?: number;
   isRtl?: boolean;
   pack?: import('@force/shared').TemplateId;
+  /** See HeroBannerProps.presentation — same semantics, applies to every slide. */
+  presentation?: 'full-bleed' | 'framed';
 }
 
 /**
@@ -338,6 +351,8 @@ export interface ProductCarouselProps {
   cardGap?: import('@force/shared').CardGap;
   showLabel?: boolean;
   showHover?: boolean;
+  /** Wrap each card in a rounded-2xl bg-card border + shadow frame. Default false. */
+  showCardFrame?: boolean;
 }
 
 /**
@@ -370,6 +385,8 @@ export interface CategoryStripProps {
   cardGap?: import('@force/shared').CardGap;
   showLabel?: boolean;
   showHover?: boolean;
+  /** Wrap each card in a rounded-2xl bg-card border + shadow frame. Default false. */
+  showCardFrame?: boolean;
 }
 
 /**
@@ -496,6 +513,8 @@ export interface CategoryGridProps {
   showLabel?: boolean;
   /** Enable hover/zoom (default true). */
   showHover?: boolean;
+  /** Wrap each card in a rounded-2xl bg-card border + shadow frame. Default false. */
+  showCardFrame?: boolean;
   /** Merchant-picked column counts from admin Layout page. */
   mobileColumns?: 1 | 2 | 3;
   desktopColumns?: 2 | 3 | 4;

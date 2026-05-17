@@ -418,6 +418,11 @@ export default function StoreLayoutPage() {
                     checked={layout.categories.showHover !== false}
                     onChange={v => updateSection('categories', s => ({ ...s, showHover: v }))}
                   />
+                  <RowToggle
+                    label="Show frame around each card"
+                    checked={!!layout.categories.showCardFrame}
+                    onChange={v => updateSection('categories', s => ({ ...s, showCardFrame: v }))}
+                  />
                 </div>
                 <TypographyJumpLinks
                   storeId={storeId}
@@ -704,6 +709,7 @@ type CardControlsValues = {
   cardGap?: 'tight' | 'normal' | 'loose' | 'xloose';
   showLabel?: boolean;
   showHover?: boolean;
+  showCardFrame?: boolean;
 };
 
 function ProductCardControls({
@@ -786,6 +792,11 @@ function ProductCardControls({
         label="Hover effects"
         checked={values.showHover !== false}
         onChange={v => onChange({ showHover: v })}
+      />
+      <RowToggle
+        label="Show frame around each card"
+        checked={!!values.showCardFrame}
+        onChange={v => onChange({ showCardFrame: v })}
       />
     </div>
   );

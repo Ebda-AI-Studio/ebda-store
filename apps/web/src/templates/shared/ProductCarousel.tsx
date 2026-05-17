@@ -5,7 +5,13 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { SectionHeading } from './SectionHeading';
 import { getPackStyles } from './pack-styles';
-import { cardAspectClass, cardShapeClasses, gridGapClass, productSizeClass } from './card-size';
+import {
+  cardAspectClass,
+  cardFrameClass,
+  cardShapeClasses,
+  gridGapClass,
+  productSizeClass,
+} from './card-size';
 import { OutOfStockRibbon, isProductNew } from './ProductCardCta';
 import { BrandPill } from './BrandPill';
 import { useStore } from '../../contexts/StoreContext';
@@ -49,6 +55,7 @@ export function ProductCarousel({
   cardGap,
   showLabel = true,
   showHover = true,
+  showCardFrame,
 }: ProductCarouselProps) {
   const styles = getPackStyles(pack);
   const sizeCap = productSizeClass(cardSize);
@@ -246,7 +253,9 @@ export function ProductCarousel({
                   // at sm. Desktop max cap now driven by per-store cardSize
                   // (xs/sm/md/lg/xl) so a merchant can shrink or grow product
                   // cards without theme code changes.
-                  className={`snap-start shrink-0 w-[44vw] sm:w-[28vw] md:w-[22vw] lg:w-[19vw] xl:w-[17vw] ${sizeCap}`}
+                  // showCardFrame (opt-in) adds rounded-2xl bg-card border +
+                  // shadow around each card so they read as contained tiles.
+                  className={`snap-start shrink-0 w-[44vw] sm:w-[28vw] md:w-[22vw] lg:w-[19vw] xl:w-[17vw] ${sizeCap} ${cardFrameClass(showCardFrame)}`}
                 >
                   {/* Sprint 2 (2026-05-17): hover-scale 1.02 on the card
                       frame for the same micro-payoff PecannbeeProductCard

@@ -109,6 +109,20 @@ export function cardShapeClasses(shape: CardShape | undefined): {
 }
 
 /**
+ * Optional per-card "framed" wrapper. When the merchant turns on
+ * `showCardFrame` in admin, each category / product card sits inside a
+ * rounded-2xl + bg-card + subtle shadow frame. Returns `''` when off so
+ * the wrapper renders as a no-op div (template stays the same). Used by
+ * CategoryStrip, per-theme CategoryGrid, and ProductCarousel. Added
+ * 2026-05-17 night (Ahmad: "opt-in frames around categories + products").
+ */
+export function cardFrameClass(on: boolean | undefined): string {
+  return on
+    ? 'rounded-2xl border border-border bg-card p-3 shadow-sm transition-shadow duration-300 hover:shadow-md'
+    : '';
+}
+
+/**
  * Card aspect override. Returns '' when set to 'theme' so the theme's
  * own default applies; returns an explicit `aspect-*` class otherwise.
  */

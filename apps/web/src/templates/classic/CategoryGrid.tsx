@@ -2,10 +2,14 @@
 
 import type { CategoryGridProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { gridColsClass, gridGapClass } from '../shared/card-size';
-import { getDisplayTitle } from '../shared';
+import { cardFrameClass, gridColsClass, gridGapClass } from '../shared/card-size';
+import { SectionHeading } from '../shared/SectionHeading';
 import CategoryCard from './CategoryCard';
 
+// 2026-05-17 night: heading rendering moved to the shared SectionHeading
+// so the editorial hairline toggles (showKickerLines / showSubtitleLines)
+// wired through SectionTitleOverride actually apply. Pack='classic' picks
+// serif title + serif tracked kicker styling from pack-styles.
 export default function ClassicCategoryGrid({
   categories,
   isRtl: isRtlProp,
@@ -15,64 +19,70 @@ export default function ClassicCategoryGrid({
   kickerAr,
   subtitle,
   subtitleAr,
+  showKickerLines,
+  showSubtitleLines,
   cardSize,
   cardAspect,
   cardShape,
   cardGap,
   showLabel,
   showHover,
+  showCardFrame,
   mobileColumns,
   desktopColumns,
   urlPrefix = '',
 }: CategoryGridProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
-  const displayTitle = getDisplayTitle(isRtl, title, titleAr);
-  const displayKicker = isRtl ? (kickerAr ?? kicker) : (kicker ?? kickerAr);
-  const displaySubtitle = isRtl ? (subtitleAr ?? subtitle) : (subtitle ?? subtitleAr);
 
   return (
     <section dir={isRtl ? 'rtl' : 'ltr'} data-zone="categories">
       <div className="container mx-auto px-4">
-        {(displayKicker || displayTitle || displaySubtitle) && (
-          <div className="text-center mb-10 md:mb-14 flex flex-col items-center gap-3">
-            {displayKicker && (
-              <span className="inline-flex items-center rounded-none bg-foreground text-background px-3 py-1 font-serif text-[10px] uppercase tracking-[0.3em]">
-                {displayKicker}
-              </span>
-            )}
-            <div className="w-12 h-px bg-border" />
-            {displayTitle && (
-              <h2 className="text-2xl md:text-3xl lg:text-4xl font-serif font-normal text-foreground">
-                {displayTitle}
-              </h2>
-            )}
-            {displaySubtitle && (
-              <p className="font-serif text-sm md:text-base text-muted-foreground max-w-xl">
-                {displaySubtitle}
-              </p>
-            )}
-            <div className="w-12 h-px bg-border" />
-          </div>
-        )}
-
+        <SectionHeading
+          title={title}
+          titleAr={titleAr}
+          kicker={kicker}
+          kickerAr={kickerAr}
+          subtitle={subtitle}
+          subtitleAr={subtitleAr}
+          showKickerLines={showKickerLines}
+          showSubtitleLines={showSubtitleLines}
+          isRtl={isRtl}
+          pack="classic"
+        />
         {/* Grid - 4 columns on desktop for elegant spacing */}
         <div
           className={`grid ${gridGapClass(cardGap)} ${gridColsClass(mobileColumns, desktopColumns)}`}
         >
-          {categories.map(category => (
-            <CategoryCard
-              cardSize={cardSize}
-              cardAspect={cardAspect}
-              cardShape={cardShape}
-              showLabel={showLabel}
-              showHover={showHover}
-              key={category.id}
-              category={category}
-              isRtl={isRtl}
-              urlPrefix={urlPrefix}
-            />
-          ))}
+          {categories.map(category => {
+            const frame = cardFrameClass(showCardFrame);
+            return frame ? (
+              <div key={category.id} className={frame}>
+                <CategoryCard
+                  cardSize={cardSize}
+                  cardAspect={cardAspect}
+                  cardShape={cardShape}
+                  showLabel={showLabel}
+                  showHover={showHover}
+                  category={category}
+                  isRtl={isRtl}
+                  urlPrefix={urlPrefix}
+                />
+              </div>
+            ) : (
+              <CategoryCard
+                cardSize={cardSize}
+                cardAspect={cardAspect}
+                cardShape={cardShape}
+                showLabel={showLabel}
+                showHover={showHover}
+                key={category.id}
+                category={category}
+                isRtl={isRtl}
+                urlPrefix={urlPrefix}
+              />
+            );
+          })}
         </div>
       </div>
     </section>
