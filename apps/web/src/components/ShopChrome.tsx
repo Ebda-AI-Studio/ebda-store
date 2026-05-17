@@ -198,7 +198,13 @@ export function ShopChrome({ children }: { children: ReactNode }) {
   const urlPrefix = storeUrl('');
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    // pb-20 on mobile reserves 80px at the very bottom of the document so
+    // the fixed BottomTabBar (56px + safe-area-inset) doesn't cover the
+    // footer's last rows (Powered by Force AI credit + cookie preferences
+    // link + payment icons). Lives on the OUTER container — previous fix
+    // on <main> alone wasn't enough because footer + afterFooter sit
+    // OUTSIDE main, so they still got clipped. Desktop has no tab bar.
+    <div className="flex min-h-screen flex-col bg-background pb-20 md:pb-0">
       {/* `data-zone` wrappers let the per-store typography rules in
           apps/web/src/app/layout.tsx target each storefront zone
           without having to rewrite the templates' internal markup.
@@ -229,11 +235,7 @@ export function ShopChrome({ children }: { children: ReactNode }) {
           utilityBar={utilityBar}
         />
       </header>
-      <main role="main" className="flex-1 pb-20 md:pb-0">
-        {/* pb-20 reserves 80px at the bottom on mobile so the BottomTabBar
-            (fixed 56px + safe-area-inset) doesn't cover the last rows of
-            the footer (Powered by Force AI + cookie consent link).
-            Desktop has no bar — no reserve needed. Ahmad 2026-05-17. */}
+      <main role="main" className="flex-1">
         {children}
       </main>
       <footer role="contentinfo" data-zone="footer">

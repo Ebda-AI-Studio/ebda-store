@@ -23,6 +23,15 @@ export function SectionDivider() {
   };
   if (!settings.enabled) return null;
 
+  // Mutual exclusion with backgroundPreset (Ahmad 2026-05-17 evening):
+  // both systems separate sections visually — running them together is
+  // unpleasant double-separation. When the merchant picked a bg preset,
+  // the alternation IS the divider; render no <hr>. Dividers only paint
+  // when bg preset is `none` (or unset), so flat-bg stores still get a
+  // visible separator.
+  const bgPreset = store.theme?.backgroundPreset ?? 'none';
+  if (bgPreset !== 'none') return null;
+
   // Color resolution — single source of truth so the admin live preview
   // and the storefront render stay in lockstep.
   const colorCss = resolveDividerColor(settings, store.theme?.primaryColor);
