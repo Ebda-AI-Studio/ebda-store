@@ -117,7 +117,12 @@ function PecannbeeProductCardImpl({
         prefetch={false}
         className="group/img block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       >
-        <div className="relative aspect-square overflow-hidden bg-muted">
+        {/* Image: mobile 1:1 (square reads cleaner in tight 2-up grids),
+            desktop 3:4 portrait per design.md canonical product image
+            size 600×800. PecannbeeProductCard is the PLP / search /
+            category-listing card; per-store cardAspect on the homepage
+            carousels lives on theme-specific ProductCards instead. */}
+        <div className="relative aspect-square sm:aspect-[3/4] overflow-hidden bg-muted">
           {img ? (
             <>
               <Image

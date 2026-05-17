@@ -35,13 +35,16 @@ export function HeroBanner({
   const mobileSrc = dedicatedMobileSrc || desktopSrc;
   // Mobile aspect tracks what the merchant actually uploaded:
   //   - dedicated mobile image present → 3:4 portrait (matches the admin
-  //     ImageUpload's aspectRatio="3/4" + server-side sharp resize). Using
-  //     a landscape wrapper here crops the top of the image — verified
+  //     ImageUpload's aspectRatio="3/4" + server-side sharp resize, +
+  //     the design.md canonical mobile hero size 800×1067). Using a
+  //     landscape wrapper crops the top of a portrait image — verified
   //     2026-05-17 with wadyaljuz's olive-jar banner where the title
   //     "من الوادي إلى الأيادي" was being cut off at the top.
-  //   - only desktop image present → 3:2 landscape so the wide cinematic
-  //     crop renders sensibly on mobile without huge letterbox bars.
-  // Desktop stays at 2.4:1 either way.
+  //   - only desktop image present → 3:2 landscape fallback so the wide
+  //     cinematic crop renders sensibly on mobile without huge letterbox
+  //     bars. Forcing 3:4 on a landscape source would over-crop the sides.
+  // Desktop aspect matches the design.md canonical hero size 1920×700
+  // (zFloos brief) — slightly wider than the previous 2.4:1 (1920×800).
   const mobileAspectClass = dedicatedMobileSrc ? 'aspect-[3/4]' : 'aspect-[3/2]';
   const text = isRtl ? (headlineAr ?? headline) : (headline ?? headlineAr);
   const subtitleText = isRtl ? (subtitleAr ?? subtitle) : (subtitle ?? subtitleAr);
@@ -51,7 +54,7 @@ export function HeroBanner({
 
   return (
     <section
-      className={`relative w-full overflow-hidden bg-muted ${mobileAspectClass} sm:aspect-[2.4/1]`}
+      className={`relative w-full overflow-hidden bg-muted ${mobileAspectClass} sm:aspect-[1920/700]`}
       dir={isRtl ? 'rtl' : 'ltr'}
     >
       {desktopSrc && (

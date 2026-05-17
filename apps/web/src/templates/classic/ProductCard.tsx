@@ -56,8 +56,10 @@ function ClassicProductCard({
         prefetch={false}
         className="group block cursor-pointer"
       >
-        {/* Image container — aspect-square, clean border */}
-        <div className="relative aspect-square overflow-hidden bg-muted border border-border group-hover:border-foreground/35 group-hover:shadow-[0_18px_36px_-22px_hsl(var(--foreground)/0.20)] transition-all duration-500 ease-out mb-3">
+        {/* Image container — mobile 1:1 (square reads better in 2-up
+            grocery grids), desktop 3:4 portrait (per design.md canonical
+            product image 600×800). Clean border. */}
+        <div className="relative aspect-square sm:aspect-[3/4] overflow-hidden bg-muted border border-border group-hover:border-foreground/35 group-hover:shadow-[0_18px_36px_-22px_hsl(var(--foreground)/0.20)] transition-all duration-500 ease-out mb-3">
           {onToggleCompare && (
             <CompareButton
               productId={product.id}
