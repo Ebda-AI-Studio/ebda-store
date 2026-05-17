@@ -100,7 +100,10 @@ export default function ModernFooter({
           : 'lg:grid-cols-3';
 
   return (
-    <footer className="bg-gray-900 text-gray-300 mt-auto" dir={isRtl ? 'rtl' : 'ltr'}>
+    <footer
+      className="bg-[hsl(var(--bg-section-alt))] text-foreground/75 mt-auto"
+      dir={isRtl ? 'rtl' : 'ltr'}
+    >
       <div className="container mx-auto px-4 py-16 lg:py-20">
         <div className={`grid grid-cols-1 md:grid-cols-2 ${lgColsClass} gap-10 lg:gap-12`}>
           {/* Brand Column */}
@@ -109,13 +112,13 @@ export default function ModernFooter({
               <img
                 src={displayLogo}
                 alt={displayName}
-                className="h-16 sm:h-20 w-auto object-contain brightness-0 invert"
+                className="h-16 sm:h-20 w-auto object-contain"
               />
             ) : (
-              <h3 className="text-xl font-bold text-white">{displayName}</h3>
+              <h3 className="text-xl font-bold text-foreground">{displayName}</h3>
             )}
             {displayDescription && (
-              <p className="text-gray-400 text-sm leading-relaxed">{displayDescription}</p>
+              <p className="text-foreground/60 text-sm leading-relaxed">{displayDescription}</p>
             )}
 
             {/* Social Icons */}
@@ -127,11 +130,11 @@ export default function ModernFooter({
                     href={url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-9 h-9 bg-white/10 hover:bg-primary rounded-lg flex items-center justify-center transition-colors duration-300 ease-out cursor-pointer"
+                    className="w-9 h-9 bg-foreground/10 hover:bg-primary rounded-lg flex items-center justify-center transition-colors duration-300 ease-out cursor-pointer"
                     aria-label={key}
                   >
                     <svg
-                      className="w-4 h-4 text-gray-300 hover:text-white"
+                      className="w-4 h-4 text-foreground/75 hover:text-foreground"
                       fill="currentColor"
                       viewBox="0 0 24 24"
                       aria-hidden="true"
@@ -149,7 +152,7 @@ export default function ModernFooter({
           {footerSections.length > 0 ? (
             footerSections.map(section => (
               <div key={section.key} className="space-y-4">
-                <h4 className="text-xs font-bold text-white uppercase tracking-[0.18em]">
+                <h4 className="text-xs font-bold text-foreground uppercase tracking-[0.18em]">
                   {section.heading}
                 </h4>
                 <ul className="space-y-2.5">
@@ -157,7 +160,7 @@ export default function ModernFooter({
                     <li key={link.href}>
                       <Link
                         href={link.href}
-                        className="text-sm text-gray-400 hover:text-white transition-colors duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                        className="text-sm text-foreground/60 hover:text-foreground transition-colors duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                       >
                         {link.label}
                       </Link>
@@ -168,7 +171,7 @@ export default function ModernFooter({
             ))
           ) : (
             <div className="space-y-4">
-              <h4 className="text-xs font-bold text-white uppercase tracking-[0.18em]">
+              <h4 className="text-xs font-bold text-foreground uppercase tracking-[0.18em]">
                 {isRtl ? 'الروابط' : 'Links'}
               </h4>
               <ul className="space-y-2.5">
@@ -176,7 +179,7 @@ export default function ModernFooter({
                   <li key={item.href}>
                     <Link
                       href={item.href}
-                      className="text-sm text-gray-400 hover:text-white transition-colors duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                      className="text-sm text-foreground/60 hover:text-foreground transition-colors duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                     >
                       {isRtl && item.labelAr ? item.labelAr : item.label}
                     </Link>
@@ -190,7 +193,7 @@ export default function ModernFooter({
               Empty section with just a heading looks unfinished. */}
           {hasContact && (
             <div className="space-y-4">
-              <h4 className="text-xs font-bold text-white uppercase tracking-[0.18em]">
+              <h4 className="text-xs font-bold text-foreground uppercase tracking-[0.18em]">
                 {isRtl ? 'تواصل معنا' : 'Contact'}
               </h4>
               <ul className="space-y-3">
@@ -198,10 +201,10 @@ export default function ModernFooter({
                   <li>
                     <a
                       href={`mailto:${contact.email}`}
-                      className="flex items-center gap-3 text-sm text-gray-400 hover:text-white transition-colors duration-300 ease-out"
+                      className="flex items-center gap-3 text-sm text-foreground/60 hover:text-foreground transition-colors duration-300 ease-out"
                     >
                       <svg
-                        className="w-4 h-4 shrink-0 text-gray-500"
+                        className="w-4 h-4 shrink-0 text-foreground/55"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -222,11 +225,11 @@ export default function ModernFooter({
                   <li>
                     <a
                       href={`tel:${contact.phone}`}
-                      className="flex items-center gap-3 text-sm text-gray-400 hover:text-white transition-colors duration-300 ease-out"
+                      className="flex items-center gap-3 text-sm text-foreground/60 hover:text-foreground transition-colors duration-300 ease-out"
                       dir="ltr"
                     >
                       <svg
-                        className="w-4 h-4 shrink-0 text-gray-500"
+                        className="w-4 h-4 shrink-0 text-foreground/55"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -249,7 +252,7 @@ export default function ModernFooter({
                   (() => {
                     const mapIcon = (
                       <svg
-                        className="w-4 h-4 mt-0.5 shrink-0 text-gray-500"
+                        className="w-4 h-4 mt-0.5 shrink-0 text-foreground/55"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -275,14 +278,14 @@ export default function ModernFooter({
                           href={addressMapHref}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-start gap-3 text-sm text-gray-400 hover:text-white transition-colors duration-300 ease-out"
+                          className="flex items-start gap-3 text-sm text-foreground/60 hover:text-foreground transition-colors duration-300 ease-out"
                         >
                           {mapIcon}
                           {displayAddress}
                         </a>
                       </li>
                     ) : (
-                      <li className="flex items-start gap-3 text-sm text-gray-400">
+                      <li className="flex items-start gap-3 text-sm text-foreground/60">
                         {mapIcon}
                         {displayAddress}
                       </li>
@@ -295,13 +298,13 @@ export default function ModernFooter({
           {/* Newsletter — hidden when the store explicitly opts out. */}
           {showNewsletter && (
             <div className="space-y-4">
-              <h4 className="text-xs font-bold text-white uppercase tracking-[0.18em]">
+              <h4 className="text-xs font-bold text-foreground uppercase tracking-[0.18em]">
                 {isRtl ? 'النشرة الإخبارية' : 'Newsletter'}
               </h4>
               {/* Body line — render store description when set; previously
                   was hardcoded demo copy. */}
               {displayDescription && (
-                <p className="text-sm text-gray-400 leading-relaxed">{displayDescription}</p>
+                <p className="text-sm text-foreground/60 leading-relaxed">{displayDescription}</p>
               )}
               {subscribed ? (
                 <p className="text-sm text-primary font-medium">
@@ -315,7 +318,7 @@ export default function ModernFooter({
                     onChange={e => setEmail(e.target.value)}
                     placeholder={isRtl ? 'البريد الإلكتروني' : 'Email address'}
                     aria-label={isRtl ? 'البريد الإلكتروني' : 'Email address'}
-                    className="w-full px-4 py-2.5 bg-white/10 rounded-lg border border-white/10 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 text-sm text-white placeholder:text-gray-500 transition-colors duration-300 ease-out"
+                    className="w-full px-4 py-2.5 bg-foreground/10 rounded-lg border border-white/10 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 text-sm text-foreground placeholder:text-foreground/55 transition-colors duration-300 ease-out"
                     dir={isRtl ? 'rtl' : 'ltr'}
                     required
                     disabled={submitting}
@@ -348,12 +351,12 @@ export default function ModernFooter({
             The whole bar can be hidden via `footerLinks.bottomBar.enabled`. */}
         {bottomBar.enabled && (
           <div className="mt-12 pt-6 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-4">
-            <p className="text-xs text-gray-500">{bottomBar.copyright}</p>
+            <p className="text-xs text-foreground/55">{bottomBar.copyright}</p>
             <div className="flex items-center gap-5">
               {bottomBar.privacyEnabled && (
                 <Link
                   href={`${urlPrefix}/privacy`}
-                  className="text-xs text-gray-500 hover:text-gray-300 transition-colors duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                  className="text-xs text-foreground/55 hover:text-foreground/75 transition-colors duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                 >
                   {isRtl ? 'سياسة الخصوصية' : 'Privacy Policy'}
                 </Link>
@@ -361,7 +364,7 @@ export default function ModernFooter({
               {bottomBar.termsEnabled && (
                 <Link
                   href={`${urlPrefix}/terms`}
-                  className="text-xs text-gray-500 hover:text-gray-300 transition-colors duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                  className="text-xs text-foreground/55 hover:text-foreground/75 transition-colors duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                 >
                   {isRtl ? 'الشروط والأحكام' : 'Terms & Conditions'}
                 </Link>
@@ -369,7 +372,7 @@ export default function ModernFooter({
               {bottomBar.shippingEnabled && (
                 <Link
                   href={`${urlPrefix}/shipping`}
-                  className="text-xs text-gray-500 hover:text-gray-300 transition-colors duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                  className="text-xs text-foreground/55 hover:text-foreground/75 transition-colors duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                 >
                   {isRtl ? 'الشحن' : 'Shipping'}
                 </Link>

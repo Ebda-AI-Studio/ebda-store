@@ -10,6 +10,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { getPackStyles } from './pack-styles';
 import { productCardPropsEqual } from './product-card-memo';
 import { TaxInclusiveLabel } from './tax-inclusive-label';
+import { OutOfStockRibbon, isProductNew } from './ProductCardCta';
 
 interface PecannbeeProductCardProps extends ProductCardProps {
   pack?: TemplateId;
@@ -92,13 +93,19 @@ function PecannbeeProductCardImpl({
     }
   };
 
+  const showNewBadge = inStock && isProductNew(product);
+
   return (
     <article
       // max-w cap on desktop so product cards in a 4-col grid don't
       // balloon to 300+px each. Mobile (2 cols, narrow viewport) doesn't
       // hit the cap. Ahmad 2026-05-16 'products as well' after the
       // category cap landed.
-      className={`flex flex-col overflow-hidden w-full md:max-w-[200px] mx-auto ${styles.card}`}
+      // Sprint 2 (2026-05-17): hover-scale 1.02 + slow shadow lift for
+      // a micro-payoff on desktop — addresses the friend complaint
+      // 'product cards are static'. Mobile loses nothing (no hover state
+      // to trigger). `group` enables the inner image scale below.
+      className={`group flex flex-col overflow-hidden w-full md:max-w-[200px] mx-auto transition-all duration-500 ease-out md:hover:scale-[1.02] md:hover:shadow-[0_20px_40px_-20px_hsl(var(--foreground)/0.18)] ${styles.card}`}
       dir={isRtl ? 'rtl' : 'ltr'}
       itemScope
       itemType="https://schema.org/Product"
@@ -177,17 +184,23 @@ function PecannbeeProductCardImpl({
             </svg>
           </button>
 
-          {/* Sold-out RED ribbon top-START (RTL right, LTR left) — pecannbee-
-              style high-visibility marker. Customer sees status at a glance
-              while scrolling, before parsing the dimmed button below. */}
-          {!inStock && (
-            <span className="absolute top-3 start-3 rounded-md bg-red-600 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-white shadow-[0_8px_20px_-8px_rgb(220_38_38_/_0.5)]">
-              {isRtl ? 'نفدت الكمية' : 'Out Of Stock'}
+          {/* Sprint 2 (2026-05-17): replaced the inline OOS pill with the
+              shared OutOfStockRibbon component — proper diagonal corner
+              ribbon at -45°, consumed by all 5 themes already. NEW
+              orange badge added below it (top-START) when product is
+              flagged new OR was created in the last 14 days. */}
+          <OutOfStockRibbon inStock={inStock} isRtl={isRtl} />
+          {showNewBadge && (
+            <span
+              className="absolute top-3 start-3 z-10 rounded-full bg-[hsl(var(--primary))] px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-[hsl(var(--primary-foreground))] shadow-[0_6px_14px_-6px_hsl(var(--primary)/0.5)]"
+              aria-label={isRtl ? 'منتج جديد' : 'New product'}
+            >
+              {isRtl ? 'جديد' : 'NEW'}
             </span>
           )}
           {/* Sale chip top-END when in stock */}
           {inStock && onSale && (
-            <span className="absolute top-3 end-3 rounded-full bg-foreground/90 px-2.5 py-1 text-[11px] font-semibold tracking-wide text-background shadow-[0_8px_20px_-8px_hsl(var(--foreground)/0.35)]">
+            <span className="absolute top-3 end-3 z-10 rounded-full bg-foreground/90 px-2.5 py-1 text-[11px] font-semibold tracking-wide text-background shadow-[0_8px_20px_-8px_hsl(var(--foreground)/0.35)]">
               -{discountPct}%
             </span>
           )}

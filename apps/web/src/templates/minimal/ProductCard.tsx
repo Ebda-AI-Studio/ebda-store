@@ -10,7 +10,7 @@ import { Price } from '@force/ui';
 import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
 import { productCardPropsEqual } from '../shared/product-card-memo';
 import { getProductPricing } from '../../lib/product-pricing';
-import { OutOfStockRibbon, ProductCardCta } from '../shared/ProductCardCta';
+import { OutOfStockRibbon, ProductCardCta, isProductNew } from '../shared/ProductCardCta';
 import { cn } from '@force/ui';
 
 /**
@@ -60,6 +60,19 @@ function MinimalProductCard({
               elsewhere, but the OOS state needs unambiguous communication
               regardless of pack philosophy (2026-05-16). */}
           <OutOfStockRibbon inStock={product.inStock !== false} isRtl={isRtl} />
+          {/* Sprint 2 (2026-05-17): NEW badge in minimal kept extra-quiet
+              (no shadow, tight padding, primary color via theme token)
+              so it doesn't violate the chrome-free identity but still
+              flags fresh inventory. Hides under OOS via isProductNew
+              implicit gating in caller order. */}
+          {product.inStock !== false && isProductNew(product) && (
+            <span
+              className="absolute top-2 start-2 z-10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.18em] text-[hsl(var(--primary))] bg-background"
+              aria-label={isRtl ? 'منتج جديد' : 'New product'}
+            >
+              {isRtl ? 'جديد' : 'NEW'}
+            </span>
+          )}
           {onToggleCompare && (
             <CompareButton
               productId={product.id}

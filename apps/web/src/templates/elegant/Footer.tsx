@@ -80,7 +80,10 @@ export default function ElegantFooter({
   );
 
   return (
-    <footer className="bg-muted border-t border-border mt-auto" dir={isRtl ? 'rtl' : 'ltr'}>
+    <footer
+      className="bg-[hsl(var(--bg-section-alt))] border-t border-border mt-auto"
+      dir={isRtl ? 'rtl' : 'ltr'}
+    >
       {/* Newsletter — hidden when the store explicitly opts out. */}
       {showNewsletter && (
         <div className="border-b border-border/50">

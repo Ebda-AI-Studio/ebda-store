@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { SectionHeading } from './SectionHeading';
 import { getPackStyles } from './pack-styles';
 import { cardAspectClass, cardShapeClasses, gridGapClass, productSizeClass } from './card-size';
-import { OutOfStockRibbon } from './ProductCardCta';
+import { OutOfStockRibbon, isProductNew } from './ProductCardCta';
 import { getProductCardTextSizes } from '@force/shared';
 import type { ProductCarouselProps } from '../types';
 
@@ -216,6 +216,7 @@ export function ProductCarousel({
               // and disable the cart button.
               const hasVariants = !!product.variants && product.variants.length > 0;
               const inStock = product.inStock !== false;
+              const showNewBadge = inStock && isProductNew(product);
 
               return (
                 <li
@@ -228,7 +229,12 @@ export function ProductCarousel({
                   // cards without theme code changes.
                   className={`snap-start shrink-0 w-[44vw] sm:w-[28vw] md:w-[22vw] lg:w-[19vw] xl:w-[17vw] ${sizeCap}`}
                 >
-                  <div className={`overflow-hidden ${shape.radius} ${styles.card}`}>
+                  {/* Sprint 2 (2026-05-17): hover-scale 1.02 on the card
+                      frame for the same micro-payoff PecannbeeProductCard
+                      now uses. Mobile loses nothing (no hover state). */}
+                  <div
+                    className={`overflow-hidden transition-all duration-500 ease-out md:hover:scale-[1.02] md:hover:shadow-[0_20px_40px_-20px_hsl(var(--foreground)/0.18)] ${shape.radius} ${styles.card}`}
+                  >
                     <Link
                       href={href}
                       prefetch={false}
@@ -238,6 +244,17 @@ export function ProductCarousel({
                         className={`group/img relative ${aspectCls} ${shape.radius} overflow-hidden bg-muted`}
                       >
                         <OutOfStockRibbon inStock={inStock} isRtl={isRtl} />
+                        {/* Sprint 2: NEW orange pill top-START when new OR
+                            <14 days old. Doesn't collide with OOS ribbon
+                            because OOS hides NEW (see isProductNew gate). */}
+                        {showNewBadge && (
+                          <span
+                            className="absolute top-3 start-3 z-10 rounded-full bg-[hsl(var(--primary))] px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-[hsl(var(--primary-foreground))] shadow-[0_6px_14px_-6px_hsl(var(--primary)/0.5)]"
+                            aria-label={isRtl ? 'منتج جديد' : 'New product'}
+                          >
+                            {isRtl ? 'جديد' : 'NEW'}
+                          </span>
+                        )}
                         {img ? (
                           <>
                             <Image

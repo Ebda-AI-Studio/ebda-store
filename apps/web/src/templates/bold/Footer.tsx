@@ -56,7 +56,10 @@ export default function BoldFooter({
     totalCells >= 6 ? 'lg:grid-cols-6' : totalCells === 5 ? 'lg:grid-cols-5' : 'lg:grid-cols-4';
 
   return (
-    <footer className="bg-gray-950 text-white mt-auto" dir={isRtl ? 'rtl' : 'ltr'}>
+    <footer
+      className="bg-[hsl(var(--bg-section-alt))] text-foreground mt-auto"
+      dir={isRtl ? 'rtl' : 'ltr'}
+    >
       <div className="container mx-auto px-4 py-12 sm:py-16 md:py-20">
         {/* Main grid */}
         <div
@@ -68,15 +71,15 @@ export default function BoldFooter({
               <img
                 src={displayLogo}
                 alt={displayName}
-                className="h-16 sm:h-20 w-auto object-contain mb-6 brightness-0 invert"
+                className="h-16 sm:h-20 w-auto object-contain mb-6"
               />
             ) : (
-              <h3 className="text-3xl font-black uppercase tracking-wider mb-6 text-white">
+              <h3 className="text-3xl font-black uppercase tracking-wider mb-6 text-foreground">
                 {displayName}
               </h3>
             )}
             {displayDescription && (
-              <p className="text-gray-300 text-sm leading-relaxed max-w-sm mb-8">
+              <p className="text-foreground/75 text-sm leading-relaxed max-w-sm mb-8">
                 {displayDescription}
               </p>
             )}
@@ -90,11 +93,11 @@ export default function BoldFooter({
                     href={url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-10 h-10 flex items-center justify-center bg-white/10 hover:bg-primary rounded-none transition-colors duration-200 cursor-pointer"
+                    className="w-10 h-10 flex items-center justify-center bg-foreground/10 hover:bg-primary rounded-none transition-colors duration-200 cursor-pointer"
                     aria-label={key}
                   >
                     <svg
-                      className="w-4 h-4 text-white"
+                      className="w-4 h-4 text-foreground"
                       fill="currentColor"
                       viewBox="0 0 24 24"
                       aria-hidden="true"
@@ -112,7 +115,7 @@ export default function BoldFooter({
           {footerSections.length > 0 ? (
             footerSections.map(section => (
               <div key={section.key}>
-                <h4 className="text-xs font-black uppercase tracking-[0.2em] mb-6 text-white">
+                <h4 className="text-xs font-black uppercase tracking-[0.2em] mb-6 text-foreground">
                   {section.heading}
                 </h4>
                 <ul className="space-y-3">
@@ -120,7 +123,7 @@ export default function BoldFooter({
                     <li key={link.href}>
                       <Link
                         href={link.href}
-                        className="text-sm text-gray-300 hover:text-primary transition-colors duration-200 font-medium inline-flex items-center gap-2 group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                        className="text-sm text-foreground/75 hover:text-primary transition-colors duration-200 font-medium inline-flex items-center gap-2 group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                       >
                         <span className="w-0 group-hover:w-3 h-0.5 bg-primary transition-all duration-200 shrink-0" />
                         {link.label}
@@ -132,7 +135,7 @@ export default function BoldFooter({
             ))
           ) : (
             <div>
-              <h4 className="text-xs font-black uppercase tracking-[0.2em] mb-6 text-white">
+              <h4 className="text-xs font-black uppercase tracking-[0.2em] mb-6 text-foreground">
                 {isRtl ? 'روابط سريعة' : 'Quick Links'}
               </h4>
               <ul className="space-y-3">
@@ -140,7 +143,7 @@ export default function BoldFooter({
                   <li key={item.href}>
                     <Link
                       href={item.href}
-                      className="text-sm text-gray-300 hover:text-primary transition-colors duration-200 font-medium inline-flex items-center gap-2 group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                      className="text-sm text-foreground/75 hover:text-primary transition-colors duration-200 font-medium inline-flex items-center gap-2 group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                     >
                       <span className="w-0 group-hover:w-3 h-0.5 bg-primary transition-all duration-200 shrink-0" />
                       {isRtl && item.labelAr ? item.labelAr : item.label}
@@ -155,7 +158,7 @@ export default function BoldFooter({
               hollow column. */}
           {hasContact && (
             <div>
-              <h4 className="text-xs font-black uppercase tracking-[0.2em] mb-6 text-white">
+              <h4 className="text-xs font-black uppercase tracking-[0.2em] mb-6 text-foreground">
                 {isRtl ? 'تواصل معنا' : 'Get in Touch'}
               </h4>
               <ul className="space-y-3">
@@ -163,7 +166,7 @@ export default function BoldFooter({
                   <li>
                     <a
                       href={`mailto:${contact.email}`}
-                      className="text-sm text-gray-300 hover:text-primary transition-colors duration-200 font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                      className="text-sm text-foreground/75 hover:text-primary transition-colors duration-200 font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                     >
                       {contact.email}
                     </a>
@@ -173,7 +176,7 @@ export default function BoldFooter({
                   <li>
                     <a
                       href={`tel:${contact.phone}`}
-                      className="text-sm text-gray-300 hover:text-primary transition-colors duration-200 font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                      className="text-sm text-foreground/75 hover:text-primary transition-colors duration-200 font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                       dir="ltr"
                     >
                       {displayPhone}
@@ -181,7 +184,7 @@ export default function BoldFooter({
                   </li>
                 )}
                 {displayAddress && (
-                  <li className="text-sm text-gray-300">
+                  <li className="text-sm text-foreground/75">
                     {addressMapHref ? (
                       <a
                         href={addressMapHref}
@@ -205,12 +208,12 @@ export default function BoldFooter({
             entire bar can be hidden via `footerLinks.bottomBar.enabled`. */}
         {bottomBar.enabled && (
           <div className="pt-8 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-4">
-            <p className="text-xs text-gray-400 font-medium">{bottomBar.copyright}</p>
+            <p className="text-xs text-foreground/60 font-medium">{bottomBar.copyright}</p>
             <div className="flex gap-6">
               {bottomBar.privacyEnabled && (
                 <Link
                   href={`${urlPrefix}/privacy`}
-                  className="text-xs text-gray-400 hover:text-primary transition-colors duration-200 font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                  className="text-xs text-foreground/60 hover:text-primary transition-colors duration-200 font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                 >
                   {isRtl ? 'الخصوصية' : 'Privacy'}
                 </Link>
@@ -218,7 +221,7 @@ export default function BoldFooter({
               {bottomBar.termsEnabled && (
                 <Link
                   href={`${urlPrefix}/terms`}
-                  className="text-xs text-gray-400 hover:text-primary transition-colors duration-200 font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                  className="text-xs text-foreground/60 hover:text-primary transition-colors duration-200 font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                 >
                   {isRtl ? 'الشروط' : 'Terms'}
                 </Link>
@@ -226,7 +229,7 @@ export default function BoldFooter({
               {bottomBar.shippingEnabled && (
                 <Link
                   href={`${urlPrefix}/shipping`}
-                  className="text-xs text-gray-400 hover:text-primary transition-colors duration-200 font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                  className="text-xs text-foreground/60 hover:text-primary transition-colors duration-200 font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                 >
                   {isRtl ? 'الشحن' : 'Shipping'}
                 </Link>

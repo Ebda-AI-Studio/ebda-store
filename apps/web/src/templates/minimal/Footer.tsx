@@ -48,7 +48,10 @@ export default function MinimalFooter({
   const bottomBar = resolveBottomBar(footerLinks?.bottomBar, displayName, isRtl, disabledCmsSlugs);
 
   return (
-    <footer className="bg-background mt-auto py-12 md:py-16" dir={isRtl ? 'rtl' : 'ltr'}>
+    <footer
+      className="bg-[hsl(var(--bg-section-alt))] mt-auto py-12 md:py-16"
+      dir={isRtl ? 'rtl' : 'ltr'}
+    >
       <div className="container mx-auto px-6">
         {/* Single-row layout: logo · links · copyright */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-8">

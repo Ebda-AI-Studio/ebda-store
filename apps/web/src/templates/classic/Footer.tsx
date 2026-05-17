@@ -58,7 +58,7 @@ export default function ClassicFooter({
 
   return (
     <footer
-      className="bg-gray-50 dark:bg-muted/30 border-t border-border mt-auto"
+      className="bg-[hsl(var(--bg-section-alt))] border-t border-border mt-auto"
       dir={isRtl ? 'rtl' : 'ltr'}
     >
       <div className="container mx-auto px-4 pt-16 pb-8">
