@@ -10,13 +10,17 @@ import {
   DEFAULT_THEME,
   BORDER_RADIUS_MAP,
   FONT_FAMILY_MAP,
+  resolveBackgroundPreset,
 } from '@force/shared';
 
 /**
  * Convert theme to CSS custom properties
- * Defined locally to avoid module resolution issues
+ * Defined locally to avoid module resolution issues. Mirrors the version
+ * in @force/shared/src/types/store-theme.ts — keep in sync when adding
+ * tokens.
  */
 function themeToCssVars(theme: StoreTheme): Record<string, string> {
+  const bg = resolveBackgroundPreset(theme);
   return {
     '--primary': theme.primaryColor,
     '--primary-foreground': theme.primaryForeground,
@@ -43,6 +47,9 @@ function themeToCssVars(theme: StoreTheme): Record<string, string> {
     '--warning-foreground': theme.warningForeground,
     '--radius': BORDER_RADIUS_MAP[theme.borderRadius],
     '--font-family': FONT_FAMILY_MAP[theme.fontFamily],
+    // Sprint 1 section-rhythm tokens — see shared store-theme.ts.
+    '--bg-page': bg.bgPage,
+    '--bg-section-alt': bg.bgSectionAlt,
   };
 }
 

@@ -4,6 +4,7 @@ import { useT } from '@/i18n/useT';
 import { BrandPreview } from './BrandPreview';
 import { ColorPalettePicker } from './ColorPalettePicker';
 import { TypographyPicker } from './TypographyPicker';
+import { BackgroundPresetPicker } from './BackgroundPresetPicker';
 import type { StoreBranding } from './types';
 
 interface ThemeTabProps {
@@ -37,6 +38,15 @@ export function ThemeTab({ branding, onChange }: ThemeTabProps) {
       />
 
       <TypographyPicker
+        theme={branding.theme}
+        onChange={theme => onChange({ ...branding, theme })}
+      />
+
+      {/* Sprint 1 (2026-05-17) — homepage section background preset.
+          ADDITIVE: doesn't replace or remove any existing branding
+          control. Defaults to 'none' so existing stores see no visual
+          change until they explicitly pick a preset. */}
+      <BackgroundPresetPicker
         theme={branding.theme}
         onChange={theme => onChange({ ...branding, theme })}
       />

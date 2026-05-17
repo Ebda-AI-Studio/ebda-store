@@ -7,6 +7,7 @@ import { SectionHeading } from './SectionHeading';
 import { getPackStyles } from './pack-styles';
 import { cardAspectClass, cardShapeClasses, gridGapClass, productSizeClass } from './card-size';
 import { OutOfStockRibbon } from './ProductCardCta';
+import { getProductCardTextSizes } from '@force/shared';
 import type { ProductCarouselProps } from '../types';
 
 /**
@@ -43,6 +44,11 @@ export function ProductCarousel({
 }: ProductCarouselProps) {
   const styles = getPackStyles(pack);
   const sizeCap = productSizeClass(cardSize);
+  // Sprint 1 (2026-05-17): per-cardSize text-size pair, paired with
+  // pack-styles flavor classes. Without this the previous `text-lg`
+  // names looked oversized inside `xs`/`sm` card widths and undersized
+  // inside `lg`/`xl` widths.
+  const textSizes = getProductCardTextSizes(cardSize);
   const shape = cardShapeClasses(cardShape);
   const aspectCls = shape.aspect || cardAspectClass(cardAspect) || 'aspect-square';
   const scrollRef = useRef<HTMLUListElement>(null);
@@ -296,11 +302,13 @@ export function ProductCarousel({
                           (cardless / image-only product strips). */}
                       {showLabel && (
                         <div className={`p-3 sm:p-4 space-y-2 ${styles.productCardBody ?? ''}`}>
-                          <p className={`line-clamp-2 ${styles.productCardName}`}>{name}</p>
+                          <p className={`line-clamp-2 ${textSizes.name} ${styles.productCardName}`}>
+                            {name}
+                          </p>
                           <div
                             className={`flex items-baseline gap-2 ${styles.productCardBody ? 'justify-center' : ''}`}
                           >
-                            <span className={styles.productCardPrice}>
+                            <span className={`${textSizes.price} ${styles.productCardPrice}`}>
                               {(product.price / 1000).toFixed(3)} {currency}
                             </span>
                             {onSale && product.compareAtPrice && (

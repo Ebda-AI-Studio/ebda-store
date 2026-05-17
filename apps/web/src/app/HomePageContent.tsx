@@ -166,9 +166,15 @@ export function HomePageContent({
                 hero with no awkward white gap — Ahmad 2026-05-16
                 'close the white gap between it and the hero banner'.
                 Bottom padding stays generous so the rhythm into "New
-                Arrivals" below feels balanced. */}
+                Arrivals" below feels balanced.
+                Sprint 1 (2026-05-17): bg-[hsl(var(--bg-page))] = first
+                of the alternating section-background pair. When the
+                merchant's backgroundPreset is `none`, both tokens
+                resolve to the same color and the rhythm comes from
+                padding alone; when a preset is picked, adjacent
+                sections alternate visibly. */}
             {layout.categories.enabled && templateCategories.length > 0 && (
-              <section className="pt-6 pb-14 sm:pt-8 sm:pb-16 lg:pt-10 lg:pb-20">
+              <section className="bg-[hsl(var(--bg-page))] pt-6 pb-14 sm:pt-8 sm:pb-16 lg:pt-10 lg:pb-20">
                 {layout.categories.layout === 'horizontal' && T.CategoryStrip ? (
                   <T.CategoryStrip
                     categories={templateCategories}
@@ -213,9 +219,11 @@ export function HomePageContent({
               </section>
             )}
 
-            {/* New Arrivals — pack ProductCarousel or ProductGrid fallback. */}
+            {/* New Arrivals — pack ProductCarousel or ProductGrid fallback.
+                Sprint 1: bg-[hsl(var(--bg-section-alt))] alternates with
+                the categories section above. */}
             {layout.newArrivals.enabled && templateNewArrivals.length > 0 && (
-              <section className="py-14 sm:py-16 lg:py-20">
+              <section className="bg-[hsl(var(--bg-section-alt))] py-14 sm:py-16 lg:py-20">
                 {T.ProductCarousel ? (
                   <T.ProductCarousel
                     products={templateNewArrivals}
@@ -249,9 +257,14 @@ export function HomePageContent({
               </section>
             )}
 
-            {/* Best Sellers carousel */}
+            {/* Best Sellers carousel.
+                Sprint 1: was `bg-muted/30` (a hardcoded muted tone);
+                now `bg-[hsl(var(--bg-page))]` so it alternates with
+                the section above. The previous muted-grey is preserved
+                when the merchant picks the `coolGrey` preset and is
+                the new default visual under `none`. */}
             {layout.bestSellers.enabled && templateBestSellers.length > 0 && (
-              <section className="bg-muted/30 py-14 sm:py-16 lg:py-20">
+              <section className="bg-[hsl(var(--bg-page))] py-14 sm:py-16 lg:py-20">
                 {T.ProductCarousel ? (
                   <T.ProductCarousel
                     products={templateBestSellers}
@@ -285,9 +298,11 @@ export function HomePageContent({
               </section>
             )}
 
-            {/* Testimonials — auto-hides when no qualifying reviews. */}
+            {/* Testimonials — auto-hides when no qualifying reviews.
+                Sprint 1: bg-[hsl(var(--bg-section-alt))] alternates
+                with Best Sellers above. */}
             {layout.testimonials.enabled && testimonials.length > 0 && T.TestimonialRow && (
-              <section className="py-14 sm:py-16 lg:py-20">
+              <section className="bg-[hsl(var(--bg-section-alt))] py-14 sm:py-16 lg:py-20">
                 <T.TestimonialRow
                   testimonials={testimonials}
                   title={testimonialsTitle}
@@ -301,11 +316,12 @@ export function HomePageContent({
         );
       })()}
 
-      {/* Featured products fallback when both carousels are disabled OR empty */}
+      {/* Featured products fallback when both carousels are disabled OR empty.
+          Sprint 1: was `bg-muted/30`; now uses the section-alt token. */}
       {!layout.newArrivals.enabled &&
         !layout.bestSellers.enabled &&
         templateProducts.length > 0 && (
-          <section className="bg-muted/30 py-14 sm:py-16 lg:py-24">
+          <section className="bg-[hsl(var(--bg-section-alt))] py-14 sm:py-16 lg:py-24">
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
               <T.ProductGrid
                 products={templateProducts}

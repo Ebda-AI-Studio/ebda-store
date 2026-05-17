@@ -551,6 +551,7 @@ export default function ProductsClient({
                 {products.map(p => (
                   <PecannbeeProductCard
                     key={p.id}
+                    cardSize="md"
                     product={toTemplateProduct(p)}
                     isRtl={language === 'ar'}
                     currency={store.currency}

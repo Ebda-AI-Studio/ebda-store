@@ -16,6 +16,22 @@ export type FontFamily = 'default' | 'serif' | 'modern' | 'rounded';
 export type BorderRadius = 'none' | 'sm' | 'md' | 'lg' | 'xl';
 
 /**
+ * Per-store homepage background preset. Selected from the admin Branding
+ * page; storefront renders alternating section backgrounds when set to
+ * anything other than `none`. Section dividers (no horizontal rules) ship
+ * platform-wide regardless of this setting — the preset only controls the
+ * COLOR depth of the alternation. Defaults to `none` (flat surface,
+ * sections separated by padding + section title anchors only).
+ *
+ * - `none`         → flat surface (`--bg-page` = `--bg-section-alt` = white). Sections rely on padding + anchors.
+ * - `warmSand`     → warm off-white (#FAF7F2) ↔ warm sand (#F0EAE0). Premium grocery / heritage brands.
+ * - `coolGrey`     → off-white (#F8F8F8) ↔ subtle grey (#EEEEEE). Tech / modern brands.
+ * - `pureWhite`    → near-white (#FFFFFF) ↔ subtle tint (#FAFAFA). Minimalists who want the rhythm without color depth.
+ * - `brandColor`   → derived from `primaryColor` via HSL lighten — page = brand at 96% L, alt = brand at 92% L. Reflects the merchant's brand color throughout the page.
+ */
+export type BackgroundPreset = 'none' | 'warmSand' | 'coolGrey' | 'pureWhite' | 'brandColor';
+
+/**
  * Store theme configuration - colors stored as HSL values
  */
 export interface StoreTheme {
@@ -59,6 +75,11 @@ export interface StoreTheme {
 
   // Styling
   borderRadius: BorderRadius;
+
+  // Per-store homepage section background preset — see BackgroundPreset
+  // for behavior. Optional; missing or 'none' means flat-surface (no
+  // alternating section tones).
+  backgroundPreset?: BackgroundPreset;
 
   // Custom CSS (for advanced users)
   customCss?: string;
@@ -153,6 +174,7 @@ export const DEFAULT_THEME: StoreTheme = {
   // Typography & Styling
   fontFamily: 'default',
   borderRadius: 'md',
+  backgroundPreset: 'none',
 };
 
 /**
@@ -281,9 +303,99 @@ export const FONT_FAMILY_MAP: Record<FontFamily, string> = {
 };
 
 /**
+ * Resolve a BackgroundPreset to its `{ bgPage, bgSectionAlt }` HSL string
+ * pair (matching the existing color-token format used elsewhere in this
+ * file — `"H S% L%"` without `hsl()` wrapper, so Tailwind utilities like
+ * `bg-[hsl(var(--bg-page))]` work as-is).
+ *
+ * For `brandColor`, the alternation is derived from the merchant's
+ * `primaryColor` by lifting lightness to 96% (page) and 92% (alt). For
+ * the static presets, values are platform-fixed and reviewed 2026-05-17
+ * after Stitch verified the section-rhythm read on screen previews.
+ */
+export function resolveBackgroundPreset(theme: StoreTheme): {
+  bgPage: string;
+  bgSectionAlt: string;
+} {
+  switch (theme.backgroundPreset) {
+    case 'warmSand':
+      // #FAF7F2 / #F0EAE0
+      return { bgPage: '36 33% 96%', bgSectionAlt: '36 33% 91%' };
+    case 'coolGrey':
+      // #F8F8F8 / #EEEEEE
+      return { bgPage: '0 0% 97%', bgSectionAlt: '0 0% 93%' };
+    case 'pureWhite':
+      // #FFFFFF / #FAFAFA
+      return { bgPage: '0 0% 100%', bgSectionAlt: '0 0% 98%' };
+    case 'brandColor': {
+      // Parse "H S% L%" → keep H+S, override L. Falls back to neutral if parse fails.
+      const m = theme.primaryColor.match(/^\s*([\d.]+)\s+([\d.]+)%\s+[\d.]+%\s*$/);
+      if (!m) return { bgPage: '0 0% 100%', bgSectionAlt: '0 0% 98%' };
+      const [, h, s] = m;
+      // Cap saturation at 25% so brand-color backgrounds never feel
+      // oversaturated — a tinted whisper, not a full wash.
+      const cappedS = Math.min(Number(s), 25);
+      return {
+        bgPage: `${h} ${cappedS}% 96%`,
+        bgSectionAlt: `${h} ${cappedS}% 92%`,
+      };
+    }
+    case 'none':
+    default:
+      // Flat surface — both tokens identical so `bg-[hsl(var(--bg-page))]`
+      // and `bg-[hsl(var(--bg-section-alt))]` render the same color and
+      // the section rhythm comes purely from padding + anchors.
+      return { bgPage: '0 0% 100%', bgSectionAlt: '0 0% 100%' };
+  }
+}
+
+/**
+ * Product-card text-size table — locked card-width ⇄ font-size ratios per
+ * the Sprint 1 plan (see `docs/superpowers/plans/2026-05-17-ui-ux-refresh-from-references.md`).
+ *
+ * Pack-styles still drives the per-template flavor (weight, tracking,
+ * color, font-family); these size classes are concatenated alongside.
+ * Pack-styles size tokens were removed from the productCardName /
+ * productCardPrice strings as part of this change to avoid conflicts.
+ *
+ * **16px floor (from design.md "Typography sizes" standing rule):** main
+ * reading text — product name + price — never goes below text-base
+ * (16px) on any breakpoint, even on small cards. Pre-2026-05-16
+ * minimal-pack used 12px and it read as a legibility regression. Smaller
+ * cards keep the 16px floor and rely on truncation; only LARGER cards
+ * step the font up from the 16px base.
+ */
+export type ProductCardSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+
+export function getProductCardTextSizes(cardSize: ProductCardSize | undefined): {
+  name: string;
+  price: string;
+  cta: string;
+} {
+  switch (cardSize) {
+    case 'xs':
+    case 'sm':
+      // Compact density — floor at 16px, no desktop step-up. Identity
+      // carries via pack-style flavor (weight, tracking).
+      return { name: 'text-base', price: 'text-base', cta: 'text-sm' };
+    case 'lg':
+      return { name: 'text-lg', price: 'text-lg sm:text-xl', cta: 'text-sm sm:text-base' };
+    case 'xl':
+      return { name: 'text-lg sm:text-xl', price: 'text-xl sm:text-2xl', cta: 'text-base' };
+    case 'md':
+    default:
+      // Default — 16px mobile, 18px from sm breakpoint. Matches the
+      // ratio the references (Pecannbee, SMEJ) use for their standard
+      // ~200px product cards.
+      return { name: 'text-base sm:text-lg', price: 'text-base sm:text-lg', cta: 'text-sm' };
+  }
+}
+
+/**
  * Convert theme to CSS custom properties
  */
 export function themeToCssVars(theme: StoreTheme): Record<string, string> {
+  const bg = resolveBackgroundPreset(theme);
   return {
     // Core colors
     '--primary': theme.primaryColor,
@@ -321,6 +433,14 @@ export function themeToCssVars(theme: StoreTheme): Record<string, string> {
     // Typography & Styling
     '--radius': BORDER_RADIUS_MAP[theme.borderRadius],
     '--font-family': FONT_FAMILY_MAP[theme.fontFamily],
+
+    // Sprint 1 (2026-05-17) — section background rhythm tokens. Resolved
+    // from `theme.backgroundPreset`; HomePageContent applies alternating
+    // `bg-[hsl(var(--bg-page))]` / `bg-[hsl(var(--bg-section-alt))]` to
+    // adjacent sections. When preset is `none` both tokens are identical
+    // and the alternation visually flattens to a single surface.
+    '--bg-page': bg.bgPage,
+    '--bg-section-alt': bg.bgSectionAlt,
   };
 }
 

@@ -6,6 +6,20 @@ export interface StoreTheme {
   foregroundColor: string;
   fontFamily: string;
   borderRadius: string;
+  /**
+   * Homepage section background preset — added 2026-05-17 (Sprint 1).
+   * When unset or 'none', sections share the page background and rely
+   * on padding + section title anchors for rhythm. When set to a named
+   * preset, adjacent sections alternate visibly via `--bg-page` ↔
+   * `--bg-section-alt` CSS tokens resolved in @force/shared.
+   *
+   * - `none`         — flat surface, no alternation
+   * - `warmSand`     — #FAF7F2 ↔ #F0EAE0 (premium grocery / heritage)
+   * - `coolGrey`     — #F8F8F8 ↔ #EEEEEE (tech / modern)
+   * - `pureWhite`    — #FFFFFF ↔ #FAFAFA (minimal rhythm without color)
+   * - `brandColor`   — derived from `primaryColor` (HSL lifted to 96%/92% L)
+   */
+  backgroundPreset?: 'none' | 'warmSand' | 'coolGrey' | 'pureWhite' | 'brandColor';
 }
 
 export interface StoreBranding {
@@ -61,7 +75,25 @@ export const DEFAULT_THEME: StoreTheme = {
   foregroundColor: '224 71% 4%',
   fontFamily: 'default',
   borderRadius: 'md',
+  backgroundPreset: 'none',
 };
+
+/**
+ * Background-preset picker options — labels are translated via
+ * `branding.theme.backgroundPreset.<value>` keys in the i18n bundle so
+ * each option shows a localized name + description.
+ */
+export const BACKGROUND_PRESET_OPTIONS: Array<{
+  value: NonNullable<StoreTheme['backgroundPreset']>;
+  /** approximate two-tone preview swatches, displayed as small colored chips */
+  swatches: [string, string];
+}> = [
+  { value: 'none', swatches: ['#FFFFFF', '#FFFFFF'] },
+  { value: 'warmSand', swatches: ['#FAF7F2', '#F0EAE0'] },
+  { value: 'coolGrey', swatches: ['#F8F8F8', '#EEEEEE'] },
+  { value: 'pureWhite', swatches: ['#FFFFFF', '#FAFAFA'] },
+  { value: 'brandColor', swatches: ['var(--brand-tint-1)', 'var(--brand-tint-2)'] },
+];
 
 export const FONT_OPTIONS: Array<{ value: string; key: string }> = [
   { value: 'default', key: 'default' },

@@ -1289,6 +1289,21 @@
         "md": "Medium",
         "lg": "Large",
         "xl": "Extra Large"
+      },
+      "backgroundPreset": {
+        "title": "Section background",
+        "description": "Adjacent sections alternate between two tones for visual rhythm. Pick a preset, or leave it off to keep a flat single surface.",
+        "none": {
+          "label": "Off (flat surface)",
+          "hint": "Sections share the page background; rhythm comes from padding only."
+        },
+        "warmSand": {
+          "label": "Warm sand",
+          "hint": "Premium grocery + heritage brands. #FAF7F2 / #F0EAE0."
+        },
+        "coolGrey": { "label": "Cool grey", "hint": "Tech + modern brands. #F8F8F8 / #EEEEEE." },
+        "pureWhite": { "label": "Pure white", "hint": "Minimal — alternation barely visible." },
+        "brandColor": { "label": "Brand color tint", "hint": "Derived from your primary color." }
       }
     },
     "preview": {

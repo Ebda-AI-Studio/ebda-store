@@ -4,7 +4,8 @@ import { memo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import type { ProductCardProps } from '../types';
-import type { TemplateId } from '@force/shared';
+import type { TemplateId, ProductCardSize } from '@force/shared';
+import { getProductCardTextSizes } from '@force/shared';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { getPackStyles } from './pack-styles';
 import { productCardPropsEqual } from './product-card-memo';
@@ -12,6 +13,12 @@ import { TaxInclusiveLabel } from './tax-inclusive-label';
 
 interface PecannbeeProductCardProps extends ProductCardProps {
   pack?: TemplateId;
+  /**
+   * Per-card font-size scale, paired with the merchant's chosen card width
+   * via `getProductCardTextSizes`. Pack-styles drives the FLAVOR (weight,
+   * tracking, color); this drives SIZE responsively. Sprint 1 2026-05-17.
+   */
+  cardSize?: ProductCardSize;
 }
 
 /**
@@ -43,10 +50,12 @@ function PecannbeeProductCardImpl({
   onRemoveFromWishlist,
   urlPrefix = '',
   pack,
+  cardSize,
 }: PecannbeeProductCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const styles = getPackStyles(pack);
+  const textSizes = getProductCardTextSizes(cardSize);
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
 
@@ -194,7 +203,7 @@ function PecannbeeProductCardImpl({
         <Link href={href} prefetch={false} className="focus:outline-none focus-visible:underline">
           <p
             id={`prod-${product.id}-name`}
-            className={`line-clamp-2 ${styles.productCardName}`}
+            className={`line-clamp-2 ${textSizes.name} ${styles.productCardName}`}
             style={{ textWrap: 'balance' }}
             itemProp="name"
           >
@@ -212,7 +221,7 @@ function PecannbeeProductCardImpl({
           >
             <meta itemProp="priceCurrency" content={currency} />
             <meta itemProp="price" content={String(product.price / 1000)} />
-            <span className={styles.productCardPrice}>
+            <span className={`${textSizes.price} ${styles.productCardPrice}`}>
               {(product.price / 1000).toFixed(3)} {currency}
             </span>
           </span>

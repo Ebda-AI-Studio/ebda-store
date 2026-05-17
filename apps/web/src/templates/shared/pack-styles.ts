@@ -60,8 +60,13 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
     // 2026-05-16: Ahmad standing rule — main reading text minimum 16px
     // across all themes for legibility. Theme identity stays via weight
     // and tracking, not size shrinking.
-    productCardName: 'text-lg md:text-xl font-semibold text-foreground tracking-tight leading-snug',
-    productCardPrice: 'text-base md:text-lg font-bold text-foreground tracking-tight',
+    // Sprint 1 (2026-05-17): text-size tokens removed from pack-styles so
+    // they can be driven by `cardSize` via getProductCardTextSizes(). Each
+    // card consumer (PecannbeeProductCard + ProductCarousel inline cards)
+    // concatenates the size class. Pack-styles now carries flavor only:
+    // weight, color, tracking, leading, font-family.
+    productCardName: 'font-semibold text-foreground tracking-tight leading-snug',
+    productCardPrice: 'font-bold text-foreground tracking-tight',
     productCardCta:
       'whitespace-nowrap rounded-full bg-foreground px-5 py-3.5 text-sm font-semibold text-background hover:bg-foreground/90 transition-colors duration-300 ease-out min-h-[44px]',
     sectionHeading:
@@ -83,9 +88,8 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
     categoryFrame:
       'rounded-sm border border-border bg-muted group-hover:border-foreground/35 transition-colors duration-700 ease-out',
     categoryCaption: 'text-base sm:text-lg font-serif font-normal text-foreground tracking-tight',
-    productCardName:
-      'text-lg md:text-xl font-serif font-normal text-foreground tracking-tight leading-snug',
-    productCardPrice: 'text-base md:text-lg font-serif font-medium text-foreground tracking-tight',
+    productCardName: 'font-serif font-normal text-foreground tracking-tight leading-snug',
+    productCardPrice: 'font-serif font-medium text-foreground tracking-tight',
     productCardBody: 'text-center',
     productCardCta:
       'whitespace-nowrap border-y border-foreground bg-foreground px-5 py-3.5 text-sm font-serif uppercase tracking-[0.22em] text-background hover:bg-foreground/85 transition-colors duration-500 ease-out min-h-[44px]',
@@ -112,8 +116,8 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
     categoryCaption:
       'text-base font-light tracking-[0.22em] uppercase text-muted-foreground group-hover:text-foreground transition-colors duration-500',
     productCardName:
-      'text-lg md:text-xl tracking-[0.18em] uppercase font-light text-muted-foreground group-hover:text-foreground transition-colors duration-500',
-    productCardPrice: 'text-base md:text-lg tracking-wide font-light text-muted-foreground',
+      'tracking-[0.18em] uppercase font-light text-muted-foreground group-hover:text-foreground transition-colors duration-500',
+    productCardPrice: 'tracking-wide font-light text-muted-foreground',
     productCardBody: 'text-center',
     productCardCta:
       'whitespace-nowrap mx-auto inline-block border-b border-foreground/70 pb-1 text-sm font-medium uppercase tracking-[0.28em] text-foreground hover:text-foreground/70 hover:border-foreground/40 bg-transparent transition-colors duration-500 ease-out min-h-[44px]',
@@ -137,9 +141,8 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
     categoryFrame:
       'rounded-2xl border-2 border-foreground bg-muted group-hover:shadow-[6px_6px_0_0_hsl(var(--foreground)/0.92)] transition-shadow duration-200 ease-out',
     categoryCaption: 'text-base font-black uppercase tracking-[0.05em] text-foreground',
-    productCardName:
-      'text-lg md:text-xl font-black uppercase tracking-[0.02em] text-foreground leading-tight',
-    productCardPrice: 'text-base md:text-lg font-black text-foreground tracking-tight',
+    productCardName: 'font-black uppercase tracking-[0.02em] text-foreground leading-tight',
+    productCardPrice: 'font-black text-foreground tracking-tight',
     productCardCta:
       'whitespace-nowrap border-t-2 border-foreground bg-foreground px-5 py-3.5 text-sm font-black uppercase tracking-[0.18em] text-background hover:bg-primary hover:text-primary-foreground transition-colors duration-200 ease-out min-h-[44px]',
     sectionHeading:
@@ -166,8 +169,8 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
     categoryCaption:
       'text-base font-extralight uppercase tracking-[0.28em] text-foreground/75 group-hover:text-foreground transition-colors duration-700',
     productCardName:
-      'text-lg md:text-xl font-light uppercase tracking-[0.22em] text-foreground/75 group-hover:text-foreground transition-colors duration-700',
-    productCardPrice: 'text-base md:text-lg font-light tracking-wide text-foreground',
+      'font-light uppercase tracking-[0.22em] text-foreground/75 group-hover:text-foreground transition-colors duration-700',
+    productCardPrice: 'font-light tracking-wide text-foreground',
     productCardBody: 'text-center',
     productCardCta:
       'whitespace-nowrap border-t border-foreground/15 bg-transparent px-5 py-3.5 text-sm font-medium uppercase tracking-[0.32em] text-foreground hover:bg-foreground hover:text-background transition-all duration-700 ease-out min-h-[44px]',
