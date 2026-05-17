@@ -9,6 +9,7 @@ import { auditLog } from '../middleware/security';
 import logger from '../lib/logger';
 import { whatsappService } from '../services/whatsapp.service';
 import { shippingCarrierService } from '../services/shipping-carrier.service';
+import { sendAlert } from '../services/alerts.service';
 
 const router = Router();
 
@@ -654,6 +655,114 @@ router.post('/shipping/icarry', express.json(), async (req: Request, res: Respon
  * POST /webhooks/shipping/aramex
  * Receive push notifications from Aramex
  */
+/**
+ * POST /webhooks/vercel-budget — Vercel Spend Management notification.
+ *
+ * Vercel POSTs this when:
+ *   - The configured spend budget is reached/exceeded (project gets paused)
+ *   - The billing cycle ends (so paused projects can be resumed)
+ *
+ * Auth: HMAC-SHA1 of the RAW request body using `VERCEL_WEBHOOK_SECRET`,
+ * delivered via `x-vercel-signature`. Constant-time compare. Mounted
+ * under the parent router which already applies `express.raw({type:
+ * 'application/json'})` so `req.body` is a Buffer here.
+ *
+ * Side effects:
+ *   - Sends a P0 Telegram alert via existing alerts.service so Ahmad gets
+ *     the ping immediately (the Telegram bot env vars are already wired).
+ *   - Logs the full Vercel payload to pino at info level so post-incident
+ *     review against the persistent log drain is possible.
+ *
+ * Future v2: auto-resume the project via Vercel API on
+ * billing_cycle.end events. v1 is alert-only — manual resume via
+ * dashboard once Ahmad sees the Telegram ping.
+ */
+router.post('/vercel-budget', async (req: Request, res: Response) => {
+  const secret = process.env.VERCEL_WEBHOOK_SECRET;
+  if (!secret) {
+    logger.error(
+      '[VERCEL_BUDGET] VERCEL_WEBHOOK_SECRET unset — refusing webhook to prevent spoofed alerts'
+    );
+    res.status(503).json({ ok: false, error: 'webhook_not_configured' });
+    return;
+  }
+
+  const signature = (req.headers['x-vercel-signature'] as string) || '';
+  if (!signature) {
+    logger.warn('[VERCEL_BUDGET] Missing x-vercel-signature header');
+    res.status(401).json({ ok: false, error: 'missing_signature' });
+    return;
+  }
+
+  // `req.body` is a Buffer because the parent /api/v1/webhooks mount
+  // applies express.raw(). HMAC over the raw bytes is what Vercel
+  // signs against.
+  const rawBody = Buffer.isBuffer(req.body) ? req.body : Buffer.from(JSON.stringify(req.body));
+  const expected = crypto.createHmac('sha1', secret).update(rawBody).digest('hex');
+
+  let valid = false;
+  try {
+    valid =
+      signature.length === expected.length &&
+      crypto.timingSafeEqual(Buffer.from(signature, 'hex'), Buffer.from(expected, 'hex'));
+  } catch {
+    valid = false;
+  }
+  if (!valid) {
+    logger.warn({ sig: signature.slice(0, 12) }, '[VERCEL_BUDGET] Invalid signature');
+    res.status(401).json({ ok: false, error: 'invalid_signature' });
+    return;
+  }
+
+  // Parse the verified payload. Vercel's schema is loose — capture every
+  // key into the alert + log so we never miss context.
+  let payload: Record<string, unknown> = {};
+  try {
+    payload = JSON.parse(rawBody.toString('utf8')) as Record<string, unknown>;
+  } catch (err) {
+    logger.error({ err }, '[VERCEL_BUDGET] Body parse failed');
+    res.status(400).json({ ok: false, error: 'invalid_json' });
+    return;
+  }
+
+  const type = String(payload.type ?? 'unknown');
+  const inner = (payload.payload as Record<string, unknown> | undefined) ?? {};
+  const spend = inner.spend ?? '?';
+  const budget = inner.budget ?? '?';
+  const currency = inner.currency ?? 'USD';
+  const scope = inner.scope ?? 'team';
+
+  logger.info({ type, payload }, '[VERCEL_BUDGET] webhook received');
+
+  // Fire the Telegram alert via the shared alerts.service.
+  try {
+    const isBudgetEvent = type === 'budget.exceeded' || type === 'budget.notification';
+    await sendAlert({
+      level: isBudgetEvent ? 'p0' : 'info',
+      source: 'webhook.vercel-budget',
+      title: isBudgetEvent
+        ? `Vercel budget ${type === 'budget.exceeded' ? 'EXCEEDED' : 'notification'}`
+        : 'Vercel billing cycle ended',
+      body:
+        `Type: ${type}\nSpend: ${spend} ${currency}\nBudget: ${budget} ${currency}\nScope: ${scope}\n` +
+        (type === 'budget.exceeded'
+          ? '⚠️ Vercel may have paused projects. Resume via dashboard.'
+          : type === 'billing_cycle.end'
+            ? 'Paused projects can be resumed now.'
+            : ''),
+      context: inner,
+      scope: 'platform',
+    });
+  } catch (err) {
+    logger.warn({ err }, '[VERCEL_BUDGET] sendAlert failed (webhook still ACKed)');
+  }
+
+  // Always 200 OK after signature passes — webhooks should ack so Vercel
+  // doesn't retry indefinitely. Downstream failures (Telegram down, etc.)
+  // are surfaced via logs, not via webhook retry.
+  res.status(200).json({ ok: true });
+});
+
 router.post('/shipping/aramex', express.json(), async (req: Request, res: Response) => {
   if (!verifyCarrierWebhookSecret(req, config.aramexWebhookSecret)) {
     logger.warn({ ip: req.ip }, '[WEBHOOK] Aramex webhook rejected — bad/missing secret');
