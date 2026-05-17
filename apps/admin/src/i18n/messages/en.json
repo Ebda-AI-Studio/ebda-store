@@ -1311,7 +1311,11 @@
       },
       "quickAdd": {
         "title": "Show quick-add (+) on product carousels",
-        "hint": "Customers can add a product to cart with one tap directly from the homepage carousels — no need to open the product page first."
+        "hint": "Customers can add a product to cart with one tap directly from the homepage carousels — no need to open the product page first. When on, the bottom \"Add to cart\" button on each carousel card is hidden (the + replaces it)."
+      },
+      "blog": {
+        "title": "Enable blog",
+        "hint": "Turns on the /blog section on your storefront and the From-the-Blog carousel on your homepage. Manage posts under Blog in the sidebar."
       }
     },
     "preview": {

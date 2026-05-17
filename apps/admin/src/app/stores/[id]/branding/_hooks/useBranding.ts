@@ -22,6 +22,7 @@ interface StoreResponse {
   address?: string;
   addressAr?: string;
   socialLinks?: StoreBranding['socialLinks'];
+  blogEnabled?: boolean;
   /**
    * `addressUrl` + `addressLink` live inside `settings.contact` (the JSONB
    * column) because they're storefront-display flags rather than columns
@@ -112,6 +113,7 @@ export function useBranding(storeId: string, messages: ToastMessages) {
           addressUrl,
           addressLink,
           socialLinks: store.socialLinks || {},
+          blogEnabled: store.blogEnabled,
         });
       }
     } catch (error) {
@@ -156,7 +158,13 @@ export function useBranding(storeId: string, messages: ToastMessages) {
         // resolver's default.
         currentContact.addressLink = branding.addressLink !== false;
         currentSettings.contact = currentContact;
-        return apiPut(basePath, { settings: currentSettings });
+        // Persist blogEnabled alongside the settings PUT — both ride
+        // the same generic PUT /stores/:id endpoint per the
+        // updateStoreSchema (2026-05-17). One round-trip covers both.
+        return apiPut(basePath, {
+          settings: currentSettings,
+          ...(branding.blogEnabled !== undefined && { blogEnabled: branding.blogEnabled }),
+        });
       })();
 
       const [brandingResult, themeResult, contactResult, socialResult, settingsResult] =

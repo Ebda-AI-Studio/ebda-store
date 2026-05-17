@@ -383,7 +383,12 @@ export function ProductCarousel({
                     </Link>
                     {/* Platform-level dual CTA: variant products → View link
                         to PDP, single-variant products → Add to cart. OOS
-                        forces a disabled button regardless. */}
+                        forces a disabled button regardless.
+                        Ahmad 2026-05-17: when showQuickAdd is on, the (+)
+                        overlay above IS the addable affordance — hiding
+                        the bottom Add-to-cart button removes the
+                        redundancy. View + Out Of Stock buttons still
+                        render because the (+) doesn't cover those cases. */}
                     {hasVariants ? (
                       <Link
                         href={href}
@@ -401,6 +406,7 @@ export function ProductCarousel({
                         {isRtl ? 'نفدت الكمية' : 'Out Of Stock'}
                       </button>
                     ) : (
+                      !showQuickAdd &&
                       onAddToCart && (
                         <button
                           type="button"

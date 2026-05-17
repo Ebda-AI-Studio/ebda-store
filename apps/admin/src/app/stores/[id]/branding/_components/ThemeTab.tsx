@@ -91,6 +91,23 @@ export function ThemeTab({ branding, onChange }: ThemeTabProps) {
         />
       </label>
 
+      {/* Bucket E1 (2026-05-17) — opt-in blog feature toggle. Sits on the
+          Theme tab alongside the other store-level on/off flags so the
+          merchant has a single discovery surface. Storefront `/blog`
+          routes 404 + homepage BlogCarousel hides when this is off. */}
+      <label className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card p-4 cursor-pointer">
+        <span className="flex-1 min-w-0">
+          <span className="block text-sm font-semibold text-foreground">{t('blog.title')}</span>
+          <span className="mt-0.5 block text-xs text-muted-foreground">{t('blog.hint')}</span>
+        </span>
+        <input
+          type="checkbox"
+          checked={branding.blogEnabled === true}
+          onChange={e => onChange({ ...branding, blogEnabled: e.target.checked })}
+          className="h-5 w-5 cursor-pointer accent-primary"
+        />
+      </label>
+
       <BrandPreview theme={branding.theme} />
     </div>
   );

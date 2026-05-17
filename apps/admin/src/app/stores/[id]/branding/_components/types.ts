@@ -75,6 +75,13 @@ export interface StoreBranding {
     wikidata?: string;
     wikipedia?: string;
   };
+  /**
+   * Bucket E1 (2026-05-17) — opt-in blog module. When false the public
+   * /blog routes 404 and the homepage BlogCarousel is hidden. Saved via
+   * the generic PUT /stores/:id endpoint (updateStoreSchema accepts
+   * `blogEnabled` as of the same date).
+   */
+  blogEnabled?: boolean;
 }
 
 export type BrandingTabId = 'branding' | 'theme' | 'contact' | 'social';
