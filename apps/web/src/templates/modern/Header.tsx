@@ -63,7 +63,7 @@ export default function ModernHeader({
               h-20 mobile keeps the row compact so it doesn't dominate
               the viewport; desktop stays h-28 for the bigger nav row.
               Logo recentered with a more permissive max-w cap below. */}
-          <div className="relative flex h-28 items-center justify-between gap-2 md:h-32">
+          <div className="relative flex h-24 overflow-hidden items-center justify-between gap-2 md:h-28">
             {/* Mobile-only hamburger (LEFT slot). Extracted from the actions
                 block so the layout matches the pecannbee + alkahraman target:
                 hamburger left, logo center, actions right. */}
@@ -108,7 +108,7 @@ export default function ModernHeader({
                   alt={displayName}
                   width={320}
                   height={120}
-                  className="h-24 max-h-24 w-auto max-w-full object-contain md:h-28 md:max-h-28"
+                  className="h-20 max-h-20 w-auto max-w-full object-contain md:h-24 md:max-h-24"
                   priority
                 />
               ) : (
