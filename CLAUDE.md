@@ -11,8 +11,16 @@ doubt, lean smaller. Industry benchmark is pecannbee.com.kw + bank-alkahraman.co
 **Before changing any size-related class (max-w, h-, p-, gap-, aspect-),
 read `design.md` in the repo root.** That file is the single source of truth
 for size baselines (product card 180-220px desktop / 150-180px mobile,
-category card 140-180px, logo h-14 mobile / h-20 desktop, etc.). Anti-patterns
-and the "still too big" diagnosis recipe are documented there too.
+category card 140-180px, etc.). Anti-patterns and the "still too big"
+diagnosis recipe are documented there too.
+
+**Logo sizing exception (2026-05-17 night, Ahmad explicit override):** logo
+defaults to **h-24 mobile / md:h-36 desktop** (was h-14/h-20 in design.md
+— Ahmad bumped this after "still not bigger" + "md sizes are very small
+in reality" feedback). Row container is **h-32 / md:h-44** with
+**`overflow-hidden`** in modern + bold headers so the absolute-positioned
+mobile-centered logo can never visually clip into the hero below.
+Applied platform-wide across all 5 theme headers.
 
 If `design.md` is missing from a future session's project root, recreate it
 from the project memory `feedback-fwb-sizing-rules.md` (or ask Ahmad to point
@@ -123,6 +131,65 @@ Anything `>300ms` or that calls a 3rd-party (Gemini, OneSignal, Vercel domains, 
 - Bulk AI sweeps throttle at `AI_BULK_THROTTLE_MS` to stay under Gemini free-tier RPM (commit `6e8b5cb`).
 - Cap AI calls per-day / per-month via `AI_DAILY_REQUEST_CAP` / `AI_MONTHLY_REQUEST_CAP` (`lib/ai-quota.ts`) so a single sweep can't brick the day's quota.
 
+### Per-store visual configuration (2026-05-17 UI refresh)
+
+After today's sprint batch, the storefront's visual language is configurable
+per-store via the **Admin → Branding → Theme tab** + dedicated admin pages.
+All flags live on the `StoreTheme` JSON column except `blogEnabled` which is
+its own `Store` column (because it gates API routes).
+
+| Flag                                | Default                                                                                         | Where                                                                                                                                                                        |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `backgroundPreset`                  | `none`                                                                                          | Branding → Theme. Values: `none` / `warmSand` / `coolGrey` / `pureWhite` / `brandColor`. Sections alternate two HSL pairs from `--bg-page` ↔ `--bg-section-alt`              |
+| `dividers` (DividerSettings object) | `{enabled: true, style: solid, thickness: 1, width: short, color: foreground, spacing: normal}` | `/stores/:id/dividers` admin page. `SectionDivider` component renders real `<hr>` between sections                                                                           |
+| `showBrandBadge`                    | `false`                                                                                         | Branding → Theme. `BrandPill` overlay (store name) on product card images. Hidden when OOS / NEW already occupies the corner                                                 |
+| `showQuickAdd`                      | `false`                                                                                         | Branding → Theme. `(+)` circle on `ProductCarousel` cards for one-tap add-to-cart. When ON, the bottom "Add to cart" button on the same card auto-suppresses (no redundancy) |
+| `showBrandStory`                    | `true`                                                                                          | Branding → Theme. `BrandStoryBlock` on homepage using `store.heroImage` + `store.description`                                                                                |
+| `showTrustStrip`                    | `true`                                                                                          | Branding → Theme. 3-up `TrustStrip` above footer                                                                                                                             |
+| `trustStripLayout`                  | `'horizontal'`                                                                                  | Branding → Theme. `'horizontal'` (3-up tight on mobile) or `'vertical'` (stacked)                                                                                            |
+| `blogEnabled` (Store column)        | `false`                                                                                         | Branding → Theme. Gates `/blog` routes + `HomeBlogCarousel`. Blog admin at `/stores/:id/blog`                                                                                |
+
+**SectionDivider ↔ backgroundPreset mutex:** when `backgroundPreset !== 'none'`,
+`SectionDivider` returns null. Color alternation IS the divider — running both
+together was unpleasant double-separation. Storefront enforces; merchants don't
+think about it.
+
+**Hairline accents on every section heading** are independent of the above —
+`SectionHeading` flanks `kicker` text AND `subtitle` text with `bg-foreground/30`
+hairlines automatically when those fields are set per-section in Admin → Layout.
+Merchants don't need to type `---- text ----`; the platform draws the lines.
+
+**Card-size:font-size locked table** (Sprint 1, see `design.md` →
+`getProductCardTextSizes(cardSize)` in `@force/shared`). Pack-styles' size
+tokens were stripped from `productCardName` / `productCardPrice` — flavor only
+(weight/tracking/color/family). Sizes come from the cardSize-aware helper.
+
+**Mobile chrome**: `BottomTabBar` (Home / Wishlist / Cart / Search) mounts
+in `ShopChrome`, hidden on PDP/checkout/auth. Header cart icon + mobile search
+bar hidden via `hidden md:inline-flex` in all 5 theme headers to avoid
+duplication with the tab bar.
+
+**Bottom-reserve invariant for fixed BottomTabBar**: `<body>` carries
+`pb-32 md:pb-0` in root `layout.tsx`. ShopChrome carries NO additional pb
+(would create double-reserve white-space above the cookieFallback row).
+Body-pb is the single source of truth. Cookie consent banner lifts on
+mobile via `bottom-[calc(56px+env(safe-area-inset-bottom))]` so its
+action buttons sit above the bar.
+
+**data-zone wiring rule**: any storefront text element exposed in the
+Admin → Typography page MUST carry the matching `data-zone="<zoneKey>"`
+on its wrapper AND avoid hardcoded `text-[Xpx]` arbitrary values —
+otherwise merchant overrides silently no-op. PoweredByForce was the
+trigger for this rule (commit `489bdaf`). Audit grep recipe in
+`feedback-fwb-data-zone-hardcoded-size-trap` scoped memory.
+
+**Cart icon canonical SVG path** (commit `e6ae439`):
+`M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z`
+— the shopping-cart-on-wheels glyph. Used across 11 surfaces (BottomTabBar,
+PecannbeeProductCard, ProductCarousel, 5 theme headers, CartClient,
+ProductListItem, admin MobileBottomNav, admin AnalyticsStatsGrid). Do NOT
+use the old shopping-bag path `M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z`.
+
 ### Redis Cache TTL Floor
 
 Short Redis TTLs (<120s) hammer Neon compute on cache miss. ESLint rule blocks them — `feedback-rollback-recipe.md` and commit `b6e6cd7`. If you need a sub-2-min cache, use the in-memory `bounded-map.ts` instead.
@@ -226,6 +293,7 @@ Optional (feature degrades gracefully if missing):
 - `GEMINI_MODEL` (default `gemini-flash-lite-latest`), `AI_BULK_THROTTLE_MS` (default 2500), `AI_DAILY_REQUEST_CAP` (default 1000), `AI_MONTHLY_REQUEST_CAP` (default 20000) — Gemini free-tier guardrails.
 - `VERCEL_API_TOKEN` / `VERCEL_PROJECT_ID` / `VERCEL_TEAM_ID` — required only for automatic custom-domain provisioning when stores attach a domain.
 - `WHATSAPP_VERIFY_TOKEN` — Meta Cloud API webhook verification (WhatsApp queue is wired but per-store credentials live on the store record).
+- `VERCEL_WEBHOOK_SECRET` — required when the Vercel Spend Management webhook is configured to POST to `/api/v1/webhooks/vercel-budget`. HMAC-SHA1 over raw body via `x-vercel-signature`. Refuses 503 when unset (never silently accepts unsigned alerts). Triggers Telegram alert via `alerts.service`. P0 for `budget.exceeded` + `budget.notification`, info for `billing_cycle.end`.
 - Payment providers (per-store credentials live on the store record; env vars below are global defaults / test mode): `PAYMENT_TEST_MODE`, `DEFAULT_PAYMENT_PROVIDER`, `DEFAULT_CURRENCY`, plus provider-specific `TAP_*`, `MYFATOORAH_*`, `HESABE_*`, `UPAYMENTS_*`.
 
 ### Admin (Vercel)
