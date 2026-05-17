@@ -310,6 +310,40 @@ export function ProductCarousel({
                             %
                           </span>
                         )}
+                        {/* Bucket E (2026-05-17): quick-add (+) circle button
+                            overlay — Bank Alkahraman pattern. Single tap = add
+                            to cart, no PDP navigation. Renders only when
+                            in-stock, NOT a variant parent (variants must be
+                            picked on PDP first), and the parent supplied an
+                            onAddToCart handler. Position bottom-end of image
+                            so it doesn't fight the wishlist heart top-start. */}
+                        {inStock && !hasVariants && onAddToCart && (
+                          <button
+                            type="button"
+                            onClick={e => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              onAddToCart(product.id);
+                            }}
+                            aria-label={isRtl ? 'إضافة للسلة' : 'Add to cart'}
+                            className="absolute bottom-3 end-3 z-10 inline-flex h-10 w-10 items-center justify-center rounded-full bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] shadow-[0_8px_20px_-6px_hsl(var(--primary)/0.5)] hover:scale-110 transition-transform cursor-pointer"
+                          >
+                            <svg
+                              className="h-5 w-5"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              aria-hidden
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2.5}
+                                d="M12 4v16m8-8H4"
+                              />
+                            </svg>
+                          </button>
+                        )}
                       </div>
                       {/* Tightened p-5/p-6 → p-3/p-4 + dropped min-h-[3em]
                           name reservation per ahmad 2026-05-16 size pass.

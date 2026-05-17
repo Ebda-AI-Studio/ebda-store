@@ -19,6 +19,8 @@ import { VariantSelector } from '../../../components/VariantSelector';
 import { useTemplateComponents } from '../../../hooks/useTemplateComponents';
 import { toTemplateProduct } from '../../../templates/adapters';
 import { TaxInclusiveLabel } from '../../../templates/shared/tax-inclusive-label';
+import { ShareProductRow } from '../../../templates/shared/ShareProductRow';
+import { SpecTable } from '../../../templates/shared/SpecTable';
 import { formatPrice } from '@/lib/format';
 
 // Lazy-load heavy below-the-fold components to reduce initial bundle size
@@ -611,6 +613,24 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                 <p className="text-sm text-muted-foreground">SKU: {product.sku}</p>
               </div>
             )}
+
+            {/* Sprint 4 (2026-05-17): share row + spec table. ShareProductRow
+                renders X/Facebook/Telegram/WhatsApp + copy-link. SpecTable
+                renders structured key-value rows from product.specifications
+                JSON; returns null when empty so no chrome bloat. */}
+            <ShareProductRow
+              productName={isRtl && product.nameAr ? product.nameAr : product.name}
+              url={typeof window !== 'undefined' ? window.location.href : ''}
+              className="mt-6 border-t border-border pt-6"
+            />
+            <SpecTable
+              specifications={
+                (product as { specifications?: unknown }).specifications as
+                  | Record<string, string>
+                  | undefined
+              }
+              className="mt-6"
+            />
           </div>
         </div>
 

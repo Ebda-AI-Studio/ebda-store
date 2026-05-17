@@ -5,6 +5,8 @@ import { useStore, useStoreUrl } from '../contexts/StoreContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useCart } from '../contexts/CartContext';
 import { ShopChrome } from '../components';
+import { BrandStoryBlock } from '../templates/shared/BrandStoryBlock';
+import { TrustStrip } from '../templates/shared/TrustStrip';
 import { toTemplateProduct, toTemplateCategory } from '../templates/adapters';
 import { getHomepageTemplate } from '../lib/serverTemplate';
 import type { TemplateId, StoreLayoutSettings } from '@force/shared';
@@ -297,6 +299,19 @@ export function HomePageContent({
                 )}
               </section>
             )}
+
+            {/* Sprint 3 + Bucket E (2026-05-17): brand story + trust strip
+                bands. Brand story uses store.heroImage + store.description
+                as platform defaults — null-safe via internal guard. Trust
+                strip ships 3 universal items (Fast Delivery / Quality /
+                Support) with bilingual platform copy. Both auto-hide
+                when their data isn't present. */}
+            <BrandStoryBlock
+              image={store.heroImage ?? undefined}
+              body={store.description ?? undefined}
+              bodyAr={store.descriptionAr ?? undefined}
+            />
+            <TrustStrip />
 
             {/* Testimonials — auto-hides when no qualifying reviews.
                 Sprint 1: bg-[hsl(var(--bg-section-alt))] alternates

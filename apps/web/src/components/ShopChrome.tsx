@@ -5,6 +5,7 @@ import { useStore, useStoreBranding, useStoreContact, useStoreUrl } from '../con
 import { useLanguage } from '../contexts/LanguageContext';
 import { useCart } from '../contexts/CartContext';
 import { useTemplateComponents } from '../hooks/useTemplateComponents';
+import { BottomTabBar } from '../templates/shared/BottomTabBar';
 import type {
   FooterBottomBarConfig,
   FooterLinkSection,
@@ -259,6 +260,11 @@ export function ShopChrome({ children }: { children: ReactNode }) {
           below the footer (cookie disclaimer, copyright, etc) inherits
           the typography zone. Kept zero-height when there's no content. */}
       <div data-zone="afterFooter" />
+      {/* Sprint 3 (2026-05-17): mobile sticky bottom tab bar. Hides
+          itself on PDP / checkout / auth routes via usePathname inside
+          the component. Mounts last so its fixed positioning sits above
+          everything else in the chrome. */}
+      <BottomTabBar />
     </div>
   );
 }
