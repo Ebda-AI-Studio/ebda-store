@@ -479,7 +479,16 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       if (!cfg || typeof cfg !== 'object') continue;
       const decls: string[] = [];
       const fam = sanitizeFontValue(cfg.fontFamily);
-      if (fam) decls.push(`font-family:${fam}`);
+      // font-family carries !important so it beats per-theme pack-styles
+      // Tailwind utility classes (`font-serif` / `font-sans` / `font-mono`)
+      // which match the same element with equal specificity (0,1,0) and
+      // win via Tailwind v4 layer ordering. Verified on wadyaljuz 2026-05-18
+      // where merchant-selected Tajawal in admin wasn't applying to the
+      // h2[data-zone="sectionTitle"] inside elegant's font-serif h2.
+      // Other zone declarations stay on normal cascade so a merchant who
+      // sets only color/size/weight doesn't override pack-style defaults
+      // they didn't touch.
+      if (fam) decls.push(`font-family:${fam} !important`);
       const size = sanitizeFontValue(cfg.fontSize);
       if (size) decls.push(`font-size:${size}`);
       const weight = sanitizeFontValue(cfg.fontWeight);
