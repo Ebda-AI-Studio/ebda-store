@@ -37,12 +37,13 @@ export function SectionDivider() {
         : 'py-5 sm:py-8';
 
   // Width: edge-to-edge OR contained inside the page max-w-7xl OR a
-  // short centered accent (40-80px wide).
+  // short centered accent. Default 'short' = 140-200px to match the
+  // SectionKicker hairlines that flank section titles (Ahmad 2026-05-17).
   const containerClass =
     settings.width === 'full'
       ? 'w-full'
       : settings.width === 'short'
-        ? 'mx-auto w-16 sm:w-20'
+        ? 'mx-auto w-[140px] sm:w-[200px]'
         : 'mx-auto max-w-7xl px-4 sm:px-6 lg:px-8';
 
   return (
@@ -64,7 +65,9 @@ export function SectionDivider() {
 function resolveDividerColor(settings: DividerSettings, primaryColor?: string): string {
   switch (settings.color) {
     case 'foreground':
-      return 'hsl(var(--foreground) / 0.25)';
+      // 0.30 matches the SectionKicker hairline opacity (bg-foreground/30)
+      // exactly — Ahmad's reference 2026-05-17 evening.
+      return 'hsl(var(--foreground) / 0.30)';
     case 'accent':
       return primaryColor ? `hsl(${primaryColor})` : 'hsl(var(--primary))';
     case 'custom':

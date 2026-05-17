@@ -72,8 +72,13 @@ export const DEFAULT_DIVIDER_SETTINGS: DividerSettings = {
   enabled: true,
   style: 'solid',
   thickness: 1,
-  width: 'contained',
-  color: 'auto',
+  // Ahmad 2026-05-17 evening: match the SectionKicker hairline style
+  // (short centered hairline at foreground/30 — see SectionHeading.tsx
+  // lines 67-84). The contained-width auto-color default looked too
+  // heavy / chrome-y; the short foreground-30 pair reads as editorial
+  // and matches the existing per-section kicker divider lines exactly.
+  width: 'short',
+  color: 'foreground',
   spacing: 'normal',
 };
 

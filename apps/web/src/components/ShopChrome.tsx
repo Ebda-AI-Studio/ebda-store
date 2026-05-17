@@ -229,7 +229,11 @@ export function ShopChrome({ children }: { children: ReactNode }) {
           utilityBar={utilityBar}
         />
       </header>
-      <main role="main" className="flex-1">
+      <main role="main" className="flex-1 pb-20 md:pb-0">
+        {/* pb-20 reserves 80px at the bottom on mobile so the BottomTabBar
+            (fixed 56px + safe-area-inset) doesn't cover the last rows of
+            the footer (Powered by Force AI + cookie consent link).
+            Desktop has no bar — no reserve needed. Ahmad 2026-05-17. */}
         {children}
       </main>
       <footer role="contentinfo" data-zone="footer">
