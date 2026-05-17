@@ -345,6 +345,38 @@ This project follows the standing rollback discipline (see global `~/.claude/CLA
 - **Migration rollback:** see `docs/ROLLBACK.md`. RLS policy state must be re-verified after restore (the `runInTenantContext` AsyncLocalStorage pattern depends on policy shape). Hand-written migrations live at `packages/database/prisma/migrations/<TS>_<name>/migration.sql` and apply on next API boot — by the time you notice a schema bug, it's already live.
 - **Trace what migrated:** `git log --diff-filter=A --name-only -- packages/database/prisma/migrations/`
 
+## UI/UX standing rules (codified 2026-05-17 from the design refresh sprints)
+
+These are LESSONS, not feature docs. Apply on every UI/UX change in this repo. Each rule has a memory file with the failure-mode context — read it once if in doubt.
+
+**1. Sister systems = runtime mutex, not merchant decision.** When two features can both solve the same UX problem (bg color shift vs hairline `<hr>` both separate sections), make them mutually exclusive on the storefront, don't ask the merchant to reconcile. The storefront component short-circuits at runtime (e.g. `if (theme.backgroundPreset !== 'none') return null;` in SectionDivider). Admin stays orthogonal; merchant flips either flag freely; storefront picks one. Reference: `feedback-fwb-section-rhythm-architecture` (scoped). Original incident: shipped both = "unpleasant double-separation".
+
+**2. New visual features default OFF.** Any toggle that changes how existing stores look ships with default `false` so no merchant gets visual surprise. Standing pattern from 2026-05-17: `showBrandBadge`, `showQuickAdd`, `blogEnabled`, `BrandPill` all default OFF. Utility features that fill empty space (`showBrandStory`, `showTrustStrip`) may default `true` because the empty state is worse than the filled state. Decide which category the flag belongs to at design time, not after a merchant complains.
+
+**3. Theme flags ride `StoreTheme` JSON; Store columns only when API-gated.** `apps/api/src/routes/store.routes.ts` themeSchema is `z.record(z.string(), z.unknown())` — new opt-in flags pass through with zero migration and zero new endpoint. Use a `Store` column ONLY when (a) routes need to 404 when off (e.g. `blogEnabled` gates `/blog`), (b) the field is used in a Prisma WHERE/ORDER, or (c) services outside the storefront need it (email templates, external APIs). Reference: `feedback-fwb-theme-flag-pattern` (scoped).
+
+**4. ThemeTab clutter ceiling = 7 toggles. Next toggle gets a dedicated admin page.** Once `ThemeTab.tsx` exceeds ~7 toggles + pickers + sub-forms, the next merchant-facing toggle is built as `/stores/[id]/<feature>` with its own sidebar entry under the right grouping (Typography / Layout / Branding). Established pattern: `/stores/:id/dividers`, `/stores/:id/blog`, `/stores/:id/typography`. Don't keep stacking onto ThemeTab — Ahmad's standing complaint: "complicated for the users".
+
+**5. Admin pages mirror storefront top-to-bottom flow.** Controls on `/typography`, `/layout`, future page-builder admins MUST be ordered in the sequence a visitor encounters them on the storefront (announcement bar → header → section headings → categories → products → footer → after-footer), NOT alphabetical, NOT grouped-by-control-type, NOT sub-controls-clustered-at-end. Use a `groupHeading` field per control + hairline group separators for labeled clusters. Sub-controls nest visually under their broad parent via `ms-4 sm:ms-6 border-s-2 border-s-primary/30`. Reference: `feedback-admin-mirrors-storefront-flow` (global). Verified on Typography page commit `c4afbe9`.
+
+**6. Fixed-bottom UI two-trap recipe.** Whenever you add ANY `position: fixed; bottom: 0;` element on mobile (tab bar, sticky CTA, cookie banner, chat widget):
+
+- **Reserve space on `<body>`, NOT on the chrome wrapper.** Body siblings (`<CookieFallback />`, debug bars, "Powered by ..." rows) live outside chrome and get clipped if pb-X is only on chrome's outer div. Root `layout.tsx` body owns `pb-32 md:pb-0`; chrome carries NO additional pb.
+- **Lift any OTHER fixed-bottom UI above the primary one** via `bottom-[calc(<bar-height>px+env(safe-area-inset-bottom))] md:bottom-0`. `env(safe-area-inset-bottom)` is critical (≥34px on notched iOS).
+  Reference: `feedback-fixed-bottom-ui-stacking` (global, 3 traps).
+
+**7. data-zone + size-class wiring is required for Typography overrides to work.** Already documented above under "Per-store visual configuration". Restated as a rule: every storefront text element exposed in `/typography` MUST (a) carry `data-zone="<zoneKey>"` on the wrapper, (b) use a Tailwind size class (`text-sm`, `text-base`, etc.), NEVER `text-[Xpx]` arbitrary values — they win specificity battles against the per-store CSS emitter and silently no-op merchant overrides. Reference: `feedback-fwb-data-zone-hardcoded-size-trap` (scoped). Audit grep recipe in the memory file.
+
+**8. Editorial-hairline divider language is platform-wide and reusable.** The visual idiom — two `bg-foreground/30` lines at `flex-1 max-w-[140px] sm:max-w-[200px]` flanking centered text — is the canonical "announcement" separator. Used in 3 places today: `SectionKicker` (above title), `SectionHeading` subtitle (below title), `SectionDivider` (between sections when bg preset is `none`). Any future decorative separator MUST reuse this language rather than invent a new visual. Single visual idea, infinite placements.
+
+**9. OSOSS reference set is the canonical Kuwait-grocery UX benchmark.** When in doubt about storefront UX direction, the three OSOSS-platform stores are the comparison set: Pecannbee, Bank Alkahraman, SMEJ. Their extracted patterns are at `reference-ui-target-pecannbee-bankalkahraman` + `reference-ui-untitled-smej` (scoped memory). Before inventing a new pattern, scan these first. The Sprint 1 "color shift IS the divider" pattern came directly from this reference set.
+
+**10. Live-review iteration is part of the design loop, not a sign of failure.** First-pass shipment is the start. Plan for 2-4 refinement rounds per non-trivial UX change. Examples from 2026-05-17 single session: logo sizing took 3 passes (h-14 → h-20 → h-24/md:h-36 + row + overflow-hidden); divider color took 2 (brand color → still brand color but visible-by-default); typography ordering took 1 major reorg after the flat-list-with-end-cluster proved unscannable; cookie banner stacking took 3 (main pb → chrome pb → body pb). Budget time for the refinement; don't claim "done" after first push without an Ahmad sign-off.
+
+**11. Sprint plan → Stitch preview → code is the standard cross-cutting UI workflow.** For any UI change that spans multiple themes, components, or admin surfaces: write `docs/plans/<date>-<slug>.md` first, drive a Stitch visual preview against the plan DESIGN.md, validate visually with Ahmad before code. Reference: `~/.claude/projects/-Users-ahmadsharaf/memory/reference-stitch-mcp` (Stitch CLI install gotcha: `--header` is varargs, name+URL FIRST). The Sprint 1 preview flow is the template — repeat for Sprint N+1.
+
+**12. commitlint enforces lowercase subjects.** `subject must be lower-case` errors come from any uppercase word in the commit subject (CLAUDE, URLs, project names). HEREDOC commits MUST start with a lowercase type (`feat:`, `fix:`, `docs:`) AND keep the subject all-lowercase. Co-Authored-By trailer needs a blank line before it (footer-leading-blank rule).
+
 ## graphify
 
 This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
