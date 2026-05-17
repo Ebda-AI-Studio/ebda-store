@@ -619,7 +619,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                 renders structured key-value rows from product.specifications
                 JSON; returns null when empty so no chrome bloat. */}
             <ShareProductRow
-              productName={isRtl && product.nameAr ? product.nameAr : product.name}
+              productName={language === 'ar' && product.nameAr ? product.nameAr : product.name}
               url={typeof window !== 'undefined' ? window.location.href : ''}
               className="mt-6 border-t border-border pt-6"
             />

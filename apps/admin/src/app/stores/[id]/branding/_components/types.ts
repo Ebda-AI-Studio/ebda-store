@@ -20,6 +20,13 @@ export interface StoreTheme {
    * - `brandColor`   — derived from `primaryColor` (HSL lifted to 96%/92% L)
    */
   backgroundPreset?: 'none' | 'warmSand' | 'coolGrey' | 'pureWhite' | 'brandColor';
+  /**
+   * Opt-in brand pill (C5 from 2026-05-17 UI refresh). When true, the
+   * store name renders as a small pill in the top-START corner of every
+   * product card image. Hidden automatically when an OOS ribbon or NEW
+   * badge is in that corner. Default false.
+   */
+  showBrandBadge?: boolean;
 }
 
 export interface StoreBranding {
@@ -76,6 +83,7 @@ export const DEFAULT_THEME: StoreTheme = {
   fontFamily: 'default',
   borderRadius: 'md',
   backgroundPreset: 'none',
+  showBrandBadge: false,
 };
 
 /**

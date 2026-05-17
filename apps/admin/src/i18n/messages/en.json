@@ -1304,6 +1304,10 @@
         "coolGrey": { "label": "Cool grey", "hint": "Tech + modern brands. #F8F8F8 / #EEEEEE." },
         "pureWhite": { "label": "Pure white", "hint": "Minimal — alternation barely visible." },
         "brandColor": { "label": "Brand color tint", "hint": "Derived from your primary color." }
+      },
+      "brandBadge": {
+        "title": "Show brand name on product cards",
+        "hint": "Adds a small pill with your store name to the top corner of every product image. Useful for brand recall on screenshots and shared images."
       }
     },
     "preview": {

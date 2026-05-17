@@ -51,6 +51,27 @@ export function ThemeTab({ branding, onChange }: ThemeTabProps) {
         onChange={theme => onChange({ ...branding, theme })}
       />
 
+      {/* Bucket C5 (2026-05-17) — opt-in brand pill on product cards. */}
+      <label className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card p-4 cursor-pointer">
+        <span className="flex-1 min-w-0">
+          <span className="block text-sm font-semibold text-foreground">
+            {t('brandBadge.title')}
+          </span>
+          <span className="mt-0.5 block text-xs text-muted-foreground">{t('brandBadge.hint')}</span>
+        </span>
+        <input
+          type="checkbox"
+          checked={branding.theme.showBrandBadge === true}
+          onChange={e =>
+            onChange({
+              ...branding,
+              theme: { ...branding.theme, showBrandBadge: e.target.checked },
+            })
+          }
+          className="h-5 w-5 cursor-pointer accent-primary"
+        />
+      </label>
+
       <BrandPreview theme={branding.theme} />
     </div>
   );

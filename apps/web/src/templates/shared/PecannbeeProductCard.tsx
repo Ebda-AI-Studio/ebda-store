@@ -11,6 +11,7 @@ import { getPackStyles } from './pack-styles';
 import { productCardPropsEqual } from './product-card-memo';
 import { TaxInclusiveLabel } from './tax-inclusive-label';
 import { OutOfStockRibbon, isProductNew } from './ProductCardCta';
+import { BrandPill } from './BrandPill';
 
 interface PecannbeeProductCardProps extends ProductCardProps {
   pack?: TemplateId;
@@ -198,6 +199,9 @@ function PecannbeeProductCardImpl({
               {isRtl ? 'جديد' : 'NEW'}
             </span>
           )}
+          {/* Bucket C5: brand pill — hidden when OOS ribbon or NEW
+              badge already occupies the top-START corner. */}
+          <BrandPill hidden={!inStock || showNewBadge} />
           {/* Sale chip top-END when in stock */}
           {inStock && onSale && (
             <span className="absolute top-3 end-3 z-10 rounded-full bg-foreground/90 px-2.5 py-1 text-[11px] font-semibold tracking-wide text-background shadow-[0_8px_20px_-8px_hsl(var(--foreground)/0.35)]">

@@ -7,6 +7,7 @@ import { SectionHeading } from './SectionHeading';
 import { getPackStyles } from './pack-styles';
 import { cardAspectClass, cardShapeClasses, gridGapClass, productSizeClass } from './card-size';
 import { OutOfStockRibbon, isProductNew } from './ProductCardCta';
+import { BrandPill } from './BrandPill';
 import { getProductCardTextSizes } from '@force/shared';
 import type { ProductCarouselProps } from '../types';
 
@@ -255,6 +256,9 @@ export function ProductCarousel({
                             {isRtl ? 'جديد' : 'NEW'}
                           </span>
                         )}
+                        {/* Bucket C5: brand pill — hidden when OOS or
+                            NEW already occupies the top-START corner. */}
+                        <BrandPill hidden={!inStock || showNewBadge} />
                         {img ? (
                           <>
                             <Image

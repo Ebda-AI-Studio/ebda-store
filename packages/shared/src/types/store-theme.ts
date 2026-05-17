@@ -81,6 +81,15 @@ export interface StoreTheme {
   // alternating section tones).
   backgroundPreset?: BackgroundPreset;
 
+  // Opt-in brand pill overlay on product card images (Bucket C5, shipped
+  // 2026-05-17). When true, the store name renders as a small pill in
+  // the top-START corner of every product image. Hidden automatically
+  // when an OOS ribbon or NEW badge is already in that corner, so the
+  // three signals never collide. Default false — opt-in because the
+  // pill adds visual noise that's only useful for brand-recall on
+  // share/screenshot contexts.
+  showBrandBadge?: boolean;
+
   // Custom CSS (for advanced users)
   customCss?: string;
 }
@@ -175,6 +184,7 @@ export const DEFAULT_THEME: StoreTheme = {
   fontFamily: 'default',
   borderRadius: 'md',
   backgroundPreset: 'none',
+  showBrandBadge: false,
 };
 
 /**
