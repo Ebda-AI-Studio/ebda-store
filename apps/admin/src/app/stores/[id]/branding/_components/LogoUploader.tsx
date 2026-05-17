@@ -1,7 +1,7 @@
 'use client';
 
 import { useT } from '@/i18n/useT';
-import { recommendedSizeText } from '@force/shared';
+import { IMAGE_STANDARDS } from '@force/shared';
 import { ImageUpload } from '../../../../../components/ImageUpload';
 import type { StoreBranding } from './types';
 
@@ -15,6 +15,19 @@ interface LogoUploaderProps {
 const LOGO_ACCEPT = 'image/jpeg,image/png,image/webp,image/gif,image/svg+xml';
 const FAVICON_ACCEPT =
   'image/jpeg,image/png,image/webp,image/gif,image/svg+xml,image/x-icon,image/vnd.microsoft.icon';
+
+// Logo can be EITHER the horizontal wordmark (400×200, 2:1) OR a square
+// brandmark (400×400, 1:1) — depends on the brand identity. Hint lists
+// both so the merchant picks the one that matches their visual.
+const LOGO_HINT = (() => {
+  const wide = IMAGE_STANDARDS.storeLogo;
+  const square = IMAGE_STANDARDS.storeLogoSquare;
+  return `Recommended: ${wide.width}×${wide.height}px wordmark OR ${square.width}×${square.height}px square brandmark (${wide.formats.join(' / ')})`;
+})();
+const FAVICON_HINT = (() => {
+  const f = IMAGE_STANDARDS.favicon;
+  return `Recommended: ${f.width}×${f.height}px (${f.formats.join(' / ')})`;
+})();
 
 /**
  * Logo, Arabic logo, and favicon uploaders. Grouped together because they
@@ -35,7 +48,7 @@ export function LogoUploader({ branding, onChange, storeId }: LogoUploaderProps)
           storeId={storeId}
           label={t('logoUpload')}
           accept={LOGO_ACCEPT}
-          recommendedSizeHint={recommendedSizeText('storeLogo')}
+          recommendedSizeHint={LOGO_HINT}
         />
       </div>
       <div>
@@ -48,7 +61,7 @@ export function LogoUploader({ branding, onChange, storeId }: LogoUploaderProps)
           storeId={storeId}
           label={t('logoArUpload')}
           accept={LOGO_ACCEPT}
-          recommendedSizeHint={recommendedSizeText('storeLogo')}
+          recommendedSizeHint={LOGO_HINT}
         />
       </div>
       <div>
@@ -61,7 +74,7 @@ export function LogoUploader({ branding, onChange, storeId }: LogoUploaderProps)
           storeId={storeId}
           label={t('faviconUpload')}
           accept={FAVICON_ACCEPT}
-          recommendedSizeHint={recommendedSizeText('favicon')}
+          recommendedSizeHint={FAVICON_HINT}
         />
       </div>
     </div>

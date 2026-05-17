@@ -114,7 +114,21 @@ export const IMAGE_STANDARDS = {
     height: 200,
     aspect: '2:1',
     formats: ['SVG', 'PNG'],
-    description: 'Store header logo. Renders at h-24 mobile / h-36 desktop. SVG preferred.',
+    description:
+      'Store header logo — horizontal wordmark. Renders at h-24 mobile / h-36 desktop. SVG preferred. See storeLogoSquare for the square-brandmark alternative.',
+  },
+  storeLogoSquare: {
+    // Brands with a circular / square mark (think Instagram avatar style)
+    // can ship a 1:1 logo instead of the 2:1 wordmark. Header renders the
+    // square at the same h-24 / h-36 height — narrower footprint, more
+    // brand-friendly for icon-led identities (e.g. Wady Aljuz's circular
+    // olive-jar mark, verified prod 2026-05-17).
+    width: 400,
+    height: 400,
+    aspect: '1:1',
+    formats: ['SVG', 'PNG'],
+    description:
+      'Store header logo — square brandmark alternative. Use when brand identity is icon-led rather than wordmark-led.',
   },
   favicon: {
     width: 512,
