@@ -83,8 +83,9 @@ packages/
 ### Deployment
 
 - **API**: Railway (Railpack build, NOT Dockerfile) at `api-production-c058.up.railway.app`
-- **Admin**: Vercel at `force-admin-seven.vercel.app`
-- **Web**: Vercel at `force-web-sigma.vercel.app`
+- **Admin**: Vercel project `force-admin` → custom domain `app.forcemediakw.com`
+- **Web**: Vercel project `force-web` → custom domain `wadyaljuz.com` (per-tenant; future tenants attach their own custom domains)
+- _Stale Vercel projects to ignore:_ `force-web-sigma` (no prod deploy), `force-web-sigma-seven.vercel.app` (DEPLOYMENT_NOT_FOUND ghost). Both pre-date the 2026-05-17 rename to the canonical `force-web` / `force-admin` projects. Safe to delete via Vercel dashboard.
 - **Database**: Neon PostgreSQL (serverless) — local .env has stale Supabase URL, production uses Neon
 - **Redis**: Railway internal (`redis.railway.internal:6379`)
 - **Storage**: Cloudflare R2 (public bucket `*.r2.dev`, NOT `*.r2.cloudflarestorage.com`)
