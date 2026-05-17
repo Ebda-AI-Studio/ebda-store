@@ -36,6 +36,8 @@ export interface StoreTheme {
   showBrandStory?: boolean;
   /** Show the 3-up trust strip above the footer. Default true. */
   showTrustStrip?: boolean;
+  /** Trust-strip layout direction. Default 'horizontal' (3-up grid). */
+  trustStripLayout?: 'horizontal' | 'vertical';
 }
 
 export interface StoreBranding {
@@ -103,6 +105,7 @@ export const DEFAULT_THEME: StoreTheme = {
   showQuickAdd: false,
   showBrandStory: true,
   showTrustStrip: true,
+  trustStripLayout: 'horizontal',
 };
 
 /**

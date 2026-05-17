@@ -157,6 +157,12 @@ export interface StoreTheme {
   showBrandStory?: boolean;
   /** Show the 3-up trust strip (Fast Delivery / Quality / Support) above the footer. */
   showTrustStrip?: boolean;
+  /**
+   * Trust-strip layout direction. `'horizontal'` (default) = 3 items in
+   * a row on every viewport (mobile gets compact gap); `'vertical'` =
+   * stacked single column on every viewport. Ahmad 2026-05-17 evening.
+   */
+  trustStripLayout?: 'horizontal' | 'vertical';
 
   // Custom CSS (for advanced users)
   customCss?: string;
@@ -257,6 +263,7 @@ export const DEFAULT_THEME: StoreTheme = {
   dividers: DEFAULT_DIVIDER_SETTINGS,
   showBrandStory: true,
   showTrustStrip: true,
+  trustStripLayout: 'horizontal',
 };
 
 /**

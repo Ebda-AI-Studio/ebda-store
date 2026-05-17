@@ -1,6 +1,7 @@
 'use client';
 
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useStore } from '../../contexts/StoreContext';
 
 /**
  * Sprint 3 (2026-05-17): 3-up trust badge strip rendered on the homepage
@@ -60,6 +61,27 @@ const DEFAULT_TRUST_ITEMS: TrustItem[] = [
 
 export function TrustStrip() {
   const { isRtl } = useLanguage();
+  const { store } = useStore();
+  // Layout direction per merchant choice. 'horizontal' (default) = 3-up
+  // grid (compact mobile, comfortable desktop). 'vertical' = stacked
+  // single column regardless of viewport. Ahmad 2026-05-17 evening.
+  const layout = store.theme?.trustStripLayout ?? 'horizontal';
+  const listClass =
+    layout === 'vertical' ? 'grid grid-cols-1 gap-6' : 'grid grid-cols-3 gap-2 sm:gap-8';
+  // Mobile-horizontal shrinks the icon + drops the subtitle so 3 items
+  // fit comfortably without wrapping the title to a third line. Desktop
+  // restores the full treatment in both modes.
+  const iconWrapClass = layout === 'vertical' ? 'h-12 w-12' : 'h-9 w-9 sm:h-12 sm:w-12';
+  const iconSvgClass = layout === 'vertical' ? 'h-6 w-6' : 'h-4 w-4 sm:h-6 sm:w-6';
+  const titleClass =
+    layout === 'vertical'
+      ? 'text-sm font-bold text-foreground'
+      : 'text-[11px] sm:text-sm font-bold text-foreground';
+  const subClass =
+    layout === 'vertical'
+      ? 'text-xs text-foreground/65 max-w-[20ch]'
+      : 'hidden sm:block text-xs text-foreground/65 max-w-[20ch]';
+
   return (
     <section
       aria-label={isRtl ? 'لماذا تتسوق معنا' : 'Why shop with us'}
@@ -67,14 +89,17 @@ export function TrustStrip() {
       className="bg-[hsl(var(--bg-page))] py-12 sm:py-16 lg:py-20"
     >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <ul className="grid grid-cols-1 gap-6 sm:grid-cols-3 sm:gap-8">
+        <ul className={listClass}>
           {DEFAULT_TRUST_ITEMS.map(item => (
-            <li key={item.titleEn} className="flex flex-col items-center text-center gap-2 px-2">
+            <li
+              key={item.titleEn}
+              className="flex flex-col items-center text-center gap-2 px-1 sm:px-2"
+            >
               <span
-                className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-[hsl(var(--primary))]/10 text-[hsl(var(--primary))]"
+                className={`inline-flex items-center justify-center rounded-full bg-[hsl(var(--primary))]/10 text-[hsl(var(--primary))] ${iconWrapClass}`}
                 aria-hidden
               >
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className={iconSvgClass} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -83,12 +108,8 @@ export function TrustStrip() {
                   />
                 </svg>
               </span>
-              <h3 className="text-sm font-bold text-foreground">
-                {isRtl ? item.titleAr : item.titleEn}
-              </h3>
-              <p className="text-xs text-foreground/65 max-w-[20ch]">
-                {isRtl ? item.subAr : item.subEn}
-              </p>
+              <h3 className={titleClass}>{isRtl ? item.titleAr : item.titleEn}</h3>
+              <p className={subClass}>{isRtl ? item.subAr : item.subEn}</p>
             </li>
           ))}
         </ul>

@@ -1324,6 +1324,12 @@
       "trustStrip": {
         "title": "Show trust strip",
         "hint": "Three icon-and-text blocks above the footer (Fast Delivery / Quality Guarantee / 24/7 Support) with platform-default bilingual copy."
+      },
+      "trustStripLayout": {
+        "title": "Trust strip layout",
+        "hint": "Horizontal = 3 items in a row (compact on mobile). Vertical = stacked single column on every viewport.",
+        "horizontal": "Horizontal (3 in a row)",
+        "vertical": "Vertical (stacked)"
       }
     },
     "preview": {

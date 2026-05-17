@@ -150,6 +150,48 @@ export function ThemeTab({ branding, onChange }: ThemeTabProps) {
         />
       </label>
 
+      {/* Trust-strip layout direction — radio pair (horizontal vs
+          vertical). Only meaningful when showTrustStrip is on, so the
+          control fades when the parent toggle is off. */}
+      <div
+        className={`rounded-lg border border-border bg-card p-4 transition-opacity ${
+          branding.theme.showTrustStrip === false ? 'opacity-50 pointer-events-none' : ''
+        }`}
+      >
+        <div className="mb-3">
+          <p className="text-sm font-semibold text-foreground">{t('trustStripLayout.title')}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{t('trustStripLayout.hint')}</p>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {(['horizontal', 'vertical'] as const).map(opt => {
+            const selected = (branding.theme.trustStripLayout ?? 'horizontal') === opt;
+            return (
+              <label
+                key={opt}
+                className={`flex cursor-pointer items-center gap-2 rounded-lg border p-2.5 text-sm transition-colors ${
+                  selected
+                    ? 'border-primary bg-primary/5 text-foreground'
+                    : 'border-border text-muted-foreground hover:border-foreground/30'
+                }`}
+              >
+                <input
+                  type="radio"
+                  checked={selected}
+                  onChange={() =>
+                    onChange({
+                      ...branding,
+                      theme: { ...branding.theme, trustStripLayout: opt },
+                    })
+                  }
+                  className="sr-only"
+                />
+                {t(`trustStripLayout.${opt}`)}
+              </label>
+            );
+          })}
+        </div>
+      </div>
+
       <BrandPreview theme={branding.theme} />
     </div>
   );
