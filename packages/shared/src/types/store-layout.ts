@@ -72,6 +72,18 @@ export interface SectionTitleOverride {
   /** Optional tagline rendered as a small line BELOW the title. Bilingual. */
   subtitle?: string;
   subtitleAr?: string;
+  /**
+   * Toggle the flanking editorial hairlines around the kicker text.
+   * Default (undefined / true) → lines render. Set to `false` to suppress
+   * just the surrounding lines while keeping the kicker text itself.
+   */
+  showKickerLines?: boolean;
+  /**
+   * Toggle the flanking editorial hairlines around the subtitle text.
+   * Default (undefined / true) → lines render. Set to `false` to suppress
+   * just the surrounding lines while keeping the subtitle text itself.
+   */
+  showSubtitleLines?: boolean;
 }
 
 /**

@@ -188,6 +188,8 @@ export function HomePageContent({
                     kickerAr={layout.categories.kickerAr}
                     subtitle={layout.categories.subtitle}
                     subtitleAr={layout.categories.subtitleAr}
+                    showKickerLines={layout.categories.showKickerLines}
+                    showSubtitleLines={layout.categories.showSubtitleLines}
                     seeAllHref={storeUrl('/products')}
                     isRtl={isRtl}
                     pack={templateId}
@@ -235,6 +237,12 @@ export function HomePageContent({
                     products={templateNewArrivals}
                     title={newArrivalsTitle}
                     titleAr={newArrivalsTitleAr}
+                    kicker={layout.newArrivals.kicker}
+                    kickerAr={layout.newArrivals.kickerAr}
+                    subtitle={layout.newArrivals.subtitle}
+                    subtitleAr={layout.newArrivals.subtitleAr}
+                    showKickerLines={layout.newArrivals.showKickerLines}
+                    showSubtitleLines={layout.newArrivals.showSubtitleLines}
                     seeAllHref={storeUrl('/products?sort=newest')}
                     isRtl={isRtl}
                     currency={store.currency}
@@ -278,6 +286,12 @@ export function HomePageContent({
                     products={templateBestSellers}
                     title={bestSellersTitle}
                     titleAr={bestSellersTitleAr}
+                    kicker={layout.bestSellers.kicker}
+                    kickerAr={layout.bestSellers.kickerAr}
+                    subtitle={layout.bestSellers.subtitle}
+                    subtitleAr={layout.bestSellers.subtitleAr}
+                    showKickerLines={layout.bestSellers.showKickerLines}
+                    showSubtitleLines={layout.bestSellers.showSubtitleLines}
                     seeAllHref={storeUrl('/products?sort=best_seller')}
                     isRtl={isRtl}
                     currency={store.currency}

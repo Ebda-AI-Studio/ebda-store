@@ -293,55 +293,18 @@ export default function StoreLayoutPage() {
                     Kicker renders as a small colored chip above the title;
                     subtitle as a tagline below. AI Generate button fills
                     all 4 fields at once based on store context. Ahmad
-                    2026-05-16. */}
-                <div className="mt-3 flex items-center justify-between gap-2">
-                  <p className="text-xs text-muted-foreground">
-                    Optional kicker + subtitle. Leave blank to skip.
-                  </p>
-                  <AiSectionFillButton
-                    storeId={storeId}
-                    section="categories"
-                    existingTitle={layout.categories.title}
-                    existingTitleAr={layout.categories.titleAr}
-                    onFilled={r =>
-                      updateSection('categories', s => ({
-                        ...s,
-                        kicker: s.kicker || r.kicker,
-                        kickerAr: s.kickerAr || r.kickerAr,
-                        subtitle: s.subtitle || r.subtitle,
-                        subtitleAr: s.subtitleAr || r.subtitleAr,
-                      }))
-                    }
-                  />
-                </div>
-                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <TextField
-                    label="Kicker label (EN)"
-                    placeholder="e.g. EXPLORE"
-                    value={layout.categories.kicker ?? ''}
-                    onChange={v => updateSection('categories', s => ({ ...s, kicker: v }))}
-                  />
-                  <TextField
-                    label="Kicker label (AR)"
-                    placeholder="مثال: استكشف"
-                    value={layout.categories.kickerAr ?? ''}
-                    onChange={v => updateSection('categories', s => ({ ...s, kickerAr: v }))}
-                    dir="rtl"
-                  />
-                  <TextField
-                    label="Subtitle (EN)"
-                    placeholder="e.g. Browse our top picks by category"
-                    value={layout.categories.subtitle ?? ''}
-                    onChange={v => updateSection('categories', s => ({ ...s, subtitle: v }))}
-                  />
-                  <TextField
-                    label="Subtitle (AR)"
-                    placeholder="مثال: تصفح أفضل اختياراتنا حسب الفئة"
-                    value={layout.categories.subtitleAr ?? ''}
-                    onChange={v => updateSection('categories', s => ({ ...s, subtitleAr: v }))}
-                    dir="rtl"
-                  />
-                </div>
+                    2026-05-16. The two line-divider toggles below control
+                    the editorial hairlines that flank the kicker/subtitle
+                    text in the shared SectionHeading paths (products
+                    carousel + horizontal-layout categories). Per-theme
+                    grid-layout categories use a chip-style kicker that
+                    doesn't have lines — toggles are a no-op there. */}
+                <KickerSubtitleControls
+                  storeId={storeId}
+                  section="categories"
+                  values={layout.categories}
+                  onPatch={patch => updateSection('categories', s => ({ ...s, ...patch }))}
+                />
                 {/* Card size, aspect, and visual toggles — Ahmad 2026-05-16
                     'make categories smaller + add options through admin'. */}
                 {/* Card size / aspect / toggles — native selects with
@@ -488,6 +451,12 @@ export default function StoreLayoutPage() {
                   onChangeTitle={v => updateSection('newArrivals', s => ({ ...s, title: v }))}
                   onChangeTitleAr={v => updateSection('newArrivals', s => ({ ...s, titleAr: v }))}
                 />
+                <KickerSubtitleControls
+                  storeId={storeId}
+                  section="newArrivals"
+                  values={layout.newArrivals}
+                  onPatch={patch => updateSection('newArrivals', s => ({ ...s, ...patch }))}
+                />
                 <ProductCardControls
                   values={layout.newArrivals}
                   onChange={patch => updateSection('newArrivals', s => ({ ...s, ...patch }))}
@@ -529,6 +498,12 @@ export default function StoreLayoutPage() {
                   placeholderAr={t('sections.bestSellers.headingArPlaceholder')}
                   onChangeTitle={v => updateSection('bestSellers', s => ({ ...s, title: v }))}
                   onChangeTitleAr={v => updateSection('bestSellers', s => ({ ...s, titleAr: v }))}
+                />
+                <KickerSubtitleControls
+                  storeId={storeId}
+                  section="bestSellers"
+                  values={layout.bestSellers}
+                  onPatch={patch => updateSection('bestSellers', s => ({ ...s, ...patch }))}
                 />
                 <ProductCardControls
                   values={layout.bestSellers}
@@ -1027,6 +1002,112 @@ function RowToggle({
       <span className="text-foreground">{label}</span>
       <Toggle checked={checked} onChange={onChange} />
     </label>
+  );
+}
+
+/**
+ * Bundled controls for kicker + subtitle text (bilingual) AND the two
+ * line-divider toggles that surround them (Ahmad 2026-05-17 night —
+ * extracted from the inline Categories block so newArrivals + bestSellers
+ * get the same surface). `showKickerLines` / `showSubtitleLines` default
+ * to true (lines visible) and only affect rendering paths that use the
+ * shared `SectionHeading` component (ProductCarousel + CategoryStrip).
+ * Per-theme `CategoryGrid` paths render their own chip-style heading
+ * which doesn't have flanking lines — toggles are a no-op there.
+ */
+type KickerSubtitleValues = {
+  kicker?: string;
+  kickerAr?: string;
+  subtitle?: string;
+  subtitleAr?: string;
+  title?: string;
+  titleAr?: string;
+  showKickerLines?: boolean;
+  showSubtitleLines?: boolean;
+};
+
+function KickerSubtitleControls({
+  storeId,
+  section,
+  values,
+  onPatch,
+}: {
+  storeId: string;
+  section: 'categories' | 'newArrivals' | 'bestSellers' | 'featured' | 'testimonials';
+  values: KickerSubtitleValues;
+  onPatch: (patch: Partial<KickerSubtitleValues>) => void;
+}) {
+  return (
+    <>
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <p className="text-xs text-muted-foreground">
+          Optional kicker + subtitle. Leave blank to skip.
+        </p>
+        <AiSectionFillButton
+          storeId={storeId}
+          section={section}
+          existingTitle={values.title}
+          existingTitleAr={values.titleAr}
+          onFilled={r =>
+            onPatch({
+              kicker: values.kicker || r.kicker,
+              kickerAr: values.kickerAr || r.kickerAr,
+              subtitle: values.subtitle || r.subtitle,
+              subtitleAr: values.subtitleAr || r.subtitleAr,
+            })
+          }
+        />
+      </div>
+      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <TextField
+          label="Kicker label (EN)"
+          placeholder="e.g. EXPLORE"
+          value={values.kicker ?? ''}
+          onChange={v => onPatch({ kicker: v })}
+        />
+        <TextField
+          label="Kicker label (AR)"
+          placeholder="مثال: استكشف"
+          value={values.kickerAr ?? ''}
+          onChange={v => onPatch({ kickerAr: v })}
+          dir="rtl"
+        />
+        <TextField
+          label="Subtitle (EN)"
+          placeholder="e.g. Browse our top picks"
+          value={values.subtitle ?? ''}
+          onChange={v => onPatch({ subtitle: v })}
+        />
+        <TextField
+          label="Subtitle (AR)"
+          placeholder="مثال: تصفح أفضل اختياراتنا"
+          value={values.subtitleAr ?? ''}
+          onChange={v => onPatch({ subtitleAr: v })}
+          dir="rtl"
+        />
+      </div>
+      <div className="mt-3 rounded-lg border border-dashed border-border bg-muted/20 p-3">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Heading line dividers
+        </p>
+        <p className="mb-3 text-[11px] text-muted-foreground/80">
+          Two short hairline rules drawn before and after the kicker / subtitle text. Turn off for a
+          cleaner look without the surrounding lines.
+        </p>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <RowToggle
+            label="Show lines around kicker"
+            checked={values.showKickerLines !== false}
+            onChange={v => onPatch({ showKickerLines: v })}
+          />
+          <RowToggle
+            label="Show lines around subtitle"
+            checked={values.showSubtitleLines !== false}
+            onChange={v => onPatch({ showSubtitleLines: v })}
+          />
+        </div>
+      </div>
+    </>
   );
 }
 

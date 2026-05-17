@@ -39,7 +39,7 @@ When Ahmad reports a bug or asks for a feature, the fix MUST land in a place whe
 
    Grep the 7 files; if the new pattern doesn't appear in all 7, it isn't shipped. See `feedback-fwb-three-product-render-paths.md`.
 
-2. **Header / footer / nav changes** → must hit ALL 5 themes (`modern/elegant/classic/minimal/bold`). Modern is wadyaljuz's theme so it ships first, but the same commit batch or an immediate follow-up MUST land the same pattern in the other 4.
+2. **Header / footer / nav changes** → must hit ALL 5 themes (`modern/elegant/classic/minimal/bold`). Wadyaljuz uses `elegant` and Palora uses `minimal` (verified against prod 2026-05-17); ship the change in whichever theme the merchant under active review uses FIRST, but the same commit batch or an immediate follow-up MUST land the same pattern in the other 4.
 
 3. **Storefront copy / labels** → goes in `apps/web/src/contexts/LanguageContext.tsx` (the `translations` map) so EN + AR are platform-level. Never hardcode user-facing strings in a theme.
 

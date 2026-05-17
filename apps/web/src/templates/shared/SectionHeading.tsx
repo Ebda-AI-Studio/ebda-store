@@ -17,6 +17,16 @@ interface SectionHeadingProps {
   /** When provided, renders a "see all" link at the end of the heading row. */
   seeAllHref?: string;
   pack?: TemplateId;
+  /**
+   * Flanking hairlines around the kicker text. Default true preserves the
+   * editorial divider look; set false to keep the kicker text alone.
+   */
+  showKickerLines?: boolean;
+  /**
+   * Flanking hairlines around the subtitle text. Default true preserves the
+   * editorial divider look; set false to keep the subtitle text alone.
+   */
+  showSubtitleLines?: boolean;
 }
 
 /**
@@ -34,6 +44,8 @@ export function SectionHeading({
   isRtl,
   seeAllHref,
   pack,
+  showKickerLines = true,
+  showSubtitleLines = true,
 }: SectionHeadingProps) {
   const text = isRtl ? (titleAr ?? title) : (title ?? titleAr);
   const kickerText = isRtl ? (kickerAr ?? kicker) : (kicker ?? kickerAr);
@@ -57,30 +69,35 @@ export function SectionHeading({
         <div className="flex flex-col gap-1.5 sm:gap-2">
           {kickerText && (
             // Editorial section divider — two hairline rules flanking the
-            // kicker text (Ahmad 2026-05-17). Replaces the previous
-            // `bg-primary/10 rounded-full` chip rendering. When a
+            // kicker text (Ahmad 2026-05-17). The flanking lines can be
+            // suppressed per-section via `showKickerLines={false}` (admin
+            // toggle wires to `layout.<section>.showKickerLines`). When a
             // merchant explicitly sets chip styling on the sectionKicker
             // zone (backgroundColor / padding / borderRadius), the
-            // typography emitter in apps/web/src/app/layout.tsx pairs the
-            // chip rule with `[data-kicker-divider-line]{display:none}`
-            // so the chip comes back without the surrounding lines.
+            // typography emitter in apps/web/src/app/layout.tsx ALSO
+            // pairs the chip rule with `[data-kicker-divider-line]{display:none}`
+            // so the chip-style escape hatch still works.
             <div className="self-stretch flex items-center justify-center gap-3 sm:gap-4">
-              <span
-                aria-hidden
-                data-kicker-divider-line
-                className="h-px flex-1 max-w-[140px] sm:max-w-[200px] bg-foreground/30"
-              />
+              {showKickerLines && (
+                <span
+                  aria-hidden
+                  data-kicker-divider-line
+                  className="h-px flex-1 max-w-[140px] sm:max-w-[200px] bg-foreground/30"
+                />
+              )}
               <span
                 className="text-base font-semibold uppercase tracking-[0.18em] text-foreground/70"
                 data-zone="sectionKicker"
               >
                 {kickerText}
               </span>
-              <span
-                aria-hidden
-                data-kicker-divider-line
-                className="h-px flex-1 max-w-[140px] sm:max-w-[200px] bg-foreground/30"
-              />
+              {showKickerLines && (
+                <span
+                  aria-hidden
+                  data-kicker-divider-line
+                  className="h-px flex-1 max-w-[140px] sm:max-w-[200px] bg-foreground/30"
+                />
+              )}
             </div>
           )}
           {text && (
@@ -92,6 +109,7 @@ export function SectionHeading({
             // Subtitle renders with flanking hairlines matching the
             // SectionKicker editorial-divider style (Ahmad 2026-05-17
             // evening — was manually typing "--- text ---" to fake it).
+            // Lines suppressible per-section via `showSubtitleLines={false}`.
             // Long descriptive subtitles still look fine with the lines
             // — they extend `flex-1` to fill but cap at max-w so they
             // never dominate. Same `bg-foreground/30` opacity as the
@@ -100,17 +118,21 @@ export function SectionHeading({
               className="self-stretch flex items-center justify-center gap-3 sm:gap-4"
               data-zone="sectionSubtitle"
             >
-              <span
-                aria-hidden
-                data-subtitle-divider-line
-                className="h-px flex-1 max-w-[140px] sm:max-w-[200px] bg-foreground/30"
-              />
+              {showSubtitleLines && (
+                <span
+                  aria-hidden
+                  data-subtitle-divider-line
+                  className="h-px flex-1 max-w-[140px] sm:max-w-[200px] bg-foreground/30"
+                />
+              )}
               <p className="text-xl text-muted-foreground max-w-2xl">{subtitleText}</p>
-              <span
-                aria-hidden
-                data-subtitle-divider-line
-                className="h-px flex-1 max-w-[140px] sm:max-w-[200px] bg-foreground/30"
-              />
+              {showSubtitleLines && (
+                <span
+                  aria-hidden
+                  data-subtitle-divider-line
+                  className="h-px flex-1 max-w-[140px] sm:max-w-[200px] bg-foreground/30"
+                />
+              )}
             </div>
           )}
         </div>

@@ -24,6 +24,8 @@ export function CategoryStrip({
   kickerAr,
   subtitle,
   subtitleAr,
+  showKickerLines,
+  showSubtitleLines,
   seeAllHref,
   isRtl,
   urlPrefix = '',
@@ -51,6 +53,8 @@ export function CategoryStrip({
           kickerAr={kickerAr}
           subtitle={subtitle}
           subtitleAr={subtitleAr}
+          showKickerLines={showKickerLines}
+          showSubtitleLines={showSubtitleLines}
           isRtl={isRtl}
           seeAllHref={seeAllHref}
           pack={pack}

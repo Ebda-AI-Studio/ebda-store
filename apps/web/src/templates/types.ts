@@ -312,6 +312,16 @@ export interface ProductCarouselProps {
   products: TemplateProduct[];
   title?: string;
   titleAr?: string;
+  /** Small uppercase eyebrow badge above the title. */
+  kicker?: string;
+  kickerAr?: string;
+  /** Tagline rendered below the title. */
+  subtitle?: string;
+  subtitleAr?: string;
+  /** Toggle the flanking editorial hairlines around the kicker. Default true. */
+  showKickerLines?: boolean;
+  /** Toggle the flanking editorial hairlines around the subtitle. Default true. */
+  showSubtitleLines?: boolean;
   /** Optional href for the "See all" link. Hidden when omitted. */
   seeAllHref?: string;
   isRtl?: boolean;
@@ -343,6 +353,10 @@ export interface CategoryStripProps {
   kickerAr?: string;
   subtitle?: string;
   subtitleAr?: string;
+  /** Toggle flanking hairlines around the kicker. Default true. */
+  showKickerLines?: boolean;
+  /** Toggle flanking hairlines around the subtitle. Default true. */
+  showSubtitleLines?: boolean;
   seeAllHref?: string;
   isRtl?: boolean;
   urlPrefix?: string;
@@ -465,6 +479,10 @@ export interface CategoryGridProps {
   /** Tagline rendered below the title. */
   subtitle?: string;
   subtitleAr?: string;
+  /** Toggle flanking hairlines around the kicker. Default true. */
+  showKickerLines?: boolean;
+  /** Toggle flanking hairlines around the subtitle. Default true. */
+  showSubtitleLines?: boolean;
   /** Per-store card size override. */
   cardSize?: import('@force/shared').CardSize;
   /** Per-store card aspect override. */

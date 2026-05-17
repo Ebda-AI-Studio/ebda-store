@@ -31,6 +31,12 @@ export function ProductCarousel({
   products,
   title,
   titleAr,
+  kicker,
+  kickerAr,
+  subtitle,
+  subtitleAr,
+  showKickerLines,
+  showSubtitleLines,
   seeAllHref,
   isRtl,
   currency = 'KWD',
@@ -135,6 +141,12 @@ export function ProductCarousel({
         <SectionHeading
           title={title}
           titleAr={titleAr}
+          kicker={kicker}
+          kickerAr={kickerAr}
+          subtitle={subtitle}
+          subtitleAr={subtitleAr}
+          showKickerLines={showKickerLines}
+          showSubtitleLines={showSubtitleLines}
           isRtl={isRtl}
           seeAllHref={seeAllHref}
           pack={pack}
