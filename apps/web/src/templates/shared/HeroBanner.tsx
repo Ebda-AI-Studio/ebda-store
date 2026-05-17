@@ -35,19 +35,17 @@ export function HeroBanner({
   // Mobile-specific source falls back to the desktop image when not set.
   const dedicatedMobileSrc = (isRtl && imageMobileAr) || imageMobile;
   const mobileSrc = dedicatedMobileSrc || desktopSrc;
-  // Mobile aspect tracks what the merchant actually uploaded:
-  //   - dedicated mobile image present → 3:4 portrait (matches the admin
-  //     ImageUpload's aspectRatio="3/4" + server-side sharp resize, +
-  //     the design.md canonical mobile hero size 800×1067). Using a
-  //     landscape wrapper crops the top of a portrait image — verified
-  //     2026-05-17 with wadyaljuz's olive-jar banner where the title
-  //     "من الوادي إلى الأيادي" was being cut off at the top.
-  //   - only desktop image present → 3:2 landscape fallback so the wide
-  //     cinematic crop renders sensibly on mobile without huge letterbox
-  //     bars. Forcing 3:4 on a landscape source would over-crop the sides.
-  // Desktop aspect matches the design.md canonical hero size 1920×700
-  // (zFloos brief) — slightly wider than the previous 2.4:1 (1920×800).
-  const mobileAspectClass = dedicatedMobileSrc ? 'aspect-[3/4]' : 'aspect-[3/2]';
+  // Mobile hero is always LANDSCAPE — Ahmad 2026-05-18 directive
+  // "the mobile hero banner i want it horizontal not vertical or
+  // portrait". Container aspect matches the desktop image (1920:700)
+  // so the same landscape banner renders edge-to-edge with no side
+  // crop on either breakpoint. The dedicated mobile image upload is
+  // still honored as a source override (different content / higher-res
+  // close-up) — but it's rendered in the same landscape container.
+  // Merchants should now upload mobile-specific images in landscape
+  // crops, not portrait. Old portrait crops (if any merchant uploaded
+  // one) will get letterboxed top + bottom on mobile.
+  const mobileAspectClass = 'aspect-[1920/700]';
   const text = isRtl ? (headlineAr ?? headline) : (headline ?? headlineAr);
   const subtitleText = isRtl ? (subtitleAr ?? subtitle) : (subtitle ?? subtitleAr);
   const cta = isRtl ? (ctaTextAr ?? ctaText) : (ctaText ?? ctaTextAr);

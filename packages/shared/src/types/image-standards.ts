@@ -39,11 +39,17 @@ export const IMAGE_STANDARDS = {
     description: 'Hero slider — desktop. Text/CTA must fit inside center 900px safe zone.',
   },
   heroMobile: {
-    width: 800,
-    height: 1067,
-    aspect: '3:4',
+    // 2026-05-18 (Ahmad directive): mobile hero is ALWAYS landscape, not
+    // portrait. Container aspect matches desktop. This entry is the
+    // RECOMMENDED smaller landscape crop merchants can upload to save
+    // mobile bandwidth — but it's optional; the storefront serves the
+    // desktop image down-sampled if no mobile image is uploaded.
+    width: 1080,
+    height: 394,
+    aspect: '~2.74:1',
     formats: ['JPEG', 'WebP'],
-    description: 'Hero slider — mobile portrait crop. Separate upload from desktop.',
+    description:
+      'Hero — mobile-optimized landscape crop (optional). Same aspect as desktop, smaller file.',
   },
   bannerDesktop: {
     width: 1920,

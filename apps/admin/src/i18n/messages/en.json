@@ -923,7 +923,7 @@
             "imageDesktopHint": "Recommended 1920×700 (~2.74:1)",
             "imageDesktopAr": "Arabic desktop image (optional)",
             "imageMobile": "Mobile image",
-            "imageMobileHint": "Recommended 800×1067 (3:4)",
+            "imageMobileHint": "Optional landscape crop — recommended 1080×394 (same aspect as desktop, smaller file)",
             "imageMobileAr": "Arabic mobile image (optional)",
             "alt": "Alt text",
             "altPlaceholder": "Describe the image",

@@ -68,13 +68,12 @@ export function HeroSlider({
     );
   }
 
-  // Mobile aspect tracks the merchant's content: if ANY slide ships a
-  // dedicated mobile (portrait) image, the carousel container goes 3:4
-  // portrait on mobile so those images render edge-to-edge. Otherwise
-  // 3:2 landscape so desktop images don't get massive letterbox bars.
-  // Mirrors the same decision in HeroBanner.tsx.
-  const hasDedicatedMobile = slides.some(s => Boolean(s.imageMobile) || Boolean(s.imageMobileAr));
-  const mobileAspectClass = hasDedicatedMobile ? 'aspect-[3/4]' : 'aspect-[3/2]';
+  // Mobile hero is always LANDSCAPE — Ahmad 2026-05-18 directive (see
+  // HeroBanner.tsx for the full rationale). Carousel container aspect
+  // matches the canonical 1920×700 desktop hero on both breakpoints.
+  // Dedicated mobile images are still honored as sources but render in
+  // the same landscape container.
+  const mobileAspectClass = 'aspect-[1920/700]';
 
   // Touch swipe — 40px threshold, RTL-aware direction.
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -104,7 +103,7 @@ export function HeroSlider({
       onTouchEnd={handleTouchEnd}
       aria-roledescription="carousel"
     >
-      <div className={`relative ${mobileAspectClass} sm:aspect-[2.45/1]`}>
+      <div className={`relative ${mobileAspectClass} sm:aspect-[1920/700]`}>
         {slides.map((slide, i) => (
           <div
             key={i}
