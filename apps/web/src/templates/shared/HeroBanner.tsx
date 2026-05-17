@@ -31,11 +31,18 @@ export function HeroBanner({
 }: HeroBannerProps) {
   const desktopSrc = (isRtl && imageAr) || image;
   // Mobile-specific source falls back to the desktop image when not set.
-  // Aspect: 3:2 landscape on mobile (matches pecannbee + bank-alkahraman target
-  // sizing, see 2026-05-16-mobile-ui-ship.md), 2.4:1 on desktop. The change
-  // from the previous 3:4 portrait keeps the hero above the fold while
-  // leaving room for the category-grid preview below.
-  const mobileSrc = (isRtl && imageMobileAr) || imageMobile || desktopSrc;
+  const dedicatedMobileSrc = (isRtl && imageMobileAr) || imageMobile;
+  const mobileSrc = dedicatedMobileSrc || desktopSrc;
+  // Mobile aspect tracks what the merchant actually uploaded:
+  //   - dedicated mobile image present → 3:4 portrait (matches the admin
+  //     ImageUpload's aspectRatio="3/4" + server-side sharp resize). Using
+  //     a landscape wrapper here crops the top of the image — verified
+  //     2026-05-17 with wadyaljuz's olive-jar banner where the title
+  //     "من الوادي إلى الأيادي" was being cut off at the top.
+  //   - only desktop image present → 3:2 landscape so the wide cinematic
+  //     crop renders sensibly on mobile without huge letterbox bars.
+  // Desktop stays at 2.4:1 either way.
+  const mobileAspectClass = dedicatedMobileSrc ? 'aspect-[3/4]' : 'aspect-[3/2]';
   const text = isRtl ? (headlineAr ?? headline) : (headline ?? headlineAr);
   const subtitleText = isRtl ? (subtitleAr ?? subtitle) : (subtitle ?? subtitleAr);
   const cta = isRtl ? (ctaTextAr ?? ctaText) : (ctaText ?? ctaTextAr);
@@ -44,7 +51,7 @@ export function HeroBanner({
 
   return (
     <section
-      className="relative w-full overflow-hidden bg-muted aspect-[3/2] sm:aspect-[2.4/1]"
+      className={`relative w-full overflow-hidden bg-muted ${mobileAspectClass} sm:aspect-[2.4/1]`}
       dir={isRtl ? 'rtl' : 'ltr'}
     >
       {desktopSrc && (

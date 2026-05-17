@@ -1,5 +1,7 @@
 import { prisma } from '@force/database';
 import { AppError } from '../middleware/error-handler';
+import logger from '../lib/logger';
+import { deleteR2ObjectIfOrphan } from './r2-cleanup.service';
 
 /**
  * Per-store Pages CMS service.
@@ -269,11 +271,36 @@ export class PagesService {
       position: payload.position ?? 0,
     };
 
-    return prisma.storePage.upsert({
+    // Snapshot the previous coverImage so the R2 object behind a replaced
+    // banner gets queued for cleanup post-write. Fetch is best-effort —
+    // if the row doesn't exist yet (create path) `previous` is null and
+    // the cleanup is a no-op.
+    const existing =
+      payload.coverImage !== undefined
+        ? await prisma.storePage.findUnique({
+            where: { storeId_slug: { storeId, slug } },
+            select: { coverImage: true },
+          })
+        : null;
+    const previousCover = existing?.coverImage ?? null;
+
+    const page = await prisma.storePage.upsert({
       where: { storeId_slug: { storeId, slug } },
       create: createData,
       update: updateData,
     });
+
+    if (
+      payload.coverImage !== undefined &&
+      previousCover &&
+      previousCover !== (payload.coverImage ?? null)
+    ) {
+      void deleteR2ObjectIfOrphan(previousCover).catch(err =>
+        logger.warn({ err, storeId, slug }, '[pages.upsert] r2 cleanup failed')
+      );
+    }
+
+    return page;
   }
 
   /**

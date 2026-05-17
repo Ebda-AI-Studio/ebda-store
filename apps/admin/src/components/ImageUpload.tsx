@@ -126,16 +126,19 @@ export function ImageUpload({
   aspectRatio = 'free',
   recommendedSizeHint,
 }: ImageUploadProps) {
-  // Map aspect ratio to a Tailwind class. Used on both the empty dropzone
-  // and the post-upload preview so the merchant sees the same rectangle
-  // shape the storefront will render in.
+  // Map aspect ratio to a Tailwind class. Used on the empty dropzone so
+  // the merchant sees the same rectangle the storefront will render in.
+  // Every non-'free' ratio gets a max-width cap — without one, the box
+  // spans the full form column and creates a giant empty square (e.g.
+  // the category-form 1/1 box collapsed to a ~600px-tall square with a
+  // 96px-tall thumbnail floating inside, reported 2026-05-17).
   const aspectClass =
     aspectRatio === '3/2'
-      ? 'aspect-[3/2]'
+      ? 'aspect-[3/2] max-w-sm'
       : aspectRatio === '3/4'
         ? 'aspect-[3/4] max-w-xs'
         : aspectRatio === '1/1'
-          ? 'aspect-square'
+          ? 'aspect-square max-w-xs'
           : '';
   const t = useT('components.imageUpload');
   const resolvedLabel = label ?? t('label');
@@ -189,11 +192,14 @@ export function ImageUpload({
   }, [value, onRemove]);
 
   if (value) {
+    // Preview path: skip the aspect wrapper — the inner thumbnail is a
+    // fixed 96px-tall image, so wrapping it in an aspect-square or
+    // aspect-[3/2] box paints a giant empty rectangle around a tiny
+    // image. The wrapper only makes sense on the empty dropzone where
+    // the dashed-border frame benefits from the shape preview.
     return (
       <div className={className}>
-        <div className={aspectClass}>
-          <UploadPreview value={value} alt={resolvedLabel} onRemove={handleRemoveWithR2} />
-        </div>
+        <UploadPreview value={value} alt={resolvedLabel} onRemove={handleRemoveWithR2} />
         {recommendedSizeHint && (
           <p className="mt-2 text-xs text-muted-foreground">{recommendedSizeHint}</p>
         )}

@@ -15,6 +15,8 @@ import { authenticate } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { getAuthUser } from '../utils/store-helpers';
+import { cleanupRemovedJsonUrls } from '../services/r2-cleanup.service';
+import logger from '../lib/logger';
 
 const router = Router({ mergeParams: true });
 
@@ -217,8 +219,9 @@ router.put(
         where: { id: storeId },
         select: { layoutSettings: true },
       });
+      const previousLayout = current?.layoutSettings ?? {};
       const merged = resolveLayoutSettings({
-        ...resolveLayoutSettings(current?.layoutSettings ?? {}),
+        ...resolveLayoutSettings(previousLayout),
         ...patch,
       });
 
@@ -226,6 +229,14 @@ router.put(
         where: { id: storeId },
         data: { layoutSettings: merged as unknown as object },
       });
+
+      // Diff every image URL nested inside the layout JSON (hero slides,
+      // banner blocks, etc.) and queue cleanup for any that dropped out.
+      // Replacing a hero slide image without this leaks the previous R2
+      // object — verified 2026-05-17 with 4 stale hero/* keys.
+      void cleanupRemovedJsonUrls(previousLayout, merged).catch(err =>
+        logger.warn({ err, storeId }, '[store-layout.put] r2 cleanup failed')
+      );
 
       await auditLog({
         action: 'store.layout.updated',

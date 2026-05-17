@@ -4,6 +4,7 @@ import { slugify } from '@force/shared';
 import { redis } from './redis.service';
 import { invalidateCached, invalidateCachedPrefix } from '../lib/public-cache';
 import logger from '../lib/logger';
+import { cleanupRemovedImages, deleteR2ObjectIfOrphan } from './r2-cleanup.service';
 
 /**
  * Bust every public-cache entry that depends on a store record. The
@@ -201,6 +202,10 @@ export class StoreService {
 
   static async update(storeId: string, data: UpdateStoreData) {
     const store = await this.getById(storeId);
+    // Snapshot the heroImage URL so a replaced banner gets the old R2
+    // object cleaned up post-commit. Same posture as branding / seo /
+    // category / page cover paths.
+    const previousHeroImage = (store as { heroImage?: string | null }).heroImage ?? null;
 
     // Auto-deduplicate slug if changing
     if (data.slug && data.slug !== store.slug) {
@@ -273,6 +278,13 @@ export class StoreService {
     }
 
     await bustStoreCaches(updatedStore.id, updatedStore.slug);
+
+    if (data.heroImage !== undefined && previousHeroImage && previousHeroImage !== data.heroImage) {
+      void deleteR2ObjectIfOrphan(previousHeroImage).catch(err =>
+        logger.warn({ err, storeId }, '[store.update] hero r2 cleanup failed')
+      );
+    }
+
     return updatedStore;
   }
 
@@ -473,6 +485,35 @@ export class StoreService {
 
     await StoreService.invalidateCache(store);
     await bustStoreCaches(updatedStore.id, updatedStore.slug);
+
+    // Diff the three image fields and queue cleanup for any URL that
+    // was replaced. `undefined` in the patch means "leave existing", so
+    // only fire when the caller explicitly sent the field.
+    const oldUrls: string[] = [];
+    const newUrls: string[] = [];
+    const s = store as {
+      logo?: string | null;
+      logoAr?: string | null;
+      favicon?: string | null;
+    };
+    if (branding.logo !== undefined) {
+      if (s.logo) oldUrls.push(s.logo);
+      if (branding.logo) newUrls.push(branding.logo);
+    }
+    if (branding.logoAr !== undefined) {
+      if (s.logoAr) oldUrls.push(s.logoAr);
+      if (branding.logoAr) newUrls.push(branding.logoAr);
+    }
+    if (branding.favicon !== undefined) {
+      if (s.favicon) oldUrls.push(s.favicon);
+      if (branding.favicon) newUrls.push(branding.favicon);
+    }
+    if (oldUrls.length > 0) {
+      void cleanupRemovedImages(oldUrls, newUrls).catch(err =>
+        logger.warn({ err, storeId }, '[store.updateBranding] r2 cleanup failed')
+      );
+    }
+
     return updatedStore;
   }
 
@@ -546,6 +587,7 @@ export class StoreService {
     }
   ) {
     const store = await this.getById(storeId);
+    const previousOgImage = (store as { ogImage?: string | null }).ogImage ?? null;
 
     const updatedStore = await prisma.store.update({
       where: { id: storeId },
@@ -563,6 +605,13 @@ export class StoreService {
 
     await StoreService.invalidateCache(store);
     await bustStoreCaches(updatedStore.id, updatedStore.slug);
+
+    if (seo.ogImage !== undefined && previousOgImage && previousOgImage !== seo.ogImage) {
+      void deleteR2ObjectIfOrphan(previousOgImage).catch(err =>
+        logger.warn({ err, storeId }, '[store.updateSeo] og-image r2 cleanup failed')
+      );
+    }
+
     return updatedStore;
   }
 

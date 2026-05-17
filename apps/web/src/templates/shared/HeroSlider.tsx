@@ -60,6 +60,14 @@ export function HeroSlider({ slides, autoplayMs = 5000, isRtl, pack }: HeroSlide
     return <HeroBanner {...slides[0]} isRtl={isRtl} pack={pack} priority />;
   }
 
+  // Mobile aspect tracks the merchant's content: if ANY slide ships a
+  // dedicated mobile (portrait) image, the carousel container goes 3:4
+  // portrait on mobile so those images render edge-to-edge. Otherwise
+  // 3:2 landscape so desktop images don't get massive letterbox bars.
+  // Mirrors the same decision in HeroBanner.tsx.
+  const hasDedicatedMobile = slides.some(s => Boolean(s.imageMobile) || Boolean(s.imageMobileAr));
+  const mobileAspectClass = hasDedicatedMobile ? 'aspect-[3/4]' : 'aspect-[3/2]';
+
   // Touch swipe — 40px threshold, RTL-aware direction.
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartXRef.current = e.touches[0]?.clientX ?? null;
@@ -88,7 +96,7 @@ export function HeroSlider({ slides, autoplayMs = 5000, isRtl, pack }: HeroSlide
       onTouchEnd={handleTouchEnd}
       aria-roledescription="carousel"
     >
-      <div className="relative" style={{ aspectRatio: '2.45 / 1' }}>
+      <div className={`relative ${mobileAspectClass} sm:aspect-[2.45/1]`}>
         {slides.map((slide, i) => (
           <div
             key={i}

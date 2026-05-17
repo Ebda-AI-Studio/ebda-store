@@ -131,3 +131,41 @@ export function cleanupRemovedImages(
   if (removed.length === 0) return Promise.resolve();
   return Promise.all(removed.map(url => deleteR2ObjectIfOrphan(url))).then(() => undefined);
 }
+
+/**
+ * Recursively walk a JSON value (object / array / string) and collect
+ * every string that looks like an http(s) URL. Used by JSON-blob columns
+ * (Store.layoutSettings, announcementBar, etc.) where image URLs may be
+ * nested arbitrarily — mirrors the walker in scripts/r2-orphan-audit.ts
+ * so the runtime cleanup and the periodic audit see the same surface.
+ */
+export function collectUrlsFromJson(value: unknown): string[] {
+  const out: string[] = [];
+  const visit = (v: unknown): void => {
+    if (v == null) return;
+    if (typeof v === 'string') {
+      if (v.startsWith('http://') || v.startsWith('https://')) out.push(v);
+      return;
+    }
+    if (Array.isArray(v)) {
+      for (const item of v) visit(item);
+      return;
+    }
+    if (typeof v === 'object') {
+      for (const inner of Object.values(v as Record<string, unknown>)) visit(inner);
+    }
+  };
+  visit(value);
+  return out;
+}
+
+/**
+ * Diff two JSON blobs by the URLs they contain and clean up any URL
+ * that disappeared. Use this for JSON columns like
+ * `Store.layoutSettings` (hero slides, banner blocks, etc.) where the
+ * admin replaces the whole blob on save — without this diff, every
+ * banner-image swap leaks the previous R2 object.
+ */
+export function cleanupRemovedJsonUrls(oldJson: unknown, newJson: unknown): Promise<void> {
+  return cleanupRemovedImages(collectUrlsFromJson(oldJson), collectUrlsFromJson(newJson));
+}
