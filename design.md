@@ -68,11 +68,79 @@ opts up via admin if their brand needs heading prominence.
 
 ---
 
+## Image asset standards (canonical designer brief — 2026-05-17 night)
+
+**Hand this section to any designer / photographer / merchant uploading visual assets.** Every image-bearing surface on FWB expects the dimensions below. Anything off-spec gets cropped or scaled by the storefront and reads as broken (unsafe-zone text disappears, faces get clipped, logos rasterize). Sourced from the zFloos theme brief Ahmad shared 2026-05-17; cross-checked against current FWB component aspect-ratios.
+
+### Why standardize the sizes
+
+- One spec → one designer ask → one upload flow. Merchants stop guessing what aspect ratio "looks right."
+- The platform's image pipeline (Cloudflare R2 + Next.js `<Image>`) needs to know the source dimensions to pick the right `srcset` candidates. Off-spec uploads get served at the wrong density on retina.
+- WebP / AVIF conversion preserves aspect — input aspect == output aspect. Wrong source aspect = wrong rendered crop forever.
+- Mobile traffic is the majority — every "mobile crop" entry below MUST be uploadable separately if the desktop crop wouldn't reflow gracefully.
+
+### The canonical sizes
+
+All sizes are SOURCE dimensions (the file the designer/photographer delivers). The storefront downscales automatically via `<Image>` srcset; never the other way around.
+
+| Surface                           | Source size (W × H)              | Aspect       | Safe zone (text/CTA)           | Format            | Notes                                                                                                                                                                                                   |
+| --------------------------------- | -------------------------------- | ------------ | ------------------------------ | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Hero slider (desktop)**         | **1920 × 700 px**                | ~2.74:1      | center 900 × 700 ("Safe Zone") | JPEG / WebP       | Anything outside the 900px-wide center safe zone gets cropped on mobile + small desktop. Headline + CTA MUST live inside the safe zone. Source from zFloos brief.                                       |
+| **Hero slider (mobile crop)**     | **800 × 1067 px** (3:4 portrait) | 3:4          | full canvas                    | JPEG / WebP       | Separate upload — desktop hero doesn't reflow to portrait without losing the subject. Merchants supply both via the slider editor's "Desktop image" + "Mobile image" pair (already supported).          |
+| **Single banner (full-width)**    | **1920 × 400 px**                | 4.8:1        | center 900 × 400               | JPEG / WebP       | Below-hero promotional strip ("Free shipping" / "New collection" etc.). Same safe-zone rule as hero — text only in center 900px.                                                                        |
+| **Single banner (mobile crop)**   | **800 × 600 px** (4:3)           | 4:3          | full                           | JPEG / WebP       | Reflow alternative when 1920×400 is too thin on mobile.                                                                                                                                                 |
+| **Product image (primary)**       | **600 × 800 px**                 | 3:4 portrait | full                           | JPEG / WebP       | The canonical product photo aspect. Source from zFloos. All ProductCard render paths (PecannbeeProductCard + 5 theme ProductCards + ProductCarousel) cap at this ratio.                                 |
+| **Product image (secondary)**     | **600 × 800 px**                 | 3:4          | full                           | JPEG / WebP       | Gallery shots — same aspect as primary so the swap doesn't reflow the PDP.                                                                                                                              |
+| **Product image (square mode)**   | **800 × 800 px**                 | 1:1          | full                           | JPEG / WebP       | Optional alt-aspect when the merchant picks `cardAspect: 'square'` in admin. Source delivery: shoot 800×800 OR center-crop the 600×800 to 600×600 then upscale.                                         |
+| **Category card (default)**       | **800 × 800 px**                 | 1:1          | full                           | JPEG / WebP / PNG | Square-by-default per CategoryCard pack-styles. Persona overrides (Classic = circle / Elegant = portrait 3:4) crop in-CSS, not source.                                                                  |
+| **Category card (portrait mode)** | **600 × 800 px**                 | 3:4          | full                           | JPEG / WebP       | When `cardShape: 'portrait'` is set in admin.                                                                                                                                                           |
+| **Brand logo (carousel)**         | **300 × 150 px**                 | 2:1          | full                           | PNG (transparent) | Small marks for the "Our Brands" carousel. Transparent background MANDATORY — colored bg looks like a sticker on the section.                                                                           |
+| **Brand logo (footer)**           | **200 × 80 px**                  | 2.5:1        | full                           | PNG / SVG         | Smaller footer mark. SVG preferred for retina.                                                                                                                                                          |
+| **Category icon (carousel)**      | **120 × 120 px**                 | 1:1          | full                           | SVG / PNG         | Simple line icons (best-seller medal / shirt / vase / sunglasses). Outlined style at 2px stroke. SVG preferred.                                                                                         |
+| **Store logo (header)**           | **400 × 200 px**                 | 2:1          | full                           | SVG / PNG         | Header wordmark. Renders at h-24 mobile / h-36 desktop per CLAUDE.md logo override — source must have enough resolution for retina at h-36 (= 144px height @ 2x = 288px). Recommend 400×200 PNG or SVG. |
+| **Favicon / PWA icon**            | **512 × 512 px**                 | 1:1          | full                           | PNG               | Square. Generates the favicon + Apple touch icon + PWA manifest icons via the `manifest.ts` route.                                                                                                      |
+| **OG image (social share)**       | **1200 × 630 px**                | ~1.91:1      | center 900 × 470               | JPEG / PNG        | Facebook + Twitter + LinkedIn card image. Headline-style imagery in the safe zone. Generated via Next.js `og.tsx` route per page when not custom-uploaded.                                              |
+| **PWA splash screen**             | **1080 × 1920 px**               | 9:16         | center 540 × 960               | PNG               | iOS / Android PWA install splash. Centered logo + brand color background. Generated via PWA build hooks.                                                                                                |
+
+### Mobile-first delivery rules
+
+1. **Two crops per landscape banner** — every hero / single banner needs a desktop horizontal (1920×wide) AND a mobile vertical (800×tall). The slider editor + banner uploader already accept both — designers must deliver both.
+2. **Square is the safe default for any non-banner asset** — when in doubt, ship 1:1 (product, category, brand logo). Square reflows cleanly to every breakpoint without crop surprises.
+3. **Safe zone = 65% of the canvas centered** — for ANY banner the text + CTA must fit inside the center 65% horizontally, so mobile crops don't lose the message. zFloos brief calls this out for the hero (900 in 1920 ≈ 47%) but our 65% recommendation is more generous + accounts for tablet portrait.
+4. **No text baked into product photos.** Product images are PHOTOS only — promotional text ("SALE 30%") goes in the platform's badge overlay (handled by `ProductCard`), never in the source image. Same for "NEW" / "BESTSELLER" badges. Bakings text into a photo = no localization + no merchant edit.
+5. **Bilingual variants** — if the source image has Arabic OR English text (a hero with "حصري" or "EXCLUSIVE"), the slider/banner uploader accepts a per-locale variant (`image` + `imageAr`). Designers should deliver Arabic + English versions of any text-carrying banner.
+6. **Compression** — JPEG quality 80 for photos; PNG-8 for logos; SVG for icons + logos when the asset is purely line-art. Target: < 200KB per hero image after WebP conversion (Cloudflare R2 polyfill auto-converts on upload).
+7. **Retina** — for ANY source where the rendered display dimension might equal the source dimension, deliver at 2× (e.g. category icon renders at 60×60 on mobile = source 120×120). For hero / single banners the 1920px source is already > 2× any reasonable display width, no further upsampling needed.
+
+### Anti-patterns
+
+- ❌ Delivering a hero at 1200×500 because "the merchant only needs that much resolution." On retina laptops the rendered display is 1440-1920px wide; anything < 1920 source upscales and reads soft.
+- ❌ Delivering product photos at 1000×1000 when the cardAspect default is 3:4 — wastes 25% of pixels in the crop. Either deliver 600×800 OR 800×1067 (2x retina of 400×534).
+- ❌ White-bg PNG for a brand logo. Brand carousels render on cream/black/colored backgrounds per theme — opaque white bg = visible white rectangle around the logo.
+- ❌ Square hero. Hero is a HORIZONTAL surface on desktop; square fits the slider but wastes 50% of the canvas. If the merchant has only square assets, route them through ProductCard imagery or the brand-story block, not hero.
+- ❌ Logo at h-16 source resolution. We render at h-36 = 144px, so a 64-pixel source logo upscales 2.3× and gets pixel-fringes on retina.
+
+### How merchants upload (admin paths)
+
+- Hero slides → `Admin → Layout → Hero → Slides → Image (desktop) + Image (mobile) + Image (desktop AR) + Image (mobile AR)`. Quad-variant upload already supported.
+- Single banner → roadmap (not yet shipped — will live at `Admin → Layout → Promo banner`).
+- Product images → `Admin → Products → <product> → Images` (multi-image upload, primary first).
+- Category images → `Admin → Categories → <category> → Image`.
+- Brand logos → `Admin → Brands → <brand> → Logo` (when Brands module is built; roadmap).
+- Store logo → `Admin → Branding → Logo (light) + Logo (dark)`.
+- Favicon / OG image → `Admin → Branding → Identity → Favicon + OG image`.
+
+Where a path is "roadmap" the asset spec still applies — when the surface ships, the size is locked.
+
+---
+
 ## 5 theme personas + per-theme token spec (2026-05-17 night)
 
 **Mobile-first because most visitors are on phones.** Every per-theme spec below leads with the mobile token; the desktop token follows after `→`. Themes inherit the platform's compact sizing + 16px floor (rules above) — what changes per theme is the **persona** (color mood + type voice + chrome language + motion timing).
 
 **Why personas, not styling variants:** Ahmad's 2026-05-17 read on the live site was that the 5 themes look too similar — same rounded sans-serif card + foreground border + 500ms hover, with only weight differing. The fix is to push each theme into a distinct merchant archetype so a buyer of one theme is making a brand-vibe choice, not a styling tweak. Stitch mockups generated 2026-05-17 night against the four non-elegant personas; elegant kept its as-shipped spec.
+
+> **Color rule (every theme, no exceptions): accent is always merchant-derived via `theme.primaryColor`.** Per-theme `accent` cells below describe ROLE + DENSITY (saturated / rich-traditional / muted / high-vis), never literal values. Neutrals (`bg-page`, `bg-surface`, `fg`, `muted`) ARE persona-defined because they carry the mood, but `accent` ALWAYS picks up the merchant's brand color. Stitch mockups (below) were generated with sample accents (violet / oxblood / sage / yellow) for visual reference only — in production those slots hold whatever brand color the merchant configured.
 
 ### Mobile-first axioms (apply to every theme)
 
@@ -102,27 +170,27 @@ opts up via admin if their brand needs heading prominence.
 
 **Mood:** crisp, electric, current. Optimistic. Single accent color does ALL the heavy lifting.
 
-| Token              | Mobile                                     | → Desktop   | Notes                             |
-| ------------------ | ------------------------------------------ | ----------- | --------------------------------- |
-| `bg-page`          | `#FAFAFA`                                  | same        | near-white, not pure              |
-| `bg-surface`       | `#FFFFFF`                                  | same        | cards                             |
-| `fg`               | `#0A0A0A`                                  | same        | near-black                        |
-| `accent`           | `#7C3AED` (electric violet)                | same        | only accent color, used sparingly |
-| `muted`            | `foreground/55`                            | same        | subtitle, captions                |
-| Font family        | Inter / Geist                              | same        | sans-serif, modern grotesque      |
-| Section heading    | 22px `font-semibold` tracking-tight        | 28px        | NO flanking lines                 |
-| Section kicker     | 11px uppercase `font-medium` tracking-wide | 12px        | text-only, no chip, NO lines      |
-| Section subtitle   | 14px `font-normal`                         | 16px        | NO lines                          |
-| Product card name  | 14px `font-semibold`                       | 14px → 16px |                                   |
-| Product card price | 14px `font-bold` accent color              | same        | accent (violet)                   |
-| Card chrome        | `rounded-2xl` `border-border/60`           | same        | subtle                            |
-| Card hover         | `-translate-y-0.5` + `shadow-md` 500ms     | same        | gentle lift                       |
-| Category card      | `rounded-xl` aspect-square                 | same        | rectangular tiles                 |
-| Header height      | 48px                                       | 56px        | wordmark left + cart/menu right   |
-| CTA / Button       | `rounded-2xl` solid accent                 | same        | match card radius                 |
-| Hero               | square 1:1 mobile / 2.4:1 desktop          | —           | subtle linear gradient overlay    |
-| Motion duration    | 500ms ease-out                             | same        |                                   |
-| Footer             | `font-medium` 14px                         | 16px        | minimal links                     |
+| Token              | Mobile                                      | → Desktop   | Notes                                                                                                                                   |
+| ------------------ | ------------------------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `bg-page`          | `#FAFAFA`                                   | same        | near-white, not pure                                                                                                                    |
+| `bg-surface`       | `#FFFFFF`                                   | same        | cards                                                                                                                                   |
+| `fg`               | `#0A0A0A`                                   | same        | near-black                                                                                                                              |
+| `accent`           | **merchant brand** via `theme.primaryColor` | same        | saturated. Used boldly on price + CTA fills — high-energy density is the persona signal. Persona governs ROLE, never the literal value. |
+| `muted`            | `foreground/55`                             | same        | subtitle, captions                                                                                                                      |
+| Font family        | Inter / Geist                               | same        | sans-serif, modern grotesque                                                                                                            |
+| Section heading    | 22px `font-semibold` tracking-tight         | 28px        | NO flanking lines                                                                                                                       |
+| Section kicker     | 11px uppercase `font-medium` tracking-wide  | 12px        | text-only, no chip, NO lines                                                                                                            |
+| Section subtitle   | 14px `font-normal`                          | 16px        | NO lines                                                                                                                                |
+| Product card name  | 14px `font-semibold`                        | 14px → 16px |                                                                                                                                         |
+| Product card price | 14px `font-bold` accent color               | same        | accent = merchant brand                                                                                                                 |
+| Card chrome        | `rounded-2xl` `border-border/60`            | same        | subtle                                                                                                                                  |
+| Card hover         | `-translate-y-0.5` + `shadow-md` 500ms      | same        | gentle lift                                                                                                                             |
+| Category card      | `rounded-xl` aspect-square                  | same        | rectangular tiles                                                                                                                       |
+| Header height      | 48px                                        | 56px        | wordmark left + cart/menu right                                                                                                         |
+| CTA / Button       | `rounded-2xl` solid accent                  | same        | match card radius                                                                                                                       |
+| Hero               | square 1:1 mobile / 2.4:1 desktop           | —           | subtle linear gradient overlay                                                                                                          |
+| Motion duration    | 500ms ease-out                              | same        |                                                                                                                                         |
+| Footer             | `font-medium` 14px                          | 16px        | minimal links                                                                                                                           |
 
 **Pushes apart from siblings:**
 
@@ -140,27 +208,27 @@ opts up via admin if their brand needs heading prominence.
 
 **Mood:** restrained, monumental, time-tested. Serif everywhere; ornamental dividers; deep neutrals.
 
-| Token              | Mobile                                                                                        | → Desktop   | Notes                                                  |
-| ------------------ | --------------------------------------------------------------------------------------------- | ----------- | ------------------------------------------------------ |
-| `bg-page`          | `#F8F4ED` (cream)                                                                             | same        | warm, NOT white                                        |
-| `bg-surface`       | `#FFFFFF`                                                                                     | same        | cards                                                  |
-| `fg`               | `#1A1410` (deep coffee)                                                                       | same        | not pure black                                         |
-| `accent`           | `#6B1A1A` (oxblood)                                                                           | same        | rich, traditional                                      |
-| `muted`            | `foreground/60`                                                                               | same        |                                                        |
-| Font family        | Cormorant Garamond / Playfair Display                                                         | same        | serif, classical                                       |
-| Section heading    | 24px `font-serif font-normal`                                                                 | 32px        | flanked by **tapering hairlines** (gold-leaf inspired) |
-| Section kicker     | 12px uppercase `font-serif tracking-[0.22em]`                                                 | 13px        | hairline-flanked                                       |
-| Section subtitle   | 14px `font-serif italic`                                                                      | 16px        | hairline-flanked, italic for traditional rhythm        |
-| Product card name  | 16px `font-serif font-normal`                                                                 | 16px → 18px | serif throughout                                       |
-| Product card price | 16px `font-serif font-medium` oxblood                                                         | same        | serif + brand accent                                   |
-| Card chrome        | `rounded-sm` `border-border/40`                                                               | same        | minimal radius, restrained                             |
-| Card hover         | `border-foreground/40` color shift 500ms                                                      | same        | no movement, color only                                |
-| Category card      | `rounded-full` (circular tiles)                                                               | same        | jewelry-grid feel                                      |
-| Header height      | 56px                                                                                          | 64px        | centered serif wordmark + hairline below               |
-| CTA / Button       | `border-y` only (top + bottom lines, no full frame), `font-serif uppercase tracking-[0.22em]` | same        | constraint = luxury                                    |
-| Hero               | 4:3 mobile / 16:9 desktop                                                                     | —           | foreground/15→/40 cinematic overlay                    |
-| Motion duration    | 500ms ease-in-out                                                                             | same        |                                                        |
-| Footer             | `font-serif` 14px italic copyright + "Established" mark                                       | 16px        |                                                        |
+| Token              | Mobile                                                                                        | → Desktop   | Notes                                                                                                                                                                                                                                  |
+| ------------------ | --------------------------------------------------------------------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bg-page`          | `#F8F4ED` (cream)                                                                             | same        | warm, NOT white                                                                                                                                                                                                                        |
+| `bg-surface`       | `#FFFFFF`                                                                                     | same        | cards                                                                                                                                                                                                                                  |
+| `fg`               | `#1A1410` (deep coffee)                                                                       | same        | not pure black                                                                                                                                                                                                                         |
+| `accent`           | **merchant brand** via `theme.primaryColor`                                                   | same        | rich, traditional density. Used on serif price text + uppercase tracked link chrome — accent reads as "heritage" when merchant picks a deep tone (oxblood / forest / navy / bronze). Persona governs SATURATION + role, not the value. |
+| `muted`            | `foreground/60`                                                                               | same        |                                                                                                                                                                                                                                        |
+| Font family        | Cormorant Garamond / Playfair Display                                                         | same        | serif, classical                                                                                                                                                                                                                       |
+| Section heading    | 24px `font-serif font-normal`                                                                 | 32px        | flanked by **tapering hairlines** (gold-leaf inspired)                                                                                                                                                                                 |
+| Section kicker     | 12px uppercase `font-serif tracking-[0.22em]`                                                 | 13px        | hairline-flanked                                                                                                                                                                                                                       |
+| Section subtitle   | 14px `font-serif italic`                                                                      | 16px        | hairline-flanked, italic for traditional rhythm                                                                                                                                                                                        |
+| Product card name  | 16px `font-serif font-normal`                                                                 | 16px → 18px | serif throughout                                                                                                                                                                                                                       |
+| Product card price | 16px `font-serif font-medium` accent                                                          | same        | accent = merchant brand                                                                                                                                                                                                                |
+| Card chrome        | `rounded-sm` `border-border/40`                                                               | same        | minimal radius, restrained                                                                                                                                                                                                             |
+| Card hover         | `border-foreground/40` color shift 500ms                                                      | same        | no movement, color only                                                                                                                                                                                                                |
+| Category card      | `rounded-full` (circular tiles)                                                               | same        | jewelry-grid feel                                                                                                                                                                                                                      |
+| Header height      | 56px                                                                                          | 64px        | centered serif wordmark + hairline below                                                                                                                                                                                               |
+| CTA / Button       | `border-y` only (top + bottom lines, no full frame), `font-serif uppercase tracking-[0.22em]` | same        | constraint = luxury                                                                                                                                                                                                                    |
+| Hero               | 4:3 mobile / 16:9 desktop                                                                     | —           | foreground/15→/40 cinematic overlay                                                                                                                                                                                                    |
+| Motion duration    | 500ms ease-in-out                                                                             | same        |                                                                                                                                                                                                                                        |
+| Footer             | `font-serif` 14px italic copyright + "Established" mark                                       | 16px        |                                                                                                                                                                                                                                        |
 
 **Pushes apart from siblings:**
 
@@ -178,33 +246,33 @@ opts up via admin if their brand needs heading prominence.
 
 **Mood:** quiet, sparse, image-first. Whisper-quiet hovers; ultra-light type; massive whitespace.
 
-| Token              | Mobile                                             | → Desktop   | Notes                                       |
-| ------------------ | -------------------------------------------------- | ----------- | ------------------------------------------- |
-| `bg-page`          | `#FFFFFF`                                          | same        | pure white                                  |
-| `bg-surface`       | `#FFFFFF`                                          | same        | no card chrome — surface = page             |
-| `fg`               | `#000000`                                          | same        | pure black, max contrast against pure white |
-| `accent`           | `#8FA68C` (sage)                                   | same        | muted, used sparingly                       |
-| `muted`            | `foreground/40`                                    | same        |                                             |
-| Font family        | Inter Display (ultralight) / Helvetica Neue Light  | same        | sans, ULTRA-light                           |
-| Section heading    | 24px `font-extralight tracking-[0.28em]` uppercase | 32px        | NO lines (silence)                          |
-| Section kicker     | 11px uppercase `font-light tracking-[0.32em]`      | 12px        | wide tracking carries identity              |
-| Section subtitle   | 13px `font-light` muted                            | 14px        | NO lines                                    |
-| Product card name  | 14px `font-extralight`                             | 14px → 16px |                                             |
-| Product card price | 13px `font-light` foreground                       | 14px        | NO accent on price                          |
-| Card chrome        | NO border, NO radius (`rounded-none`), NO shadow   | same        | zero chrome                                 |
-| Card hover         | color shift muted-foreground → foreground 500ms    | same        | no movement, only color                     |
-| Category card      | square aspect, NO border, NO radius                | same        | image is everything                         |
-| Header height      | 64px                                               | 80px        | ultra-thin wordmark + icon-only nav         |
-| CTA / Button       | underlined link (`border-b border-foreground`)     | same        | NO button frame ever                        |
-| Hero               | 16:9 full-bleed, NO overlay                        | —           | image speaks for itself, headline below     |
-| Motion duration    | 500ms ease-out                                     | same        |                                             |
-| Footer             | 4-line `font-light` 12px                           | 14px        | minimal copyright                           |
+| Token              | Mobile                                             | → Desktop   | Notes                                                                                                                                                     |
+| ------------------ | -------------------------------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bg-page`          | `#FFFFFF`                                          | same        | pure white                                                                                                                                                |
+| `bg-surface`       | `#FFFFFF`                                          | same        | no card chrome — surface = page                                                                                                                           |
+| `fg`               | `#000000`                                          | same        | pure black, max contrast against pure white                                                                                                               |
+| `accent`           | **merchant brand** via `theme.primaryColor`        | same        | muted density — used ONLY as background tint, hover hint, or underline. Never on price text, never as a button fill. Persona governs DENSITY + restraint. |
+| `muted`            | `foreground/40`                                    | same        |                                                                                                                                                           |
+| Font family        | Inter Display (ultralight) / Helvetica Neue Light  | same        | sans, ULTRA-light                                                                                                                                         |
+| Section heading    | 24px `font-extralight tracking-[0.28em]` uppercase | 32px        | NO lines (silence)                                                                                                                                        |
+| Section kicker     | 11px uppercase `font-light tracking-[0.32em]`      | 12px        | wide tracking carries identity                                                                                                                            |
+| Section subtitle   | 13px `font-light` muted                            | 14px        | NO lines                                                                                                                                                  |
+| Product card name  | 14px `font-extralight`                             | 14px → 16px |                                                                                                                                                           |
+| Product card price | 13px `font-light` foreground                       | 14px        | NO accent on price                                                                                                                                        |
+| Card chrome        | NO border, NO radius (`rounded-none`), NO shadow   | same        | zero chrome                                                                                                                                               |
+| Card hover         | color shift muted-foreground → foreground 500ms    | same        | no movement, only color                                                                                                                                   |
+| Category card      | square aspect, NO border, NO radius                | same        | image is everything                                                                                                                                       |
+| Header height      | 64px                                               | 80px        | ultra-thin wordmark + icon-only nav                                                                                                                       |
+| CTA / Button       | underlined link (`border-b border-foreground`)     | same        | NO button frame ever                                                                                                                                      |
+| Hero               | 16:9 full-bleed, NO overlay                        | —           | image speaks for itself, headline below                                                                                                                   |
+| Motion duration    | 500ms ease-out                                     | same        |                                                                                                                                                           |
+| Footer             | 4-line `font-light` 12px                           | 14px        | minimal copyright                                                                                                                                         |
 
 **Pushes apart from siblings:**
 
 1. ZERO card chrome — no border, no radius, no shadow. The OTHER 4 themes all use some frame.
 2. NO buttons — every CTA is an underlined link. Unique.
-3. Sage accent used **only as muted background tint**, never on text. Other themes use accent on price or buttons.
+3. Brand accent used **only as muted background tint**, never on text. Other themes use accent on price or buttons.
 
 **Mockup:** ![Minimal persona target](./docs/design-mockups/personas/minimal-editorial-fashion.png) — Stitch screen `f42277c57b824e04ba41a4a6c2aa2fa9`.
 
@@ -216,27 +284,27 @@ opts up via admin if their brand needs heading prominence.
 
 **Mood:** loud, sharp, fast. High contrast. All-caps. Brutalist offset shadows.
 
-| Token              | Mobile                                                                        | → Desktop   | Notes                                           |
-| ------------------ | ----------------------------------------------------------------------------- | ----------- | ----------------------------------------------- |
-| `bg-page`          | `#FFFFFF`                                                                     | same        | pure white background                           |
-| `bg-surface`       | `#FFFFFF`                                                                     | same        | white cards on white page; the border separates |
-| `fg`               | `#000000`                                                                     | same        | pure black                                      |
-| `accent`           | `#FFE600` (electric yellow)                                                   | same        | high-vis safety yellow                          |
-| `muted`            | `foreground/70`                                                               | same        | bolder than other themes' muted                 |
-| Font family        | Space Grotesk / Inter Display Black                                           | same        | sans, geometric, bold                           |
-| Section heading    | 24px `font-black uppercase tracking-tight`                                    | 32px        | NO flanking lines (just bold text)              |
-| Section kicker     | 12px uppercase `font-black tracking-tight`                                    | 13px        | no lines, no chip                               |
-| Section subtitle   | 13px `font-bold uppercase`                                                    | 14px        | NO lines                                        |
-| Product card name  | 14px `font-black uppercase`                                                   | 14px → 16px |                                                 |
-| Product card price | 16px `font-black` foreground                                                  | same        |                                                 |
-| Card chrome        | `border-2 border-foreground` + offset `[6px_6px_0_0]` shadow                  | same        | brutalist signature                             |
-| Card hover         | `translate-x-1 translate-y-1` (shadow appears to fall behind) 200ms           | same        | SNAPPY                                          |
-| Category card      | `border-2` + `rounded-2xl` (NOT 3xl)                                          | same        | tight angular                                   |
-| Header height      | 56px                                                                          | 64px        | black bar + white wordmark center               |
-| CTA / Button       | solid accent yellow + 2px border + 6px offset shadow + `font-black uppercase` | same        | brutalist signature                             |
-| Hero               | square 1:1 with offset 6px black shadow on the image                          | —           | even the hero photo gets the shadow treatment   |
-| Motion duration    | **200ms ease-out**                                                            | same        | fastest of all themes                           |
-| Footer             | black bg + yellow `font-black uppercase` text                                 | same        | inverted footer                                 |
+| Token              | Mobile                                                                                  | → Desktop   | Notes                                                                                                                                                                                                                                                         |
+| ------------------ | --------------------------------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bg-page`          | `#FFFFFF`                                                                               | same        | pure white background                                                                                                                                                                                                                                         |
+| `bg-surface`       | `#FFFFFF`                                                                               | same        | white cards on white page; the border separates                                                                                                                                                                                                               |
+| `fg`               | `#000000`                                                                               | same        | pure black                                                                                                                                                                                                                                                    |
+| `accent`           | **merchant brand** via `theme.primaryColor`                                             | same        | high-vis density. Used as full button fill, footer background, and inverted-text foreground — accent reads "brand bombast" when merchant picks an electric tone (yellow / lime / orange / hot pink). Persona governs DENSITY + role, never the literal value. |
+| `muted`            | `foreground/70`                                                                         | same        | bolder than other themes' muted                                                                                                                                                                                                                               |
+| Font family        | Space Grotesk / Inter Display Black                                                     | same        | sans, geometric, bold                                                                                                                                                                                                                                         |
+| Section heading    | 24px `font-black uppercase tracking-tight`                                              | 32px        | NO flanking lines (just bold text)                                                                                                                                                                                                                            |
+| Section kicker     | 12px uppercase `font-black tracking-tight`                                              | 13px        | no lines, no chip                                                                                                                                                                                                                                             |
+| Section subtitle   | 13px `font-bold uppercase`                                                              | 14px        | NO lines                                                                                                                                                                                                                                                      |
+| Product card name  | 14px `font-black uppercase`                                                             | 14px → 16px |                                                                                                                                                                                                                                                               |
+| Product card price | 16px `font-black` foreground                                                            | same        |                                                                                                                                                                                                                                                               |
+| Card chrome        | `border-2 border-foreground` + offset `[6px_6px_0_0]` shadow                            | same        | brutalist signature                                                                                                                                                                                                                                           |
+| Card hover         | `translate-x-1 translate-y-1` (shadow appears to fall behind) 200ms                     | same        | SNAPPY                                                                                                                                                                                                                                                        |
+| Category card      | `border-2` + `rounded-2xl` (NOT 3xl)                                                    | same        | tight angular                                                                                                                                                                                                                                                 |
+| Header height      | 56px                                                                                    | 64px        | black bar + white wordmark center                                                                                                                                                                                                                             |
+| CTA / Button       | solid accent (merchant brand) + 2px border + 6px offset shadow + `font-black uppercase` | same        | brutalist signature                                                                                                                                                                                                                                           |
+| Hero               | square 1:1 with offset 6px black shadow on the image                                    | —           | even the hero photo gets the shadow treatment                                                                                                                                                                                                                 |
+| Motion duration    | **200ms ease-out**                                                                      | same        | fastest of all themes                                                                                                                                                                                                                                         |
+| Footer             | black bg + accent (merchant brand) `font-black uppercase` text                          | same        | inverted footer — accent is the only color on the bar, picks up the brand fully                                                                                                                                                                               |
 
 **Pushes apart from siblings:**
 

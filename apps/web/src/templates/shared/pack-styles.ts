@@ -51,9 +51,15 @@ export interface PackStyles {
 
 export const PACK_STYLES: Record<TemplateId, PackStyles> = {
   modern: {
-    // Tinted shadow (foreground-hued via /5) instead of pure black; gentle
-    // 0.5px lift kept (Modern's signature) but slowed to 500ms ease-out.
-    card: 'rounded-2xl border border-border/60 bg-card hover:shadow-[0_24px_48px_-20px_hsl(var(--foreground)/0.12)] hover:border-foreground/15 hover:-translate-y-0.5 transition-all duration-500 ease-out',
+    // 2026-05-17 night persona refresh: tech / SaaS / DTC software-y target.
+    // Changes from baseline: (1) card hover shadow 0.12→0.18 (more lift),
+    // (2) productCardPrice text-foreground→text-primary (modern is the ONLY
+    // theme that puts accent on price), (3) productCardCta rounded-full→
+    // rounded-2xl + brand fill (unifies CTA radius with card radius),
+    // (4) sectionHeading font-bold→font-semibold (introduces mid-weight
+    // hierarchy), (5) heroCta rounded-full→rounded-2xl + brand fill (matches
+    // in-page cards). See design.md "Theme 1 — Modern" persona spec.
+    card: 'rounded-2xl border border-border/60 bg-card hover:shadow-[0_24px_48px_-20px_hsl(var(--foreground)/0.18)] hover:border-foreground/15 hover:-translate-y-0.5 transition-all duration-500 ease-out',
     categoryFrame:
       'rounded-2xl bg-muted shadow-[0_10px_30px_-18px_hsl(var(--foreground)/0.10)] group-hover:shadow-[0_24px_48px_-20px_hsl(var(--foreground)/0.14)] transition-shadow duration-700 ease-out',
     categoryCaption: 'text-base sm:text-lg font-semibold text-foreground tracking-tight',
@@ -66,18 +72,18 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
     // concatenates the size class. Pack-styles now carries flavor only:
     // weight, color, tracking, leading, font-family.
     productCardName: 'font-semibold text-foreground tracking-tight leading-snug',
-    productCardPrice: 'font-bold text-foreground tracking-tight',
+    productCardPrice: 'font-bold text-primary tracking-tight',
     productCardCta:
-      'whitespace-nowrap rounded-full bg-foreground px-5 py-3.5 text-sm font-semibold text-background hover:bg-foreground/90 transition-colors duration-300 ease-out min-h-[44px]',
+      'whitespace-nowrap rounded-2xl bg-primary px-5 py-3.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors duration-300 ease-out min-h-[44px]',
     sectionHeading:
-      'text-[22px] sm:text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight text-foreground leading-[1.1]',
+      'text-[22px] sm:text-3xl md:text-4xl lg:text-5xl font-semibold tracking-tight text-foreground leading-[1.1]',
     sectionSeeAll:
       'text-xl font-semibold text-foreground/70 hover:text-foreground transition-colors duration-300 underline-offset-4 hover:underline',
     heroOverlay: 'bg-gradient-to-b from-foreground/0 via-foreground/5 to-foreground/35',
     heroHeadline:
       'text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight text-white drop-shadow-xl leading-[1.05]',
     heroCta:
-      'rounded-full bg-white px-8 py-4 text-base font-semibold text-foreground hover:bg-white/95 hover:-translate-y-0.5 shadow-[0_18px_40px_-18px_rgba(255,255,255,0.45)] transition-all duration-500 ease-out min-h-[44px]',
+      'rounded-2xl bg-primary px-8 py-4 text-base font-semibold text-primary-foreground hover:bg-primary/90 hover:-translate-y-0.5 shadow-[0_18px_40px_-18px_hsl(var(--primary)/0.45)] transition-all duration-500 ease-out min-h-[44px]',
     testimonialCard:
       'rounded-2xl border border-border/60 bg-card p-7 hover:shadow-[0_24px_48px_-20px_hsl(var(--foreground)/0.10)] hover:border-foreground/15 transition-all duration-500 ease-out',
     testimonialAuthor: 'text-base font-semibold text-foreground tracking-tight',
@@ -106,32 +112,41 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
     testimonialAuthor: 'text-sm font-serif uppercase tracking-[0.22em] text-foreground',
   },
   minimal: {
-    // No chrome — whitespace IS the design. Slow restrained color shifts only.
+    // 2026-05-17 night persona refresh: editorial / fashion / magazine
+    // target. Push HARDER apart from Modern (the biggest overlap pair per
+    // the audit). Changes from baseline: (1) categoryFrame drops bg-muted/40
+    // → bg-transparent (zero chrome, the page bg shows through — minimal is
+    // the ONLY theme with NO surface fill on category cards), (2) productCardName
+    // weight font-light → font-extralight (true ultralight identity, stronger
+    // contrast vs Modern's font-semibold), (3) sectionHeading font-light →
+    // font-extralight to match. Hero overlay kept at /30 (already minimal
+    // among the 5; pure transparent makes white headline illegible on bright
+    // images). See design.md "Theme 3 — Minimal" persona spec.
+    // No-chrome philosophy: NO border, NO radius, NO shadow on cards. Page
+    // bg shows through. CTA is an underlined link, never a button frame.
     card: 'bg-transparent',
-    categoryFrame: 'rounded-md bg-muted/40',
-    // Minimal's identity is whitespace + tiny tracking — but main text
-    // (name + price + category caption) still hits 16px floor for
-    // legibility. Letter-spacing + light weight carry the minimal
-    // voice; size carries the readability.
+    categoryFrame: 'bg-transparent',
+    // Minimal's identity is whitespace + tiny tracking + ULTRA-light weight.
+    // Main text still hits 16px floor for legibility (Ahmad standing rule).
     categoryCaption:
-      'text-base font-light tracking-[0.22em] uppercase text-muted-foreground group-hover:text-foreground transition-colors duration-500',
+      'text-base font-extralight tracking-[0.22em] uppercase text-muted-foreground group-hover:text-foreground transition-colors duration-500',
     productCardName:
-      'tracking-[0.18em] uppercase font-light text-muted-foreground group-hover:text-foreground transition-colors duration-500',
-    productCardPrice: 'tracking-wide font-light text-muted-foreground',
+      'tracking-[0.18em] uppercase font-extralight text-muted-foreground group-hover:text-foreground transition-colors duration-500',
+    productCardPrice: 'tracking-wide font-extralight text-muted-foreground',
     productCardBody: 'text-center',
     productCardCta:
       'whitespace-nowrap mx-auto inline-block border-b border-foreground/70 pb-1 text-sm font-medium uppercase tracking-[0.28em] text-foreground hover:text-foreground/70 hover:border-foreground/40 bg-transparent transition-colors duration-500 ease-out min-h-[44px]',
     sectionHeading:
-      'text-[22px] sm:text-3xl md:text-4xl lg:text-5xl font-light tracking-tight text-foreground leading-[1.1]',
+      'text-[22px] sm:text-3xl md:text-4xl lg:text-5xl font-extralight tracking-tight text-foreground leading-[1.1]',
     sectionSeeAll:
-      'text-xl font-light uppercase tracking-[0.28em] text-muted-foreground hover:text-foreground transition-colors duration-500',
+      'text-xl font-extralight uppercase tracking-[0.28em] text-muted-foreground hover:text-foreground transition-colors duration-500',
     heroOverlay: 'bg-gradient-to-b from-transparent via-transparent to-foreground/30',
     heroHeadline:
       'text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extralight tracking-tight text-white drop-shadow-xl leading-[1.05]',
     heroCta:
       'inline-block border-b border-white pb-2 text-sm font-medium uppercase tracking-[0.22em] text-white hover:border-white/50 hover:text-white/80 transition-colors duration-500 ease-out min-h-[44px]',
     testimonialCard: 'border-t border-border/40 bg-transparent py-10',
-    testimonialAuthor: 'text-sm font-light text-foreground tracking-wide',
+    testimonialAuthor: 'text-sm font-extralight text-foreground tracking-wide',
   },
   bold: {
     // Brutalist core preserved: 2px borders + offset shadow on hover.
