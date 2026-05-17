@@ -353,10 +353,14 @@ export function resolveBackgroundPreset(theme: StoreTheme): {
       const [, h, s] = m;
       // Cap saturation at 25% so brand-color backgrounds never feel
       // oversaturated — a tinted whisper, not a full wash.
+      // 2026-05-17 (evening): contrast bumped from 96/92 to 97/86 so the
+      // alternation is visibly distinct — the 4-point lightness gap was
+      // perceptually flat on most screens. 11-point gap reads as a clear
+      // band shift without losing the "whisper of brand color" feel.
       const cappedS = Math.min(Number(s), 25);
       return {
-        bgPage: `${h} ${cappedS}% 96%`,
-        bgSectionAlt: `${h} ${cappedS}% 92%`,
+        bgPage: `${h} ${cappedS}% 97%`,
+        bgSectionAlt: `${h} ${cappedS}% 86%`,
       };
     }
     case 'none':
