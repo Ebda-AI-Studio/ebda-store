@@ -7,6 +7,7 @@ import { useCart } from '../contexts/CartContext';
 import { ShopChrome } from '../components';
 import { BrandStoryBlock } from '../templates/shared/BrandStoryBlock';
 import { TrustStrip } from '../templates/shared/TrustStrip';
+import { HomeBlogCarousel } from '../templates/shared/HomeBlogCarousel';
 import { toTemplateProduct, toTemplateCategory } from '../templates/adapters';
 import { getHomepageTemplate } from '../lib/serverTemplate';
 import type { TemplateId, StoreLayoutSettings } from '@force/shared';
@@ -311,6 +312,7 @@ export function HomePageContent({
               body={store.description ?? undefined}
               bodyAr={store.descriptionAr ?? undefined}
             />
+            <HomeBlogCarousel />
             <TrustStrip />
 
             {/* Testimonials — auto-hides when no qualifying reviews.

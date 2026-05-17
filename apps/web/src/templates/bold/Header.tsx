@@ -145,7 +145,7 @@ export default function BoldHeader({
               {/* Cart */}
               <Link
                 href={`${urlPrefix}/cart`}
-                className="relative inline-flex h-11 w-11 items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors duration-200 cursor-pointer"
+                className="relative hidden md:inline-flex h-11 w-11 items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors duration-200 cursor-pointer"
                 aria-label={isRtl ? `سلة (${cartItemCount})` : `Cart (${cartItemCount})`}
               >
                 <svg
@@ -198,7 +198,7 @@ export default function BoldHeader({
 
           {/* Mobile persistent search bar — pecannbee target. Always visible
               under the logo row on mobile, hidden on md+. */}
-          <div className="md:hidden pb-3 border-t border-white/10 pt-3" data-zone="mobile-search">
+          <div className="hidden" data-zone="mobile-search">
             <form onSubmit={handleSearch} className="relative">
               <svg
                 className={`absolute top-1/2 -translate-y-1/2 ${isRtl ? 'right-3' : 'left-3'} w-5 h-5 text-white/50 pointer-events-none`}

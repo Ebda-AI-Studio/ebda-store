@@ -96,6 +96,15 @@ export function buildStoreAdminNav(storeId: string, labels: NavLabels): NavItem[
       icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
     },
     {
+      // Blog (Bucket E1, 2026-05-17). Always visible in the sidebar
+      // even when blogEnabled=false so the merchant has a clear entry
+      // point to turn it on. The list page surfaces an inline toggle.
+      name: 'Blog',
+      href: `/stores/${storeId}/blog`,
+      // Pencil-write icon
+      icon: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z',
+    },
+    {
       name: labels.aiTools,
       href: `/stores/${storeId}/ai-tools`,
       // sparkle icon — matches the orange "✨" in the AI buttons throughout

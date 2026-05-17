@@ -8,6 +8,7 @@ import { getPackStyles } from './pack-styles';
 import { cardAspectClass, cardShapeClasses, gridGapClass, productSizeClass } from './card-size';
 import { OutOfStockRibbon, isProductNew } from './ProductCardCta';
 import { BrandPill } from './BrandPill';
+import { useStore } from '../../contexts/StoreContext';
 import { getProductCardTextSizes } from '@force/shared';
 import type { ProductCarouselProps } from '../types';
 
@@ -45,6 +46,11 @@ export function ProductCarousel({
 }: ProductCarouselProps) {
   const styles = getPackStyles(pack);
   const sizeCap = productSizeClass(cardSize);
+  // Bucket E3 (2026-05-17): quick-add (+) circle is opt-in per store.
+  // When `store.theme.showQuickAdd === true`, in-stock non-variant
+  // products get the overlay button; otherwise it's hidden.
+  const { store } = useStore();
+  const showQuickAdd = store.theme?.showQuickAdd === true;
   // Sprint 1 (2026-05-17): per-cardSize text-size pair, paired with
   // pack-styles flavor classes. Without this the previous `text-lg`
   // names looked oversized inside `xs`/`sm` card widths and undersized
@@ -314,14 +320,14 @@ export function ProductCarousel({
                             %
                           </span>
                         )}
-                        {/* Bucket E (2026-05-17): quick-add (+) circle button
+                        {/* Bucket E3 (2026-05-17): quick-add (+) circle button
                             overlay — Bank Alkahraman pattern. Single tap = add
                             to cart, no PDP navigation. Renders only when
-                            in-stock, NOT a variant parent (variants must be
-                            picked on PDP first), and the parent supplied an
-                            onAddToCart handler. Position bottom-end of image
-                            so it doesn't fight the wishlist heart top-start. */}
-                        {inStock && !hasVariants && onAddToCart && (
+                            opt-in flag is set + in-stock + not a variant
+                            parent + onAddToCart handler present. Position
+                            bottom-end of image so it doesn't fight the
+                            wishlist heart top-start. */}
+                        {showQuickAdd && inStock && !hasVariants && onAddToCart && (
                           <button
                             type="button"
                             onClick={e => {

@@ -27,6 +27,11 @@ export interface StoreTheme {
    * badge is in that corner. Default false.
    */
   showBrandBadge?: boolean;
+  /**
+   * Opt-in quick-add (+) circle overlay on carousel cards (E3).
+   * Single-tap add-to-cart without leaving the page. Default false.
+   */
+  showQuickAdd?: boolean;
 }
 
 export interface StoreBranding {
@@ -84,6 +89,7 @@ export const DEFAULT_THEME: StoreTheme = {
   borderRadius: 'md',
   backgroundPreset: 'none',
   showBrandBadge: false,
+  showQuickAdd: false,
 };
 
 /**

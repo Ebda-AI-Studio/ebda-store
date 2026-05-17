@@ -255,7 +255,7 @@ export default function ClassicHeader({
           <div className={`flex md:hidden items-center gap-1 ${isRtl ? 'flex-row-reverse' : ''}`}>
             <Link
               href={`${urlPrefix}/cart`}
-              className="relative inline-flex h-11 w-11 items-center justify-center text-foreground/60 hover:text-foreground transition-colors duration-500 cursor-pointer"
+              className="relative hidden md:inline-flex h-11 w-11 items-center justify-center text-foreground/60 hover:text-foreground transition-colors duration-500 cursor-pointer"
               aria-label={isRtl ? 'السلة' : 'Cart'}
             >
               <svg
@@ -287,7 +287,7 @@ export default function ClassicHeader({
       {/* Mobile persistent search bar — pecannbee target layout. Always
           visible under the main header row on mobile so customers don't
           have to open the menu to search. Hidden on md+. */}
-      <div className="md:hidden border-t border-border/40 py-3" data-zone="mobile-search">
+      <div className="hidden" data-zone="mobile-search">
         <form onSubmit={handleSearch} className="relative container mx-auto px-4">
           <svg
             className={`absolute top-1/2 -translate-y-1/2 ${isRtl ? 'right-7' : 'left-7'} w-5 h-5 text-muted-foreground pointer-events-none`}

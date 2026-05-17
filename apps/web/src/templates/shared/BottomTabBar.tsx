@@ -49,7 +49,6 @@ export function BottomTabBar() {
     labelEn: string;
     labelAr: string;
     icon: JSX.Element;
-    primary?: boolean;
   }> = [
     {
       key: 'home',
@@ -88,9 +87,8 @@ export function BottomTabBar() {
       href: storeUrl('/cart'),
       labelEn: 'Cart',
       labelAr: 'السلة',
-      primary: true,
       icon: (
-        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
+        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -136,32 +134,19 @@ export function BottomTabBar() {
         {tabs.map(tab => {
           const active = isActive(tab.href);
           const label = isRtl ? tab.labelAr : tab.labelEn;
-          // Cart gets the elevated treatment regardless of active state
-          // (always-primary affordance). Other tabs get the soft pill
-          // background only when active.
-          const isPrimary = tab.primary;
           return (
             <li key={tab.key} className="flex">
               <Link
                 href={tab.href}
                 prefetch={false}
                 className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 min-h-[56px] transition-colors ${
-                  isPrimary
-                    ? 'text-[hsl(var(--primary-foreground))]'
-                    : active
-                      ? 'text-foreground'
-                      : 'text-foreground/60 hover:text-foreground'
+                  active ? 'text-foreground' : 'text-foreground/60 hover:text-foreground'
                 }`}
                 aria-current={active ? 'page' : undefined}
               >
-                {/* Elevated cart pill OR active soft pill */}
                 <span
-                  className={`relative inline-flex items-center justify-center rounded-full transition-colors ${
-                    isPrimary
-                      ? 'h-11 w-11 -mt-3 bg-[hsl(var(--primary))] shadow-[0_8px_20px_-6px_hsl(var(--primary)/0.5)]'
-                      : active
-                        ? 'h-9 w-12 bg-[hsl(var(--primary))]/10'
-                        : 'h-9 w-12'
+                  className={`relative inline-flex h-9 w-12 items-center justify-center rounded-full transition-colors ${
+                    active ? 'bg-[hsl(var(--primary))]/10' : ''
                   }`}
                 >
                   {tab.icon}

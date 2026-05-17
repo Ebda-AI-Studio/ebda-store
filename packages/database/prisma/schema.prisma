@@ -249,6 +249,10 @@ model Store {
   pwaEnabled  Boolean @default(false) @map("pwa_enabled")
   pwaSettings Json    @default("{}") @map("pwa_settings") // PWASettings JSON
 
+  // Blog (Bucket E1, 2026-05-17) — opt-in per store. When false the
+  // /blog routes return 404 and BlogCarousel hides on the homepage.
+  blogEnabled Boolean @default(false) @map("blog_enabled")
+
   // Relations
   owner                    User                       @relation(fields: [ownerId], references: [id])
   // Customer accounts that authenticate against this store. Distinct from
@@ -293,12 +297,49 @@ model Store {
   bulkAiJobs               BulkAiJob[]
   faqs                     StoreFaq[]
   howtos                   StoreHowto[]
+  blogPosts                BlogPost[]
 
   @@index([ownerId])
   @@index([status])
   @@index([plan])
   @@index([createdAt])
   @@map("stores")
+}
+
+// ==========================================
+// Blog Posts (Bucket E1, 2026-05-17)
+// ==========================================
+//
+// Per-store blog. Opt-in via `Store.blogEnabled`. Content is stored as
+// plain text with `\n\n` paragraph separators — rendered server-side
+// via `paragraph-render.ts` which escapes every text node, so no
+// client-side sanitizer dep is required. Future rich-text content
+// will land via a contentBlocks JSON column mirroring StorePage.
+//
+// `publishedAt` is set when isPublished flips to true; serves as the
+// canonical date both for sorting and for the OG/Article published_time
+// SEO field on the public detail page.
+model BlogPost {
+  id          String    @id @default(uuid())
+  storeId     String    @map("store_id")
+  slug        String
+  title       String
+  titleAr     String?   @map("title_ar")
+  excerpt     String?
+  excerptAr   String?   @map("excerpt_ar")
+  content     String
+  contentAr   String?   @map("content_ar")
+  coverImage  String?   @map("cover_image")
+  isPublished Boolean   @default(false) @map("is_published")
+  publishedAt DateTime? @map("published_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, slug])
+  @@index([storeId, isPublished, publishedAt])
+  @@map("blog_posts")
 }
 
 // ==========================================

@@ -39,6 +39,8 @@ type UpdateStoreData = Partial<CreateStoreData> & {
   heroCtaTextAr?: string | null;
   heroCtaLink?: string | null;
   heroImage?: string | null;
+  /** Bucket E1 (2026-05-17): opt-in blog feature toggle. */
+  blogEnabled?: boolean;
 };
 
 export class StoreService {
@@ -254,6 +256,7 @@ export class StoreService {
         ...(data.heroCtaTextAr !== undefined && { heroCtaTextAr: data.heroCtaTextAr }),
         ...(data.heroCtaLink !== undefined && { heroCtaLink: data.heroCtaLink }),
         ...(data.heroImage !== undefined && { heroImage: data.heroImage }),
+        ...(data.blogEnabled !== undefined && { blogEnabled: data.blogEnabled }),
       },
       include: {
         owner: {

@@ -527,6 +527,41 @@ class ApiClient {
     );
   }
 
+  // Blog (Bucket E1, 2026-05-17)
+  async listBlogPosts(storeId: string, limit = 20) {
+    return this.request<{
+      posts: Array<{
+        id: string;
+        slug: string;
+        title: string;
+        titleAr?: string | null;
+        excerpt?: string | null;
+        excerptAr?: string | null;
+        coverImage?: string | null;
+        publishedAt?: string | null;
+        createdAt: string;
+      }>;
+    }>(`/public/${storeId}/blog?limit=${limit}`);
+  }
+
+  async getBlogPost(storeId: string, slug: string) {
+    return this.request<{
+      post: {
+        id: string;
+        slug: string;
+        title: string;
+        titleAr?: string | null;
+        excerpt?: string | null;
+        excerptAr?: string | null;
+        content: string;
+        contentAr?: string | null;
+        coverImage?: string | null;
+        publishedAt?: string | null;
+        createdAt: string;
+      };
+    }>(`/public/${storeId}/blog/${slug}`);
+  }
+
   // Store-scoped products (for admin)
   async getStoreProducts(storeId: string, params?: Record<string, string>) {
     const query = params ? `?${new URLSearchParams(params)}` : '';

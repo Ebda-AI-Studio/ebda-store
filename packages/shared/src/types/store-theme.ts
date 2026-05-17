@@ -90,6 +90,14 @@ export interface StoreTheme {
   // share/screenshot contexts.
   showBrandBadge?: boolean;
 
+  // Opt-in quick-add (+) circle overlay on ProductCarousel cards (Bucket
+  // E3, shipped 2026-05-17). When true, in-stock non-variant products
+  // get a primary-color circle button bottom-end of the image — single
+  // tap adds to cart without leaving the page. Default false because
+  // some stores prefer routing every add through the PDP (clearer
+  // conversion funnel + lets the customer see ingredients/spec first).
+  showQuickAdd?: boolean;
+
   // Custom CSS (for advanced users)
   customCss?: string;
 }
@@ -185,6 +193,7 @@ export const DEFAULT_THEME: StoreTheme = {
   borderRadius: 'md',
   backgroundPreset: 'none',
   showBrandBadge: false,
+  showQuickAdd: false,
 };
 
 /**

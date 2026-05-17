@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import authRoutes from './auth.routes';
 import storeRoutes from './store.routes';
+import blogRoutes from './blog.routes';
 import productRoutes from './product.routes';
 import cartRoutes from './cart.routes';
 import orderRoutes from './order.routes';
@@ -100,6 +101,11 @@ router.use('/stores', tenantContext, variantRoutes);
 // declares both surfaces; mounting at the API root preserves the full
 // path prefixes (`/stores/...` + `/public/...`).
 router.use('/', tenantContext, pagesRoutes);
+
+// Blog (Bucket E1, 2026-05-17) — same dual-surface pattern as pages.
+// Admin CRUD under /stores/:storeId/blog, public reads under
+// /public/:storeId/blog. Both 404 when the store hasn't opted in.
+router.use('/', tenantContext, blogRoutes);
 
 // Notification routes (admin + public push)
 router.use('/stores', tenantContext, notificationRoutes);

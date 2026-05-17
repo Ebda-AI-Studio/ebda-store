@@ -91,6 +91,8 @@ export interface StoreData {
   twitterHandle?: string;
   googleSiteVerification?: string;
   pwaEnabled?: boolean;
+  /** Bucket E1 (2026-05-17): opt-in blog feature toggle. */
+  blogEnabled?: boolean;
   pwaSettings?: Record<string, unknown>;
   settings?: Record<string, unknown>;
   /** When true, customer-facing prices already include VAT and the

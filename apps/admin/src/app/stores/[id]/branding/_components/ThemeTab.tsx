@@ -72,6 +72,25 @@ export function ThemeTab({ branding, onChange }: ThemeTabProps) {
         />
       </label>
 
+      {/* Bucket E3 (2026-05-17) — opt-in quick-add (+) on carousel cards. */}
+      <label className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card p-4 cursor-pointer">
+        <span className="flex-1 min-w-0">
+          <span className="block text-sm font-semibold text-foreground">{t('quickAdd.title')}</span>
+          <span className="mt-0.5 block text-xs text-muted-foreground">{t('quickAdd.hint')}</span>
+        </span>
+        <input
+          type="checkbox"
+          checked={branding.theme.showQuickAdd === true}
+          onChange={e =>
+            onChange({
+              ...branding,
+              theme: { ...branding.theme, showQuickAdd: e.target.checked },
+            })
+          }
+          className="h-5 w-5 cursor-pointer accent-primary"
+        />
+      </label>
+
       <BrandPreview theme={branding.theme} />
     </div>
   );

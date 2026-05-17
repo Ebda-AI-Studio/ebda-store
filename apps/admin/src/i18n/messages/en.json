@@ -1308,6 +1308,10 @@
       "brandBadge": {
         "title": "Show brand name on product cards",
         "hint": "Adds a small pill with your store name to the top corner of every product image. Useful for brand recall on screenshots and shared images."
+      },
+      "quickAdd": {
+        "title": "Show quick-add (+) on product carousels",
+        "hint": "Customers can add a product to cart with one tap directly from the homepage carousels — no need to open the product page first."
       }
     },
     "preview": {
