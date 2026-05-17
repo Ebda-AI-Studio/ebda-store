@@ -128,6 +128,83 @@ function resolveSource(fromAddress: string): string {
 }
 
 /**
+ * Project-identification markers used to tag forwarded Telegram alerts
+ * with `[<ProjectTag>] <subject>` so Ahmad knows which project the email
+ * came from (Ahmad 2026-05-17 night: "all projects do send there the
+ * email have details about the platform and project name, include them
+ * so i know which project").
+ *
+ * Order matters — first match wins. Most specific first (FWB-API before
+ * FWB-Web before FWB, etc.) so a Sentry email mentioning both
+ * `force-website-builder` and `api` lands as FWB-API not bare FWB.
+ *
+ * Senders that follow the `[<Project Name>] <Title>` subject convention
+ * (Sentry, Vercel, PostHog, Neon) get caught by the bracket-prefix step
+ * in `extractProject` first; this list is the fallback for senders that
+ * embed the project name in body text only (Axiom alerts, Railway
+ * deployment notifications, BetterStack incidents).
+ */
+const PROJECT_MARKERS: Array<{ tag: string; patterns: RegExp[] }> = [
+  // FWB sub-projects — match BEFORE plain FWB so the most specific tag wins
+  {
+    tag: 'FWB-API',
+    patterns: [
+      /force-website-builder.*api/i,
+      /store-api\.forcemediakw\.com/i,
+      /api-production-c058/i,
+    ],
+  },
+  { tag: 'FWB-Admin', patterns: [/force-admin/i, /\bapp\.forcemediakw\.com/i] },
+  {
+    tag: 'FWB-Web',
+    patterns: [/force-web\b/i, /wadyaljuz/i, /store\.forcemediakw\.com/i, /force-web-sigma/i],
+  },
+  { tag: 'FWB', patterns: [/force-website-builder/i, /\bfwb\b/i] },
+  // Other Force projects
+  {
+    tag: 'WBS',
+    patterns: [/whatsapp.?saas/i, /whatsapp.?bulk/i, /\bws\.forcemediakw\.com/i, /\bwbs\b/i],
+  },
+  { tag: 'CRM', patterns: [/force.media.crm/i, /\bcrm\.forcemediakw\.com/i] },
+  { tag: 'Landing', patterns: [/force.media.landing/i, /^www\.forcemediakw\.com/i] },
+  { tag: 'OmHassan', patterns: [/om.?hassan/i] },
+];
+
+/**
+ * Extract a short project tag from an email's subject + body. Returns
+ * `null` when no marker matches — caller falls back to the raw subject.
+ *
+ * Two-pass strategy:
+ *  1. Parse the bracketed prefix Sentry/Vercel/PostHog use
+ *     (`[force-web] Build failed`) → match against PROJECT_MARKERS;
+ *     if no map hit, return the literal bracket contents (truncated)
+ *     so unknown-project alerts still surface a hint.
+ *  2. Scan the first 1KB of subject+body for any marker pattern —
+ *     catches senders that put the project name in body text only.
+ */
+function extractProject(subject: string, body: string): string | null {
+  // 1. Bracketed-prefix path. Sentry: `[force-website-builder/api] ...`
+  //    Vercel:  `[force-web] Build failed`
+  //    PostHog: `[Force Website Builder] Insight...`
+  const bracketMatch = subject.match(/^\s*\[([^\]]+)\]/);
+  if (bracketMatch) {
+    const inBracket = bracketMatch[1];
+    for (const { tag, patterns } of PROJECT_MARKERS) {
+      if (patterns.some(rx => rx.test(inBracket))) return tag;
+    }
+    // Unknown bracket — return literal (truncated) so we don't lose the hint
+    return inBracket.length > 24 ? inBracket.slice(0, 24) : inBracket;
+  }
+
+  // 2. Body-scan fallback. First 1KB covers most service templates.
+  const haystack = `${subject} ${body}`.slice(0, 1000);
+  for (const { tag, patterns } of PROJECT_MARKERS) {
+    if (patterns.some(rx => rx.test(haystack))) return tag;
+  }
+  return null;
+}
+
+/**
  * Decide whether an email is actually an alert worth forwarding.
  * Returns `true` to forward, `false` to skip (and mark \Seen so it
  * doesn't keep re-firing on every cron tick).
@@ -217,13 +294,22 @@ export async function pollGmailAlerts(): Promise<PollResult> {
               .trim()
               .slice(0, 500);
 
+            // Prepend a [ProjectTag] to the Telegram title so Ahmad knows
+            // which project the email came from. All Force projects share
+            // one Gmail inbox + one Telegram chat, so without this every
+            // alert reads as "untagged" — operator has to click into the
+            // email body to find out. Tag is `null` when no marker matched;
+            // we still send (with raw subject) so unknown alerts aren't lost.
+            const projectTag = extractProject(subject, bodyExcerpt);
+            const titledSubject = projectTag ? `[${projectTag}] ${subject}` : subject;
+
             await sendAlert({
               level: 'p1',
               scope: 'platform',
               source: `email.${source}`,
-              title: subject,
+              title: titledSubject,
               body: bodyExcerpt,
-              context: { from: fromAddr, uid: String(uid) },
+              context: { from: fromAddr, uid: String(uid), project: projectTag ?? 'unknown' },
             });
 
             await client.messageFlagsAdd(String(uid), ['\\Seen']);
