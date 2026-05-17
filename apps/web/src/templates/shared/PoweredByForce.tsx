@@ -12,15 +12,21 @@ import { useLanguage } from '../../contexts/LanguageContext';
  * noreferrer"` because external + visited by anonymous customers; `target=
  * "_blank"` so it doesn't unload the merchant's storefront when clicked.
  *
- * Styling intentionally low-contrast (text-muted-foreground/70 + tiny
- * size) so it reads as platform attribution, not store branding.
+ * Styling: low-contrast (text-muted-foreground/70) so it reads as platform
+ * attribution not store branding. Size bumped from 11px to text-sm sm:text-base
+ * (14-16px) 2026-05-17 evening — Ahmad reported the previous 11px was
+ * unreadable. `data-zone="afterFooter"` lets the Typography admin override
+ * size + family + color per-store (was missing — that's why admin font-size
+ * changes weren't rendering). Tightened margin-top from mt-6 to mt-3 to
+ * close the visible white-space gap above the credit on short footers.
  */
 export function PoweredByForce() {
   const { t, language } = useLanguage();
   const align = language === 'ar' ? 'text-right' : 'text-left';
   return (
     <div
-      className={`mt-6 border-t border-border/40 pt-4 text-[11px] tracking-wide text-muted-foreground/70 ${align}`}
+      data-zone="afterFooter"
+      className={`mt-3 border-t border-border/40 pt-3 text-sm sm:text-base tracking-wide text-muted-foreground/70 ${align}`}
     >
       <a
         href="https://store.forcemediakw.com"

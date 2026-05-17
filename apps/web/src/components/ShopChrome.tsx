@@ -198,13 +198,14 @@ export function ShopChrome({ children }: { children: ReactNode }) {
   const urlPrefix = storeUrl('');
 
   return (
-    // pb-20 on mobile reserves 80px at the very bottom of the document so
+    // pb-32 on mobile reserves 128px at the very bottom of the document so
     // the fixed BottomTabBar (56px + safe-area-inset) doesn't cover the
     // footer's last rows (Powered by Force AI credit + cookie preferences
-    // link + payment icons). Lives on the OUTER container — previous fix
-    // on <main> alone wasn't enough because footer + afterFooter sit
-    // OUTSIDE main, so they still got clipped. Desktop has no tab bar.
-    <div className="flex min-h-screen flex-col bg-background pb-20 md:pb-0">
+    // fallback row + payment icons). Bumped from pb-20 → pb-32 on
+    // 2026-05-17 evening because the cookieFallback row (rendered in
+    // root layout.tsx AFTER ShopChrome) added ~50px below the previous
+    // reserve and clipped behind the tab bar. Desktop has no tab bar.
+    <div className="flex min-h-screen flex-col bg-background pb-32 md:pb-0">
       {/* `data-zone` wrappers let the per-store typography rules in
           apps/web/src/app/layout.tsx target each storefront zone
           without having to rewrite the templates' internal markup.
