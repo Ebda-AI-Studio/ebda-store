@@ -66,6 +66,277 @@ opts up via admin if their brand needs heading prominence.
 
 **Anti-pattern**: shrinking a font BELOW the table to recreate "this theme uses tiny text" feel. The themes diverge on weight + tracking, NEVER on main-text size. The pre-2026-05-16 state where minimal used text-xs (12px) for product name was a legibility regression hidden as "design choice".
 
+---
+
+## 5 theme personas + per-theme token spec (2026-05-17 night)
+
+**Mobile-first because most visitors are on phones.** Every per-theme spec below leads with the mobile token; the desktop token follows after `→`. Themes inherit the platform's compact sizing + 16px floor (rules above) — what changes per theme is the **persona** (color mood + type voice + chrome language + motion timing).
+
+**Why personas, not styling variants:** Ahmad's 2026-05-17 read on the live site was that the 5 themes look too similar — same rounded sans-serif card + foreground border + 500ms hover, with only weight differing. The fix is to push each theme into a distinct merchant archetype so a buyer of one theme is making a brand-vibe choice, not a styling tweak. Stitch mockups generated 2026-05-17 night against the four non-elegant personas; elegant kept its as-shipped spec.
+
+### Mobile-first axioms (apply to every theme)
+
+1. **Tap targets ≥ 44×44px.** Use min-height-11 (44px) on every clickable. iOS HIG floor, also Android Material.
+2. **Body text ≥ 16px** so iOS Safari doesn't force-zoom on focus. See `feedback-mobile-form-text-base` (global memory).
+3. **No horizontal scroll on the page itself.** Horizontal scroll is opt-in per `<section>` (carousels) and never affects the page.
+4. **Hero loads first.** Image priority + AVIF/WebP via Next/Image; never above-the-fold lazy.
+5. **Initial JS budget < 200kb** for the homepage. Section components that need interactivity load on view via `dynamic()`.
+6. **CTA always reachable.** BottomTabBar (Home / Wishlist / Cart / Search) on mobile so the cart is never more than one tap away.
+7. **Bilingual:** every theme renders symmetrically in LTR + RTL. Card flips, padding mirrors, line-clamps work in Arabic.
+
+### How to read each theme block
+
+- **Persona statement** — who the merchant is.
+- **Color tokens** — the 5 base values (mobile + desktop are identical; light mode only at v1).
+- **Type voice** — family + weight + tracking per role.
+- **Chrome language** — borders, radii, shadows, hovers.
+- **Hero / Categories / Products / Footer** — per-section voice details.
+- **What pushes it apart** — the 2-3 token directions that separate it from siblings.
+- **Mockup** — Stitch-generated visual target (URL).
+
+---
+
+### Theme 1 — Modern (persona: tech / SaaS / DTC software-y)
+
+**Who buys it:** founders launching a new D2C brand that reads as a startup, a SaaS company selling physical merch, a Kuwait tech retailer. Reference: stripe.com / linear.app aesthetic translated to retail.
+
+**Mood:** crisp, electric, current. Optimistic. Single accent color does ALL the heavy lifting.
+
+| Token              | Mobile                                     | → Desktop   | Notes                             |
+| ------------------ | ------------------------------------------ | ----------- | --------------------------------- |
+| `bg-page`          | `#FAFAFA`                                  | same        | near-white, not pure              |
+| `bg-surface`       | `#FFFFFF`                                  | same        | cards                             |
+| `fg`               | `#0A0A0A`                                  | same        | near-black                        |
+| `accent`           | `#7C3AED` (electric violet)                | same        | only accent color, used sparingly |
+| `muted`            | `foreground/55`                            | same        | subtitle, captions                |
+| Font family        | Inter / Geist                              | same        | sans-serif, modern grotesque      |
+| Section heading    | 22px `font-semibold` tracking-tight        | 28px        | NO flanking lines                 |
+| Section kicker     | 11px uppercase `font-medium` tracking-wide | 12px        | text-only, no chip, NO lines      |
+| Section subtitle   | 14px `font-normal`                         | 16px        | NO lines                          |
+| Product card name  | 14px `font-semibold`                       | 14px → 16px |                                   |
+| Product card price | 14px `font-bold` accent color              | same        | accent (violet)                   |
+| Card chrome        | `rounded-2xl` `border-border/60`           | same        | subtle                            |
+| Card hover         | `-translate-y-0.5` + `shadow-md` 500ms     | same        | gentle lift                       |
+| Category card      | `rounded-xl` aspect-square                 | same        | rectangular tiles                 |
+| Header height      | 48px                                       | 56px        | wordmark left + cart/menu right   |
+| CTA / Button       | `rounded-2xl` solid accent                 | same        | match card radius                 |
+| Hero               | square 1:1 mobile / 2.4:1 desktop          | —           | subtle linear gradient overlay    |
+| Motion duration    | 500ms ease-out                             | same        |                                   |
+| Footer             | `font-medium` 14px                         | 16px        | minimal links                     |
+
+**Pushes apart from siblings:**
+
+1. ONLY theme using a saturated accent on price text — others use foreground.
+2. CTA radius **matches** card radius (`rounded-2xl` everywhere); other themes use different shapes.
+3. NO flanking hairlines on section heading — clean, no editorial chrome.
+
+**Mockup:** ![Modern persona target](./docs/design-mockups/personas/modern-tech-saas.png) — Stitch screen `001efa47ba0a47fc845bc9ee5c986e5e` (project `1270409879280912943`). Regenerate by re-running `/tmp/stitch-personas/gen.sh` (script preserved) or `generate_screen_from_text` with the prompt baked into that script.
+
+---
+
+### Theme 2 — Classic (persona: heritage / luxury / traditional retail)
+
+**Who buys it:** family-run watch shop, Kuwaiti gold/jewelry merchant, established perfume house, oud retailer. Reference: tiffany.com / vacheron-constantin.com translated to ecommerce-ready.
+
+**Mood:** restrained, monumental, time-tested. Serif everywhere; ornamental dividers; deep neutrals.
+
+| Token              | Mobile                                                                                        | → Desktop   | Notes                                                  |
+| ------------------ | --------------------------------------------------------------------------------------------- | ----------- | ------------------------------------------------------ |
+| `bg-page`          | `#F8F4ED` (cream)                                                                             | same        | warm, NOT white                                        |
+| `bg-surface`       | `#FFFFFF`                                                                                     | same        | cards                                                  |
+| `fg`               | `#1A1410` (deep coffee)                                                                       | same        | not pure black                                         |
+| `accent`           | `#6B1A1A` (oxblood)                                                                           | same        | rich, traditional                                      |
+| `muted`            | `foreground/60`                                                                               | same        |                                                        |
+| Font family        | Cormorant Garamond / Playfair Display                                                         | same        | serif, classical                                       |
+| Section heading    | 24px `font-serif font-normal`                                                                 | 32px        | flanked by **tapering hairlines** (gold-leaf inspired) |
+| Section kicker     | 12px uppercase `font-serif tracking-[0.22em]`                                                 | 13px        | hairline-flanked                                       |
+| Section subtitle   | 14px `font-serif italic`                                                                      | 16px        | hairline-flanked, italic for traditional rhythm        |
+| Product card name  | 16px `font-serif font-normal`                                                                 | 16px → 18px | serif throughout                                       |
+| Product card price | 16px `font-serif font-medium` oxblood                                                         | same        | serif + brand accent                                   |
+| Card chrome        | `rounded-sm` `border-border/40`                                                               | same        | minimal radius, restrained                             |
+| Card hover         | `border-foreground/40` color shift 500ms                                                      | same        | no movement, color only                                |
+| Category card      | `rounded-full` (circular tiles)                                                               | same        | jewelry-grid feel                                      |
+| Header height      | 56px                                                                                          | 64px        | centered serif wordmark + hairline below               |
+| CTA / Button       | `border-y` only (top + bottom lines, no full frame), `font-serif uppercase tracking-[0.22em]` | same        | constraint = luxury                                    |
+| Hero               | 4:3 mobile / 16:9 desktop                                                                     | —           | foreground/15→/40 cinematic overlay                    |
+| Motion duration    | 500ms ease-in-out                                                                             | same        |                                                        |
+| Footer             | `font-serif` 14px italic copyright + "Established" mark                                       | 16px        |                                                        |
+
+**Pushes apart from siblings:**
+
+1. ONLY theme using serif **everywhere** (heading + body + price). Others reserve serif for hero only or skip it.
+2. **Circular** category tiles instead of square/rectangular — instantly reads "jewelry / heritage".
+3. CTA uses **border-y only** (no full button frame) — unique chrome among the 5.
+
+**Mockup:** ![Classic persona target](./docs/design-mockups/personas/classic-heritage-luxury.png) — Stitch screen `d123282b8985468ca90026c419b62e13`.
+
+---
+
+### Theme 3 — Minimal (persona: editorial / fashion / magazine)
+
+**Who buys it:** independent fashion label, art-direction-led perfume brand, ceramic/object studio, plant store. Reference: aritzia.com / kinfolk.com / muji.com.
+
+**Mood:** quiet, sparse, image-first. Whisper-quiet hovers; ultra-light type; massive whitespace.
+
+| Token              | Mobile                                             | → Desktop   | Notes                                       |
+| ------------------ | -------------------------------------------------- | ----------- | ------------------------------------------- |
+| `bg-page`          | `#FFFFFF`                                          | same        | pure white                                  |
+| `bg-surface`       | `#FFFFFF`                                          | same        | no card chrome — surface = page             |
+| `fg`               | `#000000`                                          | same        | pure black, max contrast against pure white |
+| `accent`           | `#8FA68C` (sage)                                   | same        | muted, used sparingly                       |
+| `muted`            | `foreground/40`                                    | same        |                                             |
+| Font family        | Inter Display (ultralight) / Helvetica Neue Light  | same        | sans, ULTRA-light                           |
+| Section heading    | 24px `font-extralight tracking-[0.28em]` uppercase | 32px        | NO lines (silence)                          |
+| Section kicker     | 11px uppercase `font-light tracking-[0.32em]`      | 12px        | wide tracking carries identity              |
+| Section subtitle   | 13px `font-light` muted                            | 14px        | NO lines                                    |
+| Product card name  | 14px `font-extralight`                             | 14px → 16px |                                             |
+| Product card price | 13px `font-light` foreground                       | 14px        | NO accent on price                          |
+| Card chrome        | NO border, NO radius (`rounded-none`), NO shadow   | same        | zero chrome                                 |
+| Card hover         | color shift muted-foreground → foreground 500ms    | same        | no movement, only color                     |
+| Category card      | square aspect, NO border, NO radius                | same        | image is everything                         |
+| Header height      | 64px                                               | 80px        | ultra-thin wordmark + icon-only nav         |
+| CTA / Button       | underlined link (`border-b border-foreground`)     | same        | NO button frame ever                        |
+| Hero               | 16:9 full-bleed, NO overlay                        | —           | image speaks for itself, headline below     |
+| Motion duration    | 500ms ease-out                                     | same        |                                             |
+| Footer             | 4-line `font-light` 12px                           | 14px        | minimal copyright                           |
+
+**Pushes apart from siblings:**
+
+1. ZERO card chrome — no border, no radius, no shadow. The OTHER 4 themes all use some frame.
+2. NO buttons — every CTA is an underlined link. Unique.
+3. Sage accent used **only as muted background tint**, never on text. Other themes use accent on price or buttons.
+
+**Mockup:** ![Minimal persona target](./docs/design-mockups/personas/minimal-editorial-fashion.png) — Stitch screen `f42277c57b824e04ba41a4a6c2aa2fa9`.
+
+---
+
+### Theme 4 — Bold (persona: streetwear / youth / DTC brand)
+
+**Who buys it:** local hype brand selling sneakers/tees, energy drink, gaming peripherals, sports merch. Reference: supreme.com / palace.com / kith.com.
+
+**Mood:** loud, sharp, fast. High contrast. All-caps. Brutalist offset shadows.
+
+| Token              | Mobile                                                                        | → Desktop   | Notes                                           |
+| ------------------ | ----------------------------------------------------------------------------- | ----------- | ----------------------------------------------- |
+| `bg-page`          | `#FFFFFF`                                                                     | same        | pure white background                           |
+| `bg-surface`       | `#FFFFFF`                                                                     | same        | white cards on white page; the border separates |
+| `fg`               | `#000000`                                                                     | same        | pure black                                      |
+| `accent`           | `#FFE600` (electric yellow)                                                   | same        | high-vis safety yellow                          |
+| `muted`            | `foreground/70`                                                               | same        | bolder than other themes' muted                 |
+| Font family        | Space Grotesk / Inter Display Black                                           | same        | sans, geometric, bold                           |
+| Section heading    | 24px `font-black uppercase tracking-tight`                                    | 32px        | NO flanking lines (just bold text)              |
+| Section kicker     | 12px uppercase `font-black tracking-tight`                                    | 13px        | no lines, no chip                               |
+| Section subtitle   | 13px `font-bold uppercase`                                                    | 14px        | NO lines                                        |
+| Product card name  | 14px `font-black uppercase`                                                   | 14px → 16px |                                                 |
+| Product card price | 16px `font-black` foreground                                                  | same        |                                                 |
+| Card chrome        | `border-2 border-foreground` + offset `[6px_6px_0_0]` shadow                  | same        | brutalist signature                             |
+| Card hover         | `translate-x-1 translate-y-1` (shadow appears to fall behind) 200ms           | same        | SNAPPY                                          |
+| Category card      | `border-2` + `rounded-2xl` (NOT 3xl)                                          | same        | tight angular                                   |
+| Header height      | 56px                                                                          | 64px        | black bar + white wordmark center               |
+| CTA / Button       | solid accent yellow + 2px border + 6px offset shadow + `font-black uppercase` | same        | brutalist signature                             |
+| Hero               | square 1:1 with offset 6px black shadow on the image                          | —           | even the hero photo gets the shadow treatment   |
+| Motion duration    | **200ms ease-out**                                                            | same        | fastest of all themes                           |
+| Footer             | black bg + yellow `font-black uppercase` text                                 | same        | inverted footer                                 |
+
+**Pushes apart from siblings:**
+
+1. ONLY theme using **offset brutalist shadows** (`[6px_6px_0_0]`) — instantly recognizable signature.
+2. ONLY theme at **200ms** transitions — all others are 500-700ms. Speed IS the brand.
+3. Inverted footer (black bg) — no other theme inverts.
+
+**Mockup:** ![Bold persona target](./docs/design-mockups/personas/bold-streetwear-youth.png) — Stitch screen `b941627c946347a283be3c962fc30446`.
+
+---
+
+### Theme 5 — Elegant (persona: premium / serif / fashion-house)
+
+**Who buys it:** high-end perfume brand, designer fashion label, luxury cosmetics (Wady Aljuz uses this). Reference: chanel.com / hermes.com / aesop.com.
+
+**Mood:** glacial, restrained, ultra-premium. Hairline weight. Wide tracking. 700ms hovers.
+
+| Token              | Mobile                                                                          | → Desktop   | Notes                                     |
+| ------------------ | ------------------------------------------------------------------------------- | ----------- | ----------------------------------------- |
+| `bg-page`          | `#FFFFFF`                                                                       | same        | pure white                                |
+| `bg-surface`       | `#FFFFFF`                                                                       | same        | no contrast against page                  |
+| `fg`               | `#1A1A1A`                                                                       | same        | near-black                                |
+| `accent`           | merchant's brand color via `theme.primaryColor`                                 | same        | accent comes from merchant, not theme     |
+| `muted`            | `foreground/55`                                                                 | same        |                                           |
+| Font family        | Cormorant / Tenor Sans / Inter Light                                            | same        | serif headings + sans body, ultra-light   |
+| Section heading    | 24px `font-serif font-extralight tracking-[-0.01em]`                            | 32px        | hairline-flanked (kicker + subtitle both) |
+| Section kicker     | 12px uppercase `font-light tracking-[0.32em]`                                   | 13px        | hairline-flanked                          |
+| Section subtitle   | 14px `font-extralight italic`                                                   | 16px        | hairline-flanked                          |
+| Product card name  | 14px `font-light`                                                               | 14px → 16px |                                           |
+| Product card price | 14px `font-extralight`                                                          | 14px → 16px |                                           |
+| Card chrome        | `border-foreground/10` hairline + `rounded-md`                                  | same        | thinnest border of any theme              |
+| Card hover         | border `/10→/25` + color shift 700ms                                            | same        | glacial pacing                            |
+| Category card      | `aspect-[3/4]` portrait + hairline border + `rounded-md`                        | same        | lookbook proportions                      |
+| Header height      | 56px                                                                            | 72px        | thin wordmark + hairline below            |
+| CTA / Button       | `border-t border-foreground/20` only + `font-light uppercase tracking-[0.22em]` | same        | whisper-thin top border                   |
+| Hero               | 16:9 with `backdrop-blur-md` overlay                                            | —           | frosted glass aesthetic                   |
+| Motion duration    | **700ms ease-in-out**                                                           | same        | slowest of all themes                     |
+| Footer             | `font-extralight` 14px + hairline divider                                       | 16px        |                                           |
+
+**Pushes apart from siblings:**
+
+1. ONLY theme using **hairline-flanked editorial dividers** on every section heading + subtitle.
+2. **700ms** motion is slowest of all themes — luxury pacing.
+3. **Hairline borders** at `/10` opacity — others go `/40+`.
+
+**Mockup:** As shipped on wadyaljuz.com (live reference).
+
+---
+
+### Cross-theme rules that hold
+
+- **Card size + aspect** are always merchant-controlled per `CardSize` + `CardAspect` + `CardShape` enums (see `packages/shared/src/types/store-layout.ts`). Per-theme defaults above are starting points, not locks.
+- **Typography zones** (Admin → Typography) always override per-theme defaults via the per-store CSS emitter in `apps/web/src/app/layout.tsx`. See `feedback-fwb-data-zone-hardcoded-size-trap` (scoped memory).
+- **Per-section heading-line toggles** (`showKickerLines` / `showSubtitleLines` per section — `CategoriesSettings` / `ProductCarouselSettings`) work across all 5 themes' shared SectionHeading paths. Per-theme `CategoryGrid` chip-style headings ignore the toggle (no lines to hide).
+- **Background preset + Section divider** mutex still applies (see CLAUDE.md). Persona doesn't change the rule.
+- **Cart icon** stays the canonical SVG across all 5 themes (see CLAUDE.md).
+- **Logo sizing override** stays h-24 mobile / md:h-36 desktop across all 5 themes (CLAUDE.md).
+
+### Token-name conventions (FWB house style)
+
+Inspired by Shopify Polaris + Material Design Tokens, adapted to FWB's simpler 5-theme system. Future tokens should follow this naming:
+
+| Pattern                     | Example                                          | Use                           |
+| --------------------------- | ------------------------------------------------ | ----------------------------- |
+| `bg-<role>`                 | `bg-page`, `bg-section-alt`, `bg-surface`        | container backgrounds         |
+| `text-<role>` / `fg-<role>` | `text-foreground`, `text-muted-foreground`       | text colors via Tailwind      |
+| `border-<role>/<opacity>`   | `border-border/40`, `border-foreground/10`       | borders with opacity          |
+| `<role>-<style>`            | `productCardName`, `sectionKicker`               | pack-styles tokens            |
+| `rounded-<scale>`           | `rounded-sm` / `rounded-md` / `rounded-2xl`      | Tailwind radii                |
+| `duration-<ms>`             | `duration-200` / `duration-500` / `duration-700` | Tailwind transition durations |
+
+**Role-over-value:** never name a token by its color (`color-blue-500`). Always name by the role (`accent-primary`, `bg-page`). Lets us swap palettes per theme without renaming consumers.
+
+### Token architecture (Polaris-inspired, FWB-adapted)
+
+The 5-theme architecture should follow Shopify Polaris's two-layer pattern so future themes are cheap to add:
+
+1. **Primitive scale** — raw values, no semantic meaning. One `size` scale (4px base × multiplier), one `color` palette, one `font` family list, one `motion` duration scale. Lives in `packages/shared/src/types/store-theme.ts` (already partially there for color via `--bg-page` / `--bg-section-alt` etc.).
+2. **Semantic alias** — every component consumes ONLY semantic tokens (`bg-page`, `text-foreground`, `border-border`), never primitive values directly. Per-theme variation = swap the alias mapping, not the consumer.
+
+**Key Polaris patterns to adopt (verified 2026-05-17 by reading `/tmp/polaris-react-audit/polaris-tokens/src/themes/base/`):**
+
+| Pattern                                   | What it means                                                                                                                                                                      | Why for FWB                                                                                                                                                                                                                                      |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **`bg-fill` vs `bg-surface`** split       | `bg-fill` = opaque solid regions (buttons, chips, badges). `bg-surface` = container backgrounds (cards, modals, page). Same color role, different element context.                 | Eliminates ambiguity. A "primary background" on a button (`bg-fill-brand`) ≠ a "primary background" on a card (`bg-surface-brand`).                                                                                                              |
+| **Text composites, not size-only tokens** | Bundle each text variant as size + weight + line-height + letter-spacing. Don't token-ize just `font-size`. Polaris has `heading-md` / `body-sm` etc. composite tokens.            | Per-theme bold/minimal differences become a one-line composite override (`text-heading-md`) instead of 4 separate weight/size/tracking/leading overrides per usage site.                                                                         |
+| **Dark mode as partial override**         | A dark theme is a DIFF against the base theme, not a separate file. Only the tokens that differ get redefined.                                                                     | When FWB ships dark mode (deferred), each of the 5 themes gets a 10-30-line dark override instead of a fork.                                                                                                                                     |
+| **Mobile-first breakpoints**              | Polaris: `xs:0`, `sm:490`, `md:768`, `lg:1040`, `xl:1440`. FWB currently uses Tailwind defaults (`sm:640`, `md:768`, `lg:1024`).                                                   | Polaris's `sm:490` better fits Kuwait mobile traffic (most phones 390-430px wide — Tailwind's `sm:640` skips the iPhone Plus / Galaxy S Ultra range). Consider a future migration.                                                               |
+| **4px base × non-linear scale**           | Polaris space scale: `0, 025, 050, 100, 150, 200, 300, 400, 500, 600, 800, 1000, 1200, 1600, 2000, 2400, 2800, 3200`. Gaps at 700/900/1100 intentional — no design calls for them. | FWB should NOT generate every spacing step from 0 to 80px — keep the scale sparse so merchants can't pick weird values. Tailwind's full scale is fine for code; the AI auto-fill should restrict to: `space-1, 2, 3, 4, 6, 8, 12, 16` (8 steps). |
+| **Z-index in hundreds**                   | Polaris: `z-0=auto, z-1=100, z-2=200, ...`. Insert layers without renaming.                                                                                                        | When FWB adds sticky CTA + chat widget + cookie banner stacking (already 3 fixed-bottom layers), use 100/200/300/400 instead of 10/20/30/40 so we can interleave.                                                                                |
+| **Component-specific aliases**            | Polaris exposes `space-card-padding`, `space-button-group-gap` as one-step aliases on top of the scale. Components reference the alias, never the scale step.                      | FWB pack-styles already does this informally (`productCardName`, `sectionKicker`). Formalise it — every component "knows" only its alias; per-theme overrides change the alias mapping.                                                          |
+
+**What NOT to copy:**
+
+- Polaris's full ~183 color tokens. FWB's 5-theme system only needs ~12-15 color aliases. Don't over-tokenise.
+- Polaris's 13-step font-size scale. FWB's 16px floor + 4-step scale (12 / 14 / 16 / 18 / 22) covers everything.
+- Polaris's `color.text.magic` / `color.bg.fill.magic` — that's an AI-feature signature color. FWB doesn't have that surface concept.
+
+---
+
 ## Anti-patterns to refuse
 
 1. **Don't use `aspect-square` for product card images on mobile if it makes the card taller than 250px combined with content below.** Switch to `aspect-[4/3]` (landscape) or accept smaller cards via column count.
@@ -110,3 +381,22 @@ website-builder/memory/` so future sessions read the rationale.
 This file is the single source of truth for sizing across the platform.
 Future Claude sessions should read it FIRST before touching any
 size-related class.
+
+## How to scaffold a new theme from this doc
+
+When adding a 6th theme (e.g. "playful" for kids' brands, "minimal-dark" for after-hours bars):
+
+1. **Write the persona statement first** — one paragraph: who buys it, what mood, which reference site. If you can't write this, the theme will overlap with existing ones.
+2. **Fill in the per-theme token table** — copy the spec block above and fill in every row. Every blank cell is a decision you owe future merchants. Don't ship with `TBD`.
+3. **Write the "Pushes apart from siblings" 3-bullet list** — name 3 SPECIFIC tokens that no other theme uses. If you can't name 3, the theme isn't distinct.
+4. **Build pack-styles.ts entries** — `apps/web/src/templates/shared/pack-styles.ts` is the central per-pack styling table. Add entries for `sectionHeading`, `productCardName`, `productCardPrice`, `categoryCaption`, `cta`, etc. Inherit from the existing theme that's CLOSEST to the new one, then diff.
+5. **Create the 5 component dirs** — `apps/web/src/templates/<new-theme>/` needs `Header.tsx`, `Footer.tsx`, `ProductCard.tsx`, `CategoryCard.tsx`, `CategoryGrid.tsx`, `HeroBanner.tsx`. Mirror an existing theme's structure 1:1 then override the chrome.
+6. **Generate the Stitch mockup** — use the persona prompt format from `/tmp/stitch-personas/gen.sh`. Save the URL into this doc's per-theme spec block.
+7. **Add the templateId to `packages/shared/src/types/store-theme.ts`** TemplateId enum.
+8. **Add admin templateId option** in the new-store wizard + admin theme picker.
+
+If you skip step 1 (persona statement) the theme will look like a styling tweak of an existing theme, not a new option — exactly what Ahmad's 2026-05-17 audit flagged.
+
+## How to use this doc for AI-driven scaffolding
+
+A future "/scaffold-store <persona> <theme>" workflow can read THIS doc, pick the matching persona block, and emit the per-store theme JSON (backgroundPreset / dividers / showKickerLines / showSubtitleLines / etc.) such that the storefront renders the persona out of the box without merchant tuning. The per-theme token tables ARE the contract — anything outside them is merchant override territory.
