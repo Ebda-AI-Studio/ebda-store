@@ -89,9 +89,29 @@ export function SectionHeading({
             </h2>
           )}
           {subtitleText && (
-            <p className="text-xl text-muted-foreground max-w-2xl" data-zone="sectionSubtitle">
-              {subtitleText}
-            </p>
+            // Subtitle renders with flanking hairlines matching the
+            // SectionKicker editorial-divider style (Ahmad 2026-05-17
+            // evening — was manually typing "--- text ---" to fake it).
+            // Long descriptive subtitles still look fine with the lines
+            // — they extend `flex-1` to fill but cap at max-w so they
+            // never dominate. Same `bg-foreground/30` opacity as the
+            // kicker hairlines for visual consistency.
+            <div
+              className="self-stretch flex items-center justify-center gap-3 sm:gap-4"
+              data-zone="sectionSubtitle"
+            >
+              <span
+                aria-hidden
+                data-subtitle-divider-line
+                className="h-px flex-1 max-w-[140px] sm:max-w-[200px] bg-foreground/30"
+              />
+              <p className="text-xl text-muted-foreground max-w-2xl">{subtitleText}</p>
+              <span
+                aria-hidden
+                data-subtitle-divider-line
+                className="h-px flex-1 max-w-[140px] sm:max-w-[200px] bg-foreground/30"
+              />
+            </div>
           )}
         </div>
         {seeAllHref && (

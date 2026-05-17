@@ -32,6 +32,14 @@ interface ZoneDef {
   /** Marks the row visually as a sub-zone (rendered as a nested
    *  override of one of the broad zones). */
   isSubZone?: boolean;
+  /**
+   * When set, renders a group heading row above this zone in the
+   * admin Typography page. Used to separate logical clusters
+   * (Top of page / Section headings / Categories / Products / Bottom)
+   * after the 2026-05-17 reorder per Ahmad's request.
+   */
+  groupHeading?: string;
+  groupHeadingAr?: string;
   /** Sample text shown in the live preview block so the merchant can
    *  see what the zone's text actually looks like with the current
    *  settings. Should mirror what the storefront actually renders in
@@ -41,11 +49,13 @@ interface ZoneDef {
   previewTextAr: string;
 }
 
+// Ordered top-to-bottom to match the storefront page flow (Ahmad 2026-05-17
+// evening). Fine-grained sub-zones nest UNDER their related broad zone
+// instead of clustering at the end. Group headings ("Top of page" / "Section
+// headings" / etc.) separate logical groups in the rendered output via
+// `groupHeading`.
 const ZONES: ZoneDef[] = [
-  // Broad zones — wrap whole storefront regions. Descriptions point at
-  // concrete UI elements + give an example of what changes when the
-  // merchant tweaks this zone, so they know exactly which part of the
-  // store they're editing.
+  // ─── Top of page ──────────────────────────────────────────────
   {
     key: 'beforeHeader',
     label: 'Announcement bar (top promo strip)',
@@ -56,6 +66,8 @@ const ZONES: ZoneDef[] = [
       'الشريط الترويجي الضيق في أعلى كل صفحة — عادةً مثل "شحن مجاني فوق 30 د.ك" أو كود خصم.',
     previewText: 'Free shipping on orders over 30 KWD — use code SAFFRON10',
     previewTextAr: 'شحن مجاني للطلبات فوق 30 د.ك — استخدم كود SAFFRON10',
+    groupHeading: 'Top of page',
+    groupHeadingAr: 'أعلى الصفحة',
   },
   {
     key: 'header',
@@ -68,53 +80,9 @@ const ZONES: ZoneDef[] = [
     previewText: 'Wady Aljuz · Shop · About · Contact',
     previewTextAr: 'وادي الجوز · تسوّق · من نحن · تواصل',
   },
-  {
-    key: 'categories',
-    label: 'Categories section (homepage "Shop by Category")',
-    labelAr: 'قسم الفئات (في الصفحة الرئيسية: "تسوّق حسب الفئة")',
-    description:
-      'The "Shop by Category" block on the homepage — the row of category tiles + their captions ("Sweets", "Drinks", etc.).',
-    descriptionAr:
-      'كتلة "تسوّق حسب الفئة" في الصفحة الرئيسية — صف بطاقات الفئات وأسماؤها (مثلاً "حلويات"، "مشروبات").',
-    previewText: 'Sweets · Drinks · Bakery · Spices',
-    previewTextAr: 'حلويات · مشروبات · مخبوزات · بهارات',
-  },
-  {
-    key: 'products',
-    label: 'Products (listing, detail, carousels everywhere)',
-    labelAr: 'المنتجات (في صفحة القائمة، صفحة المنتج، وكل الكاروسيلات)',
-    description:
-      'The base font for every product surface: /products listing, single-product detail page, "New Arrivals" + "Best Sellers" carousels on the homepage, cart-recommendation cards. Sub-zones below override this for product name + price specifically.',
-    descriptionAr:
-      'الخط الأساسي لكل صفحات المنتجات: قائمة /products، صفحة المنتج الواحد، كاروسيلات "أحدث المنتجات" و"الأكثر مبيعاً" في الصفحة الرئيسية، وبطاقات اقتراحات السلة. الأقسام الفرعية أدناه تتجاوز هذا للاسم والسعر فقط.',
-    previewText: 'Premium Saffron Tea — 12.500 KWD — In stock',
-    previewTextAr: 'شاي الزعفران الفاخر — 12.500 د.ك — متوفر',
-  },
-  {
-    key: 'footer',
-    label: 'Footer (bottom links + copyright)',
-    labelAr: 'الفوتر (الروابط السفلية + حقوق النشر)',
-    description:
-      'The footer columns at the bottom of every page — "Shop", "Help", "About", social icons, and the copyright row.',
-    descriptionAr:
-      'أعمدة الفوتر في أسفل كل صفحة — "تسوّق"، "مساعدة"، "من نحن"، أيقونات السوشيال، وسطر حقوق النشر.',
-    previewText: '© 2026 Wady Aljuz · Privacy · Terms · Contact',
-    previewTextAr: '© 2026 وادي الجوز · الخصوصية · الشروط · تواصل معنا',
-  },
-  {
-    key: 'afterFooter',
-    label: 'Below footer (cookie consent, etc.)',
-    labelAr: 'تحت الفوتر (شريط الكوكيز ونحوه)',
-    description:
-      'Tiny elements that render below the footer — cookie consent banner, "Powered by Force" credit row.',
-    descriptionAr: 'العناصر الصغيرة أسفل الفوتر — شريط موافقة الكوكيز، سطر "مدعوم من Force".',
-    previewText: 'Powered by Force',
-    previewTextAr: 'مدعوم من فورس',
-  },
-  // Sub-zones — nested overrides.
-  // Section heading sub-zones split SectionHeading into 4 individually
-  // styleable parts — so a coloured-pill style on the title doesn't
-  // bleed onto the "View All" link next to it (Ahmad 2026-05-16).
+
+  // ─── Section headings (apply across every homepage section) ────
+  // Sub-zones split SectionHeading into 4 individually styleable parts.
   {
     key: 'sectionKicker',
     label: 'Section kicker (small chip above title)',
@@ -126,6 +94,8 @@ const ZONES: ZoneDef[] = [
     previewText: 'EXPLORE',
     previewTextAr: 'استكشف',
     isSubZone: true,
+    groupHeading: 'Section headings (used across every homepage section)',
+    groupHeadingAr: 'عناوين الأقسام (تنطبق على كل قسم في الصفحة الرئيسية)',
   },
   {
     key: 'sectionTitle',
@@ -162,6 +132,36 @@ const ZONES: ZoneDef[] = [
     previewText: 'View All →',
     previewTextAr: '← عرض الكل',
     isSubZone: true,
+  },
+
+  // ─── Categories section ────────────────────────────────────────
+  {
+    key: 'categories',
+    label: 'Categories section (homepage "Shop by Category")',
+    labelAr: 'قسم الفئات (في الصفحة الرئيسية: "تسوّق حسب الفئة")',
+    description:
+      'The "Shop by Category" block on the homepage — the row of category tiles + their captions ("Sweets", "Drinks", etc.).',
+    descriptionAr:
+      'كتلة "تسوّق حسب الفئة" في الصفحة الرئيسية — صف بطاقات الفئات وأسماؤها (مثلاً "حلويات"، "مشروبات").',
+    previewText: 'Sweets · Drinks · Bakery · Spices',
+    previewTextAr: 'حلويات · مشروبات · مخبوزات · بهارات',
+    groupHeading: 'Categories section',
+    groupHeadingAr: 'قسم الفئات',
+  },
+
+  // ─── Products (listing + detail + carousels) ──────────────────
+  {
+    key: 'products',
+    label: 'Products (listing, detail, carousels everywhere)',
+    labelAr: 'المنتجات (في صفحة القائمة، صفحة المنتج، وكل الكاروسيلات)',
+    description:
+      'The base font for every product surface: /products listing, single-product detail page, "New Arrivals" + "Best Sellers" carousels on the homepage, cart-recommendation cards. Sub-zones below override this for product name + price specifically.',
+    descriptionAr:
+      'الخط الأساسي لكل صفحات المنتجات: قائمة /products، صفحة المنتج الواحد، كاروسيلات "أحدث المنتجات" و"الأكثر مبيعاً" في الصفحة الرئيسية، وبطاقات اقتراحات السلة. الأقسام الفرعية أدناه تتجاوز هذا للاسم والسعر فقط.',
+    previewText: 'Premium Saffron Tea — 12.500 KWD — In stock',
+    previewTextAr: 'شاي الزعفران الفاخر — 12.500 د.ك — متوفر',
+    groupHeading: 'Products (cards + listing + detail)',
+    groupHeadingAr: 'المنتجات (البطاقات + القائمة + الصفحة)',
   },
   {
     key: 'productName',
@@ -210,6 +210,31 @@ const ZONES: ZoneDef[] = [
     previewText: 'Sort by: Popular',
     previewTextAr: 'الترتيب: الأكثر شعبية',
     isSubZone: true,
+  },
+
+  // ─── Bottom of page ────────────────────────────────────────────
+  {
+    key: 'footer',
+    label: 'Footer (bottom links + copyright)',
+    labelAr: 'الفوتر (الروابط السفلية + حقوق النشر)',
+    description:
+      'The footer columns at the bottom of every page — "Shop", "Help", "About", social icons, and the copyright row.',
+    descriptionAr:
+      'أعمدة الفوتر في أسفل كل صفحة — "تسوّق"، "مساعدة"، "من نحن"، أيقونات السوشيال، وسطر حقوق النشر.',
+    previewText: '© 2026 Wady Aljuz · Privacy · Terms · Contact',
+    previewTextAr: '© 2026 وادي الجوز · الخصوصية · الشروط · تواصل معنا',
+    groupHeading: 'Bottom of page',
+    groupHeadingAr: 'أسفل الصفحة',
+  },
+  {
+    key: 'afterFooter',
+    label: 'Below footer (cookie consent, etc.)',
+    labelAr: 'تحت الفوتر (شريط الكوكيز ونحوه)',
+    description:
+      'Tiny elements that render below the footer — cookie consent banner, "Powered by Force" credit row.',
+    descriptionAr: 'العناصر الصغيرة أسفل الفوتر — شريط موافقة الكوكيز، سطر "مدعوم من Force".',
+    previewText: 'Powered by Force',
+    previewTextAr: 'مدعوم من فورس',
   },
 ];
 
@@ -1304,25 +1329,33 @@ export default function TypographyPage() {
             </div>
 
             <div className="mt-4 space-y-5">
-              {ZONES.map((z, i) => {
+              {ZONES.map(z => {
                 const cfg = typo.zones[z.key] ?? {};
-                // Insert a subtle divider + header before the first
-                // sub-zone so the merchant sees they're a finer-grained
-                // override layer on top of the broad zones above.
-                const isFirstSubZone = z.isSubZone && !ZONES[i - 1]?.isSubZone;
                 return (
                   <div key={z.key} id={`zone-${z.key}`} className="scroll-mt-24">
-                    {isFirstSubZone && (
-                      <div className="mb-5 rounded-xl border border-dashed border-border bg-muted/30 p-3 text-xs text-muted-foreground">
-                        <strong className="text-foreground">Fine-grained overrides</strong> — these
-                        target specific elements inside the broad zones above. CSS specificity wins,
-                        so e.g. setting <em>Product name</em> font size overrides the broader{' '}
-                        <em>Products</em> setting for product names only.
+                    {z.groupHeading && (
+                      // Group divider — separates logical clusters in
+                      // top-to-bottom storefront order (Ahmad 2026-05-17
+                      // evening reorder). Renders before the first zone
+                      // of each cluster.
+                      <div className="mb-4 mt-2 first:mt-0 flex items-center gap-3">
+                        <span className="h-px flex-1 bg-border" aria-hidden />
+                        <h2 className="shrink-0 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                          {isAr ? (z.groupHeadingAr ?? z.groupHeading) : z.groupHeading}
+                        </h2>
+                        <span className="h-px flex-1 bg-border" aria-hidden />
                       </div>
                     )}
                     <div
                       data-zone-block={z.key}
-                      className="rounded-xl border border-border/60 bg-background p-4 transition-[box-shadow,border-color] duration-300"
+                      className={`rounded-xl border border-border/60 bg-background p-4 transition-[box-shadow,border-color] duration-300 ${
+                        z.isSubZone
+                          ? // Sub-zones (fine-grained overrides) are
+                            // visually nested under their broad zone via
+                            // start-padding + a left/right accent rail.
+                            'ms-4 sm:ms-6 border-s-2 border-s-primary/30'
+                          : ''
+                      }`}
                     >
                       <div className="flex items-center justify-between gap-2 flex-wrap">
                         <h3 className="text-sm font-semibold text-foreground">
