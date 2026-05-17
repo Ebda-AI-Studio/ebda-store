@@ -5,7 +5,12 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useToast } from '@force/ui';
 import { useT } from '@/i18n/useT';
-import { resolveLayoutSettings, type StoreLayoutSettings, type HeroSlide } from '@force/shared';
+import {
+  resolveLayoutSettings,
+  type StoreLayoutSettings,
+  type HeroSlide,
+  recommendedSizeText,
+} from '@force/shared';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { Toggle } from '../../../../components/Toggle';
 import { ImageUpload } from '../../../../components/ImageUpload';
@@ -346,10 +351,10 @@ export default function StoreLayoutPage() {
                       }
                       className="rounded-lg border border-border bg-card px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                     >
-                      <option value="theme">Theme default</option>
-                      <option value="square">Square 1:1</option>
-                      <option value="portrait">Portrait 3:4</option>
-                      <option value="landscape">Landscape 4:3</option>
+                      <option value="theme">Theme default (3:4 — 600×800)</option>
+                      <option value="square">Square 1:1 (800×800)</option>
+                      <option value="portrait">Portrait 3:4 (600×800)</option>
+                      <option value="landscape">Landscape 4:3 (800×600)</option>
                     </select>
                   </label>
                   <label className="flex flex-col gap-1 text-sm">
@@ -733,10 +738,10 @@ function ProductCardControls({
           }
           className="rounded-lg border border-border bg-card px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
         >
-          <option value="theme">Theme default</option>
-          <option value="square">Square 1:1</option>
-          <option value="portrait">Portrait 3:4</option>
-          <option value="landscape">Landscape 4:3</option>
+          <option value="theme">Theme default (3:4 — 600×800)</option>
+          <option value="square">Square 1:1 (800×800)</option>
+          <option value="portrait">Portrait 3:4 (600×800)</option>
+          <option value="landscape">Landscape 4:3 (800×600)</option>
         </select>
       </label>
       <label className="flex flex-col gap-1 text-sm">
@@ -1310,6 +1315,7 @@ function SlidesEditor({ slides, storeId, onChange }: SlidesEditorProps) {
                     storeId={storeId}
                     onUpload={url => updateSlide(index, { image: url })}
                     onRemove={() => updateSlide(index, { image: '' })}
+                    recommendedSizeHint={recommendedSizeText('heroDesktop')}
                   />
                   <div className="mt-3">
                     <label className="mb-1 block text-[10px] uppercase tracking-wider text-muted-foreground">
@@ -1321,6 +1327,7 @@ function SlidesEditor({ slides, storeId, onChange }: SlidesEditorProps) {
                       storeId={storeId}
                       onUpload={url => updateSlide(index, { imageAr: url })}
                       onRemove={() => updateSlide(index, { imageAr: '' })}
+                      recommendedSizeHint={recommendedSizeText('heroDesktop')}
                     />
                   </div>
                 </div>
@@ -1342,6 +1349,7 @@ function SlidesEditor({ slides, storeId, onChange }: SlidesEditorProps) {
                     aspectRatio="3/4"
                     onUpload={url => updateSlide(index, { imageMobile: url })}
                     onRemove={() => updateSlide(index, { imageMobile: '' })}
+                    recommendedSizeHint={recommendedSizeText('heroMobile')}
                   />
                   <div className="mt-3">
                     <label className="mb-1 block text-[10px] uppercase tracking-wider text-muted-foreground">
@@ -1354,6 +1362,7 @@ function SlidesEditor({ slides, storeId, onChange }: SlidesEditorProps) {
                       aspectRatio="3/4"
                       onUpload={url => updateSlide(index, { imageMobileAr: url })}
                       onRemove={() => updateSlide(index, { imageMobileAr: '' })}
+                      recommendedSizeHint={recommendedSizeText('heroMobile')}
                     />
                   </div>
                 </div>

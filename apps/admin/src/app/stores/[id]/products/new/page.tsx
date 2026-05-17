@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button, Input, Textarea, Select } from '@force/ui';
+import { recommendedSizeText } from '@force/shared';
 import { AdminLayout } from '../../../../../components/AdminLayout';
 import { MultiImageUpload } from '../../../../../components/ImageUpload';
 import { useAuth } from '../../../../../lib/auth';
@@ -186,6 +187,7 @@ export default function NewProductPage() {
                 storeId={storeId}
                 label={t('fields.mediaHint')}
                 max={10}
+                recommendedSizeHint={recommendedSizeText('productPrimary')}
               />
             </div>
 

@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button, Input, Textarea } from '@force/ui';
+import { recommendedSizeText } from '@force/shared';
 import { useT } from '@/i18n/useT';
 import Link from 'next/link';
 import { AdminLayout } from '../../../../../../components/AdminLayout';
@@ -455,6 +456,7 @@ export default function EditProductPage() {
                 storeId={storeId}
                 label={tFields('mediaHint')}
                 max={10}
+                recommendedSizeHint={recommendedSizeText('productPrimary')}
               />
             </div>
 

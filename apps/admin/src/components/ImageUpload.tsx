@@ -110,6 +110,12 @@ interface MultiImageUploadProps {
   label?: string;
   max?: number;
   className?: string;
+  /**
+   * Recommended-size hint rendered under the dropzone — same prop name +
+   * behavior as ImageUpload. Use `recommendedSizeText(key)` from
+   * `@force/shared/image-standards` to stay in sync with design.md.
+   */
+  recommendedSizeHint?: string;
 }
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -257,6 +263,7 @@ export function MultiImageUpload({
   label,
   max = 10,
   className = '',
+  recommendedSizeHint,
 }: MultiImageUploadProps) {
   const t = useT('components.imageUpload');
   const resolvedLabel = label ?? t('multiLabel');
@@ -351,6 +358,9 @@ export function MultiImageUpload({
         </UploadDropzone>
       )}
 
+      {recommendedSizeHint && (
+        <p className="mt-2 text-xs text-muted-foreground">{recommendedSizeHint}</p>
+      )}
       {displayError && <p className="mt-1 text-xs text-destructive">{displayError}</p>}
     </div>
   );

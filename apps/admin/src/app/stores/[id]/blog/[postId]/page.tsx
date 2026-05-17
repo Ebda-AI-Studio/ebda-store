@@ -3,6 +3,7 @@
 import { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { recommendedSizeText } from '@force/shared';
 import { apiGet, apiPost, apiPut } from '../../../../../lib/api';
 import { ImageUpload } from '../../../../../components/ImageUpload';
 
@@ -251,7 +252,7 @@ export default function BlogPostEditorPage({
             storeId={storeId}
             label="Upload cover image"
             aspectRatio="3/2"
-            recommendedSizeHint="Recommended: 1200×800px (3:2 landscape)"
+            recommendedSizeHint={recommendedSizeText('blogCover')}
           />
         </div>
 

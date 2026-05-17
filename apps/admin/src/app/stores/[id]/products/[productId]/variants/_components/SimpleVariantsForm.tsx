@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Button, Input, useToast } from '@force/ui';
+import { recommendedSizeText } from '@force/shared';
 import { useT } from '@/i18n/useT';
 import { ImageUpload } from '@/components/ImageUpload';
 import { apiGet, apiPost, apiPut, apiDelete } from '../../../../../../../lib/api';
@@ -463,6 +464,7 @@ export function SimpleVariantsForm({
                   onRemove={() => updateRow(row.rowId, { imageUrl: '' })}
                   folder="products"
                   storeId={storeId}
+                  recommendedSizeHint={recommendedSizeText('productPrimary')}
                 />
               </div>
               <div className="flex items-end justify-end pb-1">

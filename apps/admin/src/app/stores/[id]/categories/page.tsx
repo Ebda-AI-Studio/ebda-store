@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button, useToast } from '@force/ui';
+import { recommendedSizeText } from '@force/shared';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { ImageUpload } from '../../../../components/ImageUpload';
 import { apiGet, apiPost, apiPut, apiDelete } from '../../../../lib/api';
@@ -305,6 +306,8 @@ export default function StoreCategoriesPage() {
               storeId={storeId}
               label={savingBestSellersImage ? 'Saving…' : 'Upload cover'}
               accept="image/jpeg,image/png,image/webp"
+              aspectRatio="1/1"
+              recommendedSizeHint={recommendedSizeText('categorySquare')}
             />
           </div>
         </div>

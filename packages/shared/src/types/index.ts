@@ -9,6 +9,10 @@ export * from './store-layout';
 // Per-store typography overrides
 export * from './typography';
 
+// Canonical image-asset sizes (single source of truth for design.md +
+// admin "Recommended size" hints + future server-side validators).
+export * from './image-standards';
+
 // API Response Types
 export interface ApiResponse<T = unknown> {
   success: boolean;

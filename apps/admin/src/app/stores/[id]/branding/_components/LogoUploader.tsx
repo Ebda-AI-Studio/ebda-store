@@ -1,6 +1,7 @@
 'use client';
 
 import { useT } from '@/i18n/useT';
+import { recommendedSizeText } from '@force/shared';
 import { ImageUpload } from '../../../../../components/ImageUpload';
 import type { StoreBranding } from './types';
 
@@ -34,6 +35,7 @@ export function LogoUploader({ branding, onChange, storeId }: LogoUploaderProps)
           storeId={storeId}
           label={t('logoUpload')}
           accept={LOGO_ACCEPT}
+          recommendedSizeHint={recommendedSizeText('storeLogo')}
         />
       </div>
       <div>
@@ -46,6 +48,7 @@ export function LogoUploader({ branding, onChange, storeId }: LogoUploaderProps)
           storeId={storeId}
           label={t('logoArUpload')}
           accept={LOGO_ACCEPT}
+          recommendedSizeHint={recommendedSizeText('storeLogo')}
         />
       </div>
       <div>
@@ -58,6 +61,7 @@ export function LogoUploader({ branding, onChange, storeId }: LogoUploaderProps)
           storeId={storeId}
           label={t('faviconUpload')}
           accept={FAVICON_ACCEPT}
+          recommendedSizeHint={recommendedSizeText('favicon')}
         />
       </div>
     </div>
