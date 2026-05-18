@@ -125,8 +125,23 @@ export type ColorToken = (typeof COLOR_TOKENS)[number];
 const TOKEN_PREFIX = 'token:';
 
 /**
+ * Maps the short token name (used in colorValue strings and COLOR_TOKENS)
+ * to the corresponding StoreTheme field name. StoreTheme uses the `*Color`
+ * suffix convention while CSS variables use the bare token name.
+ */
+const TOKEN_TO_THEME_KEY: Record<ColorToken, keyof StoreTheme> = {
+  primary: 'primaryColor',
+  secondary: 'secondaryColor',
+  accent: 'accentColor',
+  card: 'cardColor',
+  muted: 'mutedColor',
+  foreground: 'foregroundColor',
+  border: 'borderColor',
+};
+
+/**
  * Resolve a `ColorValue` string to an actual CSS color.
- *   - 'token:<name>' → looks up StoreTheme[<name>] and wraps as hsl() if not already wrapped
+ *   - 'token:<name>' → looks up StoreTheme[<name>Color] and wraps as hsl() if not already wrapped
  *   - raw '#RRGGBB' / '#RGB' / 'hsl(...)' → passes through unchanged
  *   - empty / undefined → undefined (caller falls back to theme default)
  */
@@ -136,7 +151,13 @@ export function resolveColor(value: ColorValue | undefined, theme: StoreTheme): 
   if (value.startsWith(TOKEN_PREFIX)) {
     const key = value.slice(TOKEN_PREFIX.length) as ColorToken;
     if (!(COLOR_TOKENS as readonly string[]).includes(key)) return undefined;
-    const raw = (theme as unknown as Record<string, string | undefined>)[key];
+    // Use TOKEN_TO_THEME_KEY to map token → StoreTheme field (e.g. 'primary' → 'primaryColor').
+    // Fall back to direct key lookup to stay compatible with test fixtures that use
+    // bare Tailwind-style theme objects (e.g. { primary: '24 100% 50%' }).
+    const themeKey = TOKEN_TO_THEME_KEY[key];
+    const raw =
+      (theme[themeKey] as string | undefined) ??
+      (theme as unknown as Record<string, string | undefined>)[key];
     if (!raw) return undefined;
     return raw.startsWith('hsl(') || raw.startsWith('#') ? raw : `hsl(${raw})`;
   }

@@ -12,7 +12,9 @@ import {
   type HeroSlide,
   recommendedSizeTextForTemplate,
   type TemplateId,
+  type StoreTheme,
 } from '@force/shared';
+import { ColorField } from '../../../../components/ColorField';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { Toggle } from '../../../../components/Toggle';
 import { ImageUpload } from '../../../../components/ImageUpload';
@@ -25,6 +27,8 @@ interface StoreInfo {
   domain?: string | null;
   /** Store template — used to resolve per-theme recommended upload sizes. */
   template?: TemplateId;
+  /** Store theme — used by ColorField to resolve brand tokens for the contrast preview. */
+  theme?: StoreTheme;
 }
 
 type SectionUpdater<K extends keyof StoreLayoutSettings> = (
@@ -177,6 +181,7 @@ export default function StoreLayoutPage() {
                   value={layout.hero.bgColor}
                   onChange={v => updateSection('hero', s => ({ ...s, bgColor: v }))}
                   hint="Overrides the theme background preset for this section only."
+                  theme={storeInfo?.theme}
                 />
               </SectionCard>
 
@@ -466,6 +471,7 @@ export default function StoreLayoutPage() {
                     value={layout.categories.cardFrameColor}
                     onChange={v => updateSection('categories', s => ({ ...s, cardFrameColor: v }))}
                     hint="Overrides the theme border color for these category cards."
+                    theme={storeInfo?.theme}
                   />
                 )}
                 <ColorField
@@ -473,6 +479,7 @@ export default function StoreLayoutPage() {
                   value={layout.categories.bgColor}
                   onChange={v => updateSection('categories', s => ({ ...s, bgColor: v }))}
                   hint="Overrides the theme background preset for this section only."
+                  theme={storeInfo?.theme}
                 />
                 <TypographyJumpLinks
                   storeId={storeId}
@@ -520,12 +527,14 @@ export default function StoreLayoutPage() {
                 <ProductCardControls
                   values={layout.newArrivals}
                   onChange={patch => updateSection('newArrivals', s => ({ ...s, ...patch }))}
+                  theme={storeInfo?.theme}
                 />
                 <ColorField
                   label="Section background color"
                   value={layout.newArrivals.bgColor}
                   onChange={v => updateSection('newArrivals', s => ({ ...s, bgColor: v }))}
                   hint="Overrides the theme background preset for this section only."
+                  theme={storeInfo?.theme}
                 />
                 <TypographyJumpLinks
                   storeId={storeId}
@@ -574,12 +583,14 @@ export default function StoreLayoutPage() {
                 <ProductCardControls
                   values={layout.bestSellers}
                   onChange={patch => updateSection('bestSellers', s => ({ ...s, ...patch }))}
+                  theme={storeInfo?.theme}
                 />
                 <ColorField
                   label="Section background color"
                   value={layout.bestSellers.bgColor}
                   onChange={v => updateSection('bestSellers', s => ({ ...s, bgColor: v }))}
                   hint="Overrides the theme background preset for this section only."
+                  theme={storeInfo?.theme}
                 />
                 <TypographyJumpLinks
                   storeId={storeId}
@@ -649,6 +660,7 @@ export default function StoreLayoutPage() {
                   value={layout.testimonials.bgColor}
                   onChange={v => updateSection('testimonials', s => ({ ...s, bgColor: v }))}
                   hint="Overrides the theme background preset for this section only."
+                  theme={storeInfo?.theme}
                 />
                 <TypographyJumpLinks
                   storeId={storeId}
@@ -701,6 +713,7 @@ export default function StoreLayoutPage() {
                         : prev
                     )
                   }
+                  theme={storeInfo?.theme}
                 />
               </SectionCard>
 
@@ -813,9 +826,11 @@ type CardControlsValues = {
 function ProductCardControls({
   values,
   onChange,
+  theme,
 }: {
   values: CardControlsValues;
   onChange: (patch: Partial<CardControlsValues>) => void;
+  theme?: StoreTheme;
 }) {
   return (
     <div className="mt-3 space-y-0">
@@ -928,47 +943,10 @@ function ProductCardControls({
           value={values.cardFrameColor}
           onChange={v => onChange({ cardFrameColor: v })}
           hint="Overrides the theme border color for these cards."
+          theme={theme}
         />
       )}
     </div>
-  );
-}
-
-function ColorField({
-  label,
-  value,
-  onChange,
-  hint,
-}: {
-  label: string;
-  value: string | undefined;
-  onChange: (v: string) => void;
-  hint?: string;
-}) {
-  return (
-    <label className="flex flex-col gap-1 py-2">
-      <span className="flex items-center justify-between gap-3">
-        <span className="text-sm text-foreground">{label}</span>
-        <span className="flex items-center gap-2">
-          <input
-            type="color"
-            value={value || '#ffffff'}
-            onChange={e => onChange(e.target.value)}
-            className="h-8 w-12 cursor-pointer rounded border border-border bg-background"
-          />
-          {value ? (
-            <button
-              type="button"
-              onClick={() => onChange('')}
-              className="text-xs text-muted-foreground underline"
-            >
-              Clear
-            </button>
-          ) : null}
-        </span>
-      </span>
-      {hint ? <span className="text-xs text-muted-foreground">{hint}</span> : null}
-    </label>
   );
 }
 
