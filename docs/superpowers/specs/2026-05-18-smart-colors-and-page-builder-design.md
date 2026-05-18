@@ -20,6 +20,12 @@
 - Custom token names per merchant (only the 7 built-in brand tokens are exposed).
 - Auto-fixing card / CTA / form-control color (only section-scoped heading + body text).
 
+## Key update — 2026-05-18 second-pass requirement
+
+Ahmad surfaced a blocker after the first-pass spec: **global typography zones can't carry one color across all sections.** A `sectionHeading.color = white` chosen for the dark hero looks fine there but turns invisible on the next white-background section. The smart-color auto-fix only kicks in when the section has a bg explicitly set — so sections inheriting the theme bg still ship the global color verbatim.
+
+The fix is per-section typography overrides, layered on top of the global zone. This becomes Part 4 of the design (see below) and changes how Phase 2 distributes typography controls.
+
 ---
 
 ## Part 1 — Smart colors
@@ -322,6 +328,115 @@ Lands on the current `/layout` page (no merge yet). Smaller, lower risk, immedia
 2. A merchant visits `/stores/<id>/typography?zone=heroHeadline` → 301 redirect lands them on `/stores/<id>/page-builder` scrolled to the Hero card with the `heroHeadline` zone editor open.
 3. Editing the Categories section title font on the new page persists to the same typography zone record the old page wrote to. (Same data, new UI.)
 4. Save button persists both layout_settings AND typography changes in one click. Failed partial save (one of the two endpoints errors) surfaces the right error message.
+
+---
+
+---
+
+## Part 4 — Per-section typography overrides
+
+### 4.1 Why this lives in Phase 2 (not Phase 1)
+
+Phase 1's auto-fix solves the "section bg + global text color = invisible" case for sections where a bg is explicitly picked. It doesn't help when:
+
+- A section inherits the theme default bg (white on elegant / minimal), AND
+- The merchant set the global `sectionHeading.color` to white (because the hero LOOKS great with white text).
+
+The next section down (no bg picked → inherits white) renders white on white. No bg to trigger the auto-fix. Result: blank-looking section heading.
+
+Per-section overrides fix this structurally: each section carries its own font + color + size, layered on top of the global zone. Hero can stay white-on-dark; Categories can override with the brand foreground; New Arrivals can pick a different font weight entirely.
+
+### 4.2 Data model
+
+New optional field on every section settings interface in `packages/shared/src/types/store-layout.ts`:
+
+```ts
+export interface SectionTypographyOverride {
+  heading?: ZoneOverride;
+  kicker?: ZoneOverride;
+  subtitle?: ZoneOverride;
+  /** Optional body / paragraph override — applies to non-title text inside this section. */
+  body?: ZoneOverride;
+}
+
+export interface ZoneOverride {
+  fontFamily?: string;
+  fontSize?: string; // e.g. '32px' or 'text-3xl'
+  fontWeight?: string; // '300' | '400' | '500' | '600' | '700' | '800' | '900'
+  color?: ColorValue; // hex OR 'token:<name>' — same shape as section bgColor
+  letterSpacing?: string;
+  lineHeight?: string;
+  textTransform?: 'none' | 'uppercase' | 'lowercase' | 'capitalize';
+}
+
+// Mixed into every section interface:
+export interface CategoriesSettings extends SectionTitleOverride, SectionBgOverride {
+  // ... existing fields ...
+  typography?: SectionTypographyOverride;
+}
+// Same for HeroSettings, ProductCarouselSettings (newArrivals + bestSellers), TestimonialsSettings.
+```
+
+### 4.3 Storefront resolver
+
+A new helper in `apps/web/src/templates/shared/section-typography.ts`:
+
+```ts
+import type { ZoneOverride } from '@force/shared';
+
+export interface ResolvedZone {
+  fontFamily?: string;
+  fontSize?: string;
+  fontWeight?: string;
+  color?: string;          // resolved CSS color
+  letterSpacing?: string;
+  lineHeight?: string;
+  textTransform?: string;
+}
+
+/**
+ * Merge a section's per-section typography override with the global zone
+ * (from the typography admin). Section override wins where set; global zone
+ * fills the rest. Returns undefined when neither has any value so the caller
+ * can render with theme defaults.
+ */
+export function resolveSectionZone(
+  sectionOverride: ZoneOverride | undefined,
+  globalZone: ZoneOverride | undefined,
+  theme: StoreTheme
+): ResolvedZone | undefined { ... }
+```
+
+The resolver also runs `color` through `resolveColor` so `token:primary` works at the per-section level too.
+
+### 4.4 Render-time priority
+
+When rendering a section heading, the storefront picks the color in this order (first non-empty wins):
+
+1. **Auto-fixed `--section-fg`** — when section bg is set AND merchant's chosen color fails AA against it (only when the section has an explicit bg)
+2. **Per-section override** (`layout.<section>.typography.heading.color`)
+3. **Global zone** (`typography.sectionHeading.color`)
+4. **Theme default** (`--foreground`)
+
+Auto-fix wins because invisible text is always worse than off-brand-but-readable text. The admin warning band still shows the merchant which case fired so they can adjust deliberately.
+
+### 4.5 Admin UI
+
+Each section card in the Page Builder gets a "Typography" sub-block. Same `<ZoneEditor>` component used for global zones — just bound to `layout.<section>.typography.heading` / `.kicker` / `.subtitle` instead of the global record.
+
+Below each per-section zone editor: a "Reset to global default" link that clears the override. When the override is unset, the editor shows the resolved value (from global) as a faded placeholder so merchant can see what they're inheriting.
+
+The current "global typography zones" (the 14-zone Typography page) become PLATFORM-LEVEL DEFAULTS housed in a "Default typography" card at the bottom of the page builder. Per-section overrides inherit unless explicitly set. This satisfies CLAUDE.md rule 5 (storefront flow ordering) since defaults live BELOW the sections that consume them.
+
+### 4.6 Phase split
+
+- **Phase 1 stays unchanged** (smart colors only — solves the section-with-bg case)
+- **Phase 2 expands** to include per-section typography overrides + admin UI for them. The new fields, resolver helper, render-time priority, and admin per-section zone editor all land in Phase 2.
+- **Phase 3 (new)** — purely data-migration housekeeping if needed: no migration required because all fields are optional and existing tenants inherit globals as today.
+
+### 4.7 Backwards compat
+
+A tenant who never opens a per-section typography editor sees zero behavior change — every `layout.<section>.typography` is undefined → resolver falls through to global → renders exactly as today. Once they DO override one zone in one section, only that section + zone changes. Existing global zones stay live for every section that hasn't been overridden.
 
 ---
 

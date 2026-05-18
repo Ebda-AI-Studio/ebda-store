@@ -14,22 +14,27 @@
 
 ## Spec coverage map
 
-| Spec section                      | Tasks                                                                                 |
-| --------------------------------- | ------------------------------------------------------------------------------------- |
-| 1.1 `ColorValue` convention + Zod | Task 1 (new validator), Task 2 (schema updates), Task 12 (4-grep verify)              |
-| 1.2 `resolveColor`                | Task 3 (test) + Task 4 (impl)                                                         |
-| 1.3 `pickReadableForeground`      | Task 5 (parsers + test) + Task 6 (impl + test)                                        |
-| 1.4 `contrastRatio`               | Task 7 (test + impl)                                                                  |
-| 1.5 Storefront wiring             | Task 8 (section-bg.ts) + Task 9 (HomePageContent.tsx) + Task 10 (globals.css cascade) |
-| 1.6 Admin live preview band       | Task 11 (`ColorContrastPreview` component)                                            |
-| 1.7 Admin ColorField revised      | Task 12 (extract + dropdown + preview)                                                |
-| Phase 1 acceptance                | Task 13 (browser-qa visual sweep + commit)                                            |
-| 2.1 Route + sidebar               | Task 14 (rename + redirects)                                                          |
-| 2.2 Section card structure        | Task 15 (skeleton refactor)                                                           |
-| 2.3 Zone ownership mapping        | Task 16 (per-section zone distribution)                                               |
-| 2.4 `<ZoneEditor>` extraction     | Task 15 prerequisite                                                                  |
-| 2.5 Visual / save details         | Task 17 (parallel save)                                                               |
-| Phase 2 acceptance                | Task 18 (browser-qa + commit)                                                         |
+| Spec section                                              | Tasks                                                                                 |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| 1.1 `ColorValue` convention + Zod                         | Task 1 (new validator), Task 2 (schema updates), Task 12 (4-grep verify)              |
+| 1.2 `resolveColor`                                        | Task 3 (test) + Task 4 (impl)                                                         |
+| 1.3 `pickReadableForeground`                              | Task 5 (parsers + test) + Task 6 (impl + test)                                        |
+| 1.4 `contrastRatio`                                       | Task 7 (test + impl)                                                                  |
+| 1.5 Storefront wiring                                     | Task 8 (section-bg.ts) + Task 9 (HomePageContent.tsx) + Task 10 (globals.css cascade) |
+| 1.6 Admin live preview band                               | Task 11 (`ColorContrastPreview` component)                                            |
+| 1.7 Admin ColorField revised                              | Task 12 (extract + dropdown + preview)                                                |
+| Phase 1 acceptance                                        | Task 13 (browser-qa visual sweep + commit)                                            |
+| 2.1 Route + sidebar                                       | Task 14 (rename + redirects)                                                          |
+| 2.2 Section card structure                                | Task 15 (skeleton refactor)                                                           |
+| 2.3 Zone ownership mapping                                | Task 16 (per-section zone distribution)                                               |
+| 2.4 `<ZoneEditor>` extraction                             | Task 15 prerequisite                                                                  |
+| 2.5 Visual / save details                                 | Task 17 (parallel save)                                                               |
+| Phase 2 acceptance                                        | Task 18 (browser-qa + commit)                                                         |
+| 4.1 Why per-section override (spec update)                | Task 15b types + Zod + resolver, Task 15c storefront render, Task 16 admin UI         |
+| 4.2 Data model (ZoneOverride + SectionTypographyOverride) | Task 15b                                                                              |
+| 4.3 Storefront resolver `resolveSectionZone`              | Task 15b Step 4                                                                       |
+| 4.4 Render-time priority (auto-fix wins via `!important`) | Task 15c Step 4                                                                       |
+| 4.5 Admin per-section editors + Reset link                | Task 16 (updated)                                                                     |
 
 ---
 
@@ -1050,15 +1055,40 @@ interface ZoneEditorProps {
 
 Copy the relevant editor JSX + handlers from the typography page into the new component file. Keep the existing form-control conventions (`SelectField`, `RowToggle`, etc.).
 
+Extended props (beyond the original typography page's inline editor) to support per-section overrides in Task 16:
+
 ```tsx
 // apps/admin/src/components/ZoneEditor.tsx
 'use client';
+import type { ZoneOverride, StoreTheme } from '@force/shared';
+import { ColorField } from './ColorField';
 
-// Imports + interface as above
-// Body: copy of the existing per-zone editor JSX, parameterized via props
+interface ZoneEditorProps {
+  zoneKey: string;
+  zoneLabel: string;
+  values: ZoneOverride;
+  /** Resolved zone the merchant is inheriting from — shown as faded placeholder text inside empty fields. */
+  placeholder?: ZoneOverride;
+  onChange: (next: Partial<ZoneOverride>) => void;
+  /** Optional: clear the entire override and return to inheriting from the placeholder source. */
+  onReset?: () => void;
+  /** Required for the embedded ColorField — resolves brand-token color picks. */
+  theme: StoreTheme | undefined;
+}
+
+// Body: faithfully extracted from the typography page's inline per-zone editor,
+// PLUS:
+//   - When `placeholder?.<field>` is set AND `values?.<field>` is empty, render the
+//     field's input with `placeholder={placeholder[field]}` so merchant sees what
+//     they'd inherit.
+//   - When `onReset` is provided AND any value is set, render a small "Reset to
+//     default" link at the bottom of the editor that calls `onReset()`.
+//   - Replace the color picker invocation with `<ColorField theme={theme} ... />`
+//     (already shipped in Phase 1) so per-section color overrides get the brand-token
+//     dropdown for free.
 ```
 
-(Exact code depends on the current implementation — read the typography page first and faithfully extract.)
+(Exact field-by-field structure depends on the current typography page implementation — read it first and faithfully extract.)
 
 - [ ] **Step 3: Refactor the typography page to use the extracted component**
 
@@ -1079,63 +1109,393 @@ git commit -m "refactor(admin): extract zoneeditor for reuse in page-builder"
 
 ---
 
+## Task 15b: Per-section typography overrides — types + Zod + resolver
+
+**Files:**
+
+- Modify: `packages/shared/src/types/store-layout.ts`
+- Modify: `apps/api/src/routes/store-layout.routes.ts`
+- Create: `apps/web/src/templates/shared/section-typography.ts`
+
+This task adds the data model + resolver for Part 4 of the spec (per-section typography overrides). Lands BEFORE the admin UI distribution (Task 16) so the underlying contract is ready.
+
+- [ ] **Step 1: Add `ZoneOverride` + `SectionTypographyOverride` types**
+
+In `packages/shared/src/types/store-layout.ts`, add ABOVE `HeroSettings`:
+
+```ts
+export interface ZoneOverride {
+  fontFamily?: string;
+  fontSize?: string;
+  fontWeight?: string;
+  /** Hex color OR 'token:<name>' — same shape as section bgColor. */
+  color?: string;
+  letterSpacing?: string;
+  lineHeight?: string;
+  textTransform?: 'none' | 'uppercase' | 'lowercase' | 'capitalize';
+}
+
+export interface SectionTypographyOverride {
+  heading?: ZoneOverride;
+  kicker?: ZoneOverride;
+  subtitle?: ZoneOverride;
+  /** Body / paragraph override — non-title text inside this section. */
+  body?: ZoneOverride;
+}
+```
+
+- [ ] **Step 2: Mix `typography?: SectionTypographyOverride` into the section interfaces**
+
+Add the field to `HeroSettings`, `CategoriesSettings`, `ProductCarouselSettings`, `TestimonialsSettings`:
+
+```ts
+export interface CategoriesSettings extends SectionTitleOverride, SectionBgOverride {
+  // ... existing fields ...
+  /** Per-section typography overrides — wins over global typography zones. */
+  typography?: SectionTypographyOverride;
+}
+```
+
+- [ ] **Step 3: Add Zod validators**
+
+In `apps/api/src/routes/store-layout.routes.ts`, add ABOVE the existing schemas:
+
+```ts
+const zoneOverride = z
+  .object({
+    fontFamily: z.string().max(120).optional(),
+    fontSize: z.string().max(40).optional(),
+    fontWeight: z.string().max(10).optional(),
+    color: colorValue,
+    letterSpacing: z.string().max(20).optional(),
+    lineHeight: z.string().max(20).optional(),
+    textTransform: z.enum(['none', 'uppercase', 'lowercase', 'capitalize']).optional(),
+  })
+  .partial()
+  .optional();
+
+const sectionTypographyOverride = z
+  .object({
+    heading: zoneOverride,
+    kicker: zoneOverride,
+    subtitle: zoneOverride,
+    body: zoneOverride,
+  })
+  .partial()
+  .optional();
+```
+
+Then add `typography: sectionTypographyOverride` to each of: `heroSchema`, `categoriesSchema`, `newArrivalsSchema` / `bestSellersSchema` (or their shared `productCarouselSchema`), `testimonialsSchema`.
+
+- [ ] **Step 4: Write the section-typography resolver**
+
+```ts
+// apps/web/src/templates/shared/section-typography.ts
+import { resolveColor } from '@force/shared';
+import type { ZoneOverride, StoreTheme } from '@force/shared';
+
+export interface ResolvedZone {
+  fontFamily?: string;
+  fontSize?: string;
+  fontWeight?: string;
+  color?: string;
+  letterSpacing?: string;
+  lineHeight?: string;
+  textTransform?: string;
+}
+
+/**
+ * Merge a section-level typography override with the global zone from the
+ * typography admin. Section override wins per-field; global fills the rest;
+ * theme defaults handle anything not set anywhere. Returns undefined when
+ * neither has any value so the caller can render with raw theme defaults.
+ *
+ * Color values (hex OR 'token:<name>') are resolved against the live theme
+ * here so the consumer always gets a real CSS color string.
+ */
+export function resolveSectionZone(
+  sectionOverride: ZoneOverride | undefined,
+  globalZone: ZoneOverride | undefined,
+  theme: StoreTheme
+): ResolvedZone | undefined {
+  if (!sectionOverride && !globalZone) return undefined;
+
+  const merged: ResolvedZone = {};
+  const pick = <K extends keyof ZoneOverride>(key: K) => {
+    const v = sectionOverride?.[key] ?? globalZone?.[key];
+    if (v !== undefined) {
+      (merged as Record<string, unknown>)[key] = v;
+    }
+  };
+
+  pick('fontFamily');
+  pick('fontSize');
+  pick('fontWeight');
+  pick('letterSpacing');
+  pick('lineHeight');
+  pick('textTransform');
+
+  // Color goes through resolveColor so token: refs work at the override level too.
+  const rawColor = sectionOverride?.color ?? globalZone?.color;
+  if (rawColor) {
+    merged.color = resolveColor(rawColor, theme);
+  }
+
+  return Object.keys(merged).length ? merged : undefined;
+}
+```
+
+- [ ] **Step 5: Build + commit**
+
+```bash
+npm run build -w packages/shared 2>&1 | tail -3
+npm run build -w apps/api 2>&1 | tail -3
+npm run build -w apps/web 2>&1 | tail -3
+```
+
+All three green, then:
+
+```bash
+git add packages/shared/src/types/store-layout.ts apps/api/src/routes/store-layout.routes.ts apps/web/src/templates/shared/section-typography.ts
+git commit -m "feat(shared,api,web): per-section typography overrides with resolver"
+```
+
+---
+
+## Task 15c: Storefront consumes per-section typography
+
+**Files:**
+
+- Modify: `apps/web/src/app/HomePageContent.tsx`
+- Modify: storefront section components that render section headings (find via `grep -rln "data-zone=.sectionHeading\|data-zone=.sectionKicker" apps/web/src`)
+
+This task wires the resolver into the actual render path so per-section overrides actually appear on the storefront. Without this step, the data model exists but does nothing.
+
+- [ ] **Step 1: Identify the section heading render component**
+
+```bash
+grep -rln "data-zone=.sectionHeading.\|data-zone=.sectionKicker." apps/web/src/templates apps/web/src/app | head -10
+```
+
+Most likely candidates: `apps/web/src/templates/shared/SectionHeading.tsx` or similar.
+
+- [ ] **Step 2: Update the SectionHeading component to accept resolved zone props**
+
+```tsx
+import type { ResolvedZone } from './section-typography';
+
+interface SectionHeadingProps {
+  // ... existing props ...
+  /** Resolved heading style (per-section override merged with global zone). */
+  headingZone?: ResolvedZone;
+  kickerZone?: ResolvedZone;
+  subtitleZone?: ResolvedZone;
+}
+
+// In the JSX, apply via inline style on the wrapper:
+<h2
+  data-zone="sectionHeading"
+  style={{
+    fontFamily: headingZone?.fontFamily,
+    fontSize: headingZone?.fontSize,
+    fontWeight: headingZone?.fontWeight,
+    color: headingZone?.color,
+    letterSpacing: headingZone?.letterSpacing,
+    lineHeight: headingZone?.lineHeight,
+    textTransform: headingZone?.textTransform as React.CSSProperties['textTransform'],
+  }}
+>
+  {title}
+</h2>;
+```
+
+The auto-fixed `--section-fg` still wins via the globals.css cascade IF a section bg is set AND the resolved color would fail contrast. Otherwise the inline style applies the merchant's picked color.
+
+- [ ] **Step 3: In `HomePageContent.tsx`, resolve + pass for each section**
+
+For every section that has a `<SectionHeading>` (or equivalent), resolve its zones BEFORE rendering:
+
+```tsx
+import { resolveSectionZone } from '../templates/shared/section-typography';
+
+// Inside the component:
+const categoriesHeadingZone = resolveSectionZone(
+  layout.categories.typography?.heading,
+  globalZones.sectionHeading,
+  store.theme
+);
+const categoriesKickerZone = resolveSectionZone(
+  layout.categories.typography?.kicker,
+  globalZones.sectionKicker,
+  store.theme
+);
+const categoriesSubtitleZone = resolveSectionZone(
+  layout.categories.typography?.subtitle,
+  globalZones.sectionSubtitle,
+  store.theme
+);
+```
+
+The `globalZones` value comes from the existing typography API fetch. If it isn't currently wired into HomePageContent, plumb it from the page-level server fetch.
+
+Pass the resolved zones into the existing `<SectionHeading>` or template component:
+
+```tsx
+<SectionHeading
+  title={...}
+  headingZone={categoriesHeadingZone}
+  kickerZone={categoriesKickerZone}
+  subtitleZone={categoriesSubtitleZone}
+/>
+```
+
+Repeat for hero / newArrivals / bestSellers / testimonials.
+
+- [ ] **Step 4: Run the auto-fix priority check**
+
+The CSS cascade order matters. Verify:
+
+```css
+/* globals.css — auto-fix MUST win over inline color when bg is set */
+[data-section][style*='--section-fg'] [data-zone='sectionHeading'],
+[data-section][style*='--section-fg'] [data-zone='sectionKicker'],
+[data-section][style*='--section-fg'] [data-zone='sectionSubtitle'] {
+  color: var(--section-fg) !important;
+}
+```
+
+The `!important` is needed because inline `style="color: red"` would otherwise win over a CSS rule. The auto-fix is structural (prevents invisible text); merchant's picked color is cosmetic. Auto-fix wins.
+
+Update `apps/web/src/app/globals.css` to include this stricter rule alongside the rule added in Task 10.
+
+- [ ] **Step 5: Build + commit**
+
+```bash
+npm run build -w apps/web 2>&1 | tail -5
+```
+
+Expected: green.
+
+```bash
+git add apps/web/src/app/HomePageContent.tsx apps/web/src/app/globals.css apps/web/src/templates/shared/SectionHeading.tsx
+git commit -m "feat(web): render per-section typography with auto-fix priority cascade"
+```
+
+---
+
 ## Task 16: Distribute zones under section cards
 
 **Files:**
 
 - Modify: `apps/admin/src/app/stores/[id]/page-builder/page.tsx`
 
-- [ ] **Step 1: Add the zone-ownership map at the top of the file**
+- [ ] **Step 1: Add the per-section override editors inside each section card**
+
+Per the updated spec Part 4, each storefront section gets ITS OWN typography editor block writing to `layout.<section>.typography.{heading,kicker,subtitle,body}`. Global zones become platform-level defaults in a separate "Default typography" card at the bottom.
+
+In `apps/admin/src/app/stores/[id]/page-builder/page.tsx`, import the extracted ZoneEditor:
 
 ```tsx
 import { ZoneEditor } from '../../../../components/ZoneEditor';
-
-// Per-section zone ownership — drives which ZoneEditor instances render in each card.
-const SECTION_ZONES = {
-  announcementBar: ['announcementBar'] as const,
-  header: ['headerNav', 'storeName'] as const,
-  hero: ['heroHeadline', 'heroCta'] as const,
-  categories: ['sectionHeading', 'sectionKicker', 'sectionSubtitle'] as const,
-  newArrivals: ['sectionHeading', 'sectionKicker', 'sectionSubtitle'] as const,
-  bestSellers: ['sectionHeading', 'sectionKicker', 'sectionSubtitle'] as const,
-  testimonials: ['sectionHeading', 'sectionKicker', 'sectionSubtitle'] as const,
-  footer: ['footerLink', 'footerLegal'] as const,
-  productCardDefaults: ['productCardName', 'productCardPrice', 'productCardCta'] as const,
-  crossCutting: ['afterFooter'] as const,
-} as const;
+import type { SectionTypographyOverride, ZoneOverride } from '@force/shared';
 ```
 
-- [ ] **Step 2: Add ZoneEditor blocks inside each existing section card**
+- [ ] **Step 2: Add ZoneEditor blocks inside each existing section card with per-section binding**
 
-For every existing `<SectionCard title="...">` in the page (Hero, Categories, New Arrivals, Best Sellers, Testimonials, Product card defaults), append at the bottom of its children:
+For every `<SectionCard title="Hero" | "Categories" | "New Arrivals" | "Best Sellers" | "Testimonials">`, append at the bottom of its children:
 
 ```tsx
-{SECTION_ZONES.<section>.map(zoneKey => (
-  <ZoneEditor
-    key={zoneKey}
-    zoneKey={zoneKey}
-    zoneLabel={t(`typography.zones.${zoneKey}`)}
-    values={typography[zoneKey] ?? {}}
-    onChange={next => setTypography(prev => ({ ...prev, [zoneKey]: { ...prev[zoneKey], ...next } }))}
-  />
-))}
+<div className="mt-4 rounded-lg border border-border bg-muted/30 p-3">
+  <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+    Section typography (overrides default)
+  </h4>
+  {(['heading', 'kicker', 'subtitle'] as const).map(role => (
+    <ZoneEditor
+      key={role}
+      zoneKey={`<section>.typography.${role}`}
+      zoneLabel={`Section ${role}`}
+      values={layout.<section>.typography?.[role] ?? {}}
+      placeholder={defaults.section${capitalize(role)}}  // shows the resolved global as a faded hint
+      onChange={next =>
+        updateSection('<section>', s => ({
+          ...s,
+          typography: {
+            ...(s.typography ?? {}),
+            [role]: { ...(s.typography?.[role] ?? {}), ...next },
+          },
+        }))
+      }
+      onReset={() =>
+        updateSection('<section>', s => {
+          const { [role]: _, ...rest } = s.typography ?? {};
+          return { ...s, typography: Object.keys(rest).length ? rest : undefined };
+        })
+      }
+      theme={storeInfo?.theme}
+    />
+  ))}
+</div>
 ```
 
-The page must fetch + hold typography state alongside layout state. Add:
+The `placeholder` prop on `<ZoneEditor>` shows the resolved global zone value as a faded hint when the per-section override is unset, so the merchant sees what they're inheriting. `onReset` clears the per-section override entirely (returns to inheriting global).
+
+- [ ] **Step 3: Add a separate "Default typography" SectionCard at the bottom of the page**
+
+This is where global zones still live (for backward compatibility and for sections / zones that don't have per-section overrides). Mirror the current `/typography` page structure but inside one collapsible `<details>` block:
 
 ```tsx
-const [typography, setTypography] = useState<Record<string, ZoneValues>>({});
+<SectionCard
+  title="Default typography (platform-level)"
+  description="These defaults apply to every section that hasn't set its own override above."
+  enabled={true}
+  onToggle={() => {}}
+>
+  {(
+    [
+      'sectionHeading',
+      'sectionKicker',
+      'sectionSubtitle',
+      'heroHeadline',
+      'heroCta',
+      'announcementBar',
+      'headerNav',
+      'storeName',
+      'footerLink',
+      'footerLegal',
+      'productCardName',
+      'productCardPrice',
+      'productCardCta',
+      'afterFooter',
+    ] as const
+  ).map(zoneKey => (
+    <ZoneEditor
+      key={zoneKey}
+      zoneKey={zoneKey}
+      zoneLabel={t(`typography.zones.${zoneKey}`)}
+      values={globalZones[zoneKey] ?? {}}
+      onChange={next =>
+        setGlobalZones(prev => ({ ...prev, [zoneKey]: { ...prev[zoneKey], ...next } }))
+      }
+      theme={storeInfo?.theme}
+    />
+  ))}
+</SectionCard>
+```
 
-// In fetchData, fetch the typography zones alongside layout + store:
+- [ ] **Step 4: Fetch the global zones alongside layout + store**
+
+In the page's data-fetch effect:
+
+```tsx
 const [layoutRes, storeRes, typographyRes] = await Promise.all([
   apiGet<{ layout: StoreLayoutSettings }>(`/api/v1/admin/stores/${storeId}/layout`),
   apiGet<{ store: StoreInfo }>(`/api/v1/admin/stores/${storeId}`),
-  apiGet<{ zones: Record<string, ZoneValues> }>(`/api/v1/admin/stores/${storeId}/typography`),
+  apiGet<{ zones: Record<string, ZoneOverride> }>(`/api/v1/admin/stores/${storeId}/typography`),
 ]);
-if (typographyRes.data?.zones) setTypography(typographyRes.data.zones);
+if (typographyRes.data?.zones) setGlobalZones(typographyRes.data.zones);
 ```
 
-(Exact endpoint paths depend on the API — verify via `grep -rn "router.get.*typography" apps/api/src/routes/typography.routes.ts`.)
+(Verify endpoint path via `grep -rn "router.get.*typography" apps/api/src/routes/typography.routes.ts` — adjust accordingly.)
 
 - [ ] **Step 3: Add new SectionCards for Announcement bar / Header / Footer / Cross-cutting**
 
