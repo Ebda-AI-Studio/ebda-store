@@ -791,3 +791,16 @@
     scroll-behavior: auto !important;
   }
 }
+
+/**
+ * Section-scoped auto-fix: when a section sets --section-fg via inline style
+ * (driven by pickReadableForeground in section-bg.ts), every heading / kicker /
+ * subtitle inside that section adopts the auto-picked color. Falls back to
+ * currentColor when no section bg has been set, so existing tenants see
+ * zero behavior change.
+ */
+[data-section] [data-zone='sectionHeading'],
+[data-section] [data-zone='sectionKicker'],
+[data-section] [data-zone='sectionSubtitle'] {
+  color: var(--section-fg, currentColor);
+}

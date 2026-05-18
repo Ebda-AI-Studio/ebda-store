@@ -125,7 +125,7 @@ export function HomePageContent({
   return (
     <ShopChrome>
       {/* Hero — toggleable + mode-aware. bgColor overrides the theme bg when set. */}
-      <div style={sectionBgStyle(layout.hero.bgColor)}>
+      <div data-section="hero" style={sectionBgStyle(layout.hero.bgColor, store.theme)}>
         {layout.hero.enabled && sliderEligible && T.HeroSlider && (
           <T.HeroSlider
             slides={layout.hero.slides}
@@ -188,8 +188,9 @@ export function HomePageContent({
                 sections alternate visibly. */}
             {layout.categories.enabled && templateCategories.length > 0 && (
               <section
+                data-section="categories"
                 className="bg-[hsl(var(--bg-page))] pt-6 pb-14 sm:pt-8 sm:pb-16 lg:pt-10 lg:pb-20"
-                style={sectionBgStyle(layout.categories.bgColor)}
+                style={sectionBgStyle(layout.categories.bgColor, store.theme)}
               >
                 {layout.categories.layout === 'horizontal' && T.CategoryStrip ? (
                   <T.CategoryStrip
@@ -252,8 +253,9 @@ export function HomePageContent({
                 the categories section above. */}
             {layout.newArrivals.enabled && templateNewArrivals.length > 0 && (
               <section
+                data-section="newArrivals"
                 className="bg-[hsl(var(--bg-section-alt))] py-14 sm:py-16 lg:py-20"
-                style={sectionBgStyle(layout.newArrivals.bgColor)}
+                style={sectionBgStyle(layout.newArrivals.bgColor, store.theme)}
               >
                 {T.ProductCarousel ? (
                   <T.ProductCarousel
@@ -310,8 +312,9 @@ export function HomePageContent({
                 the new default visual under `none`. */}
             {layout.bestSellers.enabled && templateBestSellers.length > 0 && (
               <section
+                data-section="bestSellers"
                 className="bg-[hsl(var(--bg-page))] py-14 sm:py-16 lg:py-20"
-                style={sectionBgStyle(layout.bestSellers.bgColor)}
+                style={sectionBgStyle(layout.bestSellers.bgColor, store.theme)}
               >
                 {T.ProductCarousel ? (
                   <T.ProductCarousel
@@ -392,8 +395,9 @@ export function HomePageContent({
                 with Best Sellers above. */}
             {layout.testimonials.enabled && testimonials.length > 0 && T.TestimonialRow && (
               <section
+                data-section="testimonials"
                 className="bg-[hsl(var(--bg-section-alt))] py-14 sm:py-16 lg:py-20"
-                style={sectionBgStyle(layout.testimonials.bgColor)}
+                style={sectionBgStyle(layout.testimonials.bgColor, store.theme)}
               >
                 <T.TestimonialRow
                   testimonials={testimonials}
