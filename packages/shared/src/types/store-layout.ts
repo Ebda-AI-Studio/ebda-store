@@ -55,6 +55,36 @@ export interface SectionBgOverride {
   bgColor?: string;
 }
 
+/**
+ * Per-zone typography override for a single storefront section. Each field
+ * is optional — only the fields a merchant explicitly sets are non-undefined.
+ * Merged at render time with the global zone from the Typography admin by
+ * `resolveSectionZone()` in `apps/web/src/templates/shared/section-typography.ts`.
+ */
+export interface ZoneOverride {
+  fontFamily?: string;
+  fontSize?: string;
+  fontWeight?: string;
+  /** Hex color OR 'token:<name>' — same shape as section bgColor. */
+  color?: string;
+  letterSpacing?: string;
+  lineHeight?: string;
+  textTransform?: 'none' | 'uppercase' | 'lowercase' | 'capitalize';
+}
+
+/**
+ * Per-section typography overrides — heading / kicker / subtitle / body sub-zones
+ * each accept an independent `ZoneOverride`. Wins over the global typography zone
+ * for its section; global fills any unset fields.
+ */
+export interface SectionTypographyOverride {
+  heading?: ZoneOverride;
+  kicker?: ZoneOverride;
+  subtitle?: ZoneOverride;
+  /** Body / paragraph override — non-title text inside this section. */
+  body?: ZoneOverride;
+}
+
 export interface HeroSettings extends SectionBgOverride {
   enabled: boolean;
   mode: HeroMode;
@@ -73,6 +103,8 @@ export interface HeroSettings extends SectionBgOverride {
    * preserves the existing full-bleed default for back-compat.
    */
   presentation?: 'full-bleed' | 'framed';
+  /** Per-section typography overrides — wins over global typography zones. */
+  typography?: SectionTypographyOverride;
 }
 
 export type CategoriesLayout = 'grid' | 'horizontal';
@@ -217,6 +249,8 @@ export interface CategoriesSettings extends SectionTitleOverride, SectionBgOverr
   cardFrameStyle?: 'soft' | 'outline' | 'shadow' | 'paper';
   /** Hex color — applied as inline `style.borderColor` on the frame element. */
   cardFrameColor?: string;
+  /** Per-section typography overrides — wins over global typography zones. */
+  typography?: SectionTypographyOverride;
 }
 
 export interface ProductCarouselSettings extends SectionTitleOverride, SectionBgOverride {
@@ -250,6 +284,8 @@ export interface ProductCarouselSettings extends SectionTitleOverride, SectionBg
   cardFrameStyle?: 'soft' | 'outline' | 'shadow' | 'paper';
   /** Hex color — applied as inline `style.borderColor` on the frame element. */
   cardFrameColor?: string;
+  /** Per-section typography overrides — wins over global typography zones. */
+  typography?: SectionTypographyOverride;
 }
 
 export interface FilterSidebarSettings {
@@ -262,6 +298,8 @@ export interface TestimonialsSettings extends SectionTitleOverride, SectionBgOve
   enabled: boolean;
   minRating: number;
   verifiedOnly: boolean;
+  /** Per-section typography overrides — wins over global typography zones. */
+  typography?: SectionTypographyOverride;
 }
 
 /**

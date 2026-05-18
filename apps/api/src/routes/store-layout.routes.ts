@@ -51,6 +51,32 @@ const colorValue = z
   )
   .optional();
 
+// Per-zone typography override — mirrors ZoneOverride in @force/shared.
+// color reuses colorValue (hex or token:<name>).
+const zoneOverride = z
+  .object({
+    fontFamily: z.string().max(120).optional(),
+    fontSize: z.string().max(40).optional(),
+    fontWeight: z.string().max(10).optional(),
+    color: colorValue,
+    letterSpacing: z.string().max(20).optional(),
+    lineHeight: z.string().max(20).optional(),
+    textTransform: z.enum(['none', 'uppercase', 'lowercase', 'capitalize']).optional(),
+  })
+  .partial()
+  .optional();
+
+// Per-section typography override — 4 sub-zones: heading / kicker / subtitle / body.
+const sectionTypographyOverride = z
+  .object({
+    heading: zoneOverride,
+    kicker: zoneOverride,
+    subtitle: zoneOverride,
+    body: zoneOverride,
+  })
+  .partial()
+  .optional();
+
 const layoutSchema = z
   .object({
     hero: z.object({
@@ -65,6 +91,8 @@ const layoutSchema = z
       // 2026-05-18 Sprint 3: per-section bg color. Must be listed or Zod
       // silently strips it on every PUT — same trap class as imageMobile.
       bgColor: colorValue,
+      // Per-section typography overrides. Must be listed or Zod silently strips.
+      typography: sectionTypographyOverride,
     }),
     categories: z.object({
       enabled: z.boolean(),
@@ -124,6 +152,8 @@ const layoutSchema = z
       cardFrameColor: colorValue,
       // 2026-05-18 Sprint 3: per-section bg color.
       bgColor: colorValue,
+      // Per-section typography overrides. Must be listed or Zod silently strips.
+      typography: sectionTypographyOverride,
     }),
     // Product carousels — newArrivals + bestSellers. 2026-05-16: extended
     // to mirror the categories block so merchants can tune product card
@@ -166,6 +196,8 @@ const layoutSchema = z
       cardFrameColor: colorValue,
       // 2026-05-18 Sprint 3: per-section bg color.
       bgColor: colorValue,
+      // Per-section typography overrides. Must be listed or Zod silently strips.
+      typography: sectionTypographyOverride,
     }),
     bestSellers: z.object({
       enabled: z.boolean(),
@@ -202,6 +234,8 @@ const layoutSchema = z
       cardFrameColor: colorValue,
       // 2026-05-18 Sprint 3: per-section bg color.
       bgColor: colorValue,
+      // Per-section typography overrides. Must be listed or Zod silently strips.
+      typography: sectionTypographyOverride,
     }),
     filterSidebar: z.object({
       enabled: z.boolean(),
@@ -213,6 +247,8 @@ const layoutSchema = z
       verifiedOnly: z.boolean(),
       // 2026-05-18 Sprint 3: per-section bg color.
       bgColor: colorValue,
+      // Per-section typography overrides. Must be listed or Zod silently strips.
+      typography: sectionTypographyOverride,
     }),
     // sibling UGC section, added 2026-05-16. without listing here Zod
     // would silently strip it on every save — same bug class as imageMobile
