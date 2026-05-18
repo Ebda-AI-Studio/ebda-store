@@ -563,6 +563,7 @@ export default function ProductsClient({
                     cardShape={productCardDefaults?.cardShape}
                     showCardFrame={productCardDefaults?.showCardFrame}
                     cardFrameStyle={productCardDefaults?.cardFrameStyle}
+                    cardFrameWidth={productCardDefaults?.cardFrameWidth}
                     cardFrameColor={productCardDefaults?.cardFrameColor}
                     product={toTemplateProduct(p)}
                     isRtl={language === 'ar'}

@@ -156,6 +156,16 @@ export interface SectionTitleOverride {
 export type CardSize = 'xxs' | 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
 /**
+ * Per-store CARD FRAME BORDER WIDTH — independent of cardFrameStyle. Controls
+ * the actual CSS border thickness used when showCardFrame is on.
+ *   thin:   border (1px) — default, subtle
+ *   normal: border-2 (2px) — visible but clean
+ *   thick:  border-4 (4px) — bold, prominent
+ *   xthick: border-8 (8px) — extra expressive
+ */
+export type CardFrameWidth = 'thin' | 'normal' | 'thick' | 'xthick';
+
+/**
  * Generic per-store CARD ASPECT RATIO. Overrides the per-theme default
  * when set to anything other than 'theme'.
  *   theme: keep the theme's built-in default
@@ -247,6 +257,8 @@ export interface CategoriesSettings extends SectionTitleOverride, SectionBgOverr
    *   - `'paper'`  rounded-lg + bg-card + paper-style shadow + larger padding (editorial)
    */
   cardFrameStyle?: 'soft' | 'outline' | 'shadow' | 'paper';
+  /** Border width when showCardFrame is on. Default 'thin' (1px). */
+  cardFrameWidth?: CardFrameWidth;
   /** Hex color — applied as inline `style.borderColor` on the frame element. */
   cardFrameColor?: string;
   /** Per-section typography overrides — wins over global typography zones. */
@@ -282,6 +294,8 @@ export interface ProductCarouselSettings extends SectionTitleOverride, SectionBg
    * CategoriesSettings.cardFrameStyle for the 4-value enum.
    */
   cardFrameStyle?: 'soft' | 'outline' | 'shadow' | 'paper';
+  /** Border width when showCardFrame is on. Default 'thin' (1px). */
+  cardFrameWidth?: CardFrameWidth;
   /** Hex color — applied as inline `style.borderColor` on the frame element. */
   cardFrameColor?: string;
   /** Per-section typography overrides — wins over global typography zones. */
@@ -342,6 +356,8 @@ export interface ProductCardDefaults {
   showHover?: boolean;
   showCardFrame?: boolean;
   cardFrameStyle?: 'soft' | 'outline' | 'shadow' | 'paper';
+  /** Border width when showCardFrame is on. Default 'thin' (1px). */
+  cardFrameWidth?: CardFrameWidth;
   /** Hex color — applied as inline `style.borderColor` on the frame element. */
   cardFrameColor?: string;
 }

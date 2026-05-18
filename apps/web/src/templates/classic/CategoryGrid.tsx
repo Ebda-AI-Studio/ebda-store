@@ -4,7 +4,12 @@ import type { CategoryGridProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
 import { resolveColor } from '@force/shared';
-import { cardFrameClass, gridColsClass, gridGapClass } from '../shared/card-size';
+import {
+  cardFrameClass,
+  cardFrameWidthClass,
+  gridColsClass,
+  gridGapClass,
+} from '../shared/card-size';
 import { SectionHeading } from '../shared/SectionHeading';
 import CategoryCard from './CategoryCard';
 
@@ -31,6 +36,7 @@ export default function ClassicCategoryGrid({
   showHover,
   showCardFrame,
   cardFrameStyle,
+  cardFrameWidth,
   cardFrameColor,
   mobileColumns,
   desktopColumns,
@@ -70,7 +76,7 @@ export default function ClassicCategoryGrid({
             return frame ? (
               <div
                 key={category.id}
-                className={frame}
+                className={`${frame} ${cardFrameWidthClass(cardFrameWidth)}`}
                 style={
                   cardFrameColor && store.theme
                     ? { borderColor: resolveColor(cardFrameColor, store.theme) }

@@ -215,6 +215,7 @@ export function contrastRatio(bg: string, fg: string): number {
 }
 
 // Task 15d: lightenColor / darkenColor / rgbToHex / generateSectionPalette
+import type { CardFrameWidth } from '../types/store-layout';
 
 /** Convert an Rgb object to an uppercase hex string (#RRGGBB). */
 function rgbToHex(rgb: Rgb): string {
@@ -258,6 +259,8 @@ export interface PaletteSeeds {
 export interface SectionPaletteEntry {
   bgColor: ColorValue;
   cardFrameColor: ColorValue;
+  /** Default border width applied to card frames in this section. */
+  cardFrameWidth: CardFrameWidth;
   /**
    * Heading text color. Returns `'auto'` when the bg is a token ref — caller
    * must resolve the token at render time and call `pickReadableForeground`
@@ -317,6 +320,7 @@ export function generateSectionPalette(
       acc[key] = {
         bgColor: slots[key],
         cardFrameColor: primary,
+        cardFrameWidth: 'normal',
         headingColor: headingFor(slots[key]),
       };
       return acc;

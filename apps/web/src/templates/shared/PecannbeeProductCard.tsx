@@ -9,7 +9,13 @@ import { getProductCardTextSizes, resolveColor } from '@force/shared';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
 import { getPackStyles } from './pack-styles';
-import { cardFrameClass, productSizeClass, cardAspectClass, cardShapeClasses } from './card-size';
+import {
+  cardFrameClass,
+  cardFrameWidthClass,
+  productSizeClass,
+  cardAspectClass,
+  cardShapeClasses,
+} from './card-size';
 import { productCardPropsEqual } from './product-card-memo';
 import { TaxInclusiveLabel } from './tax-inclusive-label';
 import { OutOfStockRibbon, isProductNew } from './ProductCardCta';
@@ -59,6 +65,7 @@ function PecannbeeProductCardImpl({
   cardShape,
   showCardFrame,
   cardFrameStyle,
+  cardFrameWidth,
   cardFrameColor,
 }: PecannbeeProductCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
@@ -71,7 +78,8 @@ function PecannbeeProductCardImpl({
   const sizeCap = productSizeClass(cardSize);
   const shape = cardShapeClasses(cardShape);
   const aspectOverride = shape.aspect || cardAspectClass(cardAspect);
-  const frameCls = cardFrameClass(showCardFrame, cardFrameStyle);
+  const frameCls =
+    `${cardFrameClass(showCardFrame, cardFrameStyle)} ${showCardFrame ? cardFrameWidthClass(cardFrameWidth) : ''}`.trim();
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
 

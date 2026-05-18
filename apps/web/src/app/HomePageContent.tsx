@@ -285,6 +285,7 @@ export function HomePageContent({
                     showHover={layout.categories.showHover}
                     showCardFrame={layout.categories.showCardFrame}
                     cardFrameStyle={layout.categories.cardFrameStyle}
+                    cardFrameWidth={layout.categories.cardFrameWidth}
                     cardFrameColor={layout.categories.cardFrameColor}
                     headingZone={categoriesHeadingZone}
                     kickerZone={categoriesKickerZone}
@@ -310,6 +311,7 @@ export function HomePageContent({
                       showHover={layout.categories.showHover}
                       showCardFrame={layout.categories.showCardFrame}
                       cardFrameStyle={layout.categories.cardFrameStyle}
+                      cardFrameWidth={layout.categories.cardFrameWidth}
                       cardFrameColor={layout.categories.cardFrameColor}
                       mobileColumns={layout.categories.mobileColumns}
                       desktopColumns={layout.categories.desktopColumns}
@@ -363,6 +365,10 @@ export function HomePageContent({
                     showHover={layout.newArrivals.showHover}
                     showCardFrame={layout.newArrivals.showCardFrame}
                     cardFrameStyle={layout.newArrivals.cardFrameStyle}
+                    cardFrameWidth={
+                      layout.newArrivals.cardFrameWidth ||
+                      layout.productCardDefaults?.cardFrameWidth
+                    }
                     cardFrameColor={
                       layout.newArrivals.cardFrameColor ||
                       layout.productCardDefaults?.cardFrameColor
@@ -428,6 +434,10 @@ export function HomePageContent({
                     showHover={layout.bestSellers.showHover}
                     showCardFrame={layout.bestSellers.showCardFrame}
                     cardFrameStyle={layout.bestSellers.cardFrameStyle}
+                    cardFrameWidth={
+                      layout.bestSellers.cardFrameWidth ||
+                      layout.productCardDefaults?.cardFrameWidth
+                    }
                     cardFrameColor={
                       layout.bestSellers.cardFrameColor ||
                       layout.productCardDefaults?.cardFrameColor

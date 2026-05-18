@@ -148,6 +148,7 @@ const layoutSchema = z
       showSubtitleLines: z.boolean().optional(),
       showCardFrame: z.boolean().optional(),
       cardFrameStyle: z.enum(['soft', 'outline', 'shadow', 'paper']).optional(),
+      cardFrameWidth: z.enum(['thin', 'normal', 'thick', 'xthick']).optional(),
       // 2026-05-18 Sprint 4: per-section card frame color override.
       cardFrameColor: colorValue,
       // 2026-05-18 Sprint 3: per-section bg color.
@@ -192,6 +193,7 @@ const layoutSchema = z
       showSubtitleLines: z.boolean().optional(),
       showCardFrame: z.boolean().optional(),
       cardFrameStyle: z.enum(['soft', 'outline', 'shadow', 'paper']).optional(),
+      cardFrameWidth: z.enum(['thin', 'normal', 'thick', 'xthick']).optional(),
       // 2026-05-18 Sprint 4: per-section card frame color override.
       cardFrameColor: colorValue,
       // 2026-05-18 Sprint 3: per-section bg color.
@@ -230,6 +232,7 @@ const layoutSchema = z
       showSubtitleLines: z.boolean().optional(),
       showCardFrame: z.boolean().optional(),
       cardFrameStyle: z.enum(['soft', 'outline', 'shadow', 'paper']).optional(),
+      cardFrameWidth: z.enum(['thin', 'normal', 'thick', 'xthick']).optional(),
       // 2026-05-18 Sprint 4: per-section card frame color override.
       cardFrameColor: colorValue,
       // 2026-05-18 Sprint 3: per-section bg color.
@@ -288,6 +291,7 @@ const layoutSchema = z
         showHover: z.boolean().optional(),
         showCardFrame: z.boolean().optional(),
         cardFrameStyle: z.enum(['soft', 'outline', 'shadow', 'paper']).optional(),
+        cardFrameWidth: z.enum(['thin', 'normal', 'thick', 'xthick']).optional(),
         cardFrameColor: colorValue,
       })
       .partial()

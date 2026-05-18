@@ -7,6 +7,7 @@ import { getPackStyles } from './pack-styles';
 import {
   cardAspectClass,
   cardFrameClass,
+  cardFrameWidthClass,
   cardShapeClasses,
   categorySizeClass,
   gridGapClass,
@@ -46,6 +47,7 @@ export function CategoryStrip({
   showHover = true,
   showCardFrame,
   cardFrameStyle,
+  cardFrameWidth,
   cardFrameColor,
   headingZone,
   kickerZone,
@@ -91,7 +93,7 @@ export function CategoryStrip({
             return (
               <li
                 key={cat.id}
-                className={`snap-start shrink-0 w-[60vw] sm:w-[36vw] md:w-[30vw] lg:w-[26vw] xl:w-[22vw] ${sizeCap} ${cardFrameClass(showCardFrame, cardFrameStyle)}`}
+                className={`snap-start shrink-0 w-[60vw] sm:w-[36vw] md:w-[30vw] lg:w-[26vw] xl:w-[22vw] ${sizeCap} ${cardFrameClass(showCardFrame, cardFrameStyle)} ${showCardFrame ? cardFrameWidthClass(cardFrameWidth) : ''}`}
                 style={
                   showCardFrame && cardFrameColor && store.theme
                     ? { borderColor: resolveColor(cardFrameColor, store.theme) }

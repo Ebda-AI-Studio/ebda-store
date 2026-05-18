@@ -37,6 +37,7 @@ function ElegantProductCard({
   onRemoveFromWishlist,
   showCardFrame,
   cardFrameStyle: _cardFrameStyle,
+  cardFrameWidth: _cardFrameWidth,
   cardFrameColor,
 }: ProductCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();

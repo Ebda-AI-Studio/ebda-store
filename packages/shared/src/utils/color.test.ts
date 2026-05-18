@@ -162,6 +162,19 @@ describe('generateSectionPalette', () => {
     }
   });
 
+  it('every section gets cardFrameWidth = normal (2px) by default', () => {
+    const palette = generateSectionPalette({ primary: '#FF6E00' });
+    for (const section of [
+      'hero',
+      'categories',
+      'newArrivals',
+      'bestSellers',
+      'testimonials',
+    ] as const) {
+      expect(palette[section].cardFrameWidth).toBe('normal');
+    }
+  });
+
   it('every section heading color auto-fixes against its bg', () => {
     const palette = generateSectionPalette({ primary: '#FF6E00' });
     expect(palette.hero.headingColor).toBe('#000000'); // black on orange (correct AA)

@@ -13,6 +13,7 @@ import {
   recommendedSizeTextForTemplate,
   type TemplateId,
   type StoreTheme,
+  type CardFrameWidth,
 } from '@force/shared';
 import { ColorField } from '../../../../components/ColorField';
 import { AdminLayout } from '../../../../components/AdminLayout';
@@ -464,6 +465,26 @@ export default function StoreLayoutPage() {
                       </select>
                     </label>
                   )}
+                  {layout.categories.showCardFrame && (
+                    <label className="flex flex-col gap-1 text-sm">
+                      <span className="text-muted-foreground">Frame border width</span>
+                      <select
+                        value={layout.categories.cardFrameWidth ?? 'thin'}
+                        onChange={e =>
+                          updateSection('categories', s => ({
+                            ...s,
+                            cardFrameWidth: e.target.value as CardFrameWidth,
+                          }))
+                        }
+                        className="rounded-lg border border-border bg-card px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                      >
+                        <option value="thin">Thin (1px) — default</option>
+                        <option value="normal">Normal (2px)</option>
+                        <option value="thick">Thick (4px)</option>
+                        <option value="xthick">Extra thick (8px)</option>
+                      </select>
+                    </label>
+                  )}
                 </div>
                 {layout.categories.showCardFrame && (
                   <ColorField
@@ -819,6 +840,8 @@ type CardControlsValues = {
   showHover?: boolean;
   showCardFrame?: boolean;
   cardFrameStyle?: 'soft' | 'outline' | 'shadow' | 'paper';
+  /** Border width for the card frame — only visible when showCardFrame is on. */
+  cardFrameWidth?: CardFrameWidth;
   /** Hex color for the card frame border — only visible when showCardFrame is on. */
   cardFrameColor?: string;
 };
@@ -931,6 +954,21 @@ function ProductCardControls({
               <option value="outline">Outline (2px border, no shadow)</option>
               <option value="shadow">Shadow (larger drop shadow, no border)</option>
               <option value="paper">Paper (editorial, larger padding)</option>
+            </select>
+          </label>
+        )}
+        {values.showCardFrame && (
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-muted-foreground">Frame border width</span>
+            <select
+              value={values.cardFrameWidth ?? 'thin'}
+              onChange={e => onChange({ cardFrameWidth: e.target.value as CardFrameWidth })}
+              className="rounded-lg border border-border bg-card px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              <option value="thin">Thin (1px) — default</option>
+              <option value="normal">Normal (2px)</option>
+              <option value="thick">Thick (4px)</option>
+              <option value="xthick">Extra thick (8px)</option>
             </select>
           </label>
         )}

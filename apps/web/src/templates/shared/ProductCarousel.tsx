@@ -8,6 +8,7 @@ import { getPackStyles } from './pack-styles';
 import {
   cardAspectClass,
   cardFrameClass,
+  cardFrameWidthClass,
   cardShapeClasses,
   gridGapClass,
   productSizeClass,
@@ -57,6 +58,7 @@ export function ProductCarousel({
   showHover = true,
   showCardFrame,
   cardFrameStyle,
+  cardFrameWidth,
   cardFrameColor,
   headingZone,
   kickerZone,
@@ -263,7 +265,7 @@ export function ProductCarousel({
                   // cards without theme code changes.
                   // showCardFrame (opt-in) adds rounded-2xl bg-card border +
                   // shadow around each card so they read as contained tiles.
-                  className={`snap-start shrink-0 w-[44vw] sm:w-[28vw] md:w-[22vw] lg:w-[19vw] xl:w-[17vw] ${sizeCap} ${cardFrameClass(showCardFrame, cardFrameStyle)}`}
+                  className={`snap-start shrink-0 w-[44vw] sm:w-[28vw] md:w-[22vw] lg:w-[19vw] xl:w-[17vw] ${sizeCap} ${cardFrameClass(showCardFrame, cardFrameStyle)} ${showCardFrame ? cardFrameWidthClass(cardFrameWidth) : ''}`}
                   style={
                     showCardFrame && cardFrameColor && store.theme
                       ? { borderColor: resolveColor(cardFrameColor, store.theme) }

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import type { ResolvedZone } from './shared/section-typography';
+import type { CardFrameWidth } from '@force/shared';
 
 /**
  * Product data for template components
@@ -358,6 +359,8 @@ export interface ProductCarouselProps {
   showCardFrame?: boolean;
   /** Frame personality. soft / outline / shadow / paper. Default 'soft'. */
   cardFrameStyle?: 'soft' | 'outline' | 'shadow' | 'paper';
+  /** Border width when showCardFrame is on. thin/normal/thick/xthick. Default 'thin'. */
+  cardFrameWidth?: CardFrameWidth;
   /** Hex color applied as inline borderColor on the frame element when showCardFrame is on. */
   cardFrameColor?: string;
   /** Per-section typography zone overrides resolved by resolveSectionZone(). */
@@ -400,6 +403,8 @@ export interface CategoryStripProps {
   showCardFrame?: boolean;
   /** Frame personality. soft / outline / shadow / paper. Default 'soft'. */
   cardFrameStyle?: 'soft' | 'outline' | 'shadow' | 'paper';
+  /** Border width when showCardFrame is on. thin/normal/thick/xthick. Default 'thin'. */
+  cardFrameWidth?: CardFrameWidth;
   /** Hex color applied as inline borderColor on the frame element when showCardFrame is on. */
   cardFrameColor?: string;
   /** Per-section typography zone overrides resolved by resolveSectionZone(). */
@@ -469,6 +474,8 @@ export interface ProductCardProps {
   showHover?: boolean;
   showCardFrame?: boolean;
   cardFrameStyle?: 'soft' | 'outline' | 'shadow' | 'paper';
+  /** Border width when showCardFrame is on. thin/normal/thick/xthick. Default 'thin'. */
+  cardFrameWidth?: CardFrameWidth;
   /** Hex color applied as inline borderColor on the frame element when showCardFrame is on. */
   cardFrameColor?: string;
 }
@@ -553,6 +560,8 @@ export interface CategoryGridProps {
   showCardFrame?: boolean;
   /** Frame personality. soft / outline / shadow / paper. Default 'soft'. */
   cardFrameStyle?: 'soft' | 'outline' | 'shadow' | 'paper';
+  /** Border width when showCardFrame is on. thin/normal/thick/xthick. Default 'thin'. */
+  cardFrameWidth?: CardFrameWidth;
   /** Hex color applied as inline borderColor on the frame element when showCardFrame is on. */
   cardFrameColor?: string;
   /** Merchant-picked column counts from admin Layout page. */
