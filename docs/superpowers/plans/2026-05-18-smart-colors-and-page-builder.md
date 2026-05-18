@@ -1384,6 +1384,93 @@ git commit -m "feat(web): render per-section typography with auto-fix priority c
 
 ---
 
+## Task 15f: cardFrameWidth — merchant-controlled frame thickness
+
+**Files:**
+
+- Modify: `packages/shared/src/types/store-layout.ts`
+- Modify: `apps/api/src/routes/store-layout.routes.ts`
+- Modify: `apps/web/src/templates/shared/card-size.ts`
+- Modify: 13 consumer files (same set as cardFrameColor audit fix)
+- Modify: `apps/web/src/app/HomePageContent.tsx` + `apps/web/src/app/products/ProductsClient.tsx`
+- Modify: `apps/admin/src/app/stores/[id]/page-builder/page.tsx` (after Task 14 rename)
+
+New 2026-05-19 ask: cardFrameStyle controls the LOOK (soft/outline/shadow/paper) but merchants can't tune border thickness. Add cardFrameWidth enum independent of style.
+
+- [ ] **Step 1: Add `CardFrameWidth` type + section interface fields**
+
+In `packages/shared/src/types/store-layout.ts`:
+
+```ts
+export type CardFrameWidth = 'thin' | 'normal' | 'thick' | 'xthick';
+```
+
+Add `cardFrameWidth?: CardFrameWidth` to `CategoriesSettings`, `ProductCarouselSettings`, and `ProductCardDefaults` (place after `cardFrameStyle`).
+
+- [ ] **Step 2: Zod**
+
+In `apps/api/src/routes/store-layout.routes.ts`, add `cardFrameWidth: z.enum(['thin','normal','thick','xthick']).optional()` to: categories schema, newArrivals + bestSellers schemas, productCardDefaultsSchema.
+
+- [ ] **Step 3: Helper + strip baked-in border widths**
+
+In `apps/web/src/templates/shared/card-size.ts`, add:
+
+```ts
+export function cardFrameWidthClass(width: CardFrameWidth | undefined): string {
+  switch (width) {
+    case 'normal':
+      return 'border-2';
+    case 'thick':
+      return 'border-4';
+    case 'xthick':
+      return 'border-8';
+    case 'thin':
+    default:
+      return 'border';
+  }
+}
+```
+
+CRITICAL: also update `cardFrameClass` body to strip the baked-in `border` / `border-2` from each style branch — width is now purely controlled by `cardFrameWidthClass`. Keep `rounded-*`, `bg-*`, `shadow-*`, hover transitions intact.
+
+- [ ] **Step 4: Consumers apply both helpers**
+
+In each of the 13 consumer files (ProductCarousel, PecannbeeProductCard, CategoryStrip, 5 theme ProductCard, 5 theme CategoryGrid):
+
+- Accept `cardFrameWidth` in props (extend `ProductCardProps` / `ProductCarouselProps` / `CategoryStripProps` / `CategoryGridProps` in `apps/web/src/templates/types.ts`)
+- Combine both classes: `${cardFrameClass(showCardFrame, cardFrameStyle)} ${showCardFrame ? cardFrameWidthClass(cardFrameWidth) : ''}`
+
+- [ ] **Step 5: HomePageContent + PLP forward the prop**
+
+Pass `cardFrameWidth={layout.<section>.cardFrameWidth}` to each carousel/grid invocation in `HomePageContent.tsx`. PLP/category/search read `layout.productCardDefaults?.cardFrameWidth`.
+
+- [ ] **Step 6: Admin pickers**
+
+In the page-builder page, add a `<select>` for cardFrameWidth alongside the existing frame-style select in each section's card controls + product card defaults:
+
+```tsx
+<option value="thin">Thin (1px) — default</option>
+<option value="normal">Normal (2px)</option>
+<option value="thick">Thick (4px)</option>
+<option value="xthick">Extra thick (8px)</option>
+```
+
+- [ ] **Step 7: Smart palette modal forwards cardFrameWidth**
+
+Extend `SectionPaletteEntry` with `cardFrameWidth: CardFrameWidth`. Update `generateSectionPalette` to set `'normal'` on every section by default. Add a test case. `SmartPaletteModal.onApply` writes `cardFrameWidth` to each section alongside `bgColor` + `cardFrameColor`.
+
+- [ ] **Step 8: Build + commit**
+
+```bash
+npm run build -w packages/shared && npm run build -w apps/web && npm run build -w apps/admin
+```
+
+```
+feat(web,admin,shared): cardframewidth thin/normal/thick/xthick across all card surfaces
+```
+
+---
+
 ## Task 15d: Smart Palette generator helper
 
 **Files:**
