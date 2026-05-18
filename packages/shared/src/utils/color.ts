@@ -213,3 +213,114 @@ export function contrastRatio(bg: string, fg: string): number {
   const darker = Math.min(bgLum, fgLum);
   return (brighter + 0.05) / (darker + 0.05);
 }
+
+// Task 15d: lightenColor / darkenColor / rgbToHex / generateSectionPalette
+
+/** Convert an Rgb object to an uppercase hex string (#RRGGBB). */
+function rgbToHex(rgb: Rgb): string {
+  const toHex = (c: number) => c.toString(16).padStart(2, '0').toUpperCase();
+  return `#${toHex(rgb.r)}${toHex(rgb.g)}${toHex(rgb.b)}`;
+}
+
+/**
+ * Mix a color toward white by `amount` (0..1). For `'#FF6E00'` + 0.4 returns a
+ * lighter orange suitable for tinted section backgrounds. Token refs pass
+ * through unchanged so the caller can resolve at render time.
+ */
+export function lightenColor(input: string, amount: number): string {
+  if (input.startsWith('token:')) return input;
+  const rgb = parseColorToRgb(input);
+  if (!rgb) return input;
+  const t = Math.max(0, Math.min(1, amount));
+  const mix = (c: number) => Math.round(c + (255 - c) * t);
+  return rgbToHex({ r: mix(rgb.r), g: mix(rgb.g), b: mix(rgb.b) });
+}
+
+/**
+ * Mix a color toward black by `amount` (0..1). For `'#FF6E00'` + 0.4 returns a
+ * darker shade suitable for hover states / framed sections.
+ */
+export function darkenColor(input: string, amount: number): string {
+  if (input.startsWith('token:')) return input;
+  const rgb = parseColorToRgb(input);
+  if (!rgb) return input;
+  const t = Math.max(0, Math.min(1, amount));
+  const mix = (c: number) => Math.round(c * (1 - t));
+  return rgbToHex({ r: mix(rgb.r), g: mix(rgb.g), b: mix(rgb.b) });
+}
+
+export interface PaletteSeeds {
+  primary: ColorValue;
+  accent?: ColorValue;
+  neutral?: ColorValue;
+}
+
+export interface SectionPaletteEntry {
+  bgColor: ColorValue;
+  cardFrameColor: ColorValue;
+  /**
+   * Heading text color. Returns `'auto'` when the bg is a token ref — caller
+   * must resolve the token at render time and call `pickReadableForeground`
+   * then. Returns a concrete hex when the bg is a concrete hex.
+   */
+  headingColor: string;
+}
+
+export type SectionKey = 'hero' | 'categories' | 'newArrivals' | 'bestSellers' | 'testimonials';
+
+const SECTION_ORDER: SectionKey[] = [
+  'hero',
+  'categories',
+  'newArrivals',
+  'bestSellers',
+  'testimonials',
+];
+
+/**
+ * Distribute 1–3 seed colors across the 5 storefront section settings as a
+ * coherent palette. Alternates seed-bg / neutral-bg across sections; the
+ * accent (if provided) fills one slot. Card frame is the primary seed
+ * everywhere for brand consistency. Heading color auto-fixes per section bg.
+ *
+ * Token-ref seeds pass through unchanged so the caller can resolve at render.
+ */
+export function generateSectionPalette(
+  seeds: PaletteSeeds
+): Record<SectionKey, SectionPaletteEntry> {
+  const { primary, accent, neutral } = seeds;
+  const neutralBg = neutral ?? '#FFFFFF';
+
+  // newArrivals gets: accent if provided, else a lightened version of primary
+  // (or white if primary is a token ref since we can't lighten a token at this point).
+  const newArrivalsBg =
+    accent ??
+    lightenColor(
+      typeof primary === 'string' && primary.startsWith('token:') ? '#FFFFFF' : primary,
+      0.6
+    );
+
+  const slots: Record<SectionKey, ColorValue> = {
+    hero: primary,
+    categories: neutralBg,
+    newArrivals: newArrivalsBg,
+    bestSellers: neutralBg,
+    testimonials: primary,
+  };
+
+  const headingFor = (bg: ColorValue): string => {
+    if (bg.startsWith('token:')) return 'auto';
+    return pickReadableForeground(bg) ?? '#000000';
+  };
+
+  return SECTION_ORDER.reduce(
+    (acc, key) => {
+      acc[key] = {
+        bgColor: slots[key],
+        cardFrameColor: primary,
+        headingColor: headingFor(slots[key]),
+      };
+      return acc;
+    },
+    {} as Record<SectionKey, SectionPaletteEntry>
+  );
+}

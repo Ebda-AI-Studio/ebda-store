@@ -1,6 +1,15 @@
 // packages/shared/src/utils/color.test.ts
 import { describe, it, expect } from 'vitest';
-import { resolveColor, pickReadableForeground, contrastRatio, parseColorToRgb } from './color';
+import {
+  resolveColor,
+  pickReadableForeground,
+  contrastRatio,
+  parseColorToRgb,
+  relativeLuminance,
+  generateSectionPalette,
+  lightenColor,
+  darkenColor,
+} from './color';
 import type { StoreTheme } from '../types/store-theme';
 
 const TEST_THEME = {
@@ -109,5 +118,68 @@ describe('contrastRatio', () => {
 
   it('returns NaN-safe value when an input is unparseable', () => {
     expect(contrastRatio('not-a-color', '#FFFFFF')).toBe(1);
+  });
+});
+
+describe('lightenColor / darkenColor', () => {
+  it('lightenColor pushes toward white', () => {
+    const lighter = lightenColor('#FF6E00', 0.4);
+    expect(lighter).not.toBe('#FF6E00');
+    // Result should be parseable + have higher luminance than the seed.
+    const seedLum = relativeLuminance(parseColorToRgb('#FF6E00')!);
+    const lightLum = relativeLuminance(parseColorToRgb(lighter)!);
+    expect(lightLum).toBeGreaterThan(seedLum);
+  });
+
+  it('darkenColor pushes toward black', () => {
+    const darker = darkenColor('#FF6E00', 0.4);
+    const seedLum = relativeLuminance(parseColorToRgb('#FF6E00')!);
+    const darkLum = relativeLuminance(parseColorToRgb(darker)!);
+    expect(darkLum).toBeLessThan(seedLum);
+  });
+});
+
+describe('generateSectionPalette', () => {
+  it('with one seed: alternates seed bg / neutral bg across sections', () => {
+    const palette = generateSectionPalette({ primary: '#FF6E00' });
+    expect(palette.hero.bgColor).toBe('#FF6E00');
+    expect(palette.categories.bgColor).toMatch(/^#/); // some neutral
+    expect(palette.newArrivals.bgColor).not.toBe(palette.categories.bgColor);
+    expect(palette.bestSellers.bgColor).toBe(palette.categories.bgColor); // neutrals match
+    expect(palette.testimonials.bgColor).toBe('#FF6E00'); // seed returns at end
+  });
+
+  it('every section gets cardFrameColor = primary seed', () => {
+    const palette = generateSectionPalette({ primary: '#FF6E00' });
+    for (const section of [
+      'hero',
+      'categories',
+      'newArrivals',
+      'bestSellers',
+      'testimonials',
+    ] as const) {
+      expect(palette[section].cardFrameColor).toBe('#FF6E00');
+    }
+  });
+
+  it('every section heading color auto-fixes against its bg', () => {
+    const palette = generateSectionPalette({ primary: '#FF6E00' });
+    expect(palette.hero.headingColor).toBe('#000000'); // black on orange (correct AA)
+    expect(palette.categories.headingColor).toBe('#000000'); // black on light neutral
+  });
+
+  it('with primary + accent: accent populates alternating bg slots', () => {
+    const palette = generateSectionPalette({ primary: '#FF6E00', accent: '#0066CC' });
+    expect(palette.hero.bgColor).toBe('#FF6E00');
+    expect(palette.newArrivals.bgColor).toBe('#0066CC'); // accent gets a slot
+  });
+
+  it('passes token refs through unchanged for the caller to resolve at render', () => {
+    const palette = generateSectionPalette({ primary: 'token:primary' });
+    expect(palette.hero.bgColor).toBe('token:primary');
+    expect(palette.hero.cardFrameColor).toBe('token:primary');
+    // Heading color still picked from the resolved seed — caller passes theme separately when resolving.
+    // The helper returns 'auto' as a sentinel meaning "auto-fix at render".
+    expect(palette.hero.headingColor).toBe('auto');
   });
 });
