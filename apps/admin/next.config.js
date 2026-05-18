@@ -62,6 +62,24 @@ const nextConfig = {
     optimizePackageImports: ['@force/shared', '@force/ui'],
   },
 
+  // 301 permanent redirects from old admin URLs that were renamed.
+  // These protect bookmarks and any hardcoded links that predated the
+  // page-builder consolidation (2026-05-19).
+  async redirects() {
+    return [
+      {
+        source: '/stores/:id/layout',
+        destination: '/stores/:id/page-builder',
+        permanent: true,
+      },
+      {
+        source: '/stores/:id/typography',
+        destination: '/stores/:id/page-builder',
+        permanent: true,
+      },
+    ];
+  },
+
   // Security headers
   async headers() {
     return [
