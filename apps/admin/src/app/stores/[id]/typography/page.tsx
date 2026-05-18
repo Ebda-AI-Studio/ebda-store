@@ -5,7 +5,9 @@ import { useParams } from 'next/navigation';
 import { useLocale } from 'next-intl';
 import Link from 'next/link';
 import { Button, useToast } from '@force/ui';
+import type { StoreTheme } from '@force/shared';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { ZoneEditor } from '../../../../components/ZoneEditor';
 import { useCurrentStore } from '../../../../hooks/useCurrentStore';
 import { apiGet, apiPut, apiFetch } from '../../../../lib/api';
 
@@ -1476,190 +1478,103 @@ export default function TypographyPage() {
                         </div>
                       </div>
 
-                      <div className="mt-3 grid gap-3 md:grid-cols-3">
-                        <label className="flex flex-col gap-1">
-                          <span className="text-sm font-medium text-muted-foreground">
-                            Font family
-                          </span>
-                          <select
-                            value={cfg.fontFamily ?? ''}
-                            onChange={e => updateZone(z.key, { fontFamily: e.target.value })}
-                            className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
-                          >
-                            {familyOptions.map(o => (
-                              <option key={o.value} value={o.value}>
-                                {o.label}
-                              </option>
-                            ))}
-                          </select>
-                          <span className="text-xs text-muted-foreground/80">
-                            {measured?.[z.key]?.fontFamily ? (
-                              <>
-                                Currently inherits{' '}
-                                <strong>{fmt(measured[z.key].fontFamily)}</strong>.
-                              </>
-                            ) : (
-                              'Inherits the template default if left blank.'
-                            )}
-                          </span>
-                        </label>
-                        <label className="flex flex-col gap-1">
-                          <span className="text-sm font-medium text-muted-foreground">
-                            Font size
-                          </span>
-                          <input
-                            type="text"
-                            value={cfg.fontSize ?? ''}
-                            onChange={e => updateZone(z.key, { fontSize: e.target.value })}
-                            placeholder="e.g. 16 or 16px or 1rem"
-                            className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
-                          />
-                          <span className="text-xs text-muted-foreground/80">
-                            {measured?.[z.key]?.fontSize ? (
-                              <>
-                                Currently inherits <strong>{fmt(measured[z.key].fontSize)}</strong>{' '}
-                                on your live storefront.
-                              </>
-                            ) : (
-                              'Leave blank to inherit from your active template.'
-                            )}{' '}
-                            A bare number is treated as pixels (16 → 16px).
-                          </span>
-                        </label>
-                        <label className="flex flex-col gap-1">
-                          <span className="text-sm font-medium text-muted-foreground">
-                            Font weight
-                          </span>
-                          <input
-                            type="text"
-                            value={cfg.fontWeight ?? ''}
-                            onChange={e => updateZone(z.key, { fontWeight: e.target.value })}
-                            placeholder="inherit"
-                            className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
-                          />
-                          <span className="text-xs text-muted-foreground/80">
-                            {measured?.[z.key]?.fontWeight ? (
-                              <>
-                                Currently inherits{' '}
-                                <strong>{fmt(measured[z.key].fontWeight)}</strong>.
-                              </>
-                            ) : (
-                              'Leave blank to inherit.'
-                            )}{' '}
-                            Use 400 for regular, 600 for semibold, 700 for bold.
-                          </span>
-                        </label>
-                        <label className="flex flex-col gap-1">
-                          <span className="text-sm font-medium text-muted-foreground">
-                            {isAr ? 'لون النص' : 'Text colour'}
-                          </span>
-                          {/* Two-row layout matches the colored-label
-                              backgroundColor field below — picker + brand
-                              preset on row 1, full-width text input on
-                              row 2. Single-row layout cramped the text
-                              input inside a 3-col parent grid. */}
-                          <div className="flex gap-2">
-                            <input
-                              type="color"
-                              value={
-                                cfg.color && /^#[0-9a-f]{6}$/i.test(cfg.color)
-                                  ? cfg.color
-                                  : (resolveBrandPresetToHex(
-                                      cfg.color,
-                                      currentStore?.theme,
-                                      'text'
-                                    ) ?? '#000000')
-                              }
-                              onChange={e => updateZone(z.key, { color: e.target.value })}
-                              className="h-10 w-12 cursor-pointer rounded-lg border border-border bg-background"
-                              aria-label={isAr ? 'اختر اللون' : 'Pick color'}
-                            />
-                            <select
-                              value={
-                                BRAND_COLOR_PRESETS.some(p => p.value === cfg.color)
-                                  ? cfg.color
-                                  : ''
-                              }
-                              onChange={e =>
-                                e.target.value
-                                  ? updateZone(z.key, { color: e.target.value })
-                                  : undefined
-                              }
-                              className="flex-1 rounded-lg border border-border bg-background px-2 py-2 text-xs"
-                              aria-label={isAr ? 'لون العلامة التجارية' : 'Brand color preset'}
-                            >
-                              <option value="">
-                                {isAr ? '— اختر من ألوان العلامة —' : '— or pick brand preset —'}
-                              </option>
-                              {BRAND_COLOR_PRESETS.map(p => (
-                                <option key={p.value} value={p.value}>
-                                  {isAr ? p.labelAr : p.label}
+                      {/* Core typography fields (fontFamily, fontSize, fontWeight,
+                          letterSpacing, lineHeight, textTransform) extracted into
+                          ZoneEditor. The typography page wires its own font-family
+                          select (curated font library) and brand-preset color UI
+                          via the fontFamilyOptions + renderColorField props so the
+                          existing merchant-facing UX is fully preserved. */}
+                      {/* ZoneEditor handles the 6 core font fields (family, size,
+                          weight, letter-spacing, line-height, text-transform).
+                          hideLabel=true because the outer zone block already has
+                          the h3 label + description. renderColorField preserves
+                          the brand-preset color UI that the typography page uses
+                          (brand-primary format) instead of the default ColorField
+                          token: format used in the page-builder context. */}
+                      <ZoneEditor
+                        zoneKey={z.key}
+                        zoneLabel={isAr ? z.labelAr : z.label}
+                        hideLabel
+                        className="mt-3"
+                        values={{
+                          fontFamily: cfg.fontFamily,
+                          fontSize: cfg.fontSize,
+                          fontWeight: cfg.fontWeight,
+                          color: cfg.color,
+                          letterSpacing: cfg.letterSpacing,
+                          lineHeight: cfg.lineHeight,
+                        }}
+                        onChange={patch => updateZone(z.key, patch as Partial<ZoneSettings>)}
+                        theme={currentStore?.theme as StoreTheme | undefined}
+                        fontFamilyOptions={familyOptions}
+                        renderColorField={() => (
+                          <label className="flex flex-col gap-1">
+                            <span className="text-sm font-medium text-muted-foreground">
+                              {isAr ? 'لون النص' : 'Text colour'}
+                            </span>
+                            {/* Two-row layout: picker + brand preset on row 1,
+                                full-width text input on row 2. Preserved from
+                                the original 6-field grid so the brand-preset
+                                format (brand-primary etc.) stays intact. */}
+                            <div className="flex gap-2">
+                              <input
+                                type="color"
+                                value={
+                                  cfg.color && /^#[0-9a-f]{6}$/i.test(cfg.color)
+                                    ? cfg.color
+                                    : (resolveBrandPresetToHex(
+                                        cfg.color,
+                                        currentStore?.theme,
+                                        'text'
+                                      ) ?? '#000000')
+                                }
+                                onChange={e => updateZone(z.key, { color: e.target.value })}
+                                className="h-10 w-12 cursor-pointer rounded-lg border border-border bg-background"
+                                aria-label={isAr ? 'اختر اللون' : 'Pick color'}
+                              />
+                              <select
+                                value={
+                                  BRAND_COLOR_PRESETS.some(p => p.value === cfg.color)
+                                    ? cfg.color
+                                    : ''
+                                }
+                                onChange={e =>
+                                  e.target.value
+                                    ? updateZone(z.key, { color: e.target.value })
+                                    : undefined
+                                }
+                                className="flex-1 rounded-lg border border-border bg-background px-2 py-2 text-xs"
+                                aria-label={isAr ? 'لون العلامة التجارية' : 'Brand color preset'}
+                              >
+                                <option value="">
+                                  {isAr ? '— اختر من ألوان العلامة —' : '— or pick brand preset —'}
                                 </option>
-                              ))}
-                            </select>
-                          </div>
-                          <input
-                            type="text"
-                            value={cfg.color ?? ''}
-                            onChange={e => updateZone(z.key, { color: e.target.value })}
-                            placeholder="#000000 / brand-primary / hsl(...)"
-                            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
-                          />
-                          <span className="text-xs text-muted-foreground/80">
-                            {measured?.[z.key]?.color ? (
-                              <>
-                                Currently inherits <strong>{fmt(measured[z.key].color)}</strong>.
-                              </>
-                            ) : (
-                              "Inherits from the active theme's foreground colour."
-                            )}
-                          </span>
-                        </label>
-                        <label className="flex flex-col gap-1">
-                          <span className="text-sm font-medium text-muted-foreground">
-                            Line height
-                          </span>
-                          <input
-                            type="text"
-                            value={cfg.lineHeight ?? ''}
-                            onChange={e => updateZone(z.key, { lineHeight: e.target.value })}
-                            placeholder="auto (1.6)"
-                            className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
-                          />
-                          <span className="text-xs text-muted-foreground/80">
-                            {measured?.[z.key]?.lineHeight ? (
-                              <>
-                                Currently inherits{' '}
-                                <strong>{fmt(measured[z.key].lineHeight)}</strong>.{' '}
-                              </>
-                            ) : null}
-                            Leave blank for automatic — we apply <strong>1.6</strong> whenever you
-                            set a font-size so Arabic characters don't get their tops clipped.
-                          </span>
-                        </label>
-                        <label className="flex flex-col gap-1">
-                          <span className="text-sm font-medium text-muted-foreground">
-                            Letter spacing
-                          </span>
-                          <input
-                            type="text"
-                            value={cfg.letterSpacing ?? ''}
-                            onChange={e => updateZone(z.key, { letterSpacing: e.target.value })}
-                            placeholder="inherit"
-                            className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
-                          />
-                          <span className="text-xs text-muted-foreground/80">
-                            {measured?.[z.key]?.letterSpacing ? (
-                              <>
-                                Currently inherits{' '}
-                                <strong>{fmt(measured[z.key].letterSpacing)}</strong>.
-                              </>
-                            ) : (
-                              'Leave blank to inherit (typically `normal`).'
-                            )}
-                          </span>
-                        </label>
-                      </div>
+                                {BRAND_COLOR_PRESETS.map(p => (
+                                  <option key={p.value} value={p.value}>
+                                    {isAr ? p.labelAr : p.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <input
+                              type="text"
+                              value={cfg.color ?? ''}
+                              onChange={e => updateZone(z.key, { color: e.target.value })}
+                              placeholder="#000000 / brand-primary / hsl(...)"
+                              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                            />
+                            <span className="text-xs text-muted-foreground/80">
+                              {measured?.[z.key]?.color ? (
+                                <>
+                                  Currently inherits <strong>{fmt(measured[z.key].color)}</strong>.
+                                </>
+                              ) : (
+                                "Inherits from the active theme's foreground colour."
+                              )}
+                            </span>
+                          </label>
+                        )}
+                      />
 
                       {/* Colored label / chip styling — backgroundColor +
                           padding + borderRadius. Quick-apply preset

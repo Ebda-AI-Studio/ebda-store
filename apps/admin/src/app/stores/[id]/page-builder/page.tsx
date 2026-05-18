@@ -14,8 +14,11 @@ import {
   type TemplateId,
   type StoreTheme,
   type CardFrameWidth,
+  type ZoneOverride,
+  type SectionTypographyOverride,
 } from '@force/shared';
 import { ColorField } from '../../../../components/ColorField';
+import { ZoneEditor } from '../../../../components/ZoneEditor';
 import { SmartPaletteModal } from '../../../../components/SmartPaletteModal';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { Toggle } from '../../../../components/Toggle';
@@ -48,14 +51,26 @@ export default function StoreLayoutPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  // Global typography zones — fetched from the same typography endpoint as
+  // the standalone /typography page. Populated in fetchData and used as
+  // (a) placeholder "inherit" hints in per-section ZoneEditors and
+  // (b) editable values in the "Default typography" SectionCard.
+  // NOTE: edits here are NOT yet persisted by handleSave — that lands in
+  // Wave 6 when the parallel typography save call is wired up.
+  const [globalZones, setGlobalZones] = useState<Record<string, ZoneOverride>>({});
 
   const fetchData = useCallback(async () => {
     if (!storeId) return;
     setIsLoading(true);
     try {
-      const [layoutRes, storeRes] = await Promise.all([
+      // Typography endpoint returns { success: true, data: { typography: { fonts, zones } } }
+      // We only need the zones record for the global defaults + per-section placeholders.
+      const [layoutRes, storeRes, typographyRes] = await Promise.all([
         apiGet<{ layout: StoreLayoutSettings }>(`/api/v1/admin/stores/${storeId}/layout`),
         apiGet<{ store: StoreInfo }>(`/api/v1/admin/stores/${storeId}`),
+        apiGet<{ typography: { zones: Record<string, ZoneOverride> } }>(
+          `/api/v1/stores/${storeId}/typography`
+        ),
       ]);
       if (layoutRes.error) {
         toastError(t('loadError'));
@@ -64,6 +79,9 @@ export default function StoreLayoutPage() {
       }
       if (storeRes.data?.store) {
         setStoreInfo(storeRes.data.store);
+      }
+      if (typographyRes.data?.typography?.zones) {
+        setGlobalZones(typographyRes.data.typography.zones as Record<string, ZoneOverride>);
       }
     } finally {
       setIsLoading(false);
@@ -193,6 +211,34 @@ export default function StoreLayoutPage() {
                   value={layout.hero.bgColor}
                   onChange={v => updateSection('hero', s => ({ ...s, bgColor: v }))}
                   hint="Overrides the theme background preset for this section only."
+                  theme={storeInfo?.theme}
+                />
+                {/* Per-section typography overrides — wins over the global zone for
+                    this section only. Hero only exposes heading (heroHeadline global
+                    zone is the placeholder). kicker/subtitle don't apply to hero. */}
+                <SectionTypographyBlock
+                  roles={['heading'] as const}
+                  typography={layout.hero.typography}
+                  globalZones={{ heading: globalZones['sectionTitle'] }}
+                  onChangeRole={(role, next) =>
+                    updateSection('hero', s => ({
+                      ...s,
+                      typography: {
+                        ...(s.typography ?? {}),
+                        [role]: { ...(s.typography?.[role] ?? {}), ...next },
+                      },
+                    }))
+                  }
+                  onResetRole={role =>
+                    updateSection('hero', s => {
+                      const rest = { ...(s.typography ?? {}) } as SectionTypographyOverride;
+                      delete rest[role];
+                      return {
+                        ...s,
+                        typography: Object.keys(rest).length ? rest : undefined,
+                      };
+                    })
+                  }
                   theme={storeInfo?.theme}
                 />
               </SectionCard>
@@ -523,6 +569,35 @@ export default function StoreLayoutPage() {
                     { label: 'Card labels', zone: 'categories' },
                   ]}
                 />
+                <SectionTypographyBlock
+                  roles={['heading', 'kicker', 'subtitle'] as const}
+                  typography={layout.categories.typography}
+                  globalZones={{
+                    heading: globalZones['sectionTitle'],
+                    kicker: globalZones['sectionKicker'],
+                    subtitle: globalZones['sectionSubtitle'],
+                  }}
+                  onChangeRole={(role, next) =>
+                    updateSection('categories', s => ({
+                      ...s,
+                      typography: {
+                        ...(s.typography ?? {}),
+                        [role]: { ...(s.typography?.[role] ?? {}), ...next },
+                      },
+                    }))
+                  }
+                  onResetRole={role =>
+                    updateSection('categories', s => {
+                      const rest = { ...(s.typography ?? {}) } as SectionTypographyOverride;
+                      delete rest[role];
+                      return {
+                        ...s,
+                        typography: Object.keys(rest).length ? rest : undefined,
+                      };
+                    })
+                  }
+                  theme={storeInfo?.theme}
+                />
               </SectionCard>
 
               {/* New arrivals */}
@@ -579,6 +654,35 @@ export default function StoreLayoutPage() {
                     { label: 'Product price', zone: 'productPrice' },
                   ]}
                 />
+                <SectionTypographyBlock
+                  roles={['heading', 'kicker', 'subtitle'] as const}
+                  typography={layout.newArrivals.typography}
+                  globalZones={{
+                    heading: globalZones['sectionTitle'],
+                    kicker: globalZones['sectionKicker'],
+                    subtitle: globalZones['sectionSubtitle'],
+                  }}
+                  onChangeRole={(role, next) =>
+                    updateSection('newArrivals', s => ({
+                      ...s,
+                      typography: {
+                        ...(s.typography ?? {}),
+                        [role]: { ...(s.typography?.[role] ?? {}), ...next },
+                      },
+                    }))
+                  }
+                  onResetRole={role =>
+                    updateSection('newArrivals', s => {
+                      const rest = { ...(s.typography ?? {}) } as SectionTypographyOverride;
+                      delete rest[role];
+                      return {
+                        ...s,
+                        typography: Object.keys(rest).length ? rest : undefined,
+                      };
+                    })
+                  }
+                  theme={storeInfo?.theme}
+                />
               </SectionCard>
 
               {/* Best sellers */}
@@ -634,6 +738,35 @@ export default function StoreLayoutPage() {
                     { label: 'Product name', zone: 'productName' },
                     { label: 'Product price', zone: 'productPrice' },
                   ]}
+                />
+                <SectionTypographyBlock
+                  roles={['heading', 'kicker', 'subtitle'] as const}
+                  typography={layout.bestSellers.typography}
+                  globalZones={{
+                    heading: globalZones['sectionTitle'],
+                    kicker: globalZones['sectionKicker'],
+                    subtitle: globalZones['sectionSubtitle'],
+                  }}
+                  onChangeRole={(role, next) =>
+                    updateSection('bestSellers', s => ({
+                      ...s,
+                      typography: {
+                        ...(s.typography ?? {}),
+                        [role]: { ...(s.typography?.[role] ?? {}), ...next },
+                      },
+                    }))
+                  }
+                  onResetRole={role =>
+                    updateSection('bestSellers', s => {
+                      const rest = { ...(s.typography ?? {}) } as SectionTypographyOverride;
+                      delete rest[role];
+                      return {
+                        ...s,
+                        typography: Object.keys(rest).length ? rest : undefined,
+                      };
+                    })
+                  }
+                  theme={storeInfo?.theme}
                 />
               </SectionCard>
 
@@ -702,6 +835,35 @@ export default function StoreLayoutPage() {
                     { label: 'Subtitle', zone: 'sectionSubtitle' },
                   ]}
                 />
+                <SectionTypographyBlock
+                  roles={['heading', 'kicker', 'subtitle'] as const}
+                  typography={layout.testimonials.typography}
+                  globalZones={{
+                    heading: globalZones['sectionTitle'],
+                    kicker: globalZones['sectionKicker'],
+                    subtitle: globalZones['sectionSubtitle'],
+                  }}
+                  onChangeRole={(role, next) =>
+                    updateSection('testimonials', s => ({
+                      ...s,
+                      typography: {
+                        ...(s.typography ?? {}),
+                        [role]: { ...(s.typography?.[role] ?? {}), ...next },
+                      },
+                    }))
+                  }
+                  onResetRole={role =>
+                    updateSection('testimonials', s => {
+                      const rest = { ...(s.typography ?? {}) } as SectionTypographyOverride;
+                      delete rest[role];
+                      return {
+                        ...s,
+                        typography: Object.keys(rest).length ? rest : undefined,
+                      };
+                    })
+                  }
+                  theme={storeInfo?.theme}
+                />
               </SectionCard>
 
               {/* Product reviews (sibling of testimonials — both UGC) */}
@@ -758,6 +920,61 @@ export default function StoreLayoutPage() {
                   (`layout.sizing.*`) stays in DEFAULT_LAYOUT_SETTINGS for
                   back-compat with existing stores' saved JSON but isn't
                   surfaced in admin or read by render code. */}
+
+              {/* Default typography — mirrors all global zones from the
+                  /typography page in storefront top-to-bottom order.
+                  Edits here update `globalZones` local state only.
+                  Persistence via a parallel PUT /typography call is wired
+                  in Wave 6. The per-section ZoneEditors above use these
+                  values as placeholder "inherited from global" hints. */}
+              <SectionCard
+                title="Default typography (platform-level)"
+                description="These defaults apply to every section that hasn't set its own typography override above."
+                enabled={true}
+                onToggle={() => {}}
+              >
+                <div className="space-y-3">
+                  {(
+                    [
+                      'beforeHeader',
+                      'header',
+                      'sectionKicker',
+                      'sectionTitle',
+                      'sectionSubtitle',
+                      'sectionSeeAll',
+                      'categories',
+                      'products',
+                      'productName',
+                      'productPrice',
+                      'cta',
+                      'filters',
+                      'footer',
+                      'afterFooter',
+                    ] as const
+                  ).map(zoneKey => (
+                    <ZoneEditor
+                      key={zoneKey}
+                      zoneKey={zoneKey}
+                      zoneLabel={GLOBAL_ZONE_LABELS[zoneKey] ?? zoneKey}
+                      values={globalZones[zoneKey] ?? {}}
+                      onChange={next =>
+                        setGlobalZones(prev => ({
+                          ...prev,
+                          [zoneKey]: { ...(prev[zoneKey] ?? {}), ...next },
+                        }))
+                      }
+                      onReset={() =>
+                        setGlobalZones(prev => {
+                          const next = { ...prev };
+                          delete next[zoneKey];
+                          return next;
+                        })
+                      }
+                      theme={storeInfo?.theme}
+                    />
+                  ))}
+                </div>
+              </SectionCard>
             </>
           )}
         </div>
@@ -1093,6 +1310,77 @@ function TypographyJumpLinks({
             {g.label}
             <span aria-hidden>→</span>
           </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Human-readable labels for the global zone keys — mirrors the labeling
+// convention from the /typography page so merchants see consistent names.
+const GLOBAL_ZONE_LABELS: Record<string, string> = {
+  beforeHeader: 'Announcement bar (top promo strip)',
+  header: 'Page header (logo + nav)',
+  sectionKicker: 'Section kicker (chip above title)',
+  sectionTitle: 'Section heading',
+  sectionSubtitle: 'Section subtitle',
+  sectionSeeAll: 'Section "View All" link',
+  categories: 'Category card labels',
+  products: 'Products (base)',
+  productName: 'Product name (card)',
+  productPrice: 'Product price (card)',
+  cta: 'Buttons + CTAs',
+  filters: 'Filter sidebar',
+  footer: 'Footer',
+  afterFooter: 'Below footer',
+};
+
+/**
+ * Per-section typography override block. Rendered at the bottom of each
+ * SectionCard for sections that have heading / kicker / subtitle roles.
+ * Each role maps to a `ZoneOverride` in `layout.<section>.typography`.
+ *
+ * The `globalZones` prop provides the corresponding global-zone values as
+ * placeholder hints — so the merchant can see what they'd inherit from the
+ * "Default typography" card below without needing to scroll there.
+ */
+function SectionTypographyBlock({
+  roles,
+  typography,
+  globalZones,
+  onChangeRole,
+  onResetRole,
+  theme,
+}: {
+  roles: ReadonlyArray<keyof SectionTypographyOverride>;
+  typography: SectionTypographyOverride | undefined;
+  /** Global zone values used as placeholder hints in each ZoneEditor. */
+  globalZones: Partial<Record<keyof SectionTypographyOverride, ZoneOverride>>;
+  onChangeRole: (role: keyof SectionTypographyOverride, next: Partial<ZoneOverride>) => void;
+  onResetRole: (role: keyof SectionTypographyOverride) => void;
+  theme: StoreTheme | undefined;
+}) {
+  return (
+    <div className="mt-4 rounded-lg border border-border bg-muted/30 p-3">
+      <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        Section typography (overrides default)
+      </h4>
+      <p className="mb-3 text-[11px] text-muted-foreground/80">
+        Override the default typography for each text role in this section only. Leave all fields
+        empty to inherit from the Default typography card at the bottom of this page.
+      </p>
+      <div className="space-y-3">
+        {roles.map(role => (
+          <ZoneEditor
+            key={role}
+            zoneKey={`section.typography.${role}`}
+            zoneLabel={`Section ${role}`}
+            values={typography?.[role] ?? {}}
+            placeholder={globalZones[role]}
+            onChange={next => onChangeRole(role, next)}
+            onReset={() => onResetRole(role)}
+            theme={theme}
+          />
         ))}
       </div>
     </div>
