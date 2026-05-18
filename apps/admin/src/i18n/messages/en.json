@@ -898,6 +898,8 @@
       "saving": "Saving…",
       "saved": "Layout saved",
       "saveError": "Failed to save layout",
+      "saveErrorLayoutOnly": "Layout saved, but typography failed. Retry the save.",
+      "saveErrorTypographyOnly": "Typography saved, but layout failed. Retry the save.",
       "loadError": "Failed to load layout",
       "sections": {
         "hero": {

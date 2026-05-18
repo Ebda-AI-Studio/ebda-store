@@ -403,9 +403,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // raw value as-is — that's the merchant's explicit choice.
   type ColorFieldContext = 'text' | 'background';
   const resolveColorValue = (v: string, context: ColorFieldContext = 'background'): string => {
-    if (v === 'brand-primary') return 'hsl(var(--primary, 220 13% 18%))';
-    if (v === 'brand-secondary') return 'hsl(var(--secondary, 220 14% 96%))';
-    if (v === 'brand-accent') return 'hsl(var(--accent, 220 14% 92%))';
+    // 'token:*' is the new ColorField format (emitted since Wave 5 of
+    // the page-builder work). Handle alongside the legacy 'brand-*' format
+    // so stores with old data and stores with new data both resolve correctly.
+    if (v === 'token:primary' || v === 'brand-primary') return 'hsl(var(--primary, 220 13% 18%))';
+    if (v === 'token:secondary' || v === 'brand-secondary')
+      return 'hsl(var(--secondary, 220 14% 96%))';
+    if (v === 'token:accent' || v === 'brand-accent') return 'hsl(var(--accent, 220 14% 92%))';
     if (v === 'brand-foreground') {
       // brand-foreground IS the page text color. Using it as background
       // creates dark-on-dark text invisibility. Flip to background.

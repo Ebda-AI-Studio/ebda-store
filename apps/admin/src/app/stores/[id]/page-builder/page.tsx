@@ -17,6 +17,27 @@ import {
   type ZoneOverride,
   type SectionTypographyOverride,
 } from '@force/shared';
+
+// ---------------------------------------------------------------------------
+// Legacy color-format normalization
+// ---------------------------------------------------------------------------
+// The old standalone /typography page stored tokens as 'brand-primary',
+// 'brand-secondary', 'brand-accent'. The new ColorField emits 'token:primary',
+// 'token:secondary', 'token:accent'. Normalise on load so the Default-typography
+// card shows the correct Primary/Secondary/Accent chip instead of "Custom hex…".
+function normalizeLegacyColor(value: string | undefined): string | undefined {
+  if (!value) return value;
+  if (value === 'brand-primary') return 'token:primary';
+  if (value === 'brand-secondary') return 'token:secondary';
+  if (value === 'brand-accent') return 'token:accent';
+  return value;
+}
+
+function normalizeZoneColors(zone: ZoneOverride): ZoneOverride {
+  if (!zone.color) return zone;
+  const normalized = normalizeLegacyColor(zone.color);
+  return normalized === zone.color ? zone : { ...zone, color: normalized };
+}
 import { ColorField } from '../../../../components/ColorField';
 import { ZoneEditor } from '../../../../components/ZoneEditor';
 import { SmartPaletteModal } from '../../../../components/SmartPaletteModal';
@@ -55,20 +76,21 @@ export default function StoreLayoutPage() {
   // the standalone /typography page. Populated in fetchData and used as
   // (a) placeholder "inherit" hints in per-section ZoneEditors and
   // (b) editable values in the "Default typography" SectionCard.
-  // NOTE: edits here are NOT yet persisted by handleSave — that lands in
-  // Wave 6 when the parallel typography save call is wired up.
   const [globalZones, setGlobalZones] = useState<Record<string, ZoneOverride>>({});
+  // Font sources from the typography endpoint — preserved on save so we never
+  // overwrite the merchant's custom/Google font library with an empty array
+  // when only the zones are edited from this page.
+  const [typographyFonts, setTypographyFonts] = useState<unknown[]>([]);
 
   const fetchData = useCallback(async () => {
     if (!storeId) return;
     setIsLoading(true);
     try {
       // Typography endpoint returns { success: true, data: { typography: { fonts, zones } } }
-      // We only need the zones record for the global defaults + per-section placeholders.
       const [layoutRes, storeRes, typographyRes] = await Promise.all([
         apiGet<{ layout: StoreLayoutSettings }>(`/api/v1/admin/stores/${storeId}/layout`),
         apiGet<{ store: StoreInfo }>(`/api/v1/admin/stores/${storeId}`),
-        apiGet<{ typography: { zones: Record<string, ZoneOverride> } }>(
+        apiGet<{ typography: { fonts?: unknown[]; zones: Record<string, ZoneOverride> } }>(
           `/api/v1/stores/${storeId}/typography`
         ),
       ]);
@@ -80,8 +102,22 @@ export default function StoreLayoutPage() {
       if (storeRes.data?.store) {
         setStoreInfo(storeRes.data.store);
       }
-      if (typographyRes.data?.typography?.zones) {
-        setGlobalZones(typographyRes.data.typography.zones as Record<string, ZoneOverride>);
+      if (typographyRes.data?.typography) {
+        // Preserve fonts so handleSave can round-trip them unchanged.
+        setTypographyFonts(typographyRes.data.typography.fonts ?? []);
+
+        if (typographyRes.data.typography.zones) {
+          // Normalise legacy 'brand-*' color tokens to 'token:*' format so the
+          // ColorField shows the correct chip instead of "Custom hex…".
+          const raw = typographyRes.data.typography.zones;
+          const normalized = Object.fromEntries(
+            Object.entries(raw).map(([key, zone]) => [
+              key,
+              normalizeZoneColors(zone as ZoneOverride),
+            ])
+          );
+          setGlobalZones(normalized);
+        }
       }
     } finally {
       setIsLoading(false);
@@ -103,9 +139,27 @@ export default function StoreLayoutPage() {
     if (!layout) return;
     setIsSaving(true);
     try {
-      const { error } = await apiPut(`/api/v1/admin/stores/${storeId}/layout`, layout);
-      if (error) {
+      const [layoutResult, typographyResult] = await Promise.allSettled([
+        apiPut(`/api/v1/admin/stores/${storeId}/layout`, layout),
+        apiPut(`/api/v1/stores/${storeId}/typography`, {
+          fonts: typographyFonts,
+          zones: globalZones,
+        }),
+      ]);
+
+      const layoutFailed =
+        layoutResult.status === 'rejected' ||
+        (layoutResult.status === 'fulfilled' && !!layoutResult.value.error);
+      const typographyFailed =
+        typographyResult.status === 'rejected' ||
+        (typographyResult.status === 'fulfilled' && !!typographyResult.value.error);
+
+      if (layoutFailed && typographyFailed) {
         toastError(t('saveError'));
+      } else if (layoutFailed) {
+        toastError(t('saveErrorLayoutOnly'));
+      } else if (typographyFailed) {
+        toastError(t('saveErrorTypographyOnly'));
       } else {
         toastSuccess(t('saved'));
       }
