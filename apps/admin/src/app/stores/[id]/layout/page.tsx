@@ -169,6 +169,7 @@ export default function StoreLayoutPage() {
                 <SlidesEditor
                   slides={layout.hero.slides}
                   storeId={storeId}
+                  storeTemplate={storeInfo?.template}
                   onChange={next => updateSection('hero', s => ({ ...s, slides: next }))}
                 />
                 <ColorField
@@ -945,25 +946,28 @@ function ColorField({
   hint?: string;
 }) {
   return (
-    <label className="flex items-center justify-between gap-3 py-2">
-      <span className="text-sm text-foreground">{label}</span>
-      <div className="flex items-center gap-2">
-        <input
-          type="color"
-          value={value || '#ffffff'}
-          onChange={e => onChange(e.target.value)}
-          className="h-8 w-12 cursor-pointer rounded border border-border bg-background"
-        />
-        {value ? (
-          <button
-            type="button"
-            onClick={() => onChange('')}
-            className="text-xs text-muted-foreground underline"
-          >
-            Clear
-          </button>
-        ) : null}
-      </div>
+    <label className="flex flex-col gap-1 py-2">
+      <span className="flex items-center justify-between gap-3">
+        <span className="text-sm text-foreground">{label}</span>
+        <span className="flex items-center gap-2">
+          <input
+            type="color"
+            value={value || '#ffffff'}
+            onChange={e => onChange(e.target.value)}
+            className="h-8 w-12 cursor-pointer rounded border border-border bg-background"
+          />
+          {value ? (
+            <button
+              type="button"
+              onClick={() => onChange('')}
+              className="text-xs text-muted-foreground underline"
+            >
+              Clear
+            </button>
+          ) : null}
+        </span>
+      </span>
+      {hint ? <span className="text-xs text-muted-foreground">{hint}</span> : null}
     </label>
   );
 }
@@ -1365,10 +1369,11 @@ function AiSectionFillButton({
 interface SlidesEditorProps {
   slides: HeroSlide[];
   storeId: string;
+  storeTemplate: TemplateId | undefined;
   onChange: (next: HeroSlide[]) => void;
 }
 
-function SlidesEditor({ slides, storeId, onChange }: SlidesEditorProps) {
+function SlidesEditor({ slides, storeId, storeTemplate, onChange }: SlidesEditorProps) {
   const t = useT('orders.layout.sections.hero.slides');
 
   const updateSlide = (index: number, patch: Partial<HeroSlide>) => {
@@ -1494,7 +1499,7 @@ function SlidesEditor({ slides, storeId, onChange }: SlidesEditorProps) {
                     onRemove={() => updateSlide(index, { image: '' })}
                     recommendedSizeHint={recommendedSizeTextForTemplate(
                       'heroDesktop',
-                      storeInfo?.template
+                      storeTemplate
                     )}
                   />
                   <div className="mt-3">
@@ -1509,7 +1514,7 @@ function SlidesEditor({ slides, storeId, onChange }: SlidesEditorProps) {
                       onRemove={() => updateSlide(index, { imageAr: '' })}
                       recommendedSizeHint={recommendedSizeTextForTemplate(
                         'heroDesktop',
-                        storeInfo?.template
+                        storeTemplate
                       )}
                     />
                   </div>
@@ -1533,7 +1538,7 @@ function SlidesEditor({ slides, storeId, onChange }: SlidesEditorProps) {
                     onRemove={() => updateSlide(index, { imageMobile: '' })}
                     recommendedSizeHint={recommendedSizeTextForTemplate(
                       'heroMobile',
-                      storeInfo?.template
+                      storeTemplate
                     )}
                   />
                   <div className="mt-3">
@@ -1548,7 +1553,7 @@ function SlidesEditor({ slides, storeId, onChange }: SlidesEditorProps) {
                       onRemove={() => updateSlide(index, { imageMobileAr: '' })}
                       recommendedSizeHint={recommendedSizeTextForTemplate(
                         'heroMobile',
-                        storeInfo?.template
+                        storeTemplate
                       )}
                     />
                   </div>
