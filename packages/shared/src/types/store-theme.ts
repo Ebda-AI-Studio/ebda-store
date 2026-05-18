@@ -168,6 +168,15 @@ export interface StoreTheme {
    * stacked single column on every viewport. Ahmad 2026-05-17 evening.
    */
   trustStripLayout?: 'horizontal' | 'vertical';
+  /**
+   * Trust-strip visual size — scales icon + label + sub-label together
+   * via a single token. Default 'md'. Ahmad 2026-05-18: "add sizing so
+   * we can make the icons and font bigger and smaller together".
+   *   - 'sm' icon h-8 w-8 / title text-xs / sub text-[11px]
+   *   - 'md' (default) icon h-12 w-12 / title text-sm / sub text-xs
+   *   - 'lg' icon h-16 w-16 / title text-base / sub text-sm
+   */
+  trustStripSize?: 'sm' | 'md' | 'lg';
 
   // Custom CSS (for advanced users)
   customCss?: string;

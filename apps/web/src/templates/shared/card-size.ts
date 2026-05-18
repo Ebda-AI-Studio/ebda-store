@@ -129,16 +129,21 @@ export function cardFrameClass(
   style: CardFrameStyle | undefined = 'soft'
 ): string {
   if (!on) return '';
+  // 2026-05-18 visibility bump (Ahmad: frames not appearing): bumped
+  // border opacities to foreground/15-30 + shadow strength so frames
+  // are clearly visible on pure-white themes (wadyaljuz / elegant where
+  // bg-card == bg-page == white). Previously `border-border` resolved
+  // to near-white and the frame was invisible.
   switch (style) {
     case 'outline':
-      return 'rounded-xl border-2 border-border p-3 transition-colors duration-300 hover:border-foreground/40';
+      return 'rounded-xl border-2 border-foreground/25 bg-card/50 p-3 transition-colors duration-300 hover:border-foreground/45';
     case 'shadow':
-      return 'rounded-2xl bg-card p-3 shadow-md transition-shadow duration-300 hover:shadow-lg';
+      return 'rounded-2xl border border-foreground/10 bg-card p-3 shadow-md transition-shadow duration-300 hover:shadow-lg';
     case 'paper':
-      return 'rounded-lg bg-card p-4 shadow-[0_8px_24px_-12px_hsl(var(--foreground)/0.18)] transition-shadow duration-300 hover:shadow-[0_12px_32px_-12px_hsl(var(--foreground)/0.22)]';
+      return 'rounded-lg border border-foreground/10 bg-card p-4 shadow-[0_10px_28px_-12px_hsl(var(--foreground)/0.25)] transition-shadow duration-300 hover:shadow-[0_14px_36px_-12px_hsl(var(--foreground)/0.30)]';
     case 'soft':
     default:
-      return 'rounded-2xl border border-border bg-card p-3 shadow-sm transition-shadow duration-300 hover:shadow-md';
+      return 'rounded-2xl border border-foreground/15 bg-card p-3 shadow-md transition-shadow duration-300 hover:shadow-lg';
   }
 }
 

@@ -38,6 +38,8 @@ export interface StoreTheme {
   showTrustStrip?: boolean;
   /** Trust-strip layout direction. Default 'horizontal' (3-up grid). */
   trustStripLayout?: 'horizontal' | 'vertical';
+  /** Trust-strip size — scales icons + labels together. Default 'md'. */
+  trustStripSize?: 'sm' | 'md' | 'lg';
 }
 
 export interface StoreBranding {

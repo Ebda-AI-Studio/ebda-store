@@ -66,21 +66,55 @@ export function TrustStrip() {
   // grid (compact mobile, comfortable desktop). 'vertical' = stacked
   // single column regardless of viewport. Ahmad 2026-05-17 evening.
   const layout = store.theme?.trustStripLayout ?? 'horizontal';
+  // Size scales icon + title + sub together via a single token. Ahmad
+  // 2026-05-18: "add sizing so we can make the icons and font bigger
+  // and smaller together". Defaults to 'md' which matches the prior
+  // hardcoded sizes. Horizontal mode still shrinks the mobile icon
+  // slightly per `iconWrapMobile` so 3-up fits comfortably without
+  // wrapping titles.
+  const size = store.theme?.trustStripSize ?? 'md';
   const listClass =
     layout === 'vertical' ? 'grid grid-cols-1 gap-6' : 'grid grid-cols-3 gap-2 sm:gap-8';
-  // Mobile-horizontal shrinks the icon + drops the subtitle so 3 items
-  // fit comfortably without wrapping the title to a third line. Desktop
-  // restores the full treatment in both modes.
-  const iconWrapClass = layout === 'vertical' ? 'h-12 w-12' : 'h-9 w-9 sm:h-12 sm:w-12';
-  const iconSvgClass = layout === 'vertical' ? 'h-6 w-6' : 'h-4 w-4 sm:h-6 sm:w-6';
-  const titleClass =
-    layout === 'vertical'
-      ? 'text-sm font-bold text-foreground'
-      : 'text-[11px] sm:text-sm font-bold text-foreground';
-  const subClass =
-    layout === 'vertical'
-      ? 'text-xs text-foreground/65 max-w-[20ch]'
-      : 'hidden sm:block text-xs text-foreground/65 max-w-[20ch]';
+
+  // Per-size token table — single source of truth so all 4 elements
+  // scale in proportion. Vertical mode uses the unprefixed desktop
+  // classes at every breakpoint; horizontal mode adds explicit sm:
+  // breakpoints so 3-up packs tighter on mobile + comfortable on
+  // desktop. Classes are pre-composed strings (not runtime split/join)
+  // because Tailwind v4's JIT scanner can't follow dynamic class
+  // construction — every literal class must appear in source.
+  const SIZE_TOKENS = {
+    sm: {
+      iconWrapVertical: 'h-8 w-8',
+      iconWrapHorizontal: 'h-7 w-7 sm:h-8 sm:w-8',
+      iconSvgVertical: 'h-4 w-4',
+      iconSvgHorizontal: 'h-3.5 w-3.5 sm:h-4 sm:w-4',
+      title: 'text-[10px] sm:text-xs font-bold text-foreground',
+      sub: 'text-[10px] text-foreground/65 max-w-[20ch]',
+    },
+    md: {
+      iconWrapVertical: 'h-12 w-12',
+      iconWrapHorizontal: 'h-9 w-9 sm:h-12 sm:w-12',
+      iconSvgVertical: 'h-6 w-6',
+      iconSvgHorizontal: 'h-4 w-4 sm:h-6 sm:w-6',
+      title: 'text-[11px] sm:text-sm font-bold text-foreground',
+      sub: 'text-xs text-foreground/65 max-w-[20ch]',
+    },
+    lg: {
+      iconWrapVertical: 'h-16 w-16',
+      iconWrapHorizontal: 'h-12 w-12 sm:h-16 sm:w-16',
+      iconSvgVertical: 'h-8 w-8',
+      iconSvgHorizontal: 'h-6 w-6 sm:h-8 sm:w-8',
+      title: 'text-sm sm:text-base font-bold text-foreground',
+      sub: 'text-sm text-foreground/65 max-w-[24ch]',
+    },
+  } as const;
+  const tokens = SIZE_TOKENS[size];
+
+  const iconWrapClass = layout === 'vertical' ? tokens.iconWrapVertical : tokens.iconWrapHorizontal;
+  const iconSvgClass = layout === 'vertical' ? tokens.iconSvgVertical : tokens.iconSvgHorizontal;
+  const titleClass = tokens.title;
+  const subClass = layout === 'vertical' ? tokens.sub : `hidden sm:block ${tokens.sub}`;
 
   return (
     <section

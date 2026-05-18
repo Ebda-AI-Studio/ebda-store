@@ -190,6 +190,46 @@ export function ThemeTab({ branding, onChange }: ThemeTabProps) {
             );
           })}
         </div>
+
+        {/* Trust strip SIZE — scales icons + labels together (sm/md/lg).
+            Ahmad 2026-05-18: "add sizing so we can make the icons and font
+            bigger and smaller together". Hardcoded English labels for now;
+            translation keys can land in a follow-up i18n pass. */}
+        <div className="mt-4">
+          <p className="text-sm font-semibold text-foreground">Trust strip size</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Scales icons + labels together. Default Medium.
+          </p>
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            {(['sm', 'md', 'lg'] as const).map(opt => {
+              const selected = (branding.theme.trustStripSize ?? 'md') === opt;
+              const label = opt === 'sm' ? 'Small' : opt === 'md' ? 'Medium' : 'Large';
+              return (
+                <label
+                  key={opt}
+                  className={`flex cursor-pointer items-center justify-center gap-2 rounded-lg border p-2.5 text-sm transition-colors ${
+                    selected
+                      ? 'border-primary bg-primary/5 text-foreground'
+                      : 'border-border text-muted-foreground hover:border-foreground/30'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    checked={selected}
+                    onChange={() =>
+                      onChange({
+                        ...branding,
+                        theme: { ...branding.theme, trustStripSize: opt },
+                      })
+                    }
+                    className="sr-only"
+                  />
+                  {label}
+                </label>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       <BrandPreview theme={branding.theme} />
