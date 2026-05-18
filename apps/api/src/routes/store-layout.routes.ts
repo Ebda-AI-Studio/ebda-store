@@ -77,7 +77,7 @@ const layoutSchema = z
       subtitle: z.string().optional(),
       subtitleAr: z.string().optional(),
       // 2026-05-16: per-store card size / aspect / visual toggles.
-      cardSize: z.enum(['xs', 'sm', 'md', 'lg', 'xl']).optional(),
+      cardSize: z.enum(['xxs', 'xs', 'sm', 'md', 'lg', 'xl']).optional(),
       cardAspect: z.enum(['theme', 'square', 'portrait', 'landscape']).optional(),
       // 2026-05-16 batch 2: cardGap (spacing between cards) + cardShape
       // (named preset that bundles aspect + radius). Must be listed here
@@ -119,7 +119,7 @@ const layoutSchema = z
       limit: z.number().int().min(1).max(48),
       title: z.string().optional(),
       titleAr: z.string().optional(),
-      cardSize: z.enum(['xs', 'sm', 'md', 'lg', 'xl']).optional(),
+      cardSize: z.enum(['xxs', 'xs', 'sm', 'md', 'lg', 'xl']).optional(),
       cardAspect: z.enum(['theme', 'square', 'portrait', 'landscape']).optional(),
       cardShape: z
         .enum([
@@ -151,7 +151,7 @@ const layoutSchema = z
       limit: z.number().int().min(1).max(48),
       title: z.string().optional(),
       titleAr: z.string().optional(),
-      cardSize: z.enum(['xs', 'sm', 'md', 'lg', 'xl']).optional(),
+      cardSize: z.enum(['xxs', 'xs', 'sm', 'md', 'lg', 'xl']).optional(),
       cardAspect: z.enum(['theme', 'square', 'portrait', 'landscape']).optional(),
       cardShape: z
         .enum([

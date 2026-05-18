@@ -17,6 +17,8 @@ import type { CardAspect, CardGap, CardShape, CardSize } from '@force/shared';
  */
 export function categorySizeClass(size: CardSize | undefined): string {
   switch (size) {
+    case 'xxs':
+      return 'max-w-[90px] md:max-w-[110px]';
     case 'xs':
       return 'max-w-[120px] md:max-w-[140px]';
     case 'md':
@@ -38,6 +40,8 @@ export function categorySizeClass(size: CardSize | undefined): string {
  */
 export function productSizeClass(size: CardSize | undefined): string {
   switch (size) {
+    case 'xxs':
+      return 'max-w-[110px] md:max-w-[130px]';
     case 'xs':
       return 'max-w-[140px] md:max-w-[160px]';
     case 'md':

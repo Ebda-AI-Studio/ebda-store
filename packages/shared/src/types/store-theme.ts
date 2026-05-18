@@ -472,7 +472,7 @@ export function resolveBackgroundPreset(theme: StoreTheme): {
  * cards keep the 16px floor and rely on truncation; only LARGER cards
  * step the font up from the 16px base.
  */
-export type ProductCardSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+export type ProductCardSize = 'xxs' | 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
 export function getProductCardTextSizes(cardSize: ProductCardSize | undefined): {
   name: string;
@@ -480,6 +480,15 @@ export function getProductCardTextSizes(cardSize: ProductCardSize | undefined): 
   cta: string;
 } {
   switch (cardSize) {
+    case 'xxs':
+      // Ultra-compact tile — drop below the 16px floor only at this size
+      // since the card itself is so narrow (~90-110px) that 16px is too
+      // wide. Name at 10px mobile / 12px desktop; price matches.
+      return {
+        name: 'text-[10px] sm:text-xs',
+        price: 'text-[11px] sm:text-xs',
+        cta: 'text-[10px] sm:text-xs',
+      };
     case 'xs':
     case 'sm':
       // Compact density — floor at 16px, no desktop step-up. Identity

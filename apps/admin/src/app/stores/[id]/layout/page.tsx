@@ -323,11 +323,12 @@ export default function StoreLayoutPage() {
                       onChange={e =>
                         updateSection('categories', s => ({
                           ...s,
-                          cardSize: e.target.value as 'xs' | 'sm' | 'md' | 'lg' | 'xl',
+                          cardSize: e.target.value as 'xxs' | 'xs' | 'sm' | 'md' | 'lg' | 'xl',
                         }))
                       }
                       className="rounded-lg border border-border bg-card px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                     >
+                      <option value="xxs">Tiniest (90/110px)</option>
                       <option value="xs">Extra small (120/140px)</option>
                       <option value="sm">Small (150/180px) — default</option>
                       <option value="md">Medium (200/240px)</option>
@@ -719,7 +720,7 @@ interface SectionCardProps {
  * so one component covers all 3 mount points.
  */
 type CardControlsValues = {
-  cardSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+  cardSize?: 'xxs' | 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   cardAspect?: 'theme' | 'square' | 'portrait' | 'landscape';
   cardShape?:
     | 'theme'
@@ -753,6 +754,7 @@ function ProductCardControls({
           onChange={e => onChange({ cardSize: e.target.value as CardControlsValues['cardSize'] })}
           className="rounded-lg border border-border bg-card px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
         >
+          <option value="xxs">Tiniest (90/110px)</option>
           <option value="xs">Extra small (120/140px)</option>
           <option value="sm">Small (150/180px) — default</option>
           <option value="md">Medium (200/240px)</option>

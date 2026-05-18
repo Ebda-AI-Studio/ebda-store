@@ -101,13 +101,14 @@ export interface SectionTitleOverride {
 /**
  * Generic per-store CARD SIZE — used across categories, products,
  * carousels. Drives the `max-w-*` cap each card applies.
+ *   xxs: 90 / 110     (true icon-tile, 2026-05-18 — denser than xs)
  *   xs:  120 / 140    (compact icon-tile)
  *   sm:  150 / 180    (Ahmad 2026-05-16 default — "smaller")
  *   md:  200 / 240    (medium balanced)
  *   lg:  240 / 300    (hero feature tile)
  *   xl:  280 / 360    (oversized, marketing-page only)
  */
-export type CardSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+export type CardSize = 'xxs' | 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
 /**
  * Generic per-store CARD ASPECT RATIO. Overrides the per-theme default
