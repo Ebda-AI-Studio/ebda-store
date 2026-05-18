@@ -41,6 +41,12 @@ const heroSlideSchema = z.object({
   ctaHref: z.string().optional(),
 });
 
+// Hex color, 3 or 6 digits, optional alpha. Empty string allowed = unset.
+const hexColor = z
+  .string()
+  .regex(/^(#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|)$/, 'Must be a hex color')
+  .optional();
+
 const layoutSchema = z
   .object({
     hero: z.object({
@@ -52,6 +58,9 @@ const layoutSchema = z
       // Zod silently strips the field on PUT — same trap as
       // feedback-fwb-zod-silent-strip-trap.md. Keep in sync with HeroSettings.
       presentation: z.enum(['full-bleed', 'framed']).optional(),
+      // 2026-05-18 Sprint 3: per-section bg color. Must be listed or Zod
+      // silently strips it on every PUT — same trap class as imageMobile.
+      bgColor: hexColor,
     }),
     categories: z.object({
       enabled: z.boolean(),
@@ -107,6 +116,8 @@ const layoutSchema = z
       showSubtitleLines: z.boolean().optional(),
       showCardFrame: z.boolean().optional(),
       cardFrameStyle: z.enum(['soft', 'outline', 'shadow', 'paper']).optional(),
+      // 2026-05-18 Sprint 3: per-section bg color.
+      bgColor: hexColor,
     }),
     // Product carousels — newArrivals + bestSellers. 2026-05-16: extended
     // to mirror the categories block so merchants can tune product card
@@ -145,6 +156,8 @@ const layoutSchema = z
       showSubtitleLines: z.boolean().optional(),
       showCardFrame: z.boolean().optional(),
       cardFrameStyle: z.enum(['soft', 'outline', 'shadow', 'paper']).optional(),
+      // 2026-05-18 Sprint 3: per-section bg color.
+      bgColor: hexColor,
     }),
     bestSellers: z.object({
       enabled: z.boolean(),
@@ -177,6 +190,8 @@ const layoutSchema = z
       showSubtitleLines: z.boolean().optional(),
       showCardFrame: z.boolean().optional(),
       cardFrameStyle: z.enum(['soft', 'outline', 'shadow', 'paper']).optional(),
+      // 2026-05-18 Sprint 3: per-section bg color.
+      bgColor: hexColor,
     }),
     filterSidebar: z.object({
       enabled: z.boolean(),
@@ -186,6 +201,8 @@ const layoutSchema = z
       enabled: z.boolean(),
       minRating: z.number().min(1).max(5),
       verifiedOnly: z.boolean(),
+      // 2026-05-18 Sprint 3: per-section bg color.
+      bgColor: hexColor,
     }),
     // sibling UGC section, added 2026-05-16. without listing here Zod
     // would silently strip it on every save — same bug class as imageMobile

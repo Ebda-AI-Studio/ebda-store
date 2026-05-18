@@ -167,6 +167,12 @@ export default function StoreLayoutPage() {
                   storeId={storeId}
                   onChange={next => updateSection('hero', s => ({ ...s, slides: next }))}
                 />
+                <ColorField
+                  label="Section background color"
+                  value={layout.hero.bgColor}
+                  onChange={v => updateSection('hero', s => ({ ...s, bgColor: v }))}
+                  hint="Overrides the theme background preset for this section only."
+                />
               </SectionCard>
 
               {/* Categories */}
@@ -449,6 +455,12 @@ export default function StoreLayoutPage() {
                     </label>
                   )}
                 </div>
+                <ColorField
+                  label="Section background color"
+                  value={layout.categories.bgColor}
+                  onChange={v => updateSection('categories', s => ({ ...s, bgColor: v }))}
+                  hint="Overrides the theme background preset for this section only."
+                />
                 <TypographyJumpLinks
                   storeId={storeId}
                   groups={[
@@ -495,6 +507,12 @@ export default function StoreLayoutPage() {
                 <ProductCardControls
                   values={layout.newArrivals}
                   onChange={patch => updateSection('newArrivals', s => ({ ...s, ...patch }))}
+                />
+                <ColorField
+                  label="Section background color"
+                  value={layout.newArrivals.bgColor}
+                  onChange={v => updateSection('newArrivals', s => ({ ...s, bgColor: v }))}
+                  hint="Overrides the theme background preset for this section only."
                 />
                 <TypographyJumpLinks
                   storeId={storeId}
@@ -543,6 +561,12 @@ export default function StoreLayoutPage() {
                 <ProductCardControls
                   values={layout.bestSellers}
                   onChange={patch => updateSection('bestSellers', s => ({ ...s, ...patch }))}
+                />
+                <ColorField
+                  label="Section background color"
+                  value={layout.bestSellers.bgColor}
+                  onChange={v => updateSection('bestSellers', s => ({ ...s, bgColor: v }))}
+                  hint="Overrides the theme background preset for this section only."
                 />
                 <TypographyJumpLinks
                   storeId={storeId}
@@ -606,6 +630,12 @@ export default function StoreLayoutPage() {
                   placeholderAr={t('sections.testimonials.headingArPlaceholder')}
                   onChangeTitle={v => updateSection('testimonials', s => ({ ...s, title: v }))}
                   onChangeTitleAr={v => updateSection('testimonials', s => ({ ...s, titleAr: v }))}
+                />
+                <ColorField
+                  label="Section background color"
+                  value={layout.testimonials.bgColor}
+                  onChange={v => updateSection('testimonials', s => ({ ...s, bgColor: v }))}
+                  hint="Overrides the theme background preset for this section only."
                 />
                 <TypographyJumpLinks
                   storeId={storeId}
@@ -845,6 +875,41 @@ function ProductCardControls({
         </label>
       )}
     </div>
+  );
+}
+
+function ColorField({
+  label,
+  value,
+  onChange,
+  hint,
+}: {
+  label: string;
+  value: string | undefined;
+  onChange: (v: string) => void;
+  hint?: string;
+}) {
+  return (
+    <label className="flex items-center justify-between gap-3 py-2">
+      <span className="text-sm text-foreground">{label}</span>
+      <div className="flex items-center gap-2">
+        <input
+          type="color"
+          value={value || '#ffffff'}
+          onChange={e => onChange(e.target.value)}
+          className="h-8 w-12 cursor-pointer rounded border border-border bg-background"
+        />
+        {value ? (
+          <button
+            type="button"
+            onClick={() => onChange('')}
+            className="text-xs text-muted-foreground underline"
+          >
+            Clear
+          </button>
+        ) : null}
+      </div>
+    </label>
   );
 }
 

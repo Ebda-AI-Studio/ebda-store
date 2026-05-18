@@ -12,6 +12,7 @@ import { SectionDivider } from '../templates/shared/SectionDivider';
 import { toTemplateProduct, toTemplateCategory } from '../templates/adapters';
 import { getHomepageTemplate } from '../lib/serverTemplate';
 import type { TemplateId, StoreLayoutSettings } from '@force/shared';
+import { sectionBgStyle } from '../templates/shared/section-bg';
 
 /**
  * Thin client wrapper for the homepage. Server-fetched products + categories
@@ -123,37 +124,39 @@ export function HomePageContent({
 
   return (
     <ShopChrome>
-      {/* Hero — toggleable + mode-aware. */}
-      {layout.hero.enabled && sliderEligible && T.HeroSlider && (
-        <T.HeroSlider
-          slides={layout.hero.slides}
-          autoplayMs={layout.hero.autoplayMs}
-          isRtl={isRtl}
-          pack={templateId}
-          presentation={layout.hero.presentation}
-        />
-      )}
-      {layout.hero.enabled && bannerEligible && T.HeroBanner && (
-        <T.HeroBanner
-          {...layout.hero.slides[0]}
-          isRtl={isRtl}
-          pack={templateId}
-          presentation={layout.hero.presentation}
-        />
-      )}
-      {layout.hero.enabled && !sliderEligible && !bannerEligible && legacyHeroHasContent && (
-        <T.Hero
-          title={heroTitleEn}
-          titleAr={heroTitleArVal}
-          subtitle={heroSubtitleEn}
-          subtitleAr={heroSubtitleArVal}
-          image={heroImage}
-          ctaText={heroCtaEn}
-          ctaTextAr={heroCtaArVal}
-          ctaLink={heroCtaLink}
-          isRtl={isRtl}
-        />
-      )}
+      {/* Hero — toggleable + mode-aware. bgColor overrides the theme bg when set. */}
+      <div style={sectionBgStyle(layout.hero.bgColor)}>
+        {layout.hero.enabled && sliderEligible && T.HeroSlider && (
+          <T.HeroSlider
+            slides={layout.hero.slides}
+            autoplayMs={layout.hero.autoplayMs}
+            isRtl={isRtl}
+            pack={templateId}
+            presentation={layout.hero.presentation}
+          />
+        )}
+        {layout.hero.enabled && bannerEligible && T.HeroBanner && (
+          <T.HeroBanner
+            {...layout.hero.slides[0]}
+            isRtl={isRtl}
+            pack={templateId}
+            presentation={layout.hero.presentation}
+          />
+        )}
+        {layout.hero.enabled && !sliderEligible && !bannerEligible && legacyHeroHasContent && (
+          <T.Hero
+            title={heroTitleEn}
+            titleAr={heroTitleArVal}
+            subtitle={heroSubtitleEn}
+            subtitleAr={heroSubtitleArVal}
+            image={heroImage}
+            ctaText={heroCtaEn}
+            ctaTextAr={heroCtaArVal}
+            ctaLink={heroCtaLink}
+            isRtl={isRtl}
+          />
+        )}
+      </div>
 
       {/* Section titles. Each section settings type extends
           SectionTitleOverride, so the merchant can change the heading
@@ -184,7 +187,10 @@ export function HomePageContent({
                 padding alone; when a preset is picked, adjacent
                 sections alternate visibly. */}
             {layout.categories.enabled && templateCategories.length > 0 && (
-              <section className="bg-[hsl(var(--bg-page))] pt-6 pb-14 sm:pt-8 sm:pb-16 lg:pt-10 lg:pb-20">
+              <section
+                className="bg-[hsl(var(--bg-page))] pt-6 pb-14 sm:pt-8 sm:pb-16 lg:pt-10 lg:pb-20"
+                style={sectionBgStyle(layout.categories.bgColor)}
+              >
                 {layout.categories.layout === 'horizontal' && T.CategoryStrip ? (
                   <T.CategoryStrip
                     categories={templateCategories}
@@ -243,7 +249,10 @@ export function HomePageContent({
                 Sprint 1: bg-[hsl(var(--bg-section-alt))] alternates with
                 the categories section above. */}
             {layout.newArrivals.enabled && templateNewArrivals.length > 0 && (
-              <section className="bg-[hsl(var(--bg-section-alt))] py-14 sm:py-16 lg:py-20">
+              <section
+                className="bg-[hsl(var(--bg-section-alt))] py-14 sm:py-16 lg:py-20"
+                style={sectionBgStyle(layout.newArrivals.bgColor)}
+              >
                 {T.ProductCarousel ? (
                   <T.ProductCarousel
                     products={templateNewArrivals}
@@ -294,7 +303,10 @@ export function HomePageContent({
                 when the merchant picks the `coolGrey` preset and is
                 the new default visual under `none`. */}
             {layout.bestSellers.enabled && templateBestSellers.length > 0 && (
-              <section className="bg-[hsl(var(--bg-page))] py-14 sm:py-16 lg:py-20">
+              <section
+                className="bg-[hsl(var(--bg-page))] py-14 sm:py-16 lg:py-20"
+                style={sectionBgStyle(layout.bestSellers.bgColor)}
+              >
                 {T.ProductCarousel ? (
                   <T.ProductCarousel
                     products={templateBestSellers}
@@ -369,7 +381,10 @@ export function HomePageContent({
                 Sprint 1: bg-[hsl(var(--bg-section-alt))] alternates
                 with Best Sellers above. */}
             {layout.testimonials.enabled && testimonials.length > 0 && T.TestimonialRow && (
-              <section className="bg-[hsl(var(--bg-section-alt))] py-14 sm:py-16 lg:py-20">
+              <section
+                className="bg-[hsl(var(--bg-section-alt))] py-14 sm:py-16 lg:py-20"
+                style={sectionBgStyle(layout.testimonials.bgColor)}
+              >
                 <T.TestimonialRow
                   testimonials={testimonials}
                   title={testimonialsTitle}

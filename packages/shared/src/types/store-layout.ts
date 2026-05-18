@@ -42,7 +42,20 @@ export interface HeroSlide {
   ctaHref?: string;
 }
 
-export interface HeroSettings {
+/**
+ * Per-section background color override. Hex string ('#RRGGBB' or
+ * '#RGB') — when set, the storefront applies it as inline
+ * `style={{ backgroundColor }}` on the section wrapper, overriding
+ * both the theme `backgroundPreset` alternation AND the global
+ * `--bg-section-alt` token. Unset / empty string = inherit the
+ * existing alternation logic. Bilingual not needed (color is
+ * locale-free).
+ */
+export interface SectionBgOverride {
+  bgColor?: string;
+}
+
+export interface HeroSettings extends SectionBgOverride {
   enabled: boolean;
   mode: HeroMode;
   /** Autoplay interval in ms; ignored when mode === 'single' */
@@ -160,7 +173,7 @@ export type CardShape =
 export type CategoryCardSize = CardSize;
 export type CategoryCardAspect = CardAspect;
 
-export interface CategoriesSettings extends SectionTitleOverride {
+export interface CategoriesSettings extends SectionTitleOverride, SectionBgOverride {
   enabled: boolean;
   // 2026-05-16: split layout + captionPosition into desktop + mobile so
   // merchants can choose e.g. grid on desktop + horizontal-scroll on
@@ -204,7 +217,7 @@ export interface CategoriesSettings extends SectionTitleOverride {
   cardFrameStyle?: 'soft' | 'outline' | 'shadow' | 'paper';
 }
 
-export interface ProductCarouselSettings extends SectionTitleOverride {
+export interface ProductCarouselSettings extends SectionTitleOverride, SectionBgOverride {
   enabled: boolean;
   /** Max products to load */
   limit: number;
@@ -241,7 +254,7 @@ export interface FilterSidebarSettings {
   defaultOpen: boolean;
 }
 
-export interface TestimonialsSettings extends SectionTitleOverride {
+export interface TestimonialsSettings extends SectionTitleOverride, SectionBgOverride {
   enabled: boolean;
   minRating: number;
   verifiedOnly: boolean;
