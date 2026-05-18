@@ -261,9 +261,11 @@ export interface HeroBannerProps {
   image: string;
   imageAr?: string;
   /**
-   * Optional mobile-specific image. Recommended 1080×1440 (3:4 aspect)
-   * so the hero stays subject-prominent on phones. Falls back to `image`
-   * with a center-crop when unset.
+   * Optional mobile-specific image. Recommended 1080×394 landscape
+   * (~2.74:1, same aspect as desktop) per Ahmad 2026-05-18 directive
+   * "mobile hero horizontal not portrait". Smaller file = less mobile
+   * bandwidth. Falls back to the desktop `image` (downsampled) when
+   * unset — both render in the same landscape container.
    */
   imageMobile?: string;
   imageMobileAr?: string;

@@ -81,8 +81,10 @@ interface ImageUploadProps {
    * render at this ratio so the merchant sees exactly how their image
    * will be cropped on the storefront. Values mirror the storefront
    * aspects per docs/superpowers/plans/2026-05-16-mobile-ui-ship.md:
-   *   - '3/2'  → hero desktop (recommend 1200×800)
-   *   - '3/4'  → hero MOBILE (recommend 1080×1440)
+   *   - '3/2'  → legacy hero desktop (recommend 1200×800)
+   *   - '3/4'  → legacy portrait crop (DEPRECATED for hero — see
+   *     packages/shared/src/types/image-standards.ts heroMobile, now
+   *     landscape 1080×394 per Ahmad 2026-05-18 directive)
    *   - '1/1'  → category tile + product image (recommend 800×800 / 1000×1000)
    *   - 'free' → no aspect lock (default, legacy behavior)
    *

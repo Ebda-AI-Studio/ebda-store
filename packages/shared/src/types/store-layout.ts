@@ -24,11 +24,11 @@ export interface HeroSlide {
   image: string;
   imageAr?: string;
   /**
-   * Mobile image — R2 URL. Optional but strongly recommended; recommended
-   * 1080×1440 (aspect 3:4) so the hero stays subject-prominent on
-   * phone screens. When unset we fall back to `image` and crop, which
-   * usually works for landscape product shots but rarely for ones with
-   * tall subjects (people, packaging).
+   * Mobile image — R2 URL. Optional. Recommended 1080×394 landscape
+   * (~2.74:1, same aspect as desktop) per Ahmad 2026-05-18 directive
+   * "mobile hero horizontal not portrait". When unset, the storefront
+   * falls back to `image` (the desktop hero) downsampled. Both render
+   * in the same landscape container so portrait crops would letterbox.
    */
   imageMobile?: string;
   imageMobileAr?: string;

@@ -10,13 +10,19 @@ import logger from '../lib/logger';
  * poorly). 1200×800 hero @ 3:2 covers a 600×400 CSS-px hero at 2x DPR.
  */
 const ASPECT_TARGETS: Record<string, { w: number; h: number }> = {
-  '3:2': { w: 1200, h: 800 }, // hero desktop
+  '3:2': { w: 1200, h: 800 }, // legacy hero desktop
   '1:1': { w: 1000, h: 1000 }, // category + product
-  '3:4': { w: 1080, h: 1440 }, // hero mobile
+  // 3:4 was hero mobile portrait — DEPRECATED 2026-05-18 (Ahmad: mobile
+  // hero must be landscape). Kept for product/category portrait crops.
+  '3:4': { w: 600, h: 800 },
   '16:9': { w: 1280, h: 720 }, // alternative hero
   '4:3': { w: 1200, h: 900 }, // alternative hero
   '2:3': { w: 800, h: 1200 }, // alternative category
-  '2.45:1': { w: 1470, h: 600 }, // wide-cinema hero
+  '2.45:1': { w: 1470, h: 600 }, // wide-cinema hero (legacy)
+  // Canonical hero desktop + mobile (both landscape, same aspect) per
+  // packages/shared/src/types/image-standards.ts / design.md zFloos brief.
+  '1920:700': { w: 1920, h: 700 }, // hero desktop
+  '1080:394': { w: 1080, h: 394 }, // hero mobile (optional smaller crop)
 };
 
 /**
