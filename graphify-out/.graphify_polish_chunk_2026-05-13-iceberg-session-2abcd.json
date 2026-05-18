@@ -1,0 +1,120 @@
+{
+  "nodes": [
+    {
+      "id": "prisma-direct-url-rule",
+      "label": "Prisma DIRECT_URL must be unpooled host",
+      "type": "rule",
+      "summary": "DIRECT_URL in Prisma schema must point to the unpooled Neon host (no -pooler in hostname). pgbouncer transaction-pooling breaks migrate deploy in two distinct ways: invariant violation and stuck advisory lock.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf/memory/feedback-prisma-direct-url-pooler.md",
+      "tags": ["prisma", "neon", "postgresql", "migration", "railway"]
+    },
+    {
+      "id": "pgbouncer-invariant-violation",
+      "label": "pgbouncer breaks Prisma migration state",
+      "type": "trap",
+      "summary": "pgbouncer in transaction-pooling mode can hand each statement to a different backend — Prisma reads _prisma_migrations on one backend, applies on another, and the persistence state is gone, causing invariant violation error.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf/memory/feedback-prisma-direct-url-pooler.md",
+      "tags": ["prisma", "pgbouncer", "neon", "migration", "trap"]
+    },
+    {
+      "id": "pgbouncer-advisory-lock-trap",
+      "label": "Stuck advisory lock after failed migrate",
+      "type": "trap",
+      "summary": "A failed migrate deploy via pooler acquires pg_advisory_lock (objid 72707369), then the client disconnects but the pooled backend stays alive holding the lock. Subsequent deploys time out on P1002. Requires pg_terminate_backend via unpooled URL to unstick.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf/memory/feedback-prisma-direct-url-pooler.md",
+      "tags": ["prisma", "pgbouncer", "advisory-lock", "trap", "recovery"]
+    },
+    {
+      "id": "alerting-three-channel-pattern",
+      "label": "Three orthogonal alerting channels",
+      "type": "pattern",
+      "summary": "UptimeRobot (external uptime), Sentry (in-process errors), and in-API Telegram alerts (business-logic failures) cover orthogonal failure modes. No single channel sees all failures — Sentry can't tell you the server is down; UptimeRobot can't tell you a payment HMAC is failing.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf/memory/feedback-alerting-three-channel-pattern.md",
+      "tags": ["alerting", "uptime", "sentry", "telegram", "production", "observability"]
+    },
+    {
+      "id": "telegram-alert-service",
+      "label": "In-API Telegram alert service pattern",
+      "type": "pattern",
+      "summary": "Single sendAlert({level, title, body, context}) function with Redis throttle (5min per sha1(level+title)), plain fetch transport, always-safe try/catch, graceful no-op when env vars missing. P0/P1/info levels. No SDK needed.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf/memory/feedback-alerting-three-channel-pattern.md",
+      "tags": ["telegram", "alerting", "service", "redis", "railway"]
+    },
+    {
+      "id": "sentry-not-alerting",
+      "label": "Sentry alone is not alerting",
+      "type": "rule",
+      "summary": "Sentry captures errors but requires the process to be alive to phone home — if the server is unreachable, Sentry sends nothing. Must pair with an external uptime monitor (UptimeRobot) to cover the dead-process failure mode.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf/memory/feedback-alerting-three-channel-pattern.md",
+      "tags": ["sentry", "alerting", "uptime", "production-reality"]
+    },
+    {
+      "id": "ssr-compliance-link-in-layout",
+      "label": "Compliance links must be in layout.tsx for SSR",
+      "type": "rule",
+      "summary": "FWB storefront template footer only renders post-hydration (templateLoading gate). GDPR Art. 7(3) requires cookie preferences link to always be accessible — must add a fallback copy in layout.tsx (server component) to appear in initial HTML for crawlers and JS-disabled visitors.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-cookie-link-ssr-layout.md",
+      "tags": ["ssr", "nextjs", "gdpr", "cookie-consent", "layout", "compliance"]
+    },
+    {
+      "id": "template-loading-ssr-gap",
+      "label": "Dynamic template import blocks SSR HTML",
+      "type": "trap",
+      "summary": "useTemplateComponents() lazy-loads the template via dynamic import, gating all of header/footer behind templateLoading === true during SSR. The entire footer is absent from initial HTML — any compliance or SEO content in the template footer is invisible to crawlers.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-cookie-link-ssr-layout.md",
+      "tags": ["nextjs", "ssr", "template", "hydration", "trap", "fwb"]
+    },
+    {
+      "id": "gdpr-erase-single-primitive",
+      "label": "Single eraseAccount() primitive for all erasure triggers",
+      "type": "pattern",
+      "summary": "FWB's AuthService.eraseAccount(userId) is the one transaction-wrapped anonymization method called by self-serve endpoint, retention cron, and future admin override. One place to extend when new PII columns land — all three trigger paths pick it up automatically.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-gdpr-erase-reuse-pattern.md",
+      "tags": ["gdpr", "erasure", "prisma", "auth", "pattern", "fwb", "kuwait-law"]
+    },
+    {
+      "id": "gdpr-erase-idempotency",
+      "label": "eraseAccount is idempotent by design",
+      "type": "rule",
+      "summary": "The anonymization upsert is a no-op if email already starts with 'erased-', each deleteMany deletes zero rows on repeat. Safe for cron re-runs or accidental double-calls without double-recording harm beyond an audit log entry.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-gdpr-erase-reuse-pattern.md",
+      "tags": ["gdpr", "idempotency", "erasure", "pattern"]
+    },
+    {
+      "id": "gdpr-erase-tax-retention",
+      "label": "Orders preserved anonymized for tax compliance",
+      "type": "rule",
+      "summary": "GDPR erasure does NOT delete Order rows — preserved with customerId = null and scrubbed address JSON. Kuwait MOF requires invoice retention ≥5 years. Erasure satisfies Art. 17 while keeping audit trail. Separate 5-year hard-delete cron planned for 2026-12.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-gdpr-erase-reuse-pattern.md",
+      "tags": ["gdpr", "tax", "retention", "orders", "kuwait-law", "compliance"]
+    }
+  ],
+  "edges": [
+    {
+      "from": "pgbouncer-invariant-violation",
+      "to": "pgbouncer-advisory-lock-trap",
+      "type": "related-to"
+    },
+    { "from": "prisma-direct-url-rule", "to": "pgbouncer-invariant-violation", "type": "fixes" },
+    { "from": "prisma-direct-url-rule", "to": "pgbouncer-advisory-lock-trap", "type": "fixes" },
+    { "from": "telegram-alert-service", "to": "alerting-three-channel-pattern", "type": "extends" },
+    { "from": "sentry-not-alerting", "to": "alerting-three-channel-pattern", "type": "related-to" },
+    { "from": "ssr-compliance-link-in-layout", "to": "template-loading-ssr-gap", "type": "fixes" },
+    { "from": "gdpr-erase-single-primitive", "to": "gdpr-erase-idempotency", "type": "requires" },
+    {
+      "from": "gdpr-erase-single-primitive",
+      "to": "gdpr-erase-tax-retention",
+      "type": "complements"
+    },
+    {
+      "from": "gdpr-erase-single-primitive",
+      "to": "ssr-compliance-link-in-layout",
+      "type": "complements"
+    },
+    {
+      "from": "alerting-three-channel-pattern",
+      "to": "prisma-direct-url-rule",
+      "type": "related-to"
+    }
+  ]
+}

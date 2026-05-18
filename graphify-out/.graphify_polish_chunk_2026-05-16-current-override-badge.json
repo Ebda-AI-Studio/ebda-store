@@ -1,0 +1,170 @@
+{
+  "chunk_id": "2026-05-16-current-override-badge",
+  "generated_at": "2026-05-16T20:10:31Z",
+  "nodes": [
+    {
+      "id": "fwb-current-override-badge-pattern",
+      "label": "Current vs Override Header Badge Pattern",
+      "type": "pattern",
+      "summary": "Every per-zone admin config form must show a prominent header badge on each editable field displaying the currently-applied value and whether it comes from a saved override (yellow) or the theme default (green). Prevents the 'why isn't my change visible?' confusion by surfacing override state at the field itself.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-admin-current-vs-override-badge.md"
+    },
+    {
+      "id": "fwb-badge-green-inheriting-state",
+      "label": "Green Inheriting Badge State",
+      "type": "concept",
+      "summary": "Green badge (`bg-success/15 text-success`) labeled 'Current: <value>' indicates no override is saved; the value is measured live from the storefront probe via getComputedStyle. Editing the theme changes it; saving here pins the zone.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-admin-current-vs-override-badge.md"
+    },
+    {
+      "id": "fwb-badge-yellow-override-state",
+      "label": "Yellow Override Badge State",
+      "type": "concept",
+      "summary": "Yellow badge (`bg-warning/15 text-warning`) labeled 'Current: <value> · override' indicates the merchant has a saved value that shadows the theme default. Hover-title instructs how to clear it and revert.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-admin-current-vs-override-badge.md"
+    },
+    {
+      "id": "fwb-three-tier-value-resolution",
+      "label": "Three-Tier Value Resolution (Override → Measured → Hide)",
+      "type": "architecture",
+      "summary": "Badge value resolves in priority order: (1) cfg.fontSize saved override → yellow badge; (2) measured[zone].fontSize from iframe probe → green badge; (3) neither available (probe pending or zone absent) → hide the badge entirely rather than showing '—'.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-admin-current-vs-override-badge.md"
+    },
+    {
+      "id": "fwb-storefront-probe-iframe-mechanism",
+      "label": "Storefront Probe iframe getComputedStyle Mechanism",
+      "type": "architecture",
+      "summary": "Admin page renders a hidden iframe (opacity:0, NOT display:none — display:none prevents layout resolution) loading the live storefront with ?probe=typography. The TypographyProbe component runs getComputedStyle on each data-zone element after hydration and postMessages computed styles back. Admin reads measured[zone][prop] for green-badge values.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-admin-current-vs-override-badge.md"
+    },
+    {
+      "id": "fwb-badge-applicable-surfaces",
+      "label": "Override Badge Applicable Surfaces",
+      "type": "feature",
+      "summary": "The badge applies to any admin surface where a merchant override can shadow a platform default: Typography (font-size per zone), Branding/Theme (primary color), Layout (cardSize), Payment config (API key source), Hero banner (overlay-tint/aspect ratio). Rule: wherever override can shadow default, badge is required.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-admin-current-vs-override-badge.md"
+    },
+    {
+      "id": "fwb-override-discoverability-principle",
+      "label": "Override Discoverability Principle",
+      "type": "rule",
+      "summary": "Override state must be surfaced AT the field where it causes confusion — header position is mandatory, not bottom-of-form or tooltip-only. A visible color cue is required alongside the numeric value; color distinction alone (without the value) or value alone (without color) are both insufficient.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-admin-current-vs-override-badge.md"
+    },
+    {
+      "id": "fwb-badge-anti-patterns",
+      "label": "Override Badge Anti-Patterns",
+      "type": "bug-class",
+      "summary": "Five anti-patterns: (1) hint at bottom of form not header; (2) override state behind tooltip only, no color cue; (3) showing numeric value without green/yellow distinction; (4) removing badge when field is blank — that is precisely when inheriting state is most useful; (5) showing '—' or 'unknown' when probe hasn't responded — hide instead.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-admin-current-vs-override-badge.md"
+    },
+    {
+      "id": "fwb-badge-verification-recipe",
+      "label": "Override Badge Verification Recipe",
+      "type": "rule",
+      "summary": "Four-step verification for any new config form: (1) save override → reload → yellow badge with override value; (2) clear override → reload → green badge with theme default; (3) change platform theme default → reload → green badges update across all stores; (4) set then clear override → badge flips yellow→green correctly. Any step failing = discoverability gap open.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-admin-current-vs-override-badge.md"
+    },
+    {
+      "id": "fwb-probe-display-none-trap",
+      "label": "Probe iframe display:none Kills Layout Trap",
+      "type": "bug-class",
+      "summary": "The probe iframe must use opacity:0 + pointer-events:none + position:absolute, NOT display:none. display:none prevents the browser from performing layout, so getComputedStyle returns 0 or empty for size-dependent properties — the probe reads nothing and green badges never appear.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-admin-current-vs-override-badge.md"
+    },
+    {
+      "id": "fwb-zod-silent-strip-override-cross",
+      "label": "Zod Silent Strip Can Make Override Badge Show Wrong State",
+      "type": "bug-class",
+      "summary": "If the API's Zod schema silently strips a field (e.g. fontSize not in the schema), the saved override is dropped server-side. The badge then reads green (theme default) when the merchant expects yellow (their override). Always cross-reference fwb-zod-silent-strip-trap when badge shows green-when-expected-yellow.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-admin-current-vs-override-badge.md"
+    }
+  ],
+  "edges": [
+    {
+      "from": "fwb-current-override-badge-pattern",
+      "to": "fwb-badge-green-inheriting-state",
+      "relation": "related"
+    },
+    {
+      "from": "fwb-current-override-badge-pattern",
+      "to": "fwb-badge-yellow-override-state",
+      "relation": "related"
+    },
+    {
+      "from": "fwb-current-override-badge-pattern",
+      "to": "fwb-three-tier-value-resolution",
+      "relation": "implements"
+    },
+    {
+      "from": "fwb-current-override-badge-pattern",
+      "to": "fwb-override-discoverability-principle",
+      "relation": "enforces"
+    },
+    {
+      "from": "fwb-current-override-badge-pattern",
+      "to": "fwb-badge-applicable-surfaces",
+      "relation": "related"
+    },
+    {
+      "from": "fwb-badge-green-inheriting-state",
+      "to": "fwb-storefront-probe-iframe-mechanism",
+      "relation": "depends-on"
+    },
+    {
+      "from": "fwb-three-tier-value-resolution",
+      "to": "fwb-badge-green-inheriting-state",
+      "relation": "related"
+    },
+    {
+      "from": "fwb-three-tier-value-resolution",
+      "to": "fwb-badge-yellow-override-state",
+      "relation": "related"
+    },
+    {
+      "from": "fwb-badge-anti-patterns",
+      "to": "fwb-override-discoverability-principle",
+      "relation": "mitigates"
+    },
+    {
+      "from": "fwb-badge-verification-recipe",
+      "to": "fwb-current-override-badge-pattern",
+      "relation": "enforces"
+    },
+    {
+      "from": "fwb-probe-display-none-trap",
+      "to": "fwb-storefront-probe-iframe-mechanism",
+      "relation": "mitigates"
+    },
+    {
+      "from": "fwb-zod-silent-strip-override-cross",
+      "to": "fwb-badge-yellow-override-state",
+      "relation": "mitigates"
+    },
+    {
+      "from": "fwb-current-override-badge-pattern",
+      "to": "fwb-admin-live-preview-pattern",
+      "relation": "related"
+    },
+    {
+      "from": "fwb-zod-silent-strip-override-cross",
+      "to": "fwb-zod-silent-strip-trap",
+      "relation": "example-of"
+    },
+    {
+      "from": "fwb-badge-green-inheriting-state",
+      "to": "fwb-typography-size-table",
+      "relation": "depends-on"
+    },
+    {
+      "from": "fwb-badge-applicable-surfaces",
+      "to": "fwb-typography-zone-extensions",
+      "relation": "related"
+    },
+    {
+      "from": "fwb-badge-applicable-surfaces",
+      "to": "fwb-context-aware-color-tokens",
+      "relation": "related"
+    }
+  ]
+}

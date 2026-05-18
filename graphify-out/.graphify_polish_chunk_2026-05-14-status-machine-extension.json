@@ -1,0 +1,94 @@
+{
+  "nodes": [
+    {
+      "id": "verify-get-vs-post-surface-split",
+      "label": "Verify only GETs state, never triggers verification",
+      "type": "pattern",
+      "summary": "Many providers split verify into two endpoints: GET /domains/:id (reads current status, does nothing) and POST /domains/:id/verify (kicks off async verification). Calling only GET on a 'Verify' button click means the provider is never actually asked to verify — status stays not_started forever. Rule: always call POST first, then GET to read updated state. Applies to Resend, AWS SES, Stripe Identity, Vercel domain certs. FWB fix: commit f7e4cd7.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf/memory/feedback-provision-verify-status-machine.md",
+      "tags": [
+        "provider-integration",
+        "resend",
+        "status-machine",
+        "fwb",
+        "api-surface",
+        "dns-verification"
+      ],
+      "cross_links": ["merchant-domain-flow", "registrar-dns-quirks"]
+    },
+    {
+      "id": "async-verification-client-polling-ladder",
+      "label": "Async verification needs client-side polling",
+      "type": "pattern",
+      "summary": "Provider verify endpoints return synchronously but actual DNS polling is async (typically <30s when records already published, up to ~2 min when freshly propagating). Verify→fetch→stop leaves status as pending and merchant sees no change. Pattern: poll at 3s/8s/15s/30s/60s intervals, break early on 'verified' or 'failed'. Button stays in 'Verifying...' state (isVerifyingEmail boolean) for the entire polling window — prevents double-clicks and gives visual feedback. FWB: commit 875c900.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf/memory/feedback-provision-verify-status-machine.md",
+      "tags": [
+        "provider-integration",
+        "polling",
+        "async-ux",
+        "dns-verification",
+        "fwb",
+        "status-machine",
+        "resend"
+      ],
+      "cross_links": ["merchant-domain-flow", "registrar-dns-quirks"]
+    },
+    {
+      "id": "bundled-dns-records-panel-visibility-rule",
+      "label": "Bundled DNS records panel must stay until ALL resources are live",
+      "type": "pattern",
+      "summary": "When one panel shows DNS records for multiple resources (e.g. Vercel storefront records + Resend email records in one merged table), hiding it when the first resource goes live rips the email records away while the merchant is still wiring DNS at their registrar. Visibility rule: !(everyResourceLive) — not gated on any single resource. FWB formula: needsDnsRecords = !isStorefrontLive || !isEmailVerified. FWB: commit f7e4cd7.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf/memory/feedback-provision-verify-status-machine.md",
+      "tags": [
+        "admin-ux",
+        "dns-verification",
+        "fwb",
+        "content-visibility",
+        "resend",
+        "multi-resource"
+      ],
+      "cross_links": [
+        "merchant-domain-flow",
+        "registrar-dns-quirks",
+        "fwb-content-visibility-split-trap"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "source": "verify-get-vs-post-surface-split",
+      "target": "merchant-domain-flow",
+      "relation": "companion_trap"
+    },
+    {
+      "source": "verify-get-vs-post-surface-split",
+      "target": "registrar-dns-quirks",
+      "relation": "same_arc"
+    },
+    {
+      "source": "async-verification-client-polling-ladder",
+      "target": "merchant-domain-flow",
+      "relation": "companion_trap"
+    },
+    {
+      "source": "async-verification-client-polling-ladder",
+      "target": "registrar-dns-quirks",
+      "relation": "same_arc"
+    },
+    {
+      "source": "bundled-dns-records-panel-visibility-rule",
+      "target": "merchant-domain-flow",
+      "relation": "companion_trap"
+    },
+    {
+      "source": "bundled-dns-records-panel-visibility-rule",
+      "target": "registrar-dns-quirks",
+      "relation": "same_arc"
+    },
+    {
+      "source": "bundled-dns-records-panel-visibility-rule",
+      "target": "fwb-content-visibility-split-trap",
+      "relation": "same_family"
+    }
+  ]
+}

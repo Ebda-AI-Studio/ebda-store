@@ -1,0 +1,63 @@
+{
+  "nodes": [
+    {
+      "id": "fwb-content-visibility-split-trap",
+      "label": "Content/Visibility Split Trap",
+      "type": "trap",
+      "summary": "FWB separates content existence (store_faqs, store_howtos, store_pages tables) from navigation visibility (Store.settings.footerLinks flags). Any automated path that writes content rows without flipping the matching footerLinks flag leaves content silently unreachable from the storefront nav.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-content-visibility-split.md",
+      "tags": ["fwb", "tenant", "footerLinks", "visibility", "trap", "settings-json"]
+    },
+    {
+      "id": "fwb-ensure-footer-link-helper",
+      "label": "ensureFooterSupportLinkEnabled helper",
+      "type": "helper",
+      "summary": "Idempotent TypeScript helper in bulk-ai-aeo.ts that upserts a footerLinks.support entry to enabled:true after a bulk-AI sweep writes content rows. Handles both 'exists but disabled' and 'missing entirely' cases; try/catch wraps all DB access so a settings failure never blocks the parent write.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-content-visibility-split.md",
+      "tags": ["fwb", "helper", "inngest", "bulk-ai", "footerLinks", "idempotent"]
+    },
+    {
+      "id": "fwb-content-surface-visibility-rule",
+      "label": "Co-write Visibility Flag on Content Creation",
+      "type": "rule",
+      "summary": "Any code path that creates user-visible tenant content MUST also update the matching footerLinks visibility flag in the same operation. Applies to all automated writers: Inngest bulk-AI sweeps, migration scripts, seed scripts, and any future content-import paths.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-content-visibility-split.md",
+      "tags": ["fwb", "rule", "tenant", "content", "visibility", "architecture"]
+    },
+    {
+      "id": "fwb-content-table-href-map",
+      "label": "Content Table → Footer href Mapping",
+      "type": "concept",
+      "summary": "Lookup table mapping FWB content tables to their canonical footer hrefs and default enabled state: store_faqs→/faq (usually false), store_howtos→/how-to-guides (often missing), store_pages→matches slug. Reviews and storeTestimonials have no footer link.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-content-visibility-split.md",
+      "tags": ["fwb", "reference", "footerLinks", "store_faqs", "store_howtos", "store_pages"]
+    }
+  ],
+  "edges": [
+    {
+      "from": "fwb-content-visibility-split-trap",
+      "to": "fwb-ensure-footer-link-helper",
+      "type": "fixes"
+    },
+    {
+      "from": "fwb-content-surface-visibility-rule",
+      "to": "fwb-content-visibility-split-trap",
+      "type": "related-to"
+    },
+    {
+      "from": "fwb-ensure-footer-link-helper",
+      "to": "fwb-content-table-href-map",
+      "type": "requires"
+    },
+    {
+      "from": "fwb-content-visibility-split-trap",
+      "to": "fwb-cookie-link-ssr-layout",
+      "type": "related-to"
+    },
+    {
+      "from": "fwb-content-surface-visibility-rule",
+      "to": "fwb-cms-and-tenant-control",
+      "type": "complements"
+    }
+  ]
+}

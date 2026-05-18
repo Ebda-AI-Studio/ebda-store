@@ -1,0 +1,310 @@
+{
+  "chunk_id": "2026-05-16-fbt-preview-presets",
+  "generated_at": "2026-05-16T12:00:00Z",
+  "nodes": [
+    {
+      "id": "fwb-fbt-variant-aware-add-to-cart",
+      "label": "FBT Variant-Aware Add-to-Cart Rule",
+      "type": "rule",
+      "summary": "Every storefront surface that calls cart.addItem() must detect variant-parent products and gate the add with a bilingual toast + redirect to PDP. Silent failure is worse than a clear prompt.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-fbt-variant-aware-add-to-cart.md"
+    },
+    {
+      "id": "fwb-every-cart-surface-audit",
+      "label": "Every Add-to-Cart Surface Must Be Audited",
+      "type": "rule",
+      "summary": "When shipping variant detection on one surface (FBT), all other cart-add surfaces must be audited for the same gap: CartRecommendations, Wishlist move-to-cart, Quick-add modal.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-fbt-variant-aware-add-to-cart.md"
+    },
+    {
+      "id": "fwb-fbt-has-variants-helper",
+      "label": "hasVariants(p) Detection Helper",
+      "type": "pattern",
+      "summary": "Derive `hasVariants(p)` from `Array.isArray(p.variants) && p.variants.length > 0` — every component needing variant detection should use this shared helper. If the API omits variants the field is undefined, not an error.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-fbt-variant-aware-add-to-cart.md"
+    },
+    {
+      "id": "fwb-fbt-partition-pattern",
+      "label": "FBT Partition Pattern: simple vs needVariant",
+      "type": "pattern",
+      "summary": "Add-all-to-cart splits its product list into simple (add immediately) and needVariant (show info toast listing variant products by name). Never silently skip variant products — the count mismatch must surface.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-fbt-variant-aware-add-to-cart.md"
+    },
+    {
+      "id": "fwb-fbt-serial-await-no-promise-all",
+      "label": "Serial Awaits for Batch Cart Adds (No Promise.all)",
+      "type": "rule",
+      "summary": "Batch cart additions must use sequential awaits, not Promise.all — parallel adds race against each other because the second add reads a pre-first-add cart state, causing lost items.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-fbt-variant-aware-add-to-cart.md"
+    },
+    {
+      "id": "fwb-variant-api-prisma-include",
+      "label": "Prisma Include Rule for Variant-Gated Features",
+      "type": "rule",
+      "summary": "Every API endpoint driving add-to-cart UX must include `variants: { select: { id: true, price: true } }` in its Prisma select. TypeScript won't catch a missing relation — it silently reads undefined and the branch fails to no-op.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-fbt-variant-aware-add-to-cart.md"
+    },
+    {
+      "id": "fwb-fbt-bilingual-toast-variant",
+      "label": "Bilingual Variant-Gate Toast",
+      "type": "pattern",
+      "summary": "Variant detection toasts must be bilingual (EN + AR). Arabic merchants see broken UX if the toast is English-only. Toast includes the product name in the active locale and redirects to the PDP.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-fbt-variant-aware-add-to-cart.md"
+    },
+    {
+      "id": "fwb-admin-live-preview-pattern",
+      "label": "Admin Live Preview Pattern",
+      "type": "pattern",
+      "summary": "Every per-store admin styling form renders a live preview block alongside edit fields that mirrors the storefront emitter in real time, before Save. Eliminates the save→reload→check loop for visual customisation.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-admin-live-preview-pattern.md"
+    },
+    {
+      "id": "fwb-mirror-the-emitter-helper",
+      "label": "cfgToInlineStyle — Mirror-the-Emitter Helper",
+      "type": "pattern",
+      "summary": "`cfgToInlineStyle(cfg, theme)` takes the same shape the storefront's CSS emitter consumes and returns a React inline-style object. Same logic, different output target — reused by both zone previews and preset mini-previews.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-admin-live-preview-pattern.md"
+    },
+    {
+      "id": "fwb-concrete-preview-text-rule",
+      "label": "Concrete previewText Rule",
+      "type": "rule",
+      "summary": "Preview blocks must use real storefront sample strings (e.g. 'Latest Products' / 'Premium Saffron Tea'), not generic placeholders like 'Sample text'. Merchants must gauge how their actual content will render.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-admin-live-preview-pattern.md"
+    },
+    {
+      "id": "fwb-dir-aware-preview",
+      "label": "dir-Aware Preview Block",
+      "type": "rule",
+      "summary": "Admin preview blocks must wrap content in `dir={isAr ? 'rtl' : 'ltr'}` so RTL layout (text-align, padding direction) renders correctly for Arabic merchants. Missing dir makes AR preview misleading.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-admin-live-preview-pattern.md"
+    },
+    {
+      "id": "fwb-brand-preset-hex-resolution",
+      "label": "Brand-Preset Hex Resolution in Previews",
+      "type": "rule",
+      "summary": "Admin previews must resolve brand-preset tokens to literal hex via `hslComponentsToHex(theme.primaryColor)`. CSS vars like `var(--primary)` inside React inline styles don't compute and silently fall back to inherit.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-admin-live-preview-pattern.md"
+    },
+    {
+      "id": "fwb-admin-preview-verification-checklist",
+      "label": "Admin Styling UX Verification Checklist",
+      "type": "rule",
+      "summary": "Any new admin styling surface must pass 5 checks: (1) no-save preview, (2) concrete sample text, (3) brand colours resolved, (4) correct AR layout, (5) one-click preset for fast onboarding.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-admin-live-preview-pattern.md"
+    },
+    {
+      "id": "fwb-best-of-both-worlds-principle",
+      "label": "Best-of-Both-Worlds Principle",
+      "type": "concept",
+      "summary": "Admin styling UIs should pair fine-grained per-zone controls for power users with multi-zone quick-style presets for onboarding merchants. Both audiences hit the same page — don't pick one or the other.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-admin-live-preview-pattern.md"
+    },
+    {
+      "id": "fwb-multi-zone-quick-presets",
+      "label": "Multi-Zone Quick-Style Presets",
+      "type": "pattern",
+      "summary": "Every admin styling surface exposes 3-5 preset buttons that apply a coherent look across related zones in one click. Presets merge into existing zone settings (don't replace), preserving unrelated fields.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-multi-zone-quick-presets.md"
+    },
+    {
+      "id": "fwb-preset-merge-semantics",
+      "label": "Preset Merge Semantics",
+      "type": "pattern",
+      "summary": "Applying a preset merges into existing zone settings — doesn't replace. Empty-string values in a preset explicitly clear that field. After merge, strip empty strings before API submission (Zod rejects empty optional fields).",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-multi-zone-quick-presets.md"
+    },
+    {
+      "id": "fwb-mini-preview-in-preset-button",
+      "label": "Mini-Preview Inside Preset Button",
+      "type": "pattern",
+      "summary": "Each preset button renders a tiny live preview using `cfgToInlineStyle(preset.zoneSettings[mainZone], theme)` so merchants compare styles at a glance before clicking. Reuses the same helper as the zone-level preview — zero extra cost.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-multi-zone-quick-presets.md"
+    },
+    {
+      "id": "fwb-clear-n-styles-companion-button",
+      "label": "Clear N Styles Companion Button",
+      "type": "pattern",
+      "summary": "Presets must ship with a 'Clear N styles' button that deletes only the preset's target zones from state — preserving all unrelated zone settings. Nuking the full zone map is the wrong reset.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-multi-zone-quick-presets.md"
+    },
+    {
+      "id": "fwb-preset-zone-scope-rule",
+      "label": "Preset Zone Scope Rule",
+      "type": "rule",
+      "summary": "Pick 3-5 visually-related high-impact zones for a preset group — not the whole store. Section headings (kicker + title + subtitle + seeAll) are the reference scope. One mega-preset that styles everything is too coarse.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-multi-zone-quick-presets.md"
+    },
+    {
+      "id": "fwb-preset-i18n-rule",
+      "label": "Preset Labels Must Be Bilingual",
+      "type": "rule",
+      "summary": "Every preset label, description, and button must carry both `label`/`labelAr` and `description`/`descriptionAr`. Arabic-mode merchants must not see English preset names.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-multi-zone-quick-presets.md"
+    },
+    {
+      "id": "fwb-preset-surface-expansion",
+      "label": "Preset Pattern Expansion Targets",
+      "type": "architecture",
+      "summary": "Multi-zone quick presets apply beyond typography: Categories card design (size+aspect+shape+gap), Hero banner (image+overlay+headline+CTA), Footer columns+copyright — anywhere 3+ related-but-individually-controllable fields exist.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-multi-zone-quick-presets.md"
+    }
+  ],
+  "edges": [
+    {
+      "from": "fwb-fbt-variant-aware-add-to-cart",
+      "to": "fwb-public-api-variant-include-gap",
+      "relation": "example-of"
+    },
+    {
+      "from": "fwb-fbt-variant-aware-add-to-cart",
+      "to": "fwb-three-product-render-paths",
+      "relation": "enforces"
+    },
+    {
+      "from": "fwb-fbt-variant-aware-add-to-cart",
+      "to": "fwb-variant-fold-pattern",
+      "relation": "depends-on"
+    },
+    {
+      "from": "fwb-every-cart-surface-audit",
+      "to": "fwb-fbt-variant-aware-add-to-cart",
+      "relation": "enforces"
+    },
+    {
+      "from": "fwb-fbt-has-variants-helper",
+      "to": "fwb-fbt-variant-aware-add-to-cart",
+      "relation": "implements"
+    },
+    {
+      "from": "fwb-fbt-partition-pattern",
+      "to": "fwb-fbt-variant-aware-add-to-cart",
+      "relation": "implements"
+    },
+    {
+      "from": "fwb-fbt-serial-await-no-promise-all",
+      "to": "fwb-fbt-partition-pattern",
+      "relation": "enforces"
+    },
+    {
+      "from": "fwb-variant-api-prisma-include",
+      "to": "fwb-public-api-variant-include-gap",
+      "relation": "mitigates"
+    },
+    {
+      "from": "fwb-variant-api-prisma-include",
+      "to": "fwb-fbt-has-variants-helper",
+      "relation": "depends-on"
+    },
+    {
+      "from": "fwb-fbt-bilingual-toast-variant",
+      "to": "fwb-fbt-variant-aware-add-to-cart",
+      "relation": "implements"
+    },
+    {
+      "from": "fwb-admin-live-preview-pattern",
+      "to": "fwb-best-of-both-worlds-principle",
+      "relation": "example-of"
+    },
+    {
+      "from": "fwb-mirror-the-emitter-helper",
+      "to": "fwb-admin-live-preview-pattern",
+      "relation": "implements"
+    },
+    {
+      "from": "fwb-concrete-preview-text-rule",
+      "to": "fwb-admin-live-preview-pattern",
+      "relation": "enforces"
+    },
+    {
+      "from": "fwb-dir-aware-preview",
+      "to": "fwb-admin-live-preview-pattern",
+      "relation": "enforces"
+    },
+    {
+      "from": "fwb-brand-preset-hex-resolution",
+      "to": "fwb-mirror-the-emitter-helper",
+      "relation": "enforces"
+    },
+    {
+      "from": "fwb-admin-preview-verification-checklist",
+      "to": "fwb-admin-live-preview-pattern",
+      "relation": "enforces"
+    },
+    {
+      "from": "fwb-admin-live-preview-pattern",
+      "to": "fwb-typography-zone-extensions",
+      "relation": "related"
+    },
+    {
+      "from": "fwb-multi-zone-quick-presets",
+      "to": "fwb-best-of-both-worlds-principle",
+      "relation": "example-of"
+    },
+    {
+      "from": "fwb-multi-zone-quick-presets",
+      "to": "fwb-admin-live-preview-pattern",
+      "relation": "related"
+    },
+    {
+      "from": "fwb-preset-merge-semantics",
+      "to": "fwb-multi-zone-quick-presets",
+      "relation": "implements"
+    },
+    {
+      "from": "fwb-preset-merge-semantics",
+      "to": "fwb-zod-silent-strip-trap",
+      "relation": "mitigates"
+    },
+    {
+      "from": "fwb-mini-preview-in-preset-button",
+      "to": "fwb-mirror-the-emitter-helper",
+      "relation": "depends-on"
+    },
+    {
+      "from": "fwb-mini-preview-in-preset-button",
+      "to": "fwb-multi-zone-quick-presets",
+      "relation": "implements"
+    },
+    {
+      "from": "fwb-clear-n-styles-companion-button",
+      "to": "fwb-multi-zone-quick-presets",
+      "relation": "implements"
+    },
+    {
+      "from": "fwb-preset-zone-scope-rule",
+      "to": "fwb-multi-zone-quick-presets",
+      "relation": "enforces"
+    },
+    {
+      "from": "fwb-preset-i18n-rule",
+      "to": "fwb-multi-zone-quick-presets",
+      "relation": "enforces"
+    },
+    {
+      "from": "fwb-preset-surface-expansion",
+      "to": "fwb-multi-zone-quick-presets",
+      "relation": "example-of"
+    },
+    {
+      "from": "fwb-preset-surface-expansion",
+      "to": "fwb-card-size-admin-system",
+      "relation": "related"
+    },
+    {
+      "from": "fwb-multi-zone-quick-presets",
+      "to": "fwb-typography-zone-extensions",
+      "relation": "depends-on"
+    },
+    {
+      "from": "fwb-admin-preview-verification-checklist",
+      "to": "fwb-multi-zone-quick-presets",
+      "relation": "enforces"
+    },
+    {
+      "from": "fwb-multi-zone-quick-presets",
+      "to": "fwb-section-heading-sub-zones",
+      "relation": "depends-on"
+    }
+  ]
+}

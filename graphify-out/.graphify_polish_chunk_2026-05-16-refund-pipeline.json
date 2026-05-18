@@ -1,0 +1,407 @@
+{
+  "chunk_id": "2026-05-16-refund-pipeline",
+  "generated_at": "2026-05-16T12:00:00Z",
+  "nodes": [
+    {
+      "id": "fwb-action-side-effect-graph",
+      "label": "Action Side-Effect Graph Rule",
+      "type": "rule",
+      "summary": "Every order/payment/customer action must propagate to every dependent system (inventory, coupon, affiliate, loyalty, notifications, customer timeline) — treat mutations as graph traversals, not point updates.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-action-side-effect-graph.md"
+    },
+    {
+      "id": "fwb-side-effect-inventory-restore",
+      "label": "Inventory Restore on Reversal",
+      "type": "pattern",
+      "summary": "On any order reversal, restore Product.inventory + ProductVariant.inventory using raw-SQL FOR UPDATE inside $transaction with an inventoryHistory row typed 'return_stock' to avoid lost-update races.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-action-side-effect-graph.md"
+    },
+    {
+      "id": "fwb-side-effect-coupon-decrement",
+      "label": "Coupon Usage Decrement on Reversal",
+      "type": "pattern",
+      "summary": "Decrement Coupon.usageCount with a gt:0 floor guard on reversal — prevents concurrent refunds driving the count negative.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-action-side-effect-graph.md"
+    },
+    {
+      "id": "fwb-side-effect-affiliate-commission",
+      "label": "Affiliate Commission Reversal",
+      "type": "pattern",
+      "summary": "Call affiliateService.reverseCommission(storeId, orderId) as a no-op-safe primitive — idempotent if commission was never paid or already reversed.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-action-side-effect-graph.md"
+    },
+    {
+      "id": "fwb-side-effect-loyalty-reversal",
+      "label": "Loyalty Points Reversal",
+      "type": "pattern",
+      "summary": "LoyaltyService.reverseEarnedPointsFromOrder is idempotent via a tagged 'refund-revoke:<earnId>' adjust transaction — double-revoke is blocked by tag lookup.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-action-side-effect-graph.md"
+    },
+    {
+      "id": "fwb-side-effect-customer-timeline",
+      "label": "Customer Profile Timeline",
+      "type": "feature",
+      "summary": "Any action touching a customer's money must appear on the customer detail page — stats, chips, and inline rows — driven by widening the API include, not the page render.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-action-side-effect-graph.md"
+    },
+    {
+      "id": "fwb-side-effect-inngest-fanout",
+      "label": "Inngest Fan-out for Notifications",
+      "type": "pattern",
+      "summary": "All post-action notification channels (email, WhatsApp/SMS dispatcher, OneSignal push) fire via a single Inngest event with Promise.allSettled steps — never bespoke-wire channels at the callsite.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-action-side-effect-graph.md"
+    },
+    {
+      "id": "fwb-refund-side-effect-pipeline",
+      "label": "Refund Side-Effect Pipeline",
+      "type": "architecture",
+      "summary": "All three FWB refund paths (admin Refund via provider, gateway webhook, manual status) converge on OrderService.applyRefundEffects() which runs all six reversals and fires the order/refunded Inngest event.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-refund-side-effect-pipeline.md"
+    },
+    {
+      "id": "fwb-refund-path-admin-button",
+      "label": "Admin Refund via Provider Button",
+      "type": "feature",
+      "summary": "POST /stores/:id/orders/:orderId/refund-via-provider calls PaymentService.refund which moves real money at the provider before converging on applyRefundEffects — only visible when paymentStatus=paid and a completed online payment row exists.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-refund-side-effect-pipeline.md"
+    },
+    {
+      "id": "fwb-refund-path-webhook",
+      "label": "Gateway Webhook Refund Path",
+      "type": "pattern",
+      "summary": "Provider-initiated refund webhooks route through PaymentService.handleWebhook then converge on applyRefundEffects — same six side-effects for free without additional callsite code.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-refund-side-effect-pipeline.md"
+    },
+    {
+      "id": "fwb-refund-path-manual-status",
+      "label": "Manual Refunded Status Path",
+      "type": "pattern",
+      "summary": "Admin setting order status to 'refunded' via OrderService.updateStatus also calls applyRefundEffects — before 2026-05-16 this path only flipped DB rows without reversing inventory, coupon, or loyalty.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-refund-side-effect-pipeline.md"
+    },
+    {
+      "id": "fwb-order-refunded-inngest-function",
+      "label": "order/refunded Inngest Function",
+      "type": "feature",
+      "summary": "order-refunded-fanout sends customer refund email (branded shell, bilingual), dispatches notification channels via refund_processed template, and fires OneSignal admin push with data.type='order.refunded'.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-refund-side-effect-pipeline.md"
+    },
+    {
+      "id": "fwb-refund-reason-flow",
+      "label": "Refund Reason Propagation",
+      "type": "pattern",
+      "summary": "Admin types reason in RefundButton modal → persisted to Payment.metadata.refundReason → Inngest function reads it once and distributes to customer email, dispatcher template, and admin push body.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-refund-side-effect-pipeline.md"
+    },
+    {
+      "id": "fwb-webhook-url-drift",
+      "label": "Webhook URL Drift Bug-Class",
+      "type": "bug-class",
+      "summary": "Internal callsites built webhookUrl without /api/v1 prefix and /:provider suffix, diverging from what the admin UI showed merchants — silent broken webhooks for providers that honor the field.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-webhook-url-drift.md"
+    },
+    {
+      "id": "fwb-webhook-url-single-builder",
+      "label": "Single Webhook URL Builder Rule",
+      "type": "rule",
+      "summary": "When an admin UI displays a URL the user copies into an external system, the same value must come from the same builder server-side — extract paymentWebhookUrl(provider) to a shared helper to prevent drift.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-webhook-url-drift.md"
+    },
+    {
+      "id": "fwb-cart-shipping-mobile-ux",
+      "label": "Cart Shipping Form Field Order (Kuwait)",
+      "type": "pattern",
+      "summary": "Storefront checkout uses firstName/lastName/phone/email(optional)/area/address1/address2 with no city field — Kuwait deliveries route on area only, city field removed to reduce mobile checkout friction.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-cart-shipping-mobile-ux.md"
+    },
+    {
+      "id": "fwb-cart-email-optional",
+      "label": "Optional Email in Checkout",
+      "type": "rule",
+      "summary": "Email is optional in the storefront checkout (phone-link customers don't always have email) — API addressSchema relaxed to z.string().email().optional().or(z.literal('')), format-validated only when filled.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-cart-shipping-mobile-ux.md"
+    },
+    {
+      "id": "fwb-cart-admin-form-divergence",
+      "label": "Admin vs Storefront Form Divergence",
+      "type": "pattern",
+      "summary": "Admin phone-order form keeps the City field (staff have time to fill it); storefront drops it — intentional split where the admin tool targets merchants with time, and storefront targets customers mid-tap.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-cart-shipping-mobile-ux.md"
+    },
+    {
+      "id": "fwb-wadyaljuz-myfatoorah-live",
+      "label": "Wady Aljuz MyFatoorah Live",
+      "type": "architecture",
+      "summary": "Wady Aljuz can accept MyFatoorah payments end-to-end after saving the per-store webhook secret via admin Payment Settings — stored AES-encrypted in PaymentConfig.webhookSecret, decrypted at runtime.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/project-fwb-wadyaljuz-myfatoorah-live.md"
+    },
+    {
+      "id": "fwb-per-store-webhook-secret",
+      "label": "Per-Store Webhook Secret Pattern",
+      "type": "pattern",
+      "summary": "Payment provider webhook secrets are stored per-store via admin UI (not Railway env vars) — AES-encrypted in PaymentConfig.webhookSecret, loaded by factory.getProvider() at webhook-verify time.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/project-fwb-wadyaljuz-myfatoorah-live.md"
+    },
+    {
+      "id": "fwb-myfatoorah-webhook-chain",
+      "label": "MyFatoorah Webhook Chain",
+      "type": "architecture",
+      "summary": "Full verified chain: customer pays → MyFatoorah POSTs → resolveStoreIdFromWebhookPayload → per-store PaymentConfig loaded → HMAC-SHA256 verified → Payment/Order updated → Inngest order/created fires fan-out.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/project-fwb-wadyaljuz-myfatoorah-live.md"
+    },
+    {
+      "id": "fwb-hmac-alert-threshold",
+      "label": "HMAC Failure P0 Alert",
+      "type": "rule",
+      "summary": "3 HMAC failures in 5 minutes from the same provider+store triggers a P0 Telegram alert — catches portal-side webhook secret rotation before merchants notice missed payments.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/project-fwb-wadyaljuz-myfatoorah-live.md"
+    },
+    {
+      "id": "fwb-refresh-payment-safety-net",
+      "label": "Refresh Payment Safety Net",
+      "type": "pattern",
+      "summary": "Admin Refresh Payment button re-asks the provider for payment status and runs the same Inngest fanout the webhook would have — escape hatch when webhooks miss due to misconfiguration, rotation, or network blip.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-refresh-payment-safety-net.md"
+    },
+    {
+      "id": "fwb-refresh-payment-inngest-refire",
+      "label": "Inngest Event Re-fire on Manual Refresh",
+      "type": "pattern",
+      "summary": "Refresh Payment re-fires order/created so customer/admin get email+push even when the webhook never arrived — Inngest's per-store concurrency key prevents double-send if a delayed webhook later arrives.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-refresh-payment-safety-net.md"
+    },
+    {
+      "id": "fwb-public-api-variant-include-gap",
+      "label": "Public API Variant Include Gap",
+      "type": "bug-class",
+      "summary": "listPublic and advancedSearch omitted variants from their Prisma include, causing every product to silently render as single-SKU even after variant features shipped — TypeScript cannot catch this class of missing-include bug.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-public-api-variant-include-gap.md"
+    },
+    {
+      "id": "fwb-silent-feature-degradation-include",
+      "label": "Silent Feature Degradation via Missing Prisma Include",
+      "type": "rule",
+      "summary": "Any UI feature that branches on obj.relation?.length will silently fall to the no-relation branch if any endpoint forgets to include the relation — audit Prisma include trees for every endpoint the UI consumes when shipping relation-dependent features.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-public-api-variant-include-gap.md"
+    },
+    {
+      "id": "fwb-variant-narrow-select",
+      "label": "Narrow Variant Select on Public Endpoints",
+      "type": "pattern",
+      "summary": "Public product endpoints include variants with select:{id, price, compareAtPrice} only — provides the 3 fields getProductPricing needs while keeping payload small for storefront performance.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-public-api-variant-include-gap.md"
+    }
+  ],
+  "edges": [
+    {
+      "from": "fwb-refund-side-effect-pipeline",
+      "to": "fwb-action-side-effect-graph",
+      "relation": "example-of"
+    },
+    {
+      "from": "fwb-refund-path-admin-button",
+      "to": "fwb-refund-side-effect-pipeline",
+      "relation": "implements"
+    },
+    {
+      "from": "fwb-refund-path-webhook",
+      "to": "fwb-refund-side-effect-pipeline",
+      "relation": "implements"
+    },
+    {
+      "from": "fwb-refund-path-manual-status",
+      "to": "fwb-refund-side-effect-pipeline",
+      "relation": "implements"
+    },
+    {
+      "from": "fwb-refund-side-effect-pipeline",
+      "to": "fwb-side-effect-inventory-restore",
+      "relation": "implements"
+    },
+    {
+      "from": "fwb-refund-side-effect-pipeline",
+      "to": "fwb-side-effect-coupon-decrement",
+      "relation": "implements"
+    },
+    {
+      "from": "fwb-refund-side-effect-pipeline",
+      "to": "fwb-side-effect-affiliate-commission",
+      "relation": "implements"
+    },
+    {
+      "from": "fwb-refund-side-effect-pipeline",
+      "to": "fwb-side-effect-loyalty-reversal",
+      "relation": "implements"
+    },
+    {
+      "from": "fwb-refund-side-effect-pipeline",
+      "to": "fwb-side-effect-customer-timeline",
+      "relation": "implements"
+    },
+    {
+      "from": "fwb-refund-side-effect-pipeline",
+      "to": "fwb-order-refunded-inngest-function",
+      "relation": "implements"
+    },
+    {
+      "from": "fwb-order-refunded-inngest-function",
+      "to": "fwb-side-effect-inngest-fanout",
+      "relation": "example-of"
+    },
+    {
+      "from": "fwb-refund-reason-flow",
+      "to": "fwb-refund-path-admin-button",
+      "relation": "related"
+    },
+    {
+      "from": "fwb-refund-reason-flow",
+      "to": "fwb-order-refunded-inngest-function",
+      "relation": "depends-on"
+    },
+    {
+      "from": "fwb-action-side-effect-graph",
+      "to": "fwb-side-effect-inventory-restore",
+      "relation": "enforces"
+    },
+    {
+      "from": "fwb-action-side-effect-graph",
+      "to": "fwb-side-effect-coupon-decrement",
+      "relation": "enforces"
+    },
+    {
+      "from": "fwb-action-side-effect-graph",
+      "to": "fwb-side-effect-affiliate-commission",
+      "relation": "enforces"
+    },
+    {
+      "from": "fwb-action-side-effect-graph",
+      "to": "fwb-side-effect-loyalty-reversal",
+      "relation": "enforces"
+    },
+    {
+      "from": "fwb-action-side-effect-graph",
+      "to": "fwb-side-effect-customer-timeline",
+      "relation": "enforces"
+    },
+    {
+      "from": "fwb-action-side-effect-graph",
+      "to": "fwb-side-effect-inngest-fanout",
+      "relation": "enforces"
+    },
+    {
+      "from": "fwb-webhook-url-drift",
+      "to": "fwb-webhook-url-single-builder",
+      "relation": "related"
+    },
+    {
+      "from": "fwb-webhook-url-drift",
+      "to": "fwb-payment-webhook-urls",
+      "relation": "related"
+    },
+    {
+      "from": "fwb-webhook-url-drift",
+      "to": "fwb-myfatoorah-integration",
+      "relation": "related"
+    },
+    {
+      "from": "fwb-wadyaljuz-myfatoorah-live",
+      "to": "fwb-per-store-webhook-secret",
+      "relation": "implements"
+    },
+    {
+      "from": "fwb-wadyaljuz-myfatoorah-live",
+      "to": "fwb-myfatoorah-webhook-chain",
+      "relation": "implements"
+    },
+    {
+      "from": "fwb-wadyaljuz-myfatoorah-live",
+      "to": "fwb-myfatoorah-integration",
+      "relation": "related"
+    },
+    {
+      "from": "fwb-wadyaljuz-myfatoorah-live",
+      "to": "fwb-refund-side-effect-pipeline",
+      "relation": "related"
+    },
+    {
+      "from": "fwb-hmac-alert-threshold",
+      "to": "fwb-per-store-webhook-secret",
+      "relation": "enforces"
+    },
+    {
+      "from": "fwb-myfatoorah-webhook-chain",
+      "to": "fwb-payment-webhook-urls",
+      "relation": "depends-on"
+    },
+    {
+      "from": "fwb-refresh-payment-safety-net",
+      "to": "fwb-wadyaljuz-myfatoorah-live",
+      "relation": "related"
+    },
+    {
+      "from": "fwb-refresh-payment-safety-net",
+      "to": "fwb-refund-side-effect-pipeline",
+      "relation": "related"
+    },
+    {
+      "from": "fwb-refresh-payment-inngest-refire",
+      "to": "fwb-refresh-payment-safety-net",
+      "relation": "implements"
+    },
+    {
+      "from": "fwb-refresh-payment-inngest-refire",
+      "to": "fwb-side-effect-inngest-fanout",
+      "relation": "example-of"
+    },
+    {
+      "from": "fwb-public-api-variant-include-gap",
+      "to": "fwb-silent-feature-degradation-include",
+      "relation": "example-of"
+    },
+    {
+      "from": "fwb-silent-feature-degradation-include",
+      "to": "fwb-variant-narrow-select",
+      "relation": "related"
+    },
+    {
+      "from": "fwb-public-api-variant-include-gap",
+      "to": "fwb-three-product-render-paths",
+      "relation": "related"
+    },
+    {
+      "from": "fwb-public-api-variant-include-gap",
+      "to": "fwb-variant-fold-pattern",
+      "relation": "related"
+    },
+    {
+      "from": "fwb-cart-shipping-mobile-ux",
+      "to": "fwb-mobile-header-pecannbee",
+      "relation": "related"
+    },
+    {
+      "from": "fwb-cart-shipping-mobile-ux",
+      "to": "fwb-admin-phone-order-flow",
+      "relation": "related"
+    },
+    {
+      "from": "fwb-cart-email-optional",
+      "to": "fwb-cart-shipping-mobile-ux",
+      "relation": "implements"
+    },
+    {
+      "from": "fwb-cart-admin-form-divergence",
+      "to": "fwb-cart-shipping-mobile-ux",
+      "relation": "related"
+    },
+    {
+      "from": "fwb-refund-path-admin-button",
+      "to": "fwb-myfatoorah-integration",
+      "relation": "depends-on"
+    },
+    {
+      "from": "fwb-side-effect-loyalty-reversal",
+      "to": "fwb-side-effect-inngest-fanout",
+      "relation": "related"
+    }
+  ]
+}

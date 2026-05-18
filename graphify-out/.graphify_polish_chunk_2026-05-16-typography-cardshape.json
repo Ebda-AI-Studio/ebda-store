@@ -1,0 +1,274 @@
+{
+  "chunk_id": "2026-05-16-typography-cardshape",
+  "generated_at": "2026-05-16T00:00:00Z",
+  "nodes": [
+    {
+      "id": "fwb-typography-zone-chip-extension",
+      "label": "Typography Zone Chip Extension",
+      "type": "feature",
+      "summary": "Seven new optional CSS properties added to Store.typography.zones[<zone>] in 2026-05-16, enabling zones to render as coloured chips with background, padding, radius, and text decoration controls.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-typography-zone-extensions.md"
+    },
+    {
+      "id": "fwb-brand-color-preset-tokens",
+      "label": "Brand Color Preset Tokens",
+      "type": "pattern",
+      "summary": "Five resolvable string tokens (brand-primary, brand-secondary, brand-accent, brand-foreground, brand-muted) map to hsl(var(--<name>)) CSS variables, letting merchants pick colors that auto-follow the store's brand theme.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-typography-zone-extensions.md"
+    },
+    {
+      "id": "fwb-resolve-color-value-helper",
+      "label": "resolveColorValue Helper",
+      "type": "architecture",
+      "summary": "Function in apps/web/src/app/layout.tsx that translates brand-preset token strings into their CSS-variable refs at SSR render time, enabling brand-linked typography that auto-updates when the store's theme color changes.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-typography-zone-extensions.md"
+    },
+    {
+      "id": "fwb-chip-inline-block-auto-emit",
+      "label": "Chip CSS Auto-emit inline-block Rule",
+      "type": "rule",
+      "summary": "When any of backgroundColor, padding, or borderRadius is set on a typography zone, the CSS emitter must auto-add display:inline-block — without it, padding has no visible effect on inline heading spans.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-typography-zone-extensions.md"
+    },
+    {
+      "id": "fwb-chip-quick-apply-presets",
+      "label": "Quick-Apply Chip Presets (3 buttons)",
+      "type": "feature",
+      "summary": "Three one-click admin buttons (Pill-Brand-primary, Soft-chip-Brand-primary-tint, Pill-Brand-secondary) set background + padding + borderRadius + text color atomically, sparing merchants from manually knowing what radius values produce a pill shape.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-typography-zone-extensions.md"
+    },
+    {
+      "id": "fwb-typography-three-layers-lock-step",
+      "label": "Typography Three-Layers-in-Lock-Step Rule",
+      "type": "rule",
+      "summary": "Any new typography property must update all four layers in lock-step: shared TypeScript type, API Zod schema, storefront CSS emitter, and admin UI. Zod strips unknown fields silently, so missing the schema layer causes the admin to appear to save but the API drops the value.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-typography-zone-extensions.md"
+    },
+    {
+      "id": "fwb-typography-brand-preset-anti-patterns",
+      "label": "Typography Brand Preset Anti-Patterns",
+      "type": "rule",
+      "summary": "Never hardcode hex colors per zone (defeats brand-link), never set padding without backgroundColor (no visible effect on inline text), never update one layer without the other three (partial saves silently dropped by Zod).",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-typography-zone-extensions.md"
+    },
+    {
+      "id": "fwb-card-shape-enum",
+      "label": "CardShape Enum (7 Named Shapes)",
+      "type": "feature",
+      "summary": "CardShape enum in packages/shared/src/types/store-layout.ts bundles aspect ratio and corner rounding into 7 merchant-pickable presets: theme, circle, rounded-square, square, soft, portrait, landscape, pill. Overrides cardAspect when set to non-theme.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-card-shape-picker.md"
+    },
+    {
+      "id": "fwb-card-shape-classes-helper",
+      "label": "cardShapeClasses Helper",
+      "type": "architecture",
+      "summary": "Helper in apps/web/src/templates/shared/card-size.ts that maps a CardShape enum value to static Tailwind class strings {aspect, radius}. Returns empty strings for 'theme' so per-theme defaults apply. Must use static string enum (no dynamic concat) so JIT doesn't purge classes.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-card-shape-picker.md"
+    },
+    {
+      "id": "fwb-card-shape-theme-fallback",
+      "label": "CardShape Theme Fallback Pattern",
+      "type": "pattern",
+      "summary": "Each theme's CategoryCard.tsx uses shape.aspect || '<theme-default-aspect>' — named shape wins when set, otherwise falls back to per-theme aspect/radius defaults, keeping backwards compatibility for stores that never touched the new field.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-card-shape-picker.md"
+    },
+    {
+      "id": "fwb-card-shape-cardaspect-coexistence",
+      "label": "cardShape vs cardAspect Coexistence Rule",
+      "type": "rule",
+      "summary": "cardShape and cardAspect coexist — cardShape is the coarser named-preset control, cardAspect is the finer-grained legacy control. cardShape wins when non-theme; cardAspect applies when cardShape is 'theme'. Do not treat one as a replacement for the other.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-card-shape-picker.md"
+    },
+    {
+      "id": "fwb-card-shape-wire-up-checklist",
+      "label": "Card Shape 8-Step Wire-Up Checklist",
+      "type": "pattern",
+      "summary": "8-step checklist for adding admin-controllable card properties: (1) shared type+enum, (2) settings field, (3) helper with static classes, (4) prop on CardProps+GridProps, (5) apply in each of 5 themes' CategoryCard.tsx with fallback, (6) pass through CategoryGrid.tsx per theme, (7) pass from HomePageContent.tsx, (8) admin select. Skipping any step leaves a half-broken setting.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-card-shape-picker.md"
+    },
+    {
+      "id": "fwb-card-shape-anti-patterns",
+      "label": "CardShape Anti-Patterns",
+      "type": "rule",
+      "summary": "Never add shapes requiring clip-path/SVG masks (breaks lazy-loaded img, inconsistent browser support). Never hardcode shape per theme. Never forget theme fallback (breaks stores that never set the new field). Never replace cardAspect with cardShape entirely — they coexist.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-card-shape-picker.md"
+    },
+    {
+      "id": "fwb-json-column-no-migration-policy",
+      "label": "JSON Column No-Migration Policy",
+      "type": "architecture",
+      "summary": "FWB design rule: store every config-heavy state field in Prisma JSON columns so per-store admin features extend the JSON shape without schema migrations. Verified 2026-05-16 across 6 batches (cart UI, refund pipeline, cardGap, cardShape, typography chip) — all shipped with zero Prisma migrations.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-no-prisma-migration-policy.md"
+    },
+    {
+      "id": "fwb-json-column-three-layer-lock-step",
+      "label": "JSON Column Three-Layer Lock-Step Rule",
+      "type": "rule",
+      "summary": "Every JSON column's shape must stay in lock-step across three layers: (1) TypeScript types in packages/shared, (2) API Zod schemas (strips unknown fields silently), (3) storefront render/CSS emitters. Missing any one layer makes the feature silently broken — admin saves but API drops, or API accepts but storefront ignores.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-no-prisma-migration-policy.md"
+    },
+    {
+      "id": "fwb-when-migrations-required",
+      "label": "When Prisma Migrations Are Still Required",
+      "type": "rule",
+      "summary": "Four cases still require a Prisma migration despite the JSON-column policy: adding a NEW table (needs FK+indexes), adding an indexed column (search facets, status filters), adding an FK constraint column, or extending a Postgres enum (see fwb-prisma-enum-migration-trap).",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-no-prisma-migration-policy.md"
+    },
+    {
+      "id": "fwb-payment-metadata-unstructured-json",
+      "label": "Payment.metadata as Intentionally Unstructured JSON",
+      "type": "pattern",
+      "summary": "Payment.metadata JSON column is intentionally unstructured — new refund-related fields (refundId, refundStatus, refundReason, refundedAt, refundReference) land here, not as new columns. Treat it as extensible without migrations.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-no-prisma-migration-policy.md"
+    },
+    {
+      "id": "fwb-zod-silent-strip-trap",
+      "label": "Zod Silent Strip Trap on JSON Fields",
+      "type": "bug-class",
+      "summary": "Zod strips unknown fields by default — adding a new key to the TypeScript type without updating the API Zod schema causes the admin to appear to save successfully while the API silently drops the new field. Always verify by saving in admin and re-loading after any schema extension.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-no-prisma-migration-policy.md"
+    }
+  ],
+  "edges": [
+    {
+      "from": "fwb-typography-zone-chip-extension",
+      "to": "fwb-brand-color-preset-tokens",
+      "relation": "depends-on"
+    },
+    {
+      "from": "fwb-typography-zone-chip-extension",
+      "to": "fwb-resolve-color-value-helper",
+      "relation": "depends-on"
+    },
+    {
+      "from": "fwb-typography-zone-chip-extension",
+      "to": "fwb-chip-inline-block-auto-emit",
+      "relation": "enforces"
+    },
+    {
+      "from": "fwb-typography-zone-chip-extension",
+      "to": "fwb-chip-quick-apply-presets",
+      "relation": "related"
+    },
+    {
+      "from": "fwb-typography-zone-chip-extension",
+      "to": "fwb-typography-three-layers-lock-step",
+      "relation": "enforces"
+    },
+    {
+      "from": "fwb-typography-three-layers-lock-step",
+      "to": "fwb-json-column-three-layer-lock-step",
+      "relation": "example-of"
+    },
+    {
+      "from": "fwb-brand-color-preset-tokens",
+      "to": "fwb-resolve-color-value-helper",
+      "relation": "depends-on"
+    },
+    {
+      "from": "fwb-typography-zone-chip-extension",
+      "to": "fwb-typography-brand-preset-anti-patterns",
+      "relation": "related"
+    },
+    {
+      "from": "fwb-card-shape-enum",
+      "to": "fwb-card-shape-classes-helper",
+      "relation": "depends-on"
+    },
+    {
+      "from": "fwb-card-shape-enum",
+      "to": "fwb-card-shape-theme-fallback",
+      "relation": "enforces"
+    },
+    {
+      "from": "fwb-card-shape-enum",
+      "to": "fwb-card-shape-cardaspect-coexistence",
+      "relation": "related"
+    },
+    {
+      "from": "fwb-card-shape-enum",
+      "to": "fwb-card-shape-wire-up-checklist",
+      "relation": "implements"
+    },
+    {
+      "from": "fwb-card-shape-enum",
+      "to": "fwb-card-shape-anti-patterns",
+      "relation": "related"
+    },
+    {
+      "from": "fwb-card-shape-classes-helper",
+      "to": "fwb-card-size-admin-system",
+      "relation": "extends"
+    },
+    {
+      "from": "fwb-card-shape-wire-up-checklist",
+      "to": "fwb-three-product-render-paths",
+      "relation": "related"
+    },
+    {
+      "from": "fwb-json-column-no-migration-policy",
+      "to": "fwb-json-column-three-layer-lock-step",
+      "relation": "enforces"
+    },
+    {
+      "from": "fwb-json-column-no-migration-policy",
+      "to": "fwb-when-migrations-required",
+      "relation": "related"
+    },
+    {
+      "from": "fwb-json-column-no-migration-policy",
+      "to": "fwb-payment-metadata-unstructured-json",
+      "relation": "example-of"
+    },
+    {
+      "from": "fwb-json-column-no-migration-policy",
+      "to": "fwb-zod-silent-strip-trap",
+      "relation": "mitigates"
+    },
+    {
+      "from": "fwb-json-column-three-layer-lock-step",
+      "to": "fwb-zod-silent-strip-trap",
+      "relation": "mitigates"
+    },
+    {
+      "from": "fwb-when-migrations-required",
+      "to": "fwb-prisma-enum-migration-trap",
+      "relation": "related"
+    },
+    {
+      "from": "fwb-when-migrations-required",
+      "to": "fwb-railway-startcommand-exec-form",
+      "relation": "related"
+    },
+    {
+      "from": "fwb-card-shape-enum",
+      "to": "fwb-json-column-no-migration-policy",
+      "relation": "example-of"
+    },
+    {
+      "from": "fwb-typography-zone-chip-extension",
+      "to": "fwb-json-column-no-migration-policy",
+      "relation": "example-of"
+    },
+    {
+      "from": "fwb-card-shape-enum",
+      "to": "fwb-categories-rounded-centered-gap",
+      "relation": "related"
+    },
+    {
+      "from": "fwb-typography-zone-chip-extension",
+      "to": "fwb-categories-rounded-centered-gap",
+      "relation": "related"
+    },
+    {
+      "from": "fwb-typography-brand-preset-anti-patterns",
+      "to": "fwb-typography-three-layers-lock-step",
+      "relation": "enforces"
+    },
+    {
+      "from": "fwb-zod-silent-strip-trap",
+      "to": "fwb-action-side-effect-graph",
+      "relation": "related"
+    }
+  ]
+}

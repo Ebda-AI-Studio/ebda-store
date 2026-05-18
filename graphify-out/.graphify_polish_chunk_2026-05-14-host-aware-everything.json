@@ -1,0 +1,112 @@
+{
+  "nodes": [
+    {
+      "id": "host-aware-url-surfaces",
+      "label": "Host-Aware URL Surfaces (Multi-Tenant)",
+      "type": "pattern",
+      "summary": "In a Next.js multi-tenant storefront serving N hostnames, ALL URL-emitting artifacts must branch on the request's `host` header: verification meta tags, sitemap URLs, robots.txt sitemap directive, canonical links, og:url, Schema.org @id/url, and email footer CTAs. Audit pattern: grep for `getSiteUrl(` — every hit is a candidate for a host-aware override. FWB commits fc91137 + a7af7d5. Generalises from FWB day after wadyaljuz.com went live.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf/memory/feedback-merchant-domain-flow.md",
+      "tags": [
+        "multi-tenant",
+        "host-aware",
+        "next-js",
+        "seo",
+        "sitemap",
+        "metadata",
+        "fwb",
+        "custom-domain"
+      ],
+      "related_ids": ["merchant-domain-flow", "provision-verify-status-machine"]
+    },
+    {
+      "id": "host-aware-gsc-verification",
+      "label": "Host-Aware GSC Verification Meta Tag",
+      "type": "lesson",
+      "summary": "When a multi-tenant platform serves both platform and merchant hostnames, emitting both GSC verification tokens on the same page causes GSC to verify against the FIRST tag — the wrong owner on a custom domain — and leaks the hosting relationship. Fix: check `host` header against `store.domain`; if custom domain, emit only `store.googleSiteVerification`; otherwise emit platform token (+ merchant token if set). FWB commit fc91137, `apps/web/src/app/layout.tsx generateMetadata`.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf/memory/feedback-merchant-domain-flow.md",
+      "tags": [
+        "gsc",
+        "google-search-console",
+        "verification-meta",
+        "multi-tenant",
+        "host-aware",
+        "fwb",
+        "seo"
+      ],
+      "related_ids": ["host-aware-url-surfaces", "merchant-domain-flow"]
+    },
+    {
+      "id": "per-tenant-sitemap-fanout",
+      "label": "Per-Tenant Sitemap Fan-Out",
+      "type": "pattern",
+      "summary": "A single `app/sitemap.ts` route must detect whether the request host matches a known custom domain (resolve via `/public/store/resolve` with `x-store-domain` header). If yes: emit only that store's URLs rooted at `https://<host>`. If no: emit the master sitemap covering all stores under platform slugs. Without this, submitting the custom-domain sitemap to GSC tells Google to index platform URLs the merchant doesn't own. FWB commit a7af7d5.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf/memory/feedback-merchant-domain-flow.md",
+      "tags": [
+        "sitemap",
+        "multi-tenant",
+        "host-aware",
+        "seo",
+        "gsc",
+        "next-js",
+        "fwb",
+        "custom-domain"
+      ],
+      "related_ids": [
+        "host-aware-url-surfaces",
+        "merchant-domain-flow",
+        "provision-verify-status-machine"
+      ]
+    },
+    {
+      "id": "host-aware-robots-txt",
+      "label": "Host-Aware robots.txt Sitemap Directive",
+      "type": "lesson",
+      "summary": "The `sitemap:` line in robots.txt must point at the same-host sitemap, not the platform sitemap. Derive base URL from the request `host` header in `apps/web/src/app/robots.ts`: `const base = host ? \\`https://\\${host}\\` : getSiteUrl()`. Ensures `https://wadyaljuz.com/robots.txt` says `Sitemap: https://wadyaljuz.com/sitemap.xml`. FWB commit a7af7d5.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf/memory/feedback-merchant-domain-flow.md",
+      "tags": ["robots-txt", "sitemap", "multi-tenant", "host-aware", "seo", "next-js", "fwb"],
+      "related_ids": [
+        "host-aware-url-surfaces",
+        "per-tenant-sitemap-fanout",
+        "merchant-domain-flow"
+      ]
+    },
+    {
+      "id": "getSiteUrl-audit-pattern",
+      "label": "getSiteUrl() Audit Pattern for Host-Aware Overrides",
+      "type": "heuristic",
+      "summary": "Every call to `getSiteUrl(` in a multi-tenant Next.js app is a candidate for needing a host-aware override when the request is for a tenant on a custom domain. Grep for `getSiteUrl(` across the app and evaluate each hit: does this code path run in a request context where the host could be a custom tenant domain? If yes, replace with a host-header-derived base URL. Applied after FWB's custom-domain launch 2026-05-14.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf/memory/feedback-merchant-domain-flow.md",
+      "tags": [
+        "audit-pattern",
+        "getSiteUrl",
+        "multi-tenant",
+        "host-aware",
+        "next-js",
+        "fwb",
+        "seo"
+      ],
+      "related_ids": ["host-aware-url-surfaces", "merchant-domain-flow", "registrar-dns-quirks"]
+    }
+  ],
+  "edges": [
+    { "from": "host-aware-url-surfaces", "to": "merchant-domain-flow", "type": "extends" },
+    {
+      "from": "host-aware-gsc-verification",
+      "to": "host-aware-url-surfaces",
+      "type": "instance-of"
+    },
+    { "from": "per-tenant-sitemap-fanout", "to": "host-aware-url-surfaces", "type": "instance-of" },
+    { "from": "host-aware-robots-txt", "to": "per-tenant-sitemap-fanout", "type": "pairs-with" },
+    { "from": "getSiteUrl-audit-pattern", "to": "host-aware-url-surfaces", "type": "detects" },
+    {
+      "from": "host-aware-url-surfaces",
+      "to": "provision-verify-status-machine",
+      "type": "complements"
+    },
+    {
+      "from": "per-tenant-sitemap-fanout",
+      "to": "provision-verify-status-machine",
+      "type": "depends-on"
+    }
+  ]
+}

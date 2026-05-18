@@ -1,0 +1,111 @@
+{
+  "nodes": [
+    {
+      "id": "registrar-product-binding-trap",
+      "label": "Registrar Managed-Product DNS Binding Trap",
+      "type": "trap",
+      "summary": "Consumer registrars (GoDaddy, Squarespace, Wix, Namecheap) auto-attach new domains to their hosted-website product, surfacing a fake DNS row the merchant can't delete via the DNS panel. The fix is product-level disconnect (My Products → Websites + Marketing → Remove domain), not DNS editing.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf/memory/feedback-registrar-dns-quirks.md",
+      "tags": ["dns", "godaddy", "custom-domain", "merchant-onboarding", "registrar", "fwb"]
+    },
+    {
+      "id": "multi-a-record-round-robin-trap",
+      "label": "Multi-A-Record Round-Robin (67% Parking Page)",
+      "type": "trap",
+      "summary": "Merchants ADD the new A record without deleting stale ones, creating 2-3 A records on the apex. DNS resolvers round-robin across all, so 2/3 of visitors land on the parking page. Detection: `dig @<authoritative-ns> +short A example.com` returning 3+ lines. Fix: delete all A records except the platform-target one.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf/memory/feedback-registrar-dns-quirks.md",
+      "tags": [
+        "dns",
+        "apex",
+        "a-record",
+        "round-robin",
+        "custom-domain",
+        "merchant-onboarding",
+        "fwb"
+      ]
+    },
+    {
+      "id": "dns-records-table-contract",
+      "label": "DNS Records Table Contract (5-Column + Copy)",
+      "type": "rule",
+      "summary": "Admin DNS records tables MUST include Type/Name/Value/Priority/TTL columns plus a copy button per row and break-all on the value cell. A 3-column table forces merchants to ask for Priority (MX=10) and TTL defaults, creating per-onboarding friction. DKIM TXT values are ~400 chars — truncation without break-all breaks copy-paste at registrars.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf/memory/feedback-registrar-dns-quirks.md",
+      "tags": ["dns", "admin-ui", "ux", "mx", "dkim", "resend", "merchant-onboarding", "fwb"]
+    },
+    {
+      "id": "provision-verify-status-machine-trap",
+      "label": "Provision→Verify Status Machine: Button on Every Non-Terminal State",
+      "type": "trap",
+      "summary": "Gating the 'Verify' button on a single intermediate state (e.g. `pending` only) leaves merchants stuck when the provider returns `not_started` or `failed` instead. Rule: show the next-action button on EVERY non-terminal state; hide ONLY on the terminal happy state (`verified`). Applies to Resend domains, AWS SES, Stripe webhooks, TLS cert provisioning, identity verification.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf/memory/feedback-provision-verify-status-machine.md",
+      "tags": [
+        "ux",
+        "state-machine",
+        "resend",
+        "email-sender",
+        "provisioning",
+        "merchant-onboarding",
+        "fwb"
+      ]
+    },
+    {
+      "id": "provider-status-enum-reference",
+      "label": "Provider Status Enum Reference (Resend / SES / Stripe / OneSignal)",
+      "type": "concept",
+      "summary": "Canonical status enums for provisioned-resource state machines: Resend domains (not_started/pending/verified/failed), Vercel domains (verified bool + misconfigured bool), AWS SES (NotStarted/Pending/Success/Failed/TemporaryFailure), Stripe webhooks (enabled/disabled), OneSignal (subscribed/unsubscribed/not_supported). Resend and SES explicitly have a `not_started` state distinct from `pending` — the universal trap source.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf/memory/feedback-provision-verify-status-machine.md",
+      "tags": [
+        "resend",
+        "aws-ses",
+        "stripe",
+        "onesignal",
+        "vercel",
+        "state-machine",
+        "provisioning",
+        "reference"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "registrar-product-binding-trap",
+      "to": "merchant-domain-flow",
+      "type": "related-to"
+    },
+    {
+      "from": "multi-a-record-round-robin-trap",
+      "to": "merchant-domain-flow",
+      "type": "related-to"
+    },
+    {
+      "from": "dns-records-table-contract",
+      "to": "merchant-domain-flow",
+      "type": "extends"
+    },
+    {
+      "from": "dns-records-table-contract",
+      "to": "fwb-cms-and-tenant-control",
+      "type": "related-to"
+    },
+    {
+      "from": "provision-verify-status-machine-trap",
+      "to": "merchant-domain-flow",
+      "type": "related-to"
+    },
+    {
+      "from": "provision-verify-status-machine-trap",
+      "to": "fwb-content-visibility-split-trap",
+      "type": "related-to"
+    },
+    {
+      "from": "provider-status-enum-reference",
+      "to": "provision-verify-status-machine-trap",
+      "type": "complements"
+    },
+    {
+      "from": "registrar-product-binding-trap",
+      "to": "multi-a-record-round-robin-trap",
+      "type": "related-to"
+    }
+  ]
+}

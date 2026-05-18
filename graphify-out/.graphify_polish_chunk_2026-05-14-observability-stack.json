@@ -1,0 +1,107 @@
+{
+  "nodes": [
+    {
+      "id": "five-channel-observability-pattern",
+      "label": "Five-Channel Observability Pattern",
+      "type": "concept",
+      "summary": "Every Force customer-facing project ships all five observability channels before merchant go-live: UptimeRobot (external probe), Sentry (in-process errors), PostHog (product analytics), Telegram alerts.service (business-logic P0s), BetterStack (log drain). The five are orthogonal by failure mode — any subset leaves a load-bearing blind spot. Supersedes the earlier alerting-three-channel-pattern. First shipped on FWB 2026-05-14 in commits fc69938 + 8aec08b + 27955ae.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf/memory/feedback-observability-stack.md",
+      "tags": [
+        "observability",
+        "production-readiness",
+        "alerting",
+        "monitoring",
+        "force-pattern",
+        "cross-project"
+      ]
+    },
+    {
+      "id": "observability-orthogonality-argument",
+      "label": "Observability Orthogonality Argument",
+      "type": "rule",
+      "summary": "Each channel catches failure modes the others structurally cannot. Sentry can't fire when the process is dead (needs UptimeRobot). UptimeRobot can't see code errors visible to one user (needs Sentry). Neither catches business-logic silent failures like payment HMAC misconfiguration with no exception (needs in-API alerts). None preserve logs past 72h Railway buffer (needs BetterStack). None reveal behavioral drop-off patterns (needs PostHog). The five are NOT redundant — they are orthogonal.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf/memory/feedback-observability-stack.md",
+      "tags": ["observability", "production-readiness", "design-principle", "force-pattern"]
+    },
+    {
+      "id": "uptimerobot-wiring-recipe",
+      "label": "UptimeRobot Wiring Recipe",
+      "type": "pattern",
+      "summary": "Free tier, 50 monitors, 5-min interval. One monitor per customer-facing URL: FWB API → /health, storefront → https://<slug>.com. Threshold: 2 consecutive failures (avoids Neon cold-start false positives). Alert via UptimeRobot mobile app push (free). Naming: '<project> store · <slug>' for multi-merchant readability. Catches: process down, /health 5xx, DNS broken, cert expired, custom-domain misrouted.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf/memory/feedback-observability-stack.md",
+      "tags": ["uptimerobot", "monitoring", "uptime", "production-readiness", "force-pattern"]
+    },
+    {
+      "id": "sentry-wiring-recipe",
+      "label": "Sentry Three-Project Wiring Recipe",
+      "type": "pattern",
+      "summary": "One Sentry project per app (API + admin + web) — keeps error noise isolated. Next apps: 3 config files (sentry.client/server/edge.config.ts) + instrumentation.ts at app root (mandatory Next 15+, re-exports captureRequestError for RSC throws). Env vars: SENTRY_DSN (Railway), NEXT_PUBLIC_SENTRY_DSN_WEB + _ADMIN (Vercel). Sample rate: 0.1 prod for high-traffic, 1.0 for internal tools. Session replay: replaysOnErrorSampleRate:1.0 + replaysSessionSampleRate:0 (privacy). ignoreErrors: ResizeObserver, NetworkError, AbortError. Always no-op when DSN missing.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf/memory/feedback-observability-stack.md",
+      "tags": ["sentry", "error-tracking", "production-readiness", "nextjs", "force-pattern"]
+    },
+    {
+      "id": "posthog-wiring-recipe",
+      "label": "PostHog Wiring Recipe",
+      "type": "pattern",
+      "summary": "Free tier: 1M events/month. Single PostHog project, EU region (Kuwait/GCC proximity). Storefront: gated on marketing cookie consent (GDPR + Kuwait Law 13/2023) — only init after consent.marketing===true. Admin: always-on (operator-only, no public visitors). Privacy posture: ip:false, disable_session_recording:true, respect_dnt:true. Pageview: capture_pageview:'history_change' (Next App Router). Per-app captureEvent helper exported from PostHogProvider so components don't import posthog-js directly.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf/memory/feedback-observability-stack.md",
+      "tags": ["posthog", "analytics", "production-readiness", "gdpr", "consent", "force-pattern"]
+    },
+    {
+      "id": "observability-account-ownership-convention",
+      "label": "Observability Account Ownership Convention",
+      "type": "convention",
+      "summary": "Sentry (3 projects), PostHog, and UptimeRobot all belong to the merchant operator's email. BetterStack also merchant operator's email. Telegram bot belongs to the platform admin's personal account (platform-level, not per-merchant). All hosting (Vercel, Railway, Neon) belongs to the platform operator. Multi-tenant note: separate Sentry project per app, NOT per merchant — merchant-specific noise must not mix with platform-wide alerting. PostHog is a single project; use posthog.identify(merchantId) + properties to slice.",
+      "source_file": "/Users/ahmadsharaf/.claude/projects/-Users-ahmadsharaf/memory/feedback-observability-stack.md",
+      "tags": [
+        "account-management",
+        "multi-tenant",
+        "observability",
+        "force-pattern",
+        "conventions"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "five-channel-observability-pattern",
+      "to": "observability-orthogonality-argument",
+      "type": "has_principle"
+    },
+    {
+      "from": "five-channel-observability-pattern",
+      "to": "uptimerobot-wiring-recipe",
+      "type": "includes_channel"
+    },
+    {
+      "from": "five-channel-observability-pattern",
+      "to": "sentry-wiring-recipe",
+      "type": "includes_channel"
+    },
+    {
+      "from": "five-channel-observability-pattern",
+      "to": "posthog-wiring-recipe",
+      "type": "includes_channel"
+    },
+    {
+      "from": "five-channel-observability-pattern",
+      "to": "observability-account-ownership-convention",
+      "type": "has_convention"
+    },
+    {
+      "from": "five-channel-observability-pattern",
+      "to": "alerting-three-channel-pattern",
+      "type": "supersedes"
+    },
+    {
+      "from": "five-channel-observability-pattern",
+      "to": "provision-verify-status-machine",
+      "type": "related_to"
+    },
+    {
+      "from": "posthog-wiring-recipe",
+      "to": "merchant-domain-flow",
+      "type": "related_to"
+    }
+  ]
+}
