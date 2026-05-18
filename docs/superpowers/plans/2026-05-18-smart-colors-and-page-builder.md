@@ -14,27 +14,28 @@
 
 ## Spec coverage map
 
-| Spec section                                              | Tasks                                                                                 |
-| --------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| 1.1 `ColorValue` convention + Zod                         | Task 1 (new validator), Task 2 (schema updates), Task 12 (4-grep verify)              |
-| 1.2 `resolveColor`                                        | Task 3 (test) + Task 4 (impl)                                                         |
-| 1.3 `pickReadableForeground`                              | Task 5 (parsers + test) + Task 6 (impl + test)                                        |
-| 1.4 `contrastRatio`                                       | Task 7 (test + impl)                                                                  |
-| 1.5 Storefront wiring                                     | Task 8 (section-bg.ts) + Task 9 (HomePageContent.tsx) + Task 10 (globals.css cascade) |
-| 1.6 Admin live preview band                               | Task 11 (`ColorContrastPreview` component)                                            |
-| 1.7 Admin ColorField revised                              | Task 12 (extract + dropdown + preview)                                                |
-| Phase 1 acceptance                                        | Task 13 (browser-qa visual sweep + commit)                                            |
-| 2.1 Route + sidebar                                       | Task 14 (rename + redirects)                                                          |
-| 2.2 Section card structure                                | Task 15 (skeleton refactor)                                                           |
-| 2.3 Zone ownership mapping                                | Task 16 (per-section zone distribution)                                               |
-| 2.4 `<ZoneEditor>` extraction                             | Task 15 prerequisite                                                                  |
-| 2.5 Visual / save details                                 | Task 17 (parallel save)                                                               |
-| Phase 2 acceptance                                        | Task 18 (browser-qa + commit)                                                         |
-| 4.1 Why per-section override (spec update)                | Task 15b types + Zod + resolver, Task 15c storefront render, Task 16 admin UI         |
-| 4.2 Data model (ZoneOverride + SectionTypographyOverride) | Task 15b                                                                              |
-| 4.3 Storefront resolver `resolveSectionZone`              | Task 15b Step 4                                                                       |
-| 4.4 Render-time priority (auto-fix wins via `!important`) | Task 15c Step 4                                                                       |
-| 4.5 Admin per-section editors + Reset link                | Task 16 (updated)                                                                     |
+| Spec section                                                                               | Tasks                                                                                 |
+| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
+| 1.1 `ColorValue` convention + Zod                                                          | Task 1 (new validator), Task 2 (schema updates), Task 12 (4-grep verify)              |
+| 1.2 `resolveColor`                                                                         | Task 3 (test) + Task 4 (impl)                                                         |
+| 1.3 `pickReadableForeground`                                                               | Task 5 (parsers + test) + Task 6 (impl + test)                                        |
+| 1.4 `contrastRatio`                                                                        | Task 7 (test + impl)                                                                  |
+| 1.5 Storefront wiring                                                                      | Task 8 (section-bg.ts) + Task 9 (HomePageContent.tsx) + Task 10 (globals.css cascade) |
+| 1.6 Admin live preview band                                                                | Task 11 (`ColorContrastPreview` component)                                            |
+| 1.7 Admin ColorField revised                                                               | Task 12 (extract + dropdown + preview)                                                |
+| Phase 1 acceptance                                                                         | Task 13 (browser-qa visual sweep + commit)                                            |
+| 2.1 Route + sidebar                                                                        | Task 14 (rename + redirects)                                                          |
+| 2.2 Section card structure                                                                 | Task 15 (skeleton refactor)                                                           |
+| 2.3 Zone ownership mapping                                                                 | Task 16 (per-section zone distribution)                                               |
+| 2.4 `<ZoneEditor>` extraction                                                              | Task 15 prerequisite                                                                  |
+| 2.5 Visual / save details                                                                  | Task 17 (parallel save)                                                               |
+| Phase 2 acceptance                                                                         | Task 18 (browser-qa + commit)                                                         |
+| 4.1 Why per-section override (spec update)                                                 | Task 15b types + Zod + resolver, Task 15c storefront render, Task 16 admin UI         |
+| 4.2 Data model (ZoneOverride + SectionTypographyOverride)                                  | Task 15b                                                                              |
+| 4.3 Storefront resolver `resolveSectionZone`                                               | Task 15b Step 4                                                                       |
+| 4.4 Render-time priority (auto-fix wins via `!important`)                                  | Task 15c Step 4                                                                       |
+| 4.5 Admin per-section editors + Reset link                                                 | Task 16 (updated)                                                                     |
+| Smart palette generator (2026-05-19 ahmad: "give colors and set smartly for all sections") | Task 15d (helper + tests) + Task 15e (modal + page-builder button)                    |
 
 ---
 
@@ -78,7 +79,7 @@
 
 - Modify: `apps/api/src/routes/store-layout.routes.ts:45` (the `hexColor` validator added 2026-05-18)
 
-- [ ] **Step 1: Replace `hexColor` with `colorValue`**
+- [x] **Step 1: Replace `hexColor` with `colorValue`**
 
 In `apps/api/src/routes/store-layout.routes.ts`, find the `hexColor` declaration around line 45:
 
@@ -104,13 +105,13 @@ const colorValue = z
   .optional();
 ```
 
-- [ ] **Step 2: Rename every `hexColor` reference in the file to `colorValue`**
+- [x] **Step 2: Rename every `hexColor` reference in the file to `colorValue`**
 
 Use `grep -n "hexColor" apps/api/src/routes/store-layout.routes.ts` to enumerate. Update each `bgColor: hexColor` and `cardFrameColor: hexColor` to `bgColor: colorValue` / `cardFrameColor: colorValue`.
 
-- [ ] **Step 3: Verify** with `grep -c "hexColor\|colorValue" apps/api/src/routes/store-layout.routes.ts` — `hexColor` count = 0, `colorValue` count ≥ 7 (one declaration + at least 6 uses across bg + frame fields).
+- [x] **Step 3: Verify** with `grep -c "hexColor\|colorValue" apps/api/src/routes/store-layout.routes.ts` — `hexColor` count = 0, `colorValue` count ≥ 7 (one declaration + at least 6 uses across bg + frame fields).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add apps/api/src/routes/store-layout.routes.ts
@@ -1379,6 +1380,450 @@ Expected: green.
 ```bash
 git add apps/web/src/app/HomePageContent.tsx apps/web/src/app/globals.css apps/web/src/templates/shared/SectionHeading.tsx
 git commit -m "feat(web): render per-section typography with auto-fix priority cascade"
+```
+
+---
+
+## Task 15d: Smart Palette generator helper
+
+**Files:**
+
+- Modify: `packages/shared/src/utils/color.ts` (append helpers)
+- Modify: `packages/shared/src/utils/color.test.ts` (append tests)
+
+This is a NEW task added 2026-05-19 per Ahmad's directive "I want a UI to give colors and it set smartly for all the sections as cards frame color, background color, and font color." The Phase 1 auto-fix solves _render-time_ contrast; this task adds _admin-time_ palette intelligence — pick 1–3 seed colors and the system distributes them across every section's bg + frame + heading color as a coherent palette.
+
+- [ ] **Step 1: Write failing tests for `generateSectionPalette`**
+
+Append to `packages/shared/src/utils/color.test.ts`:
+
+```ts
+import { generateSectionPalette, lightenColor, darkenColor } from './color';
+
+describe('lightenColor / darkenColor', () => {
+  it('lightenColor pushes toward white', () => {
+    const lighter = lightenColor('#FF6E00', 0.4);
+    expect(lighter).not.toBe('#FF6E00');
+    // Result should be parseable + have higher luminance than the seed.
+    const seedLum = relativeLuminance(parseColorToRgb('#FF6E00')!);
+    const lightLum = relativeLuminance(parseColorToRgb(lighter)!);
+    expect(lightLum).toBeGreaterThan(seedLum);
+  });
+
+  it('darkenColor pushes toward black', () => {
+    const darker = darkenColor('#FF6E00', 0.4);
+    const seedLum = relativeLuminance(parseColorToRgb('#FF6E00')!);
+    const darkLum = relativeLuminance(parseColorToRgb(darker)!);
+    expect(darkLum).toBeLessThan(seedLum);
+  });
+});
+
+describe('generateSectionPalette', () => {
+  it('with one seed: alternates seed bg / neutral bg across sections', () => {
+    const palette = generateSectionPalette({ primary: '#FF6E00' });
+    expect(palette.hero.bgColor).toBe('#FF6E00');
+    expect(palette.categories.bgColor).toMatch(/^#/); // some neutral
+    expect(palette.newArrivals.bgColor).not.toBe(palette.categories.bgColor);
+    expect(palette.bestSellers.bgColor).toBe(palette.categories.bgColor); // neutrals match
+    expect(palette.testimonials.bgColor).toBe('#FF6E00'); // seed returns at end
+  });
+
+  it('every section gets cardFrameColor = primary seed', () => {
+    const palette = generateSectionPalette({ primary: '#FF6E00' });
+    for (const section of [
+      'hero',
+      'categories',
+      'newArrivals',
+      'bestSellers',
+      'testimonials',
+    ] as const) {
+      expect(palette[section].cardFrameColor).toBe('#FF6E00');
+    }
+  });
+
+  it('every section heading color auto-fixes against its bg', () => {
+    const palette = generateSectionPalette({ primary: '#FF6E00' });
+    expect(palette.hero.headingColor).toBe('#000000'); // black on orange (correct AA)
+    expect(palette.categories.headingColor).toBe('#000000'); // black on light neutral
+  });
+
+  it('with primary + accent: accent populates alternating bg slots', () => {
+    const palette = generateSectionPalette({ primary: '#FF6E00', accent: '#0066CC' });
+    expect(palette.hero.bgColor).toBe('#FF6E00');
+    expect(palette.newArrivals.bgColor).toBe('#0066CC'); // accent gets a slot
+  });
+
+  it('passes token refs through unchanged for the caller to resolve at render', () => {
+    const palette = generateSectionPalette({ primary: 'token:primary' });
+    expect(palette.hero.bgColor).toBe('token:primary');
+    expect(palette.hero.cardFrameColor).toBe('token:primary');
+    // Heading color still picked from the resolved seed — caller passes theme separately when resolving.
+    // The helper returns 'auto' as a sentinel meaning "auto-fix at render".
+    expect(palette.hero.headingColor).toBe('auto');
+  });
+});
+```
+
+- [ ] **Step 2: Run tests — expect every test to FAIL**
+
+```bash
+npx vitest run packages/shared/src/utils/color.test.ts -t "lightenColor\|darkenColor\|generateSectionPalette" 2>&1 | tail -10
+```
+
+Expected: 6 tests fail with "is not a function" or similar.
+
+- [ ] **Step 3: Implement `lightenColor` / `darkenColor`**
+
+Append to `packages/shared/src/utils/color.ts`:
+
+```ts
+/**
+ * Mix a color toward white by `amount` (0..1). For `'#FF6E00'` + 0.4 returns a
+ * lighter orange suitable for tinted section backgrounds. Token refs pass
+ * through unchanged so the caller can resolve at render time.
+ */
+export function lightenColor(input: string, amount: number): string {
+  if (input.startsWith('token:')) return input;
+  const rgb = parseColorToRgb(input);
+  if (!rgb) return input;
+  const t = Math.max(0, Math.min(1, amount));
+  const mix = (c: number) => Math.round(c + (255 - c) * t);
+  return rgbToHex({ r: mix(rgb.r), g: mix(rgb.g), b: mix(rgb.b) });
+}
+
+/**
+ * Mix a color toward black by `amount` (0..1). For `'#FF6E00'` + 0.4 returns a
+ * darker shade suitable for hover states / framed sections.
+ */
+export function darkenColor(input: string, amount: number): string {
+  if (input.startsWith('token:')) return input;
+  const rgb = parseColorToRgb(input);
+  if (!rgb) return input;
+  const t = Math.max(0, Math.min(1, amount));
+  const mix = (c: number) => Math.round(c * (1 - t));
+  return rgbToHex({ r: mix(rgb.r), g: mix(rgb.g), b: mix(rgb.b) });
+}
+
+function rgbToHex(rgb: Rgb): string {
+  const toHex = (c: number) => c.toString(16).padStart(2, '0').toUpperCase();
+  return `#${toHex(rgb.r)}${toHex(rgb.g)}${toHex(rgb.b)}`;
+}
+```
+
+- [ ] **Step 4: Implement `generateSectionPalette`**
+
+Append to `packages/shared/src/utils/color.ts`:
+
+```ts
+export interface PaletteSeeds {
+  primary: ColorValue;
+  accent?: ColorValue;
+  neutral?: ColorValue;
+}
+
+export interface SectionPaletteEntry {
+  bgColor: ColorValue;
+  cardFrameColor: ColorValue;
+  /**
+   * Heading text color. Returns `'auto'` when the bg is a token ref — caller
+   * must resolve the token at render time and call `pickReadableForeground`
+   * then. Returns a concrete hex when the bg is a concrete hex.
+   */
+  headingColor: string;
+}
+
+export type SectionKey = 'hero' | 'categories' | 'newArrivals' | 'bestSellers' | 'testimonials';
+
+const SECTION_ORDER: SectionKey[] = [
+  'hero',
+  'categories',
+  'newArrivals',
+  'bestSellers',
+  'testimonials',
+];
+
+/**
+ * Distribute 1–3 seed colors across the 5 storefront section settings as a
+ * coherent palette. Alternates seed-bg / neutral-bg across sections; the
+ * accent (if provided) fills one slot. Card frame is the primary seed
+ * everywhere for brand consistency. Heading color auto-fixes per section bg.
+ *
+ * Token-ref seeds pass through unchanged so the caller can resolve at render.
+ */
+export function generateSectionPalette(
+  seeds: PaletteSeeds
+): Record<SectionKey, SectionPaletteEntry> {
+  const { primary, accent, neutral } = seeds;
+  const neutralBg = neutral ?? '#FFFFFF';
+
+  const slots: Record<SectionKey, ColorValue> = {
+    hero: primary,
+    categories: neutralBg,
+    newArrivals:
+      accent ??
+      lightenColor(
+        typeof primary === 'string' && primary.startsWith('token:') ? '#FFFFFF' : primary,
+        0.6
+      ),
+    bestSellers: neutralBg,
+    testimonials: primary,
+  };
+
+  const headingFor = (bg: ColorValue): string => {
+    if (bg.startsWith('token:')) return 'auto';
+    return pickReadableForeground(bg) ?? '#000000';
+  };
+
+  return SECTION_ORDER.reduce(
+    (acc, key) => {
+      acc[key] = {
+        bgColor: slots[key],
+        cardFrameColor: primary,
+        headingColor: headingFor(slots[key]),
+      };
+      return acc;
+    },
+    {} as Record<SectionKey, SectionPaletteEntry>
+  );
+}
+```
+
+- [ ] **Step 5: Run tests — expect all 6 new tests PASS**
+
+```bash
+npx vitest run packages/shared/src/utils/color.test.ts 2>&1 | tail -10
+```
+
+Expected: 25 tests pass (19 original + 6 new).
+
+- [ ] **Step 6: Re-export from `@force/shared`**
+
+In `packages/shared/src/utils/index.ts`, append to the existing re-exports:
+
+```ts
+export { lightenColor, darkenColor, generateSectionPalette } from './color';
+export type { PaletteSeeds, SectionPaletteEntry, SectionKey } from './color';
+```
+
+- [ ] **Step 7: Build + commit**
+
+```bash
+npm run build -w packages/shared 2>&1 | tail -3
+```
+
+```bash
+git add packages/shared/src/utils/color.ts packages/shared/src/utils/color.test.ts packages/shared/src/utils/index.ts
+git commit -m "feat(shared): smart palette generator distributes seeds across section settings"
+```
+
+---
+
+## Task 15e: Smart Palette modal + page-builder integration
+
+**Files:**
+
+- Create: `apps/admin/src/components/SmartPaletteModal.tsx`
+- Modify: `apps/admin/src/app/stores/[id]/page-builder/page.tsx` (the renamed file from Task 14)
+
+Lands AFTER Task 14 (route rename) so we edit the new path.
+
+- [ ] **Step 1: Write the modal component**
+
+```tsx
+'use client';
+
+import { useState } from 'react';
+import { generateSectionPalette, COLOR_TOKENS } from '@force/shared';
+import type { StoreTheme, SectionKey, PaletteSeeds, SectionPaletteEntry } from '@force/shared';
+import { ColorField } from './ColorField';
+import { ColorContrastPreview } from './ColorContrastPreview';
+
+interface SmartPaletteModalProps {
+  open: boolean;
+  onClose: () => void;
+  onApply: (palette: Record<SectionKey, SectionPaletteEntry>) => void;
+  theme: StoreTheme | undefined;
+}
+
+export function SmartPaletteModal({ open, onClose, onApply, theme }: SmartPaletteModalProps) {
+  const [primary, setPrimary] = useState<string>('token:primary');
+  const [accent, setAccent] = useState<string>('');
+  const [neutral, setNeutral] = useState<string>('');
+
+  if (!open) return null;
+
+  const seeds: PaletteSeeds = {
+    primary,
+    accent: accent || undefined,
+    neutral: neutral || undefined,
+  };
+  const palette = primary ? generateSectionPalette(seeds) : null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-card p-6 shadow-2xl">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-xl font-semibold text-foreground">Smart palette</h2>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+            ✕
+          </button>
+        </div>
+        <p className="mb-4 text-sm text-muted-foreground">
+          Pick 1–3 colors and we'll distribute them across every section's background, card frame,
+          and heading color. Section text auto-fixes for contrast.
+        </p>
+
+        <div className="space-y-3">
+          <ColorField
+            label="Primary (required)"
+            value={primary}
+            onChange={setPrimary}
+            theme={theme}
+          />
+          <ColorField
+            label="Accent (optional — fills one alternating slot)"
+            value={accent}
+            onChange={setAccent}
+            theme={theme}
+          />
+          <ColorField
+            label="Neutral (optional — defaults to white)"
+            value={neutral}
+            onChange={setNeutral}
+            theme={theme}
+          />
+        </div>
+
+        {palette ? (
+          <div className="mt-6">
+            <h3 className="mb-2 text-sm font-semibold text-foreground">Preview</h3>
+            <div className="grid grid-cols-5 gap-2">
+              {(['hero', 'categories', 'newArrivals', 'bestSellers', 'testimonials'] as const).map(
+                key => (
+                  <div
+                    key={key}
+                    className="aspect-[3/4] rounded-lg border-2 p-2 text-center text-[10px]"
+                    style={{
+                      backgroundColor: palette[key].bgColor.startsWith('token:')
+                        ? '#eee'
+                        : palette[key].bgColor,
+                      borderColor: palette[key].cardFrameColor.startsWith('token:')
+                        ? '#888'
+                        : palette[key].cardFrameColor,
+                      color:
+                        palette[key].headingColor === 'auto' ? '#000' : palette[key].headingColor,
+                    }}
+                  >
+                    <div className="font-semibold capitalize">{key}</div>
+                  </div>
+                )
+              )}
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Token refs (e.g. <code>token:primary</code>) preview as gray here; storefront resolves
+              at render.
+            </p>
+          </div>
+        ) : null}
+
+        <div className="mt-6 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (!palette) return;
+              if (!confirm('This overwrites the current section bg + frame colors. Proceed?'))
+                return;
+              onApply(palette);
+              onClose();
+            }}
+            disabled={!palette}
+            className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
+          >
+            Apply to all sections
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+- [ ] **Step 2: Add a "Smart palette" button at the top of the page builder**
+
+In `apps/admin/src/app/stores/[id]/page-builder/page.tsx`, near the existing Save button in `<AdminLayout actions={...}>`, add:
+
+```tsx
+const [paletteOpen, setPaletteOpen] = useState(false);
+
+// Inside actions:
+<button
+  type="button"
+  onClick={() => setPaletteOpen(true)}
+  className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground hover:bg-muted transition-colors cursor-pointer"
+>
+  Smart palette
+</button>;
+```
+
+- [ ] **Step 3: Mount the modal + wire onApply**
+
+At the bottom of the page's JSX (inside the AdminLayout but outside the form):
+
+```tsx
+<SmartPaletteModal
+  open={paletteOpen}
+  onClose={() => setPaletteOpen(false)}
+  theme={storeInfo?.theme}
+  onApply={palette => {
+    setLayout(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        hero: { ...prev.hero, bgColor: palette.hero.bgColor },
+        categories: {
+          ...prev.categories,
+          bgColor: palette.categories.bgColor,
+          cardFrameColor: palette.categories.cardFrameColor,
+        },
+        newArrivals: {
+          ...prev.newArrivals,
+          bgColor: palette.newArrivals.bgColor,
+          cardFrameColor: palette.newArrivals.cardFrameColor,
+        },
+        bestSellers: {
+          ...prev.bestSellers,
+          bgColor: palette.bestSellers.bgColor,
+          cardFrameColor: palette.bestSellers.cardFrameColor,
+        },
+        testimonials: { ...prev.testimonials, bgColor: palette.testimonials.bgColor },
+      };
+    });
+  }}
+/>
+```
+
+The palette generator returns `headingColor` per section but we DON'T persist it as a per-section typography override here — Phase 1's render-time auto-fix already picks the right heading color from the section bg. The per-section typography editor (Task 16) lets the merchant override deliberately.
+
+- [ ] **Step 4: Build admin**
+
+```bash
+npm run build -w apps/admin 2>&1 | tail -5
+```
+
+Expected: "✓ Compiled successfully".
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add apps/admin/src/components/SmartPaletteModal.tsx apps/admin/src/app/stores/\[id\]/page-builder/page.tsx
+git commit -m "feat(admin): smart palette modal distributes seeds across all sections"
 ```
 
 ---
