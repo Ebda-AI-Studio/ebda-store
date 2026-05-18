@@ -10,6 +10,8 @@
  * cross-checked against FWB's actual rendered aspect ratios.
  */
 
+import type { TemplateId } from './store-theme';
+
 export interface ImageStandard {
   /** Recommended SOURCE width in pixels (what the merchant uploads). */
   width: number;
@@ -27,6 +29,19 @@ export interface ImageStandard {
   safeZone?: { width: number; height: number };
   /** One-line description shown to merchants in admin hints. */
   description: string;
+  /**
+   * Per-template recommended-source override. When a merchant's store
+   * template (modern / elegant / classic / minimal / bold) appears as
+   * a key here, that recommendation is shown in admin upload hints
+   * instead of the base width/height. Rendered storefront sizing stays
+   * UNIFORM per the theme-identity-audit rule — only the *upload hint*
+   * varies per theme.
+   *
+   * Ref: docs/superpowers/audits/2026-05-18-per-theme-image-spec-audit.md
+   */
+  templateOverrides?: Partial<
+    Record<TemplateId, { width: number; height: number; aspect: string; note?: string }>
+  >;
 }
 
 export const IMAGE_STANDARDS = {
@@ -37,6 +52,29 @@ export const IMAGE_STANDARDS = {
     formats: ['JPEG', 'WebP'],
     safeZone: { width: 900, height: 700 },
     description: 'Hero slider — desktop. Text/CTA must fit inside center 900px safe zone.',
+    // Per-theme overrides (sign-off 2026-05-18):
+    //   - elegant: Ahmad directive — heroDesktop stays at 1920×700 (2.74:1 landscape lock
+    //     is a platform invariant). Audit suggested 1920×800 but that was overridden.
+    //   - modern: +7% width bump for glass-blur retina. Shopify heavier spec — see
+    //     feedback-polaris-vs-storefront-image-sizes.md lines 26-27.
+    //   - bold: full-bleed 100vw hero warrants widest source. Shopify upper bound 2400.
+    //     Ref: docs/superpowers/audits/2026-05-18-per-theme-image-spec-audit.md §Surface 1.
+    templateOverrides: {
+      modern: {
+        width: 2048,
+        height: 750,
+        aspect: '~2.73:1',
+        note: 'Tech-startup glass-blur identity: 2048px gives clean 2× retina at the ~960px rendered half-column. Shopify heavier spec ref: feedback-polaris-vs-storefront-image-sizes.md lines 26-27.',
+      },
+      // elegant inherits base (1920×700) — Ahmad 2026-05-18 sign-off:
+      // the 2.74:1 landscape lock is a platform invariant; do NOT add an elegant override.
+      bold: {
+        width: 2400,
+        height: 900,
+        aspect: '~2.67:1',
+        note: 'Full-bleed 100vw hero — actual rendered width can exceed 1920 on 4K monitors. Shopify upper bound 2400×1000; kept at 900 height for landscape lock (design.md line 19). Ref: 2026-05-18-per-theme-image-spec-audit.md §Surface 1.',
+      },
+    },
   },
   heroMobile: {
     // 2026-05-18 (Ahmad directive): mobile hero is ALWAYS landscape, not
@@ -50,6 +88,23 @@ export const IMAGE_STANDARDS = {
     formats: ['JPEG', 'WebP'],
     description:
       'Hero — mobile-optimized landscape crop (optional). Same aspect as desktop, smaller file.',
+    // Per-theme mobile hero overrides: mirror the desktop ratio change for
+    // modern/bold so the admin hint stays consistent. elegant inherits base.
+    // Ref: docs/superpowers/audits/2026-05-18-per-theme-image-spec-audit.md §Surface 2.
+    templateOverrides: {
+      modern: {
+        width: 1080,
+        height: 400,
+        aspect: '~2.7:1',
+        note: 'Mirrors the 2048×750 desktop ratio (~2.73:1) at mobile scale. Rounds to 400 for clean math.',
+      },
+      bold: {
+        width: 1000,
+        height: 375,
+        aspect: '~2.67:1',
+        note: 'Bold full-bleed mobile. ≤1000 wide cap (design.md mobile-first rule §1 + 04-25 audit LCP constraint). Matches 2.67:1 ratio of desktop 2400×900.',
+      },
+    },
   },
   bannerDesktop: {
     width: 1920,
@@ -58,6 +113,9 @@ export const IMAGE_STANDARDS = {
     formats: ['JPEG', 'WebP'],
     safeZone: { width: 900, height: 400 },
     description: 'Full-width promotional banner — desktop.',
+    // No per-theme overrides. Banner is a uniform promotional strip;
+    // no theme identity amplifies it enough to warrant a separate merchant brief.
+    // Ref: 2026-05-18-per-theme-image-spec-audit.md §Surface 3 (all themes inherit).
   },
   bannerMobile: {
     width: 900,
@@ -67,6 +125,8 @@ export const IMAGE_STANDARDS = {
     safeZone: { width: 700, height: 600 },
     description:
       "Full-width promotional banner — mobile. Near-square crop (9:7) per Ahmad 2026-05-18 reference set. Subject/CTA must fit inside the 700×600 center safe zone so iPhone-mini crops don't lose the message.",
+    // No per-theme overrides — same rationale as bannerDesktop.
+    // Ref: 2026-05-18-per-theme-image-spec-audit.md §Surface 4.
   },
   productPrimary: {
     width: 600,
@@ -74,6 +134,40 @@ export const IMAGE_STANDARDS = {
     aspect: '3:4',
     formats: ['JPEG', 'WebP'],
     description: 'Product photo — canonical 3:4 portrait. No baked-in text or sale badges.',
+    // Per-theme overrides: modern/classic get moderate +33% bump; bold gets
+    // 1:1 to match its aspect-square ProductCard (eliminates 25% crop waste).
+    // elegant: Ahmad 2026-05-18 sign-off — admin hint stays at 800×1067 so
+    //   self-shooters aren't blocked. Luxury-tier merchants with studio
+    //   photography MAY upload up to 1200×1600 for pinch-zoom, but the hint
+    //   stays at 800×1067 (Modern/Classic tier). Note encoded in the 'note' field.
+    // Ref: docs/superpowers/audits/2026-05-18-per-theme-image-spec-audit.md §Surface 5.
+    templateOverrides: {
+      modern: {
+        width: 800,
+        height: 1067,
+        aspect: '3:4',
+        note: 'Tech-startup identity: scale-[1.03] zoom + shadow on hover amplifies detail. 800px = 2× the ~400px rendered card width. Identity-audit modern line (rounded-2xl, glass-shadow). Ref: 2026-05-18-per-theme-image-spec-audit.md §Surface 5.',
+      },
+      elegant: {
+        width: 800,
+        height: 1067,
+        aspect: '3:4',
+        note: 'Luxury-boutique hint kept at 800×1067 (Ahmad 2026-05-18 sign-off) so self-shooters are not blocked. Studio/luxury-tier merchants with professional photography MAY upload up to 1200×1600 for pinch-zoom — the hint does not enforce a ceiling. Ref: 2026-05-18-per-theme-image-spec-audit.md §Surface 5.',
+      },
+      classic: {
+        width: 800,
+        height: 1067,
+        aspect: '3:4',
+        note: 'Heritage retail (jewellery/oud/watches): moderate bump to 800 base matches modern step. Not at luxury pinch-zoom tier. Identity-audit classic (font-serif, sharp borders). Ref: 2026-05-18-per-theme-image-spec-audit.md §Surface 5.',
+      },
+      bold: {
+        width: 800,
+        height: 800,
+        aspect: '1:1',
+        note: 'Bold ProductCard uses aspect-square (code: <div className="relative aspect-square">). A 3:4 source wastes ~25% of pixels in the square crop. 800×800 matches actual rendered aspect. Ref: 2026-05-18-per-theme-image-spec-audit.md §Surface 5.',
+      },
+      // minimal inherits base (600×800) — ascetic identity, LCP-first, compact throughout.
+    },
   },
   productSquare: {
     width: 800,
@@ -81,6 +175,24 @@ export const IMAGE_STANDARDS = {
     aspect: '1:1',
     formats: ['JPEG', 'WebP'],
     description: 'Product photo — square alt aspect (when admin cardAspect = square).',
+    // Per-theme overrides for square mode:
+    // elegant gets 1200×1200 for consistency with luxury-tier retina policy.
+    // bold gets 1000×1000 (its natural default aspect) — fits ≤1000 mobile cap.
+    // Ref: 2026-05-18-per-theme-image-spec-audit.md §Surface 6.
+    templateOverrides: {
+      elegant: {
+        width: 1200,
+        height: 1200,
+        aspect: '1:1',
+        note: 'Consistent with luxury productPrimary tier: if an elegant merchant opts into square mode, same retina step applies. 1200×1200 matches productPrimary base width. Ref: 2026-05-18-per-theme-image-spec-audit.md §Surface 6.',
+      },
+      bold: {
+        width: 1000,
+        height: 1000,
+        aspect: '1:1',
+        note: 'Bold default ProductCard IS square (aspect-square). 1000×1000 provides crispness for brutalist high-contrast imagery. Stays within ≤1000 wide mobile cap. Ref: 2026-05-18-per-theme-image-spec-audit.md §Surface 6.',
+      },
+    },
   },
   productMobile: {
     width: 600,
@@ -89,6 +201,40 @@ export const IMAGE_STANDARDS = {
     formats: ['JPEG', 'WebP'],
     description:
       "Product photo — mobile-tuned 1:1 (600×600). Smaller file than productSquare's 800×800. Pair with cardAspect = square. No baked-in text or sale badges.",
+    // Per-theme overrides for mobile product crops:
+    // modern/classic: explicit 3:4 mobile crop at 400×533 (2× the 200px rendered card width).
+    // elegant: compact mobile stays at 600×800 (zFloos spec) — desktop luxury-tier
+    //   but mobile must stay compact per LCP + Kuwait mobile traffic.
+    // bold: square mobile crop 600×600 matches bold's square ProductCard aspect.
+    // minimal: inherits base (compact throughout, ascetic identity).
+    // Ref: 2026-05-18-per-theme-image-spec-audit.md §Surface 7.
+    templateOverrides: {
+      modern: {
+        width: 400,
+        height: 533,
+        aspect: '3:4',
+        note: '2× the ~200px rendered card width on mobile. Saves bandwidth vs serving 800×1067 desktop source to mobile. ≤1000 wide. Ref: 2026-05-18-per-theme-image-spec-audit.md §Surface 7.',
+      },
+      elegant: {
+        width: 600,
+        height: 800,
+        aspect: '3:4',
+        note: 'Desktop is luxury-spec (800×1067) but mobile stays at compact baseline per LCP constraint + Kuwait mobile traffic. 04-25 audit §P0 #1. Ref: 2026-05-18-per-theme-image-spec-audit.md §Surface 7.',
+      },
+      classic: {
+        width: 400,
+        height: 533,
+        aspect: '3:4',
+        note: 'Same compact mobile logic as modern. Desktop gets moderate bump; mobile stays tight. Ref: 2026-05-18-per-theme-image-spec-audit.md §Surface 7.',
+      },
+      bold: {
+        width: 600,
+        height: 600,
+        aspect: '1:1',
+        note: 'Bold square aspect on mobile: 600×600 = 2× the ~300px rendered card width (2-col grid). ≤1000 wide. Ref: 2026-05-18-per-theme-image-spec-audit.md §Surface 7.',
+      },
+      // minimal inherits base (600×600) — compact throughout.
+    },
   },
   categorySquare: {
     width: 800,
@@ -96,6 +242,43 @@ export const IMAGE_STANDARDS = {
     aspect: '1:1',
     formats: ['JPEG', 'WebP', 'PNG'],
     description: 'Category card image — default 1:1 square.',
+    // Per-theme overrides for square category cards:
+    // modern: 1000×1000 — glass-blur rounded-2xl frame rewards retina crispness.
+    // elegant: 600×800 (3:4 portrait) — CategoryCard defaults to aspect-square sm:aspect-[2/3]
+    //   so a portrait source serves both mobile square and desktop tall-portrait without waste.
+    //   Lookbook proportions per identity-audit.
+    // minimal: 600×600 — compact + chrome-free (bg-transparent). No shadow to amplify source.
+    // bold: 1200×1200 — full-bleed primary page with brutalist border-2 + offset shadow amplifies
+    //   source crispness. Shopify 1500×800 heavier than needed for card surface; 1200 is cap.
+    // classic: inherits base (800×800) — adequate for heritage retail at rendered card size.
+    // Ref: 2026-05-18-per-theme-image-spec-audit.md §Surface 8.
+    templateOverrides: {
+      modern: {
+        width: 1000,
+        height: 1000,
+        aspect: '1:1',
+        note: 'Glass-blur aesthetic + rounded-2xl frame + duration-700 shadow transition rewards crisp source at 1000px. pack-styles.ts line 63: categoryFrame: rounded-2xl. Ref: 2026-05-18-per-theme-image-spec-audit.md §Surface 8.',
+      },
+      elegant: {
+        width: 600,
+        height: 800,
+        aspect: '3:4',
+        note: 'Elegant CategoryCard: aspect-square sm:aspect-[2/3] (tall portrait on desktop). 600×800 serves both mobile square (crop from top) and desktop portrait without crop waste. Lookbook proportions. Ref: 2026-05-18-per-theme-image-spec-audit.md §Surface 8.',
+      },
+      minimal: {
+        width: 600,
+        height: 600,
+        aspect: '1:1',
+        note: 'Compact spec + chrome-free identity (bg-transparent, no shadow). pack-styles.ts line 128: categoryFrame: bg-transparent. Ref: 2026-05-18-per-theme-image-spec-audit.md §Surface 8.',
+      },
+      bold: {
+        width: 1200,
+        height: 1200,
+        aspect: '1:1',
+        note: 'Bold CategoryCard: rounded-3xl border-2 border-foreground + offset shadow-[0_18px_44px...]. Brutalist chrome amplifies source crispness. 1200 is right cap (Shopify 1500×800 is heavier than needed). Ref: 2026-05-18-per-theme-image-spec-audit.md §Surface 8.',
+      },
+      // classic inherits base (800×800).
+    },
   },
   categoryPortrait: {
     width: 600,
@@ -103,6 +286,36 @@ export const IMAGE_STANDARDS = {
     aspect: '3:4',
     formats: ['JPEG', 'WebP'],
     description: 'Category card image — portrait alt (when admin cardShape = portrait).',
+    // Per-theme overrides for portrait category mode:
+    // modern/classic: moderate +33% bump consistent with productPrimary policy.
+    // bold: 1000×1333 — stays ≤1000 wide for mobile safety while matching bold's
+    //   brutalist crispness need. rounded-3xl border-2 + offset shadow amplifies source.
+    // elegant: inherits base — elegant's natural category is already portrait (600×800);
+    //   no separate portrait mode bump needed since categorySquare override already recs 600×800.
+    // minimal: inherits base (compact throughout).
+    // Ref: 2026-05-18-per-theme-image-spec-audit.md §Surface 9.
+    templateOverrides: {
+      modern: {
+        width: 800,
+        height: 1067,
+        aspect: '3:4',
+        note: 'Consistent with productPrimary bump: if a modern merchant opts for portrait categories, same retina step applies. Ref: 2026-05-18-per-theme-image-spec-audit.md §Surface 9.',
+      },
+      classic: {
+        width: 800,
+        height: 1067,
+        aspect: '3:4',
+        note: 'Same moderate step as modern, consistent within classic moderate-bump policy. Ref: 2026-05-18-per-theme-image-spec-audit.md §Surface 9.',
+      },
+      bold: {
+        width: 1000,
+        height: 1333,
+        aspect: '3:4',
+        note: 'Portrait category tiles with rounded-3xl border-2 + offset shadow benefit from crispness step. Stays ≤1000 wide for mobile safety. Ref: 2026-05-18-per-theme-image-spec-audit.md §Surface 9.',
+      },
+      // elegant inherits base (600×800) — portrait IS elegant's natural aspect.
+      // minimal inherits base (compact throughout).
+    },
   },
   categoryMobile: {
     width: 630,
@@ -111,6 +324,47 @@ export const IMAGE_STANDARDS = {
     formats: ['JPEG', 'WebP', 'PNG'],
     description:
       "Category card image — mobile-tuned 1:1 (630×630). Smaller file than categorySquare's 800×800 desktop ref. Use when merchant only ships one image and storefront is mobile-first.",
+    // Per-theme overrides for mobile category crops (Sprint 6, 2026-05-18):
+    // modern: 500×500 — ~2.5× the ~200px rendered card on phones.
+    // elegant: 400×533 (3:4) — serves mobile square (center-crop) and portrait desktop.
+    // classic: 500×667 (3:4) — compact step matching classic's moderate policy.
+    // minimal: 400×400 — compact + ascetic, no more than needed.
+    // bold: 600×600 — matches bold's productMobile for a consistent merchant brief.
+    // Ahmad sign-off (2026-05-18): categoryMobile is a real key (added Sprint 1 commit cd0e6f4);
+    //   modern/bold bump per audit; classic/elegant/minimal inherit or get explicit conservative recs.
+    // Ref: 2026-05-18-per-theme-image-spec-audit.md §Surface 10.
+    templateOverrides: {
+      modern: {
+        width: 500,
+        height: 500,
+        aspect: '1:1',
+        note: 'Mobile category renders square (aspect-square on phones). 500px = ~2.5× the ~200px rendered card width on mobile. Ref: 2026-05-18-per-theme-image-spec-audit.md §Surface 10.',
+      },
+      elegant: {
+        width: 400,
+        height: 533,
+        aspect: '3:4',
+        note: 'Elegant mobile uses square aspect (aspect-square on phones). 400×533 serves: center-crop to 400×400 for mobile square + full frame for portrait. Conservative mobile cap. Ref: 2026-05-18-per-theme-image-spec-audit.md §Surface 10.',
+      },
+      classic: {
+        width: 500,
+        height: 667,
+        aspect: '3:4',
+        note: 'Compact step matching classic moderate policy. ≤1000 wide. Ref: 2026-05-18-per-theme-image-spec-audit.md §Surface 10.',
+      },
+      minimal: {
+        width: 400,
+        height: 400,
+        aspect: '1:1',
+        note: 'Compact + ascetic. No more than needed. Ref: 2026-05-18-per-theme-image-spec-audit.md §Surface 10.',
+      },
+      bold: {
+        width: 600,
+        height: 600,
+        aspect: '1:1',
+        note: 'Bold mobile categories render square. 600×600 matches bold productMobile crop for a consistent merchant brief. ≤1000 wide. Ref: 2026-05-18-per-theme-image-spec-audit.md §Surface 10.',
+      },
+    },
   },
   brandLogoCarousel: {
     width: 300,
@@ -215,4 +469,58 @@ export function recommendedSizeTextI18n(key: ImageStandardKey): { en: string; ar
     en: `Recommended: ${s.width} × ${s.height} px (${s.formats.join(' / ')})`,
     ar: `الحجم الموصى به: ${s.width} × ${s.height} بكسل (${s.formats.join(' / ')})`,
   };
+}
+
+/**
+ * Like `recommendedSizeText`, but resolves a per-template override
+ * when one exists. Falls back to the base width/height otherwise.
+ *
+ * Examples:
+ *   recommendedSizeTextForTemplate('heroDesktop', 'modern')
+ *     → "Recommended: 2048 × 750 px (JPEG / WebP) — modern theme"
+ *   recommendedSizeTextForTemplate('heroDesktop', 'elegant')
+ *     → "Recommended: 1920 × 700 px (JPEG / WebP)"  (base — elegant hero locked)
+ *   recommendedSizeTextForTemplate('heroDesktop', undefined)
+ *     → "Recommended: 1920 × 700 px (JPEG / WebP)"  (base)
+ */
+export function recommendedSizeTextForTemplate(
+  key: ImageStandardKey,
+  template: TemplateId | undefined
+): string {
+  // Cast to the ImageStandard interface so templateOverrides is consistently accessible
+  // across all entries (entries without overrides have it typed as undefined in the const).
+  const base = IMAGE_STANDARDS[key] as ImageStandard;
+  const override = template ? base.templateOverrides?.[template] : undefined;
+  if (override) {
+    return `Recommended: ${override.width} × ${override.height} px (${base.formats.join(' / ')}) — ${template} theme`;
+  }
+  return `Recommended: ${base.width} × ${base.height} px (${base.formats.join(' / ')})`;
+}
+
+/**
+ * Like `recommendedSizeTextI18n`, but resolves a per-template override.
+ * Returns { en, ar } bilingual pair. Falls back to base when no override.
+ *
+ * Example:
+ *   recommendedSizeTextForTemplateI18n('productPrimary', 'bold', 'ar')
+ *     → "الحجم الموصى به: 800 × 800 بكسل (JPEG / WebP) — قالب bold"
+ */
+export function recommendedSizeTextForTemplateI18n(
+  key: ImageStandardKey,
+  template: TemplateId | undefined,
+  lang: 'en' | 'ar'
+): string {
+  // Cast to the ImageStandard interface — same reason as in recommendedSizeTextForTemplate.
+  const base = IMAGE_STANDARDS[key] as ImageStandard;
+  const override = template ? base.templateOverrides?.[template] : undefined;
+  if (override) {
+    if (lang === 'ar') {
+      return `الحجم الموصى به: ${override.width} × ${override.height} بكسل (${base.formats.join(' / ')}) — قالب ${template}`;
+    }
+    return `Recommended: ${override.width} × ${override.height} px (${base.formats.join(' / ')}) — ${template} theme`;
+  }
+  if (lang === 'ar') {
+    return `الحجم الموصى به: ${base.width} × ${base.height} بكسل (${base.formats.join(' / ')})`;
+  }
+  return `Recommended: ${base.width} × ${base.height} px (${base.formats.join(' / ')})`;
 }

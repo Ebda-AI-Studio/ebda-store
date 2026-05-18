@@ -9,7 +9,8 @@ import {
   resolveLayoutSettings,
   type StoreLayoutSettings,
   type HeroSlide,
-  recommendedSizeText,
+  recommendedSizeTextForTemplate,
+  type TemplateId,
 } from '@force/shared';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { Toggle } from '../../../../components/Toggle';
@@ -21,6 +22,8 @@ interface StoreInfo {
   id: string;
   slug: string;
   domain?: string | null;
+  /** Store template — used to resolve per-theme recommended upload sizes. */
+  template?: TemplateId;
 }
 
 type SectionUpdater<K extends keyof StoreLayoutSettings> = (
@@ -1437,7 +1440,10 @@ function SlidesEditor({ slides, storeId, onChange }: SlidesEditorProps) {
                     storeId={storeId}
                     onUpload={url => updateSlide(index, { image: url })}
                     onRemove={() => updateSlide(index, { image: '' })}
-                    recommendedSizeHint={recommendedSizeText('heroDesktop')}
+                    recommendedSizeHint={recommendedSizeTextForTemplate(
+                      'heroDesktop',
+                      storeInfo?.template
+                    )}
                   />
                   <div className="mt-3">
                     <label className="mb-1 block text-[10px] uppercase tracking-wider text-muted-foreground">
@@ -1449,7 +1455,10 @@ function SlidesEditor({ slides, storeId, onChange }: SlidesEditorProps) {
                       storeId={storeId}
                       onUpload={url => updateSlide(index, { imageAr: url })}
                       onRemove={() => updateSlide(index, { imageAr: '' })}
-                      recommendedSizeHint={recommendedSizeText('heroDesktop')}
+                      recommendedSizeHint={recommendedSizeTextForTemplate(
+                        'heroDesktop',
+                        storeInfo?.template
+                      )}
                     />
                   </div>
                 </div>
@@ -1470,7 +1479,10 @@ function SlidesEditor({ slides, storeId, onChange }: SlidesEditorProps) {
                     storeId={storeId}
                     onUpload={url => updateSlide(index, { imageMobile: url })}
                     onRemove={() => updateSlide(index, { imageMobile: '' })}
-                    recommendedSizeHint={recommendedSizeText('heroMobile')}
+                    recommendedSizeHint={recommendedSizeTextForTemplate(
+                      'heroMobile',
+                      storeInfo?.template
+                    )}
                   />
                   <div className="mt-3">
                     <label className="mb-1 block text-[10px] uppercase tracking-wider text-muted-foreground">
@@ -1482,7 +1494,10 @@ function SlidesEditor({ slides, storeId, onChange }: SlidesEditorProps) {
                       storeId={storeId}
                       onUpload={url => updateSlide(index, { imageMobileAr: url })}
                       onRemove={() => updateSlide(index, { imageMobileAr: '' })}
-                      recommendedSizeHint={recommendedSizeText('heroMobile')}
+                      recommendedSizeHint={recommendedSizeTextForTemplate(
+                        'heroMobile',
+                        storeInfo?.template
+                      )}
                     />
                   </div>
                 </div>

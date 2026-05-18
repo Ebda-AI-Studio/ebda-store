@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Button, Input, useToast } from '@force/ui';
-import { recommendedSizeText } from '@force/shared';
+import { recommendedSizeTextForTemplate, type TemplateId } from '@force/shared';
 import { useT } from '@/i18n/useT';
 import { ImageUpload } from '@/components/ImageUpload';
 import { apiGet, apiPost, apiPut, apiDelete } from '../../../../../../../lib/api';
@@ -122,6 +122,19 @@ export function SimpleVariantsForm({
     return variants.map(v => rowFromVariant(v, primaryOption?.id ?? null, multiAxis));
   });
   const [saving, setSaving] = useState(false);
+  /** Template of the store — used to show per-theme recommended upload sizes. */
+  const [storeTemplate, setStoreTemplate] = useState<TemplateId | undefined>();
+
+  useEffect(() => {
+    if (!storeId) return;
+    apiGet<{ store: { template?: TemplateId } }>(`/api/v1/admin/stores/${storeId}`)
+      .then(({ data }) => {
+        if (data?.store?.template) setStoreTemplate(data.store.template);
+      })
+      .catch(() => {
+        // non-critical — falls back to base recommended size
+      });
+  }, [storeId]);
   // Per-row delete in-flight set. Without this a rapid double-click on
   // the row's delete button fires two DELETE requests against the same
   // variantId — the first succeeds, the second returns 404 ("Variant
@@ -464,7 +477,10 @@ export function SimpleVariantsForm({
                   onRemove={() => updateRow(row.rowId, { imageUrl: '' })}
                   folder="products"
                   storeId={storeId}
-                  recommendedSizeHint={recommendedSizeText('productPrimary')}
+                  recommendedSizeHint={recommendedSizeTextForTemplate(
+                    'productPrimary',
+                    storeTemplate
+                  )}
                 />
               </div>
               <div className="flex items-end justify-end pb-1">

@@ -135,6 +135,30 @@ All sizes are SOURCE dimensions (the file the designer/photographer delivers). T
 
 Where a path is "roadmap" the asset spec still applies — when the surface ships, the size is locked.
 
+### Per-template recommended source overrides (2026-05-18)
+
+Storefront rendering stays **structurally uniform** across all 5 templates — `max-w-*`, `aspect-*`, `gap-*`, and `p-*` classes are NOT theme-specific per the standing rule in `feedback-fwb-theme-identity-audit`. What varies per template is only the **admin upload hint** shown to the merchant. The table below documents cells where a theme's identity (persona, chrome language, rendered image size) justifies a different source recommendation than the canonical baseline. "inherit" means the canonical table applies. Source: [`docs/superpowers/audits/2026-05-18-per-theme-image-spec-audit.md`](docs/superpowers/audits/2026-05-18-per-theme-image-spec-audit.md) — read that document for full rationale and reference citations. Code: `IMAGE_STANDARDS[key].templateOverrides` in `packages/shared/src/types/image-standards.ts`.
+
+| Surface              | modern               | elegant                             | classic          | minimal           | bold                 |
+| -------------------- | -------------------- | ----------------------------------- | ---------------- | ----------------- | -------------------- |
+| **heroDesktop**      | 2048 × 750 (~2.73:1) | inherit (1920×700 — landscape lock) | inherit          | inherit           | 2400 × 900 (~2.67:1) |
+| **heroMobile**       | 1080 × 400 (~2.7:1)  | inherit                             | inherit          | inherit           | 1000 × 375 (~2.67:1) |
+| **bannerDesktop**    | inherit              | inherit                             | inherit          | inherit           | inherit              |
+| **bannerMobile**     | inherit              | inherit                             | inherit          | inherit           | inherit              |
+| **productPrimary**   | 800 × 1067 (3:4)     | 800 × 1067 (3:4)†                   | 800 × 1067 (3:4) | inherit (600×800) | 800 × 800 (1:1)‡     |
+| **productSquare**    | inherit              | 1200 × 1200 (1:1)                   | inherit          | inherit           | 1000 × 1000 (1:1)    |
+| **productMobile**    | 400 × 533 (3:4)      | 600 × 800 (3:4)                     | 400 × 533 (3:4)  | inherit (600×600) | 600 × 600 (1:1)      |
+| **categorySquare**   | 1000 × 1000 (1:1)    | 600 × 800 (3:4)§                    | inherit          | 600 × 600 (1:1)   | 1200 × 1200 (1:1)    |
+| **categoryPortrait** | 800 × 1067 (3:4)     | inherit (600×800)                   | 800 × 1067 (3:4) | inherit           | 1000 × 1333 (3:4)    |
+| **categoryMobile**   | 500 × 500 (1:1)      | 400 × 533 (3:4)                     | 500 × 667 (3:4)  | 400 × 400 (1:1)   | 600 × 600 (1:1)      |
+
+**Notes:**
+
+- † elegant `productPrimary` hint is 800×1067 per Ahmad 2026-05-18 sign-off. Luxury/studio merchants may upload up to 1200×1600 for pinch-zoom — the hint does not enforce a ceiling.
+- ‡ bold `productPrimary` is 1:1 because bold's `ProductCard` uses `aspect-square` by default. A 3:4 source wastes ~25% in the center crop.
+- § elegant `categorySquare` recommends a 3:4 portrait source (600×800) because the `CategoryCard` renders as `aspect-square sm:aspect-[2/3]` on desktop — the portrait source serves both the mobile square crop and the desktop tall-portrait without waste.
+- `heroDesktop` for elegant inherits the base 1920×700 — the 2.74:1 landscape lock is a platform invariant (Ahmad 2026-05-18 directive); audit suggested 1920×800 but was overridden.
+
 ---
 
 ## 5 theme personas + per-theme token spec (2026-05-17 night)

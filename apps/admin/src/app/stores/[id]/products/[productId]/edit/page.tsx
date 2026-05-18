@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button, Input, Textarea } from '@force/ui';
-import { recommendedSizeText } from '@force/shared';
+import { recommendedSizeTextForTemplate, type TemplateId } from '@force/shared';
 import { useT } from '@/i18n/useT';
 import Link from 'next/link';
 import { AdminLayout } from '../../../../../../components/AdminLayout';
@@ -53,6 +53,8 @@ export default function EditProductPage() {
 
   const [product, setProduct] = useState<Product | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
+  /** Template of the store — used to show per-theme recommended upload sizes. */
+  const [storeTemplate, setStoreTemplate] = useState<TemplateId | undefined>();
   const [images, setImages] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -106,12 +108,17 @@ export default function EditProductPage() {
         setLoading(true);
         setNotFound(false);
 
-        const [productResult, categoriesResult] = await Promise.all([
+        const [productResult, categoriesResult, storeResult] = await Promise.all([
           apiGet<{ product?: Product } & Product>(
             `/api/v1/stores/${storeId}/products/${productId}`
           ),
           apiGet<{ categories: Category[] }>(`/api/v1/stores/${storeId}/categories`),
+          // Fetch store template for per-theme upload-size hint (non-critical).
+          apiGet<{ store: { template?: TemplateId } }>(`/api/v1/admin/stores/${storeId}`),
         ]);
+        if (storeResult.data?.store?.template) {
+          setStoreTemplate(storeResult.data.store.template);
+        }
 
         if (categoriesResult.data?.categories) {
           setCategories(categoriesResult.data.categories);
@@ -456,7 +463,10 @@ export default function EditProductPage() {
                 storeId={storeId}
                 label={tFields('mediaHint')}
                 max={10}
-                recommendedSizeHint={recommendedSizeText('productPrimary')}
+                recommendedSizeHint={recommendedSizeTextForTemplate(
+                  'productPrimary',
+                  storeTemplate
+                )}
               />
             </div>
 

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button, useToast } from '@force/ui';
-import { recommendedSizeText } from '@force/shared';
+import { recommendedSizeTextForTemplate, type TemplateId } from '@force/shared';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { ImageUpload } from '../../../../components/ImageUpload';
 import { apiGet, apiPost, apiPut, apiDelete } from '../../../../lib/api';
@@ -56,6 +56,9 @@ export default function StoreCategoriesPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const { success: toastSuccess, error: showError } = useToast();
+
+  /** Template of the store — used to show per-theme recommended upload sizes. */
+  const [storeTemplate, setStoreTemplate] = useState<TemplateId | undefined>();
 
   // Best Sellers virtual category cover. Lives on the Store row, not on
   // a Category row — so it gets its own tiny GET/PUT pair instead of
@@ -116,7 +119,17 @@ export default function StoreCategoriesPage() {
   useEffect(() => {
     fetchCategories();
     fetchBestSellersImage();
-  }, [fetchCategories, fetchBestSellersImage]);
+    // Fetch store template for per-theme upload-size hint (non-critical).
+    if (storeId) {
+      apiGet<{ store: { template?: TemplateId } }>(`/api/v1/admin/stores/${storeId}`)
+        .then(({ data }) => {
+          if (data?.store?.template) setStoreTemplate(data.store.template);
+        })
+        .catch(() => {
+          // non-critical — falls back to base recommended size
+        });
+    }
+  }, [fetchCategories, fetchBestSellersImage, storeId]);
 
   function openAddForm() {
     setEditingId(null);
@@ -307,7 +320,7 @@ export default function StoreCategoriesPage() {
               label={savingBestSellersImage ? 'Saving…' : 'Upload cover'}
               accept="image/jpeg,image/png,image/webp"
               aspectRatio="1/1"
-              recommendedSizeHint={recommendedSizeText('categorySquare')}
+              recommendedSizeHint={recommendedSizeTextForTemplate('categorySquare', storeTemplate)}
             />
           </div>
         </div>

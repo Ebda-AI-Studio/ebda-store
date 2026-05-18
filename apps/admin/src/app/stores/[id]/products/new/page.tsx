@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button, Input, Textarea, Select } from '@force/ui';
-import { recommendedSizeText } from '@force/shared';
+import { recommendedSizeTextForTemplate, type TemplateId } from '@force/shared';
 import { AdminLayout } from '../../../../../components/AdminLayout';
 import { MultiImageUpload } from '../../../../../components/ImageUpload';
 import { useAuth } from '../../../../../lib/auth';
@@ -30,6 +30,8 @@ export default function NewProductPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
+  /** Template of the store — used to show per-theme recommended upload sizes. */
+  const [storeTemplate, setStoreTemplate] = useState<TemplateId | undefined>();
   const [images, setImages] = useState<string[]>([]);
 
   const [formData, setFormData] = useState({
@@ -63,7 +65,21 @@ export default function NewProductPage() {
       }
     }
 
+    async function fetchStoreTemplate() {
+      try {
+        const { data } = await apiGet<{ store: { template?: TemplateId } }>(
+          `/api/v1/admin/stores/${storeId}`
+        );
+        if (data?.store?.template) {
+          setStoreTemplate(data.store.template);
+        }
+      } catch {
+        // non-critical — falls back to base recommended size
+      }
+    }
+
     fetchCategories();
+    fetchStoreTemplate();
   }, [storeId, isAuthenticated]);
 
   const updateField = (field: string, value: string) => {
@@ -187,7 +203,10 @@ export default function NewProductPage() {
                 storeId={storeId}
                 label={t('fields.mediaHint')}
                 max={10}
-                recommendedSizeHint={recommendedSizeText('productPrimary')}
+                recommendedSizeHint={recommendedSizeTextForTemplate(
+                  'productPrimary',
+                  storeTemplate
+                )}
               />
             </div>
 
