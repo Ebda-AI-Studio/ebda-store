@@ -5,6 +5,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 import type { ProductCardProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useStore } from '../../contexts/StoreContext';
+import { resolveColor } from '@force/shared';
 import { Price, ProductBadge, ProductBadgeGroup, Rating, cn } from '@force/ui';
 import { calculateDiscount } from '../shared/display-helpers';
 import { PlaceholderImageIcon } from '../shared/icons';
@@ -38,6 +40,7 @@ function ModernProductCard({
   cardFrameColor,
 }: ProductCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
+  const { store } = useStore();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const [isHovered, setIsHovered] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
@@ -72,7 +75,11 @@ function ModernProductCard({
       // products, category pages) render at the same size as the main
       // listings. Ahmad 2026-05-16 design.md baseline.
       className="w-full md:max-w-[200px] mx-auto"
-      style={showCardFrame && cardFrameColor ? { borderColor: cardFrameColor } : undefined}
+      style={
+        showCardFrame && cardFrameColor && store.theme
+          ? { borderColor: resolveColor(cardFrameColor, store.theme) }
+          : undefined
+      }
     >
       <Link
         href={`${urlPrefix}/products/${product.slug}`}

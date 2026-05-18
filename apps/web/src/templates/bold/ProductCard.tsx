@@ -5,6 +5,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 import type { ProductCardProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useStore } from '../../contexts/StoreContext';
+import { resolveColor } from '@force/shared';
 import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions';
 import { Price, ProductBadge, ProductBadgeGroup, cn } from '@force/ui';
 import { calculateDiscount } from '../shared/display-helpers';
@@ -37,6 +39,7 @@ function BoldProductCard({
   cardFrameColor,
 }: ProductCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
+  const { store } = useStore();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const [isHovered, setIsHovered] = useState(false);
 
@@ -52,7 +55,11 @@ function BoldProductCard({
       itemType="https://schema.org/Product"
       aria-labelledby={`prod-${product.id}-name`}
       className="w-full md:max-w-[200px] mx-auto"
-      style={showCardFrame && cardFrameColor ? { borderColor: cardFrameColor } : undefined}
+      style={
+        showCardFrame && cardFrameColor && store.theme
+          ? { borderColor: resolveColor(cardFrameColor, store.theme) }
+          : undefined
+      }
     >
       <Link
         href={`${urlPrefix}/products/${product.slug}`}

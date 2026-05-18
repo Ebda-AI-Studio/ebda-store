@@ -246,7 +246,12 @@ export function HomePageContent({
               </section>
             )}
 
-            <SectionDivider />
+            {/* Divider between categories and new-arrivals. Suppressed when
+                either flanking section has an explicit per-section bgColor —
+                the color shift already acts as the visual separator. */}
+            <SectionDivider
+              hideForExplicitBg={!!(layout.categories.bgColor || layout.newArrivals.bgColor)}
+            />
 
             {/* New Arrivals — pack ProductCarousel or ProductGrid fallback.
                 Sprint 1: bg-[hsl(var(--bg-section-alt))] alternates with
@@ -302,7 +307,10 @@ export function HomePageContent({
               </section>
             )}
 
-            <SectionDivider />
+            {/* Divider between new-arrivals and best-sellers. */}
+            <SectionDivider
+              hideForExplicitBg={!!(layout.newArrivals.bgColor || layout.bestSellers.bgColor)}
+            />
 
             {/* Best Sellers carousel.
                 Sprint 1: was `bg-muted/30` (a hardcoded muted tone);
@@ -371,7 +379,8 @@ export function HomePageContent({
                 on) — Ahmad 2026-05-17 evening. Set via Branding -> Theme. */}
             {store.theme?.showBrandStory !== false && (
               <>
-                <SectionDivider />
+                {/* Divider before brand story; prev section is best-sellers. */}
+                <SectionDivider hideForExplicitBg={!!layout.bestSellers.bgColor} />
                 <BrandStoryBlock
                   image={store.heroImage ?? undefined}
                   body={store.description ?? undefined}
@@ -379,6 +388,8 @@ export function HomePageContent({
                 />
               </>
             )}
+            {/* Divider before blog carousel. BrandStory and blog have no
+                per-section bgColor fields, so hideForExplicitBg stays false. */}
             <SectionDivider />
             <HomeBlogCarousel />
             {store.theme?.showTrustStrip !== false && (
@@ -388,7 +399,9 @@ export function HomePageContent({
               </>
             )}
 
-            <SectionDivider />
+            {/* Divider before testimonials. Suppressed when testimonials
+                section has an explicit per-section bgColor. */}
+            <SectionDivider hideForExplicitBg={!!layout.testimonials.bgColor} />
 
             {/* Testimonials — auto-hides when no qualifying reviews.
                 Sprint 1: bg-[hsl(var(--bg-section-alt))] alternates

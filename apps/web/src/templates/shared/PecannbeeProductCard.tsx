@@ -5,8 +5,9 @@ import Image from 'next/image';
 import Link from 'next/link';
 import type { ProductCardProps } from '../types';
 import type { TemplateId, ProductCardSize } from '@force/shared';
-import { getProductCardTextSizes } from '@force/shared';
+import { getProductCardTextSizes, resolveColor } from '@force/shared';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useStore } from '../../contexts/StoreContext';
 import { getPackStyles } from './pack-styles';
 import { cardFrameClass, productSizeClass, cardAspectClass, cardShapeClasses } from './card-size';
 import { productCardPropsEqual } from './product-card-memo';
@@ -61,6 +62,7 @@ function PecannbeeProductCardImpl({
   cardFrameColor,
 }: PecannbeeProductCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
+  const { store } = useStore();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const styles = getPackStyles(pack);
   const textSizes = getProductCardTextSizes(cardSize);
@@ -119,7 +121,11 @@ function PecannbeeProductCardImpl({
       // 'product cards are static'. Mobile loses nothing (no hover state
       // to trigger). `group` enables the inner image scale below.
       className={`group flex flex-col overflow-hidden w-full mx-auto transition-all duration-500 ease-out md:hover:scale-[1.02] md:hover:shadow-[0_20px_40px_-20px_hsl(var(--foreground)/0.18)] ${sizeCap || 'md:max-w-[200px]'} ${frameCls} ${shape.radius} ${styles.card}`}
-      style={showCardFrame && cardFrameColor ? { borderColor: cardFrameColor } : undefined}
+      style={
+        showCardFrame && cardFrameColor && store.theme
+          ? { borderColor: resolveColor(cardFrameColor, store.theme) }
+          : undefined
+      }
       dir={isRtl ? 'rtl' : 'ltr'}
       itemScope
       itemType="https://schema.org/Product"

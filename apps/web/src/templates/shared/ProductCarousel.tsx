@@ -15,7 +15,7 @@ import {
 import { OutOfStockRibbon, isProductNew } from './ProductCardCta';
 import { BrandPill } from './BrandPill';
 import { useStore } from '../../contexts/StoreContext';
-import { getProductCardTextSizes } from '@force/shared';
+import { getProductCardTextSizes, resolveColor } from '@force/shared';
 import type { ProductCarouselProps } from '../types';
 
 /**
@@ -259,7 +259,9 @@ export function ProductCarousel({
                   // shadow around each card so they read as contained tiles.
                   className={`snap-start shrink-0 w-[44vw] sm:w-[28vw] md:w-[22vw] lg:w-[19vw] xl:w-[17vw] ${sizeCap} ${cardFrameClass(showCardFrame, cardFrameStyle)}`}
                   style={
-                    showCardFrame && cardFrameColor ? { borderColor: cardFrameColor } : undefined
+                    showCardFrame && cardFrameColor && store.theme
+                      ? { borderColor: resolveColor(cardFrameColor, store.theme) }
+                      : undefined
                   }
                 >
                   {/* Sprint 2 (2026-05-17): hover-scale 1.02 on the card
