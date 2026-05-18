@@ -31,6 +31,9 @@ export default function ModernCategoryGrid({
   mobileColumns,
   desktopColumns,
   urlPrefix = '',
+  headingZone,
+  kickerZone,
+  subtitleZone,
 }: CategoryGridProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const { store } = useStore();
@@ -70,6 +73,9 @@ export default function ModernCategoryGrid({
         showSubtitleLines={showSubtitleLines}
         isRtl={isRtl}
         pack="modern"
+        headingZone={headingZone}
+        kickerZone={kickerZone}
+        subtitleZone={subtitleZone}
       />
       <div
         className={`grid ${gridGapClass(cardGap)} ${gridColsClass(cappedMobile, cappedDesktop)}`}

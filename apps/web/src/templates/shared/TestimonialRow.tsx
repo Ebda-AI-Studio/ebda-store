@@ -12,7 +12,16 @@ import type { TestimonialRowProps } from '../types';
  *   - Bold: 2px border + black uppercase author
  *   - Elegant: hairline top border + serif/extralight tracked author
  */
-export function TestimonialRow({ testimonials, title, titleAr, isRtl, pack }: TestimonialRowProps) {
+export function TestimonialRow({
+  testimonials,
+  title,
+  titleAr,
+  isRtl,
+  pack,
+  headingZone,
+  kickerZone,
+  subtitleZone,
+}: TestimonialRowProps) {
   if (testimonials.length === 0) return null;
   const styles = getPackStyles(pack);
   const heading = isRtl ? (titleAr ?? title ?? 'آراء العملاء') : (title ?? 'Customer Reviews');
@@ -20,7 +29,14 @@ export function TestimonialRow({ testimonials, title, titleAr, isRtl, pack }: Te
   return (
     <section className="px-4 sm:px-6 lg:px-8" dir={isRtl ? 'rtl' : 'ltr'}>
       <div className="mx-auto max-w-7xl">
-        <SectionHeading title={heading} isRtl={isRtl} pack={pack} />
+        <SectionHeading
+          title={heading}
+          isRtl={isRtl}
+          pack={pack}
+          headingZone={headingZone}
+          kickerZone={kickerZone}
+          subtitleZone={subtitleZone}
+        />
         <div className="grid gap-7 sm:grid-cols-2 lg:grid-cols-3 lg:gap-9">
           {testimonials.slice(0, 6).map(t => (
             <article key={t.id} className={styles.testimonialCard}>

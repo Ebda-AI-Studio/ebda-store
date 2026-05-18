@@ -13,6 +13,7 @@ import { toTemplateProduct, toTemplateCategory } from '../templates/adapters';
 import { getHomepageTemplate } from '../lib/serverTemplate';
 import type { TemplateId, StoreLayoutSettings } from '@force/shared';
 import { sectionBgStyle } from '../templates/shared/section-bg';
+import { resolveSectionZone } from '../templates/shared/section-typography';
 
 /**
  * Thin client wrapper for the homepage. Server-fetched products + categories
@@ -61,6 +62,76 @@ export function HomePageContent({
 
   const isRtl = language === 'ar';
   const T = getHomepageTemplate(templateId);
+
+  // Per-section typography zones. Global zones are not accessible client-side
+  // here (they're applied via CSS injection in layout.tsx), so we pass
+  // undefined for the global zone — resolveSectionZone returns just the
+  // section-level override values. When no per-section override is set,
+  // resolveSectionZone returns undefined and SectionHeading uses its
+  // default CSS class styling (no inline style applied).
+  const categoriesHeadingZone = resolveSectionZone(
+    layout.categories.typography?.heading,
+    undefined,
+    store.theme
+  );
+  const categoriesKickerZone = resolveSectionZone(
+    layout.categories.typography?.kicker,
+    undefined,
+    store.theme
+  );
+  const categoriesSubtitleZone = resolveSectionZone(
+    layout.categories.typography?.subtitle,
+    undefined,
+    store.theme
+  );
+
+  const newArrivalsHeadingZone = resolveSectionZone(
+    layout.newArrivals.typography?.heading,
+    undefined,
+    store.theme
+  );
+  const newArrivalsKickerZone = resolveSectionZone(
+    layout.newArrivals.typography?.kicker,
+    undefined,
+    store.theme
+  );
+  const newArrivalsSubtitleZone = resolveSectionZone(
+    layout.newArrivals.typography?.subtitle,
+    undefined,
+    store.theme
+  );
+
+  const bestSellersHeadingZone = resolveSectionZone(
+    layout.bestSellers.typography?.heading,
+    undefined,
+    store.theme
+  );
+  const bestSellersKickerZone = resolveSectionZone(
+    layout.bestSellers.typography?.kicker,
+    undefined,
+    store.theme
+  );
+  const bestSellersSubtitleZone = resolveSectionZone(
+    layout.bestSellers.typography?.subtitle,
+    undefined,
+    store.theme
+  );
+
+  const testimonialsHeadingZone = resolveSectionZone(
+    layout.testimonials.typography?.heading,
+    undefined,
+    store.theme
+  );
+  const testimonialsKickerZone = resolveSectionZone(
+    layout.testimonials.typography?.kicker,
+    undefined,
+    store.theme
+  );
+  const testimonialsSubtitleZone = resolveSectionZone(
+    layout.testimonials.typography?.subtitle,
+    undefined,
+    store.theme
+  );
 
   // Build a single lookup so the cart-add handler works for products from any
   // of the three sources (featured, new arrivals, best sellers).
@@ -215,6 +286,9 @@ export function HomePageContent({
                     showCardFrame={layout.categories.showCardFrame}
                     cardFrameStyle={layout.categories.cardFrameStyle}
                     cardFrameColor={layout.categories.cardFrameColor}
+                    headingZone={categoriesHeadingZone}
+                    kickerZone={categoriesKickerZone}
+                    subtitleZone={categoriesSubtitleZone}
                   />
                 ) : (
                   <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -240,6 +314,9 @@ export function HomePageContent({
                       mobileColumns={layout.categories.mobileColumns}
                       desktopColumns={layout.categories.desktopColumns}
                       isRtl={isRtl}
+                      headingZone={categoriesHeadingZone}
+                      kickerZone={categoriesKickerZone}
+                      subtitleZone={categoriesSubtitleZone}
                     />
                   </div>
                 )}
@@ -290,6 +367,9 @@ export function HomePageContent({
                       layout.newArrivals.cardFrameColor ||
                       layout.productCardDefaults?.cardFrameColor
                     }
+                    headingZone={newArrivalsHeadingZone}
+                    kickerZone={newArrivalsKickerZone}
+                    subtitleZone={newArrivalsSubtitleZone}
                   />
                 ) : (
                   <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -352,6 +432,9 @@ export function HomePageContent({
                       layout.bestSellers.cardFrameColor ||
                       layout.productCardDefaults?.cardFrameColor
                     }
+                    headingZone={bestSellersHeadingZone}
+                    kickerZone={bestSellersKickerZone}
+                    subtitleZone={bestSellersSubtitleZone}
                   />
                 ) : (
                   <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -418,6 +501,9 @@ export function HomePageContent({
                   titleAr={testimonialsTitleAr}
                   isRtl={isRtl}
                   pack={templateId}
+                  headingZone={testimonialsHeadingZone}
+                  kickerZone={testimonialsKickerZone}
+                  subtitleZone={testimonialsSubtitleZone}
                 />
               </section>
             )}

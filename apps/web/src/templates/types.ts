@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import type { ResolvedZone } from './shared/section-typography';
 
 /**
  * Product data for template components
@@ -359,6 +360,10 @@ export interface ProductCarouselProps {
   cardFrameStyle?: 'soft' | 'outline' | 'shadow' | 'paper';
   /** Hex color applied as inline borderColor on the frame element when showCardFrame is on. */
   cardFrameColor?: string;
+  /** Per-section typography zone overrides resolved by resolveSectionZone(). */
+  headingZone?: ResolvedZone;
+  kickerZone?: ResolvedZone;
+  subtitleZone?: ResolvedZone;
 }
 
 /**
@@ -397,6 +402,10 @@ export interface CategoryStripProps {
   cardFrameStyle?: 'soft' | 'outline' | 'shadow' | 'paper';
   /** Hex color applied as inline borderColor on the frame element when showCardFrame is on. */
   cardFrameColor?: string;
+  /** Per-section typography zone overrides resolved by resolveSectionZone(). */
+  headingZone?: ResolvedZone;
+  kickerZone?: ResolvedZone;
+  subtitleZone?: ResolvedZone;
 }
 
 /**
@@ -418,6 +427,10 @@ export interface TestimonialRowProps {
   titleAr?: string;
   isRtl?: boolean;
   pack?: import('@force/shared').TemplateId;
+  /** Per-section typography zone overrides resolved by resolveSectionZone(). */
+  headingZone?: ResolvedZone;
+  kickerZone?: ResolvedZone;
+  subtitleZone?: ResolvedZone;
 }
 
 /**
@@ -546,6 +559,10 @@ export interface CategoryGridProps {
   mobileColumns?: 1 | 2 | 3;
   desktopColumns?: 2 | 3 | 4;
   urlPrefix?: string;
+  /** Per-section typography zone overrides resolved by resolveSectionZone(). */
+  headingZone?: ResolvedZone;
+  kickerZone?: ResolvedZone;
+  subtitleZone?: ResolvedZone;
 }
 
 /**

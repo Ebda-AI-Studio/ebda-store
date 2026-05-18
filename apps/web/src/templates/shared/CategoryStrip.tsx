@@ -47,10 +47,14 @@ export function CategoryStrip({
   showCardFrame,
   cardFrameStyle,
   cardFrameColor,
+  headingZone,
+  kickerZone,
+  subtitleZone,
 }: CategoryStripProps) {
-  if (categories.length === 0) return null;
+  // Hooks must be called unconditionally (before any early return).
   const { store } = useStore();
   const styles = getPackStyles(pack);
+  if (categories.length === 0) return null;
   const sizeCap = categorySizeClass(cardSize);
   const shape = cardShapeClasses(cardShape);
   const aspectCls = shape.aspect || cardAspectClass(cardAspect) || 'aspect-square';
@@ -70,6 +74,9 @@ export function CategoryStrip({
           isRtl={isRtl}
           seeAllHref={seeAllHref}
           pack={pack}
+          headingZone={headingZone}
+          kickerZone={kickerZone}
+          subtitleZone={subtitleZone}
         />
         <ul
           // touch-pan-x + overscroll-x-contain: iOS-stuck-scroll fix

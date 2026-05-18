@@ -58,6 +58,9 @@ export function ProductCarousel({
   showCardFrame,
   cardFrameStyle,
   cardFrameColor,
+  headingZone,
+  kickerZone,
+  subtitleZone,
 }: ProductCarouselProps) {
   const styles = getPackStyles(pack);
   const sizeCap = productSizeClass(cardSize);
@@ -159,6 +162,9 @@ export function ProductCarousel({
           isRtl={isRtl}
           seeAllHref={seeAllHref}
           pack={pack}
+          headingZone={headingZone}
+          kickerZone={kickerZone}
+          subtitleZone={subtitleZone}
         />
         <div
           className="relative"

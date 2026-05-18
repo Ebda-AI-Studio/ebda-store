@@ -1,8 +1,10 @@
 'use client';
 
+import type React from 'react';
 import Link from 'next/link';
 import type { TemplateId } from '@force/shared';
 import { getPackStyles } from './pack-styles';
+import type { ResolvedZone } from './section-typography';
 
 interface SectionHeadingProps {
   title?: string;
@@ -27,6 +29,16 @@ interface SectionHeadingProps {
    * editorial divider look; set false to keep the subtitle text alone.
    */
   showSubtitleLines?: boolean;
+  /**
+   * Per-section typography overrides resolved by resolveSectionZone().
+   * When provided, applied as inline styles on the heading h2, kicker span,
+   * and subtitle wrapper. The auto-fix cascade rule in globals.css uses
+   * !important on --section-fg so auto-picked contrast color wins over the
+   * color field here when the section has an explicit bgColor.
+   */
+  headingZone?: ResolvedZone;
+  kickerZone?: ResolvedZone;
+  subtitleZone?: ResolvedZone;
 }
 
 /**
@@ -46,6 +58,9 @@ export function SectionHeading({
   pack,
   showKickerLines = true,
   showSubtitleLines = true,
+  headingZone,
+  kickerZone,
+  subtitleZone,
 }: SectionHeadingProps) {
   const text = isRtl ? (titleAr ?? title) : (title ?? titleAr);
   const kickerText = isRtl ? (kickerAr ?? kicker) : (kicker ?? kickerAr);
@@ -88,6 +103,15 @@ export function SectionHeading({
               <span
                 className="text-base font-semibold uppercase tracking-[0.18em] text-foreground/70"
                 data-zone="sectionKicker"
+                style={{
+                  fontFamily: kickerZone?.fontFamily,
+                  fontSize: kickerZone?.fontSize,
+                  fontWeight: kickerZone?.fontWeight,
+                  color: kickerZone?.color,
+                  letterSpacing: kickerZone?.letterSpacing,
+                  lineHeight: kickerZone?.lineHeight,
+                  textTransform: kickerZone?.textTransform as React.CSSProperties['textTransform'],
+                }}
               >
                 {kickerText}
               </span>
@@ -101,7 +125,19 @@ export function SectionHeading({
             </div>
           )}
           {text && (
-            <h2 className={styles.sectionHeading} data-zone="sectionTitle">
+            <h2
+              className={styles.sectionHeading}
+              data-zone="sectionTitle"
+              style={{
+                fontFamily: headingZone?.fontFamily,
+                fontSize: headingZone?.fontSize,
+                fontWeight: headingZone?.fontWeight,
+                color: headingZone?.color,
+                letterSpacing: headingZone?.letterSpacing,
+                lineHeight: headingZone?.lineHeight,
+                textTransform: headingZone?.textTransform as React.CSSProperties['textTransform'],
+              }}
+            >
               {text}
             </h2>
           )}
@@ -117,6 +153,15 @@ export function SectionHeading({
             <div
               className="self-stretch flex items-center justify-center gap-3 sm:gap-4"
               data-zone="sectionSubtitle"
+              style={{
+                fontFamily: subtitleZone?.fontFamily,
+                fontSize: subtitleZone?.fontSize,
+                fontWeight: subtitleZone?.fontWeight,
+                color: subtitleZone?.color,
+                letterSpacing: subtitleZone?.letterSpacing,
+                lineHeight: subtitleZone?.lineHeight,
+                textTransform: subtitleZone?.textTransform as React.CSSProperties['textTransform'],
+              }}
             >
               {showSubtitleLines && (
                 <span

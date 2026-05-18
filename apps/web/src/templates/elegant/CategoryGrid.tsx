@@ -35,6 +35,9 @@ export default function ElegantCategoryGrid({
   mobileColumns,
   desktopColumns,
   urlPrefix = '',
+  headingZone,
+  kickerZone,
+  subtitleZone,
 }: CategoryGridProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const { store } = useStore();
@@ -54,6 +57,9 @@ export default function ElegantCategoryGrid({
           showSubtitleLines={showSubtitleLines}
           isRtl={isRtl}
           pack="elegant"
+          headingZone={headingZone}
+          kickerZone={kickerZone}
+          subtitleZone={subtitleZone}
         />
         <div
           className={`grid ${gridGapClass(cardGap)} ${gridColsClass(mobileColumns, desktopColumns)}`}

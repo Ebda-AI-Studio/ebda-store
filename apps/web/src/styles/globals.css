@@ -798,9 +798,34 @@
  * subtitle inside that section adopts the auto-picked color. Falls back to
  * currentColor when no section bg has been set, so existing tenants see
  * zero behavior change.
+ *
+ * Two-rule cascade:
+ *   1. Loose rule (no-bg sections) — `var(--section-fg, currentColor)` falls
+ *      back to currentColor when --section-fg is unset, so there's no effect
+ *      on sections without an explicit bgColor. This lets per-section inline
+ *      style colors from typography overrides apply normally.
+ *   2. Strict rule (with-bg sections) — targets only sections where
+ *      --section-fg was actually set (the [style*='--section-fg'] guard). Uses
+ *      !important so it beats any inline color set by per-section typography
+ *      overrides. Auto-fix contrast ALWAYS wins when a section has a custom bg.
+ *
+ * Note: data-zone="sectionTitle" is the heading H2 zone (see typography.ts +
+ * SectionHeading.tsx). "sectionHeading" is a pack-styles CSS class name only;
+ * the data-zone attribute is "sectionTitle". Both rules must use sectionTitle.
  */
-[data-section] [data-zone='sectionHeading'],
+[data-section] [data-zone='sectionTitle'],
 [data-section] [data-zone='sectionKicker'],
 [data-section] [data-zone='sectionSubtitle'] {
   color: var(--section-fg, currentColor);
+}
+
+/**
+ * Strict override: when a section has an explicit bg color (--section-fg is
+ * set on the section element), the auto-picked readable foreground wins over
+ * any per-section typography inline color. The !important beats inline style.
+ */
+[data-section][style*='--section-fg'] [data-zone='sectionTitle'],
+[data-section][style*='--section-fg'] [data-zone='sectionKicker'],
+[data-section][style*='--section-fg'] [data-zone='sectionSubtitle'] {
+  color: var(--section-fg) !important;
 }
