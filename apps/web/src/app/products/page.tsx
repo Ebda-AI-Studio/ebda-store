@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import { getStoreOrNotFound } from '../../lib/store-resolver';
 import { API_URL } from '../../lib/api';
+import { resolveLayoutSettings, type ProductCardDefaults } from '@force/shared';
 import { breadcrumbJsonLd, itemList, getSiteUrl } from '../../lib/structured-data';
 import { JsonLd } from '../../components/JsonLd';
 import ProductsClient from './ProductsClient';
@@ -11,6 +12,24 @@ export const metadata: Metadata = {
   description:
     'Browse our full catalog of products. Find the best deals with fast delivery in Kuwait.',
 };
+
+/** Fetch the store's layout settings to read `productCardDefaults`. */
+async function fetchProductCardDefaults(store: {
+  id: string;
+}): Promise<ProductCardDefaults | undefined> {
+  if (!store.id || store.id === 'demo') return undefined;
+  try {
+    const res = await fetch(`${API_URL}/public/stores/${store.id}/layout`, {
+      next: { revalidate: 60 },
+    });
+    if (!res.ok) return undefined;
+    const json = await res.json();
+    const layout = resolveLayoutSettings(json?.data?.layout ?? {});
+    return layout.productCardDefaults ? { ...layout.productCardDefaults } : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 async function fetchInitialData(
   store: { id: string; domain?: string },
@@ -73,7 +92,12 @@ export default async function ProductsPage({
   const params = await searchParams;
   const rawCategory = params.category;
   const category = Array.isArray(rawCategory) ? rawCategory[0] : rawCategory;
-  const initialData = await fetchInitialData(store, { category });
+  // Fetch layout in parallel with product data so PLP cards respect the
+  // merchant's global productCardDefaults (size, frame color, etc.).
+  const [initialData, productCardDefaults] = await Promise.all([
+    fetchInitialData(store, { category }),
+    fetchProductCardDefaults(store),
+  ]);
 
   const siteUrl = getSiteUrl(store);
 
@@ -124,6 +148,7 @@ export default async function ProductsPage({
           initialCategories={initialData.categories}
           initialProducts={initialData.products}
           initialMeta={initialData.meta}
+          productCardDefaults={productCardDefaults}
         />
       </Suspense>
     </>

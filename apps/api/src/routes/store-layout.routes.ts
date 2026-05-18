@@ -116,6 +116,8 @@ const layoutSchema = z
       showSubtitleLines: z.boolean().optional(),
       showCardFrame: z.boolean().optional(),
       cardFrameStyle: z.enum(['soft', 'outline', 'shadow', 'paper']).optional(),
+      // 2026-05-18 Sprint 4: per-section card frame color override.
+      cardFrameColor: hexColor,
       // 2026-05-18 Sprint 3: per-section bg color.
       bgColor: hexColor,
     }),
@@ -156,6 +158,8 @@ const layoutSchema = z
       showSubtitleLines: z.boolean().optional(),
       showCardFrame: z.boolean().optional(),
       cardFrameStyle: z.enum(['soft', 'outline', 'shadow', 'paper']).optional(),
+      // 2026-05-18 Sprint 4: per-section card frame color override.
+      cardFrameColor: hexColor,
       // 2026-05-18 Sprint 3: per-section bg color.
       bgColor: hexColor,
     }),
@@ -190,6 +194,8 @@ const layoutSchema = z
       showSubtitleLines: z.boolean().optional(),
       showCardFrame: z.boolean().optional(),
       cardFrameStyle: z.enum(['soft', 'outline', 'shadow', 'paper']).optional(),
+      // 2026-05-18 Sprint 4: per-section card frame color override.
+      cardFrameColor: hexColor,
       // 2026-05-18 Sprint 3: per-section bg color.
       bgColor: hexColor,
     }),
@@ -217,6 +223,35 @@ const layoutSchema = z
       productImageAspect: z.enum(['1:1', '3:4']),
       categoryImageAspect: z.enum(['1:1', '3:4', '2:3']),
     }),
+    // 2026-05-18 Sprint 4: global product-card defaults for PLP / category /
+    // search surfaces. Merchants set these once; every non-homepage card
+    // surface inherits them automatically. Homepage carousels read their own
+    // per-section fields first and fall back here.
+    productCardDefaults: z
+      .object({
+        cardSize: z.enum(['xxs', 'xs', 'sm', 'md', 'lg', 'xl']).optional(),
+        cardAspect: z.enum(['theme', 'square', 'portrait', 'landscape']).optional(),
+        cardShape: z
+          .enum([
+            'theme',
+            'circle',
+            'rounded-square',
+            'square',
+            'soft',
+            'portrait',
+            'landscape',
+            'pill',
+          ])
+          .optional(),
+        cardGap: z.enum(['tight', 'normal', 'loose', 'xloose']).optional(),
+        showLabel: z.boolean().optional(),
+        showHover: z.boolean().optional(),
+        showCardFrame: z.boolean().optional(),
+        cardFrameStyle: z.enum(['soft', 'outline', 'shadow', 'paper']).optional(),
+        cardFrameColor: hexColor,
+      })
+      .partial()
+      .optional(),
   })
   // Allow partial bodies so the admin UI can patch a single section without
   // re-sending every field. We re-merge with the existing JSON before save.

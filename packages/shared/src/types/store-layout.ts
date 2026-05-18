@@ -215,6 +215,8 @@ export interface CategoriesSettings extends SectionTitleOverride, SectionBgOverr
    *   - `'paper'`  rounded-lg + bg-card + paper-style shadow + larger padding (editorial)
    */
   cardFrameStyle?: 'soft' | 'outline' | 'shadow' | 'paper';
+  /** Hex color — applied as inline `style.borderColor` on the frame element. */
+  cardFrameColor?: string;
 }
 
 export interface ProductCarouselSettings extends SectionTitleOverride, SectionBgOverride {
@@ -246,6 +248,8 @@ export interface ProductCarouselSettings extends SectionTitleOverride, SectionBg
    * CategoriesSettings.cardFrameStyle for the 4-value enum.
    */
   cardFrameStyle?: 'soft' | 'outline' | 'shadow' | 'paper';
+  /** Hex color — applied as inline `style.borderColor` on the frame element. */
+  cardFrameColor?: string;
 }
 
 export interface FilterSidebarSettings {
@@ -281,6 +285,29 @@ export interface ReviewSectionSettings {
   enabled: boolean;
 }
 
+/**
+ * Global product-card defaults — drives the PLP, category, search, and
+ * any non-homepage product-card surface. Homepage carousels
+ * (newArrivals / bestSellers) read their own fields first and fall back
+ * to these defaults when a per-section override is unset.
+ *
+ * Added 2026-05-18 because card-size / frame controls used to stop at
+ * the homepage edge; merchants couldn't change PLP card density or
+ * frame color without a code change.
+ */
+export interface ProductCardDefaults {
+  cardSize?: CardSize;
+  cardAspect?: CardAspect;
+  cardShape?: CardShape;
+  cardGap?: CardGap;
+  showLabel?: boolean;
+  showHover?: boolean;
+  showCardFrame?: boolean;
+  cardFrameStyle?: 'soft' | 'outline' | 'shadow' | 'paper';
+  /** Hex color — applied as inline `style.borderColor` on the frame element. */
+  cardFrameColor?: string;
+}
+
 export interface StoreLayoutSettings {
   hero: HeroSettings;
   categories: CategoriesSettings;
@@ -290,6 +317,8 @@ export interface StoreLayoutSettings {
   testimonials: TestimonialsSettings;
   reviewSection: ReviewSectionSettings;
   sizing: SizingContract;
+  /** Defaults applied to all non-homepage product-card surfaces. */
+  productCardDefaults?: ProductCardDefaults;
 }
 
 /**
@@ -367,5 +396,6 @@ export function resolveLayoutSettings(input: unknown): StoreLayoutSettings {
     testimonials: { ...DEFAULT_LAYOUT_SETTINGS.testimonials, ...(raw.testimonials ?? {}) },
     reviewSection: { ...DEFAULT_LAYOUT_SETTINGS.reviewSection, ...(raw.reviewSection ?? {}) },
     sizing: { ...DEFAULT_LAYOUT_SETTINGS.sizing, ...(raw.sizing ?? {}) },
+    productCardDefaults: { ...(raw.productCardDefaults ?? {}) },
   };
 }

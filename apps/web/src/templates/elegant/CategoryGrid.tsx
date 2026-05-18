@@ -29,6 +29,7 @@ export default function ElegantCategoryGrid({
   showHover,
   showCardFrame,
   cardFrameStyle,
+  cardFrameColor,
   mobileColumns,
   desktopColumns,
   urlPrefix = '',
@@ -57,7 +58,11 @@ export default function ElegantCategoryGrid({
           {categories.map(category => {
             const frame = cardFrameClass(showCardFrame, cardFrameStyle);
             return frame ? (
-              <div key={category.id} className={frame}>
+              <div
+                key={category.id}
+                className={frame}
+                style={cardFrameColor ? { borderColor: cardFrameColor } : undefined}
+              >
                 <CategoryCard
                   cardSize={cardSize}
                   cardAspect={cardAspect}

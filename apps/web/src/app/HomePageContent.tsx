@@ -213,6 +213,7 @@ export function HomePageContent({
                     showHover={layout.categories.showHover}
                     showCardFrame={layout.categories.showCardFrame}
                     cardFrameStyle={layout.categories.cardFrameStyle}
+                    cardFrameColor={layout.categories.cardFrameColor}
                   />
                 ) : (
                   <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -234,6 +235,7 @@ export function HomePageContent({
                       showHover={layout.categories.showHover}
                       showCardFrame={layout.categories.showCardFrame}
                       cardFrameStyle={layout.categories.cardFrameStyle}
+                      cardFrameColor={layout.categories.cardFrameColor}
                       mobileColumns={layout.categories.mobileColumns}
                       desktopColumns={layout.categories.desktopColumns}
                       isRtl={isRtl}
@@ -277,6 +279,10 @@ export function HomePageContent({
                     showHover={layout.newArrivals.showHover}
                     showCardFrame={layout.newArrivals.showCardFrame}
                     cardFrameStyle={layout.newArrivals.cardFrameStyle}
+                    cardFrameColor={
+                      layout.newArrivals.cardFrameColor ||
+                      layout.productCardDefaults?.cardFrameColor
+                    }
                   />
                 ) : (
                   <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -331,6 +337,10 @@ export function HomePageContent({
                     showHover={layout.bestSellers.showHover}
                     showCardFrame={layout.bestSellers.showCardFrame}
                     cardFrameStyle={layout.bestSellers.cardFrameStyle}
+                    cardFrameColor={
+                      layout.bestSellers.cardFrameColor ||
+                      layout.productCardDefaults?.cardFrameColor
+                    }
                   />
                 ) : (
                   <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">

@@ -32,6 +32,9 @@ function BoldProductCard({
   onToggleCompare,
 
   onRemoveFromWishlist,
+  showCardFrame,
+  cardFrameStyle: _cardFrameStyle,
+  cardFrameColor,
 }: ProductCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -49,6 +52,7 @@ function BoldProductCard({
       itemType="https://schema.org/Product"
       aria-labelledby={`prod-${product.id}-name`}
       className="w-full md:max-w-[200px] mx-auto"
+      style={showCardFrame && cardFrameColor ? { borderColor: cardFrameColor } : undefined}
     >
       <Link
         href={`${urlPrefix}/products/${product.slug}`}

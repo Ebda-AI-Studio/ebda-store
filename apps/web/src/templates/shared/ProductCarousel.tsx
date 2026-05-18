@@ -57,6 +57,7 @@ export function ProductCarousel({
   showHover = true,
   showCardFrame,
   cardFrameStyle,
+  cardFrameColor,
 }: ProductCarouselProps) {
   const styles = getPackStyles(pack);
   const sizeCap = productSizeClass(cardSize);
@@ -257,6 +258,9 @@ export function ProductCarousel({
                   // showCardFrame (opt-in) adds rounded-2xl bg-card border +
                   // shadow around each card so they read as contained tiles.
                   className={`snap-start shrink-0 w-[44vw] sm:w-[28vw] md:w-[22vw] lg:w-[19vw] xl:w-[17vw] ${sizeCap} ${cardFrameClass(showCardFrame, cardFrameStyle)}`}
+                  style={
+                    showCardFrame && cardFrameColor ? { borderColor: cardFrameColor } : undefined
+                  }
                 >
                   {/* Sprint 2 (2026-05-17): hover-scale 1.02 on the card
                       frame for the same micro-payoff PecannbeeProductCard

@@ -31,6 +31,7 @@ export default function BoldCategoryGrid({
   showHover,
   showCardFrame,
   cardFrameStyle,
+  cardFrameColor,
   mobileColumns,
   desktopColumns,
   urlPrefix = '',
@@ -68,7 +69,11 @@ export default function BoldCategoryGrid({
             const stagger = index % 2 === 1 ? 'lg:translate-y-8' : '';
             const frame = cardFrameClass(showCardFrame, cardFrameStyle);
             return (
-              <div key={category.id} className={`${stagger} ${frame}`.trim()}>
+              <div
+                key={category.id}
+                className={`${stagger} ${frame}`.trim()}
+                style={frame && cardFrameColor ? { borderColor: cardFrameColor } : undefined}
+              >
                 <CategoryCard
                   cardSize={cardSize}
                   cardAspect={cardAspect}

@@ -8,6 +8,7 @@ import type { TemplateId, ProductCardSize } from '@force/shared';
 import { getProductCardTextSizes } from '@force/shared';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { getPackStyles } from './pack-styles';
+import { cardFrameClass, productSizeClass, cardAspectClass, cardShapeClasses } from './card-size';
 import { productCardPropsEqual } from './product-card-memo';
 import { TaxInclusiveLabel } from './tax-inclusive-label';
 import { OutOfStockRibbon, isProductNew } from './ProductCardCta';
@@ -53,11 +54,22 @@ function PecannbeeProductCardImpl({
   urlPrefix = '',
   pack,
   cardSize,
+  cardAspect,
+  cardShape,
+  showCardFrame,
+  cardFrameStyle,
+  cardFrameColor,
 }: PecannbeeProductCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const styles = getPackStyles(pack);
   const textSizes = getProductCardTextSizes(cardSize);
+  // Sprint 4 (2026-05-18): global card-defaults wiring so PLP / category /
+  // search cards reflect the merchant's productCardDefaults settings.
+  const sizeCap = productSizeClass(cardSize);
+  const shape = cardShapeClasses(cardShape);
+  const aspectOverride = shape.aspect || cardAspectClass(cardAspect);
+  const frameCls = cardFrameClass(showCardFrame, cardFrameStyle);
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
 
@@ -106,7 +118,8 @@ function PecannbeeProductCardImpl({
       // a micro-payoff on desktop — addresses the friend complaint
       // 'product cards are static'. Mobile loses nothing (no hover state
       // to trigger). `group` enables the inner image scale below.
-      className={`group flex flex-col overflow-hidden w-full md:max-w-[200px] mx-auto transition-all duration-500 ease-out md:hover:scale-[1.02] md:hover:shadow-[0_20px_40px_-20px_hsl(var(--foreground)/0.18)] ${styles.card}`}
+      className={`group flex flex-col overflow-hidden w-full mx-auto transition-all duration-500 ease-out md:hover:scale-[1.02] md:hover:shadow-[0_20px_40px_-20px_hsl(var(--foreground)/0.18)] ${sizeCap || 'md:max-w-[200px]'} ${frameCls} ${shape.radius} ${styles.card}`}
+      style={showCardFrame && cardFrameColor ? { borderColor: cardFrameColor } : undefined}
       dir={isRtl ? 'rtl' : 'ltr'}
       itemScope
       itemType="https://schema.org/Product"
@@ -122,7 +135,9 @@ function PecannbeeProductCardImpl({
             size 600×800. PecannbeeProductCard is the PLP / search /
             category-listing card; per-store cardAspect on the homepage
             carousels lives on theme-specific ProductCards instead. */}
-        <div className="relative aspect-square sm:aspect-[3/4] overflow-hidden bg-muted">
+        <div
+          className={`relative overflow-hidden bg-muted ${aspectOverride || 'aspect-square sm:aspect-[3/4]'}`}
+        >
           {img ? (
             <>
               <Image

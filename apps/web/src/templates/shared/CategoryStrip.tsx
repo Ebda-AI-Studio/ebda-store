@@ -44,6 +44,7 @@ export function CategoryStrip({
   showHover = true,
   showCardFrame,
   cardFrameStyle,
+  cardFrameColor,
 }: CategoryStripProps) {
   if (categories.length === 0) return null;
   const styles = getPackStyles(pack);
@@ -81,6 +82,9 @@ export function CategoryStrip({
               <li
                 key={cat.id}
                 className={`snap-start shrink-0 w-[60vw] sm:w-[36vw] md:w-[30vw] lg:w-[26vw] xl:w-[22vw] ${sizeCap} ${cardFrameClass(showCardFrame, cardFrameStyle)}`}
+                style={
+                  showCardFrame && cardFrameColor ? { borderColor: cardFrameColor } : undefined
+                }
               >
                 <Link
                   href={href}

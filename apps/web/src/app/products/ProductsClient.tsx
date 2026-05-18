@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { api, type Product, type Category, type PaginationMeta } from '@/lib/api';
+import type { ProductCardDefaults } from '@force/shared';
 import { useToast, Select } from '@force/ui';
 import { useCart } from '../../contexts/CartContext';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
@@ -70,12 +71,15 @@ interface ProductsClientProps {
   initialCategories?: Category[];
   initialProducts?: Product[];
   initialMeta?: PaginationMeta | null;
+  /** Global product-card defaults from the merchant's layout settings. */
+  productCardDefaults?: ProductCardDefaults;
 }
 
 export default function ProductsClient({
   initialCategories = [],
   initialProducts = [],
   initialMeta = null,
+  productCardDefaults,
 }: ProductsClientProps) {
   const searchParams = useSearchParams();
   const [search, setSearch] = useState('');
@@ -551,7 +555,15 @@ export default function ProductsClient({
                 {products.map(p => (
                   <PecannbeeProductCard
                     key={p.id}
-                    cardSize="md"
+                    // productCardDefaults override the "md" fallback when set.
+                    // Per-section overrides don't apply on PLP; only the global
+                    // defaults slot applies here (Sprint 4, 2026-05-18).
+                    cardSize={productCardDefaults?.cardSize ?? 'md'}
+                    cardAspect={productCardDefaults?.cardAspect}
+                    cardShape={productCardDefaults?.cardShape}
+                    showCardFrame={productCardDefaults?.showCardFrame}
+                    cardFrameStyle={productCardDefaults?.cardFrameStyle}
+                    cardFrameColor={productCardDefaults?.cardFrameColor}
                     product={toTemplateProduct(p)}
                     isRtl={language === 'ar'}
                     currency={store.currency}

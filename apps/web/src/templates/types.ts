@@ -357,6 +357,8 @@ export interface ProductCarouselProps {
   showCardFrame?: boolean;
   /** Frame personality. soft / outline / shadow / paper. Default 'soft'. */
   cardFrameStyle?: 'soft' | 'outline' | 'shadow' | 'paper';
+  /** Hex color applied as inline borderColor on the frame element when showCardFrame is on. */
+  cardFrameColor?: string;
 }
 
 /**
@@ -393,6 +395,8 @@ export interface CategoryStripProps {
   showCardFrame?: boolean;
   /** Frame personality. soft / outline / shadow / paper. Default 'soft'. */
   cardFrameStyle?: 'soft' | 'outline' | 'shadow' | 'paper';
+  /** Hex color applied as inline borderColor on the frame element when showCardFrame is on. */
+  cardFrameColor?: string;
 }
 
 /**
@@ -441,6 +445,19 @@ export interface ProductCardProps {
    */
   onRemoveFromWishlist?: (productId: string) => void;
   urlPrefix?: string;
+  // Per-card layout overrides from productCardDefaults — 2026-05-18 Sprint 4.
+  // These allow PLP / category / search surfaces to reflect the merchant's
+  // global card-defaults settings set in Admin → Layout.
+  cardSize?: import('@force/shared').CardSize;
+  cardAspect?: import('@force/shared').CardAspect;
+  cardShape?: import('@force/shared').CardShape;
+  cardGap?: import('@force/shared').CardGap;
+  showLabel?: boolean;
+  showHover?: boolean;
+  showCardFrame?: boolean;
+  cardFrameStyle?: 'soft' | 'outline' | 'shadow' | 'paper';
+  /** Hex color applied as inline borderColor on the frame element when showCardFrame is on. */
+  cardFrameColor?: string;
 }
 
 /**
@@ -523,6 +540,8 @@ export interface CategoryGridProps {
   showCardFrame?: boolean;
   /** Frame personality. soft / outline / shadow / paper. Default 'soft'. */
   cardFrameStyle?: 'soft' | 'outline' | 'shadow' | 'paper';
+  /** Hex color applied as inline borderColor on the frame element when showCardFrame is on. */
+  cardFrameColor?: string;
   /** Merchant-picked column counts from admin Layout page. */
   mobileColumns?: 1 | 2 | 3;
   desktopColumns?: 2 | 3 | 4;

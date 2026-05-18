@@ -8,6 +8,7 @@ import { useT } from '@/i18n/useT';
 import {
   resolveLayoutSettings,
   type StoreLayoutSettings,
+  type ProductCardDefaults,
   type HeroSlide,
   recommendedSizeTextForTemplate,
   type TemplateId,
@@ -458,6 +459,14 @@ export default function StoreLayoutPage() {
                     </label>
                   )}
                 </div>
+                {layout.categories.showCardFrame && (
+                  <ColorField
+                    label="Card frame color (this section)"
+                    value={layout.categories.cardFrameColor}
+                    onChange={v => updateSection('categories', s => ({ ...s, cardFrameColor: v }))}
+                    hint="Overrides the theme border color for these category cards."
+                  />
+                )}
                 <ColorField
                   label="Section background color"
                   value={layout.categories.bgColor}
@@ -667,6 +676,33 @@ export default function StoreLayoutPage() {
                 />
               </SectionCard>
 
+              {/* Product Card Defaults — global card controls that apply
+                  to the PLP, search, and any product surface outside the
+                  homepage carousels. Per-section settings above override
+                  these for homepage new-arrivals + best-sellers. */}
+              <SectionCard
+                title="Product card defaults"
+                description="Applied to the catalog, category, search, and any product surface outside the homepage. Per-section settings above override these for the homepage carousels."
+                alwaysOn
+              >
+                <ProductCardControls
+                  values={layout.productCardDefaults ?? {}}
+                  onChange={patch =>
+                    setLayout(prev =>
+                      prev
+                        ? {
+                            ...prev,
+                            productCardDefaults: {
+                              ...(prev.productCardDefaults ?? {}),
+                              ...(patch as Partial<ProductCardDefaults>),
+                            },
+                          }
+                        : prev
+                    )
+                  }
+                />
+              </SectionCard>
+
               {/* Sizing contract section removed 2026-05-16 — its 3 fields
                   (heroAspect / productImageAspect / categoryImageAspect)
                   were never consumed by the storefront. The per-section
@@ -769,6 +805,8 @@ type CardControlsValues = {
   showHover?: boolean;
   showCardFrame?: boolean;
   cardFrameStyle?: 'soft' | 'outline' | 'shadow' | 'paper';
+  /** Hex color for the card frame border — only visible when showCardFrame is on. */
+  cardFrameColor?: string;
 };
 
 function ProductCardControls({
@@ -779,103 +817,117 @@ function ProductCardControls({
   onChange: (patch: Partial<CardControlsValues>) => void;
 }) {
   return (
-    <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-      <label className="flex flex-col gap-1 text-sm">
-        <span className="text-muted-foreground">Card size</span>
-        <select
-          value={values.cardSize ?? 'sm'}
-          onChange={e => onChange({ cardSize: e.target.value as CardControlsValues['cardSize'] })}
-          className="rounded-lg border border-border bg-card px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-        >
-          <option value="xxs">Tiniest (90/110px)</option>
-          <option value="xs">Extra small (120/140px)</option>
-          <option value="sm">Small (150/180px) — default</option>
-          <option value="md">Medium (200/240px)</option>
-          <option value="lg">Large (240/300px)</option>
-          <option value="xl">Extra large (280/360px)</option>
-        </select>
-      </label>
-      <label className="flex flex-col gap-1 text-sm">
-        <span className="text-muted-foreground">Image aspect</span>
-        <select
-          value={values.cardAspect ?? 'theme'}
-          onChange={e =>
-            onChange({ cardAspect: e.target.value as CardControlsValues['cardAspect'] })
-          }
-          className="rounded-lg border border-border bg-card px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-        >
-          <option value="theme">Theme default (3:4 — 600×800)</option>
-          <option value="square">Square 1:1 (800×800)</option>
-          <option value="portrait">Portrait 3:4 (600×800)</option>
-          <option value="landscape">Landscape 4:3 (800×600)</option>
-        </select>
-      </label>
-      <label className="flex flex-col gap-1 text-sm">
-        <span className="text-muted-foreground">Card shape</span>
-        <select
-          value={values.cardShape ?? 'theme'}
-          onChange={e => onChange({ cardShape: e.target.value as CardControlsValues['cardShape'] })}
-          className="rounded-lg border border-border bg-card px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-        >
-          <option value="theme">Theme default</option>
-          <option value="circle">Circle (round, 1:1)</option>
-          <option value="rounded-square">Rounded square (soft, 1:1)</option>
-          <option value="square">Sharp square (1:1)</option>
-          <option value="soft">Soft rectangle (4:5)</option>
-          <option value="portrait">Portrait (3:4)</option>
-          <option value="landscape">Landscape (4:3)</option>
-          <option value="pill">Pill (horizontal, 2:1)</option>
-        </select>
-        <span className="text-[11px] text-muted-foreground/80">
-          Overrides the aspect ratio + rounded corners with one preset.
-        </span>
-      </label>
-      <label className="flex flex-col gap-1 text-sm">
-        <span className="text-muted-foreground">Card spacing</span>
-        <select
-          value={values.cardGap ?? 'normal'}
-          onChange={e => onChange({ cardGap: e.target.value as CardControlsValues['cardGap'] })}
-          className="rounded-lg border border-border bg-card px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-        >
-          <option value="tight">Tight (6-8px)</option>
-          <option value="normal">Normal (12-16px) — default</option>
-          <option value="loose">Loose (20-24px)</option>
-          <option value="xloose">Extra loose (32-40px)</option>
-        </select>
-      </label>
-      <RowToggle
-        label="Show labels"
-        checked={values.showLabel !== false}
-        onChange={v => onChange({ showLabel: v })}
-      />
-      <RowToggle
-        label="Hover effects"
-        checked={values.showHover !== false}
-        onChange={v => onChange({ showHover: v })}
-      />
-      <RowToggle
-        label="Show frame around each card"
-        checked={!!values.showCardFrame}
-        onChange={v => onChange({ showCardFrame: v })}
-      />
-      {values.showCardFrame && (
+    <div className="mt-3 space-y-0">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <label className="flex flex-col gap-1 text-sm">
-          <span className="text-muted-foreground">Frame style</span>
+          <span className="text-muted-foreground">Card size</span>
           <select
-            value={values.cardFrameStyle ?? 'soft'}
+            value={values.cardSize ?? 'sm'}
+            onChange={e => onChange({ cardSize: e.target.value as CardControlsValues['cardSize'] })}
+            className="rounded-lg border border-border bg-card px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          >
+            <option value="xxs">Tiniest (90/110px)</option>
+            <option value="xs">Extra small (120/140px)</option>
+            <option value="sm">Small (150/180px) — default</option>
+            <option value="md">Medium (200/240px)</option>
+            <option value="lg">Large (240/300px)</option>
+            <option value="xl">Extra large (280/360px)</option>
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="text-muted-foreground">Image aspect</span>
+          <select
+            value={values.cardAspect ?? 'theme'}
             onChange={e =>
-              onChange({
-                cardFrameStyle: e.target.value as CardControlsValues['cardFrameStyle'],
-              })
+              onChange({ cardAspect: e.target.value as CardControlsValues['cardAspect'] })
             }
             className="rounded-lg border border-border bg-card px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           >
-            <option value="soft">Soft (rounded + light shadow) — default</option>
-            <option value="outline">Outline (2px border, no shadow)</option>
-            <option value="shadow">Shadow (larger drop shadow, no border)</option>
-            <option value="paper">Paper (editorial, larger padding)</option>
+            <option value="theme">Theme default (3:4 — 600×800)</option>
+            <option value="square">Square 1:1 (800×800)</option>
+            <option value="portrait">Portrait 3:4 (600×800)</option>
+            <option value="landscape">Landscape 4:3 (800×600)</option>
           </select>
         </label>
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="text-muted-foreground">Card shape</span>
+          <select
+            value={values.cardShape ?? 'theme'}
+            onChange={e =>
+              onChange({ cardShape: e.target.value as CardControlsValues['cardShape'] })
+            }
+            className="rounded-lg border border-border bg-card px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          >
+            <option value="theme">Theme default</option>
+            <option value="circle">Circle (round, 1:1)</option>
+            <option value="rounded-square">Rounded square (soft, 1:1)</option>
+            <option value="square">Sharp square (1:1)</option>
+            <option value="soft">Soft rectangle (4:5)</option>
+            <option value="portrait">Portrait (3:4)</option>
+            <option value="landscape">Landscape (4:3)</option>
+            <option value="pill">Pill (horizontal, 2:1)</option>
+          </select>
+          <span className="text-[11px] text-muted-foreground/80">
+            Overrides the aspect ratio + rounded corners with one preset.
+          </span>
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="text-muted-foreground">Card spacing</span>
+          <select
+            value={values.cardGap ?? 'normal'}
+            onChange={e => onChange({ cardGap: e.target.value as CardControlsValues['cardGap'] })}
+            className="rounded-lg border border-border bg-card px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          >
+            <option value="tight">Tight (6-8px)</option>
+            <option value="normal">Normal (12-16px) — default</option>
+            <option value="loose">Loose (20-24px)</option>
+            <option value="xloose">Extra loose (32-40px)</option>
+          </select>
+        </label>
+        <RowToggle
+          label="Show labels"
+          checked={values.showLabel !== false}
+          onChange={v => onChange({ showLabel: v })}
+        />
+        <RowToggle
+          label="Hover effects"
+          checked={values.showHover !== false}
+          onChange={v => onChange({ showHover: v })}
+        />
+        <RowToggle
+          label="Show frame around each card"
+          checked={!!values.showCardFrame}
+          onChange={v => onChange({ showCardFrame: v })}
+        />
+        {values.showCardFrame && (
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-muted-foreground">Frame style</span>
+            <select
+              value={values.cardFrameStyle ?? 'soft'}
+              onChange={e =>
+                onChange({
+                  cardFrameStyle: e.target.value as CardControlsValues['cardFrameStyle'],
+                })
+              }
+              className="rounded-lg border border-border bg-card px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              <option value="soft">Soft (rounded + light shadow) — default</option>
+              <option value="outline">Outline (2px border, no shadow)</option>
+              <option value="shadow">Shadow (larger drop shadow, no border)</option>
+              <option value="paper">Paper (editorial, larger padding)</option>
+            </select>
+          </label>
+        )}
+      </div>
+      {/* Card frame color — full-width below the grid so the color picker
+          + clear button have room. Only shown when the frame toggle is on. */}
+      {values.showCardFrame && (
+        <ColorField
+          label="Card frame color (this section)"
+          value={values.cardFrameColor}
+          onChange={v => onChange({ cardFrameColor: v })}
+          hint="Overrides the theme border color for these cards."
+        />
       )}
     </div>
   );

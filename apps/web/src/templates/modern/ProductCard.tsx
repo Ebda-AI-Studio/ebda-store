@@ -33,6 +33,9 @@ function ModernProductCard({
   onToggleCompare,
   onRemoveFromWishlist,
   urlPrefix = '',
+  showCardFrame,
+  cardFrameStyle: _cardFrameStyle,
+  cardFrameColor,
 }: ProductCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -69,6 +72,7 @@ function ModernProductCard({
       // products, category pages) render at the same size as the main
       // listings. Ahmad 2026-05-16 design.md baseline.
       className="w-full md:max-w-[200px] mx-auto"
+      style={showCardFrame && cardFrameColor ? { borderColor: cardFrameColor } : undefined}
     >
       <Link
         href={`${urlPrefix}/products/${product.slug}`}
