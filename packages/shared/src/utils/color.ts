@@ -157,13 +157,18 @@ export function pickReadableForeground(bg: string | undefined): '#ffffff' | '#00
   const rgb = parseColorToRgb(bg);
   if (!rgb) return undefined;
   const lum = relativeLuminance(rgb);
-  // 0.35 is the practical flip point: luminances above this are light enough
-  // that black text passes WCAG AA for large text; below (including brand
-  // saturated colors like the FWB orange at ~0.32) white text is preferred.
-  // The mathematically balanced point is 0.179 but that leaves many
-  // mid-luminance brand colors with insufficient black contrast — 0.35
-  // matches real-world design-system practice (Material Design, Polaris).
-  return lum > 0.35 ? '#000000' : '#ffffff';
+  // 0.179 is the WCAG-correct flip point — the luminance value where contrast
+  // against black and white is mathematically balanced (solving 20L²+2L-1=0).
+  // For #FF6E00 (FWB brand orange, L≈0.324) this returns BLACK because black
+  // gives 7.48:1 contrast (passes AA easily) while white gives 2.81:1 (fails AA).
+  //
+  // An earlier draft used 0.35 to make the helper return white-on-orange
+  // (matching the "Material on-color" pattern). That was wrong: it would ship
+  // white text that fails AA on the brand orange, which is the exact "unreadable
+  // text" bug this helper exists to prevent. If a merchant wants white on their
+  // brand color anyway, they pick it explicitly and the ColorContrastPreview
+  // warning surfaces the failing ratio so they can decide deliberately.
+  return lum > 0.179 ? '#000000' : '#ffffff';
 }
 
 // Task 6: contrastRatio

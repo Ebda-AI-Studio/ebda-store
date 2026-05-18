@@ -72,9 +72,12 @@ describe('pickReadableForeground', () => {
     expect(pickReadableForeground('#1a1a1a')).toBe('#ffffff');
   });
 
-  it('returns white for the FWB brand orange', () => {
-    // #FF6E00 has luminance ~0.30 — should pick white text
-    expect(pickReadableForeground('#FF6E00')).toBe('#ffffff');
+  it('returns black for the FWB brand orange (L≈0.324; black=7.5:1 passes AA, white=2.8:1 fails)', () => {
+    // #FF6E00 has luminance ~0.324. WCAG flip point is 0.179 so this is
+    // above the threshold → black wins. Verified mathematically:
+    //   contrast(orange, black) = (0.324 + 0.05) / 0.05 = 7.48 ✓ AA
+    //   contrast(orange, white) = 1.05 / 0.374        = 2.81 ✗ AA
+    expect(pickReadableForeground('#FF6E00')).toBe('#000000');
   });
 
   it('handles hsl() input', () => {
