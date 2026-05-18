@@ -16,6 +16,7 @@ import {
   type CardFrameWidth,
 } from '@force/shared';
 import { ColorField } from '../../../../components/ColorField';
+import { SmartPaletteModal } from '../../../../components/SmartPaletteModal';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { Toggle } from '../../../../components/Toggle';
 import { ImageUpload } from '../../../../components/ImageUpload';
@@ -46,6 +47,7 @@ export default function StoreLayoutPage() {
   const [storeInfo, setStoreInfo] = useState<StoreInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!storeId) return;
@@ -109,14 +111,23 @@ export default function StoreLayoutPage() {
       title={t('title')}
       subtitle={t('subtitle')}
       actions={
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={!layout || isSaving}
-          className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60 transition-colors cursor-pointer"
-        >
-          {isSaving ? t('saving') : t('save')}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setPaletteOpen(true)}
+            className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground hover:bg-muted transition-colors cursor-pointer"
+          >
+            Smart palette
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={!layout || isSaving}
+            className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60 transition-colors cursor-pointer"
+          >
+            {isSaving ? t('saving') : t('save')}
+          </button>
+        </div>
       }
     >
       <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_480px]">
@@ -801,6 +812,39 @@ export default function StoreLayoutPage() {
           </div>
         </aside>
       </div>
+      <SmartPaletteModal
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        theme={storeInfo?.theme}
+        onApply={palette => {
+          setLayout(prev => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              hero: { ...prev.hero, bgColor: palette.hero.bgColor },
+              categories: {
+                ...prev.categories,
+                bgColor: palette.categories.bgColor,
+                cardFrameColor: palette.categories.cardFrameColor,
+                cardFrameWidth: palette.categories.cardFrameWidth,
+              },
+              newArrivals: {
+                ...prev.newArrivals,
+                bgColor: palette.newArrivals.bgColor,
+                cardFrameColor: palette.newArrivals.cardFrameColor,
+                cardFrameWidth: palette.newArrivals.cardFrameWidth,
+              },
+              bestSellers: {
+                ...prev.bestSellers,
+                bgColor: palette.bestSellers.bgColor,
+                cardFrameColor: palette.bestSellers.cardFrameColor,
+                cardFrameWidth: palette.bestSellers.cardFrameWidth,
+              },
+              testimonials: { ...prev.testimonials, bgColor: palette.testimonials.bgColor },
+            };
+          });
+        }}
+      />
     </AdminLayout>
   );
 }
