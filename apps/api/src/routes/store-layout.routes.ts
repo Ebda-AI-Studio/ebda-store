@@ -41,10 +41,14 @@ const heroSlideSchema = z.object({
   ctaHref: z.string().optional(),
 });
 
-// Hex color, 3 or 6 digits, optional alpha. Empty string allowed = unset.
-const hexColor = z
+// Color value: hex (#RGB, #RRGGBB, #RRGGBBAA) OR brand token (token:<name>) OR empty.
+// Empty string = unset, falls back to theme background preset.
+const colorValue = z
   .string()
-  .regex(/^(#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|)$/, 'Must be a hex color')
+  .regex(
+    /^(#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|token:(primary|secondary|accent|card|muted|foreground|border)|)$/,
+    'Must be a hex color or token:<brand-color>'
+  )
   .optional();
 
 const layoutSchema = z
@@ -60,7 +64,7 @@ const layoutSchema = z
       presentation: z.enum(['full-bleed', 'framed']).optional(),
       // 2026-05-18 Sprint 3: per-section bg color. Must be listed or Zod
       // silently strips it on every PUT — same trap class as imageMobile.
-      bgColor: hexColor,
+      bgColor: colorValue,
     }),
     categories: z.object({
       enabled: z.boolean(),
@@ -117,9 +121,9 @@ const layoutSchema = z
       showCardFrame: z.boolean().optional(),
       cardFrameStyle: z.enum(['soft', 'outline', 'shadow', 'paper']).optional(),
       // 2026-05-18 Sprint 4: per-section card frame color override.
-      cardFrameColor: hexColor,
+      cardFrameColor: colorValue,
       // 2026-05-18 Sprint 3: per-section bg color.
-      bgColor: hexColor,
+      bgColor: colorValue,
     }),
     // Product carousels — newArrivals + bestSellers. 2026-05-16: extended
     // to mirror the categories block so merchants can tune product card
@@ -159,9 +163,9 @@ const layoutSchema = z
       showCardFrame: z.boolean().optional(),
       cardFrameStyle: z.enum(['soft', 'outline', 'shadow', 'paper']).optional(),
       // 2026-05-18 Sprint 4: per-section card frame color override.
-      cardFrameColor: hexColor,
+      cardFrameColor: colorValue,
       // 2026-05-18 Sprint 3: per-section bg color.
-      bgColor: hexColor,
+      bgColor: colorValue,
     }),
     bestSellers: z.object({
       enabled: z.boolean(),
@@ -195,9 +199,9 @@ const layoutSchema = z
       showCardFrame: z.boolean().optional(),
       cardFrameStyle: z.enum(['soft', 'outline', 'shadow', 'paper']).optional(),
       // 2026-05-18 Sprint 4: per-section card frame color override.
-      cardFrameColor: hexColor,
+      cardFrameColor: colorValue,
       // 2026-05-18 Sprint 3: per-section bg color.
-      bgColor: hexColor,
+      bgColor: colorValue,
     }),
     filterSidebar: z.object({
       enabled: z.boolean(),
@@ -208,7 +212,7 @@ const layoutSchema = z
       minRating: z.number().min(1).max(5),
       verifiedOnly: z.boolean(),
       // 2026-05-18 Sprint 3: per-section bg color.
-      bgColor: hexColor,
+      bgColor: colorValue,
     }),
     // sibling UGC section, added 2026-05-16. without listing here Zod
     // would silently strip it on every save — same bug class as imageMobile
@@ -248,7 +252,7 @@ const layoutSchema = z
         showHover: z.boolean().optional(),
         showCardFrame: z.boolean().optional(),
         cardFrameStyle: z.enum(['soft', 'outline', 'shadow', 'paper']).optional(),
-        cardFrameColor: hexColor,
+        cardFrameColor: colorValue,
       })
       .partial()
       .optional(),
