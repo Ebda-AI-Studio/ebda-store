@@ -60,11 +60,13 @@ export const IMAGE_STANDARDS = {
     description: 'Full-width promotional banner — desktop.',
   },
   bannerMobile: {
-    width: 800,
-    height: 600,
-    aspect: '4:3',
+    width: 900,
+    height: 700,
+    aspect: '9:7',
     formats: ['JPEG', 'WebP'],
-    description: 'Full-width promotional banner — mobile.',
+    safeZone: { width: 700, height: 600 },
+    description:
+      "Full-width promotional banner — mobile. Near-square crop (9:7) per Ahmad 2026-05-18 reference set. Subject/CTA must fit inside the 700×600 center safe zone so iPhone-mini crops don't lose the message.",
   },
   productPrimary: {
     width: 600,
@@ -80,6 +82,14 @@ export const IMAGE_STANDARDS = {
     formats: ['JPEG', 'WebP'],
     description: 'Product photo — square alt aspect (when admin cardAspect = square).',
   },
+  productMobile: {
+    width: 600,
+    height: 600,
+    aspect: '1:1',
+    formats: ['JPEG', 'WebP'],
+    description:
+      "Product photo — mobile-tuned 1:1 (600×600). Smaller file than productSquare's 800×800. Pair with cardAspect = square. No baked-in text or sale badges.",
+  },
   categorySquare: {
     width: 800,
     height: 800,
@@ -93,6 +103,14 @@ export const IMAGE_STANDARDS = {
     aspect: '3:4',
     formats: ['JPEG', 'WebP'],
     description: 'Category card image — portrait alt (when admin cardShape = portrait).',
+  },
+  categoryMobile: {
+    width: 630,
+    height: 630,
+    aspect: '1:1',
+    formats: ['JPEG', 'WebP', 'PNG'],
+    description:
+      "Category card image — mobile-tuned 1:1 (630×630). Smaller file than categorySquare's 800×800 desktop ref. Use when merchant only ships one image and storefront is mobile-first.",
   },
   brandLogoCarousel: {
     width: 300,
