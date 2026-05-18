@@ -3,6 +3,16 @@
 // Export utility modules
 export * from './image';
 export * from './csv';
+// Color helpers (smart-color resolver + contrast utilities)
+export {
+  resolveColor,
+  pickReadableForeground,
+  contrastRatio,
+  parseColorToRgb,
+  relativeLuminance,
+  COLOR_TOKENS,
+} from './color';
+export type { ColorValue, ColorToken, Rgb } from './color';
 
 /**
  * Format a price value as a localised currency string.

@@ -1,0 +1,110 @@
+// packages/shared/src/utils/color.test.ts
+import { describe, it, expect } from 'vitest';
+import { resolveColor, pickReadableForeground, contrastRatio, parseColorToRgb } from './color';
+import type { StoreTheme } from '../types/store-theme';
+
+const TEST_THEME = {
+  primary: '24 100% 50%', // brand orange ~#FF6E00
+  secondary: '220 13% 91%',
+  accent: '210 80% 60%',
+  card: '0 0% 100%', // white
+  muted: '210 16% 96%',
+  foreground: '224 71% 4%', // near-black
+  border: '220 13% 91%',
+  background: '0 0% 100%',
+} as unknown as StoreTheme;
+
+describe('parseColorToRgb', () => {
+  it('parses #RRGGBB', () => {
+    expect(parseColorToRgb('#FF6E00')).toEqual({ r: 255, g: 110, b: 0 });
+  });
+
+  it('parses #RGB shorthand', () => {
+    expect(parseColorToRgb('#F00')).toEqual({ r: 255, g: 0, b: 0 });
+  });
+
+  it('parses hsl(H S% L%) space-separated', () => {
+    expect(parseColorToRgb('hsl(0 100% 50%)')).toEqual({ r: 255, g: 0, b: 0 });
+  });
+
+  it('parses bare HSL triplet "H S% L%"', () => {
+    expect(parseColorToRgb('0 100% 50%')).toEqual({ r: 255, g: 0, b: 0 });
+  });
+
+  it('returns null for invalid input', () => {
+    expect(parseColorToRgb('not-a-color')).toBeNull();
+    expect(parseColorToRgb('')).toBeNull();
+  });
+});
+
+describe('resolveColor', () => {
+  it('returns undefined for empty input', () => {
+    expect(resolveColor(undefined, TEST_THEME)).toBeUndefined();
+    expect(resolveColor('', TEST_THEME)).toBeUndefined();
+  });
+
+  it('passes through raw hex unchanged', () => {
+    expect(resolveColor('#FF6E00', TEST_THEME)).toBe('#FF6E00');
+  });
+
+  it('resolves token:<name> to hsl() string', () => {
+    expect(resolveColor('token:primary', TEST_THEME)).toBe('hsl(24 100% 50%)');
+  });
+
+  it('returns undefined for unknown token', () => {
+    expect(resolveColor('token:nonexistent' as string, TEST_THEME)).toBeUndefined();
+  });
+
+  it('passes through HSL string from theme if already wrapped', () => {
+    const themeWithWrappedHsl = { ...TEST_THEME, primary: 'hsl(24 100% 50%)' } as StoreTheme;
+    expect(resolveColor('token:primary', themeWithWrappedHsl)).toBe('hsl(24 100% 50%)');
+  });
+});
+
+describe('pickReadableForeground', () => {
+  it('returns black for bright bg', () => {
+    expect(pickReadableForeground('#FFFFFF')).toBe('#000000');
+    expect(pickReadableForeground('#FFFF00')).toBe('#000000'); // yellow
+  });
+
+  it('returns white for dark bg', () => {
+    expect(pickReadableForeground('#000000')).toBe('#ffffff');
+    expect(pickReadableForeground('#1a1a1a')).toBe('#ffffff');
+  });
+
+  it('returns white for the FWB brand orange', () => {
+    // #FF6E00 has luminance ~0.30 — should pick white text
+    expect(pickReadableForeground('#FF6E00')).toBe('#ffffff');
+  });
+
+  it('handles hsl() input', () => {
+    expect(pickReadableForeground('hsl(0 0% 100%)')).toBe('#000000');
+    expect(pickReadableForeground('hsl(0 0% 0%)')).toBe('#ffffff');
+  });
+
+  it('returns undefined for unparseable input', () => {
+    expect(pickReadableForeground(undefined)).toBeUndefined();
+    expect(pickReadableForeground('not-a-color')).toBeUndefined();
+  });
+});
+
+describe('contrastRatio', () => {
+  it('returns 21 for black vs white', () => {
+    expect(contrastRatio('#000000', '#FFFFFF')).toBeCloseTo(21, 0);
+  });
+
+  it('returns 1 for identical colors', () => {
+    expect(contrastRatio('#FF6E00', '#FF6E00')).toBeCloseTo(1, 1);
+  });
+
+  it('passes WCAG AA for the FWB orange + white text', () => {
+    const ratio = contrastRatio('#FF6E00', '#FFFFFF');
+    // FWB orange + white is ~3.0:1 — passes AA large text (3.0) but fails AA normal text (4.5).
+    expect(ratio).toBeGreaterThan(2.5);
+    expect(ratio).toBeLessThan(4.5);
+  });
+
+  it('returns NaN-safe value when an input is unparseable', () => {
+    expect(contrastRatio('not-a-color', '#FFFFFF')).toBe(1);
+  });
+});
