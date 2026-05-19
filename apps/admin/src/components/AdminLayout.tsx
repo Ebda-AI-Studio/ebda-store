@@ -90,6 +90,8 @@ export function AdminLayout({
     content: t('navContent'),
     settings: t('navSettings'),
     aiTools: t('navAiTools'),
+    navAccounts: t('navAccounts'),
+    navJournal: t('navJournal'),
   };
 
   // Sync dark mode with localStorage and system preference

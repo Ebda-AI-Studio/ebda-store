@@ -3564,6 +3564,8 @@
       "navContent": "المحتوى",
       "navSettings": "الإعدادات",
       "navAiTools": "أدوات الذكاء الاصطناعي",
+      "navAccounts": "دليل الحسابات",
+      "navJournal": "اليومية",
       "superAdmin": "مدير عام",
       "superAdminHint": "صلاحية كاملة على المنصة",
       "superAdminViewingStore": "مدير عام",
@@ -3592,6 +3594,38 @@
     },
     "brand": {
       "forceMediaAlt": "Force Media"
+    }
+  },
+  "finance": {
+    "accounts": {
+      "title": "دليل الحسابات",
+      "description": "كل الحسابات الدفترية مجمّعة حسب النوع. لا يمكن تعديل أو حذف الحسابات النظامية.",
+      "type": {
+        "asset": "الأصول",
+        "liability": "الالتزامات",
+        "equity": "حقوق الملكية",
+        "revenue": "الإيرادات",
+        "expense": "المصروفات"
+      },
+      "system": "نظامي",
+      "code": "الرمز",
+      "name": "الاسم",
+      "noAccountsHint": "لا توجد حسابات بعد. حدّث الصفحة أو تواصل مع الدعم."
+    },
+    "journal": {
+      "title": "قيود اليومية",
+      "description": "كل عملية مالية تنشئ قيد دفتري متوازن هنا.",
+      "entryNumber": "رقم القيد",
+      "postedAt": "التاريخ",
+      "source": "المصدر",
+      "memo": "البيان",
+      "debit": "مدين",
+      "credit": "دائن",
+      "reversed": "→ مُلغى",
+      "reverses": "يلغي",
+      "viewDetail": "عرض",
+      "account": "الحساب",
+      "noEntries": "لا توجد قيود بعد — ستظهر هنا عند إتمام الطلبات."
     }
   }
 }

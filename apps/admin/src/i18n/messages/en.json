@@ -3561,6 +3561,8 @@
       "navContent": "Content",
       "navSettings": "Settings",
       "navAiTools": "AI Tools",
+      "navAccounts": "Chart of Accounts",
+      "navJournal": "Journal",
       "superAdmin": "Super Admin",
       "superAdminHint": "Full platform access",
       "superAdminViewingStore": "Super Admin",
@@ -3589,6 +3591,38 @@
     },
     "brand": {
       "forceMediaAlt": "Force Media"
+    }
+  },
+  "finance": {
+    "accounts": {
+      "title": "Chart of Accounts",
+      "description": "All ledger accounts grouped by type. System accounts cannot be edited or deleted.",
+      "type": {
+        "asset": "Assets",
+        "liability": "Liabilities",
+        "equity": "Equity",
+        "revenue": "Revenue",
+        "expense": "Expenses"
+      },
+      "system": "System",
+      "code": "Code",
+      "name": "Name",
+      "noAccountsHint": "No accounts seeded yet. Refresh or contact support."
+    },
+    "journal": {
+      "title": "Journal Entries",
+      "description": "Every financial event posts a balanced journal entry here.",
+      "entryNumber": "Entry #",
+      "postedAt": "Date",
+      "source": "Source",
+      "memo": "Memo",
+      "debit": "Debit",
+      "credit": "Credit",
+      "reversed": "Reversed →",
+      "reverses": "Reverses",
+      "viewDetail": "View",
+      "account": "Account",
+      "noEntries": "No journal entries yet — they will appear here as orders complete."
     }
   }
 }

@@ -1,0 +1,206 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useParams } from 'next/navigation';
+import Link from 'next/link';
+import { AdminLayout } from '../../../../../../components/AdminLayout';
+import { useT } from '@/i18n/useT';
+import { apiGet } from '@/lib/api';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface LineAccount {
+  id: string;
+  code: string;
+  nameEn: string;
+  nameAr: string | null;
+}
+
+interface JournalLine {
+  id: string;
+  debit: number;
+  credit: number;
+  lineMemo: string | null;
+  account: LineAccount;
+}
+
+interface ReversalRef {
+  id: string;
+  entryNumber: string;
+}
+
+interface JournalEntry {
+  id: string;
+  entryNumber: string;
+  postedAt: string;
+  source: string;
+  memo: string | null;
+  memoAr: string | null;
+  status: 'posted' | 'reversed' | 'draft';
+  /** Entry that reversed this one (this entry is the original). */
+  reversedBy: ReversalRef | null;
+  /** Entry that this one reverses (this entry is the reversal). */
+  reverses: ReversalRef | null;
+  lines: JournalLine[];
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
+export default function JournalDetailPage() {
+  const params = useParams();
+  const storeId = params?.id as string;
+  const entryId = params?.entryId as string;
+  const t = useT('finance.journal');
+  const tc = useT('common');
+
+  const [entry, setEntry] = useState<JournalEntry | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!storeId || !entryId) return;
+    apiGet<JournalEntry>(`/api/v1/stores/${storeId}/finance/journal/${entryId}`)
+      .then(({ data, error: apiError }) => {
+        if (apiError) {
+          setError(apiError.message);
+        } else if (data) {
+          setEntry(data);
+        } else {
+          setError('Entry not found');
+        }
+      })
+      .catch(() => setError('Failed to load journal entry'));
+  }, [storeId, entryId]);
+
+  const backHref = `/stores/${storeId}/finance/journal`;
+
+  if (error) {
+    return (
+      <AdminLayout title={t('title')}>
+        <div className="p-6 space-y-3">
+          <Link href={backHref} className="text-sm text-primary underline underline-offset-2">
+            ← {t('title')}
+          </Link>
+          <p className="text-red-600 text-sm">{error}</p>
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  if (!entry) {
+    return (
+      <AdminLayout title={t('title')}>
+        <div className="p-6 text-muted-foreground text-sm">{tc('loading')}</div>
+      </AdminLayout>
+    );
+  }
+
+  const totalDr = entry.lines.reduce((s, l) => s + l.debit, 0);
+  const totalCr = entry.lines.reduce((s, l) => s + l.credit, 0);
+
+  return (
+    <AdminLayout
+      title={entry.entryNumber}
+      subtitle={`${new Date(entry.postedAt).toLocaleString()} · ${entry.source.replace(/_/g, ' ')}`}
+    >
+      <div className="max-w-3xl space-y-5">
+        {/* Back link */}
+        <Link href={backHref} className="text-sm text-primary underline underline-offset-2">
+          ← {t('title')}
+        </Link>
+
+        {/* Entry header card */}
+        <div className="rounded-xl border border-border bg-card p-5 space-y-2">
+          {entry.memo && <p className="text-sm text-foreground">{entry.memo}</p>}
+          {entry.memoAr && (
+            <p className="text-sm text-muted-foreground" dir="rtl">
+              {entry.memoAr}
+            </p>
+          )}
+
+          {/* Reversal notices */}
+          {entry.status === 'reversed' && entry.reversedBy && (
+            <p className="text-sm text-amber-700 dark:text-amber-400">
+              {t('reversed')}{' '}
+              <Link
+                href={`/stores/${storeId}/finance/journal/${entry.reversedBy.id}`}
+                className="underline underline-offset-2"
+              >
+                {entry.reversedBy.entryNumber}
+              </Link>
+            </p>
+          )}
+          {entry.reverses && (
+            <p className="text-sm text-amber-700 dark:text-amber-400">
+              {t('reverses')}{' '}
+              <Link
+                href={`/stores/${storeId}/finance/journal/${entry.reverses.id}`}
+                className="underline underline-offset-2"
+              >
+                {entry.reverses.entryNumber}
+              </Link>
+            </p>
+          )}
+        </div>
+
+        {/* Lines table */}
+        <div className="rounded-xl border border-border overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/30">
+              <tr>
+                <th className="text-start px-3 py-2 font-medium text-muted-foreground w-24">
+                  {t('account')}
+                </th>
+                <th className="text-start px-3 py-2 font-medium text-muted-foreground">
+                  {t('memo')}
+                </th>
+                <th className="text-end px-3 py-2 font-medium text-muted-foreground w-32">
+                  {t('debit')}
+                </th>
+                <th className="text-end px-3 py-2 font-medium text-muted-foreground w-32">
+                  {t('credit')}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {entry.lines.map(line => (
+                <tr key={line.id} className="border-t border-border/40">
+                  <td className="px-3 py-2 font-mono text-xs text-muted-foreground">
+                    {line.account.code}
+                  </td>
+                  <td className="px-3 py-2">
+                    <span className="text-foreground">{line.lineMemo ?? line.account.nameEn}</span>
+                    {line.account.nameAr && !line.lineMemo && (
+                      <span className="text-muted-foreground text-xs ms-2" dir="rtl">
+                        — {line.account.nameAr}
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2 text-end font-mono text-xs">
+                    {line.debit > 0 ? (line.debit / 1000).toFixed(3) : ''}
+                  </td>
+                  <td className="px-3 py-2 text-end font-mono text-xs">
+                    {line.credit > 0 ? (line.credit / 1000).toFixed(3) : ''}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            {/* Totals footer */}
+            <tfoot className="bg-muted/20 border-t border-border">
+              <tr>
+                <td className="px-3 py-2 text-xs font-medium text-muted-foreground" colSpan={2}>
+                  Total
+                </td>
+                <td className="px-3 py-2 text-end font-mono text-xs font-semibold">
+                  {(totalDr / 1000).toFixed(3)}
+                </td>
+                <td className="px-3 py-2 text-end font-mono text-xs font-semibold">
+                  {(totalCr / 1000).toFixed(3)}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </AdminLayout>
+  );
+}
