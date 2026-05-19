@@ -365,6 +365,20 @@ router.post(
         }),
       ]);
 
+      // Fire the same post-payment fanout the webhook handler does —
+      // accounting journal + WhatsApp WBS notification both rely on this event.
+      inngest
+        .send({
+          name: 'order/created',
+          data: {
+            orderId,
+            storeId: order.storeId,
+            paymentMethod: codPayment.provider,
+            locale: undefined,
+          },
+        })
+        .catch(err => logger.error({ err, orderId }, '[COD] Failed to enqueue order/created'));
+
       await auditLog({
         action: 'order.cod_marked_paid',
         userId: user.userId,
@@ -438,6 +452,27 @@ router.post(
       ]);
 
       await prisma.$transaction(updates);
+
+      // Fire one order/created event per updated order so accounting journal +
+      // WBS WhatsApp both receive the paid notification. Promise.allSettled so
+      // one failed enqueue doesn't block the response or the others.
+      await Promise.allSettled(
+        codOrders.map(o =>
+          inngest
+            .send({
+              name: 'order/created',
+              data: {
+                orderId: o.id,
+                storeId: o.storeId,
+                paymentMethod: o.payments[0].provider,
+                locale: undefined,
+              },
+            })
+            .catch(err =>
+              logger.error({ err, orderId: o.id }, '[COD bulk] Failed to enqueue order/created')
+            )
+        )
+      );
 
       await auditLog({
         action: 'order.cod_bulk_marked_paid',
