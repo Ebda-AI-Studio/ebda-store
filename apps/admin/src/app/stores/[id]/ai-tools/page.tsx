@@ -24,7 +24,7 @@ import { apiGet, apiPost } from '../../../../lib/api';
 
 interface BulkAiJob {
   id: string;
-  kind: 'translate' | 'seo' | 'faq_aeo' | 'howto_aeo' | 'meta_aeo';
+  kind: 'translate' | 'seo' | 'faq_aeo' | 'howto_aeo' | 'meta_aeo' | 'recommendations';
   status: 'queued' | 'running' | 'completed' | 'failed';
   direction: 'to_ar' | 'to_en' | null;
   total: number;
@@ -65,7 +65,14 @@ export default function AiToolsPage() {
   const [activeJob, setActiveJob] = useState<BulkAiJobDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [starting, setStarting] = useState<
-    'translate-ar' | 'translate-en' | 'seo' | 'faq-aeo' | 'howto-aeo' | 'meta-aeo' | null
+    | 'translate-ar'
+    | 'translate-en'
+    | 'seo'
+    | 'faq-aeo'
+    | 'howto-aeo'
+    | 'meta-aeo'
+    | 'recommendations'
+    | null
   >(null);
 
   const fetchJobs = useCallback(async () => {
@@ -205,6 +212,27 @@ export default function AiToolsPage() {
     }
   }
 
+  async function startRecommendations() {
+    setError(null);
+    setStarting('recommendations');
+    try {
+      const { data, error: apiError } = await apiPost<{ job: BulkAiJob }>(
+        `/api/v1/stores/${storeId}/ai/bulk/recommendations`,
+        {}
+      );
+      if (apiError || !data) {
+        setError(apiError?.message || 'Failed to start recommendations sweep');
+        return;
+      }
+      setActiveJob({ ...data.job, errors: null } as BulkAiJobDetail);
+      await fetchJobs();
+    } catch {
+      setError('Network error');
+    } finally {
+      setStarting(null);
+    }
+  }
+
   return (
     <AdminLayout
       title="AI Tools"
@@ -293,6 +321,16 @@ export default function AiToolsPage() {
           resultsHref={`/stores/${storeId}/seo`}
           resultsLabel="View meta on SEO page"
         />
+        <BulkActionCard
+          title="AI product recommendations"
+          body='Generate AI-driven cross-sell recommendations across your catalogue. Fills the storefront "You might also like" section on each product page. Re-running updates existing suggestions.'
+          buttonLabel="Run sweep"
+          loading={starting === 'recommendations'}
+          disabled={
+            !!activeJob && activeJob.status !== 'completed' && activeJob.status !== 'failed'
+          }
+          onClick={startRecommendations}
+        />
       </div>
 
       {activeJob && (
@@ -338,7 +376,9 @@ export default function AiToolsPage() {
                             ? 'Draft FAQs'
                             : j.kind === 'howto_aeo'
                               ? 'Draft HowTos'
-                              : 'Meta AEO rewrite'}
+                              : j.kind === 'recommendations'
+                                ? 'AI recommendations'
+                                : 'Meta AEO rewrite'}
                     </td>
                     <td className="px-4 py-3">
                       <StatusBadge status={j.status} />
@@ -466,7 +506,9 @@ function ActiveJobCard({ job, onClose }: { job: BulkAiJobDetail; onClose: () => 
                   ? 'FAQ draft sweep'
                   : job.kind === 'howto_aeo'
                     ? 'HowTo draft sweep'
-                    : 'Meta AEO rewrite sweep'}
+                    : job.kind === 'recommendations'
+                      ? 'AI recommendations sweep'
+                      : 'Meta AEO rewrite sweep'}
           </h3>
           <p className="text-xs text-muted-foreground">
             {isDone

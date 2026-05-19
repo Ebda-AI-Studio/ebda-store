@@ -511,4 +511,49 @@ router.post(
   }
 );
 
+// =====================================================================
+// Bulk AI recommendations sweep.
+// Generates cross-sell suggestions for every active product using
+// Gemini. Results are stored in ai_recommendation and queried by
+// recommendation.service.ts as the second priority (after manual
+// cross-sells, before FBT).
+// =====================================================================
+
+router.post(
+  '/bulk/recommendations',
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+
+      const job = await prisma.bulkAiJob.create({
+        data: { storeId, userId: req.user!.userId, kind: 'recommendations' },
+        select: { id: true, status: true, kind: true, createdAt: true },
+      });
+
+      try {
+        await inngest.send({
+          name: 'bulk-ai/recommendations-requested',
+          data: { jobId: job.id, storeId },
+        });
+      } catch (err) {
+        await markJobFailedIfEnqueueFailed(job.id, err);
+        res.status(503).json({
+          success: false,
+          error: {
+            code: 'AI_QUEUE_UNREACHABLE',
+            message:
+              'Could not enqueue the recommendations sweep right now. Try again in a minute.',
+          },
+        });
+        return;
+      }
+
+      res.status(202).json({ success: true, data: { job } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 export default router;

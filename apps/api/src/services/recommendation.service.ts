@@ -79,30 +79,52 @@ class RecommendationService {
         ...r.targetProduct,
       }));
     } else {
-      // FBT fallback
-      const fbtRows = await prisma.frequentlyBoughtTogether.findMany({
-        where: {
-          storeId,
-          OR: [{ productId1: productId }, { productId2: productId }],
-        },
-        orderBy: { coOccurrenceCount: 'desc' },
+      // AI recommendations — second priority after manual cross-sells.
+      // When the bulk-ai-recommendations sweep has been run for this store
+      // these rows are populated and ordered by Gemini confidence score.
+      const aiRecRows = await prisma.aiRecommendation.findMany({
+        where: { storeId, sourceProductId: productId },
+        orderBy: { score: 'desc' },
         take: 4,
         select: {
-          productId1: true,
-          productId2: true,
-          coOccurrenceCount: true,
-          product1: { select: productSelect },
-          product2: { select: productSelect },
+          targetProduct: { select: productSelect },
+          score: true,
+          reason: true,
         },
       });
 
-      crossSell = fbtRows.map(row => {
-        const isSource = row.productId1 === productId;
-        return {
-          coOccurrenceCount: row.coOccurrenceCount,
-          ...(isSource ? row.product2 : row.product1),
-        };
-      });
+      if (aiRecRows.length > 0) {
+        crossSell = aiRecRows.map(r => ({
+          aiScore: r.score,
+          aiReason: r.reason,
+          ...r.targetProduct,
+        }));
+      } else {
+        // FBT fallback — used when no AI recs exist for this product yet.
+        const fbtRows = await prisma.frequentlyBoughtTogether.findMany({
+          where: {
+            storeId,
+            OR: [{ productId1: productId }, { productId2: productId }],
+          },
+          orderBy: { coOccurrenceCount: 'desc' },
+          take: 4,
+          select: {
+            productId1: true,
+            productId2: true,
+            coOccurrenceCount: true,
+            product1: { select: productSelect },
+            product2: { select: productSelect },
+          },
+        });
+
+        crossSell = fbtRows.map(row => {
+          const isSource = row.productId1 === productId;
+          return {
+            coOccurrenceCount: row.coOccurrenceCount,
+            ...(isSource ? row.product2 : row.product1),
+          };
+        });
+      }
     }
 
     // 3. Upsell: manual relations
