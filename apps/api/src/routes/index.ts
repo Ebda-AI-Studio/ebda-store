@@ -44,6 +44,7 @@ import suppliersRoutes from './suppliers.routes';
 import purchaseOrdersRoutes from './purchase-orders.routes';
 import stockAdjustmentsRoutes from './stock-adjustments.routes';
 import expensesRoutes from './expenses.routes';
+import backordersRoutes from './backorders.routes';
 import { tenantContext } from '../middleware/tenant-context';
 
 const router = Router();
@@ -154,6 +155,9 @@ router.use('/stores', tenantContext, stockAdjustmentsRoutes);
 
 // Expense CRUD + approve/post/reject (Batch 2 accounting)
 router.use('/stores', tenantContext, expensesRoutes);
+
+// Backorder list + cancel (Batch 2 accounting)
+router.use('/stores', tenantContext, backordersRoutes);
 
 // Wishlist routes (user-scoped, no store context)
 router.use('/wishlist', wishlistRoutes);
