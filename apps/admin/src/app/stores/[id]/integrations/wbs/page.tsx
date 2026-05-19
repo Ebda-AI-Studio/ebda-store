@@ -59,9 +59,14 @@ function templateLabel(t: AvailableTemplate): string {
   return `${t.name} (${t.language}) — ${t.category}`;
 }
 
-/** Build a unique value string for a template option */
-function templateValue(t: AvailableTemplate): string {
-  return `${t.name}:::${t.language}`;
+/** Build a unique value string for a template option. Accepts either an
+ *  AvailableTemplate (WBS API shape, language stored as `language`) or a
+ *  TemplateEntry (persisted selection shape, language stored as
+ *  `languageCode`) so the same helper can render select options AND match
+ *  saved values back to the option set. */
+function templateValue(t: { name: string; language?: string; languageCode?: string }): string {
+  const lang = t.language ?? t.languageCode ?? '';
+  return `${t.name}:::${lang}`;
 }
 
 /** Parse a template value string back to a TemplateEntry */
@@ -358,7 +363,7 @@ export default function WbsIntegrationPage() {
                     ] as const
                   ).map(({ key, label, description }) => {
                     const current = selectedTemplates[key];
-                    const currentValue = current ? templateValue(current as AvailableTemplate) : '';
+                    const currentValue = current ? templateValue(current) : '';
 
                     return (
                       <div
