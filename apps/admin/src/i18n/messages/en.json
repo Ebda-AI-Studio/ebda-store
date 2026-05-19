@@ -3761,6 +3761,36 @@
         "cancelButton": "Cancel PO",
         "cancelConfirm": "Cancel this PO? This action cannot be undone."
       }
+    },
+    "backorders": {
+      "title": "Open Backorders",
+      "description": "Customers waiting on out-of-stock items. New PO receipts FIFO-clear the oldest first.",
+      "orderNumber": "Order #",
+      "customer": "Customer",
+      "product": "Product",
+      "qty": "Qty",
+      "daysWaiting": "Waiting",
+      "daysWaitingValue": "{days} days",
+      "cancel": "Cancel",
+      "cancelModal": {
+        "title": "Cancel backorder",
+        "reasonLabel": "Cancellation reason (sent to customer)",
+        "confirm": "Cancel & Refund",
+        "discard": "Keep"
+      },
+      "empty": "No open backorders. When customers buy out-of-stock items with backorder enabled, they'll appear here."
+    },
+    "reorder": {
+      "title": "Reorder Suggestions",
+      "comingSoon": "AI-powered reorder suggestions are coming in Batch 3.",
+      "explainer": "We'll compute weekly velocity × supplier lead time + safety stock + open backorders to surface 'reorder N units of X' cards. One click to draft a PO pre-filled with quantities and the best supplier.",
+      "notify": "Notify me when ready"
+    },
+    "deadstock": {
+      "title": "Dead-Stock Detection",
+      "comingSoon": "AI-powered dead-stock detection is coming in Batch 3.",
+      "explainer": "We'll flag products with 0 sales in 90 days and stock value above KWD 50, with AI-generated bilingual clearance copy and suggested discount %.",
+      "notify": "Notify me when ready"
     }
   }
 }
