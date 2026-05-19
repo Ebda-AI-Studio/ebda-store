@@ -66,13 +66,22 @@ const zoneOverride = z
   .partial()
   .optional();
 
-// Per-section typography override — 4 sub-zones: heading / kicker / subtitle / body.
+// Per-section typography override — heading / kicker / subtitle / body / seeAll /
+// productName / productPrice / productCta / categoryLabel.
+// Extended 2026-05-19 (Wave 3A) to include product-card and category-card roles so
+// per-section blocks can host all section-specific zones. Keep in sync with
+// SectionTypographyOverride in packages/shared/src/types/store-layout.ts.
 const sectionTypographyOverride = z
   .object({
     heading: zoneOverride,
     kicker: zoneOverride,
     subtitle: zoneOverride,
     body: zoneOverride,
+    seeAll: zoneOverride,
+    productName: zoneOverride,
+    productPrice: zoneOverride,
+    productCta: zoneOverride,
+    categoryLabel: zoneOverride,
   })
   .partial()
   .optional();
@@ -293,6 +302,10 @@ const layoutSchema = z
         cardFrameStyle: z.enum(['soft', 'outline', 'shadow', 'paper']).optional(),
         cardFrameWidth: z.enum(['thin', 'normal', 'thick', 'xthick']).optional(),
         cardFrameColor: colorValue,
+        // 2026-05-19 Wave 3A: per-section typography overrides for catalog-wide
+        // product card defaults (productName / productPrice / productCta).
+        // Must be listed or Zod silently strips — same trap as per-section blocks.
+        typography: sectionTypographyOverride,
       })
       .partial()
       .optional(),

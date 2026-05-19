@@ -76,6 +76,10 @@ export interface ZoneOverride {
  * Per-section typography overrides — heading / kicker / subtitle / body sub-zones
  * each accept an independent `ZoneOverride`. Wins over the global typography zone
  * for its section; global fills any unset fields.
+ *
+ * Extended 2026-05-19 (Wave 3A) to include product-card and category-card roles so
+ * per-section blocks can host all section-specific zones. The global "Default
+ * typography" card now shows only truly platform-wide zones (header / footer etc).
  */
 export interface SectionTypographyOverride {
   heading?: ZoneOverride;
@@ -83,6 +87,16 @@ export interface SectionTypographyOverride {
   subtitle?: ZoneOverride;
   /** Body / paragraph override — non-title text inside this section. */
   body?: ZoneOverride;
+  /** "View All" / "See All" link rendered at the bottom of a section. */
+  seeAll?: ZoneOverride;
+  /** Product name text on a product card within this section. */
+  productName?: ZoneOverride;
+  /** Product price text on a product card within this section. */
+  productPrice?: ZoneOverride;
+  /** Product CTA / "Add to cart" button text within this section. */
+  productCta?: ZoneOverride;
+  /** Category card label text within this section. */
+  categoryLabel?: ZoneOverride;
 }
 
 export interface HeroSettings extends SectionBgOverride {
@@ -360,6 +374,12 @@ export interface ProductCardDefaults {
   cardFrameWidth?: CardFrameWidth;
   /** Hex color — applied as inline `style.borderColor` on the frame element. */
   cardFrameColor?: string;
+  /**
+   * Per-section typography overrides for catalog-wide product card defaults.
+   * Covers productName / productPrice / productCta — the same roles that
+   * appear on per-section product-grid cards. Added 2026-05-19 (Wave 3A).
+   */
+  typography?: SectionTypographyOverride;
 }
 
 export interface StoreLayoutSettings {
