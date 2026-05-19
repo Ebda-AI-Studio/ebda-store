@@ -39,6 +39,7 @@ import publicStoreLayoutRoutes from './public-store-layout.routes';
 import pagesRoutes from './pages.routes';
 import typographyRoutes from './typography.routes';
 import wbsIntegrationRoutes from './wbs-integration.routes';
+import financeRoutes from './finance.routes';
 import { tenantContext } from '../middleware/tenant-context';
 
 const router = Router();
@@ -134,6 +135,9 @@ router.use('/stores', tenantContext, newsletterRoutes);
 
 // WBS integration routes (Force Store ↔ WBS bridge config)
 router.use('/stores', tenantContext, wbsIntegrationRoutes);
+
+// Finance routes (COA tree + general ledger journal)
+router.use('/stores', tenantContext, financeRoutes);
 
 // Wishlist routes (user-scoped, no store context)
 router.use('/wishlist', wishlistRoutes);
