@@ -1,0 +1,290 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { AdminLayout } from '../../../../../../components/AdminLayout';
+import { useT } from '@/i18n/useT';
+import { apiGet, apiPost } from '@/lib/api';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface AccountRow {
+  id: string;
+  code: string;
+  nameEn: string;
+  nameAr: string | null;
+}
+
+interface AccountsTree {
+  assets: AccountRow[];
+  liabilities: AccountRow[];
+  equity: AccountRow[];
+  revenue: AccountRow[];
+  expenses: AccountRow[];
+}
+
+interface LineDraft {
+  accountId: string;
+  debit: string;
+  credit: string;
+  lineMemo: string;
+}
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const EMPTY_LINE: LineDraft = { accountId: '', debit: '', credit: '', lineMemo: '' };
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
+export default function NewJournalEntryPage() {
+  const params = useParams();
+  const storeId = params?.id as string;
+  const router = useRouter();
+  const t = useT('finance.journal');
+  const tNew = useT('finance.newEntry');
+
+  const [accounts, setAccounts] = useState<AccountRow[]>([]);
+  const [memo, setMemo] = useState('');
+  const [memoAr, setMemoAr] = useState('');
+  const [lines, setLines] = useState<LineDraft[]>([{ ...EMPTY_LINE }, { ...EMPTY_LINE }]);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!storeId) return;
+    apiGet<AccountsTree>(`/api/v1/stores/${storeId}/finance/accounts`).then(({ data }) => {
+      if (!data) return;
+      const flat = [
+        ...(data.assets ?? []),
+        ...(data.liabilities ?? []),
+        ...(data.equity ?? []),
+        ...(data.revenue ?? []),
+        ...(data.expenses ?? []),
+      ].sort((a, b) => a.code.localeCompare(b.code));
+      setAccounts(flat);
+    });
+  }, [storeId]);
+
+  function updateLine(i: number, patch: Partial<LineDraft>) {
+    setLines(cur => cur.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
+  }
+
+  function addLine() {
+    setLines(cur => [...cur, { ...EMPTY_LINE }]);
+  }
+
+  function removeLine(i: number) {
+    setLines(cur => (cur.length <= 2 ? cur : cur.filter((_, idx) => idx !== i)));
+  }
+
+  const totals = lines.reduce(
+    (acc, l) => ({
+      debit: acc.debit + (Number(l.debit) || 0),
+      credit: acc.credit + (Number(l.credit) || 0),
+    }),
+    { debit: 0, credit: 0 }
+  );
+  const balanced = totals.debit > 0 && totals.debit === totals.credit;
+
+  async function submit() {
+    setError(null);
+    if (!balanced) {
+      setError(tNew('errors.unbalanced'));
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const payload = {
+        memo: memo || undefined,
+        memoAr: memoAr || undefined,
+        lines: lines.map(l => ({
+          accountId: l.accountId,
+          debit: Math.round(Number(l.debit) || 0),
+          credit: Math.round(Number(l.credit) || 0),
+          lineMemo: l.lineMemo || undefined,
+        })),
+      };
+      const { data, error: apiError } = await apiPost<{ id: string }>(
+        `/api/v1/stores/${storeId}/finance/journal`,
+        payload
+      );
+      if (apiError) {
+        setError(apiError.message);
+        return;
+      }
+      router.push(`/stores/${storeId}/finance/journal/${data?.id}`);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <AdminLayout title={tNew('title')} subtitle={tNew('description')}>
+      <div className="max-w-4xl space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <label className="space-y-1">
+            <span className="text-sm font-medium">{tNew('memo')}</span>
+            <input
+              type="text"
+              value={memo}
+              onChange={e => setMemo(e.target.value)}
+              className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
+              placeholder={tNew('memoPlaceholder')}
+            />
+          </label>
+          <label className="space-y-1" dir="rtl">
+            <span className="text-sm font-medium">{tNew('memoAr')}</span>
+            <input
+              type="text"
+              value={memoAr}
+              onChange={e => setMemoAr(e.target.value)}
+              className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
+              placeholder={tNew('memoArPlaceholder')}
+            />
+          </label>
+        </div>
+
+        <div className="rounded-xl border border-border overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/30">
+              <tr>
+                <th className="text-start px-3 py-2 font-medium text-muted-foreground">
+                  {tNew('account')}
+                </th>
+                <th className="text-end px-3 py-2 w-32 font-medium text-muted-foreground">
+                  {t('debit')} (fils)
+                </th>
+                <th className="text-end px-3 py-2 w-32 font-medium text-muted-foreground">
+                  {t('credit')} (fils)
+                </th>
+                <th className="text-start px-3 py-2 font-medium text-muted-foreground">
+                  {t('memo')}
+                </th>
+                <th className="w-12" />
+              </tr>
+            </thead>
+            <tbody>
+              {lines.map((l, i) => (
+                <tr key={i} className="border-t border-border/40">
+                  <td className="px-3 py-2">
+                    <select
+                      value={l.accountId}
+                      onChange={e => updateLine(i, { accountId: e.target.value })}
+                      className="w-full border border-border rounded px-2 py-1 text-base sm:text-sm"
+                    >
+                      <option value="">— {tNew('selectAccount')} —</option>
+                      {accounts.map(a => (
+                        <option key={a.id} value={a.id}>
+                          {a.code} — {a.nameEn}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="px-3 py-2">
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={l.debit}
+                      onChange={e =>
+                        updateLine(i, {
+                          debit: e.target.value,
+                          credit: e.target.value ? '' : l.credit,
+                        })
+                      }
+                      className="w-full border border-border rounded px-2 py-1 text-end font-mono text-base sm:text-sm"
+                    />
+                  </td>
+                  <td className="px-3 py-2">
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={l.credit}
+                      onChange={e =>
+                        updateLine(i, {
+                          credit: e.target.value,
+                          debit: e.target.value ? '' : l.debit,
+                        })
+                      }
+                      className="w-full border border-border rounded px-2 py-1 text-end font-mono text-base sm:text-sm"
+                    />
+                  </td>
+                  <td className="px-3 py-2">
+                    <input
+                      type="text"
+                      value={l.lineMemo}
+                      onChange={e => updateLine(i, { lineMemo: e.target.value })}
+                      className="w-full border border-border rounded px-2 py-1 text-base sm:text-sm"
+                    />
+                  </td>
+                  <td className="px-3 py-2 text-center">
+                    <button
+                      type="button"
+                      onClick={() => removeLine(i)}
+                      disabled={lines.length <= 2}
+                      className="text-red-600 disabled:opacity-30 hover:underline text-xs"
+                    >
+                      ✕
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot className="bg-muted/20">
+              <tr className="border-t border-border">
+                <td className="px-3 py-2 font-medium">{tNew('totals')}</td>
+                <td className="px-3 py-2 text-end font-mono font-semibold">
+                  {totals.debit.toLocaleString()}
+                </td>
+                <td className="px-3 py-2 text-end font-mono font-semibold">
+                  {totals.credit.toLocaleString()}
+                </td>
+                <td className="px-3 py-2" colSpan={2}>
+                  {!balanced && totals.debit + totals.credit > 0 && (
+                    <span className="text-red-600 text-xs">{tNew('errors.unbalanced')}</span>
+                  )}
+                  {balanced && <span className="text-green-700 text-xs">{tNew('balanced')}</span>}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={addLine}
+            className="px-3 py-1.5 border border-border rounded text-sm"
+          >
+            {tNew('addLine')}
+          </button>
+        </div>
+
+        {error && <div className="text-red-600 text-sm">{error}</div>}
+
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={submit}
+            disabled={!balanced || submitting}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded disabled:opacity-50"
+          >
+            {submitting ? tNew('submitting') : tNew('submit')}
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push(`/stores/${storeId}/finance/journal`)}
+            className="px-4 py-2 border border-border rounded"
+          >
+            {tNew('cancel')}
+          </button>
+        </div>
+
+        <p className="text-xs text-muted-foreground">{tNew('superAdminNotice')}</p>
+      </div>
+    </AdminLayout>
+  );
+}

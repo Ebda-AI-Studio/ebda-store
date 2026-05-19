@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { AdminLayout } from '../../../../../components/AdminLayout';
 import { useT } from '@/i18n/useT';
 import { apiGet } from '@/lib/api';
+import { useRouter } from 'next/navigation';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -33,7 +34,9 @@ export default function JournalListPage() {
   const params = useParams();
   const storeId = params?.id as string;
   const t = useT('finance.journal');
+  const tNew = useT('finance.newEntry');
   const tc = useT('common');
+  const router = useRouter();
 
   const [entries, setEntries] = useState<JournalEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -70,6 +73,15 @@ export default function JournalListPage() {
   return (
     <AdminLayout title={t('title')} subtitle={t('description')}>
       <div className="max-w-5xl space-y-4">
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => router.push(`/stores/${storeId}/finance/journal/new`)}
+            className="px-3 py-1.5 bg-primary text-primary-foreground rounded text-sm"
+          >
+            {tNew('addNew')}
+          </button>
+        </div>
         {entries.length === 0 ? (
           <p className="text-muted-foreground text-sm">{t('noEntries')}</p>
         ) : (

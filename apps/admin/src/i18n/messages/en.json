@@ -3623,6 +3623,27 @@
       "viewDetail": "View",
       "account": "Account",
       "noEntries": "No journal entries yet — they will appear here as orders complete."
+    },
+    "newEntry": {
+      "title": "New Manual Journal Entry",
+      "description": "Post an adjusting entry. Super-admin only. Lines must balance (sum of debits = sum of credits).",
+      "memo": "Memo (English)",
+      "memoAr": "Memo (Arabic)",
+      "memoPlaceholder": "Year-end depreciation, opening adjustment, …",
+      "memoArPlaceholder": "…",
+      "account": "Account",
+      "selectAccount": "Select account",
+      "totals": "Totals",
+      "balanced": "✓ Balanced",
+      "addLine": "+ Add line",
+      "addNew": "+ New Manual Entry",
+      "submit": "Post entry",
+      "submitting": "Posting…",
+      "cancel": "Cancel",
+      "superAdminNotice": "Manual entries require super-admin. Posted entries are immutable — corrections via reversal only.",
+      "errors": {
+        "unbalanced": "Debits must equal credits"
+      }
     }
   }
 }
