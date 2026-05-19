@@ -5,6 +5,7 @@ import { redis } from './redis.service';
 import { invalidateCached, invalidateCachedPrefix } from '../lib/public-cache';
 import logger from '../lib/logger';
 import { cleanupRemovedImages, deleteR2ObjectIfOrphan } from './r2-cleanup.service';
+import { seedCoaForStore } from './accounting/account.service';
 
 /**
  * Bust every public-cache entry that depends on a store record. The
@@ -198,6 +199,10 @@ export class StoreService {
         },
       },
     });
+
+    // Seed Chart of Accounts (Kuwait retail template, 27 system accounts).
+    // Idempotent — safe if accountingEnabled is later toggled.
+    await seedCoaForStore(store.id);
 
     return store;
   }
