@@ -17,7 +17,11 @@ import { z } from 'zod';
 import { prisma, runInTenantContext } from '@force/database';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
-import { listAccountsTree } from '../services/accounting/account.service';
+import {
+  listAccountsTree,
+  createChildAccount,
+  setAccountActive,
+} from '../services/accounting/account.service';
 import { postEntry } from '../services/accounting/journal.service';
 
 const router = Router({ mergeParams: true });
@@ -198,6 +202,74 @@ router.post(
       );
 
       res.status(201).json({ data: entry });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ─── POST /:storeId/finance/accounts ─────────────────────────────────────────
+
+const createChildSchema = z.object({
+  parentId: z.string().uuid(),
+  code: z
+    .string()
+    .min(1)
+    .max(20)
+    .regex(/^\d{4,6}$/, 'Code must be 4-6 digits'),
+  nameEn: z.string().min(1).max(120),
+  nameAr: z.string().max(120).optional(),
+});
+
+/**
+ * Create a custom child account under a system parent.
+ * Type is inherited from the parent. Only one level of custom children allowed.
+ */
+router.post(
+  '/:storeId/finance/accounts',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = createChildSchema.safeParse(req.body);
+      if (!body.success) {
+        res.status(422).json({ error: 'validation', issues: body.error.issues });
+        return;
+      }
+      const acct = await runInTenantContext(req.params.storeId, () =>
+        createChildAccount({ storeId: req.params.storeId, ...body.data })
+      );
+      res.status(201).json({ data: acct });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ─── PATCH /:storeId/finance/accounts/:accountId/active ──────────────────────
+
+const setActiveSchema = z.object({ isActive: z.boolean() });
+
+/**
+ * Enable or disable a custom account. System accounts cannot be disabled.
+ */
+router.patch(
+  '/:storeId/finance/accounts/:accountId/active',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = setActiveSchema.safeParse(req.body);
+      if (!body.success) {
+        res.status(422).json({ error: 'validation', issues: body.error.issues });
+        return;
+      }
+      const acct = await runInTenantContext(req.params.storeId, () =>
+        setAccountActive(req.params.storeId, req.params.accountId, body.data.isActive)
+      );
+      res.json({ data: acct });
     } catch (err) {
       next(err);
     }

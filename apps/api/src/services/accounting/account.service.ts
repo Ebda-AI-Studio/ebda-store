@@ -168,6 +168,66 @@ export interface AccountsTree {
   expenses: AccountsTreeNode[];
 }
 
+export interface CreateChildAccountInput {
+  storeId: string;
+  parentId: string;
+  code: string; // unique per store, must not start with a system reserved prefix already in use
+  nameEn: string;
+  nameAr?: string;
+}
+
+/**
+ * Create a custom (non-system) child account under an existing parent account.
+ * Type is inherited from the parent — merchants cannot mix types in a tree.
+ * Throws if:
+ *   - parent doesn't exist or belongs to a different store
+ *   - parent is itself a non-system custom child (we only allow one level of customization)
+ *   - code collides with an existing account in this store
+ */
+export async function createChildAccount(input: CreateChildAccountInput) {
+  const parent = await prisma.account.findFirst({
+    where: { id: input.parentId, storeId: input.storeId },
+    select: { id: true, type: true, isSystem: true, code: true },
+  });
+  if (!parent) throw new Error('Parent account not found in this store');
+  if (!parent.isSystem) {
+    throw new Error('Custom children are only allowed under system accounts (one-level deep)');
+  }
+  const collision = await prisma.account.findUnique({
+    where: { storeId_code: { storeId: input.storeId, code: input.code } },
+    select: { id: true },
+  });
+  if (collision) throw new Error(`Account code ${input.code} already exists in this store`);
+
+  return prisma.account.create({
+    data: {
+      storeId: input.storeId,
+      parentId: input.parentId,
+      code: input.code,
+      nameEn: input.nameEn,
+      nameAr: input.nameAr,
+      type: parent.type,
+      isSystem: false,
+      isActive: true,
+    },
+  });
+}
+
+/**
+ * Soft-disable a custom account. System accounts can never be disabled.
+ * Disabled accounts remain visible in the COA tree (greyed out in UI) but
+ * cannot be used as new journal-line targets.
+ */
+export async function setAccountActive(storeId: string, accountId: string, isActive: boolean) {
+  const acct = await prisma.account.findFirst({
+    where: { id: accountId, storeId },
+    select: { isSystem: true },
+  });
+  if (!acct) throw new Error('Account not found');
+  if (acct.isSystem) throw new Error('System accounts cannot be disabled');
+  return prisma.account.update({ where: { id: accountId }, data: { isActive } });
+}
+
 /**
  * Returns the COA grouped by type with parent-child nesting. Roots are the
  * accounts with no parentId; their children are nested via the AccountTree
