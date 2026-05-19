@@ -19,12 +19,37 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { z } from 'zod';
 import { createHash } from 'crypto';
+import sharp from 'sharp';
 import { prisma } from '@force/database';
 import { config } from '../config';
 import { redis } from './redis.service';
 import { AppError } from '../middleware/error-handler';
 import { assertAiQuota } from '../lib/ai-quota';
 import logger from '../lib/logger';
+
+// Gemini Vision accepts only these mime types for inline_data. Anything else
+// (image/svg+xml, image/gif, image/tiff, image/x-icon) gets a 400. We
+// rasterize via sharp to PNG before sending. Keep this in sync with
+// https://ai.google.dev/gemini-api/docs/prompting_with_media#supported_file_formats
+const GEMINI_SUPPORTED_IMAGE_MIME_TYPES = new Set([
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+  'image/heic',
+  'image/heif',
+]);
+
+async function rasterizeForGemini(
+  buf: Buffer,
+  mimeType: string
+): Promise<{ data: string; mimeType: string }> {
+  if (GEMINI_SUPPORTED_IMAGE_MIME_TYPES.has(mimeType)) {
+    return { data: buf.toString('base64'), mimeType };
+  }
+  // sharp handles SVG, GIF (first frame), TIFF, ICO, BMP, AVIF natively.
+  const png = await sharp(buf).png().toBuffer();
+  return { data: png.toString('base64'), mimeType: 'image/png' };
+}
 
 type Feature = 'translate' | 'seo' | 'categorize' | 'section';
 type Lang = 'en' | 'ar';
@@ -492,9 +517,26 @@ export class AIService {
       );
     }
 
-    const buf = await logoFetch.arrayBuffer();
-    const base64 = Buffer.from(buf).toString('base64');
-    const mimeType = logoFetch.headers.get('content-type') ?? 'image/png';
+    const arrayBuf = await logoFetch.arrayBuffer();
+    const rawMime = (logoFetch.headers.get('content-type') ?? 'image/png')
+      .split(';')[0]
+      .trim()
+      .toLowerCase();
+
+    let base64: string;
+    let mimeType: string;
+    try {
+      const rasterized = await rasterizeForGemini(Buffer.from(arrayBuf), rawMime);
+      base64 = rasterized.data;
+      mimeType = rasterized.mimeType;
+    } catch (err) {
+      logger.error({ err, rawMime, logoUrl }, 'Logo rasterization failed before Gemini call');
+      throw new AppError(
+        502,
+        'AI_LOGO_RASTERIZE_FAILED',
+        'Could not prepare the logo image for AI processing.'
+      );
+    }
 
     const prompt =
       'Look at this brand logo. Identify the 3 most important brand colors:\n' +
