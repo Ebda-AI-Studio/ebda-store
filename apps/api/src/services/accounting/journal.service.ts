@@ -1,5 +1,6 @@
 import { prisma } from '@force/database';
 import type { JournalEntry, JournalEntrySource, Prisma } from '@prisma/client';
+import { Prisma as PrismaNs } from '@prisma/client';
 import { nextSequence } from '../sequence.service';
 
 export interface JournalLineInput {
@@ -44,46 +45,76 @@ export async function postEntry(input: PostEntryInput): Promise<JournalEntry> {
     throw new Error('Journal entry requires at least one line');
   }
 
-  const run = async (tx: Prisma.TransactionClient) => {
-    if (input.sourceId) {
-      const existing = await tx.journalEntry.findFirst({
+  // Fast-path idempotency check (skipped if no sourceId — manual entries are
+  // never coalesced). Cheap: indexed by (source, source_id). If hit, return
+  // without locking anything.
+  if (input.sourceId) {
+    const client = input.tx ?? prisma;
+    const existing = await client.journalEntry.findFirst({
+      where: {
+        storeId: input.storeId,
+        source: input.source,
+        sourceId: input.sourceId,
+      },
+    });
+    if (existing) return existing;
+  }
+
+  // Reserve the sequence OUTSIDE any interactive transaction. The sequence
+  // service uses an atomic INSERT … ON CONFLICT DO UPDATE … RETURNING — no
+  // long-lived lock. Doing it inside an interactive tx caused a lock convoy
+  // under fan-out (5 webhook retries) and burst-timeouts at the 5s default
+  // interactive-tx limit. See test/integration/accounting/accounting-idempotency.
+  const entryNumber = await nextSequence(input.storeId, 'journal');
+
+  const createData: PrismaNs.JournalEntryCreateInput = {
+    store: { connect: { id: input.storeId } },
+    entryNumber,
+    postedAt: input.postedAt ?? new Date(),
+    source: input.source,
+    sourceId: input.sourceId,
+    memo: input.memo,
+    memoAr: input.memoAr,
+    status: 'posted',
+    postedBy: input.postedBy,
+    lines: {
+      create: input.lines.map(l => ({
+        accountId: l.accountId,
+        debit: l.debit,
+        credit: l.credit,
+        lineMemo: l.lineMemo,
+        lineMemoAr: l.lineMemoAr,
+        refTable: l.refTable,
+        refId: l.refId,
+      })),
+    },
+  };
+
+  try {
+    const client = input.tx ?? prisma;
+    return await client.journalEntry.create({ data: createData });
+  } catch (err: unknown) {
+    // P2002 = unique constraint violation. With the
+    // journal_entries_store_source_source_id_unique partial index in place,
+    // a concurrent caller raced us and won. Find and return their entry —
+    // idempotency contract preserved.
+    if (
+      err instanceof PrismaNs.PrismaClientKnownRequestError &&
+      err.code === 'P2002' &&
+      input.sourceId
+    ) {
+      const client = input.tx ?? prisma;
+      const winner = await client.journalEntry.findFirst({
         where: {
           storeId: input.storeId,
           source: input.source,
           sourceId: input.sourceId,
         },
       });
-      if (existing) return existing;
+      if (winner) return winner;
     }
-
-    const entryNumber = await nextSequence(input.storeId, 'journal');
-    return tx.journalEntry.create({
-      data: {
-        storeId: input.storeId,
-        entryNumber,
-        postedAt: input.postedAt ?? new Date(),
-        source: input.source,
-        sourceId: input.sourceId,
-        memo: input.memo,
-        memoAr: input.memoAr,
-        status: 'posted',
-        postedBy: input.postedBy,
-        lines: {
-          create: input.lines.map(l => ({
-            accountId: l.accountId,
-            debit: l.debit,
-            credit: l.credit,
-            lineMemo: l.lineMemo,
-            lineMemoAr: l.lineMemoAr,
-            refTable: l.refTable,
-            refId: l.refId,
-          })),
-        },
-      },
-    });
-  };
-
-  return input.tx ? run(input.tx) : prisma.$transaction(run);
+    throw err;
+  }
 }
 
 /**
