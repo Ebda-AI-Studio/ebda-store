@@ -81,6 +81,9 @@ Integration tests (`tests/integration/accounting/`):
 - `apps/api/src/routes/index.ts` — mount 5 new routers
 - `apps/api/src/routes/finance.routes.ts` — add `/dashboard` + `/reports/*` endpoints
 - `apps/api/src/routes/product.routes.ts` — add `inStock` / `acceptsBackorder` / `lowStock` / `availableQty` to public response
+- `apps/api/src/services/analytics.service.ts` — add `glRevenueWindow` + `stockSnapshot` + `cashflowTrend` helpers (Task 16b)
+- `apps/api/src/routes/analytics.routes.ts` — augment `/dashboard` + `/low-stock` + `/performance`; add `/cashflow` + `/stock-snapshot` (Task 16b)
+- `apps/admin/src/app/stores/[id]/analytics/page.tsx` — surface GL fields + inventory snapshot + cashflow chart (Task 16b)
 - `apps/api/src/services/cart.service.ts` — allow add-to-cart when `inventory <= 0 AND allowBackorder`
 - `apps/api/src/services/order.service.ts` — `create` allows zero-stock checkout when allowBackorder; sets `costPriceDeferred` + creates `BackorderLine` rows post-checkout; `applyRefundEffects` auto-cancels open BackorderLines for refunded order
 - `apps/admin/src/components/admin-layout/buildStoreAdminNav.ts` — add Stock group + extend Finance group
@@ -1330,9 +1333,7 @@ export interface ReceiveInput {
  *   2. Update PO item.qtyReceived; transition status (partial vs received).
  *   3. Fire `stock/po-received` Inngest event so the AP journal posts.
  */
-export async function receivePurchaseOrder(
-  input: ReceiveInput
-): Promise<{
+export async function receivePurchaseOrder(input: ReceiveInput): Promise<{
   po: PurchaseOrder;
   clearedBackorders: Array<{
     backorderLineId: string;
@@ -2798,6 +2799,140 @@ Commit: `feat(admin): stock sidebar group + finance group extensions`
 
 ---
 
+## Task 16b: Wire existing Analytics endpoints into accounting + stock data
+
+**Context:** `apps/api/src/routes/analytics.routes.ts` already exposes 10 endpoints used by `apps/admin/src/app/stores/[id]/analytics/page.tsx`: `/dashboard`, `/sales`, `/top-products`, `/top-categories`, `/orders-by-status`, `/customers`, `/recent-orders`, `/low-stock`, `/payment-status`, `/performance`. All currently source from operational tables (orders/products/users) — NONE pull from `journal_lines`, `stock_adjustments`, or `backorder_lines`. Without this task, Analytics shows operational sums that diverge from the GL whenever refunds, deferred COGS, or backorders are involved.
+
+**Files:**
+
+- Modify: `apps/api/src/services/analytics.service.ts` — add 3 helpers
+- Modify: `apps/api/src/routes/analytics.routes.ts` — augment 3 endpoints + add 2 new
+- Modify: `apps/admin/src/app/stores/[id]/analytics/page.tsx` — surface new fields
+- Modify: `apps/admin/messages/{en,ar}.json` — add `analytics.gl.*` + `analytics.inventorySnapshot.*` + `analytics.cashflow.*` keys
+
+### Step 1: Add GL-aware helpers to `analytics.service.ts`
+
+```ts
+import { trialBalance, profitAndLoss } from './accounting/reports.service';
+
+// Inside AnalyticsService class:
+
+static async glRevenueWindow(storeId: string, from: Date, to: Date) {
+  const pnl = await profitAndLoss(storeId, from, to);
+  const cogs = pnl.expenses.filter((e) => e.code.startsWith('50')).reduce((s, e) => s + e.balance, 0);
+  return {
+    revenue: pnl.totalRevenue,
+    cogs,
+    grossProfit: pnl.totalRevenue - cogs,
+    netIncome: pnl.netIncome,
+  };
+}
+
+static async stockSnapshot(storeId: string) {
+  const [valueRow, backorderRow, rulesCount] = await Promise.all([
+    prisma.$queryRaw<{ total: bigint }[]>`
+      SELECT COALESCE(SUM(inventory * COALESCE(cost_price, 0)), 0) AS total
+      FROM public.products WHERE store_id = ${storeId}::uuid AND deleted_at IS NULL
+    `,
+    prisma.$queryRaw<{ count: bigint; value: bigint }[]>`
+      SELECT
+        COUNT(*) AS count,
+        COALESCE(SUM(bl.qty * COALESCE(p.cost_price, 0)), 0) AS value
+      FROM public.backorder_lines bl
+      JOIN public.products p ON p.id = bl.product_id
+      WHERE bl.store_id = ${storeId}::uuid AND bl.fulfilled_at IS NULL AND bl.cancelled_at IS NULL
+    `,
+    prisma.reorderRule.count({ where: { storeId, isActive: true } }),
+  ]);
+  return {
+    stockValue: Number(valueRow[0]?.total ?? 0),
+    openBackorderCount: Number(backorderRow[0]?.count ?? 0),
+    backorderedDemandValue: Number(backorderRow[0]?.value ?? 0),
+    reorderRulesCount: rulesCount,
+  };
+}
+
+static async cashflowTrend(storeId: string, from: Date, to: Date) {
+  const rows = await prisma.$queryRaw<Array<{ day: Date; net: bigint }>>`
+    SELECT DATE_TRUNC('day', e.posted_at) AS day,
+           COALESCE(SUM(l.debit), 0) - COALESCE(SUM(l.credit), 0) AS net
+    FROM public.journal_lines l
+    JOIN public.journal_entries e ON e.id = l.entry_id
+    JOIN public.accounts a       ON a.id = l.account_id
+    WHERE e.store_id = ${storeId}::uuid AND e.status = 'posted'
+      AND e.posted_at BETWEEN ${from} AND ${to}
+      AND a.code IN ('1000','1010','1020','1030')
+    GROUP BY DATE_TRUNC('day', e.posted_at)
+    ORDER BY day ASC
+  `;
+  return rows.map((r) => ({ day: r.day, net: Number(r.net) }));
+}
+```
+
+### Step 2: Augment 3 endpoints + add 2 new in `analytics.routes.ts`
+
+- **`/dashboard`** — alongside existing operational sums, add to response: `gl: await AnalyticsService.glRevenueWindow(storeId, monthStart, now)` and `stock: await AnalyticsService.stockSnapshot(storeId)`. Existing callers still work; admin opts in.
+- **`/low-stock`** — for each product in the result, enrich with: `openBackorderCount` (`prisma.backorderLine.groupBy({ by: 'productId', _count })`), `acceptsBackorder` (`product.allowBackorder`), `reorderRule` (preferred supplier / minQty / reorderQty / leadTimeDays).
+- **`/performance`** — add `glGrossProfit` field (from `glRevenueWindow`) alongside the existing operational `profit`. Admin can show the gap.
+- **NEW `/cashflow`** — wraps `cashflowTrend(storeId, from, to)`; from/to default to last 30 days.
+- **NEW `/stock-snapshot`** — wraps `stockSnapshot(storeId)`; shared source of truth between Stock dashboard and Analytics page.
+
+### Step 3: Admin Analytics page
+
+Modify `apps/admin/src/app/stores/[id]/analytics/page.tsx`:
+
+- Add KPI cards for `dashboard.gl.revenue`, `dashboard.gl.grossProfit`, `dashboard.gl.netIncome` with a "GL" badge + tooltip explaining "Sourced from the General Ledger — refund-aware and deferred-COGS-aware."
+- New "Inventory snapshot" section: stock value / open backorders / backordered demand value
+- New "Cashflow (last 30 days)" section: simple line/bar chart from `/cashflow` (reuse existing chart primitive if present, else minimal SVG)
+- Low-stock list: add `Open backorders: N` badge per product where > 0, `Accepts backorder` chip, and the reorder rule summary line
+
+### Step 4: i18n additions
+
+In `apps/admin/messages/en.json` under existing `analytics.*` block:
+
+```json
+"gl": {
+  "badge": "GL",
+  "tooltip": "Sourced from the General Ledger — refund-aware and deferred-COGS-aware",
+  "revenue": "Revenue (GL)",
+  "cogs": "COGS (GL)",
+  "grossProfit": "Gross profit (GL)",
+  "netIncome": "Net income (GL)"
+},
+"inventorySnapshot": {
+  "title": "Inventory snapshot",
+  "stockValue": "Stock value",
+  "openBackorders": "Open backorders",
+  "backorderedDemandValue": "Backordered demand value",
+  "reorderRules": "Reorder rules"
+},
+"cashflow": {
+  "title": "Cashflow",
+  "netDaily": "Net daily movement",
+  "last30": "Last 30 days"
+},
+"lowStock": {
+  "openBackorders": "Open backorders: {count}",
+  "acceptsBackorder": "Accepts backorder",
+  "reorderRule": "Reorder: min {min} / qty {qty} / lead {lead}d"
+}
+```
+
+- Arabic mirror.
+
+### Step 5: Build + commit
+
+```bash
+npm run build -w apps/api 2>&1 | tail -3
+npm run build -w apps/admin 2>&1 | tail -3
+git add apps/api/src/services/analytics.service.ts apps/api/src/routes/analytics.routes.ts apps/admin/src/app/stores/\[id\]/analytics/ apps/admin/messages/en.json apps/admin/messages/ar.json
+git commit -m "feat(analytics): wire dashboard + low-stock + new cashflow + stock-snapshot to gl + backorders"
+```
+
+**Note:** no separate integration test for Task 16b — analytics endpoints are thin wrappers over `reports.service` (tested in Batch 1) + the two new direct queries (covered by smoke-hitting `/analytics/dashboard` after a sale + refund + backorder fulfillment in Tasks 17–19 fixtures).
+
+---
+
 ## Task 17: Integration test — PO receive lifecycle
 
 **File:** `tests/integration/accounting/accounting-po-receive.test.ts`
@@ -2904,7 +3039,7 @@ disown
 - 4 backorder mechanics ✓ Tasks 4 + 8 + 9
 - 6 admin Stock + Finance pages ✓ Tasks 12-15
 - 8 KW specifics (fils, COA codes) ✓ throughout (posting helpers use codes from Batch 1's COA seed)
-- 9 Batch 2 scope ✓ all 21 tasks
+- 9 Batch 2 scope ✓ all 21 tasks + Task 16b (Analytics wiring)
 
 **Open questions to flag to Ahmad before execution:**
 
