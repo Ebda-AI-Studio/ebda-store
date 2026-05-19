@@ -69,7 +69,10 @@ export default function BoldHeader({
                   priority
                 />
               ) : (
-                <span className="text-xl font-black uppercase tracking-wider text-white">
+                <span
+                  className="text-xl font-black uppercase tracking-wider text-white"
+                  data-zone="storeName"
+                >
                   {displayName}
                 </span>
               )}

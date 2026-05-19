@@ -112,7 +112,9 @@ export default function ModernHeader({
                   priority
                 />
               ) : (
-                <span className="text-xl font-bold text-primary">{displayName}</span>
+                <span className="text-xl font-bold text-primary" data-zone="storeName">
+                  {displayName}
+                </span>
               )}
             </Link>
 

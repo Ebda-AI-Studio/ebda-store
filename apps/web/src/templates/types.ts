@@ -303,6 +303,13 @@ export interface HeroBannerProps {
    * existing edge-to-edge look for stores that already shipped that way.
    */
   presentation?: 'full-bleed' | 'framed';
+  /**
+   * Per-section typography zone override for the hero headline h1.
+   * Resolved via resolveSectionZone() in HomePageContent and applied as
+   * inline styles on the <h1> inside HeroBanner. Closes the wiring gap
+   * identified in the 2026-05-20 page-builder audit.
+   */
+  headingZone?: ResolvedZone;
 }
 
 /**
@@ -318,6 +325,12 @@ export interface HeroSliderProps {
   pack?: import('@force/shared').TemplateId;
   /** See HeroBannerProps.presentation — same semantics, applies to every slide. */
   presentation?: 'full-bleed' | 'framed';
+  /**
+   * Per-section typography zone override for the hero headline h1.
+   * Forwarded to each HeroBanner slide. Closes the wiring gap identified
+   * in the 2026-05-20 page-builder audit.
+   */
+  headingZone?: ResolvedZone;
 }
 
 /**
@@ -603,6 +616,10 @@ export interface CategoryGridProps {
   headingZone?: ResolvedZone;
   kickerZone?: ResolvedZone;
   subtitleZone?: ResolvedZone;
+  /** "See all →" link typography override. Applies when grid layout path is active. */
+  seeAllZone?: ResolvedZone;
+  /** Optional href for the "See all" link. Hidden when omitted. */
+  seeAllHref?: string;
   /** Category label text typography override (text below each card image). */
   categoryLabelZone?: ResolvedZone;
 }

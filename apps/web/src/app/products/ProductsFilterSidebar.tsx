@@ -32,6 +32,14 @@ interface ProductsFilterSidebarProps {
   /** Upper bound that the data could possibly contain. */
   priceCeil?: number;
   onPriceChange?: (min: number, max: number) => void;
+  /**
+   * Merchant-controlled initial open/collapsed state for the desktop sticky
+   * sidebar. On mobile the sidebar is a slide-over bottom-sheet — it always
+   * starts closed (the user taps the filter button to open it). On desktop
+   * ≥lg the sidebar is always visible in the layout; `defaultOpen` controls
+   * whether it starts in the expanded state. Defaults to true when undefined.
+   */
+  defaultOpen?: boolean;
 }
 
 const SEARCH_DEBOUNCE_MS = 300;
@@ -55,6 +63,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
     priceFloor,
     priceCeil,
     onPriceChange,
+    defaultOpen,
   } = props;
   const { t } = useLanguage();
 
@@ -76,8 +85,12 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
   }, [debouncedSearch]);
 
   // Mobile renders a slide-up bottom-sheet with backdrop (Pecannbee spec § 4.4).
-  // Desktop renders inline as a sticky sidebar.
+  // Desktop renders inline as a sticky sidebar — merchant can set
+  // filterSidebar.defaultOpen to start it collapsed.
   const [isOpen, setIsOpen] = useState(false);
+  // Desktop expanded/collapsed state — initialised from the merchant's
+  // filterSidebar.defaultOpen setting (defaults to open when unset).
+  const [isDesktopExpanded, setIsDesktopExpanded] = useState(defaultOpen !== false);
 
   // Lock background scroll while the bottom-sheet is open.
   useEffect(() => {
@@ -410,9 +423,49 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
         </div>
       )}
 
-      {/* Desktop inline sidebar */}
-      <div id="products-filter-panel" className="hidden lg:block lg:sticky lg:top-24 space-y-6">
-        {renderBody(false)}
+      {/* Desktop inline sidebar — collapsible via the header button. Initial
+          open state driven by the merchant's filterSidebar.defaultOpen setting. */}
+      <div id="products-filter-panel" className="hidden lg:block lg:sticky lg:top-24">
+        {/* Collapse toggle header */}
+        <button
+          type="button"
+          onClick={() => setIsDesktopExpanded(v => !v)}
+          aria-expanded={isDesktopExpanded}
+          aria-controls="products-filter-panel-body"
+          className="mb-4 flex w-full items-center justify-between text-sm font-semibold text-foreground hover:text-primary transition-colors"
+        >
+          <span className="inline-flex items-center gap-2">
+            <svg
+              className="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
+              />
+            </svg>
+            {t('Filters', 'الفلاتر')}
+          </span>
+          <svg
+            className={`h-4 w-4 transition-transform duration-200 ${isDesktopExpanded ? 'rotate-180' : ''}`}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            aria-hidden="true"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        {isDesktopExpanded && (
+          <div id="products-filter-panel-body" className="space-y-6">
+            {renderBody(false)}
+          </div>
+        )}
       </div>
     </aside>
   );

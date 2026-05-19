@@ -1,5 +1,6 @@
 'use client';
 
+import type React from 'react';
 import { memo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -69,6 +70,11 @@ function PecannbeeProductCardImpl({
   cardFrameWidth,
   cardFrameSize,
   cardFrameColor,
+  showLabel,
+  showHover,
+  productNameZone,
+  productPriceZone,
+  productCtaZone,
 }: PecannbeeProductCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const { store } = useStore();
@@ -162,10 +168,10 @@ function PecannbeeProductCardImpl({
                 fill
                 sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 200px"
                 className={`object-cover transition-opacity duration-500 ${
-                  product.images?.[1]?.url ? 'group-hover/img:opacity-0' : ''
+                  showHover !== false && product.images?.[1]?.url ? 'group-hover/img:opacity-0' : ''
                 }`}
               />
-              {product.images?.[1]?.url && (
+              {showHover !== false && product.images?.[1]?.url && (
                 <Image
                   src={product.images[1].url}
                   alt={product.images[1].alt ?? name}
@@ -253,38 +259,74 @@ function PecannbeeProductCardImpl({
           to whatever the actual content needs. Net effect: ~20-30px shorter
           per card on mobile, denser grid feel matches the pecannbee target. */}
       <div className={`flex flex-1 flex-col gap-2 p-3 sm:p-4 ${styles.productCardBody ?? ''}`}>
-        <Link href={href} prefetch={false} className="focus:outline-none focus-visible:underline">
-          <p
-            id={`prod-${product.id}-name`}
-            className={`line-clamp-2 ${textSizes.name} ${styles.productCardName}`}
-            style={{ textWrap: 'balance' }}
-            itemProp="name"
-          >
-            {name}
-          </p>
-        </Link>
-        <div
-          className={`flex items-baseline gap-2 ${styles.productCardBody ? 'justify-center' : ''}`}
-        >
-          <span
-            itemProp="offers"
-            itemScope
-            itemType="https://schema.org/Offer"
-            className="contents"
-          >
-            <meta itemProp="priceCurrency" content={currency} />
-            <meta itemProp="price" content={String(product.price / 1000)} />
-            <span className={`${textSizes.price} ${styles.productCardPrice}`}>
-              {(product.price / 1000).toFixed(3)} {currency}
-            </span>
-          </span>
-          {onSale && product.compareAtPrice && (
-            <span className="text-sm text-muted-foreground line-through">
-              {(product.compareAtPrice / 1000).toFixed(3)}
-            </span>
-          )}
-        </div>
-        <TaxInclusiveLabel className="block text-xs text-muted-foreground" />
+        {/* showLabel gates the entire name + price + tax block. When false the
+            card shows image + CTA only — useful for icon-style catalog grids
+            where the merchant wants a minimal card. Defaults to visible (undefined
+            treated as true) to preserve existing behavior. */}
+        {showLabel !== false && (
+          <>
+            <Link
+              href={href}
+              prefetch={false}
+              className="focus:outline-none focus-visible:underline"
+            >
+              <p
+                id={`prod-${product.id}-name`}
+                data-zone="productName"
+                className={`line-clamp-2 ${textSizes.name} ${styles.productCardName}`}
+                style={{
+                  textWrap: 'balance',
+                  fontFamily: productNameZone?.fontFamily,
+                  fontSize: productNameZone?.fontSize,
+                  fontWeight: productNameZone?.fontWeight,
+                  color: productNameZone?.color,
+                  letterSpacing: productNameZone?.letterSpacing,
+                  lineHeight: productNameZone?.lineHeight,
+                  textTransform:
+                    productNameZone?.textTransform as React.CSSProperties['textTransform'],
+                }}
+                itemProp="name"
+              >
+                {name}
+              </p>
+            </Link>
+            <div
+              className={`flex items-baseline gap-2 ${styles.productCardBody ? 'justify-center' : ''}`}
+            >
+              <span
+                itemProp="offers"
+                itemScope
+                itemType="https://schema.org/Offer"
+                className="contents"
+              >
+                <meta itemProp="priceCurrency" content={currency} />
+                <meta itemProp="price" content={String(product.price / 1000)} />
+                <span
+                  data-zone="productPrice"
+                  className={`${textSizes.price} ${styles.productCardPrice}`}
+                  style={{
+                    fontFamily: productPriceZone?.fontFamily,
+                    fontSize: productPriceZone?.fontSize,
+                    fontWeight: productPriceZone?.fontWeight,
+                    color: productPriceZone?.color,
+                    letterSpacing: productPriceZone?.letterSpacing,
+                    lineHeight: productPriceZone?.lineHeight,
+                    textTransform:
+                      productPriceZone?.textTransform as React.CSSProperties['textTransform'],
+                  }}
+                >
+                  {(product.price / 1000).toFixed(3)} {currency}
+                </span>
+              </span>
+              {onSale && product.compareAtPrice && (
+                <span className="text-sm text-muted-foreground line-through">
+                  {(product.compareAtPrice / 1000).toFixed(3)}
+                </span>
+              )}
+            </div>
+            <TaxInclusiveLabel className="block text-xs text-muted-foreground" />
+          </>
+        )}
 
         {/* Dual CTA pattern (per docs/superpowers/plans/2026-05-16-mobile-ui-
             ship.md): products WITH variants can't be added to cart inline —
@@ -298,6 +340,15 @@ function PecannbeeProductCardImpl({
             href={href}
             prefetch={false}
             className={`mt-auto inline-flex w-full items-center justify-center gap-2 min-h-[44px] ${styles.productCardCta}`}
+            style={{
+              fontFamily: productCtaZone?.fontFamily,
+              fontSize: productCtaZone?.fontSize,
+              fontWeight: productCtaZone?.fontWeight,
+              color: productCtaZone?.color,
+              letterSpacing: productCtaZone?.letterSpacing,
+              lineHeight: productCtaZone?.lineHeight,
+              textTransform: productCtaZone?.textTransform as React.CSSProperties['textTransform'],
+            }}
           >
             {isRtl ? 'عرض' : 'View'}
           </Link>
@@ -307,6 +358,15 @@ function PecannbeeProductCardImpl({
             disabled={!inStock || isAdding}
             onClick={handleAdd}
             className={`mt-auto inline-flex w-full items-center justify-center gap-2 min-h-[44px] ${styles.productCardCta} disabled:cursor-not-allowed disabled:opacity-60`}
+            style={{
+              fontFamily: productCtaZone?.fontFamily,
+              fontSize: productCtaZone?.fontSize,
+              fontWeight: productCtaZone?.fontWeight,
+              color: productCtaZone?.color,
+              letterSpacing: productCtaZone?.letterSpacing,
+              lineHeight: productCtaZone?.lineHeight,
+              textTransform: productCtaZone?.textTransform as React.CSSProperties['textTransform'],
+            }}
           >
             {!inStock ? (
               isRtl ? (

@@ -69,6 +69,14 @@ export function HomePageContent({
   // section-level override values. When no per-section override is set,
   // resolveSectionZone returns undefined and SectionHeading uses its
   // default CSS class styling (no inline style applied).
+  // Hero heading typography zone — wires the merchant's per-section heading
+  // override to the HeroBanner / HeroSlider headline h1.
+  const heroHeadingZone = resolveSectionZone(
+    layout.hero.typography?.heading,
+    undefined,
+    store.theme
+  );
+
   const categoriesHeadingZone = resolveSectionZone(
     layout.categories.typography?.heading,
     undefined,
@@ -254,6 +262,7 @@ export function HomePageContent({
             isRtl={isRtl}
             pack={templateId}
             presentation={layout.hero.presentation}
+            headingZone={heroHeadingZone}
           />
         )}
         {layout.hero.enabled && bannerEligible && T.HeroBanner && (
@@ -262,6 +271,7 @@ export function HomePageContent({
             isRtl={isRtl}
             pack={templateId}
             presentation={layout.hero.presentation}
+            headingZone={heroHeadingZone}
           />
         )}
         {layout.hero.enabled && !sliderEligible && !bannerEligible && legacyHeroHasContent && (
@@ -370,9 +380,11 @@ export function HomePageContent({
                       mobileColumns={layout.categories.mobileColumns}
                       desktopColumns={layout.categories.desktopColumns}
                       isRtl={isRtl}
+                      seeAllHref={storeUrl('/products')}
                       headingZone={categoriesHeadingZone}
                       kickerZone={categoriesKickerZone}
                       subtitleZone={categoriesSubtitleZone}
+                      seeAllZone={categoriesSeeAllZone}
                       categoryLabelZone={categoriesLabelZone}
                     />
                   </div>

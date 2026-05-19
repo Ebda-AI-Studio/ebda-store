@@ -263,6 +263,10 @@ const layoutSchema = z
       enabled: z.boolean(),
       minRating: z.number().min(1).max(5),
       verifiedOnly: z.boolean(),
+      // SectionTitleOverride fields — must be listed or Zod silently strips
+      // them on PUT (same trap class as imageMobile 2026-05-16).
+      title: z.string().optional(),
+      titleAr: z.string().optional(),
       // 2026-05-18 Sprint 3: per-section bg color.
       bgColor: colorValue,
       // Per-section typography overrides. Must be listed or Zod silently strips.

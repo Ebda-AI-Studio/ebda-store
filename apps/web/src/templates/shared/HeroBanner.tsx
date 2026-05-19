@@ -1,5 +1,6 @@
 'use client';
 
+import type React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import type { HeroBannerProps } from '../types';
@@ -29,6 +30,7 @@ export function HeroBanner({
   pack,
   priority = true,
   presentation = 'full-bleed',
+  headingZone,
 }: HeroBannerProps) {
   const isFramed = presentation === 'framed';
   const desktopSrc = (isRtl && imageAr) || image;
@@ -94,7 +96,23 @@ export function HeroBanner({
       {showOverlay && (
         <div className={`absolute inset-0 flex items-center justify-center ${styles.heroOverlay}`}>
           <div className="mx-auto max-w-3xl px-6 text-center">
-            {text && <h1 className={styles.heroHeadline}>{text}</h1>}
+            {text && (
+              <h1
+                className={styles.heroHeadline}
+                data-zone="heroHeadline"
+                style={{
+                  fontFamily: headingZone?.fontFamily,
+                  fontSize: headingZone?.fontSize,
+                  fontWeight: headingZone?.fontWeight,
+                  color: headingZone?.color,
+                  letterSpacing: headingZone?.letterSpacing,
+                  lineHeight: headingZone?.lineHeight,
+                  textTransform: headingZone?.textTransform as React.CSSProperties['textTransform'],
+                }}
+              >
+                {text}
+              </h1>
+            )}
             {subtitleText && (
               <p className="mt-3 text-base sm:text-lg text-white/90 drop-shadow">{subtitleText}</p>
             )}

@@ -83,7 +83,10 @@ export default function MinimalHeader({
                 priority
               />
             ) : (
-              <span className="text-xs tracking-[0.3em] uppercase font-light text-foreground">
+              <span
+                className="text-xs tracking-[0.3em] uppercase font-light text-foreground"
+                data-zone="storeName"
+              >
                 {displayName}
               </span>
             )}

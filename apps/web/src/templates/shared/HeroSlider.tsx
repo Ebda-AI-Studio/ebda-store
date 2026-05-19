@@ -18,6 +18,7 @@ export function HeroSlider({
   isRtl,
   pack,
   presentation = 'full-bleed',
+  headingZone,
 }: HeroSliderProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const pausedRef = useRef(false);
@@ -64,7 +65,14 @@ export function HeroSlider({
   if (slides.length === 0) return null;
   if (slides.length === 1) {
     return (
-      <HeroBanner {...slides[0]} isRtl={isRtl} pack={pack} priority presentation={presentation} />
+      <HeroBanner
+        {...slides[0]}
+        isRtl={isRtl}
+        pack={pack}
+        priority
+        presentation={presentation}
+        headingZone={headingZone}
+      />
     );
   }
 
@@ -122,6 +130,7 @@ export function HeroSlider({
               pack={pack}
               priority={i === 0}
               presentation={presentation}
+              headingZone={headingZone}
             />
           </div>
         ))}

@@ -43,9 +43,11 @@ export default function ClassicCategoryGrid({
   mobileColumns,
   desktopColumns,
   urlPrefix = '',
+  seeAllHref,
   headingZone,
   kickerZone,
   subtitleZone,
+  seeAllZone,
   categoryLabelZone,
 }: CategoryGridProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
@@ -66,9 +68,11 @@ export default function ClassicCategoryGrid({
           showSubtitleLines={showSubtitleLines}
           isRtl={isRtl}
           pack="classic"
+          seeAllHref={seeAllHref}
           headingZone={headingZone}
           kickerZone={kickerZone}
           subtitleZone={subtitleZone}
+          seeAllZone={seeAllZone}
         />
         {/* Grid - 4 columns on desktop for elegant spacing */}
         <div

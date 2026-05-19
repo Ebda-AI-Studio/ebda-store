@@ -2,7 +2,11 @@ import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import { getStoreOrNotFound } from '../../lib/store-resolver';
 import { API_URL } from '../../lib/api';
-import { resolveLayoutSettings, type ProductCardDefaults } from '@force/shared';
+import {
+  resolveLayoutSettings,
+  type ProductCardDefaults,
+  type FilterSidebarSettings,
+} from '@force/shared';
 import { breadcrumbJsonLd, itemList, getSiteUrl } from '../../lib/structured-data';
 import { JsonLd } from '../../components/JsonLd';
 import ProductsClient from './ProductsClient';
@@ -13,21 +17,29 @@ export const metadata: Metadata = {
     'Browse our full catalog of products. Find the best deals with fast delivery in Kuwait.',
 };
 
-/** Fetch the store's layout settings to read `productCardDefaults`. */
-async function fetchProductCardDefaults(store: {
-  id: string;
-}): Promise<ProductCardDefaults | undefined> {
-  if (!store.id || store.id === 'demo') return undefined;
+interface PlpLayoutSettings {
+  productCardDefaults?: ProductCardDefaults;
+  filterSidebar?: FilterSidebarSettings;
+}
+
+/** Fetch the store's layout settings to read `productCardDefaults` and `filterSidebar`. */
+async function fetchPlpLayoutSettings(store: { id: string }): Promise<PlpLayoutSettings> {
+  if (!store.id || store.id === 'demo') return {};
   try {
     const res = await fetch(`${API_URL}/public/stores/${store.id}/layout`, {
       next: { revalidate: 60 },
     });
-    if (!res.ok) return undefined;
+    if (!res.ok) return {};
     const json = await res.json();
     const layout = resolveLayoutSettings(json?.data?.layout ?? {});
-    return layout.productCardDefaults ? { ...layout.productCardDefaults } : undefined;
+    return {
+      productCardDefaults: layout.productCardDefaults
+        ? { ...layout.productCardDefaults }
+        : undefined,
+      filterSidebar: layout.filterSidebar ? { ...layout.filterSidebar } : undefined,
+    };
   } catch {
-    return undefined;
+    return {};
   }
 }
 
@@ -93,11 +105,13 @@ export default async function ProductsPage({
   const rawCategory = params.category;
   const category = Array.isArray(rawCategory) ? rawCategory[0] : rawCategory;
   // Fetch layout in parallel with product data so PLP cards respect the
-  // merchant's global productCardDefaults (size, frame color, etc.).
-  const [initialData, productCardDefaults] = await Promise.all([
+  // merchant's global productCardDefaults (size, frame color, etc.) and the
+  // filterSidebar.enabled / filterSidebar.defaultOpen merchant preferences.
+  const [initialData, plpLayout] = await Promise.all([
     fetchInitialData(store, { category }),
-    fetchProductCardDefaults(store),
+    fetchPlpLayoutSettings(store),
   ]);
+  const { productCardDefaults, filterSidebar } = plpLayout;
 
   const siteUrl = getSiteUrl(store);
 
@@ -149,6 +163,7 @@ export default async function ProductsPage({
           initialProducts={initialData.products}
           initialMeta={initialData.meta}
           productCardDefaults={productCardDefaults}
+          filterSidebar={filterSidebar}
         />
       </Suspense>
     </>

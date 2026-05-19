@@ -151,7 +151,10 @@ export default function ClassicHeader({
                 priority
               />
             ) : (
-              <span className="text-2xl font-serif font-bold tracking-wider text-foreground">
+              <span
+                className="text-2xl font-serif font-bold tracking-wider text-foreground"
+                data-zone="storeName"
+              >
                 {displayName}
               </span>
             )}

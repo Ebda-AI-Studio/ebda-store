@@ -45,9 +45,11 @@ export default function BoldCategoryGrid({
   mobileColumns,
   desktopColumns,
   urlPrefix = '',
+  seeAllHref,
   headingZone,
   kickerZone,
   subtitleZone,
+  seeAllZone,
   categoryLabelZone,
 }: CategoryGridProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
@@ -75,9 +77,11 @@ export default function BoldCategoryGrid({
           showSubtitleLines={showSubtitleLines}
           isRtl={isRtl}
           pack="bold"
+          seeAllHref={seeAllHref}
           headingZone={headingZone}
           kickerZone={kickerZone}
           subtitleZone={subtitleZone}
+          seeAllZone={seeAllZone}
         />
         {/* Grid - Staggered layout for dynamism */}
         <div

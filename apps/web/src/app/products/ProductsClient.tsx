@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { api, type Product, type Category, type PaginationMeta } from '@/lib/api';
-import type { ProductCardDefaults } from '@force/shared';
+import type { ProductCardDefaults, FilterSidebarSettings } from '@force/shared';
 import { useToast, Select } from '@force/ui';
 import { useCart } from '../../contexts/CartContext';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
@@ -14,6 +14,8 @@ import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useTemplateComponents } from '../../hooks/useTemplateComponents';
 import { toTemplateProduct } from '../../templates/adapters';
 import { PecannbeeProductCard } from '../../templates/shared/PecannbeeProductCard';
+import { gridGapClass } from '../../templates/shared/card-size';
+import { resolveSectionZone } from '../../templates/shared/section-typography';
 import { ProductListItem } from './ProductListItem';
 import { ProductsFilterSidebar } from './ProductsFilterSidebar';
 import { ProductsPagination } from './ProductsPagination';
@@ -73,6 +75,8 @@ interface ProductsClientProps {
   initialMeta?: PaginationMeta | null;
   /** Global product-card defaults from the merchant's layout settings. */
   productCardDefaults?: ProductCardDefaults;
+  /** Filter sidebar merchant preferences (enabled toggle + defaultOpen). */
+  filterSidebar?: FilterSidebarSettings;
 }
 
 export default function ProductsClient({
@@ -80,6 +84,7 @@ export default function ProductsClient({
   initialProducts = [],
   initialMeta = null,
   productCardDefaults,
+  filterSidebar,
 }: ProductsClientProps) {
   const searchParams = useSearchParams();
   const [search, setSearch] = useState('');
@@ -127,6 +132,28 @@ export default function ProductsClient({
   const storeUrl = useStoreUrl();
   const { templateId } = useTemplateComponents();
   const sortOptions = getSortOptions(t);
+
+  // Resolve productCardDefaults typography zones for PLP cards. The global
+  // zones are not accessible from this client component (they're emitted as
+  // CSS in layout.tsx), so we pass undefined for the global zone arg — same
+  // pattern as HomePageContent.tsx. When no per-section override is set,
+  // resolveSectionZone returns undefined and PecannbeeProductCard falls back
+  // to its pack-styles CSS classes (no inline style applied).
+  const plpProductNameZone = resolveSectionZone(
+    productCardDefaults?.typography?.productName,
+    undefined,
+    store.theme
+  );
+  const plpProductPriceZone = resolveSectionZone(
+    productCardDefaults?.typography?.productPrice,
+    undefined,
+    store.theme
+  );
+  const plpProductCtaZone = resolveSectionZone(
+    productCardDefaults?.typography?.productCta,
+    undefined,
+    store.theme
+  );
 
   // Cart-id → quantity is consumed by ProductListItem (list view). The grid
   // view's PecannbeeProductCard handles its own optimistic add state.
@@ -349,29 +376,33 @@ export default function ProductsClient({
         </div>
 
         <div className="flex flex-col gap-8 lg:flex-row">
-          {/* Sidebar Filters */}
-          <ProductsFilterSidebar
-            search={search}
-            categoryFilter={categoryFilter}
-            categories={categories}
-            meta={meta}
-            language={language}
-            onSearchChange={setSearch}
-            onCategoryChange={setCategoryFilter}
-            onClearAll={handleClearAll}
-            onSearchSubmit={handleSearch}
-            sortBy={sortBy}
-            sortOptions={sortOptions.map(o => ({ value: o.value, label: o.label }))}
-            onSortChange={setSortBy}
-            priceMin={priceMin}
-            priceMax={priceMax}
-            priceFloor={0}
-            priceCeil={100}
-            onPriceChange={(min, max) => {
-              setPriceMin(min);
-              setPriceMax(max);
-            }}
-          />
+          {/* Sidebar Filters — hidden when merchant sets filterSidebar.enabled = false.
+              defaultOpen drives the initial collapsed/open state on desktop. */}
+          {filterSidebar?.enabled !== false && (
+            <ProductsFilterSidebar
+              search={search}
+              categoryFilter={categoryFilter}
+              categories={categories}
+              meta={meta}
+              language={language}
+              onSearchChange={setSearch}
+              onCategoryChange={setCategoryFilter}
+              onClearAll={handleClearAll}
+              onSearchSubmit={handleSearch}
+              sortBy={sortBy}
+              sortOptions={sortOptions.map(o => ({ value: o.value, label: o.label }))}
+              onSortChange={setSortBy}
+              priceMin={priceMin}
+              priceMax={priceMax}
+              priceFloor={0}
+              priceCeil={100}
+              onPriceChange={(min, max) => {
+                setPriceMin(min);
+                setPriceMax(max);
+              }}
+              defaultOpen={filterSidebar?.defaultOpen}
+            />
+          )}
 
           {/* Products Grid */}
           <div className="flex-1">
@@ -549,7 +580,7 @@ export default function ProductsClient({
                 from the `pack` prop (see templates/shared/pack-styles.ts). */}
             {!isLoading && !error && viewMode === 'grid' && (
               <div
-                className="grid gap-4 grid-cols-2 sm:gap-5 md:grid-cols-3 lg:grid-cols-4 lg:gap-6 xl:grid-cols-5 2xl:grid-cols-6"
+                className={`grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 ${productCardDefaults?.cardGap ? gridGapClass(productCardDefaults.cardGap) : 'gap-4 sm:gap-5 lg:gap-6'}`}
                 dir={language === 'ar' ? 'rtl' : 'ltr'}
               >
                 {products.map(p => (
@@ -566,6 +597,11 @@ export default function ProductsClient({
                     cardFrameWidth={productCardDefaults?.cardFrameWidth}
                     cardFrameSize={productCardDefaults?.cardFrameSize}
                     cardFrameColor={productCardDefaults?.cardFrameColor}
+                    showLabel={productCardDefaults?.showLabel}
+                    showHover={productCardDefaults?.showHover}
+                    productNameZone={plpProductNameZone}
+                    productPriceZone={plpProductPriceZone}
+                    productCtaZone={plpProductCtaZone}
                     product={toTemplateProduct(p)}
                     isRtl={language === 'ar'}
                     currency={store.currency}

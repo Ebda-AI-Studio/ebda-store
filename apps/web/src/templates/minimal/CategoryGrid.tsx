@@ -45,9 +45,11 @@ export default function MinimalCategoryGrid({
   mobileColumns,
   desktopColumns,
   urlPrefix = '',
+  seeAllHref,
   headingZone,
   kickerZone,
   subtitleZone,
+  seeAllZone,
   categoryLabelZone,
 }: CategoryGridProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
@@ -68,9 +70,11 @@ export default function MinimalCategoryGrid({
           showSubtitleLines={showSubtitleLines}
           isRtl={isRtl}
           pack="minimal"
+          seeAllHref={seeAllHref}
           headingZone={headingZone}
           kickerZone={kickerZone}
           subtitleZone={subtitleZone}
+          seeAllZone={seeAllZone}
         />
         {/* Grid - Simple 4 columns */}
         <div

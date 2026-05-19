@@ -360,6 +360,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     // and the sub-zone rules below them win cascade ties.
     'beforeHeader',
     'header',
+    // storeName is a sub-zone of header — the store name text element inside
+    // every theme Header. Listed after header so a tied selector still wins
+    // on source order. Closes wiring gap from 2026-05-20 audit.
+    'storeName',
     'categories',
     'products',
     'footer',
