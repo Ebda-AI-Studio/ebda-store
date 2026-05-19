@@ -626,7 +626,7 @@ export default function StoreLayoutPage() {
                   )}
                   {layout.categories.showCardFrame && (
                     <label className="flex flex-col gap-1 text-sm">
-                      <span className="text-muted-foreground">Frame border width</span>
+                      <span className="text-muted-foreground">Frame size (thickness)</span>
                       <select
                         value={layout.categories.cardFrameWidth ?? 'thin'}
                         onChange={e =>
@@ -1417,7 +1417,7 @@ function ProductCardControls({
         )}
         {values.showCardFrame && (
           <label className="flex flex-col gap-1 text-sm">
-            <span className="text-muted-foreground">Frame border width</span>
+            <span className="text-muted-foreground">Frame size (thickness)</span>
             <select
               value={values.cardFrameWidth ?? 'thin'}
               onChange={e => onChange({ cardFrameWidth: e.target.value as CardFrameWidth })}
