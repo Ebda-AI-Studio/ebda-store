@@ -292,7 +292,7 @@ router.put(
         resourceType: 'store',
         resourceId: storeId,
         details: {
-          wbsEnabled: input.wbsEnabled,
+          wbsEnabled: input.wbsEnabled ?? null,
           wbsClientId: autoPopulatedClientId || input.wbsClientId || null,
           apiKeyChanged: isNewApiKey,
           keyCleared: isClearApiKey,
