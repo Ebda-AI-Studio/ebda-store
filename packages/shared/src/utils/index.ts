@@ -3,6 +3,10 @@
 // Export utility modules
 export * from './image';
 export * from './csv';
+export { TEMPLATE_PRESETS, getTemplatePresets } from './template-presets';
+export type { TemplateSeeds } from './template-presets';
+export { VIBE_PRESETS, getVibePreset } from './vibe-presets';
+export type { VibeId, VibePreset } from './vibe-presets';
 // Color helpers (smart-color resolver + contrast utilities)
 export {
   resolveColor,

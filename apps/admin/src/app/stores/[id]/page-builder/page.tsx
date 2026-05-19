@@ -1485,6 +1485,8 @@ export default function StoreLayoutPage() {
         open={paletteOpen}
         onClose={() => setPaletteOpen(false)}
         theme={storeInfo?.theme}
+        storeId={storeId}
+        storeTemplate={storeInfo?.template}
         onApply={async (palette, themeUpdates: ThemeUpdates) => {
           // 1. Apply palette to layout state (same as before).
           setLayout(prev => {

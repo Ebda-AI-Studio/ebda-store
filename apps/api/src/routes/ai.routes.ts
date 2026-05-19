@@ -240,6 +240,39 @@ router.post(
 );
 
 // =====================================================================
+// Smart Palette v3 — Layer C: Gemini Vision logo-to-palette extraction.
+// POST /stores/:storeId/ai/palette-from-logo
+// =====================================================================
+
+router.post(
+  '/palette-from-logo',
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+
+      const store = await prisma.store.findUnique({
+        where: { id: storeId },
+        select: { logo: true },
+      });
+
+      if (!store?.logo) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'NO_LOGO', message: 'Upload a store logo first.' },
+        });
+        return;
+      }
+
+      const palette = await AIService.extractPaletteFromLogo(store.logo, storeId);
+      res.json({ success: true, data: palette });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// =====================================================================
 // Bulk sweeps — translate or SEO across the entire catalogue.
 // Returns 202 + jobId; admin polls /bulk/:jobId for progress.
 // =====================================================================

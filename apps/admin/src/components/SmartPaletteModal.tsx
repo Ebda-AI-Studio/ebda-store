@@ -1,7 +1,12 @@
 'use client';
 
-import { useState } from 'react';
-import { generateSectionPalette, DEFAULT_THEME } from '@force/shared';
+import { useState, useEffect } from 'react';
+import {
+  generateSectionPalette,
+  DEFAULT_THEME,
+  getTemplatePresets,
+  getVibePreset,
+} from '@force/shared';
 import type {
   StoreTheme,
   SectionKey,
@@ -10,10 +15,13 @@ import type {
   PalettePattern,
   CardFrameSize,
   CardFrameWidth,
+  VibeId,
+  TemplateId,
 } from '@force/shared';
 import { hexToHsl } from '../lib/color';
 import { ColorField } from './ColorField';
 import { SectionPreview } from './SectionPreview';
+import { apiPost } from '../lib/api';
 
 /**
  * Brand-color updates the parent should persist to StoreTheme on apply.
@@ -37,6 +45,10 @@ interface SmartPaletteModalProps {
    */
   onApply: (palette: Record<SectionKey, SectionPaletteEntry>, themeUpdates: ThemeUpdates) => void;
   theme: StoreTheme | undefined;
+  /** Store ID — used for the AI logo extraction call (Layer C). */
+  storeId?: string;
+  /** Active template — used to pre-fill seeds on modal open (Layer A). */
+  storeTemplate?: TemplateId;
 }
 
 const SECTION_KEYS: SectionKey[] = [
@@ -54,17 +66,71 @@ const PATTERN_LABELS: Record<PalettePattern, string> = {
   'single-bg': 'Solid background',
 };
 
-export function SmartPaletteModal({ open, onClose, onApply, theme }: SmartPaletteModalProps) {
-  const [primary, setPrimary] = useState<string>('token:primary');
-  const [accent, setAccent] = useState<string>('');
-  const [neutral, setNeutral] = useState<string>('');
-  const [pattern, setPattern] = useState<PalettePattern>('alternating');
-  const [paletteFrameWidth, setPaletteFrameWidth] = useState<CardFrameWidth>('normal');
-  const [paletteFrameSize, setPaletteFrameSize] = useState<CardFrameSize>('normal');
+const VIBE_IDS: VibeId[] = [
+  'luxury',
+  'boutique',
+  'grocery',
+  'streetwear',
+  'minimal',
+  'tech',
+  'restaurant',
+  'cafe',
+  'beauty',
+];
+
+export function SmartPaletteModal({
+  open,
+  onClose,
+  onApply,
+  theme,
+  storeId,
+  storeTemplate,
+}: SmartPaletteModalProps) {
+  // Layer A: template-derived defaults (lowest priority)
+  const templateSeeds = getTemplatePresets(storeTemplate);
+
+  const defaultPrimary = templateSeeds?.primary ?? 'token:primary';
+  const defaultAccent = templateSeeds?.accent ?? '';
+  const defaultNeutral = templateSeeds?.neutral ?? '';
+  const defaultPattern: PalettePattern = templateSeeds?.pattern ?? 'alternating';
+  const defaultFrameWidth: CardFrameWidth = templateSeeds?.cardFrameWidth ?? 'normal';
+  const defaultFrameSize: CardFrameSize = templateSeeds?.cardFrameSize ?? 'normal';
+
+  const [primary, setPrimary] = useState<string>(defaultPrimary);
+  const [accent, setAccent] = useState<string>(defaultAccent);
+  const [neutral, setNeutral] = useState<string>(defaultNeutral);
+  const [pattern, setPattern] = useState<PalettePattern>(defaultPattern);
+  const [paletteFrameWidth, setPaletteFrameWidth] = useState<CardFrameWidth>(defaultFrameWidth);
+  const [paletteFrameSize, setPaletteFrameSize] = useState<CardFrameSize>(defaultFrameSize);
   const [overrides, setOverrides] = useState<
     Partial<Record<SectionKey, Partial<SectionPaletteEntry>>>
   >({});
   const [expandedSection, setExpandedSection] = useState<SectionKey | null>(null);
+
+  // Layer B: active vibe selection
+  const [activeVibe, setActiveVibe] = useState<VibeId | null>(null);
+
+  // Layer C: AI logo extraction state
+  const [logoLoading, setLogoLoading] = useState(false);
+  const [logoError, setLogoError] = useState<string | null>(null);
+
+  // Re-apply Layer A defaults whenever the modal opens or the template changes.
+  // This ensures "reset to template defaults" works correctly without a
+  // separate reset handler — reopening the modal re-seeds from the template.
+  useEffect(() => {
+    if (!open) return;
+    const seeds = getTemplatePresets(storeTemplate);
+    setPrimary(seeds?.primary ?? 'token:primary');
+    setAccent(seeds?.accent ?? '');
+    setNeutral(seeds?.neutral ?? '');
+    setPattern(seeds?.pattern ?? 'alternating');
+    setPaletteFrameWidth(seeds?.cardFrameWidth ?? 'normal');
+    setPaletteFrameSize(seeds?.cardFrameSize ?? 'normal');
+    setActiveVibe(null);
+    setOverrides({});
+    setExpandedSection(null);
+    setLogoError(null);
+  }, [open, storeTemplate]);
 
   if (!open) return null;
 
@@ -83,6 +149,74 @@ export function SmartPaletteModal({ open, onClose, onApply, theme }: SmartPalett
   };
   const palette = primary ? generateSectionPalette(seeds, resolvedTheme) : null;
 
+  // Layer B: apply vibe preset — overrides seeds + pattern + frame
+  function applyVibe(vibeId: VibeId) {
+    const preset = getVibePreset(vibeId);
+    if (!preset) return;
+    setActiveVibe(vibeId);
+    setPrimary(preset.primary);
+    setAccent(preset.accent);
+    setNeutral(preset.neutral);
+    setPattern(preset.pattern);
+    setPaletteFrameWidth(preset.cardFrameWidth);
+    setPaletteFrameSize(preset.cardFrameSize);
+    // Clear per-section overrides when switching vibe so the new vibe
+    // is fully applied without leftover overrides interfering.
+    setOverrides({});
+  }
+
+  // Layer A: reset to template defaults
+  function resetToTemplateDefaults() {
+    const seeds = getTemplatePresets(storeTemplate);
+    setPrimary(seeds?.primary ?? 'token:primary');
+    setAccent(seeds?.accent ?? '');
+    setNeutral(seeds?.neutral ?? '');
+    setPattern(seeds?.pattern ?? 'alternating');
+    setPaletteFrameWidth(seeds?.cardFrameWidth ?? 'normal');
+    setPaletteFrameSize(seeds?.cardFrameSize ?? 'normal');
+    setActiveVibe(null);
+    setOverrides({});
+  }
+
+  // Layer C: AI logo extraction
+  async function handleLogoSuggest() {
+    if (!storeId) {
+      setLogoError('Store ID not available.');
+      return;
+    }
+    setLogoLoading(true);
+    setLogoError(null);
+    try {
+      const res = await apiPost<{ primary: string; accent: string; neutral: string }>(
+        `/api/v1/stores/${storeId}/ai/palette-from-logo`,
+        {}
+      );
+      if (res.error) {
+        const code = (res.error as { code?: string }).code;
+        if (code === 'NO_LOGO') {
+          setLogoError('Upload a store logo first.');
+        } else if (code === 'AI_QUOTA_EXCEEDED' || code === 'AI_QUOTA_DAILY_EXCEEDED') {
+          setLogoError('AI quota reached. Try again tomorrow.');
+        } else {
+          setLogoError(res.error.message ?? 'AI extraction failed.');
+        }
+        return;
+      }
+      if (res.data) {
+        // AI suggestion overrides seeds (highest priority before manual edits).
+        setPrimary(res.data.primary);
+        setAccent(res.data.accent);
+        setNeutral(res.data.neutral);
+        // Clear any active vibe so the AI result is the clean baseline.
+        setActiveVibe(null);
+      }
+    } catch {
+      setLogoError('AI extraction failed. Please try again.');
+    } finally {
+      setLogoLoading(false);
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-card p-6 shadow-2xl">
@@ -100,6 +234,66 @@ export function SmartPaletteModal({ open, onClose, onApply, theme }: SmartPalett
           Pick 1–3 colors and we&apos;ll distribute them across every section&apos;s background,
           card frame, and heading color. Section text auto-fixes for contrast.
         </p>
+
+        {/* Layer C: AI logo suggestion button */}
+        <div className="mb-4 flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handleLogoSuggest}
+            disabled={logoLoading || !storeId}
+            className="flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {logoLoading ? (
+              <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            ) : (
+              <span>✨</span>
+            )}
+            {logoLoading ? 'Extracting…' : 'Suggest from my logo'}
+          </button>
+          {logoError ? (
+            <span className="text-xs text-destructive">{logoError}</span>
+          ) : (
+            <span className="text-xs text-muted-foreground">
+              Uses Gemini Vision to read dominant brand colors from your store logo
+            </span>
+          )}
+        </div>
+
+        {/* Layer B: Vibe picker */}
+        <div className="mb-4 rounded-xl border border-border bg-muted/30 p-4">
+          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Vibe (optional — overrides seeds + distribution)
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {VIBE_IDS.map(vibeId => {
+              const vibe = {
+                luxury: 'Luxury',
+                boutique: 'Boutique',
+                grocery: 'Grocery',
+                streetwear: 'Streetwear',
+                minimal: 'Minimal',
+                tech: 'Tech',
+                restaurant: 'Restaurant',
+                cafe: 'Cafe',
+                beauty: 'Beauty',
+              }[vibeId];
+              return (
+                <button
+                  key={vibeId}
+                  type="button"
+                  onClick={() => applyVibe(vibeId)}
+                  className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                    activeVibe === vibeId
+                      ? 'border-primary bg-primary/10 text-foreground'
+                      : 'border-border bg-background text-muted-foreground hover:bg-muted'
+                  }`}
+                >
+                  {vibe}
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
         {/* Distribution sub-section: pattern + frame thickness */}
         <div className="mb-4 rounded-xl border border-border bg-muted/30 p-4">
@@ -169,7 +363,7 @@ export function SmartPaletteModal({ open, onClose, onApply, theme }: SmartPalett
           </div>
         </div>
 
-        {/* Seed color inputs */}
+        {/* Seed color inputs + Layer A reset link */}
         <div className="space-y-3">
           <ColorField
             label="Primary (required)"
@@ -189,6 +383,18 @@ export function SmartPaletteModal({ open, onClose, onApply, theme }: SmartPalett
             onChange={setNeutral}
             theme={theme}
           />
+          {/* Layer A: reset link — only shown when template has a preset */}
+          {getTemplatePresets(storeTemplate) ? (
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={resetToTemplateDefaults}
+                className="text-xs text-muted-foreground underline hover:text-foreground"
+              >
+                Reset to template defaults
+              </button>
+            </div>
+          ) : null}
         </div>
 
         {/* Interactive preview grid — click any section to override */}

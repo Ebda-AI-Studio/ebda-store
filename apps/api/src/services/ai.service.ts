@@ -1,5 +1,6 @@
 /**
- * Force Store AI assistant — translation, SEO meta, category suggestions.
+ * Force Store AI assistant — translation, SEO meta, category suggestions,
+ * and logo-to-palette vision extraction.
  *
  * Provider: Google Gemini 2.0 Flash (free tier — 15 req/min, ~1500
  * req/day per project). Strong Arabic + English handling, native
@@ -16,6 +17,7 @@
  * usage can be aggregated for billing/audit later.
  */
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { z } from 'zod';
 import { createHash } from 'crypto';
 import { prisma } from '@force/database';
 import { config } from '../config';
@@ -171,6 +173,18 @@ function stripJsonFences(text: string): string {
     .replace(/```$/, '')
     .trim();
 }
+
+// ---------------------------------------------------------------------------
+// Logo-to-palette vision types (Layer C)
+// ---------------------------------------------------------------------------
+
+const paletteExtractionSchema = z.object({
+  primary: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  accent: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  neutral: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+});
+
+export type ExtractedPalette = z.infer<typeof paletteExtractionSchema>;
 
 export class AIService {
   /**
@@ -447,6 +461,92 @@ export class AIService {
 
     await redis.set(key, JSON.stringify(parsed), CACHE_TTL_SECONDS);
     return { suggestion: parsed, cached: false };
+  }
+
+  /**
+   * Extract dominant brand colors from a store logo image using Gemini
+   * Vision. Returns { primary, accent, neutral } as #RRGGBB hex strings.
+   *
+   * The caller (palette-from-logo route) already validates that the store
+   * has a logo URL before calling this method. Throws AppError on:
+   *   - Logo URL not reachable (fetch error)
+   *   - Gemini returns non-JSON or invalid hex values
+   *   - AI quota exhausted (re-thrown as AppError 429)
+   */
+  static async extractPaletteFromLogo(logoUrl: string, storeId: string): Promise<ExtractedPalette> {
+    ensureEnabled();
+    await assertAiQuota();
+
+    // Fetch the logo bytes — Gemini Vision needs inline base64 data.
+    let logoFetch: Response;
+    try {
+      logoFetch = await fetch(logoUrl);
+    } catch (err) {
+      throw new AppError(502, 'AI_LOGO_FETCH_FAILED', 'Could not reach the logo URL.');
+    }
+    if (!logoFetch.ok) {
+      throw new AppError(
+        502,
+        'AI_LOGO_FETCH_FAILED',
+        `Logo fetch returned HTTP ${logoFetch.status}.`
+      );
+    }
+
+    const buf = await logoFetch.arrayBuffer();
+    const base64 = Buffer.from(buf).toString('base64');
+    const mimeType = logoFetch.headers.get('content-type') ?? 'image/png';
+
+    const prompt =
+      'Look at this brand logo. Identify the 3 most important brand colors:\n' +
+      '1. PRIMARY — the most dominant brand color (often the main shape/wordmark)\n' +
+      '2. ACCENT — a complementary color that appears in the logo (or a harmonious accent if logo is single-color)\n' +
+      '3. NEUTRAL — a background/surface color (white, cream, light gray — pick what complements primary)\n\n' +
+      'Output ONLY a JSON object, no prose, no markdown fences:\n' +
+      '{ "primary": "#RRGGBB", "accent": "#RRGGBB", "neutral": "#RRGGBB" }\n\n' +
+      'Use 6-digit hex. Do not output any other text.';
+
+    const model = getClient().getGenerativeModel({ model: MODEL });
+
+    let res;
+    try {
+      res = await model.generateContent([
+        {
+          inlineData: {
+            mimeType,
+            data: base64,
+          },
+        },
+        prompt,
+      ]);
+    } catch (err) {
+      rethrowAsAppError(err, 'AI logo palette extraction failed');
+    }
+
+    const rawText = stripJsonFences(res.response.text());
+    let parsed: ExtractedPalette;
+    try {
+      parsed = paletteExtractionSchema.parse(JSON.parse(rawText));
+    } catch (err) {
+      logger.error({ err, rawText }, 'Gemini returned invalid JSON for logo palette extraction');
+      throw new AppError(
+        502,
+        'AI_BAD_RESPONSE',
+        'AI returned an unexpected response for logo palette extraction.'
+      );
+    }
+
+    const usage = res.response.usageMetadata;
+    // Record as 'seo' feature bucket — no dedicated 'vision' bucket yet.
+    // Token counts land in per-store quota tracking regardless.
+    await recordUsage(
+      storeId,
+      'seo',
+      usage?.promptTokenCount ?? 0,
+      usage?.candidatesTokenCount ?? 0,
+      false
+    );
+
+    return parsed;
   }
 
   /**
