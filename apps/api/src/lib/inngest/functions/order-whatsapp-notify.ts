@@ -31,6 +31,7 @@ import {
   WbsUnauthorizedError,
   WbsTemplateMissingError,
 } from '../../../services/wbs-bridge.service';
+import { featureService } from '../../../services/feature.service';
 import { validateE164 } from '../../../utils/phone-e164';
 import logger from '../../logger';
 
@@ -77,6 +78,18 @@ export async function handleOrderWhatsAppNotify(
   if (!orderId || !storeId) {
     logger.warn({ eventName }, '[WBS-NOTIFY] fired without ids — skipping');
     return { skipped: 'missing-ids' };
+  }
+
+  // ── Step 0: Platform feature gate ──────────────────────────────────────
+  // Super-admin entitlement check: is this merchant on a plan that includes
+  // WhatsApp notifications? Independent of the merchant's per-store wbsEnabled
+  // toggle — both must be on for sends to fire.
+  const featureEnabled = await step.run('check-feature-flag', () =>
+    featureService.isFeatureEnabled(storeId, 'whatsapp')
+  );
+  if (!featureEnabled) {
+    logger.info({ storeId }, '[WBS-NOTIFY] WhatsApp feature not enabled for store — skipping');
+    return { skipped: 'feature-disabled' };
   }
 
   // ── Step 1: Load store config ──────────────────────────────────────────

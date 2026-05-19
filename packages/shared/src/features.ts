@@ -138,8 +138,10 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     key: 'whatsapp',
     name: 'WhatsApp Notifications',
     nameAr: 'إشعارات واتساب',
-    description: 'Send order updates and promotions to customers via WhatsApp.',
-    descriptionAr: 'إرسال تحديثات الطلبات والعروض الترويجية للعملاء عبر واتساب.',
+    description:
+      'Send order confirmation, shipping, and delivery updates via the Force WhatsApp Business Platform bridge. The merchant connects their WABA on the WhatsApp Notifications page and picks an approved Meta template per event.',
+    descriptionAr:
+      'إرسال تأكيدات الطلب وتحديثات الشحن والتسليم عبر منصة فورس للواتساب التجاري. يربط التاجر حساب الواتساب التجاري الخاص به في صفحة إشعارات الواتساب ويختار قالب Meta معتمد لكل حدث.',
     category: 'marketing',
   },
   sms: {

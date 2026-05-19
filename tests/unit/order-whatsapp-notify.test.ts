@@ -85,6 +85,12 @@ vi.mock('@api/lib/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
+vi.mock('@api/services/feature.service', () => ({
+  featureService: {
+    isFeatureEnabled: vi.fn().mockResolvedValue(true),
+  },
+}));
+
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
 const STORE_ID = 'store-uuid-1';
