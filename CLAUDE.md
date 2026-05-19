@@ -1,5 +1,32 @@
 # Force Website Builder - Project Guidelines
 
+## Strategic positioning — read this BEFORE any feature decision (codified 2026-05-19)
+
+**Force AI's competitive value in the Kuwait market = customizable storefronts + AI/smart software on top.**
+
+Every feature decision should be evaluated against that positioning. Generic SaaS storefront builders (Shopify, Wix, Wix Kuwait, Salla) compete on tooling depth + ecosystem. We compete on:
+
+1. **Customization granularity** — merchants can tune visual + behavioral details (per-section bg, per-section typography, per-section card frame size/color, smart-palette distribution, per-theme image-spec hints) that Shopify locks behind paid themes or developer access. Ahmad's standing "I want to control X" feedback is direct evidence of this market gap.
+2. **AI-as-default** — translation (en/ar), SEO copy, category suggestion, content auto-fill, bulk catalogue sweeps via Gemini Flash Lite. Free tier matters because Kuwait merchants are price-sensitive and mostly self-shoot/self-write. Every manual field that an AI could fill is a competitive opportunity.
+3. **Arabic-first locality** — bilingual fields everywhere, RTL-correct admin, Kuwait-stack integrations (Tap/MyFatoorah/Hesabe/UPayments/OneSignal/Resend/Neon). Localized to the Gulf instead of bolt-on i18n.
+4. **Compact-ecommerce sizing** — design.md compact baselines match how Kuwait/GCC merchants actually shoot products + write copy. Shopify's 2048×2048 luxury assumptions are wrong for our merchant profile.
+
+### When evaluating a new feature, ask:
+
+- **Does this strengthen one of the four pillars above?** If yes, it's on-strategy. If no, it's table-stakes — implement at the minimum quality bar but don't over-invest.
+- **Is there a manual step here an AI could auto-fill?** If yes, surface an "AI auto-fill" button. Gemini Flash Lite is the default provider (free tier covers most catalogues).
+- **Is this a setting a merchant should be able to tune per-section/per-store?** If yes, expose it. Don't pre-decide for them. The platform's job is to give them the dials + smart defaults; their job is the brand.
+- **Does it work in Arabic?** Test in both locales. RTL is not an afterthought.
+
+### Anti-patterns to refuse
+
+- **Generic features for "any market"** when a Kuwait-specific shape exists (e.g. shipping zones generic across countries when KW Districts have known names + courier coverage).
+- **Manual workflows that should be AI-assisted** (e.g. asking merchant to write Arabic translations when Gemini Flash Lite can suggest them).
+- **Hardcoded design choices that should be customization knobs** (e.g. "the section heading is always 32px" — see `feedback-fwb-data-zone-hardcoded-size-trap`).
+- **English-first UI** even if Arabic is "supported later" (e.g. ColorField labels in English-only with no Arabic translation key).
+
+The 2026-05-19 AI competitive audit at `docs/superpowers/audits/2026-05-19-ai-competitive-audit.md` baselines where we stand against this positioning + ranks improvement opportunities.
+
 ## Sizing rules — read `design.md` FIRST
 
 Ahmad's standing preference (codified 2026-05-16): **default to compact ecommerce
