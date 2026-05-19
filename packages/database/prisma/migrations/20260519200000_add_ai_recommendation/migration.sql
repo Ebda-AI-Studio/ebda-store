@@ -8,7 +8,7 @@
 -- BulkAiJob rows can track sweep progress.
 
 -- Extend the enum first (must happen before the table that references it)
-ALTER TYPE "bulk_ai_job_kind" ADD VALUE IF NOT EXISTS 'recommendations';
+ALTER TYPE "BulkAiJobKind" ADD VALUE IF NOT EXISTS 'recommendations';
 
 -- Create the ai_recommendation table
 CREATE TABLE "ai_recommendation" (
