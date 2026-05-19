@@ -84,8 +84,11 @@ export function SectionHeading({
   // independently from the Typography admin.
   return (
     <div className="mb-8 flex flex-col gap-2 sm:mb-12 sm:gap-3">
-      <div className="flex items-end justify-between gap-4">
-        <div className="flex flex-col gap-1.5 sm:gap-2">
+      {/* relative row: title-block is full-width-centered, seeAll absolute-anchored
+          on the end edge. Mobile-first — on narrow viewports seeAll drops below
+          the heading block instead of overlapping the centered title. */}
+      <div className="relative">
+        <div className="flex flex-col items-center gap-1.5 sm:gap-2">
           {kickerText && (
             // Editorial section divider — two hairline rules flanking the
             // kicker text (Ahmad 2026-05-17). The flanking lines can be
@@ -188,7 +191,7 @@ export function SectionHeading({
         {seeAllHref && (
           <Link
             href={seeAllHref}
-            className={`shrink-0 ${styles.sectionSeeAll}`}
+            className={`mt-2 block text-end shrink-0 sm:absolute sm:end-0 sm:bottom-0 sm:mt-0 ${styles.sectionSeeAll}`}
             data-zone="sectionSeeAll"
             style={{
               fontFamily: seeAllZone?.fontFamily,
