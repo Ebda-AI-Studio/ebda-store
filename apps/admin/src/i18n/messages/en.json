@@ -3698,6 +3698,69 @@
         "submitDraft": "Save as draft",
         "submitPost": "Save and post"
       }
+    },
+    "suppliers": {
+      "title": "Suppliers",
+      "description": "Suppliers you place purchase orders with.",
+      "newButton": "+ New Supplier",
+      "name": "Name",
+      "contact": "Contact",
+      "phone": "Phone",
+      "email": "Email",
+      "paymentTerms": "Payment Terms",
+      "active": "Active",
+      "terms": {
+        "net0": "Cash on delivery",
+        "net15": "Net 15 days",
+        "net30": "Net 30 days",
+        "net60": "Net 60 days",
+        "custom": "Custom"
+      },
+      "new": {
+        "title": "New Supplier",
+        "customTermsDays": "Custom terms days",
+        "notes": "Notes (English)",
+        "notesAr": "Notes (Arabic)",
+        "submit": "Create supplier"
+      }
+    },
+    "purchaseOrders": {
+      "title": "Purchase Orders",
+      "description": "Track POs to suppliers. Receiving a PO updates inventory + posts to Inventory / AP accounts.",
+      "newButton": "+ New PO",
+      "poNumber": "PO #",
+      "supplier": "Supplier",
+      "status": "Status",
+      "expectedDate": "Expected",
+      "receivedDate": "Received",
+      "total": "Total (KWD)",
+      "createdDate": "Created",
+      "statuses": {
+        "draft": "Draft",
+        "sent": "Sent",
+        "partial": "Partial",
+        "received": "Received",
+        "cancelled": "Cancelled"
+      },
+      "new": {
+        "title": "New Purchase Order",
+        "selectSupplier": "Select supplier",
+        "expectedDateLabel": "Expected receipt date",
+        "addItem": "+ Add line item",
+        "qty": "Qty",
+        "unitCost": "Unit cost (fils)",
+        "lineTotal": "Line total (KWD)",
+        "subtotal": "Subtotal",
+        "submit": "Create draft PO"
+      },
+      "detail": {
+        "qtyReceived": "Received",
+        "qtyRemaining": "Remaining",
+        "receiveSection": "Receive items",
+        "receiveButton": "Receive",
+        "cancelButton": "Cancel PO",
+        "cancelConfirm": "Cancel this PO? This action cannot be undone."
+      }
     }
   }
 }
