@@ -9,6 +9,15 @@ interface SectionPreviewProps {
   cardFrameColor: string | undefined;
   cardFrameWidth: CardFrameWidth | undefined;
   headingZone: { color?: string; fontFamily?: string; fontWeight?: string } | undefined;
+  /**
+   * Optional per-section product-card typography overrides. When provided,
+   * the mock product name + price inside each preview card adopt the
+   * specified font + color so the merchant sees product-card typography
+   * render alongside the section bg.
+   */
+  productNameZone?: { color?: string; fontFamily?: string; fontWeight?: string };
+  productPriceZone?: { color?: string; fontFamily?: string; fontWeight?: string };
+  productCtaZone?: { color?: string; fontFamily?: string; fontWeight?: string };
   theme: StoreTheme;
 }
 
@@ -25,6 +34,9 @@ export function SectionPreview({
   cardFrameColor,
   cardFrameWidth,
   headingZone,
+  productNameZone,
+  productPriceZone,
+  productCtaZone,
   theme,
 }: SectionPreviewProps) {
   const resolvedBg = resolveColor(bgColor, theme) ?? '#FFFFFF';
@@ -33,10 +45,20 @@ export function SectionPreview({
   const resolvedFrame = resolveColor(cardFrameColor, theme) ?? '#E5E7EB';
   const widthClass = WIDTH_CLASS[cardFrameWidth ?? 'thin'];
 
+  // Mock product-card surface — always contrasts against the section bg so
+  // the cards stay visible regardless of which bg the merchant picked. The
+  // section bg may be brand primary (dark) OR a light neutral; pick the
+  // mock surface that contrasts.
+  const cardSurface = autoFg === '#000000' ? '#FFFFFF' : 'rgba(255,255,255,0.10)';
+  const cardSurfaceFg = autoFg === '#000000' ? '#1f2937' : '#FFFFFF';
+
+  const productNameColor = resolveColor(productNameZone?.color, theme) ?? cardSurfaceFg;
+  const productPriceColor = resolveColor(productPriceZone?.color, theme) ?? cardSurfaceFg;
+
   return (
-    <div className="rounded-lg p-4 text-center" style={{ backgroundColor: resolvedBg }}>
+    <div className="rounded-lg p-4" style={{ backgroundColor: resolvedBg }}>
       <p
-        className="mb-2 text-xs font-semibold uppercase tracking-wider"
+        className="mb-3 text-center text-xs font-semibold uppercase tracking-wider"
         style={{
           color: headingColor,
           fontFamily: headingZone?.fontFamily,
@@ -49,9 +71,48 @@ export function SectionPreview({
         {[1, 2, 3].map(i => (
           <div
             key={i}
-            className={`aspect-square rounded ${widthClass} bg-white/40`}
-            style={{ borderColor: resolvedFrame }}
-          />
+            className={`flex flex-col items-stretch rounded ${widthClass} overflow-hidden`}
+            style={{ borderColor: resolvedFrame, backgroundColor: cardSurface }}
+          >
+            {/* image placeholder — visible regardless of section bg */}
+            <div className="aspect-square w-full" style={{ backgroundColor: 'rgba(0,0,0,0.06)' }} />
+            <div className="px-1.5 py-1 text-[9px] leading-tight">
+              <div
+                className="truncate"
+                style={{
+                  color: productNameColor,
+                  fontFamily: productNameZone?.fontFamily,
+                  fontWeight: productNameZone?.fontWeight,
+                }}
+              >
+                Product
+              </div>
+              <div
+                className="font-semibold"
+                style={{
+                  color: productPriceColor,
+                  fontFamily: productPriceZone?.fontFamily,
+                  fontWeight: productPriceZone?.fontWeight,
+                }}
+              >
+                5.000 KD
+              </div>
+              <div
+                className="mt-0.5 rounded-sm py-0.5 text-center text-[8px] font-medium uppercase tracking-wider"
+                style={{
+                  backgroundColor: resolvedFrame,
+                  color:
+                    resolveColor(productCtaZone?.color, theme) ??
+                    pickReadableForeground(resolvedFrame) ??
+                    '#FFFFFF',
+                  fontFamily: productCtaZone?.fontFamily,
+                  fontWeight: productCtaZone?.fontWeight,
+                }}
+              >
+                Add
+              </div>
+            </div>
+          </div>
         ))}
       </div>
     </div>
