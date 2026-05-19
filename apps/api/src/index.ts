@@ -20,7 +20,6 @@ import { prisma } from '@force/database';
 import { redis } from './services/redis.service';
 import { circuitBreaker } from './services/circuit-breaker.service';
 import { emailQueue } from './services/email-queue.service';
-import { whatsappQueue } from './services/whatsapp-queue.service';
 import { smsQueue } from './services/sms-queue.service';
 import { abandonedCartService } from './services/abandoned-cart.service';
 import { recommendationService } from './services/recommendation.service';
@@ -62,7 +61,6 @@ socketService.initialize(httpServer);
 
   // Start email queue processor
   emailQueue.startProcessing();
-  whatsappQueue.startProcessing(2000);
   smsQueue.startProcessing(2000);
   abandonedCartService.startProcessing(900000); // 15 minutes
   recommendationService.startFBTCron(86400000, []); // daily; storeIds populated per-trigger
@@ -425,7 +423,6 @@ async function gracefulShutdown(signal: string) {
 
     try {
       emailQueue.stopProcessing();
-      whatsappQueue.stopProcessing();
       smsQueue.stopProcessing();
       abandonedCartService.stopProcessing();
       recommendationService.stopFBTCron();

@@ -101,7 +101,6 @@ export const config = {
   storageSecretKey: process.env.STORAGE_SECRET_KEY || '',
   storageBucket: process.env.STORAGE_BUCKET || 'uploads',
   storagePublicUrl: process.env.STORAGE_PUBLIC_URL || '',
-  whatsappVerifyToken: process.env.WHATSAPP_VERIFY_TOKEN || '',
 
   // Web Push (VAPID) - platform-wide keys for standards-based Web Push (RFC 8030)
   vapidPublicKey: process.env.VAPID_PUBLIC_KEY || '',

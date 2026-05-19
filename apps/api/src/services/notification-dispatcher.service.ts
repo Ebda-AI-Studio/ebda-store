@@ -1,14 +1,17 @@
 /**
  * Notification Dispatcher Service
- * Orchestrates multi-channel notification delivery (WhatsApp, SMS, Push)
+ * Orchestrates multi-channel notification delivery (SMS, Push)
  * based on feature flags, per-event config, and available credentials.
+ *
+ * WhatsApp is intentionally NOT a dispatcher channel — it flows through the
+ * Force Store ↔ WBS bridge as a separate event-driven path
+ * (`apps/api/src/lib/inngest/functions/order-whatsapp-notify.ts`).
  *
  * IMPORTANT: dispatch() NEVER throws — all errors are caught and logged.
  */
 
 import { featureService } from './feature.service';
 import { notificationConfigService } from './notification-config.service';
-import { whatsappQueue } from './whatsapp-queue.service';
 import { smsQueue } from './sms-queue.service';
 import { pushService } from './push.service';
 import { redis } from './redis.service';
@@ -17,12 +20,10 @@ import logger from '../lib/logger';
 import {
   NotificationEvent,
   NotificationData,
-  WHATSAPP_TEMPLATES,
   SMS_TEMPLATES,
   PUSH_TEMPLATES,
   renderSmsTemplate,
 } from '@force/shared';
-import type { WhatsAppConfig } from './whatsapp.service';
 import type { SmsConfig } from './sms.service';
 
 // ==========================================
@@ -37,7 +38,6 @@ const RATE_LIMIT_MAX_PER_WINDOW = 100; // 100 notifications per hour per store p
 // ==========================================
 
 interface EventConfig {
-  whatsapp: boolean;
   sms: boolean;
   push: boolean;
 }
@@ -132,20 +132,20 @@ class NotificationDispatcherService {
     try {
       const row = await prisma.notificationEventConfig.findUnique({
         where: { storeId_event: { storeId, event } },
-        select: { whatsapp: true, sms: true, push: true },
+        select: { sms: true, push: true },
       });
 
       if (!row) {
-        return { whatsapp: true, sms: true, push: true };
+        return { sms: true, push: true };
       }
 
-      return { whatsapp: row.whatsapp, sms: row.sms, push: row.push };
+      return { sms: row.sms, push: row.push };
     } catch (err) {
       logger.warn(
         { err, storeId, event },
         '[NotificationDispatcher] Failed to fetch event config, defaulting all on'
       );
-      return { whatsapp: true, sms: true, push: true };
+      return { sms: true, push: true };
     }
   }
 
@@ -159,8 +159,7 @@ class NotificationDispatcherService {
     data: NotificationData
   ): Promise<void> {
     // 1. Check feature flags in parallel
-    const [whatsappEnabled, smsEnabled, pushEnabled] = await Promise.all([
-      featureService.isFeatureEnabled(storeId, 'whatsapp'),
+    const [smsEnabled, pushEnabled] = await Promise.all([
       featureService.isFeatureEnabled(storeId, 'sms'),
       featureService.isFeatureEnabled(storeId, 'push_notifications'),
     ]);
@@ -169,49 +168,12 @@ class NotificationDispatcherService {
     const eventConfig = await this.getEventConfig(storeId, event);
 
     // 3. Get channel credentials
-    const [whatsappConfig, smsConfig, pushConfig] = await Promise.all([
-      notificationConfigService.getConfig(storeId, 'whatsapp'),
+    const [smsConfig, pushConfig] = await Promise.all([
       notificationConfigService.getConfig(storeId, 'sms'),
       notificationConfigService.getConfig(storeId, 'push'),
     ]);
 
     // 4. Dispatch to each channel — wrapped individually so one failure doesn't block others
-
-    // ── WhatsApp ──────────────────────────────────────────────────────────────
-    if (!whatsappEnabled) {
-      logger.debug(
-        { storeId, event },
-        '[NotificationDispatcher] WhatsApp skipped: feature_disabled'
-      );
-    } else if (!eventConfig.whatsapp) {
-      logger.debug({ storeId, event }, '[NotificationDispatcher] WhatsApp skipped: event_disabled');
-    } else if (!this.hasValidCredentials(whatsappConfig, 'whatsapp', storeId)) {
-      logger.debug({ storeId, event }, '[NotificationDispatcher] WhatsApp skipped: not_configured');
-    } else if (!data.customerPhone) {
-      logger.debug({ storeId, event }, '[NotificationDispatcher] WhatsApp skipped: no_phone');
-    } else if (!(await this.checkRateLimit(storeId, 'whatsapp'))) {
-      logger.debug({ storeId, event }, '[NotificationDispatcher] WhatsApp skipped: rate_limited');
-    } else {
-      try {
-        const template = WHATSAPP_TEMPLATES[event];
-        const variables = template.variables(data);
-        const waConfig = whatsappConfig!.credentials as unknown as WhatsAppConfig;
-
-        await whatsappQueue.enqueue({
-          storeId,
-          event,
-          recipientPhone: data.customerPhone,
-          templateName: template.name,
-          variables,
-          config: waConfig,
-          idempotencyKey: `whatsapp_${storeId}_${event}_${data.orderNumber}`,
-        });
-
-        logger.info({ storeId, event }, '[NotificationDispatcher] WhatsApp queued');
-      } catch (err) {
-        logger.error({ err, storeId, event }, '[NotificationDispatcher] WhatsApp dispatch failed');
-      }
-    }
 
     // ── SMS ───────────────────────────────────────────────────────────────────
     if (!smsEnabled) {

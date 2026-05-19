@@ -6,11 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import crypto from 'crypto';
 
-import {
-  SMS_TEMPLATES,
-  WHATSAPP_TEMPLATES,
-  PUSH_TEMPLATES,
-} from '../../packages/shared/src/notifications';
+import { SMS_TEMPLATES, PUSH_TEMPLATES } from '../../packages/shared/src/notifications';
 
 // ─── 2. SMS_TEMPLATES has entries for all 3 cart events ───────────────────────
 
@@ -43,43 +39,6 @@ describe('SMS_TEMPLATES — cart abandoned entries', () => {
     const t = SMS_TEMPLATES.cart_abandoned_step3;
     expect(t.en.length).toBeGreaterThan(0);
     expect(t.ar.length).toBeGreaterThan(0);
-  });
-});
-
-// ─── 3. WHATSAPP_TEMPLATES has entries for all 3 cart events ─────────────────
-
-describe('WHATSAPP_TEMPLATES — cart abandoned entries', () => {
-  it('has an entry for cart_abandoned_step1', () => {
-    expect(WHATSAPP_TEMPLATES).toHaveProperty('cart_abandoned_step1');
-  });
-
-  it('has an entry for cart_abandoned_step2', () => {
-    expect(WHATSAPP_TEMPLATES).toHaveProperty('cart_abandoned_step2');
-  });
-
-  it('has an entry for cart_abandoned_step3', () => {
-    expect(WHATSAPP_TEMPLATES).toHaveProperty('cart_abandoned_step3');
-  });
-
-  it('cart_abandoned_step1 has a name and variables function', () => {
-    const t = WHATSAPP_TEMPLATES.cart_abandoned_step1;
-    expect(typeof t.name).toBe('string');
-    expect(t.name.length).toBeGreaterThan(0);
-    expect(typeof t.variables).toBe('function');
-  });
-
-  it('cart_abandoned_step2 has a name and variables function', () => {
-    const t = WHATSAPP_TEMPLATES.cart_abandoned_step2;
-    expect(typeof t.name).toBe('string');
-    expect(t.name.length).toBeGreaterThan(0);
-    expect(typeof t.variables).toBe('function');
-  });
-
-  it('cart_abandoned_step3 has a name and variables function', () => {
-    const t = WHATSAPP_TEMPLATES.cart_abandoned_step3;
-    expect(typeof t.name).toBe('string');
-    expect(t.name.length).toBeGreaterThan(0);
-    expect(typeof t.variables).toBe('function');
   });
 });
 

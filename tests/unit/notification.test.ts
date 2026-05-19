@@ -7,7 +7,6 @@ import { describe, it, expect } from 'vitest';
 
 // Import directly from source (same pattern as feature.test.ts)
 import {
-  WHATSAPP_TEMPLATES,
   SMS_TEMPLATES,
   PUSH_TEMPLATES,
   renderSmsTemplate,
@@ -115,33 +114,6 @@ describe('SMS_TEMPLATES', () => {
       expect(typeof template.ar).toBe('string');
       expect(template.ar.length).toBeGreaterThan(0);
     }
-  });
-});
-
-// ─── WHATSAPP_TEMPLATES ───────────────────────────────────────────────────────
-
-describe('WHATSAPP_TEMPLATES', () => {
-  it('has entries for all events', () => {
-    for (const event of ALL_EVENTS) {
-      expect(WHATSAPP_TEMPLATES).toHaveProperty(event);
-    }
-  });
-
-  it('each entry has a name string and variables function', () => {
-    for (const event of ALL_EVENTS) {
-      const template = WHATSAPP_TEMPLATES[event];
-      expect(typeof template.name).toBe('string');
-      expect(template.name.length).toBeGreaterThan(0);
-      expect(typeof template.variables).toBe('function');
-    }
-  });
-
-  it('variables function returns an array of strings', () => {
-    const vars = WHATSAPP_TEMPLATES.order_confirmed.variables(sampleData);
-    expect(Array.isArray(vars)).toBe(true);
-    expect(vars.every(v => typeof v === 'string')).toBe(true);
-    expect(vars).toContain('Ahmad');
-    expect(vars).toContain('ORD-001');
   });
 });
 
