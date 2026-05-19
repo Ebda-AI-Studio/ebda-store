@@ -262,6 +262,11 @@ model Store {
   wbsApiKey    String?  @map("wbs_api_key")
   wbsTemplates Json?    @map("wbs_templates")
 
+  // Accounting Settings (Batch 1)
+  accountingEnabled    Boolean @default(true) @map("accounting_enabled")
+  defaultTaxRateBps    Int     @default(0)    @map("default_tax_rate_bps")
+  fiscalYearStartMonth Int     @default(1)    @map("fiscal_year_start_month")
+
   // Relations
   owner                    User                       @relation(fields: [ownerId], references: [id])
   // Customer accounts that authenticate against this store. Distinct from
@@ -307,6 +312,8 @@ model Store {
   faqs                     StoreFaq[]
   howtos                   StoreHowto[]
   blogPosts                BlogPost[]
+  accounts                 Account[]
+  journalEntries           JournalEntry[]
 
   @@index([ownerId])
   @@index([status])
@@ -1962,4 +1969,119 @@ model ProductFaq {
 
   @@index([productId])
   @@map("product_faqs")
+}
+
+// ==========================================
+// Accounting (Batch 1 — foundations)
+// ==========================================
+
+enum AccountType {
+  asset
+  liability
+  equity
+  revenue
+  expense
+}
+
+enum JournalEntrySource {
+  order
+  refund
+  purchase_order
+  expense
+  stock_adjustment
+  manual
+  period_close
+  opening_balance
+}
+
+enum JournalEntryStatus {
+  posted
+  reversed
+  draft
+}
+
+model Sequence {
+  // Per-store, per-kind monotonically-increasing counter. Used for entryNumber,
+  // poNumber, adjustmentNumber, expenseNumber. Atomic increment via FOR UPDATE.
+  storeId String @map("store_id")
+  kind    String // 'journal' | 'po' | 'adjustment' | 'expense'
+  next    Int    @default(1)
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@id([storeId, kind])
+  @@map("sequences")
+}
+
+model Account {
+  id        String      @id @default(uuid())
+  storeId   String      @map("store_id")
+  code      String
+  nameEn    String      @map("name_en")
+  nameAr    String?     @map("name_ar")
+  type      AccountType
+  parentId  String?     @map("parent_id")
+  isSystem  Boolean     @default(false) @map("is_system")
+  isActive  Boolean     @default(true)  @map("is_active")
+  createdAt DateTime    @default(now()) @map("created_at")
+  updatedAt DateTime    @updatedAt      @map("updated_at")
+
+  store    Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  parent   Account?      @relation("AccountTree", fields: [parentId], references: [id])
+  children Account[]     @relation("AccountTree")
+  lines    JournalLine[]
+
+  @@unique([storeId, code])
+  @@index([storeId, type])
+  @@map("accounts")
+}
+
+model JournalEntry {
+  id           String             @id @default(uuid())
+  storeId      String             @map("store_id")
+  entryNumber  String             @map("entry_number")
+  postedAt     DateTime           @map("posted_at")
+  source       JournalEntrySource
+  sourceId     String?            @map("source_id")
+  reversedById String?            @unique @map("reversed_by_id")
+  reversesId   String?            @unique @map("reverses_id")
+  memo         String?
+  memoAr       String?            @map("memo_ar")
+  status       JournalEntryStatus @default(posted)
+  postedBy     String?            @map("posted_by")
+  createdAt    DateTime           @default(now()) @map("created_at")
+
+  store      Store         @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  lines      JournalLine[]
+  reversedBy JournalEntry? @relation("ReversedBy", fields: [reversedById], references: [id])
+  reversedByEntry JournalEntry[] @relation("ReversedBy")
+  reverses   JournalEntry? @relation("Reverses", fields: [reversesId], references: [id])
+  reversedByThis JournalEntry[] @relation("Reverses")
+
+  @@unique([storeId, entryNumber])
+  @@index([storeId, postedAt(sort: Desc)])
+  @@index([source, sourceId])
+  @@index([storeId, status])
+  @@map("journal_entries")
+}
+
+model JournalLine {
+  id         String   @id @default(uuid())
+  entryId    String   @map("entry_id")
+  accountId  String   @map("account_id")
+  debit      Int      @default(0)
+  credit     Int      @default(0)
+  currency   String   @default("KWD")
+  lineMemo   String?  @map("line_memo")
+  lineMemoAr String?  @map("line_memo_ar")
+  refTable   String?  @map("ref_table")
+  refId      String?  @map("ref_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  entry   JournalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  account Account      @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@index([entryId])
+  @@index([accountId])
+  @@index([refTable, refId])
+  @@map("journal_lines")
 }
