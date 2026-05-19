@@ -23,6 +23,7 @@ import {
   setAccountActive,
 } from '../services/accounting/account.service';
 import { postEntry } from '../services/accounting/journal.service';
+import { trialBalance, profitAndLoss, balanceSheet } from '../services/accounting/reports.service';
 
 const router = Router({ mergeParams: true });
 
@@ -270,6 +271,136 @@ router.patch(
         setAccountActive(req.params.storeId, req.params.accountId, body.data.isActive)
       );
       res.json({ data: acct });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ─── GET /:storeId/finance/reports/trial-balance ─────────────────────────────
+
+/**
+ * Trial balance as of `asOf` (optional ISO datetime query param).
+ * Returns all accounts with debit/credit totals and running balance.
+ */
+router.get(
+  '/:storeId/finance/reports/trial-balance',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const asOf = req.query.asOf ? new Date(String(req.query.asOf)) : undefined;
+      const data = await runInTenantContext(req.params.storeId, () =>
+        trialBalance(req.params.storeId, asOf)
+      );
+      res.json({ data });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ─── GET /:storeId/finance/reports/pnl ───────────────────────────────────────
+
+/**
+ * Profit & loss for the period [from, to].
+ * Defaults to last 30 days when query params are omitted.
+ */
+router.get(
+  '/:storeId/finance/reports/pnl',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const from = new Date(
+        String(req.query.from ?? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+      );
+      const to = new Date(String(req.query.to ?? new Date().toISOString()));
+      const data = await runInTenantContext(req.params.storeId, () =>
+        profitAndLoss(req.params.storeId, from, to)
+      );
+      res.json({ data });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ─── GET /:storeId/finance/reports/balance-sheet ─────────────────────────────
+
+/**
+ * Balance sheet snapshot as of `asOf` (default: now).
+ * Buckets accounts into assets / liabilities / equity with totals.
+ */
+router.get(
+  '/:storeId/finance/reports/balance-sheet',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const asOf = req.query.asOf ? new Date(String(req.query.asOf)) : new Date();
+      const data = await runInTenantContext(req.params.storeId, () =>
+        balanceSheet(req.params.storeId, asOf)
+      );
+      res.json({ data });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ─── GET /:storeId/finance/dashboard ─────────────────────────────────────────
+
+/**
+ * Merchant-facing finance dashboard — this-month P&L, cash account balances,
+ * stock value, and balance-sheet totals.
+ * Cash accounts are those whose code starts with '10' (asset accounts in the
+ * 1000-1099 range per Kuwait COA — bank + petty cash).
+ */
+router.get(
+  '/:storeId/finance/dashboard',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const now = new Date();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+      const data = await runInTenantContext(req.params.storeId, async () => {
+        const [pnl, bs, stockValueRows] = await Promise.all([
+          profitAndLoss(req.params.storeId, monthStart, now),
+          balanceSheet(req.params.storeId, now),
+          prisma.$queryRawUnsafe<{ total: bigint }[]>(
+            `SELECT COALESCE(SUM(inventory * COALESCE(cost_price, 0)), 0) AS total
+             FROM public.products
+             WHERE store_id = $1::uuid AND deleted_at IS NULL`,
+            req.params.storeId
+          ),
+        ]);
+
+        const stockValue = Number(stockValueRows[0]?.total ?? 0);
+
+        return {
+          thisMonth: {
+            revenue: pnl.totalRevenue,
+            expenses: pnl.totalExpenses,
+            net: pnl.netIncome,
+          },
+          cash: bs.assets.filter(a => a.code.startsWith('10')),
+          stockValue,
+          balanceSheet: {
+            totalAssets: bs.totalAssets,
+            totalLiabilities: bs.totalLiabilities,
+            totalEquity: bs.totalEquity,
+          },
+        };
+      });
+
+      res.json({ data });
     } catch (err) {
       next(err);
     }
