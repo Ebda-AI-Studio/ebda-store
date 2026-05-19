@@ -21,6 +21,7 @@ export default function SettingsClient() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const { success: toastSuccess, error: toastError } = useToast();
@@ -154,24 +155,74 @@ export default function SettingsClient() {
     }
   }
 
+  async function handleExportData() {
+    setIsExporting(true);
+    setMessage(null);
+    try {
+      const result = await api.get<unknown>('/auth/me/export');
+      if (!result.success || !result.data) {
+        toastError(
+          t('Download failed', 'فشل التنزيل'),
+          t('Please try again.', 'يرجى المحاولة مرة أخرى.')
+        );
+        return;
+      }
+      // Trigger browser download of the JSON payload — name includes today's
+      // date so the user knows the snapshot point.
+      const blob = new Blob([JSON.stringify(result.data, null, 2)], {
+        type: 'application/json',
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `my-account-data-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toastSuccess(
+        t('Data downloaded', 'تم تنزيل البيانات'),
+        t('Your account data has been saved to your device.', 'تم حفظ بيانات حسابك على جهازك.')
+      );
+    } catch {
+      toastError(
+        t('Download failed', 'فشل التنزيل'),
+        t('Please try again.', 'يرجى المحاولة مرة أخرى.')
+      );
+    } finally {
+      setIsExporting(false);
+    }
+  }
+
   async function handleDeleteAccount() {
     setIsDeleting(true);
     setMessage(null);
 
     try {
-      const result = await api.delete<{ message: string }>('/auth/me');
+      // Kuwait Law 13/2023 + GDPR Art. 17 compliant erasure: POST /auth/me/erase
+      // irreversibly anonymizes PII while preserving anonymized order records
+      // for Kuwait MOF tax retention. The old DELETE /auth/me was a soft-delete
+      // (deletedAt timestamp) that left PII intact — NOT compliant.
+      const result = await api.post<{ message: string }>('/auth/me/erase', {});
       if (result.success) {
         // Clear refresh token from localStorage (access token is HTTP-only cookie cleared by server)
         if (typeof window !== 'undefined') {
           localStorage.removeItem('refreshToken');
         }
-        toastSuccess('Account deleted', 'Your account has been permanently deleted.');
+        toastSuccess(
+          t('Account deleted', 'تم حذف الحساب'),
+          t('Your account data has been anonymized.', 'تم إخفاء بيانات حسابك.')
+        );
         // Redirect to home after account deletion
         router.push('/');
       } else {
         toastError(
-          'Delete failed',
-          result.error?.message || 'Failed to delete account. Please try again.'
+          t('Delete failed', 'فشل الحذف'),
+          result.error?.message ||
+            t(
+              'Failed to delete account. Please try again.',
+              'فشل حذف الحساب. يرجى المحاولة مرة أخرى.'
+            )
         );
         setMessage({
           type: 'error',
@@ -179,7 +230,10 @@ export default function SettingsClient() {
         });
       }
     } catch {
-      toastError('Delete failed', 'Failed to delete account. Please try again.');
+      toastError(
+        t('Delete failed', 'فشل الحذف'),
+        t('Failed to delete account. Please try again.', 'فشل حذف الحساب. يرجى المحاولة مرة أخرى.')
+      );
       setMessage({ type: 'error', text: 'Failed to delete account. Please try again.' });
     } finally {
       setIsDeleting(false);
@@ -362,6 +416,45 @@ export default function SettingsClient() {
         </form>
       </div>
 
+      {/* Privacy & data \u2014 GDPR Art. 20 / Kuwait Law 13/2023 portability right */}
+      <div className="rounded-xl border border-border bg-card shadow-sm">
+        <div className="border-b border-border bg-muted/40 p-4">
+          <h2 className="font-semibold text-foreground">
+            {t(
+              'Privacy & data',
+              '\u0627\u0644\u062e\u0635\u0648\u0635\u064a\u0629 \u0648\u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a'
+            )}
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            {t(
+              'Download a copy of your data',
+              '\u062a\u0646\u0632\u064a\u0644 \u0646\u0633\u062e\u0629 \u0645\u0646 \u0628\u064a\u0627\u0646\u0627\u062a\u0643'
+            )}
+          </p>
+        </div>
+        <div className="p-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex-1">
+              <p className="font-medium text-foreground">
+                {t(
+                  'Download my data',
+                  '\u062a\u0646\u0632\u064a\u0644 \u0628\u064a\u0627\u0646\u0627\u062a\u064a'
+                )}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {t(
+                  'Get a JSON file with your profile, orders, addresses, and wishlist \u2014 exercise of your right to data portability under Kuwait Law 13/2023.',
+                  '\u0627\u062d\u0635\u0644 \u0639\u0644\u0649 \u0645\u0644\u0641 JSON \u064a\u062d\u062a\u0648\u064a \u0639\u0644\u0649 \u0645\u0644\u0641\u0643 \u0627\u0644\u0634\u062e\u0635\u064a \u0648\u0637\u0644\u0628\u0627\u062a\u0643 \u0648\u0639\u0646\u0627\u0648\u064a\u0646\u0643 \u0648\u0645\u0641\u0636\u0644\u0627\u062a\u0643 \u2014 \u0645\u0645\u0627\u0631\u0633\u0629 \u062d\u0642\u0643 \u0641\u064a \u0646\u0642\u0644 \u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a \u0648\u0641\u0642\u0627\u064b \u0644\u0644\u0642\u0627\u0646\u0648\u0646 \u0627\u0644\u0643\u0648\u064a\u062a\u064a 13/2023.'
+                )}
+              </p>
+            </div>
+            <Button variant="outline" onClick={handleExportData} isLoading={isExporting}>
+              {t('Download', '\u062a\u0646\u0632\u064a\u0644')}
+            </Button>
+          </div>
+        </div>
+      </div>
+
       {/* Danger Zone */}
       <div className="rounded-xl border border-destructive/30 bg-card shadow-sm">
         <div className="border-b border-destructive/30 bg-destructive/10 p-4">
@@ -408,8 +501,8 @@ export default function SettingsClient() {
             </h2>
             <p className="mt-2 text-sm text-muted-foreground">
               {t(
-                'Are you sure you want to permanently delete your account? This action cannot be undone and all your data will be lost.',
-                '\u0647\u0644 \u0623\u0646\u062a \u0645\u062a\u0623\u0643\u062f \u0623\u0646\u0643 \u062a\u0631\u064a\u062f \u062d\u0630\u0641 \u062d\u0633\u0627\u0628\u0643 \u0646\u0647\u0627\u0626\u064a\u0627\u064b\u061f \u0644\u0627 \u064a\u0645\u0643\u0646 \u0627\u0644\u062a\u0631\u0627\u062c\u0639 \u0639\u0646 \u0647\u0630\u0627 \u0627\u0644\u0625\u062c\u0631\u0627\u0621 \u0648\u0633\u062a\u0641\u0642\u062f \u062c\u0645\u064a\u0639 \u0628\u064a\u0627\u0646\u0627\u062a\u0643.'
+                'Your name, email, phone, and addresses will be permanently anonymized. Your past order records will remain (with personal data removed) for tax-compliance retention per Kuwait Law 13/2023. You will be signed out immediately. This cannot be undone.',
+                '\u0633\u064a\u062a\u0645 \u0625\u062e\u0641\u0627\u0621 \u0627\u0633\u0645\u0643 \u0648\u0628\u0631\u064a\u062f\u0643 \u0627\u0644\u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a \u0648\u0647\u0627\u062a\u0641\u0643 \u0648\u0639\u0646\u0627\u0648\u064a\u0646\u0643 \u0628\u0634\u0643\u0644 \u062f\u0627\u0626\u0645. \u0633\u062a\u0628\u0642\u0649 \u0633\u062c\u0644\u0627\u062a \u0637\u0644\u0628\u0627\u062a\u0643 \u0627\u0644\u0633\u0627\u0628\u0642\u0629 (\u0628\u062f\u0648\u0646 \u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0634\u062e\u0635\u064a\u0629) \u0644\u0623\u063a\u0631\u0627\u0636 \u0627\u0644\u0627\u0645\u062a\u062b\u0627\u0644 \u0627\u0644\u0636\u0631\u064a\u0628\u064a \u0648\u0641\u0642\u0627\u064b \u0644\u0644\u0642\u0627\u0646\u0648\u0646 \u0627\u0644\u0643\u0648\u064a\u062a\u064a 13/2023. \u0633\u064a\u062a\u0645 \u062a\u0633\u062c\u064a\u0644 \u062e\u0631\u0648\u062c\u0643 \u0641\u0648\u0631\u0627\u064b. \u0644\u0627 \u064a\u0645\u0643\u0646 \u0627\u0644\u062a\u0631\u0627\u062c\u0639 \u0639\u0646 \u0647\u0630\u0627 \u0627\u0644\u0625\u062c\u0631\u0627\u0621.'
               )}
             </p>
             <div className="mt-6 flex items-center justify-end gap-3">
