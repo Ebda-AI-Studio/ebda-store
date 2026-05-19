@@ -88,21 +88,31 @@ export async function postOrderPaymentJournal(args: {
 
   // --- Cash / revenue entry ---
   const netRevenue = order.subtotal - order.discount;
-  const cashLines: Array<{ accountId: string; debit: number; credit: number; lineMemo?: string }> =
-    [
-      {
-        accountId: cashAccountId,
-        debit: order.total,
-        credit: 0,
-        lineMemo: `Order ${order.orderNumber} payment`,
-      },
-    ];
+  const cashLines: Array<{
+    accountId: string;
+    debit: number;
+    credit: number;
+    lineMemo?: string;
+    refTable?: string;
+    refId?: string;
+  }> = [
+    {
+      accountId: cashAccountId,
+      debit: order.total,
+      credit: 0,
+      lineMemo: `Order ${order.orderNumber} payment`,
+      refTable: 'orders',
+      refId: order.id,
+    },
+  ];
   if (netRevenue > 0)
     cashLines.push({
       accountId: revenueAccountId,
       debit: 0,
       credit: netRevenue,
       lineMemo: 'Sales revenue (net of discount)',
+      refTable: 'orders',
+      refId: order.id,
     });
   if (order.tax > 0)
     cashLines.push({
@@ -110,6 +120,8 @@ export async function postOrderPaymentJournal(args: {
       debit: 0,
       credit: order.tax,
       lineMemo: 'Tax collected',
+      refTable: 'orders',
+      refId: order.id,
     });
   if (order.shipping > 0)
     cashLines.push({
@@ -117,6 +129,8 @@ export async function postOrderPaymentJournal(args: {
       debit: 0,
       credit: order.shipping,
       lineMemo: 'Shipping fee',
+      refTable: 'orders',
+      refId: order.id,
     });
 
   await postEntry({
@@ -133,8 +147,14 @@ export async function postOrderPaymentJournal(args: {
   // costPriceDeferred ships in Batch 2 (backorder support); for Batch 1, no items are deferred.
   // if (item.costPriceDeferred) continue;
   let totalCogs = 0;
-  const cogsLines: Array<{ accountId: string; debit: number; credit: number; lineMemo?: string }> =
-    [];
+  const cogsLines: Array<{
+    accountId: string;
+    debit: number;
+    credit: number;
+    lineMemo?: string;
+    refTable?: string;
+    refId?: string;
+  }> = [];
   for (const item of order.items) {
     if (!item.costPrice || item.costPrice <= 0) continue;
     const itemCogs = item.costPrice * item.quantity;
@@ -144,12 +164,16 @@ export async function postOrderPaymentJournal(args: {
       debit: itemCogs,
       credit: 0,
       lineMemo: `COGS — ${item.productName} × ${item.quantity}`,
+      refTable: 'order_items',
+      refId: item.id,
     });
     cogsLines.push({
       accountId: inventoryAccountId,
       debit: 0,
       credit: itemCogs,
       lineMemo: `Inventory out — ${item.productName} × ${item.quantity}`,
+      refTable: 'order_items',
+      refId: item.id,
     });
   }
   if (totalCogs > 0) {
