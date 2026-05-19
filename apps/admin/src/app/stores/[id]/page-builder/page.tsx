@@ -6,6 +6,7 @@ import { useToast } from '@force/ui';
 import { useT } from '@/i18n/useT';
 import {
   resolveLayoutSettings,
+  DEFAULT_THEME,
   type StoreLayoutSettings,
   type ProductCardDefaults,
   type HeroSlide,
@@ -41,6 +42,7 @@ function normalizeZoneColors(zone: ZoneOverride): ZoneOverride {
 import { ColorField } from '../../../../components/ColorField';
 import { ZoneEditor } from '../../../../components/ZoneEditor';
 import { SmartPaletteModal } from '../../../../components/SmartPaletteModal';
+import { SectionPreview } from '../../../../components/SectionPreview';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { Toggle } from '../../../../components/Toggle';
 import { ImageUpload } from '../../../../components/ImageUpload';
@@ -56,6 +58,11 @@ interface StoreInfo {
   /** Store theme — used by ColorField to resolve brand tokens for the contrast preview. */
   theme?: StoreTheme;
 }
+
+// Neutral fallback used by SectionPreview before the real theme loads from the
+// API. DEFAULT_THEME from @force/shared is the platform neutral; any token
+// resolution will produce sensible greys + white until storeInfo arrives.
+const FALLBACK_THEME: StoreTheme = DEFAULT_THEME;
 
 type SectionUpdater<K extends keyof StoreLayoutSettings> = (
   prev: StoreLayoutSettings[K]
@@ -322,6 +329,19 @@ export default function StoreLayoutPage() {
                   }
                   theme={storeInfo?.theme}
                 />
+                <div className="mt-4">
+                  <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Live preview
+                  </p>
+                  <SectionPreview
+                    label="Hero"
+                    bgColor={layout.hero.bgColor}
+                    cardFrameColor={undefined}
+                    cardFrameWidth={undefined}
+                    headingZone={layout.hero.typography?.heading}
+                    theme={storeInfo?.theme ?? FALLBACK_THEME}
+                  />
+                </div>
               </SectionCard>
 
               {/* Categories */}
@@ -672,6 +692,19 @@ export default function StoreLayoutPage() {
                   }
                   theme={storeInfo?.theme}
                 />
+                <div className="mt-4">
+                  <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Live preview
+                  </p>
+                  <SectionPreview
+                    label="Categories"
+                    bgColor={layout.categories.bgColor}
+                    cardFrameColor={layout.categories.cardFrameColor}
+                    cardFrameWidth={layout.categories.cardFrameWidth}
+                    headingZone={layout.categories.typography?.heading}
+                    theme={storeInfo?.theme ?? FALLBACK_THEME}
+                  />
+                </div>
               </SectionCard>
 
               {/* New arrivals */}
@@ -764,6 +797,19 @@ export default function StoreLayoutPage() {
                   }
                   theme={storeInfo?.theme}
                 />
+                <div className="mt-4">
+                  <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Live preview
+                  </p>
+                  <SectionPreview
+                    label="New arrivals"
+                    bgColor={layout.newArrivals.bgColor}
+                    cardFrameColor={layout.newArrivals.cardFrameColor}
+                    cardFrameWidth={layout.newArrivals.cardFrameWidth}
+                    headingZone={layout.newArrivals.typography?.heading}
+                    theme={storeInfo?.theme ?? FALLBACK_THEME}
+                  />
+                </div>
               </SectionCard>
 
               {/* Best sellers */}
@@ -856,6 +902,19 @@ export default function StoreLayoutPage() {
                   }
                   theme={storeInfo?.theme}
                 />
+                <div className="mt-4">
+                  <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Live preview
+                  </p>
+                  <SectionPreview
+                    label="Best sellers"
+                    bgColor={layout.bestSellers.bgColor}
+                    cardFrameColor={layout.bestSellers.cardFrameColor}
+                    cardFrameWidth={layout.bestSellers.cardFrameWidth}
+                    headingZone={layout.bestSellers.typography?.heading}
+                    theme={storeInfo?.theme ?? FALLBACK_THEME}
+                  />
+                </div>
               </SectionCard>
 
               {/* Filter sidebar */}
@@ -944,6 +1003,19 @@ export default function StoreLayoutPage() {
                   }
                   theme={storeInfo?.theme}
                 />
+                <div className="mt-4">
+                  <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Live preview
+                  </p>
+                  <SectionPreview
+                    label="Testimonials"
+                    bgColor={layout.testimonials.bgColor}
+                    cardFrameColor={undefined}
+                    cardFrameWidth={undefined}
+                    headingZone={layout.testimonials.typography?.heading}
+                    theme={storeInfo?.theme ?? FALLBACK_THEME}
+                  />
+                </div>
               </SectionCard>
 
               {/* Product reviews (sibling of testimonials — both UGC) */}
@@ -1032,6 +1104,19 @@ export default function StoreLayoutPage() {
                   }
                   theme={storeInfo?.theme}
                 />
+                <div className="mt-4">
+                  <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Live preview
+                  </p>
+                  <SectionPreview
+                    label="Product cards"
+                    bgColor={undefined}
+                    cardFrameColor={layout.productCardDefaults?.cardFrameColor}
+                    cardFrameWidth={layout.productCardDefaults?.cardFrameWidth}
+                    headingZone={layout.productCardDefaults?.typography?.productName}
+                    theme={storeInfo?.theme ?? FALLBACK_THEME}
+                  />
+                </div>
               </SectionCard>
 
               {/* Sizing contract section removed 2026-05-16 — its 3 fields
