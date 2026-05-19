@@ -1,8 +1,8 @@
 'use client';
 
 import { ColorContrastPreview } from './ColorContrastPreview';
-import { COLOR_TOKENS } from '@force/shared';
-import type { StoreTheme } from '@force/shared';
+import { COLOR_TOKENS, resolveColor } from '@force/shared';
+import type { StoreTheme, ColorToken } from '@force/shared';
 
 interface ColorFieldProps {
   label: string;
@@ -13,6 +13,17 @@ interface ColorFieldProps {
   theme: StoreTheme | undefined;
   /** Optional merchant-picked foreground color (from a typography zone) for the preview warning. */
   previewFg?: string;
+  /**
+   * When the merchant has not picked a value yet, show the inherited brand color
+   * as the empty-state label instead of the generic "— Theme default —" text.
+   *
+   * E.g. `inheritFromToken="card"` on a bgColor field will show
+   * "Brand: Surface: Card (#f5f0eb)" when the merchant's theme has `cardColor` set.
+   *
+   * The stored value stays empty — this is only a visual hint. Setting a value
+   * or clicking "Clear" behaves normally.
+   */
+  inheritFromToken?: ColorToken;
 }
 
 const TOKEN_LABELS: Record<(typeof COLOR_TOKENS)[number], string> = {
@@ -27,12 +38,32 @@ const TOKEN_LABELS: Record<(typeof COLOR_TOKENS)[number], string> = {
 
 const CUSTOM = '__custom__';
 
-export function ColorField({ label, value, onChange, hint, theme, previewFg }: ColorFieldProps) {
+export function ColorField({
+  label,
+  value,
+  onChange,
+  hint,
+  theme,
+  previewFg,
+  inheritFromToken,
+}: ColorFieldProps) {
   const isToken = value?.startsWith('token:') ?? false;
   const tokenName = isToken ? (value as string).slice(6) : '';
   const hexValue = !isToken ? value || '' : '';
 
   const selectValue = isToken ? tokenName : value ? CUSTOM : '';
+
+  // Compute the inherited brand-color label for the empty-state option.
+  // Only shown when no value is set and inheritFromToken is provided AND the
+  // theme actually has the token set (non-empty resolution).
+  const inheritedResolvedHex =
+    !value && inheritFromToken && theme
+      ? resolveColor(`token:${inheritFromToken}`, theme)
+      : undefined;
+  const inheritedLabel =
+    inheritedResolvedHex && inheritFromToken
+      ? `Brand: ${TOKEN_LABELS[inheritFromToken]} (${inheritedResolvedHex})`
+      : '— Theme default —';
 
   const handleSelectChange = (next: string) => {
     if (next === '') {
@@ -53,7 +84,7 @@ export function ColorField({ label, value, onChange, hint, theme, previewFg }: C
           onChange={e => handleSelectChange(e.target.value)}
           className="rounded border border-border bg-background px-2 py-1 text-sm"
         >
-          <option value="">— Theme default —</option>
+          <option value="">{inheritedLabel}</option>
           {COLOR_TOKENS.map(t => (
             <option key={t} value={t}>
               {TOKEN_LABELS[t]}

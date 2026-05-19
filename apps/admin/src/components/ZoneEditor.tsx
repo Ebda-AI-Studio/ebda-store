@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import type { ZoneOverride, StoreTheme } from '@force/shared';
+import type { ZoneOverride, StoreTheme, ColorToken } from '@force/shared';
 import { ColorField } from './ColorField';
 
 export interface ZoneEditorProps {
@@ -54,6 +54,13 @@ export interface ZoneEditorProps {
    * typography page's per-zone data-zone-block).
    */
   className?: string;
+  /**
+   * When the merchant has not set a color for this zone yet, show the inherited
+   * brand-token color as the empty-state hint in the ColorField dropdown.
+   * Passed through directly to the embedded `<ColorField inheritFromToken>`.
+   * Omit when the zone's text doesn't inherit from a predictable brand token.
+   */
+  inheritFromToken?: ColorToken;
 }
 
 // Auto-append `px` to bare numbers in size / spacing fields so merchants
@@ -97,6 +104,7 @@ export function ZoneEditor({
   fontFamilyOptions,
   hideLabel,
   className,
+  inheritFromToken,
 }: ZoneEditorProps) {
   const hasValues = hasAnyValue(values);
 
@@ -274,6 +282,7 @@ export function ZoneEditor({
                 : 'Leave empty to inherit from active theme.'
             }
             theme={theme}
+            inheritFromToken={inheritFromToken}
           />
         )}
       </div>

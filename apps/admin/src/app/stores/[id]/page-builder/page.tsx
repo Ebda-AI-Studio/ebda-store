@@ -15,6 +15,7 @@ import {
   type CardFrameWidth,
   type ZoneOverride,
   type SectionTypographyOverride,
+  type ColorToken,
 } from '@force/shared';
 
 // ---------------------------------------------------------------------------
@@ -289,6 +290,7 @@ export default function StoreLayoutPage() {
                   onChange={v => updateSection('hero', s => ({ ...s, bgColor: v }))}
                   hint="Overrides the theme background preset for this section only."
                   theme={storeInfo?.theme}
+                  inheritFromToken="card"
                 />
                 {/* Per-section typography overrides — wins over the global zone for
                     this section only. Hero only exposes heading (heroHeadline global
@@ -630,6 +632,7 @@ export default function StoreLayoutPage() {
                     onChange={v => updateSection('categories', s => ({ ...s, cardFrameColor: v }))}
                     hint="Overrides the theme border color for these category cards."
                     theme={storeInfo?.theme}
+                    inheritFromToken="border"
                   />
                 )}
                 <ColorField
@@ -638,6 +641,7 @@ export default function StoreLayoutPage() {
                   onChange={v => updateSection('categories', s => ({ ...s, bgColor: v }))}
                   hint="Overrides the theme background preset for this section only."
                   theme={storeInfo?.theme}
+                  inheritFromToken="card"
                 />
                 <SectionTypographyBlock
                   roles={['heading', 'kicker', 'subtitle', 'seeAll', 'categoryLabel']}
@@ -713,6 +717,7 @@ export default function StoreLayoutPage() {
                   onChange={v => updateSection('newArrivals', s => ({ ...s, bgColor: v }))}
                   hint="Overrides the theme background preset for this section only."
                   theme={storeInfo?.theme}
+                  inheritFromToken="card"
                 />
                 <SectionTypographyBlock
                   roles={[
@@ -804,6 +809,7 @@ export default function StoreLayoutPage() {
                   onChange={v => updateSection('bestSellers', s => ({ ...s, bgColor: v }))}
                   hint="Overrides the theme background preset for this section only."
                   theme={storeInfo?.theme}
+                  inheritFromToken="card"
                 />
                 <SectionTypographyBlock
                   roles={[
@@ -906,6 +912,7 @@ export default function StoreLayoutPage() {
                   onChange={v => updateSection('testimonials', s => ({ ...s, bgColor: v }))}
                   hint="Overrides the theme background preset for this section only."
                   theme={storeInfo?.theme}
+                  inheritFromToken="card"
                 />
                 <SectionTypographyBlock
                   roles={['heading', 'kicker', 'subtitle']}
@@ -1345,6 +1352,7 @@ function ProductCardControls({
           onChange={v => onChange({ cardFrameColor: v })}
           hint="Overrides the theme border color for these cards."
           theme={theme}
+          inheritFromToken="border"
         />
       )}
     </div>
@@ -1427,6 +1435,22 @@ type SectionTypographyRole =
   | 'productCta'
   | 'categoryLabel';
 
+/**
+ * Maps each per-section typography role to the brand token it inherits from
+ * by default when no color is explicitly set. Used to populate the inherited
+ * brand-color hint in the ZoneEditor ColorField empty state.
+ */
+const ROLE_INHERIT: Record<SectionTypographyRole, ColorToken> = {
+  heading: 'foreground',
+  kicker: 'foreground',
+  subtitle: 'foreground',
+  seeAll: 'primary',
+  productName: 'foreground',
+  productPrice: 'foreground',
+  productCta: 'primary',
+  categoryLabel: 'foreground',
+};
+
 /** Human-readable label for each per-section typography role. */
 const ROLE_LABELS: Record<SectionTypographyRole, string> = {
   heading: 'Section heading',
@@ -1500,6 +1524,7 @@ function SectionTypographyBlock({
             onChange={next => onChangeRole(role, next)}
             onReset={() => onResetRole(role)}
             theme={theme}
+            inheritFromToken={ROLE_INHERIT[role]}
           />
         ))}
       </div>
