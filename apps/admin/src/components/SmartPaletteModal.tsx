@@ -199,99 +199,115 @@ export function SmartPaletteModal({ open, onClose, onApply, theme }: SmartPalett
             </p>
             <div className="grid grid-cols-5 gap-2">
               {SECTION_KEYS.map(key => (
-                <div key={key}>
-                  <div className="min-h-[180px]">
-                    <button
-                      type="button"
-                      onClick={() => setExpandedSection(prev => (prev === key ? null : key))}
-                      className={`h-full w-full rounded-lg border-2 transition-colors ${
-                        expandedSection === key
-                          ? 'border-primary'
-                          : 'border-transparent hover:border-primary/40'
-                      }`}
-                      aria-expanded={expandedSection === key}
-                    >
-                      <SectionPreview
-                        label={key.charAt(0).toUpperCase() + key.slice(1)}
-                        bgColor={palette[key].bgColor}
-                        cardFrameColor={palette[key].cardFrameColor}
-                        cardFrameWidth={palette[key].cardFrameWidth}
-                        cardFrameSize={palette[key].cardFrameSize}
-                        headingZone={undefined}
-                        theme={resolvedTheme}
-                      />
-                    </button>
-                  </div>
-                  {expandedSection === key ? (
-                    <div className="mt-2 rounded-lg border border-primary/40 bg-muted/30 p-3">
-                      {/* 3-column grid: Background | Card frame | Frame thickness */}
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                        <ColorField
-                          label="Background"
-                          value={overrides[key]?.bgColor}
-                          onChange={v =>
-                            setOverrides(prev => ({
-                              ...prev,
-                              [key]: { ...prev[key], bgColor: v },
-                            }))
-                          }
-                          theme={theme}
-                          inheritFromToken="card"
-                          showContrastPreview={false}
-                        />
-                        <ColorField
-                          label="Card frame"
-                          value={overrides[key]?.cardFrameColor}
-                          onChange={v =>
-                            setOverrides(prev => ({
-                              ...prev,
-                              [key]: { ...prev[key], cardFrameColor: v },
-                            }))
-                          }
-                          theme={theme}
-                          inheritFromToken="border"
-                          showContrastPreview={false}
-                        />
-                        <label className="flex flex-col gap-1 text-sm">
-                          <span className="text-muted-foreground">Frame thickness</span>
-                          <select
-                            value={overrides[key]?.cardFrameWidth ?? palette[key].cardFrameWidth}
-                            onChange={e =>
-                              setOverrides(prev => ({
-                                ...prev,
-                                [key]: {
-                                  ...prev[key],
-                                  cardFrameWidth: e.target.value as CardFrameWidth,
-                                },
-                              }))
-                            }
-                            className="rounded border border-border bg-background px-2 py-1 text-sm"
-                          >
-                            <option value="thin">Thin (1px)</option>
-                            <option value="normal">Normal (2px)</option>
-                            <option value="thick">Thick (4px)</option>
-                            <option value="xthick">Extra thick (8px)</option>
-                          </select>
-                        </label>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setOverrides(prev => {
-                            const next = { ...prev };
-                            delete next[key];
-                            return next;
-                          })
-                        }
-                        className="mt-3 text-xs text-muted-foreground underline hover:text-foreground"
-                      >
-                        Reset this section
-                      </button>
-                    </div>
-                  ) : null}
+                <div key={key} className="min-h-[180px]">
+                  <button
+                    type="button"
+                    onClick={() => setExpandedSection(prev => (prev === key ? null : key))}
+                    className={`h-full w-full rounded-lg border-2 transition-colors ${
+                      expandedSection === key
+                        ? 'border-primary'
+                        : 'border-transparent hover:border-primary/40'
+                    }`}
+                    aria-expanded={expandedSection === key}
+                  >
+                    <SectionPreview
+                      label={key.charAt(0).toUpperCase() + key.slice(1)}
+                      bgColor={palette[key].bgColor}
+                      cardFrameColor={palette[key].cardFrameColor}
+                      cardFrameWidth={palette[key].cardFrameWidth}
+                      cardFrameSize={palette[key].cardFrameSize}
+                      headingZone={undefined}
+                      theme={resolvedTheme}
+                    />
+                  </button>
                 </div>
               ))}
             </div>
+            {/* Override editor renders BELOW the tile row so it gets the full
+                modal width (5 columns combined) instead of 1/5 — otherwise the
+                3 ColorFields + select inside overlap inside a ~150px column. */}
+            {expandedSection ? (
+              <div className="mt-3 rounded-lg border border-primary/40 bg-muted/30 p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Override: {expandedSection.charAt(0).toUpperCase() + expandedSection.slice(1)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedSection(null)}
+                    className="text-xs text-muted-foreground hover:text-foreground"
+                    aria-label="Close override editor"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <ColorField
+                    label="Background"
+                    value={overrides[expandedSection]?.bgColor}
+                    onChange={v =>
+                      setOverrides(prev => ({
+                        ...prev,
+                        [expandedSection]: { ...prev[expandedSection], bgColor: v },
+                      }))
+                    }
+                    theme={theme}
+                    inheritFromToken="card"
+                    showContrastPreview={false}
+                  />
+                  <ColorField
+                    label="Card frame"
+                    value={overrides[expandedSection]?.cardFrameColor}
+                    onChange={v =>
+                      setOverrides(prev => ({
+                        ...prev,
+                        [expandedSection]: { ...prev[expandedSection], cardFrameColor: v },
+                      }))
+                    }
+                    theme={theme}
+                    inheritFromToken="border"
+                    showContrastPreview={false}
+                  />
+                  <label className="flex flex-col gap-1 text-sm">
+                    <span className="text-muted-foreground">Frame thickness</span>
+                    <select
+                      value={
+                        overrides[expandedSection]?.cardFrameWidth ??
+                        palette[expandedSection].cardFrameWidth
+                      }
+                      onChange={e =>
+                        setOverrides(prev => ({
+                          ...prev,
+                          [expandedSection]: {
+                            ...prev[expandedSection],
+                            cardFrameWidth: e.target.value as CardFrameWidth,
+                          },
+                        }))
+                      }
+                      className="rounded border border-border bg-background px-2 py-1 text-sm"
+                    >
+                      <option value="thin">Thin (1px)</option>
+                      <option value="normal">Normal (2px)</option>
+                      <option value="thick">Thick (4px)</option>
+                      <option value="xthick">Extra thick (8px)</option>
+                    </select>
+                  </label>
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setOverrides(prev => {
+                      const next = { ...prev };
+                      delete next[expandedSection];
+                      return next;
+                    })
+                  }
+                  className="mt-3 text-xs text-muted-foreground underline hover:text-foreground"
+                >
+                  Reset this section
+                </button>
+              </div>
+            ) : null}
             <p className="mt-2 text-xs text-muted-foreground">
               Token refs (e.g. <code>token:primary</code>) preview as gray here; storefront resolves
               at render.
