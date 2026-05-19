@@ -1,3 +1,4 @@
+const path = require('path');
 const createNextIntlPlugin = require('next-intl/plugin');
 
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
@@ -8,6 +9,13 @@ const nextConfig = {
 
   // Enable standalone output for containerized deployment
   output: 'standalone',
+
+  // Next 16 + Turbopack default: tell the bundler the monorepo root so it
+  // walks up to root node_modules for workspace-hoisted deps. Without this,
+  // `react-onesignal` (declared in apps/admin/package.json but hoisted to
+  // root) fails to resolve on Vercel. Previous Webpack default tolerated
+  // workspace-isolated resolution; Turbopack is stricter.
+  outputFileTracingRoot: path.join(__dirname, '../..'),
 
   transpilePackages: ['@force/ui', '@force/shared'],
 

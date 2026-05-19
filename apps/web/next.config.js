@@ -1,6 +1,13 @@
+const path = require('path');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+
+  // Next 16 + Turbopack default: monorepo-root file-tracing so the bundler
+  // walks up to root node_modules for workspace-hoisted deps. Sister to
+  // the same setting in apps/admin/next.config.js.
+  outputFileTracingRoot: path.join(__dirname, '../..'),
 
   transpilePackages: ['@force/ui', '@force/shared'],
 
