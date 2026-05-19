@@ -41,6 +41,7 @@ import typographyRoutes from './typography.routes';
 import wbsIntegrationRoutes from './wbs-integration.routes';
 import financeRoutes from './finance.routes';
 import suppliersRoutes from './suppliers.routes';
+import purchaseOrdersRoutes from './purchase-orders.routes';
 import { tenantContext } from '../middleware/tenant-context';
 
 const router = Router();
@@ -142,6 +143,9 @@ router.use('/stores', tenantContext, financeRoutes);
 
 // Supplier CRUD (Batch 2 accounting)
 router.use('/stores', tenantContext, suppliersRoutes);
+
+// Purchase Order CRUD + receive (Batch 2 accounting)
+router.use('/stores', tenantContext, purchaseOrdersRoutes);
 
 // Wishlist routes (user-scoped, no store context)
 router.use('/wishlist', wishlistRoutes);

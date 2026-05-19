@@ -24,6 +24,7 @@ import { accountingPostOrderJournal } from './accounting-post-order-journal';
 import { accountingPostRefundJournal } from './accounting-post-refund-journal';
 import { accountingDailyClose } from './accounting-daily-close';
 import { accountingPeriodReconciliation } from './accounting-period-reconciliation';
+import { accountingPostPoReceiveJournal } from './accounting-post-po-receive-journal';
 
 /**
  * Registry of every Inngest function the API exposes. The serve
@@ -57,4 +58,5 @@ export const inngestFunctions: InngestFunction.Any[] = [
   accountingPostRefundJournal,
   accountingDailyClose,
   accountingPeriodReconciliation,
+  accountingPostPoReceiveJournal,
 ];
