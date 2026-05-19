@@ -314,6 +314,7 @@ model Store {
   blogPosts                BlogPost[]
   accounts                 Account[]
   journalEntries           JournalEntry[]
+  sequences                Sequence[]
 
   @@index([ownerId])
   @@index([status])
@@ -2008,6 +2009,8 @@ model Sequence {
   next    Int    @default(1)
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
   @@id([storeId, kind])
   @@map("sequences")
 }
@@ -2043,7 +2046,6 @@ model JournalEntry {
   source       JournalEntrySource
   sourceId     String?            @map("source_id")
   reversedById String?            @unique @map("reversed_by_id")
-  reversesId   String?            @unique @map("reverses_id")
   memo         String?
   memoAr       String?            @map("memo_ar")
   status       JournalEntryStatus @default(posted)
@@ -2052,10 +2054,8 @@ model JournalEntry {
 
   store      Store         @relation(fields: [storeId], references: [id], onDelete: Restrict)
   lines      JournalLine[]
-  reversedBy JournalEntry? @relation("ReversedBy", fields: [reversedById], references: [id])
-  reversedByEntry JournalEntry[] @relation("ReversedBy")
-  reverses   JournalEntry? @relation("Reverses", fields: [reversesId], references: [id])
-  reversedByThis JournalEntry[] @relation("Reverses")
+  reversedBy JournalEntry?  @relation("Reversal", fields: [reversedById], references: [id])
+  reverses   JournalEntry?  @relation("Reversal")
 
   @@unique([storeId, entryNumber])
   @@index([storeId, postedAt(sort: Desc)])
