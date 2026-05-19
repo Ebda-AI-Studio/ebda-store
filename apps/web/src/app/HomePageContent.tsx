@@ -286,6 +286,7 @@ export function HomePageContent({
                     showCardFrame={layout.categories.showCardFrame}
                     cardFrameStyle={layout.categories.cardFrameStyle}
                     cardFrameWidth={layout.categories.cardFrameWidth}
+                    cardFrameSize={layout.categories.cardFrameSize}
                     cardFrameColor={layout.categories.cardFrameColor}
                     headingZone={categoriesHeadingZone}
                     kickerZone={categoriesKickerZone}
@@ -312,6 +313,7 @@ export function HomePageContent({
                       showCardFrame={layout.categories.showCardFrame}
                       cardFrameStyle={layout.categories.cardFrameStyle}
                       cardFrameWidth={layout.categories.cardFrameWidth}
+                      cardFrameSize={layout.categories.cardFrameSize}
                       cardFrameColor={layout.categories.cardFrameColor}
                       mobileColumns={layout.categories.mobileColumns}
                       desktopColumns={layout.categories.desktopColumns}
@@ -368,6 +370,9 @@ export function HomePageContent({
                     cardFrameWidth={
                       layout.newArrivals.cardFrameWidth ||
                       layout.productCardDefaults?.cardFrameWidth
+                    }
+                    cardFrameSize={
+                      layout.newArrivals.cardFrameSize || layout.productCardDefaults?.cardFrameSize
                     }
                     cardFrameColor={
                       layout.newArrivals.cardFrameColor ||
@@ -437,6 +442,9 @@ export function HomePageContent({
                     cardFrameWidth={
                       layout.bestSellers.cardFrameWidth ||
                       layout.productCardDefaults?.cardFrameWidth
+                    }
+                    cardFrameSize={
+                      layout.bestSellers.cardFrameSize || layout.productCardDefaults?.cardFrameSize
                     }
                     cardFrameColor={
                       layout.bestSellers.cardFrameColor ||

@@ -37,6 +37,7 @@ function BoldProductCard({
   showCardFrame,
   cardFrameStyle: _cardFrameStyle,
   cardFrameWidth: _cardFrameWidth,
+  cardFrameSize: _cardFrameSize,
   cardFrameColor,
 }: ProductCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();

@@ -215,7 +215,7 @@ export function contrastRatio(bg: string, fg: string): number {
 }
 
 // Task 15d: lightenColor / darkenColor / rgbToHex / generateSectionPalette
-import type { CardFrameWidth } from '../types/store-layout';
+import type { CardFrameSize, CardFrameWidth } from '../types/store-layout';
 
 /** Convert an Rgb object to an uppercase hex string (#RRGGBB). */
 function rgbToHex(rgb: Rgb): string {
@@ -288,6 +288,7 @@ export interface PaletteSeeds {
   pattern?: PalettePattern;
   overrides?: Partial<Record<SectionKey, Partial<SectionPaletteEntry>>>;
   cardFrameWidth?: CardFrameWidth;
+  cardFrameSize?: CardFrameSize;
 }
 
 export interface SectionPaletteEntry {
@@ -295,6 +296,8 @@ export interface SectionPaletteEntry {
   cardFrameColor: ColorValue;
   /** Default border width applied to card frames in this section. */
   cardFrameWidth: CardFrameWidth;
+  /** Default frame box padding (breathing room between content and border) in this section. */
+  cardFrameSize: CardFrameSize;
   /**
    * Heading text color. Returns `'auto'` when the bg is a token ref — caller
    * must resolve the token at render time and call `pickReadableForeground`
@@ -340,6 +343,7 @@ export function generateSectionPalette(
     pattern = 'alternating',
     overrides,
     cardFrameWidth = 'normal',
+    cardFrameSize = 'normal',
   } = seeds;
   const neutralBg = neutral ?? '#FFFFFF';
 
@@ -411,6 +415,7 @@ export function generateSectionPalette(
         bgColor: slots[key],
         cardFrameColor: primary,
         cardFrameWidth,
+        cardFrameSize,
         headingColor: headingFor(slots[key]),
       };
       return acc;

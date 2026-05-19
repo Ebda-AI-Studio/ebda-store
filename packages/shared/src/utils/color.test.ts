@@ -271,4 +271,18 @@ describe('generateSectionPalette patterns', () => {
       expect(p[k].cardFrameWidth).toBe('xthick');
     }
   });
+
+  it('cardFrameSize defaults to normal across all sections', () => {
+    const p = generateSectionPalette({ primary: '#FF6E00' });
+    for (const k of ['hero', 'categories', 'newArrivals', 'bestSellers', 'testimonials'] as const) {
+      expect(p[k].cardFrameSize).toBe('normal');
+    }
+  });
+
+  it('cardFrameSize from seeds propagates to all sections', () => {
+    const p = generateSectionPalette({ primary: '#FF6E00', cardFrameSize: 'spacious' });
+    for (const k of ['hero', 'categories', 'newArrivals', 'bestSellers', 'testimonials'] as const) {
+      expect(p[k].cardFrameSize).toBe('spacious');
+    }
+  });
 });

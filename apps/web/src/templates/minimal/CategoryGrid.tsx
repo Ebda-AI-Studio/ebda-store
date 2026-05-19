@@ -6,6 +6,7 @@ import { useStore } from '../../contexts/StoreContext';
 import { resolveColor } from '@force/shared';
 import {
   cardFrameClass,
+  cardFrameSizeClass,
   cardFrameWidthClass,
   gridColsClass,
   gridGapClass,
@@ -39,6 +40,7 @@ export default function MinimalCategoryGrid({
   showCardFrame,
   cardFrameStyle,
   cardFrameWidth,
+  cardFrameSize,
   cardFrameColor,
   mobileColumns,
   desktopColumns,
@@ -78,7 +80,7 @@ export default function MinimalCategoryGrid({
             return frame ? (
               <div
                 key={category.id}
-                className={`${frame} ${cardFrameWidthClass(cardFrameWidth)}`}
+                className={`${frame} ${cardFrameWidthClass(cardFrameWidth)} ${cardFrameSizeClass(cardFrameSize)}`}
                 style={
                   cardFrameColor && store.theme
                     ? { borderColor: resolveColor(cardFrameColor, store.theme) }

@@ -13,6 +13,7 @@ import {
   recommendedSizeTextForTemplate,
   type TemplateId,
   type StoreTheme,
+  type CardFrameSize,
   type CardFrameWidth,
   type ZoneOverride,
   type SectionTypographyOverride,
@@ -626,7 +627,7 @@ export default function StoreLayoutPage() {
                   )}
                   {layout.categories.showCardFrame && (
                     <label className="flex flex-col gap-1 text-sm">
-                      <span className="text-muted-foreground">Frame size (thickness)</span>
+                      <span className="text-muted-foreground">Border thickness</span>
                       <select
                         value={layout.categories.cardFrameWidth ?? 'thin'}
                         onChange={e =>
@@ -641,6 +642,26 @@ export default function StoreLayoutPage() {
                         <option value="normal">Normal (2px)</option>
                         <option value="thick">Thick (4px)</option>
                         <option value="xthick">Extra thick (8px)</option>
+                      </select>
+                    </label>
+                  )}
+                  {layout.categories.showCardFrame && (
+                    <label className="flex flex-col gap-1 text-sm">
+                      <span className="text-muted-foreground">Frame size</span>
+                      <select
+                        value={layout.categories.cardFrameSize ?? 'normal'}
+                        onChange={e =>
+                          updateSection('categories', s => ({
+                            ...s,
+                            cardFrameSize: e.target.value as CardFrameSize,
+                          }))
+                        }
+                        className="rounded-lg border border-border bg-card px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                      >
+                        <option value="compact">Compact (8px padding)</option>
+                        <option value="normal">Normal (12px padding) — default</option>
+                        <option value="comfortable">Comfortable (16px padding)</option>
+                        <option value="spacious">Spacious (24px padding)</option>
                       </select>
                     </label>
                   )}
@@ -701,6 +722,7 @@ export default function StoreLayoutPage() {
                     bgColor={layout.categories.bgColor}
                     cardFrameColor={layout.categories.cardFrameColor}
                     cardFrameWidth={layout.categories.cardFrameWidth}
+                    cardFrameSize={layout.categories.cardFrameSize}
                     headingZone={layout.categories.typography?.heading}
                     theme={storeInfo?.theme ?? FALLBACK_THEME}
                   />
@@ -806,6 +828,7 @@ export default function StoreLayoutPage() {
                     bgColor={layout.newArrivals.bgColor}
                     cardFrameColor={layout.newArrivals.cardFrameColor}
                     cardFrameWidth={layout.newArrivals.cardFrameWidth}
+                    cardFrameSize={layout.newArrivals.cardFrameSize}
                     headingZone={layout.newArrivals.typography?.heading}
                     theme={storeInfo?.theme ?? FALLBACK_THEME}
                   />
@@ -911,6 +934,7 @@ export default function StoreLayoutPage() {
                     bgColor={layout.bestSellers.bgColor}
                     cardFrameColor={layout.bestSellers.cardFrameColor}
                     cardFrameWidth={layout.bestSellers.cardFrameWidth}
+                    cardFrameSize={layout.bestSellers.cardFrameSize}
                     headingZone={layout.bestSellers.typography?.heading}
                     theme={storeInfo?.theme ?? FALLBACK_THEME}
                   />
@@ -1113,6 +1137,7 @@ export default function StoreLayoutPage() {
                     bgColor={undefined}
                     cardFrameColor={layout.productCardDefaults?.cardFrameColor}
                     cardFrameWidth={layout.productCardDefaults?.cardFrameWidth}
+                    cardFrameSize={layout.productCardDefaults?.cardFrameSize}
                     headingZone={layout.productCardDefaults?.typography?.productName}
                     theme={storeInfo?.theme ?? FALLBACK_THEME}
                   />
@@ -1237,6 +1262,7 @@ export default function StoreLayoutPage() {
                 showCardFrame: true,
                 cardFrameColor: palette.categories.cardFrameColor,
                 cardFrameWidth: palette.categories.cardFrameWidth,
+                cardFrameSize: palette.categories.cardFrameSize,
               },
               newArrivals: {
                 ...prev.newArrivals,
@@ -1244,6 +1270,7 @@ export default function StoreLayoutPage() {
                 showCardFrame: true,
                 cardFrameColor: palette.newArrivals.cardFrameColor,
                 cardFrameWidth: palette.newArrivals.cardFrameWidth,
+                cardFrameSize: palette.newArrivals.cardFrameSize,
               },
               bestSellers: {
                 ...prev.bestSellers,
@@ -1251,6 +1278,7 @@ export default function StoreLayoutPage() {
                 showCardFrame: true,
                 cardFrameColor: palette.bestSellers.cardFrameColor,
                 cardFrameWidth: palette.bestSellers.cardFrameWidth,
+                cardFrameSize: palette.bestSellers.cardFrameSize,
               },
               testimonials: { ...prev.testimonials, bgColor: palette.testimonials.bgColor },
             };
@@ -1300,6 +1328,8 @@ type CardControlsValues = {
   cardFrameStyle?: 'soft' | 'outline' | 'shadow' | 'paper';
   /** Border width for the card frame — only visible when showCardFrame is on. */
   cardFrameWidth?: CardFrameWidth;
+  /** Frame box padding — only visible when showCardFrame is on. */
+  cardFrameSize?: CardFrameSize;
   /** Hex color for the card frame border — only visible when showCardFrame is on. */
   cardFrameColor?: string;
 };
@@ -1417,7 +1447,7 @@ function ProductCardControls({
         )}
         {values.showCardFrame && (
           <label className="flex flex-col gap-1 text-sm">
-            <span className="text-muted-foreground">Frame size (thickness)</span>
+            <span className="text-muted-foreground">Border thickness</span>
             <select
               value={values.cardFrameWidth ?? 'thin'}
               onChange={e => onChange({ cardFrameWidth: e.target.value as CardFrameWidth })}
@@ -1427,6 +1457,21 @@ function ProductCardControls({
               <option value="normal">Normal (2px)</option>
               <option value="thick">Thick (4px)</option>
               <option value="xthick">Extra thick (8px)</option>
+            </select>
+          </label>
+        )}
+        {values.showCardFrame && (
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-muted-foreground">Frame size</span>
+            <select
+              value={values.cardFrameSize ?? 'normal'}
+              onChange={e => onChange({ cardFrameSize: e.target.value as CardFrameSize })}
+              className="rounded-lg border border-border bg-card px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              <option value="compact">Compact (8px padding)</option>
+              <option value="normal">Normal (12px padding) — default</option>
+              <option value="comfortable">Comfortable (16px padding)</option>
+              <option value="spacious">Spacious (24px padding)</option>
             </select>
           </label>
         )}

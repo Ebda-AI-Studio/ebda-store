@@ -180,6 +180,17 @@ export type CardSize = 'xxs' | 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 export type CardFrameWidth = 'thin' | 'normal' | 'thick' | 'xthick';
 
 /**
+ * Per-store CARD FRAME SIZE — controls the padding (breathing room) between
+ * the card content and the frame border. Independent of CardFrameWidth (border
+ * line thickness). As Ahmad put it: "the frame may be large and the border thin".
+ *   compact:     p-2  (8px)  — tight, dense grid
+ *   normal:      p-3  (12px) — default, balanced
+ *   comfortable: p-4  (16px) — generous breathing room
+ *   spacious:    p-6  (24px) — editorial, premium
+ */
+export type CardFrameSize = 'compact' | 'normal' | 'comfortable' | 'spacious';
+
+/**
  * Generic per-store CARD ASPECT RATIO. Overrides the per-theme default
  * when set to anything other than 'theme'.
  *   theme: keep the theme's built-in default
@@ -273,6 +284,8 @@ export interface CategoriesSettings extends SectionTitleOverride, SectionBgOverr
   cardFrameStyle?: 'soft' | 'outline' | 'shadow' | 'paper';
   /** Border width when showCardFrame is on. Default 'thin' (1px). */
   cardFrameWidth?: CardFrameWidth;
+  /** Frame padding (breathing room between content and border). Default 'normal' (12px). */
+  cardFrameSize?: CardFrameSize;
   /** Hex color — applied as inline `style.borderColor` on the frame element. */
   cardFrameColor?: string;
   /** Per-section typography overrides — wins over global typography zones. */
@@ -310,6 +323,8 @@ export interface ProductCarouselSettings extends SectionTitleOverride, SectionBg
   cardFrameStyle?: 'soft' | 'outline' | 'shadow' | 'paper';
   /** Border width when showCardFrame is on. Default 'thin' (1px). */
   cardFrameWidth?: CardFrameWidth;
+  /** Frame padding (breathing room between content and border). Default 'normal' (12px). */
+  cardFrameSize?: CardFrameSize;
   /** Hex color — applied as inline `style.borderColor` on the frame element. */
   cardFrameColor?: string;
   /** Per-section typography overrides — wins over global typography zones. */
@@ -372,6 +387,8 @@ export interface ProductCardDefaults {
   cardFrameStyle?: 'soft' | 'outline' | 'shadow' | 'paper';
   /** Border width when showCardFrame is on. Default 'thin' (1px). */
   cardFrameWidth?: CardFrameWidth;
+  /** Frame padding (breathing room between content and border). Default 'normal' (12px). */
+  cardFrameSize?: CardFrameSize;
   /** Hex color — applied as inline `style.borderColor` on the frame element. */
   cardFrameColor?: string;
   /**

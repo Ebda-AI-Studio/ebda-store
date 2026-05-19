@@ -8,6 +8,7 @@ import type {
   PaletteSeeds,
   SectionPaletteEntry,
   PalettePattern,
+  CardFrameSize,
   CardFrameWidth,
 } from '@force/shared';
 import { ColorField } from './ColorField';
@@ -41,6 +42,7 @@ export function SmartPaletteModal({ open, onClose, onApply, theme }: SmartPalett
   const [neutral, setNeutral] = useState<string>('');
   const [pattern, setPattern] = useState<PalettePattern>('alternating');
   const [paletteFrameWidth, setPaletteFrameWidth] = useState<CardFrameWidth>('normal');
+  const [paletteFrameSize, setPaletteFrameSize] = useState<CardFrameSize>('normal');
   const [overrides, setOverrides] = useState<
     Partial<Record<SectionKey, Partial<SectionPaletteEntry>>>
   >({});
@@ -58,6 +60,7 @@ export function SmartPaletteModal({ open, onClose, onApply, theme }: SmartPalett
     neutral: neutral || undefined,
     pattern,
     cardFrameWidth: paletteFrameWidth,
+    cardFrameSize: paletteFrameSize,
     overrides,
   };
   const palette = primary ? generateSectionPalette(seeds, resolvedTheme) : null;
@@ -125,6 +128,27 @@ export function SmartPaletteModal({ open, onClose, onApply, theme }: SmartPalett
               ))}
             </div>
           </div>
+          <div className="mt-3">
+            <label className="mb-2 block text-xs font-medium text-muted-foreground">
+              Frame size (padding)
+            </label>
+            <div className="grid grid-cols-4 gap-2">
+              {(['compact', 'normal', 'comfortable', 'spacious'] as const).map(s => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setPaletteFrameSize(s)}
+                  className={`rounded border p-2 text-xs font-medium capitalize ${
+                    paletteFrameSize === s
+                      ? 'border-primary bg-primary/10 text-foreground'
+                      : 'border-border bg-background text-muted-foreground hover:bg-muted'
+                  }`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Seed color inputs */}
@@ -174,6 +198,7 @@ export function SmartPaletteModal({ open, onClose, onApply, theme }: SmartPalett
                         bgColor={palette[key].bgColor}
                         cardFrameColor={palette[key].cardFrameColor}
                         cardFrameWidth={palette[key].cardFrameWidth}
+                        cardFrameSize={palette[key].cardFrameSize}
                         headingZone={undefined}
                         theme={resolvedTheme}
                       />

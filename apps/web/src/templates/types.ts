@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import type { ResolvedZone } from './shared/section-typography';
-import type { CardFrameWidth } from '@force/shared';
+import type { CardFrameSize, CardFrameWidth } from '@force/shared';
 
 /**
  * Product data for template components
@@ -361,6 +361,8 @@ export interface ProductCarouselProps {
   cardFrameStyle?: 'soft' | 'outline' | 'shadow' | 'paper';
   /** Border width when showCardFrame is on. thin/normal/thick/xthick. Default 'thin'. */
   cardFrameWidth?: CardFrameWidth;
+  /** Frame padding (breathing room between content and border). compact/normal/comfortable/spacious. Default 'normal'. */
+  cardFrameSize?: CardFrameSize;
   /** Hex color applied as inline borderColor on the frame element when showCardFrame is on. */
   cardFrameColor?: string;
   /** Per-section typography zone overrides resolved by resolveSectionZone(). */
@@ -405,6 +407,8 @@ export interface CategoryStripProps {
   cardFrameStyle?: 'soft' | 'outline' | 'shadow' | 'paper';
   /** Border width when showCardFrame is on. thin/normal/thick/xthick. Default 'thin'. */
   cardFrameWidth?: CardFrameWidth;
+  /** Frame padding (breathing room between content and border). compact/normal/comfortable/spacious. Default 'normal'. */
+  cardFrameSize?: CardFrameSize;
   /** Hex color applied as inline borderColor on the frame element when showCardFrame is on. */
   cardFrameColor?: string;
   /** Per-section typography zone overrides resolved by resolveSectionZone(). */
@@ -476,6 +480,8 @@ export interface ProductCardProps {
   cardFrameStyle?: 'soft' | 'outline' | 'shadow' | 'paper';
   /** Border width when showCardFrame is on. thin/normal/thick/xthick. Default 'thin'. */
   cardFrameWidth?: CardFrameWidth;
+  /** Frame padding (breathing room between content and border). compact/normal/comfortable/spacious. Default 'normal'. */
+  cardFrameSize?: CardFrameSize;
   /** Hex color applied as inline borderColor on the frame element when showCardFrame is on. */
   cardFrameColor?: string;
 }
@@ -562,6 +568,8 @@ export interface CategoryGridProps {
   cardFrameStyle?: 'soft' | 'outline' | 'shadow' | 'paper';
   /** Border width when showCardFrame is on. thin/normal/thick/xthick. Default 'thin'. */
   cardFrameWidth?: CardFrameWidth;
+  /** Frame padding (breathing room between content and border). compact/normal/comfortable/spacious. Default 'normal'. */
+  cardFrameSize?: CardFrameSize;
   /** Hex color applied as inline borderColor on the frame element when showCardFrame is on. */
   cardFrameColor?: string;
   /** Merchant-picked column counts from admin Layout page. */

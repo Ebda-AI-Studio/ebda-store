@@ -8,7 +8,14 @@
  * value never breaks render. Defaults match Ahmad's 2026-05-16
  * "smaller" preference (sm category, sm product).
  */
-import type { CardAspect, CardFrameWidth, CardGap, CardShape, CardSize } from '@force/shared';
+import type {
+  CardAspect,
+  CardFrameSize,
+  CardFrameWidth,
+  CardGap,
+  CardShape,
+  CardSize,
+} from '@force/shared';
 
 /**
  * Category card size → tailwind max-w classes (mobile + desktop).
@@ -143,16 +150,45 @@ export function cardFrameClass(
   // combining both helpers never produces a double border-width conflict.
   // The border-color classes (border-foreground/XX) are kept — they set color
   // only and don't collide with width classes.
+  // Padding is intentionally OMITTED here — controlled exclusively by
+  // cardFrameSizeClass() so the two helpers never produce conflicting p-N.
+  // border-color classes (border-foreground/XX) are kept; they only set
+  // color and don't conflict with width classes from cardFrameWidthClass().
   switch (style) {
     case 'outline':
-      return 'rounded-xl border-foreground/25 bg-card/50 p-3 transition-colors duration-300 hover:border-foreground/45';
+      return 'rounded-xl border-foreground/25 bg-card/50 transition-colors duration-300 hover:border-foreground/45';
     case 'shadow':
-      return 'rounded-2xl border-foreground/10 bg-card p-3 shadow-md transition-shadow duration-300 hover:shadow-lg';
+      return 'rounded-2xl border-foreground/10 bg-card shadow-md transition-shadow duration-300 hover:shadow-lg';
     case 'paper':
-      return 'rounded-lg border-foreground/10 bg-card p-4 shadow-[0_10px_28px_-12px_hsl(var(--foreground)/0.25)] transition-shadow duration-300 hover:shadow-[0_14px_36px_-12px_hsl(var(--foreground)/0.30)]';
+      return 'rounded-lg border-foreground/10 bg-card shadow-[0_10px_28px_-12px_hsl(var(--foreground)/0.25)] transition-shadow duration-300 hover:shadow-[0_14px_36px_-12px_hsl(var(--foreground)/0.30)]';
     case 'soft':
     default:
-      return 'rounded-2xl border-foreground/15 bg-card p-3 shadow-md transition-shadow duration-300 hover:shadow-lg';
+      return 'rounded-2xl border-foreground/15 bg-card shadow-md transition-shadow duration-300 hover:shadow-lg';
+  }
+}
+
+/**
+ * Map the merchant's chosen frame SIZE (padding / breathing room between
+ * content and border) to a Tailwind padding utility. Used alongside
+ * `cardFrameClass` + `cardFrameWidthClass` — the three helpers control
+ * distinct CSS axes (style, border-thickness, padding).
+ *
+ * Callers should apply this only when `showCardFrame` is true:
+ *   `${cardFrameClass(showCardFrame, cardFrameStyle)} ${showCardFrame ? cardFrameWidthClass(cardFrameWidth) : ''} ${showCardFrame ? cardFrameSizeClass(cardFrameSize) : ''}`
+ *
+ * Static enumeration so Tailwind JIT keeps every class.
+ */
+export function cardFrameSizeClass(size: CardFrameSize | undefined): string {
+  switch (size) {
+    case 'compact':
+      return 'p-2';
+    case 'comfortable':
+      return 'p-4';
+    case 'spacious':
+      return 'p-6';
+    case 'normal':
+    default:
+      return 'p-3';
   }
 }
 

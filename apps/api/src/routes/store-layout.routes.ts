@@ -158,6 +158,8 @@ const layoutSchema = z
       showCardFrame: z.boolean().optional(),
       cardFrameStyle: z.enum(['soft', 'outline', 'shadow', 'paper']).optional(),
       cardFrameWidth: z.enum(['thin', 'normal', 'thick', 'xthick']).optional(),
+      // 2026-05-19: frame box padding — independent of border thickness.
+      cardFrameSize: z.enum(['compact', 'normal', 'comfortable', 'spacious']).optional(),
       // 2026-05-18 Sprint 4: per-section card frame color override.
       cardFrameColor: colorValue,
       // 2026-05-18 Sprint 3: per-section bg color.
@@ -203,6 +205,8 @@ const layoutSchema = z
       showCardFrame: z.boolean().optional(),
       cardFrameStyle: z.enum(['soft', 'outline', 'shadow', 'paper']).optional(),
       cardFrameWidth: z.enum(['thin', 'normal', 'thick', 'xthick']).optional(),
+      // 2026-05-19: frame box padding — independent of border thickness.
+      cardFrameSize: z.enum(['compact', 'normal', 'comfortable', 'spacious']).optional(),
       // 2026-05-18 Sprint 4: per-section card frame color override.
       cardFrameColor: colorValue,
       // 2026-05-18 Sprint 3: per-section bg color.
@@ -242,6 +246,8 @@ const layoutSchema = z
       showCardFrame: z.boolean().optional(),
       cardFrameStyle: z.enum(['soft', 'outline', 'shadow', 'paper']).optional(),
       cardFrameWidth: z.enum(['thin', 'normal', 'thick', 'xthick']).optional(),
+      // 2026-05-19: frame box padding — independent of border thickness.
+      cardFrameSize: z.enum(['compact', 'normal', 'comfortable', 'spacious']).optional(),
       // 2026-05-18 Sprint 4: per-section card frame color override.
       cardFrameColor: colorValue,
       // 2026-05-18 Sprint 3: per-section bg color.
@@ -301,6 +307,8 @@ const layoutSchema = z
         showCardFrame: z.boolean().optional(),
         cardFrameStyle: z.enum(['soft', 'outline', 'shadow', 'paper']).optional(),
         cardFrameWidth: z.enum(['thin', 'normal', 'thick', 'xthick']).optional(),
+        // 2026-05-19: frame box padding — independent of border thickness.
+        cardFrameSize: z.enum(['compact', 'normal', 'comfortable', 'spacious']).optional(),
         cardFrameColor: colorValue,
         // 2026-05-19 Wave 3A: per-section typography overrides for catalog-wide
         // product card defaults (productName / productPrice / productCta).

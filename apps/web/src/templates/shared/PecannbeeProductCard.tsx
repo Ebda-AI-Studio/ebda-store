@@ -11,6 +11,7 @@ import { useStore } from '../../contexts/StoreContext';
 import { getPackStyles } from './pack-styles';
 import {
   cardFrameClass,
+  cardFrameSizeClass,
   cardFrameWidthClass,
   productSizeClass,
   cardAspectClass,
@@ -66,6 +67,7 @@ function PecannbeeProductCardImpl({
   showCardFrame,
   cardFrameStyle,
   cardFrameWidth,
+  cardFrameSize,
   cardFrameColor,
 }: PecannbeeProductCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
@@ -79,7 +81,7 @@ function PecannbeeProductCardImpl({
   const shape = cardShapeClasses(cardShape);
   const aspectOverride = shape.aspect || cardAspectClass(cardAspect);
   const frameCls =
-    `${cardFrameClass(showCardFrame, cardFrameStyle)} ${showCardFrame ? cardFrameWidthClass(cardFrameWidth) : ''}`.trim();
+    `${cardFrameClass(showCardFrame, cardFrameStyle)} ${showCardFrame ? cardFrameWidthClass(cardFrameWidth) : ''} ${showCardFrame ? cardFrameSizeClass(cardFrameSize) : ''}`.trim();
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
 

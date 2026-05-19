@@ -1,13 +1,14 @@
 'use client';
 
 import { resolveColor, pickReadableForeground } from '@force/shared';
-import type { StoreTheme, CardFrameWidth } from '@force/shared';
+import type { StoreTheme, CardFrameSize, CardFrameWidth } from '@force/shared';
 
 interface SectionPreviewProps {
   label: string;
   bgColor: string | undefined;
   cardFrameColor: string | undefined;
   cardFrameWidth: CardFrameWidth | undefined;
+  cardFrameSize?: CardFrameSize;
   headingZone: { color?: string; fontFamily?: string; fontWeight?: string } | undefined;
   /**
    * Optional per-section product-card typography overrides. When provided,
@@ -28,11 +29,20 @@ const WIDTH_CLASS: Record<CardFrameWidth, string> = {
   xthick: 'border-8',
 };
 
+// Halved from storefront values so the small preview tile still fits 3 cards.
+const SIZE_CLASS: Record<CardFrameSize, string> = {
+  compact: 'p-1',
+  normal: 'p-1.5',
+  comfortable: 'p-2',
+  spacious: 'p-3',
+};
+
 export function SectionPreview({
   label,
   bgColor,
   cardFrameColor,
   cardFrameWidth,
+  cardFrameSize,
   headingZone,
   productNameZone,
   productPriceZone,
@@ -44,6 +54,7 @@ export function SectionPreview({
   const headingColor = resolveColor(headingZone?.color, theme) ?? autoFg;
   const resolvedFrame = resolveColor(cardFrameColor, theme) ?? '#E5E7EB';
   const widthClass = WIDTH_CLASS[cardFrameWidth ?? 'thin'];
+  const sizeClass = SIZE_CLASS[cardFrameSize ?? 'normal'];
 
   // Mock product-card surface — always contrasts against the section bg so
   // the cards stay visible regardless of which bg the merchant picked. The
@@ -71,7 +82,7 @@ export function SectionPreview({
         {[1, 2, 3].map(i => (
           <div
             key={i}
-            className={`flex flex-col items-stretch rounded ${widthClass} overflow-hidden`}
+            className={`flex flex-col items-stretch rounded ${widthClass} ${sizeClass} overflow-hidden`}
             style={{ borderColor: resolvedFrame, backgroundColor: cardSurface }}
           >
             {/* image placeholder — visible regardless of section bg */}

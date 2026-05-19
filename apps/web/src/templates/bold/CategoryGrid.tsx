@@ -6,6 +6,7 @@ import { useStore } from '../../contexts/StoreContext';
 import { resolveColor } from '@force/shared';
 import {
   cardFrameClass,
+  cardFrameSizeClass,
   cardFrameWidthClass,
   gridColsClass,
   gridGapClass,
@@ -39,6 +40,7 @@ export default function BoldCategoryGrid({
   showCardFrame,
   cardFrameStyle,
   cardFrameWidth,
+  cardFrameSize,
   cardFrameColor,
   mobileColumns,
   desktopColumns,
@@ -86,7 +88,7 @@ export default function BoldCategoryGrid({
             return (
               <div
                 key={category.id}
-                className={`${stagger} ${frame} ${frame ? cardFrameWidthClass(cardFrameWidth) : ''}`.trim()}
+                className={`${stagger} ${frame} ${frame ? cardFrameWidthClass(cardFrameWidth) : ''} ${frame ? cardFrameSizeClass(cardFrameSize) : ''}`.trim()}
                 style={
                   frame && cardFrameColor && store.theme
                     ? { borderColor: resolveColor(cardFrameColor, store.theme) }
