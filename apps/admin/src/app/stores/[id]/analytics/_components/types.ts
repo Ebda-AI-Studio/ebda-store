@@ -46,6 +46,36 @@ export interface LowStockProduct {
   sku: string;
   inventory: number;
   images?: { url: string }[];
+  /** Open (unfulfilled) backorder lines for this product */
+  openBackorderCount?: number;
+  /** Whether the product allows backorder purchases */
+  acceptsBackorder?: boolean;
+  /** Active reorder rule, if any */
+  reorderRule?: {
+    minQty: number;
+    reorderQty: number;
+    leadTimeDays: number;
+    preferredSupplier?: { name: string } | null;
+  } | null;
+}
+
+export interface GlWindow {
+  revenue: number;
+  cogs: number;
+  grossProfit: number;
+  netIncome: number;
+}
+
+export interface StockSnapshot {
+  stockValue: number;
+  openBackorderCount: number;
+  backorderedDemandValue: number;
+  reorderRulesCount: number;
+}
+
+export interface CashflowPoint {
+  day: string;
+  net: number;
 }
 
 export type Period = 'week' | 'month' | 'year';

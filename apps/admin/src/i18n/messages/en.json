@@ -1126,7 +1126,30 @@
     "lowStock": {
       "title": "Low Stock Alerts",
       "allStocked": "All products are well stocked",
-      "unitsLeft": "{count} left"
+      "unitsLeft": "{count} left",
+      "openBackorders": "Open backorders: {count}",
+      "acceptsBackorder": "Accepts backorder",
+      "reorderRule": "Reorder: min {min} / qty {qty} / lead {lead}d"
+    },
+    "gl": {
+      "badge": "GL",
+      "tooltip": "Sourced from the General Ledger — refund-aware and deferred-COGS-aware",
+      "revenue": "Revenue (GL)",
+      "cogs": "COGS (GL)",
+      "grossProfit": "Gross profit (GL)",
+      "netIncome": "Net income (GL)"
+    },
+    "inventorySnapshot": {
+      "title": "Inventory snapshot",
+      "stockValue": "Stock value",
+      "openBackorders": "Open backorders",
+      "backorderedDemandValue": "Backordered demand value",
+      "reorderRules": "Reorder rules"
+    },
+    "cashflow": {
+      "title": "Cashflow",
+      "netDaily": "Net daily movement",
+      "last30": "Last 30 days"
     }
   },
   "settings": {

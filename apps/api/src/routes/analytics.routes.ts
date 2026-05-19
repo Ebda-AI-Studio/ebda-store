@@ -3,6 +3,7 @@ import { authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/rbac';
 import { AnalyticsService } from '../services/analytics.service';
 import { requireStoreAccess } from '../middleware/store-access';
+import { prisma } from '@force/database';
 
 const router = Router({ mergeParams: true });
 
@@ -29,11 +30,18 @@ router.get(
       const { storeId } = req.params;
       const dateRange = parseDateRange(req);
 
-      const stats = await AnalyticsService.getDashboardStats(storeId, dateRange);
+      const now = new Date();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+      const [stats, gl, stock] = await Promise.all([
+        AnalyticsService.getDashboardStats(storeId, dateRange),
+        AnalyticsService.glRevenueWindow(storeId, monthStart, now),
+        AnalyticsService.stockSnapshot(storeId),
+      ]);
 
       res.json({
         success: true,
-        data: { stats },
+        data: { stats, gl, stock },
       });
     } catch (error) {
       next(error);
@@ -197,7 +205,7 @@ router.get(
   }
 );
 
-// GET /stores/:storeId/analytics/low-stock - Get low stock products
+// GET /stores/:storeId/analytics/low-stock - Get low stock products (enriched with backorder + reorder data)
 router.get(
   '/low-stock',
   authenticate,
@@ -213,10 +221,57 @@ router.get(
         threshold ? parseInt(threshold as string) : 10
       );
 
-      res.json({
-        success: true,
-        data: { products },
-      });
+      let enriched = products as ((typeof products)[number] & {
+        openBackorderCount: number;
+        acceptsBackorder: boolean;
+        reorderRule: unknown;
+      })[];
+
+      if (products.length > 0) {
+        const productIds = products.map(p => p.id);
+
+        // Batch-load open backorder counts per product
+        const backorderGroups = await prisma.backorderLine.groupBy({
+          by: ['productId'],
+          where: {
+            storeId,
+            productId: { in: productIds },
+            fulfilledAt: null,
+            cancelledAt: null,
+          },
+          _count: { id: true },
+        });
+        const backorderCountById = new Map(backorderGroups.map(g => [g.productId, g._count.id]));
+
+        // Batch-load reorder rules for these products
+        const reorderRules = await prisma.reorderRule.findMany({
+          where: { storeId, productId: { in: productIds }, isActive: true },
+          select: {
+            productId: true,
+            minQty: true,
+            reorderQty: true,
+            leadTimeDays: true,
+            preferredSupplier: { select: { name: true } },
+          },
+        });
+        const reorderRuleById = new Map(reorderRules.map(r => [r.productId, r]));
+
+        // Batch-load allowBackorder flag for these products
+        const productFlags = await prisma.product.findMany({
+          where: { id: { in: productIds } },
+          select: { id: true, allowBackorder: true },
+        });
+        const allowBackorderById = new Map(productFlags.map(p => [p.id, p.allowBackorder]));
+
+        enriched = products.map(p => ({
+          ...p,
+          openBackorderCount: backorderCountById.get(p.id) ?? 0,
+          acceptsBackorder: allowBackorderById.get(p.id) ?? false,
+          reorderRule: reorderRuleById.get(p.id) ?? null,
+        }));
+      }
+
+      res.json({ success: true, data: { products: enriched } });
     } catch (error) {
       next(error);
     }
@@ -246,7 +301,7 @@ router.get(
   }
 );
 
-// GET /stores/:storeId/analytics/performance - Quick performance summary
+// GET /stores/:storeId/analytics/performance - Quick performance summary (with GL gross profit)
 router.get(
   '/performance',
   authenticate,
@@ -256,12 +311,62 @@ router.get(
     try {
       const { storeId } = req.params;
 
-      const performance = await AnalyticsService.getPerformanceSummary(storeId);
+      const now = new Date();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+      const [performance, glThisMonth] = await Promise.all([
+        AnalyticsService.getPerformanceSummary(storeId),
+        AnalyticsService.glRevenueWindow(storeId, monthStart, now),
+      ]);
 
       res.json({
         success: true,
-        data: { performance },
+        data: {
+          performance,
+          glGrossProfit: glThisMonth.grossProfit,
+        },
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// GET /stores/:storeId/analytics/cashflow - Daily cash-account movement trend
+router.get(
+  '/cashflow',
+  authenticate,
+  requirePermission('analytics:read'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const now = new Date();
+      const defaultFrom = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+      const from = req.query.from ? new Date(req.query.from as string) : defaultFrom;
+      const to = req.query.to ? new Date(req.query.to as string) : now;
+
+      const trend = await AnalyticsService.cashflowTrend(storeId, from, to);
+
+      res.json({ success: true, data: { trend } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// GET /stores/:storeId/analytics/stock-snapshot - Inventory point-in-time snapshot
+router.get(
+  '/stock-snapshot',
+  authenticate,
+  requirePermission('analytics:read'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const snapshot = await AnalyticsService.stockSnapshot(storeId);
+      res.json({ success: true, data: snapshot });
     } catch (error) {
       next(error);
     }

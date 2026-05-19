@@ -3,11 +3,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { apiGet } from '../../../../../lib/api';
 import type {
+  CashflowPoint,
   DashboardStats,
+  GlWindow,
   LowStockProduct,
   Period,
   RecentOrder,
   SalesData,
+  StockSnapshot,
   TopProduct,
 } from '../_components/types';
 
@@ -16,14 +19,22 @@ interface UseAnalyticsArgs {
   period: Period;
 }
 
+interface DashboardResponseData {
+  stats: DashboardStats;
+  gl: GlWindow;
+  stock: StockSnapshot;
+}
+
 /**
- * Fans out the five analytics endpoints in parallel and exposes the combined
- * loading state. We refetch on `period` change because the sales endpoint is
- * the only one that actually depends on it — the others are fetched again for
- * simplicity and to keep the skeleton UX consistent.
+ * Fans out analytics endpoints in parallel and exposes the combined loading
+ * state. Dashboard now returns gl + stock alongside operational stats.
+ * Cashflow is fetched separately (last 30 days, independent of period selector).
  */
 export function useAnalytics({ storeId, period }: UseAnalyticsArgs) {
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [gl, setGl] = useState<GlWindow | null>(null);
+  const [stockSnapshot, setStockSnapshot] = useState<StockSnapshot | null>(null);
+  const [cashflow, setCashflow] = useState<CashflowPoint[]>([]);
   const [salesData, setSalesData] = useState<SalesData[]>([]);
   const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
@@ -37,17 +48,26 @@ export function useAnalytics({ storeId, period }: UseAnalyticsArgs) {
     try {
       const basePath = `/api/v1/stores/${storeId}/analytics`;
 
-      const [dashboardResult, salesResult, productsResult, ordersResult, stockResult] =
-        await Promise.all([
-          apiGet<{ stats: DashboardStats }>(`${basePath}/dashboard`),
-          apiGet<{ sales: SalesData[] }>(`${basePath}/sales?period=${period}`),
-          apiGet<{ products: TopProduct[] }>(`${basePath}/top-products?limit=5`),
-          apiGet<{ orders: RecentOrder[] }>(`${basePath}/recent-orders?limit=5`),
-          apiGet<{ products: LowStockProduct[] }>(`${basePath}/low-stock?threshold=10`),
-        ]);
+      const [
+        dashboardResult,
+        salesResult,
+        productsResult,
+        ordersResult,
+        stockResult,
+        cashflowResult,
+      ] = await Promise.all([
+        apiGet<DashboardResponseData>(`${basePath}/dashboard`),
+        apiGet<{ sales: SalesData[] }>(`${basePath}/sales?period=${period}`),
+        apiGet<{ products: TopProduct[] }>(`${basePath}/top-products?limit=5`),
+        apiGet<{ orders: RecentOrder[] }>(`${basePath}/recent-orders?limit=5`),
+        apiGet<{ products: LowStockProduct[] }>(`${basePath}/low-stock?threshold=10`),
+        apiGet<{ trend: Array<{ day: string; net: number }> }>(`${basePath}/cashflow`),
+      ]);
 
       if (dashboardResult.data) {
         setStats(dashboardResult.data.stats);
+        setGl(dashboardResult.data.gl ?? null);
+        setStockSnapshot(dashboardResult.data.stock ?? null);
       }
       if (salesResult.data) {
         setSalesData(salesResult.data.sales);
@@ -60,6 +80,9 @@ export function useAnalytics({ storeId, period }: UseAnalyticsArgs) {
       }
       if (stockResult.data) {
         setLowStockProducts(stockResult.data.products);
+      }
+      if (cashflowResult.data) {
+        setCashflow(cashflowResult.data.trend ?? []);
       }
     } catch (error) {
       console.error('Failed to fetch analytics:', error);
@@ -74,6 +97,9 @@ export function useAnalytics({ storeId, period }: UseAnalyticsArgs) {
 
   return {
     stats,
+    gl,
+    stockSnapshot,
+    cashflow,
     salesData,
     topProducts,
     recentOrders,

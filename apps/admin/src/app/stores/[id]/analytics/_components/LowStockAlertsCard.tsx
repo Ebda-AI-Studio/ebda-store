@@ -68,9 +68,31 @@ export function LowStockAlertsCard({ products }: LowStockAlertsCardProps) {
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-foreground truncate">{product.name}</p>
                 <p className="text-xs text-muted-foreground">{product.sku}</p>
+                {/* Backorder enrichment — shown when Batch 2 data is present */}
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {(product.openBackorderCount ?? 0) > 0 && (
+                    <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
+                      {t('openBackorders', { count: product.openBackorderCount ?? 0 })}
+                    </span>
+                  )}
+                  {product.acceptsBackorder && (
+                    <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                      {t('acceptsBackorder')}
+                    </span>
+                  )}
+                  {product.reorderRule && (
+                    <span className="px-1.5 py-0.5 text-[10px] text-muted-foreground rounded bg-muted">
+                      {t('reorderRule', {
+                        min: product.reorderRule.minQty,
+                        qty: product.reorderRule.reorderQty,
+                        lead: product.reorderRule.leadTimeDays,
+                      })}
+                    </span>
+                  )}
+                </div>
               </div>
               <span
-                className={`px-2 py-1 text-xs font-semibold rounded ${
+                className={`px-2 py-1 text-xs font-semibold rounded shrink-0 ${
                   product.inventory === 0
                     ? 'bg-destructive/10 text-destructive dark:bg-destructive/30/30 dark:text-destructive'
                     : product.inventory <= 5

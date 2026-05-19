@@ -1126,7 +1126,30 @@
     "lowStock": {
       "title": "تنبيهات المخزون المنخفض",
       "allStocked": "جميع المنتجات متوفرة بشكل جيد",
-      "unitsLeft": "{count} متبقٍّ"
+      "unitsLeft": "{count} متبقٍّ",
+      "openBackorders": "طلبات متأخرة مفتوحة: {count}",
+      "acceptsBackorder": "يقبل الطلبات المتأخرة",
+      "reorderRule": "إعادة الطلب: حد {min} / كمية {qty} / مهلة {lead} يوم"
+    },
+    "gl": {
+      "badge": "دفتر",
+      "tooltip": "مصدره دفتر الأستاذ العام — يراعي المبالغ المستردة والتكاليف المؤجلة",
+      "revenue": "الإيرادات (دفتر الأستاذ)",
+      "cogs": "تكلفة المبيعات (دفتر الأستاذ)",
+      "grossProfit": "إجمالي الربح (دفتر الأستاذ)",
+      "netIncome": "صافي الدخل (دفتر الأستاذ)"
+    },
+    "inventorySnapshot": {
+      "title": "لقطة المخزون",
+      "stockValue": "قيمة المخزون",
+      "openBackorders": "طلبات متأخرة مفتوحة",
+      "backorderedDemandValue": "قيمة الطلب المتأخر",
+      "reorderRules": "قواعد إعادة الطلب"
+    },
+    "cashflow": {
+      "title": "التدفق النقدي",
+      "netDaily": "الحركة اليومية الصافية",
+      "last30": "آخر 30 يومًا"
     }
   },
   "settings": {

@@ -1,5 +1,6 @@
 import { prisma, Prisma } from '@force/database';
 import { redis } from './redis.service';
+import { profitAndLoss } from './accounting/reports.service';
 
 // ==========================================
 // Simple cache-aside helper for analytics queries (60s TTL).
@@ -680,6 +681,78 @@ export class AnalyticsService {
       orders: o._count,
       percentage: total > 0 ? Math.round(((o._sum?.total || 0) / total) * 100) : 0,
     }));
+  }
+
+  // =====================================================================
+  // GL-aware helpers (Task 16b — Batch 2)
+  // =====================================================================
+
+  /**
+   * Returns period P&L figures sourced from the General Ledger.
+   * Refund-aware and deferred-COGS-aware (journal lines are the source of truth).
+   */
+  static async glRevenueWindow(storeId: string, from: Date, to: Date) {
+    const pnl = await profitAndLoss(storeId, from, to);
+    const cogs = pnl.expenses
+      .filter(e => e.code.startsWith('50'))
+      .reduce((s, e) => s + e.balance, 0);
+    return {
+      revenue: pnl.totalRevenue,
+      cogs,
+      grossProfit: pnl.totalRevenue - cogs,
+      netIncome: pnl.netIncome,
+    };
+  }
+
+  /**
+   * Point-in-time inventory snapshot: stock value, open backorder demand,
+   * and active reorder rules count.
+   */
+  static async stockSnapshot(storeId: string) {
+    const [valueRow, backorderRow, rulesCount] = await Promise.all([
+      prisma.$queryRaw<{ total: bigint }[]>`
+        SELECT COALESCE(SUM(inventory * COALESCE(cost_price, 0)), 0) AS total
+        FROM public.products WHERE store_id = ${storeId}::uuid AND deleted_at IS NULL
+      `,
+      prisma.$queryRaw<{ count: bigint; value: bigint }[]>`
+        SELECT
+          COUNT(*) AS count,
+          COALESCE(SUM(bl.qty * COALESCE(p.cost_price, 0)), 0) AS value
+        FROM public.backorder_lines bl
+        JOIN public.products p ON p.id = bl.product_id
+        WHERE bl.store_id = ${storeId}::uuid
+          AND bl.fulfilled_at IS NULL
+          AND bl.cancelled_at IS NULL
+      `,
+      prisma.reorderRule.count({ where: { storeId, isActive: true } }),
+    ]);
+    return {
+      stockValue: Number(valueRow[0]?.total ?? 0),
+      openBackorderCount: Number(backorderRow[0]?.count ?? 0),
+      backorderedDemandValue: Number(backorderRow[0]?.value ?? 0),
+      reorderRulesCount: rulesCount,
+    };
+  }
+
+  /**
+   * Daily net cash movement (DR - CR on cash accounts 1000/1010/1020/1030)
+   * over the given window. Used for the cashflow trend chart.
+   */
+  static async cashflowTrend(storeId: string, from: Date, to: Date) {
+    const rows = await prisma.$queryRaw<Array<{ day: Date; net: bigint }>>`
+      SELECT DATE_TRUNC('day', e.posted_at) AS day,
+             COALESCE(SUM(l.debit), 0) - COALESCE(SUM(l.credit), 0) AS net
+      FROM public.journal_lines l
+      JOIN public.journal_entries e ON e.id = l.entry_id
+      JOIN public.accounts a       ON a.id = l.account_id
+      WHERE e.store_id = ${storeId}::uuid
+        AND e.status = 'posted'
+        AND e.posted_at BETWEEN ${from} AND ${to}
+        AND a.code IN ('1000','1010','1020','1030')
+      GROUP BY DATE_TRUNC('day', e.posted_at)
+      ORDER BY day ASC
+    `;
+    return rows.map(r => ({ day: r.day, net: Number(r.net) }));
   }
 
   /**
