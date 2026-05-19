@@ -42,7 +42,7 @@ function normalizeZoneColors(zone: ZoneOverride): ZoneOverride {
 }
 import { ColorField } from '../../../../components/ColorField';
 import { ZoneEditor } from '../../../../components/ZoneEditor';
-import { SmartPaletteModal } from '../../../../components/SmartPaletteModal';
+import { SmartPaletteModal, type ThemeUpdates } from '../../../../components/SmartPaletteModal';
 import { SectionPreview } from '../../../../components/SectionPreview';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { Toggle } from '../../../../components/Toggle';
@@ -1250,7 +1250,8 @@ export default function StoreLayoutPage() {
         open={paletteOpen}
         onClose={() => setPaletteOpen(false)}
         theme={storeInfo?.theme}
-        onApply={palette => {
+        onApply={async (palette, themeUpdates: ThemeUpdates) => {
+          // 1. Apply palette to layout state (same as before).
           setLayout(prev => {
             if (!prev) return prev;
             return {
@@ -1283,6 +1284,39 @@ export default function StoreLayoutPage() {
               testimonials: { ...prev.testimonials, bgColor: palette.testimonials.bgColor },
             };
           });
+
+          // 2. Persist brand-token updates to StoreTheme so ColorField "Brand: ..."
+          //    picks resolve to the colors the merchant just chose. This is
+          //    independent of the main Save button — merchant clicked Apply, so
+          //    the theme is written immediately.
+          const hasThemeUpdates =
+            themeUpdates.primaryColor !== undefined || themeUpdates.accentColor !== undefined;
+          if (hasThemeUpdates && storeInfo?.theme) {
+            const updatedTheme = { ...storeInfo.theme, ...themeUpdates };
+            try {
+              const res = await apiPut(`/api/v1/stores/${storeId}/theme`, updatedTheme);
+              if (res.error) {
+                // Theme write failed but layout apply succeeded — surface a toast but
+                // don't block the merchant. They can update brand colors in /branding.
+                toastError(
+                  'Brand colors saved to sections, but theme update failed. Update in Branding if needed.'
+                );
+              } else {
+                // Refresh storeInfo so subsequent ColorField empty-state previews
+                // show the new brand colors.
+                const storeRes = await apiGet<{ store: StoreInfo }>(
+                  `/api/v1/admin/stores/${storeId}`
+                );
+                if (storeRes.data?.store) {
+                  setStoreInfo(storeRes.data.store);
+                }
+              }
+            } catch {
+              toastError(
+                'Brand colors saved to sections, but theme update failed. Update in Branding if needed.'
+              );
+            }
+          }
         }}
       />
     </AdminLayout>

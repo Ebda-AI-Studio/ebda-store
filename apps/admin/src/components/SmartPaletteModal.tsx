@@ -11,13 +11,31 @@ import type {
   CardFrameSize,
   CardFrameWidth,
 } from '@force/shared';
+import { hexToHsl } from '../lib/color';
 import { ColorField } from './ColorField';
 import { SectionPreview } from './SectionPreview';
+
+/**
+ * Brand-color updates the parent should persist to StoreTheme on apply.
+ * Only populated when the merchant explicitly typed/picked a raw hex value —
+ * if they selected an existing token ('token:primary') no theme update is needed.
+ */
+export interface ThemeUpdates {
+  primaryColor?: string;
+  accentColor?: string;
+}
 
 interface SmartPaletteModalProps {
   open: boolean;
   onClose: () => void;
-  onApply: (palette: Record<SectionKey, SectionPaletteEntry>) => void;
+  /**
+   * Called when merchant clicks "Apply to all sections".
+   * `palette` contains per-section bg/frame settings.
+   * `themeUpdates` contains the resolved HSL triplets for brand tokens that
+   * should be persisted back to StoreTheme so ColorField "Brand: ..." picks
+   * resolve to the colors the merchant just chose.
+   */
+  onApply: (palette: Record<SectionKey, SectionPaletteEntry>, themeUpdates: ThemeUpdates) => void;
   theme: StoreTheme | undefined;
 }
 
@@ -205,50 +223,56 @@ export function SmartPaletteModal({ open, onClose, onApply, theme }: SmartPalett
                     </button>
                   </div>
                   {expandedSection === key ? (
-                    <div className="mt-2 space-y-2 rounded-lg border border-primary/40 bg-muted/30 p-2">
-                      <ColorField
-                        label="Background"
-                        value={overrides[key]?.bgColor}
-                        onChange={v =>
-                          setOverrides(prev => ({ ...prev, [key]: { ...prev[key], bgColor: v } }))
-                        }
-                        theme={theme}
-                        inheritFromToken="card"
-                      />
-                      <ColorField
-                        label="Card frame"
-                        value={overrides[key]?.cardFrameColor}
-                        onChange={v =>
-                          setOverrides(prev => ({
-                            ...prev,
-                            [key]: { ...prev[key], cardFrameColor: v },
-                          }))
-                        }
-                        theme={theme}
-                        inheritFromToken="border"
-                      />
-                      <div>
-                        <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                          Frame thickness
-                        </label>
-                        <select
-                          value={overrides[key]?.cardFrameWidth ?? palette[key].cardFrameWidth}
-                          onChange={e =>
+                    <div className="mt-2 rounded-lg border border-primary/40 bg-muted/30 p-3">
+                      {/* 3-column grid: Background | Card frame | Frame thickness */}
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                        <ColorField
+                          label="Background"
+                          value={overrides[key]?.bgColor}
+                          onChange={v =>
                             setOverrides(prev => ({
                               ...prev,
-                              [key]: {
-                                ...prev[key],
-                                cardFrameWidth: e.target.value as CardFrameWidth,
-                              },
+                              [key]: { ...prev[key], bgColor: v },
                             }))
                           }
-                          className="w-full rounded border border-border bg-background px-2 py-1 text-sm"
-                        >
-                          <option value="thin">Thin (1px)</option>
-                          <option value="normal">Normal (2px)</option>
-                          <option value="thick">Thick (4px)</option>
-                          <option value="xthick">Extra thick (8px)</option>
-                        </select>
+                          theme={theme}
+                          inheritFromToken="card"
+                          showContrastPreview={false}
+                        />
+                        <ColorField
+                          label="Card frame"
+                          value={overrides[key]?.cardFrameColor}
+                          onChange={v =>
+                            setOverrides(prev => ({
+                              ...prev,
+                              [key]: { ...prev[key], cardFrameColor: v },
+                            }))
+                          }
+                          theme={theme}
+                          inheritFromToken="border"
+                          showContrastPreview={false}
+                        />
+                        <label className="flex flex-col gap-1 text-sm">
+                          <span className="text-muted-foreground">Frame thickness</span>
+                          <select
+                            value={overrides[key]?.cardFrameWidth ?? palette[key].cardFrameWidth}
+                            onChange={e =>
+                              setOverrides(prev => ({
+                                ...prev,
+                                [key]: {
+                                  ...prev[key],
+                                  cardFrameWidth: e.target.value as CardFrameWidth,
+                                },
+                              }))
+                            }
+                            className="rounded border border-border bg-background px-2 py-1 text-sm"
+                          >
+                            <option value="thin">Thin (1px)</option>
+                            <option value="normal">Normal (2px)</option>
+                            <option value="thick">Thick (4px)</option>
+                            <option value="xthick">Extra thick (8px)</option>
+                          </select>
+                        </label>
                       </div>
                       <button
                         type="button"
@@ -259,7 +283,7 @@ export function SmartPaletteModal({ open, onClose, onApply, theme }: SmartPalett
                             return next;
                           })
                         }
-                        className="text-xs text-muted-foreground underline"
+                        className="mt-3 text-xs text-muted-foreground underline hover:text-foreground"
                       >
                         Reset this section
                       </button>
@@ -289,7 +313,19 @@ export function SmartPaletteModal({ open, onClose, onApply, theme }: SmartPalett
               if (!palette) return;
               if (!confirm('This overwrites the current section bg + frame colors. Proceed?'))
                 return;
-              onApply(palette);
+
+              // Build theme updates: only include when the merchant entered a
+              // raw hex value (not a token ref). Convert hex → HSL triplet to
+              // match the format StoreTheme stores (e.g. '26 100% 50%').
+              const themeUpdates: ThemeUpdates = {};
+              if (primary && !primary.startsWith('token:')) {
+                themeUpdates.primaryColor = hexToHsl(primary);
+              }
+              if (accent && !accent.startsWith('token:')) {
+                themeUpdates.accentColor = hexToHsl(accent);
+              }
+
+              onApply(palette, themeUpdates);
               onClose();
             }}
             disabled={!palette}

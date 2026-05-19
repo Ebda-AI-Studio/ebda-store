@@ -24,6 +24,13 @@ interface ColorFieldProps {
    * or clicking "Clear" behaves normally.
    */
   inheritFromToken?: ColorToken;
+  /**
+   * When false, suppress the inline ColorContrastPreview band. Useful when the
+   * caller renders its own contrast preview elsewhere (e.g. SmartPaletteModal's
+   * tile shows the full-section preview; the per-field band is redundant).
+   * Default true (existing behavior).
+   */
+  showContrastPreview?: boolean;
 }
 
 const TOKEN_LABELS: Record<(typeof COLOR_TOKENS)[number], string> = {
@@ -46,6 +53,7 @@ export function ColorField({
   theme,
   previewFg,
   inheritFromToken,
+  showContrastPreview = true,
 }: ColorFieldProps) {
   const isToken = value?.startsWith('token:') ?? false;
   const tokenName = isToken ? (value as string).slice(6) : '';
@@ -111,7 +119,7 @@ export function ColorField({
         ) : null}
       </div>
       {hint ? <span className="text-xs text-muted-foreground">{hint}</span> : null}
-      {value && theme ? (
+      {showContrastPreview && value && theme ? (
         <ColorContrastPreview bg={value} theme={theme} pickedFg={previewFg} />
       ) : null}
     </div>
