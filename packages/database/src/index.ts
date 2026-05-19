@@ -129,6 +129,9 @@ export {
   CouponType,
   VerificationTokenType,
   LoyaltyTransactionType,
+  AccountType,
+  JournalEntrySource,
+  JournalEntryStatus,
 } from '@prisma/client';
 
 export { prisma as db };
