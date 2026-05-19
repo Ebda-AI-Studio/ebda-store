@@ -20,6 +20,7 @@ import { BrandPill } from './BrandPill';
 import { useStore } from '../../contexts/StoreContext';
 import { getProductCardTextSizes, resolveColor } from '@force/shared';
 import type { ProductCarouselProps } from '../types';
+import { responsiveFontSize } from './section-typography';
 
 /**
  * Horizontal-scroll product strip. Card chrome + CTA pill style vary per pack:
@@ -412,7 +413,7 @@ export function ProductCarousel({
                             data-zone="productName"
                             style={{
                               fontFamily: productNameZone?.fontFamily,
-                              fontSize: productNameZone?.fontSize,
+                              fontSize: responsiveFontSize(productNameZone?.fontSize),
                               fontWeight: productNameZone?.fontWeight,
                               color: productNameZone?.color,
                               letterSpacing: productNameZone?.letterSpacing,
@@ -431,7 +432,7 @@ export function ProductCarousel({
                               data-zone="productPrice"
                               style={{
                                 fontFamily: productPriceZone?.fontFamily,
-                                fontSize: productPriceZone?.fontSize,
+                                fontSize: responsiveFontSize(productPriceZone?.fontSize),
                                 fontWeight: productPriceZone?.fontWeight,
                                 color: productPriceZone?.color,
                                 letterSpacing: productPriceZone?.letterSpacing,
@@ -465,7 +466,7 @@ export function ProductCarousel({
                     {(() => {
                       const ctaStyle: React.CSSProperties = {
                         fontFamily: productCtaZone?.fontFamily,
-                        fontSize: productCtaZone?.fontSize,
+                        fontSize: responsiveFontSize(productCtaZone?.fontSize),
                         fontWeight: productCtaZone?.fontWeight,
                         color: productCtaZone?.color,
                         letterSpacing: productCtaZone?.letterSpacing,

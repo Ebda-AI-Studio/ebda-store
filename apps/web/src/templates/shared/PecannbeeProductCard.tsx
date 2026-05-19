@@ -19,6 +19,7 @@ import {
   cardShapeClasses,
 } from './card-size';
 import { productCardPropsEqual } from './product-card-memo';
+import { responsiveFontSize } from './section-typography';
 import { TaxInclusiveLabel } from './tax-inclusive-label';
 import { OutOfStockRibbon, isProductNew } from './ProductCardCta';
 import { BrandPill } from './BrandPill';
@@ -277,7 +278,7 @@ function PecannbeeProductCardImpl({
                 style={{
                   textWrap: 'balance',
                   fontFamily: productNameZone?.fontFamily,
-                  fontSize: productNameZone?.fontSize,
+                  fontSize: responsiveFontSize(productNameZone?.fontSize),
                   fontWeight: productNameZone?.fontWeight,
                   color: productNameZone?.color,
                   letterSpacing: productNameZone?.letterSpacing,
@@ -306,7 +307,7 @@ function PecannbeeProductCardImpl({
                   className={`${textSizes.price} ${styles.productCardPrice}`}
                   style={{
                     fontFamily: productPriceZone?.fontFamily,
-                    fontSize: productPriceZone?.fontSize,
+                    fontSize: responsiveFontSize(productPriceZone?.fontSize),
                     fontWeight: productPriceZone?.fontWeight,
                     color: productPriceZone?.color,
                     letterSpacing: productPriceZone?.letterSpacing,
@@ -342,7 +343,7 @@ function PecannbeeProductCardImpl({
             className={`mt-auto inline-flex w-full items-center justify-center gap-2 min-h-[44px] ${styles.productCardCta}`}
             style={{
               fontFamily: productCtaZone?.fontFamily,
-              fontSize: productCtaZone?.fontSize,
+              fontSize: responsiveFontSize(productCtaZone?.fontSize),
               fontWeight: productCtaZone?.fontWeight,
               color: productCtaZone?.color,
               letterSpacing: productCtaZone?.letterSpacing,
@@ -360,7 +361,7 @@ function PecannbeeProductCardImpl({
             className={`mt-auto inline-flex w-full items-center justify-center gap-2 min-h-[44px] ${styles.productCardCta} disabled:cursor-not-allowed disabled:opacity-60`}
             style={{
               fontFamily: productCtaZone?.fontFamily,
-              fontSize: productCtaZone?.fontSize,
+              fontSize: responsiveFontSize(productCtaZone?.fontSize),
               fontWeight: productCtaZone?.fontWeight,
               color: productCtaZone?.color,
               letterSpacing: productCtaZone?.letterSpacing,

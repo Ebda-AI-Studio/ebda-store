@@ -17,6 +17,7 @@ import {
 import type { CategoryStripProps } from '../types';
 import { useStore } from '../../contexts/StoreContext';
 import { resolveColor } from '@force/shared';
+import { responsiveFontSize } from './section-typography';
 
 /**
  * Horizontal-scroll category strip. Cards are square 1:1 images with
@@ -147,7 +148,7 @@ export function CategoryStrip({
                       data-zone="categoryLabel"
                       style={{
                         fontFamily: categoryLabelZone?.fontFamily,
-                        fontSize: categoryLabelZone?.fontSize,
+                        fontSize: responsiveFontSize(categoryLabelZone?.fontSize),
                         fontWeight: categoryLabelZone?.fontWeight,
                         color: categoryLabelZone?.color,
                         letterSpacing: categoryLabelZone?.letterSpacing,

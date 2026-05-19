@@ -5,6 +5,7 @@ import Link from 'next/link';
 import type { CategoryCardProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { categorySizeClass, cardShapeClasses } from '../shared/card-size';
+import { responsiveFontSize } from '../shared/section-typography';
 
 export default function MinimalCategoryCard({
   category,
@@ -57,7 +58,7 @@ export default function MinimalCategoryCard({
         data-zone="categoryLabel"
         style={{
           fontFamily: categoryLabelZone?.fontFamily,
-          fontSize: categoryLabelZone?.fontSize,
+          fontSize: responsiveFontSize(categoryLabelZone?.fontSize),
           fontWeight: categoryLabelZone?.fontWeight,
           color: categoryLabelZone?.color,
           letterSpacing: categoryLabelZone?.letterSpacing,

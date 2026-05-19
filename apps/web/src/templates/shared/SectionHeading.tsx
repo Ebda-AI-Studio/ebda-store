@@ -5,6 +5,7 @@ import Link from 'next/link';
 import type { TemplateId } from '@force/shared';
 import { getPackStyles } from './pack-styles';
 import type { ResolvedZone } from './section-typography';
+import { responsiveFontSize } from './section-typography';
 
 interface SectionHeadingProps {
   title?: string;
@@ -108,7 +109,7 @@ export function SectionHeading({
                 data-zone="sectionKicker"
                 style={{
                   fontFamily: kickerZone?.fontFamily,
-                  fontSize: kickerZone?.fontSize,
+                  fontSize: responsiveFontSize(kickerZone?.fontSize),
                   fontWeight: kickerZone?.fontWeight,
                   color: kickerZone?.color,
                   letterSpacing: kickerZone?.letterSpacing,
@@ -133,7 +134,7 @@ export function SectionHeading({
               data-zone="sectionTitle"
               style={{
                 fontFamily: headingZone?.fontFamily,
-                fontSize: headingZone?.fontSize,
+                fontSize: responsiveFontSize(headingZone?.fontSize),
                 fontWeight: headingZone?.fontWeight,
                 color: headingZone?.color,
                 letterSpacing: headingZone?.letterSpacing,
@@ -158,7 +159,7 @@ export function SectionHeading({
               data-zone="sectionSubtitle"
               style={{
                 fontFamily: subtitleZone?.fontFamily,
-                fontSize: subtitleZone?.fontSize,
+                fontSize: responsiveFontSize(subtitleZone?.fontSize),
                 fontWeight: subtitleZone?.fontWeight,
                 color: subtitleZone?.color,
                 letterSpacing: subtitleZone?.letterSpacing,
@@ -191,7 +192,7 @@ export function SectionHeading({
             data-zone="sectionSeeAll"
             style={{
               fontFamily: seeAllZone?.fontFamily,
-              fontSize: seeAllZone?.fontSize,
+              fontSize: responsiveFontSize(seeAllZone?.fontSize),
               fontWeight: seeAllZone?.fontWeight,
               color: seeAllZone?.color,
               letterSpacing: seeAllZone?.letterSpacing,

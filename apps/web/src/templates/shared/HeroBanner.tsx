@@ -5,6 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import type { HeroBannerProps } from '../types';
 import { getPackStyles } from './pack-styles';
+import { responsiveFontSize } from './section-typography';
 
 /**
  * Single hero banner — full-bleed image, optional headline overlay + CTA.
@@ -102,7 +103,7 @@ export function HeroBanner({
                 data-zone="heroHeadline"
                 style={{
                   fontFamily: headingZone?.fontFamily,
-                  fontSize: headingZone?.fontSize,
+                  fontSize: responsiveFontSize(headingZone?.fontSize),
                   fontWeight: headingZone?.fontWeight,
                   color: headingZone?.color,
                   letterSpacing: headingZone?.letterSpacing,

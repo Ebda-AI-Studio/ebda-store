@@ -5,6 +5,7 @@ import Link from 'next/link';
 import type { CategoryCardProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { categorySizeClass, cardAspectClass, cardShapeClasses } from '../shared/card-size';
+import { responsiveFontSize } from '../shared/section-typography';
 
 /**
  * Modern category card — image + label-below layout. Per-store
@@ -69,7 +70,7 @@ export default function ModernCategoryCard({
           data-zone="categoryLabel"
           style={{
             fontFamily: categoryLabelZone?.fontFamily,
-            fontSize: categoryLabelZone?.fontSize,
+            fontSize: responsiveFontSize(categoryLabelZone?.fontSize),
             fontWeight: categoryLabelZone?.fontWeight,
             color: categoryLabelZone?.color,
             letterSpacing: categoryLabelZone?.letterSpacing,
