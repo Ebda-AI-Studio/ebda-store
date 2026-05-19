@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
-import Link from 'next/link';
 import { useToast } from '@force/ui';
 import { useT } from '@/i18n/useT';
 import {
@@ -613,16 +612,6 @@ export default function StoreLayoutPage() {
                   hint="Overrides the theme background preset for this section only."
                   theme={storeInfo?.theme}
                 />
-                <TypographyJumpLinks
-                  storeId={storeId}
-                  groups={[
-                    { label: 'Section heading', zone: 'sectionTitle' },
-                    { label: 'Kicker', zone: 'sectionKicker' },
-                    { label: 'Subtitle', zone: 'sectionSubtitle' },
-                    { label: 'See all link', zone: 'sectionSeeAll' },
-                    { label: 'Card labels', zone: 'categories' },
-                  ]}
-                />
                 <SectionTypographyBlock
                   roles={['heading', 'kicker', 'subtitle'] as const}
                   typography={layout.categories.typography}
@@ -696,17 +685,6 @@ export default function StoreLayoutPage() {
                   onChange={v => updateSection('newArrivals', s => ({ ...s, bgColor: v }))}
                   hint="Overrides the theme background preset for this section only."
                   theme={storeInfo?.theme}
-                />
-                <TypographyJumpLinks
-                  storeId={storeId}
-                  groups={[
-                    { label: 'Section heading', zone: 'sectionTitle' },
-                    { label: 'Kicker', zone: 'sectionKicker' },
-                    { label: 'Subtitle', zone: 'sectionSubtitle' },
-                    { label: 'See all link', zone: 'sectionSeeAll' },
-                    { label: 'Product name', zone: 'productName' },
-                    { label: 'Product price', zone: 'productPrice' },
-                  ]}
                 />
                 <SectionTypographyBlock
                   roles={['heading', 'kicker', 'subtitle'] as const}
@@ -782,17 +760,6 @@ export default function StoreLayoutPage() {
                   hint="Overrides the theme background preset for this section only."
                   theme={storeInfo?.theme}
                 />
-                <TypographyJumpLinks
-                  storeId={storeId}
-                  groups={[
-                    { label: 'Section heading', zone: 'sectionTitle' },
-                    { label: 'Kicker', zone: 'sectionKicker' },
-                    { label: 'Subtitle', zone: 'sectionSubtitle' },
-                    { label: 'See all link', zone: 'sectionSeeAll' },
-                    { label: 'Product name', zone: 'productName' },
-                    { label: 'Product price', zone: 'productPrice' },
-                  ]}
-                />
                 <SectionTypographyBlock
                   roles={['heading', 'kicker', 'subtitle'] as const}
                   typography={layout.bestSellers.typography}
@@ -836,10 +803,6 @@ export default function StoreLayoutPage() {
                   checked={layout.filterSidebar.defaultOpen}
                   onChange={v => updateSection('filterSidebar', s => ({ ...s, defaultOpen: v }))}
                 />
-                <TypographyJumpLinks
-                  storeId={storeId}
-                  groups={[{ label: 'Filter labels', zone: 'filters' }]}
-                />
               </SectionCard>
 
               {/* Testimonials */}
@@ -881,14 +844,6 @@ export default function StoreLayoutPage() {
                   hint="Overrides the theme background preset for this section only."
                   theme={storeInfo?.theme}
                 />
-                <TypographyJumpLinks
-                  storeId={storeId}
-                  groups={[
-                    { label: 'Section heading', zone: 'sectionTitle' },
-                    { label: 'Kicker', zone: 'sectionKicker' },
-                    { label: 'Subtitle', zone: 'sectionSubtitle' },
-                  ]}
-                />
                 <SectionTypographyBlock
                   roles={['heading', 'kicker', 'subtitle'] as const}
                   typography={layout.testimonials.typography}
@@ -926,16 +881,7 @@ export default function StoreLayoutPage() {
                 description={t('sections.reviewSection.description')}
                 enabled={layout.reviewSection.enabled}
                 onToggle={v => updateSection('reviewSection', s => ({ ...s, enabled: v }))}
-              >
-                <TypographyJumpLinks
-                  storeId={storeId}
-                  groups={[
-                    { label: 'Section heading', zone: 'sectionTitle' },
-                    { label: 'Kicker', zone: 'sectionKicker' },
-                    { label: 'Subtitle', zone: 'sectionSubtitle' },
-                  ]}
-                />
-              </SectionCard>
+              ></SectionCard>
 
               {/* Product Card Defaults — global card controls that apply
                   to the PLP, search, and any product surface outside the
@@ -1324,49 +1270,6 @@ function SectionCard({
         <div className="border-t border-border pt-4 mt-1">{children}</div>
       )}
     </section>
-  );
-}
-
-/**
- * Footer block on every SectionCard that exposes a per-section font.
- * Deep-links to /typography#zone-<key> so the merchant lands on the
- * exact zone block that controls the part they're editing — Section
- * heading / "See all" / Product name / Filter labels / etc. The
- * /typography page pulses a ring on the matching zone for ~2.5s on
- * arrival so it's obvious which controls correspond to this section.
- *
- * Why this exists (Ahmad 2026-05-17): Layout and Typography were two
- * disjoint admin trees with no cross-links. Editing how a section
- * looked required learning the abstract zone taxonomy + switching
- * pages. The deep-link chips collapse that friction to one click.
- * See ~/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-
- * website-builder/memory/feedback-fwb-layout-typography-decoupled.md
- */
-function TypographyJumpLinks({
-  storeId,
-  groups,
-}: {
-  storeId: string;
-  groups: Array<{ label: string; zone: string }>;
-}) {
-  return (
-    <div className="mt-4 rounded-lg border border-dashed border-border bg-muted/30 p-3">
-      <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        Typography for this section
-      </p>
-      <div className="flex flex-wrap gap-2">
-        {groups.map(g => (
-          <Link
-            key={g.zone}
-            href={`/stores/${storeId}/typography#zone-${g.zone}`}
-            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-1 text-xs font-medium text-foreground hover:bg-muted hover:border-primary/40 transition-colors"
-          >
-            {g.label}
-            <span aria-hidden>→</span>
-          </Link>
-        ))}
-      </div>
-    </div>
   );
 }
 
