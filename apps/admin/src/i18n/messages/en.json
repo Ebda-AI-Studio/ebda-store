@@ -3645,5 +3645,59 @@
         "unbalanced": "Debits must equal credits"
       }
     }
+  },
+  "stock": {
+    "navGroup": "Stock",
+    "dashboard": {
+      "title": "Stock Dashboard",
+      "stockValue": "Stock Value",
+      "onHandSkus": "On-hand SKUs",
+      "lowStockSkus": "Low-stock SKUs",
+      "openBackorders": "Open Backorders",
+      "reorderSuggestions": "Reorder Suggestions",
+      "comingBatch3": "Coming in Batch 3 (AI-powered)"
+    },
+    "inventory": {
+      "title": "Inventory",
+      "description": "Per-product stock levels. Quick-adjust a row's quantity from here.",
+      "sku": "SKU",
+      "name": "Name",
+      "onHand": "On Hand",
+      "lowStockThreshold": "Low-Stock Threshold",
+      "allowsBackorder": "Allows Backorder",
+      "quickAdjust": "Quick Adjust"
+    },
+    "adjustments": {
+      "title": "Stock Adjustments",
+      "description": "Every manual stock change posts a balanced journal entry. Posted adjustments are immutable.",
+      "newButton": "+ New Adjustment",
+      "number": "Number",
+      "type": "Type",
+      "status": "Status",
+      "date": "Date",
+      "impact": "Value Impact (KWD)",
+      "types": {
+        "cycle_count": "Cycle Count",
+        "damage": "Damage",
+        "theft": "Theft",
+        "loss": "Loss",
+        "write_off": "Write-off",
+        "found": "Found Stock",
+        "return_to_supplier": "Return to Supplier"
+      },
+      "new": {
+        "title": "New Stock Adjustment",
+        "description": "Choose the adjustment type and set new quantities. Saving as draft lets you review before posting; posting is irreversible.",
+        "typeLabel": "Adjustment type",
+        "reasonLabel": "Reason (English)",
+        "reasonArLabel": "Reason (Arabic)",
+        "evidenceLabel": "Evidence URL (optional)",
+        "addItem": "+ Add product",
+        "selectProduct": "Select product",
+        "newQty": "New quantity",
+        "submitDraft": "Save as draft",
+        "submitPost": "Save and post"
+      }
+    }
   }
 }
