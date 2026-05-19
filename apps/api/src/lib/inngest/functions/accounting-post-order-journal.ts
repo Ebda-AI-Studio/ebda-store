@@ -1,0 +1,47 @@
+import type { InngestFunction } from 'inngest';
+import logger from '../../logger';
+import { inngest } from '../client';
+import { postOrderPaymentJournal } from '../../../services/accounting/posting/order-posting';
+
+/**
+ * Listens to the canonical order/created Inngest event (fired by OrderService
+ * + the refresh-payment safety net + payment webhooks) and posts the
+ * double-entry GL journal: DR Cash[provider] / CR Sales+Tax+Shipping + DR COGS
+ * / CR Inventory.
+ *
+ * Idempotent via journal.service's (source, sourceId) lookup, so multiple
+ * fires (webhook retries, refresh-payment, Inngest retries) post the journal
+ * exactly once per (orderId, kind).
+ *
+ * Why listen to order/created instead of hooking into OrderService directly:
+ * payment-paid transitions are spread across four route handlers (lines 364,
+ * 436, 553, 619 in order.routes.ts). The Inngest event is the single
+ * rendezvous point that fires in all four paths. Trade-off: ~seconds gap
+ * between order-marked-paid and journal post. Mitigated by the daily
+ * reconciliation job (Task 14) which catches any missed posts.
+ */
+export const accountingPostOrderJournal: InngestFunction.Any = inngest.createFunction(
+  {
+    id: 'accounting-post-order-journal',
+    name: 'Accounting — post journal on order paid',
+    retries: 3,
+    // Concurrency keyed per-store to prevent two parallel posts racing on the
+    // same store's sequence counter. Per-store concurrency = 5 is conservative
+    // but safe (sequence service is already concurrent-safe via Postgres upsert).
+    concurrency: { limit: 5, key: 'event.data.storeId' },
+    triggers: [{ event: 'order/created' }],
+  },
+  async ({ event, step }) => {
+    const { orderId, storeId } = (event.data ?? {}) as { orderId?: string; storeId?: string };
+    if (!orderId || !storeId) {
+      logger.warn(
+        { event: event.name, data: event.data },
+        'accountingPostOrderJournal: missing ids'
+      );
+      return { skipped: 'missing-ids' };
+    }
+    await step.run('post-journal', () => postOrderPaymentJournal({ orderId }));
+    logger.info({ orderId, storeId }, 'accountingPostOrderJournal: posted');
+    return { posted: true, orderId };
+  }
+);

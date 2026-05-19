@@ -19,6 +19,7 @@ import { alertsFailureWatch } from './alerts-failure-watch';
 import { gmailAlertPoller } from './gmail-alert-poller';
 import { queueDepthWatch } from './queue-depth-watch';
 import { orderWhatsAppNotify } from './order-whatsapp-notify';
+import { accountingPostOrderJournal } from './accounting-post-order-journal';
 
 /**
  * Registry of every Inngest function the API exposes. The serve
@@ -47,4 +48,5 @@ export const inngestFunctions: InngestFunction.Any[] = [
   gmailAlertPoller,
   queueDepthWatch,
   orderWhatsAppNotify,
+  accountingPostOrderJournal,
 ];
