@@ -3644,6 +3644,101 @@
       "errors": {
         "unbalanced": "Debits must equal credits"
       }
+    },
+    "dashboard": {
+      "title": "Finance Dashboard",
+      "thisMonth": "This Month",
+      "revenue": "Revenue",
+      "expenses": "Expenses",
+      "net": "Net Income",
+      "stockValue": "Stock Value",
+      "cash": "Cash by Account",
+      "balanceSheet": "Balance Sheet",
+      "assets": "Assets",
+      "liabilities": "Liabilities",
+      "equity": "Equity",
+      "negativeBalanceTooltip": "Negative balance — check opening balance + stock adjustments"
+    },
+    "expenses": {
+      "title": "Expenses",
+      "description": "Operating expenses tracked against your COA. Approved expenses post a balanced journal entry.",
+      "newButton": "+ New Expense",
+      "number": "Number",
+      "date": "Date",
+      "vendor": "Vendor",
+      "category": "Category",
+      "amount": "Amount (KWD)",
+      "tax": "Tax (KWD)",
+      "total": "Total (KWD)",
+      "status": "Status",
+      "statuses": {
+        "draft": "Draft",
+        "pending": "Pending Approval",
+        "approved": "Approved",
+        "posted": "Posted",
+        "rejected": "Rejected"
+      },
+      "actions": {
+        "approve": "Approve",
+        "post": "Post",
+        "reject": "Reject",
+        "rejectConfirm": "Reject this expense? It will be marked rejected and cannot be posted."
+      },
+      "new": {
+        "title": "New Expense",
+        "expenseDate": "Expense date",
+        "selectSupplier": "(no vendor)",
+        "selectExpenseAccount": "Select expense category",
+        "selectPaidFromAccount": "Select paid-from account",
+        "amount": "Amount (fils)",
+        "taxAmount": "Tax (fils)",
+        "totalInKwd": "Total (KWD)",
+        "notes": "Notes (English)",
+        "notesAr": "Notes (Arabic)",
+        "receiptUrl": "Receipt URL",
+        "receiptHint": "Paste an R2 URL. Auto-upload with OCR is coming in Batch 3.",
+        "submit": "Create draft expense"
+      }
+    },
+    "reports": {
+      "title": "Financial Reports",
+      "description": "Trial Balance, Profit & Loss, and Balance Sheet from your journal entries.",
+      "tabs": {
+        "trialBalance": "Trial Balance",
+        "pnl": "Profit & Loss",
+        "balanceSheet": "Balance Sheet"
+      },
+      "asOf": "As of",
+      "from": "From",
+      "to": "To",
+      "exportCsv": "Export CSV",
+      "exportXlsx": "Export XLSX",
+      "exportXlsxComing": "XLSX export coming soon",
+      "trialBalance": {
+        "accountCode": "Code",
+        "accountName": "Account",
+        "debit": "Debit",
+        "credit": "Credit",
+        "balance": "Balance",
+        "totals": "Totals",
+        "balanced": "Trial balance verified — debits = credits"
+      },
+      "pnl": {
+        "revenue": "Revenue",
+        "totalRevenue": "Total Revenue",
+        "expenses": "Expenses",
+        "totalExpenses": "Total Expenses",
+        "netIncome": "Net Income"
+      },
+      "balanceSheet": {
+        "assets": "Assets",
+        "totalAssets": "Total Assets",
+        "liabilities": "Liabilities",
+        "totalLiabilities": "Total Liabilities",
+        "equity": "Equity",
+        "totalEquity": "Total Equity",
+        "balanced": "Balance sheet verified — Assets = Liabilities + Equity"
+      }
     }
   },
   "stock": {

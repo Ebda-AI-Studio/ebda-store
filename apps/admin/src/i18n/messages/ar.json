@@ -3647,6 +3647,101 @@
       "errors": {
         "unbalanced": "المدين يجب أن يساوي الدائن"
       }
+    },
+    "dashboard": {
+      "title": "لوحة تحكم المالية",
+      "thisMonth": "هذا الشهر",
+      "revenue": "الإيرادات",
+      "expenses": "المصروفات",
+      "net": "صافي الدخل",
+      "stockValue": "قيمة المخزون",
+      "cash": "النقدية بحسب الحساب",
+      "balanceSheet": "الميزانية العمومية",
+      "assets": "الأصول",
+      "liabilities": "الالتزامات",
+      "equity": "حقوق الملكية",
+      "negativeBalanceTooltip": "رصيد سالب — تحقق من الرصيد الافتتاحي وتسويات المخزون"
+    },
+    "expenses": {
+      "title": "المصروفات",
+      "description": "المصروفات التشغيلية مسجّلة مقابل دليل الحسابات. المصروفات المعتمدة تُنشئ قيداً دفترياً متوازناً.",
+      "newButton": "+ مصروف جديد",
+      "number": "الرقم",
+      "date": "التاريخ",
+      "vendor": "المورد",
+      "category": "الفئة",
+      "amount": "المبلغ (د.ك)",
+      "tax": "الضريبة (د.ك)",
+      "total": "الإجمالي (د.ك)",
+      "status": "الحالة",
+      "statuses": {
+        "draft": "مسودة",
+        "pending": "في انتظار الاعتماد",
+        "approved": "معتمد",
+        "posted": "مُرحَّل",
+        "rejected": "مرفوض"
+      },
+      "actions": {
+        "approve": "اعتماد",
+        "post": "ترحيل",
+        "reject": "رفض",
+        "rejectConfirm": "رفض هذا المصروف؟ سيُوسَم بالرفض ولن يمكن ترحيله."
+      },
+      "new": {
+        "title": "مصروف جديد",
+        "expenseDate": "تاريخ المصروف",
+        "selectSupplier": "(بدون مورد)",
+        "selectExpenseAccount": "اختر فئة المصروف",
+        "selectPaidFromAccount": "اختر حساب الدفع",
+        "amount": "المبلغ (فلس)",
+        "taxAmount": "الضريبة (فلس)",
+        "totalInKwd": "الإجمالي (د.ك)",
+        "notes": "ملاحظات (إنجليزي)",
+        "notesAr": "ملاحظات (عربي)",
+        "receiptUrl": "رابط الإيصال",
+        "receiptHint": "الصق رابط R2. الرفع التلقائي مع OCR قادم في Batch 3.",
+        "submit": "إنشاء مصروف كمسودة"
+      }
+    },
+    "reports": {
+      "title": "التقارير المالية",
+      "description": "ميزان المراجعة وبيان الدخل والميزانية العمومية من قيود اليومية.",
+      "tabs": {
+        "trialBalance": "ميزان المراجعة",
+        "pnl": "الربح والخسارة",
+        "balanceSheet": "الميزانية العمومية"
+      },
+      "asOf": "بتاريخ",
+      "from": "من",
+      "to": "إلى",
+      "exportCsv": "تصدير CSV",
+      "exportXlsx": "تصدير XLSX",
+      "exportXlsxComing": "تصدير XLSX قادم قريباً",
+      "trialBalance": {
+        "accountCode": "الرمز",
+        "accountName": "الحساب",
+        "debit": "مدين",
+        "credit": "دائن",
+        "balance": "الرصيد",
+        "totals": "المجاميع",
+        "balanced": "ميزان المراجعة مثبّت — المدين = الدائن"
+      },
+      "pnl": {
+        "revenue": "الإيرادات",
+        "totalRevenue": "إجمالي الإيرادات",
+        "expenses": "المصروفات",
+        "totalExpenses": "إجمالي المصروفات",
+        "netIncome": "صافي الدخل"
+      },
+      "balanceSheet": {
+        "assets": "الأصول",
+        "totalAssets": "إجمالي الأصول",
+        "liabilities": "الالتزامات",
+        "totalLiabilities": "إجمالي الالتزامات",
+        "equity": "حقوق الملكية",
+        "totalEquity": "إجمالي حقوق الملكية",
+        "balanced": "الميزانية مثبّتة — الأصول = الالتزامات + حقوق الملكية"
+      }
     }
   },
   "stock": {
