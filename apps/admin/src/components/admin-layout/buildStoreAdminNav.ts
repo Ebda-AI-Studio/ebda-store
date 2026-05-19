@@ -21,6 +21,19 @@ export type NavLabels = {
   aiTools: string;
   navAccounts: string;
   navJournal: string;
+  // Stock group (Batch 2)
+  navStockDashboard: string;
+  navInventory: string;
+  navAdjustments: string;
+  navSuppliers: string;
+  navPurchaseOrders: string;
+  navReorder: string;
+  navBackorders: string;
+  navDeadstock: string;
+  // Finance group extensions (Batch 2)
+  navFinanceDashboard: string;
+  navExpenses: string;
+  navReports: string;
 };
 
 // Super Admin navigation (Force Media platform admin)
@@ -75,6 +88,71 @@ export function buildStoreAdminNav(storeId: string, labels: NavLabels): NavItem[
       href: `/stores/${storeId}/customers`,
       icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z',
     },
+    // ── Stock group (Batch 2) ────────────────────────────────────────────────
+    {
+      // Stock Dashboard — overview of on-hand levels, low-stock SKUs, etc.
+      name: labels.navStockDashboard,
+      href: `/stores/${storeId}/stock/dashboard`,
+      // Chart bars icon
+      icon: 'M3 12h2v9H3zm4-4h2v13H7zm4-4h2v17h-2zm4 8h2v9h-2zm4-12h2v21h-2z',
+    },
+    {
+      // Inventory — per-product stock levels with quick-adjust
+      name: labels.navInventory,
+      href: `/stores/${storeId}/stock/inventory`,
+      // List lines icon
+      icon: 'M4 6h16M4 12h16M4 18h7',
+    },
+    {
+      // Adjustments — manual stock adjustments that post balanced journal entries
+      name: labels.navAdjustments,
+      href: `/stores/${storeId}/stock/adjustments`,
+      // Pencil/edit icon
+      icon: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z',
+    },
+    {
+      // Suppliers — supplier directory for purchase orders
+      name: labels.navSuppliers,
+      href: `/stores/${storeId}/stock/suppliers`,
+      // Building icon
+      icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4',
+    },
+    {
+      // Purchase Orders — track POs; receipt updates inventory + AP accounts
+      name: labels.navPurchaseOrders,
+      href: `/stores/${storeId}/stock/purchase-orders`,
+      // Cart icon (same as Batch 1 uses)
+      icon: 'M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z',
+    },
+    {
+      // Reorder Suggestions — AI-powered (Batch 3 feature, visible now with coming-soon page)
+      name: labels.navReorder,
+      href: `/stores/${storeId}/stock/reorder`,
+      // Refresh/cycle icon
+      icon: 'M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15',
+    },
+    {
+      // Backorders — customers waiting on out-of-stock items
+      name: labels.navBackorders,
+      href: `/stores/${storeId}/stock/backorders`,
+      // Clock icon
+      icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
+    },
+    {
+      // Dead Stock — AI-powered clearance detection (Batch 3 feature, coming-soon page)
+      name: labels.navDeadstock,
+      href: `/stores/${storeId}/stock/deadstock`,
+      // Trash icon
+      icon: 'M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16',
+    },
+    // ── Finance group (Batch 1 + Batch 2 extensions) ─────────────────────────
+    {
+      // Finance Dashboard — P&L, balance sheet, cash summary (Batch 2)
+      name: labels.navFinanceDashboard,
+      href: `/stores/${storeId}/finance/dashboard`,
+      // Dollar-sign circle icon
+      icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1L15 8m-3-2v8m4-4a8 8 0 11-16 0 8 8 0 0116 0z',
+    },
     {
       // Finance — Chart of Accounts (read-only COA tree)
       name: labels.navAccounts,
@@ -88,6 +166,20 @@ export function buildStoreAdminNav(storeId: string, labels: NavLabels): NavItem[
       href: `/stores/${storeId}/finance/journal`,
       // List/lines icon
       icon: 'M4 6h16M4 10h16M4 14h16M4 18h16',
+    },
+    {
+      // Finance — Expenses tracking (Batch 2)
+      name: labels.navExpenses,
+      href: `/stores/${storeId}/finance/expenses`,
+      // Receipt/dollar icon
+      icon: 'M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2zM10 9a.5.5 0 11-1 0 .5.5 0 011 0zm5 5a.5.5 0 11-1 0 .5.5 0 011 0z',
+    },
+    {
+      // Finance — Financial reports: trial balance, P&L, balance sheet (Batch 2)
+      name: labels.navReports,
+      href: `/stores/${storeId}/finance/reports`,
+      // Bar chart icon
+      icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
     },
     {
       name: labels.analytics,

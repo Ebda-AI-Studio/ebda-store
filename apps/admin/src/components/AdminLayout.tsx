@@ -92,6 +92,19 @@ export function AdminLayout({
     aiTools: t('navAiTools'),
     navAccounts: t('navAccounts'),
     navJournal: t('navJournal'),
+    // Stock group (Batch 2)
+    navStockDashboard: t('navStockDashboard'),
+    navInventory: t('navInventory'),
+    navAdjustments: t('navAdjustments'),
+    navSuppliers: t('navSuppliers'),
+    navPurchaseOrders: t('navPurchaseOrders'),
+    navReorder: t('navReorder'),
+    navBackorders: t('navBackorders'),
+    navDeadstock: t('navDeadstock'),
+    // Finance group extensions (Batch 2)
+    navFinanceDashboard: t('navFinanceDashboard'),
+    navExpenses: t('navExpenses'),
+    navReports: t('navReports'),
   };
 
   // Sync dark mode with localStorage and system preference
