@@ -63,6 +63,14 @@ type OrderDeliveredEvent = EventPayload & {
   };
 };
 
+type OrderShippedEvent = EventPayload & {
+  name: 'order/shipped';
+  data: {
+    orderId: string;
+    storeId: string;
+  };
+};
+
 type ReviewSubmittedEvent = EventPayload & {
   name: 'review/submitted';
   data: {
@@ -78,6 +86,7 @@ export type AppEvent =
   | BulkAiTranslateEvent
   | BulkAiSeoEvent
   | OrderDeliveredEvent
+  | OrderShippedEvent
   | ReviewSubmittedEvent;
 
 // Inngest re-registers the function manifest only when it detects a

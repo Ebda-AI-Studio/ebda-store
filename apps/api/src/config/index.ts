@@ -201,6 +201,11 @@ export const config = {
   // forge "delivered" status updates on any tracking number.
   icarryWebhookSecret: process.env.ICARRY_WEBHOOK_SECRET || '',
   aramexWebhookSecret: process.env.ARAMEX_WEBHOOK_SECRET || '',
+
+  // Force WhatsApp Business Platform bridge
+  // Base URL of the WBS backend. In production: https://backend.forcemediakw.com
+  // Leave unset in dev — the bridge will skip sends gracefully when store.wbsEnabled=false.
+  wbsBaseUrl: process.env.WBS_BASE_URL || 'https://backend.forcemediakw.com',
 } as const;
 
 // Additional production validations (core secrets already validated above)

@@ -724,6 +724,12 @@ export class OrderService {
         },
         orderLocale
       ).catch(err => logger.error({ err }, 'Failed to send order shipped email'));
+
+      // Fire order/shipped Inngest event so the WBS bridge (and future listeners)
+      // can send a WhatsApp shipping notification.
+      inngest
+        .send({ name: 'order/shipped', data: { orderId, storeId } })
+        .catch(err => logger.error({ err, orderId }, 'Failed to enqueue order/shipped event'));
     } else if (status === 'confirmed' && shippingAddrFull) {
       // Payment success / order confirmed
       void EmailService.sendPaymentSuccess(

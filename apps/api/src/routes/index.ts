@@ -38,6 +38,7 @@ import storeLayoutRoutes from './store-layout.routes';
 import publicStoreLayoutRoutes from './public-store-layout.routes';
 import pagesRoutes from './pages.routes';
 import typographyRoutes from './typography.routes';
+import wbsIntegrationRoutes from './wbs-integration.routes';
 import { tenantContext } from '../middleware/tenant-context';
 
 const router = Router();
@@ -130,6 +131,9 @@ router.use('/public', affiliateRoutes);
 // Newsletter admin routes (list + CSV export). Public signup is in
 // public.routes.ts so visitors don't need a JWT to subscribe.
 router.use('/stores', tenantContext, newsletterRoutes);
+
+// WBS integration routes (Force Store ↔ WBS bridge config)
+router.use('/stores', tenantContext, wbsIntegrationRoutes);
 
 // Wishlist routes (user-scoped, no store context)
 router.use('/wishlist', wishlistRoutes);
