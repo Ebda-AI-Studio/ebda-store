@@ -1,5 +1,6 @@
 'use client';
 
+import type React from 'react';
 import Link from 'next/link';
 import type { CategoryCardProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -11,6 +12,7 @@ export default function BoldCategoryCard({
   cardSize,
   cardShape,
   urlPrefix = '',
+  categoryLabelZone,
 }: CategoryCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -55,7 +57,20 @@ export default function BoldCategoryCard({
 
         {/* Content */}
         <div className="absolute inset-x-0 bottom-0 p-6">
-          <h3 className="text-2xl font-black uppercase text-white mb-2 tracking-tight group-hover:text-primary transition-colors duration-200">
+          <h3
+            className="text-2xl font-black uppercase text-white mb-2 tracking-tight group-hover:text-primary transition-colors duration-200"
+            data-zone="categoryLabel"
+            style={{
+              fontFamily: categoryLabelZone?.fontFamily,
+              fontSize: categoryLabelZone?.fontSize,
+              fontWeight: categoryLabelZone?.fontWeight,
+              color: categoryLabelZone?.color,
+              letterSpacing: categoryLabelZone?.letterSpacing,
+              lineHeight: categoryLabelZone?.lineHeight,
+              textTransform:
+                categoryLabelZone?.textTransform as React.CSSProperties['textTransform'],
+            }}
+          >
             {displayName}
           </h3>
           {category.productCount !== undefined && (

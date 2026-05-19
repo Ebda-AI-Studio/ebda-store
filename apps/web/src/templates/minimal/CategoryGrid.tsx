@@ -48,6 +48,7 @@ export default function MinimalCategoryGrid({
   headingZone,
   kickerZone,
   subtitleZone,
+  categoryLabelZone,
 }: CategoryGridProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const { store } = useStore();
@@ -96,6 +97,7 @@ export default function MinimalCategoryGrid({
                   category={category}
                   isRtl={isRtl}
                   urlPrefix={urlPrefix}
+                  categoryLabelZone={categoryLabelZone}
                 />
               </div>
             ) : (
@@ -109,6 +111,7 @@ export default function MinimalCategoryGrid({
                 category={category}
                 isRtl={isRtl}
                 urlPrefix={urlPrefix}
+                categoryLabelZone={categoryLabelZone}
               />
             );
           })}

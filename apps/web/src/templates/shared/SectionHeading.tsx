@@ -39,6 +39,8 @@ interface SectionHeadingProps {
   headingZone?: ResolvedZone;
   kickerZone?: ResolvedZone;
   subtitleZone?: ResolvedZone;
+  /** Typography override for the "See all →" link at the row end. */
+  seeAllZone?: ResolvedZone;
 }
 
 /**
@@ -61,6 +63,7 @@ export function SectionHeading({
   headingZone,
   kickerZone,
   subtitleZone,
+  seeAllZone,
 }: SectionHeadingProps) {
   const text = isRtl ? (titleAr ?? title) : (title ?? titleAr);
   const kickerText = isRtl ? (kickerAr ?? kicker) : (kicker ?? kickerAr);
@@ -186,6 +189,15 @@ export function SectionHeading({
             href={seeAllHref}
             className={`shrink-0 ${styles.sectionSeeAll}`}
             data-zone="sectionSeeAll"
+            style={{
+              fontFamily: seeAllZone?.fontFamily,
+              fontSize: seeAllZone?.fontSize,
+              fontWeight: seeAllZone?.fontWeight,
+              color: seeAllZone?.color,
+              letterSpacing: seeAllZone?.letterSpacing,
+              lineHeight: seeAllZone?.lineHeight,
+              textTransform: seeAllZone?.textTransform as React.CSSProperties['textTransform'],
+            }}
           >
             {isRtl ? 'عرض الكل' : 'See all'}
           </Link>

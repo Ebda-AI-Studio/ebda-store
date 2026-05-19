@@ -84,6 +84,16 @@ export function HomePageContent({
     undefined,
     store.theme
   );
+  const categoriesSeeAllZone = resolveSectionZone(
+    layout.categories.typography?.seeAll,
+    undefined,
+    store.theme
+  );
+  const categoriesLabelZone = resolveSectionZone(
+    layout.categories.typography?.categoryLabel,
+    undefined,
+    store.theme
+  );
 
   const newArrivalsHeadingZone = resolveSectionZone(
     layout.newArrivals.typography?.heading,
@@ -100,6 +110,26 @@ export function HomePageContent({
     undefined,
     store.theme
   );
+  const newArrivalsSeeAllZone = resolveSectionZone(
+    layout.newArrivals.typography?.seeAll,
+    undefined,
+    store.theme
+  );
+  const newArrivalsProductNameZone = resolveSectionZone(
+    layout.newArrivals.typography?.productName,
+    undefined,
+    store.theme
+  );
+  const newArrivalsProductPriceZone = resolveSectionZone(
+    layout.newArrivals.typography?.productPrice,
+    undefined,
+    store.theme
+  );
+  const newArrivalsProductCtaZone = resolveSectionZone(
+    layout.newArrivals.typography?.productCta,
+    undefined,
+    store.theme
+  );
 
   const bestSellersHeadingZone = resolveSectionZone(
     layout.bestSellers.typography?.heading,
@@ -113,6 +143,26 @@ export function HomePageContent({
   );
   const bestSellersSubtitleZone = resolveSectionZone(
     layout.bestSellers.typography?.subtitle,
+    undefined,
+    store.theme
+  );
+  const bestSellersSeeAllZone = resolveSectionZone(
+    layout.bestSellers.typography?.seeAll,
+    undefined,
+    store.theme
+  );
+  const bestSellersProductNameZone = resolveSectionZone(
+    layout.bestSellers.typography?.productName,
+    undefined,
+    store.theme
+  );
+  const bestSellersProductPriceZone = resolveSectionZone(
+    layout.bestSellers.typography?.productPrice,
+    undefined,
+    store.theme
+  );
+  const bestSellersProductCtaZone = resolveSectionZone(
+    layout.bestSellers.typography?.productCta,
     undefined,
     store.theme
   );
@@ -291,6 +341,8 @@ export function HomePageContent({
                     headingZone={categoriesHeadingZone}
                     kickerZone={categoriesKickerZone}
                     subtitleZone={categoriesSubtitleZone}
+                    seeAllZone={categoriesSeeAllZone}
+                    categoryLabelZone={categoriesLabelZone}
                   />
                 ) : (
                   <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -321,6 +373,7 @@ export function HomePageContent({
                       headingZone={categoriesHeadingZone}
                       kickerZone={categoriesKickerZone}
                       subtitleZone={categoriesSubtitleZone}
+                      categoryLabelZone={categoriesLabelZone}
                     />
                   </div>
                 )}
@@ -381,6 +434,10 @@ export function HomePageContent({
                     headingZone={newArrivalsHeadingZone}
                     kickerZone={newArrivalsKickerZone}
                     subtitleZone={newArrivalsSubtitleZone}
+                    seeAllZone={newArrivalsSeeAllZone}
+                    productNameZone={newArrivalsProductNameZone}
+                    productPriceZone={newArrivalsProductPriceZone}
+                    productCtaZone={newArrivalsProductCtaZone}
                   />
                 ) : (
                   <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -453,6 +510,10 @@ export function HomePageContent({
                     headingZone={bestSellersHeadingZone}
                     kickerZone={bestSellersKickerZone}
                     subtitleZone={bestSellersSubtitleZone}
+                    seeAllZone={bestSellersSeeAllZone}
+                    productNameZone={bestSellersProductNameZone}
+                    productPriceZone={bestSellersProductPriceZone}
+                    productCtaZone={bestSellersProductCtaZone}
                   />
                 ) : (
                   <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">

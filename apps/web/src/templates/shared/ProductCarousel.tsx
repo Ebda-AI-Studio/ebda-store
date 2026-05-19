@@ -1,5 +1,6 @@
 'use client';
 
+import type React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
@@ -65,6 +66,10 @@ export function ProductCarousel({
   headingZone,
   kickerZone,
   subtitleZone,
+  seeAllZone,
+  productNameZone,
+  productPriceZone,
+  productCtaZone,
 }: ProductCarouselProps) {
   const styles = getPackStyles(pack);
   const sizeCap = productSizeClass(cardSize);
@@ -169,6 +174,7 @@ export function ProductCarousel({
           headingZone={headingZone}
           kickerZone={kickerZone}
           subtitleZone={subtitleZone}
+          seeAllZone={seeAllZone}
         />
         <div
           className="relative"
@@ -401,13 +407,39 @@ export function ProductCarousel({
                           (cardless / image-only product strips). */}
                       {showLabel && (
                         <div className={`p-3 sm:p-4 space-y-2 ${styles.productCardBody ?? ''}`}>
-                          <p className={`line-clamp-2 ${textSizes.name} ${styles.productCardName}`}>
+                          <p
+                            className={`line-clamp-2 ${textSizes.name} ${styles.productCardName}`}
+                            data-zone="productName"
+                            style={{
+                              fontFamily: productNameZone?.fontFamily,
+                              fontSize: productNameZone?.fontSize,
+                              fontWeight: productNameZone?.fontWeight,
+                              color: productNameZone?.color,
+                              letterSpacing: productNameZone?.letterSpacing,
+                              lineHeight: productNameZone?.lineHeight,
+                              textTransform:
+                                productNameZone?.textTransform as React.CSSProperties['textTransform'],
+                            }}
+                          >
                             {name}
                           </p>
                           <div
                             className={`flex items-baseline gap-2 ${styles.productCardBody ? 'justify-center' : ''}`}
                           >
-                            <span className={`${textSizes.price} ${styles.productCardPrice}`}>
+                            <span
+                              className={`${textSizes.price} ${styles.productCardPrice}`}
+                              data-zone="productPrice"
+                              style={{
+                                fontFamily: productPriceZone?.fontFamily,
+                                fontSize: productPriceZone?.fontSize,
+                                fontWeight: productPriceZone?.fontWeight,
+                                color: productPriceZone?.color,
+                                letterSpacing: productPriceZone?.letterSpacing,
+                                lineHeight: productPriceZone?.lineHeight,
+                                textTransform:
+                                  productPriceZone?.textTransform as React.CSSProperties['textTransform'],
+                              }}
+                            >
                               {(product.price / 1000).toFixed(3)} {currency}
                             </span>
                             {onSale && product.compareAtPrice && (
@@ -427,34 +459,55 @@ export function ProductCarousel({
                         the bottom Add-to-cart button removes the
                         redundancy. View + Out Of Stock buttons still
                         render because the (+) doesn't cover those cases. */}
-                    {hasVariants ? (
-                      <Link
-                        href={href}
-                        prefetch={false}
-                        className={`block w-full text-center cursor-pointer ${styles.productCardCta}`}
-                      >
-                        {isRtl ? 'عرض' : 'View'}
-                      </Link>
-                    ) : !inStock ? (
-                      <button
-                        type="button"
-                        disabled
-                        className={`block w-full text-center opacity-60 cursor-not-allowed ${styles.productCardCta}`}
-                      >
-                        {isRtl ? 'نفدت الكمية' : 'Out Of Stock'}
-                      </button>
-                    ) : (
-                      !showQuickAdd &&
-                      onAddToCart && (
+                    {/* CTA zone inline style applied via a shared style object
+                        so all three CTA variants (View / OOS / Add to cart)
+                        reflect the merchant's productCta typography override. */}
+                    {(() => {
+                      const ctaStyle: React.CSSProperties = {
+                        fontFamily: productCtaZone?.fontFamily,
+                        fontSize: productCtaZone?.fontSize,
+                        fontWeight: productCtaZone?.fontWeight,
+                        color: productCtaZone?.color,
+                        letterSpacing: productCtaZone?.letterSpacing,
+                        lineHeight: productCtaZone?.lineHeight,
+                        textTransform:
+                          productCtaZone?.textTransform as React.CSSProperties['textTransform'],
+                      };
+                      return hasVariants ? (
+                        <Link
+                          href={href}
+                          prefetch={false}
+                          className={`block w-full text-center cursor-pointer ${styles.productCardCta}`}
+                          data-zone="productCta"
+                          style={ctaStyle}
+                        >
+                          {isRtl ? 'عرض' : 'View'}
+                        </Link>
+                      ) : !inStock ? (
                         <button
                           type="button"
-                          onClick={() => onAddToCart(product.id)}
-                          className={`block w-full text-center cursor-pointer ${styles.productCardCta}`}
+                          disabled
+                          className={`block w-full text-center opacity-60 cursor-not-allowed ${styles.productCardCta}`}
+                          data-zone="productCta"
+                          style={ctaStyle}
                         >
-                          {isRtl ? 'إضافة للسلة' : 'Add to cart'}
+                          {isRtl ? 'نفدت الكمية' : 'Out Of Stock'}
                         </button>
-                      )
-                    )}
+                      ) : (
+                        !showQuickAdd &&
+                        onAddToCart && (
+                          <button
+                            type="button"
+                            onClick={() => onAddToCart(product.id)}
+                            className={`block w-full text-center cursor-pointer ${styles.productCardCta}`}
+                            data-zone="productCta"
+                            style={ctaStyle}
+                          >
+                            {isRtl ? 'إضافة للسلة' : 'Add to cart'}
+                          </button>
+                        )
+                      );
+                    })()}
                   </div>
                 </li>
               );

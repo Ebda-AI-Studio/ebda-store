@@ -46,6 +46,7 @@ export default function ClassicCategoryGrid({
   headingZone,
   kickerZone,
   subtitleZone,
+  categoryLabelZone,
 }: CategoryGridProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const { store } = useStore();
@@ -94,6 +95,7 @@ export default function ClassicCategoryGrid({
                   category={category}
                   isRtl={isRtl}
                   urlPrefix={urlPrefix}
+                  categoryLabelZone={categoryLabelZone}
                 />
               </div>
             ) : (
@@ -107,6 +109,7 @@ export default function ClassicCategoryGrid({
                 category={category}
                 isRtl={isRtl}
                 urlPrefix={urlPrefix}
+                categoryLabelZone={categoryLabelZone}
               />
             );
           })}

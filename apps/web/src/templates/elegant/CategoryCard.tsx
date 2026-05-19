@@ -1,5 +1,6 @@
 'use client';
 
+import type React from 'react';
 import Link from 'next/link';
 import type { CategoryCardProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -11,6 +12,7 @@ export default function ElegantCategoryCard({
   cardSize,
   cardShape,
   urlPrefix = '',
+  categoryLabelZone,
 }: CategoryCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -65,7 +67,19 @@ export default function ElegantCategoryCard({
           text-center with RTL/LTR aligns to a side which fights the
           centered image above. */}
       <div className="text-center">
-        <h3 className="text-base font-light text-foreground tracking-[-0.005em] group-hover:text-foreground/70 transition-colors duration-700">
+        <h3
+          className="text-base font-light text-foreground tracking-[-0.005em] group-hover:text-foreground/70 transition-colors duration-700"
+          data-zone="categoryLabel"
+          style={{
+            fontFamily: categoryLabelZone?.fontFamily,
+            fontSize: categoryLabelZone?.fontSize,
+            fontWeight: categoryLabelZone?.fontWeight,
+            color: categoryLabelZone?.color,
+            letterSpacing: categoryLabelZone?.letterSpacing,
+            lineHeight: categoryLabelZone?.lineHeight,
+            textTransform: categoryLabelZone?.textTransform as React.CSSProperties['textTransform'],
+          }}
+        >
           {displayName}
         </h3>
         {category.productCount !== undefined && (

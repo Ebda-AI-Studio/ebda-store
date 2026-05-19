@@ -1,5 +1,6 @@
 'use client';
 
+import type React from 'react';
 import Link from 'next/link';
 import type { CategoryCardProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -24,6 +25,7 @@ export default function ModernCategoryCard({
   showLabel = true,
   showHover = true,
   urlPrefix = '',
+  categoryLabelZone,
 }: CategoryCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -62,7 +64,19 @@ export default function ModernCategoryCard({
         )}
       </div>
       {showLabel && (
-        <p className="mt-2 text-center text-sm md:text-base font-medium text-foreground line-clamp-1">
+        <p
+          className="mt-2 text-center text-sm md:text-base font-medium text-foreground line-clamp-1"
+          data-zone="categoryLabel"
+          style={{
+            fontFamily: categoryLabelZone?.fontFamily,
+            fontSize: categoryLabelZone?.fontSize,
+            fontWeight: categoryLabelZone?.fontWeight,
+            color: categoryLabelZone?.color,
+            letterSpacing: categoryLabelZone?.letterSpacing,
+            lineHeight: categoryLabelZone?.lineHeight,
+            textTransform: categoryLabelZone?.textTransform as React.CSSProperties['textTransform'],
+          }}
+        >
           {displayName}
         </p>
       )}

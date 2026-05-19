@@ -369,6 +369,14 @@ export interface ProductCarouselProps {
   headingZone?: ResolvedZone;
   kickerZone?: ResolvedZone;
   subtitleZone?: ResolvedZone;
+  /** "See all →" link typography override. */
+  seeAllZone?: ResolvedZone;
+  /** Product name text typography override (applied to name below image). */
+  productNameZone?: ResolvedZone;
+  /** Product price text typography override. */
+  productPriceZone?: ResolvedZone;
+  /** Product CTA button text typography override (Add to cart / View). */
+  productCtaZone?: ResolvedZone;
 }
 
 /**
@@ -415,6 +423,10 @@ export interface CategoryStripProps {
   headingZone?: ResolvedZone;
   kickerZone?: ResolvedZone;
   subtitleZone?: ResolvedZone;
+  /** "See all →" link typography override. */
+  seeAllZone?: ResolvedZone;
+  /** Category label text typography override (text below each card image). */
+  categoryLabelZone?: ResolvedZone;
 }
 
 /**
@@ -484,6 +496,15 @@ export interface ProductCardProps {
   cardFrameSize?: CardFrameSize;
   /** Hex color applied as inline borderColor on the frame element when showCardFrame is on. */
   cardFrameColor?: string;
+  /**
+   * Per-section typography zone overrides for individual card elements.
+   * Applied as inline styles on name / price / CTA respectively. Theme
+   * ProductCards that don't differentiate these visually may ignore them
+   * via the _discard pattern on destructuring.
+   */
+  productNameZone?: ResolvedZone;
+  productPriceZone?: ResolvedZone;
+  productCtaZone?: ResolvedZone;
 }
 
 /**
@@ -528,6 +549,8 @@ export interface CategoryCardProps {
   /** Enable hover/zoom effects. */
   showHover?: boolean;
   urlPrefix?: string;
+  /** Category label text typography override forwarded from CategoryGrid/CategoryStrip. */
+  categoryLabelZone?: ResolvedZone;
 }
 
 /**
@@ -580,6 +603,8 @@ export interface CategoryGridProps {
   headingZone?: ResolvedZone;
   kickerZone?: ResolvedZone;
   subtitleZone?: ResolvedZone;
+  /** Category label text typography override (text below each card image). */
+  categoryLabelZone?: ResolvedZone;
 }
 
 /**

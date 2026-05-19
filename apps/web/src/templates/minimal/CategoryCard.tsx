@@ -1,5 +1,6 @@
 'use client';
 
+import type React from 'react';
 import Link from 'next/link';
 import type { CategoryCardProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -11,6 +12,7 @@ export default function MinimalCategoryCard({
   cardSize,
   cardShape,
   urlPrefix = '',
+  categoryLabelZone,
 }: CategoryCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -50,7 +52,19 @@ export default function MinimalCategoryCard({
       </div>
 
       {/* Title - Simple */}
-      <h3 className="text-xs tracking-[0.22em] uppercase font-light text-muted-foreground group-hover:text-foreground transition-colors duration-500 ease-out">
+      <h3
+        className="text-xs tracking-[0.22em] uppercase font-light text-muted-foreground group-hover:text-foreground transition-colors duration-500 ease-out"
+        data-zone="categoryLabel"
+        style={{
+          fontFamily: categoryLabelZone?.fontFamily,
+          fontSize: categoryLabelZone?.fontSize,
+          fontWeight: categoryLabelZone?.fontWeight,
+          color: categoryLabelZone?.color,
+          letterSpacing: categoryLabelZone?.letterSpacing,
+          lineHeight: categoryLabelZone?.lineHeight,
+          textTransform: categoryLabelZone?.textTransform as React.CSSProperties['textTransform'],
+        }}
+      >
         {displayName}
       </h3>
     </Link>

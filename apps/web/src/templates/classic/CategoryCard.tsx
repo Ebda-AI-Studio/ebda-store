@@ -1,5 +1,6 @@
 'use client';
 
+import type React from 'react';
 import Link from 'next/link';
 import type { CategoryCardProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -11,6 +12,7 @@ export default function ClassicCategoryCard({
   cardSize,
   cardShape,
   urlPrefix = '',
+  categoryLabelZone,
 }: CategoryCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -55,7 +57,19 @@ export default function ClassicCategoryCard({
       </div>
 
       {/* Title - Serif typography */}
-      <h3 className="text-lg font-serif text-foreground group-hover:text-primary transition-colors duration-500 mb-2 tracking-tight">
+      <h3
+        className="text-lg font-serif text-foreground group-hover:text-primary transition-colors duration-500 mb-2 tracking-tight"
+        data-zone="categoryLabel"
+        style={{
+          fontFamily: categoryLabelZone?.fontFamily,
+          fontSize: categoryLabelZone?.fontSize,
+          fontWeight: categoryLabelZone?.fontWeight,
+          color: categoryLabelZone?.color,
+          letterSpacing: categoryLabelZone?.letterSpacing,
+          lineHeight: categoryLabelZone?.lineHeight,
+          textTransform: categoryLabelZone?.textTransform as React.CSSProperties['textTransform'],
+        }}
+      >
         {displayName}
       </h3>
 

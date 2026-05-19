@@ -1,5 +1,6 @@
 'use client';
 
+import type React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { SectionHeading } from './SectionHeading';
@@ -54,6 +55,8 @@ export function CategoryStrip({
   headingZone,
   kickerZone,
   subtitleZone,
+  seeAllZone,
+  categoryLabelZone,
 }: CategoryStripProps) {
   // Hooks must be called unconditionally (before any early return).
   const { store } = useStore();
@@ -81,6 +84,7 @@ export function CategoryStrip({
           headingZone={headingZone}
           kickerZone={kickerZone}
           subtitleZone={subtitleZone}
+          seeAllZone={seeAllZone}
         />
         <ul
           // touch-pan-x + overscroll-x-contain: iOS-stuck-scroll fix
@@ -138,7 +142,20 @@ export function CategoryStrip({
                     )}
                   </div>
                   {showLabel && (
-                    <p className={`mt-5 text-center line-clamp-2 ${styles.categoryCaption}`}>
+                    <p
+                      className={`mt-5 text-center line-clamp-2 ${styles.categoryCaption}`}
+                      data-zone="categoryLabel"
+                      style={{
+                        fontFamily: categoryLabelZone?.fontFamily,
+                        fontSize: categoryLabelZone?.fontSize,
+                        fontWeight: categoryLabelZone?.fontWeight,
+                        color: categoryLabelZone?.color,
+                        letterSpacing: categoryLabelZone?.letterSpacing,
+                        lineHeight: categoryLabelZone?.lineHeight,
+                        textTransform:
+                          categoryLabelZone?.textTransform as React.CSSProperties['textTransform'],
+                      }}
+                    >
                       {name}
                     </p>
                   )}
