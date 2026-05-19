@@ -95,6 +95,14 @@ type StockPoReceivedEvent = EventPayload & {
   };
 };
 
+type StockAdjustmentPostedEvent = EventPayload & {
+  name: 'stock/adjustment-posted';
+  data: {
+    storeId: string;
+    adjustmentId: string;
+  };
+};
+
 export type AppEvent =
   | OrderCreatedEvent
   | BulkImportStartedEvent
@@ -104,7 +112,8 @@ export type AppEvent =
   | OrderDeliveredEvent
   | OrderShippedEvent
   | ReviewSubmittedEvent
-  | StockPoReceivedEvent;
+  | StockPoReceivedEvent
+  | StockAdjustmentPostedEvent;
 
 // Inngest re-registers the function manifest only when it detects a
 // deploy-version change. Without an explicit deploy id, Railway boots
