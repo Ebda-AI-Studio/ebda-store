@@ -250,10 +250,15 @@ export function darkenColor(input: string, amount: number): string {
   return rgbToHex({ r: mix(rgb.r), g: mix(rgb.g), b: mix(rgb.b) });
 }
 
+export type PalettePattern = 'alternating' | 'monochrome' | 'triad' | 'single-bg';
+
 export interface PaletteSeeds {
   primary: ColorValue;
   accent?: ColorValue;
   neutral?: ColorValue;
+  pattern?: PalettePattern;
+  overrides?: Partial<Record<SectionKey, Partial<SectionPaletteEntry>>>;
+  cardFrameWidth?: CardFrameWidth;
 }
 
 export interface SectionPaletteEntry {
@@ -281,50 +286,121 @@ const SECTION_ORDER: SectionKey[] = [
 
 /**
  * Distribute 1–3 seed colors across the 5 storefront section settings as a
- * coherent palette. Alternates seed-bg / neutral-bg across sections; the
- * accent (if provided) fills one slot. Card frame is the primary seed
- * everywhere for brand consistency. Heading color auto-fixes per section bg.
+ * coherent palette. Supports four distribution patterns:
+ *   - 'alternating' (default): primary / neutral / accent / neutral / primary
+ *   - 'monochrome': primary everywhere
+ *   - 'triad': primary / neutral / accent / primary / neutral
+ *   - 'single-bg': neutral everywhere
  *
+ * Card frame is the primary seed everywhere for brand consistency.
+ * Heading color auto-fixes per section bg via WCAG luminance.
  * Token-ref seeds pass through unchanged so the caller can resolve at render.
+ *
+ * Optional `overrides` map wins over pattern-derived defaults on a per-section
+ * per-field basis. Optional `cardFrameWidth` sets the border width for every
+ * section (default 'normal').
  */
 export function generateSectionPalette(
   seeds: PaletteSeeds
 ): Record<SectionKey, SectionPaletteEntry> {
-  const { primary, accent, neutral } = seeds;
+  const {
+    primary,
+    accent,
+    neutral,
+    pattern = 'alternating',
+    overrides,
+    cardFrameWidth = 'normal',
+  } = seeds;
   const neutralBg = neutral ?? '#FFFFFF';
 
-  // newArrivals gets: accent if provided, else a lightened version of primary
-  // (or white if primary is a token ref since we can't lighten a token at this point).
-  const newArrivalsBg =
+  // Accent fallback: if pattern needs an accent slot but none is provided,
+  // use a lightened version of primary (or white if primary is a token ref).
+  const accentBg =
     accent ??
     lightenColor(
       typeof primary === 'string' && primary.startsWith('token:') ? '#FFFFFF' : primary,
       0.6
     );
 
-  const slots: Record<SectionKey, ColorValue> = {
-    hero: primary,
-    categories: neutralBg,
-    newArrivals: newArrivalsBg,
-    bestSellers: neutralBg,
-    testimonials: primary,
-  };
+  // Background distribution by pattern.
+  // | pattern      | hero    | categories | newArrivals | bestSellers | testimonials |
+  // |--------------|---------|------------|-------------|-------------|--------------|
+  // | alternating  | primary | neutral    | accent      | neutral     | primary      |
+  // | monochrome   | primary | primary    | primary     | primary     | primary      |
+  // | triad        | primary | neutral    | accent      | primary     | neutral      |
+  // | single-bg    | neutral | neutral    | neutral     | neutral     | neutral      |
+  let slots: Record<SectionKey, ColorValue>;
+  switch (pattern) {
+    case 'monochrome':
+      slots = {
+        hero: primary,
+        categories: primary,
+        newArrivals: primary,
+        bestSellers: primary,
+        testimonials: primary,
+      };
+      break;
+    case 'triad':
+      slots = {
+        hero: primary,
+        categories: neutralBg,
+        newArrivals: accentBg,
+        bestSellers: primary,
+        testimonials: neutralBg,
+      };
+      break;
+    case 'single-bg':
+      slots = {
+        hero: neutralBg,
+        categories: neutralBg,
+        newArrivals: neutralBg,
+        bestSellers: neutralBg,
+        testimonials: neutralBg,
+      };
+      break;
+    case 'alternating':
+    default:
+      slots = {
+        hero: primary,
+        categories: neutralBg,
+        newArrivals: accentBg,
+        bestSellers: neutralBg,
+        testimonials: primary,
+      };
+  }
 
   const headingFor = (bg: ColorValue): string => {
     if (bg.startsWith('token:')) return 'auto';
     return pickReadableForeground(bg) ?? '#000000';
   };
 
-  return SECTION_ORDER.reduce(
+  const base = SECTION_ORDER.reduce(
     (acc, key) => {
       acc[key] = {
         bgColor: slots[key],
         cardFrameColor: primary,
-        cardFrameWidth: 'normal',
+        cardFrameWidth,
         headingColor: headingFor(slots[key]),
       };
       return acc;
     },
     {} as Record<SectionKey, SectionPaletteEntry>
   );
+
+  // Apply per-section overrides on top of pattern-derived defaults.
+  if (overrides) {
+    for (const key of SECTION_ORDER) {
+      const ovr = overrides[key];
+      if (!ovr) continue;
+      const merged: SectionPaletteEntry = { ...base[key], ...ovr };
+      // Re-compute headingColor when bgColor override changes the bg, unless
+      // headingColor is also explicitly overridden.
+      if (ovr.bgColor !== undefined && ovr.headingColor === undefined) {
+        merged.headingColor = headingFor(ovr.bgColor);
+      }
+      base[key] = merged;
+    }
+  }
+
+  return base;
 }

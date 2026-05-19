@@ -14,7 +14,7 @@ export {
 } from './color';
 export type { ColorValue, ColorToken, Rgb } from './color';
 export { lightenColor, darkenColor, generateSectionPalette } from './color';
-export type { PaletteSeeds, SectionPaletteEntry, SectionKey } from './color';
+export type { PaletteSeeds, SectionPaletteEntry, SectionKey, PalettePattern } from './color';
 
 /**
  * Format a price value as a localised currency string.

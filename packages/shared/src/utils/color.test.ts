@@ -10,6 +10,7 @@ import {
   lightenColor,
   darkenColor,
 } from './color';
+import type { PalettePattern } from './color';
 import type { StoreTheme } from '../types/store-theme';
 
 const TEST_THEME = {
@@ -194,5 +195,60 @@ describe('generateSectionPalette', () => {
     // Heading color still picked from the resolved seed — caller passes theme separately when resolving.
     // The helper returns 'auto' as a sentinel meaning "auto-fix at render".
     expect(palette.hero.headingColor).toBe('auto');
+  });
+});
+
+describe('generateSectionPalette patterns', () => {
+  const seeds = { primary: '#FF6E00', accent: '#0066CC', neutral: '#FFFFFF' };
+
+  it('alternating pattern (default): primary-neutral-accent-neutral-primary', () => {
+    // No explicit pattern → defaults to 'alternating'.
+    const p = generateSectionPalette({ ...seeds });
+    expect(p.hero.bgColor).toBe('#FF6E00');
+    expect(p.categories.bgColor).toBe('#FFFFFF');
+    expect(p.newArrivals.bgColor).toBe('#0066CC');
+    expect(p.bestSellers.bgColor).toBe('#FFFFFF');
+    expect(p.testimonials.bgColor).toBe('#FF6E00');
+  });
+
+  it('monochrome pattern: every section gets primary bg', () => {
+    const p = generateSectionPalette({ ...seeds, pattern: 'monochrome' as PalettePattern });
+    for (const k of ['hero', 'categories', 'newArrivals', 'bestSellers', 'testimonials'] as const) {
+      expect(p[k].bgColor).toBe('#FF6E00');
+    }
+  });
+
+  it('triad pattern: primary-neutral-accent-primary-neutral', () => {
+    const p = generateSectionPalette({ ...seeds, pattern: 'triad' as PalettePattern });
+    expect(p.hero.bgColor).toBe('#FF6E00');
+    expect(p.categories.bgColor).toBe('#FFFFFF');
+    expect(p.newArrivals.bgColor).toBe('#0066CC');
+    expect(p.bestSellers.bgColor).toBe('#FF6E00');
+    expect(p.testimonials.bgColor).toBe('#FFFFFF');
+  });
+
+  it('single-bg pattern: every section gets neutral bg', () => {
+    const p = generateSectionPalette({ ...seeds, pattern: 'single-bg' as PalettePattern });
+    for (const k of ['hero', 'categories', 'newArrivals', 'bestSellers', 'testimonials'] as const) {
+      expect(p[k].bgColor).toBe('#FFFFFF');
+    }
+  });
+
+  it('overrides win over pattern-derived defaults', () => {
+    const p = generateSectionPalette({
+      ...seeds,
+      pattern: 'monochrome' as PalettePattern,
+      overrides: { categories: { bgColor: '#00FF00' } },
+    });
+    expect(p.hero.bgColor).toBe('#FF6E00');
+    expect(p.categories.bgColor).toBe('#00FF00'); // override wins
+    expect(p.newArrivals.bgColor).toBe('#FF6E00');
+  });
+
+  it('cardFrameWidth from seeds applies to all sections', () => {
+    const p = generateSectionPalette({ ...seeds, cardFrameWidth: 'xthick' });
+    for (const k of ['hero', 'categories', 'newArrivals', 'bestSellers', 'testimonials'] as const) {
+      expect(p[k].cardFrameWidth).toBe('xthick');
+    }
   });
 });

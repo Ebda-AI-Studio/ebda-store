@@ -1,9 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import { generateSectionPalette } from '@force/shared';
-import type { StoreTheme, SectionKey, PaletteSeeds, SectionPaletteEntry } from '@force/shared';
+import { generateSectionPalette, DEFAULT_THEME } from '@force/shared';
+import type {
+  StoreTheme,
+  SectionKey,
+  PaletteSeeds,
+  SectionPaletteEntry,
+  PalettePattern,
+  CardFrameWidth,
+} from '@force/shared';
 import { ColorField } from './ColorField';
+import { SectionPreview } from './SectionPreview';
 
 interface SmartPaletteModalProps {
   open: boolean;
@@ -12,10 +20,24 @@ interface SmartPaletteModalProps {
   theme: StoreTheme | undefined;
 }
 
+const SECTION_KEYS: SectionKey[] = [
+  'hero',
+  'categories',
+  'newArrivals',
+  'bestSellers',
+  'testimonials',
+];
+
 export function SmartPaletteModal({ open, onClose, onApply, theme }: SmartPaletteModalProps) {
   const [primary, setPrimary] = useState<string>('token:primary');
   const [accent, setAccent] = useState<string>('');
   const [neutral, setNeutral] = useState<string>('');
+  const [pattern, setPattern] = useState<PalettePattern>('alternating');
+  const [paletteFrameWidth, setPaletteFrameWidth] = useState<CardFrameWidth>('normal');
+  const [overrides, setOverrides] = useState<
+    Partial<Record<SectionKey, Partial<SectionPaletteEntry>>>
+  >({});
+  const [expandedSection, setExpandedSection] = useState<SectionKey | null>(null);
 
   if (!open) return null;
 
@@ -23,8 +45,15 @@ export function SmartPaletteModal({ open, onClose, onApply, theme }: SmartPalett
     primary,
     accent: accent || undefined,
     neutral: neutral || undefined,
+    pattern,
+    cardFrameWidth: paletteFrameWidth,
+    overrides,
   };
   const palette = primary ? generateSectionPalette(seeds) : null;
+
+  // Resolved theme — fall back to DEFAULT_THEME so SectionPreview always gets
+  // a valid StoreTheme object even when the store hasn't been saved yet.
+  const resolvedTheme = theme ?? DEFAULT_THEME;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -44,6 +73,53 @@ export function SmartPaletteModal({ open, onClose, onApply, theme }: SmartPalett
           card frame, and heading color. Section text auto-fixes for contrast.
         </p>
 
+        {/* Distribution pattern picker */}
+        <div className="mb-4">
+          <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Distribution pattern
+          </label>
+          <div className="grid grid-cols-4 gap-2">
+            {(['alternating', 'monochrome', 'triad', 'single-bg'] as const).map(p => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => setPattern(p)}
+                className={`rounded border p-2 text-xs font-medium capitalize ${
+                  pattern === p
+                    ? 'border-primary bg-primary/10 text-foreground'
+                    : 'border-border bg-background text-muted-foreground hover:bg-muted'
+                }`}
+              >
+                {p.replace('-', ' ')}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Card frame thickness picker */}
+        <div className="mb-4">
+          <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Card frame thickness
+          </label>
+          <div className="grid grid-cols-4 gap-2">
+            {(['thin', 'normal', 'thick', 'xthick'] as const).map(w => (
+              <button
+                key={w}
+                type="button"
+                onClick={() => setPaletteFrameWidth(w)}
+                className={`rounded border p-2 text-xs font-medium capitalize ${
+                  paletteFrameWidth === w
+                    ? 'border-primary bg-primary/10 text-foreground'
+                    : 'border-border bg-background text-muted-foreground hover:bg-muted'
+                }`}
+              >
+                {w}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Seed color inputs */}
         <div className="space-y-3">
           <ColorField
             label="Primary (required)"
@@ -65,30 +141,97 @@ export function SmartPaletteModal({ open, onClose, onApply, theme }: SmartPalett
           />
         </div>
 
+        {/* Interactive preview grid — click any section to override */}
         {palette ? (
           <div className="mt-6">
-            <h3 className="mb-2 text-sm font-semibold text-foreground">Preview</h3>
+            <h3 className="mb-2 text-sm font-semibold text-foreground">
+              Preview — click any section to override
+            </h3>
             <div className="grid grid-cols-5 gap-2">
-              {(['hero', 'categories', 'newArrivals', 'bestSellers', 'testimonials'] as const).map(
-                key => (
-                  <div
-                    key={key}
-                    className="aspect-[3/4] rounded-lg border-2 p-2 text-center text-[10px]"
-                    style={{
-                      backgroundColor: palette[key].bgColor.startsWith('token:')
-                        ? '#eee'
-                        : palette[key].bgColor,
-                      borderColor: palette[key].cardFrameColor.startsWith('token:')
-                        ? '#888'
-                        : palette[key].cardFrameColor,
-                      color:
-                        palette[key].headingColor === 'auto' ? '#000' : palette[key].headingColor,
-                    }}
+              {SECTION_KEYS.map(key => (
+                <div key={key}>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedSection(prev => (prev === key ? null : key))}
+                    className={`w-full rounded-lg border-2 transition-colors ${
+                      expandedSection === key
+                        ? 'border-primary'
+                        : 'border-transparent hover:border-primary/40'
+                    }`}
+                    aria-expanded={expandedSection === key}
                   >
-                    <div className="font-semibold capitalize">{key}</div>
-                  </div>
-                )
-              )}
+                    <SectionPreview
+                      label={key.charAt(0).toUpperCase() + key.slice(1)}
+                      bgColor={palette[key].bgColor}
+                      cardFrameColor={palette[key].cardFrameColor}
+                      cardFrameWidth={palette[key].cardFrameWidth}
+                      headingZone={undefined}
+                      theme={resolvedTheme}
+                    />
+                  </button>
+                  {expandedSection === key ? (
+                    <div className="mt-2 space-y-2 rounded-lg border border-primary/40 bg-muted/30 p-2">
+                      <ColorField
+                        label="Background"
+                        value={overrides[key]?.bgColor}
+                        onChange={v =>
+                          setOverrides(prev => ({ ...prev, [key]: { ...prev[key], bgColor: v } }))
+                        }
+                        theme={theme}
+                        inheritFromToken="card"
+                      />
+                      <ColorField
+                        label="Card frame"
+                        value={overrides[key]?.cardFrameColor}
+                        onChange={v =>
+                          setOverrides(prev => ({
+                            ...prev,
+                            [key]: { ...prev[key], cardFrameColor: v },
+                          }))
+                        }
+                        theme={theme}
+                        inheritFromToken="border"
+                      />
+                      <div>
+                        <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                          Frame thickness
+                        </label>
+                        <select
+                          value={overrides[key]?.cardFrameWidth ?? palette[key].cardFrameWidth}
+                          onChange={e =>
+                            setOverrides(prev => ({
+                              ...prev,
+                              [key]: {
+                                ...prev[key],
+                                cardFrameWidth: e.target.value as CardFrameWidth,
+                              },
+                            }))
+                          }
+                          className="w-full rounded border border-border bg-background px-2 py-1 text-sm"
+                        >
+                          <option value="thin">Thin (1px)</option>
+                          <option value="normal">Normal (2px)</option>
+                          <option value="thick">Thick (4px)</option>
+                          <option value="xthick">Extra thick (8px)</option>
+                        </select>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setOverrides(prev => {
+                            const next = { ...prev };
+                            delete next[key];
+                            return next;
+                          })
+                        }
+                        className="text-xs text-muted-foreground underline"
+                      >
+                        Reset this section
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              ))}
             </div>
             <p className="mt-2 text-xs text-muted-foreground">
               Token refs (e.g. <code>token:primary</code>) preview as gray here; storefront resolves
