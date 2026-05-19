@@ -70,6 +70,15 @@ export interface ZoneOverride {
   letterSpacing?: string;
   lineHeight?: string;
   textTransform?: 'none' | 'uppercase' | 'lowercase' | 'capitalize';
+  /**
+   * Per-zone text alignment. Uses logical values so RTL Arabic flips correctly:
+   *   - `start` → left in LTR, right in RTL
+   *   - `center` → always centered
+   *   - `end` → right in LTR, left in RTL
+   * Default when unset: the consumer's baseline (most section headings default
+   * to center; body text defaults to start).
+   */
+  textAlign?: 'start' | 'center' | 'end';
 }
 
 /**

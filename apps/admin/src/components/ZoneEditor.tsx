@@ -262,6 +262,45 @@ export function ZoneEditor({
             <option value="none">None (explicit)</option>
           </select>
         </label>
+
+        {/* Text alignment — logical (start/center/end) so RTL Arabic flips
+            correctly. 3-button segmented control mirrors the visual choice
+            better than a select. "Inherit" = no value → consumer default. */}
+        <div className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-muted-foreground">Text alignment</span>
+          <div className="flex items-stretch overflow-hidden rounded-lg border border-border">
+            {(
+              [
+                { value: '', label: 'Auto', title: 'Inherit (use consumer default)' },
+                { value: 'start', label: 'Start', title: 'Left in LTR, right in RTL' },
+                { value: 'center', label: 'Center', title: 'Always centered' },
+                { value: 'end', label: 'End', title: 'Right in LTR, left in RTL' },
+              ] as const
+            ).map(opt => {
+              const active = (values.textAlign ?? '') === opt.value;
+              return (
+                <button
+                  key={opt.value || 'auto'}
+                  type="button"
+                  title={opt.title}
+                  onClick={() =>
+                    onChange({
+                      textAlign:
+                        opt.value === '' ? undefined : (opt.value as ZoneOverride['textAlign']),
+                    })
+                  }
+                  className={`flex-1 px-2 py-1.5 text-xs font-medium transition-colors ${
+                    active
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-background text-muted-foreground hover:bg-muted hover:text-foreground'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       {/* Color — full-width below the grid for breathing room.

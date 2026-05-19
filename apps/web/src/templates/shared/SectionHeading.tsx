@@ -82,13 +82,24 @@ export function SectionHeading({
   // Layout: kicker → title h2 → subtitle on the left, seeAll on the right.
   // Each text element gets its own data-zone so merchants can style them
   // independently from the Typography admin.
+  //
+  // Per-zone textAlign (start/center/end) overrides the default center on each
+  // text element independently. When kicker/subtitle alignment is non-center,
+  // the flanking editorial-divider hairlines auto-suppress because they only
+  // read well on a centered line. Wrapper uses items-stretch so each child
+  // takes the full row width and self-aligns via its own textAlign.
+  const kickerAlign = kickerZone?.textAlign ?? 'center';
+  const titleAlign = headingZone?.textAlign ?? 'center';
+  const subtitleAlign = subtitleZone?.textAlign ?? 'center';
+  const kickerShowLines = showKickerLines && kickerAlign === 'center';
+  const subtitleShowLines = showSubtitleLines && subtitleAlign === 'center';
   return (
     <div className="mb-8 flex flex-col gap-2 sm:mb-12 sm:gap-3">
       {/* relative row: title-block is full-width-centered, seeAll absolute-anchored
           on the end edge. Mobile-first — on narrow viewports seeAll drops below
           the heading block instead of overlapping the centered title. */}
       <div className="relative">
-        <div className="flex flex-col items-center gap-1.5 sm:gap-2">
+        <div className="flex flex-col items-stretch gap-1.5 sm:gap-2">
           {kickerText && (
             // Editorial section divider — two hairline rules flanking the
             // kicker text (Ahmad 2026-05-17). The flanking lines can be
@@ -99,8 +110,16 @@ export function SectionHeading({
             // typography emitter in apps/web/src/app/layout.tsx ALSO
             // pairs the chip rule with `[data-kicker-divider-line]{display:none}`
             // so the chip-style escape hatch still works.
-            <div className="self-stretch flex items-center justify-center gap-3 sm:gap-4">
-              {showKickerLines && (
+            <div
+              className={`self-stretch flex items-center gap-3 sm:gap-4 ${
+                kickerAlign === 'start'
+                  ? 'justify-start'
+                  : kickerAlign === 'end'
+                    ? 'justify-end'
+                    : 'justify-center'
+              }`}
+            >
+              {kickerShowLines && (
                 <span
                   aria-hidden
                   data-kicker-divider-line
@@ -122,7 +141,7 @@ export function SectionHeading({
               >
                 {kickerText}
               </span>
-              {showKickerLines && (
+              {kickerShowLines && (
                 <span
                   aria-hidden
                   data-kicker-divider-line
@@ -133,7 +152,13 @@ export function SectionHeading({
           )}
           {text && (
             <h2
-              className={`${styles.sectionHeading} text-center`}
+              className={`${styles.sectionHeading} ${
+                titleAlign === 'start'
+                  ? 'text-start'
+                  : titleAlign === 'end'
+                    ? 'text-end'
+                    : 'text-center'
+              }`}
               data-zone="sectionTitle"
               style={{
                 fontFamily: headingZone?.fontFamily,
@@ -158,7 +183,13 @@ export function SectionHeading({
             // never dominate. Same `bg-foreground/30` opacity as the
             // kicker hairlines for visual consistency.
             <div
-              className="self-stretch flex items-center justify-center gap-3 sm:gap-4"
+              className={`self-stretch flex items-center gap-3 sm:gap-4 ${
+                subtitleAlign === 'start'
+                  ? 'justify-start'
+                  : subtitleAlign === 'end'
+                    ? 'justify-end'
+                    : 'justify-center'
+              }`}
               data-zone="sectionSubtitle"
               style={{
                 fontFamily: subtitleZone?.fontFamily,
@@ -170,7 +201,7 @@ export function SectionHeading({
                 textTransform: subtitleZone?.textTransform as React.CSSProperties['textTransform'],
               }}
             >
-              {showSubtitleLines && (
+              {subtitleShowLines && (
                 <span
                   aria-hidden
                   data-subtitle-divider-line
@@ -178,7 +209,7 @@ export function SectionHeading({
                 />
               )}
               <p className="text-xl text-muted-foreground max-w-2xl">{subtitleText}</p>
-              {showSubtitleLines && (
+              {subtitleShowLines && (
                 <span
                   aria-hidden
                   data-subtitle-divider-line
