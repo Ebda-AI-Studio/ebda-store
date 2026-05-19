@@ -162,7 +162,6 @@ model JournalEntry {
   source       JournalEntrySource
   sourceId     String?            @map("source_id")
   reversedById String?            @unique @map("reversed_by_id")
-  reversesId   String?            @unique @map("reverses_id")
   memo         String?
   memoAr       String?            @map("memo_ar")
   status       JournalEntryStatus @default(posted)
@@ -172,7 +171,7 @@ model JournalEntry {
   store      Store         @relation(fields: [storeId], references: [id], onDelete: Restrict)
   lines      JournalLine[]
   reversedBy JournalEntry? @relation("Reversal", fields: [reversedById], references: [id])
-  reverses   JournalEntry? @relation("Reversal", fields: [reversesId], references: [id])
+  reverses   JournalEntry? @relation("Reversal")
 
   @@unique([storeId, entryNumber])
   @@index([storeId, postedAt(sort: Desc)])
@@ -899,9 +898,15 @@ describe('journal.service', () => {
       ],
     });
     const r = await reverseEntry(a.id, 'test reversal');
-    expect(r.reversesId).toBe(a.id);
+    // reverses is the inverse accessor on the "Reversal" relation — load it explicitly
+    const rWithInverse = await prisma.journalEntry.findUnique({
+      where: { id: r.id },
+      include: { reverses: true },
+    });
+    expect(rWithInverse?.reverses?.id).toBe(a.id);
     const updated = await prisma.journalEntry.findUnique({ where: { id: a.id } });
     expect(updated?.status).toBe('reversed');
+    expect(updated?.reversedById).toBe(r.id);
     const revLines = await prisma.journalLine.findMany({ where: { entryId: r.id } });
     expect(revLines.find(l => l.credit === 3000 && l.accountId === cashId)).toBeDefined();
     expect(revLines.find(l => l.debit === 3000 && l.accountId === revId)).toBeDefined();
@@ -1037,7 +1042,11 @@ export async function reverseEntry(
         memo: reason ?? `Reversal of ${original.entryNumber}`,
         memoAr: reason ?? `إلغاء قيد ${original.entryNumber}`,
         status: 'posted',
-        reversesId: original.id,
+        // NOTE: schema was simplified in commit ea4f668 — JournalEntry uses a
+        // single "Reversal" named relation with one FK on the ORIGINAL entry's
+        // reversedById. The reversal entry's `reverses` accessor resolves via
+        // inverse traversal; no reversesId column is set here. The update below
+        // sets original.reversedById to point at this new entry.
         lines: {
           create: original.lines.map(l => ({
             accountId: l.accountId,
@@ -1623,12 +1632,12 @@ describe('refund posts a reversal journal entry', () => {
     expect(original?.status).toBe('reversed');
     expect(original?.reversedById).toBeTruthy();
 
-    // Mirror entry posted
+    // Mirror entry posted — reverses accessor resolves to original via inverse
     const reversal = await prisma.journalEntry.findUnique({
       where: { id: original!.reversedById! },
-      include: { lines: true },
+      include: { lines: true, reverses: true },
     });
-    expect(reversal?.reversesId).toBe(original?.id);
+    expect(reversal?.reverses?.id).toBe(original?.id);
     expect(reversal?.lines.find(l => l.credit === 2000)).toBeDefined();
     expect(reversal?.lines.find(l => l.debit === 2000)).toBeDefined();
 
