@@ -267,6 +267,9 @@ model Store {
   defaultTaxRateBps    Int     @default(0)    @map("default_tax_rate_bps")
   fiscalYearStartMonth Int     @default(1)    @map("fiscal_year_start_month")
 
+  // Accounting Settings (Batch 2)
+  expenseTwoStepApproval Boolean @default(false) @map("expense_two_step_approval")
+
   // Relations
   owner                    User                       @relation(fields: [ownerId], references: [id])
   // Customer accounts that authenticate against this store. Distinct from
@@ -316,6 +319,12 @@ model Store {
   accounts                 Account[]
   journalEntries           JournalEntry[]
   sequences                Sequence[]
+  suppliers                Supplier[]
+  purchaseOrders           PurchaseOrder[]
+  stockAdjustments         StockAdjustment[]
+  reorderRules             ReorderRule[]
+  backorderLines           BackorderLine[]
+  expenses                 Expense[]
 
   @@index([ownerId])
   @@index([status])
@@ -514,30 +523,36 @@ model Product {
   createdAt         DateTime      @default(now()) @map("created_at")
   updatedAt         DateTime      @updatedAt @map("updated_at")
   deletedAt         DateTime?     @map("deleted_at") // Soft delete support
+  allowBackorder    Boolean       @default(false) @map("allow_backorder")
+  lastCostUpdateAt  DateTime?     @map("last_cost_update_at")
 
   // Variants
   hasVariants Boolean @default(false) @map("has_variants")
 
   // Relations
-  store             Store                      @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  images            ProductImage[]
-  categories        ProductCategory[]
-  cartItems         CartItem[]
-  orderItems        OrderItem[]
-  tags              ProductTag[]
-  wishlists         WishlistItem[]
-  reviews           Review[]
-  returnItems       ReturnItem[]
-  inventoryHistory  InventoryHistory[]
-  options           ProductOption[]
-  variants          ProductVariant[]
-  relationsAsSource ProductRelation[]          @relation("ProductRelationSource")
-  relationsAsTarget ProductRelation[]          @relation("ProductRelationTarget")
-  fbtAsProduct1     FrequentlyBoughtTogether[] @relation("FBTProduct1")
-  fbtAsProduct2     FrequentlyBoughtTogether[] @relation("FBTProduct2")
-  aiRecsAsSource    AiRecommendation[]         @relation("AiRecSource")
-  aiRecsAsTarget    AiRecommendation[]         @relation("AiRecTarget")
-  faqs              ProductFaq[]
+  store                Store                      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  images               ProductImage[]
+  categories           ProductCategory[]
+  cartItems            CartItem[]
+  orderItems           OrderItem[]
+  tags                 ProductTag[]
+  wishlists            WishlistItem[]
+  reviews              Review[]
+  returnItems          ReturnItem[]
+  inventoryHistory     InventoryHistory[]
+  options              ProductOption[]
+  variants             ProductVariant[]
+  relationsAsSource    ProductRelation[]          @relation("ProductRelationSource")
+  relationsAsTarget    ProductRelation[]          @relation("ProductRelationTarget")
+  fbtAsProduct1        FrequentlyBoughtTogether[] @relation("FBTProduct1")
+  fbtAsProduct2        FrequentlyBoughtTogether[] @relation("FBTProduct2")
+  aiRecsAsSource       AiRecommendation[]         @relation("AiRecSource")
+  aiRecsAsTarget       AiRecommendation[]         @relation("AiRecTarget")
+  faqs                 ProductFaq[]
+  purchaseOrderItems   PurchaseOrderItem[]
+  stockAdjustmentItems StockAdjustmentItem[]
+  reorderRules         ReorderRule[]
+  backorderLines       BackorderLine[]
 
   @@unique([storeId, slug])
   @@unique([storeId, sku]) // Prevent duplicate SKUs within a store (null values are excluded)
@@ -705,11 +720,16 @@ model ProductVariant {
   isActive       Boolean  @default(true) @map("is_active")
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
+  allowBackorder Boolean  @default(false) @map("allow_backorder")
 
-  product    Product                @relation(fields: [productId], references: [id], onDelete: Cascade)
-  options    ProductVariantOption[]
-  cartItems  CartItem[]
-  orderItems OrderItem[]
+  product              Product                @relation(fields: [productId], references: [id], onDelete: Cascade)
+  options              ProductVariantOption[]
+  cartItems            CartItem[]
+  orderItems           OrderItem[]
+  purchaseOrderItems   PurchaseOrderItem[]
+  stockAdjustmentItems StockAdjustmentItem[]
+  reorderRules         ReorderRule[]
+  backorderLines       BackorderLine[]
 
   @@index([productId])
   @@index([sku])
@@ -871,13 +891,15 @@ model OrderItem {
   // `price`. Snapshotted because the product's cost may change later but
   // the order's profit must reflect what it cost on the day it shipped.
   // Nullable for orders placed before this column existed.
-  costPrice   Int?    @map("cost_price")
-  total       Int
+  costPrice         Int?    @map("cost_price")
+  total             Int
+  costPriceDeferred Boolean @default(false) @map("cost_price_deferred")
 
-  order       Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product     Product         @relation(fields: [productId], references: [id])
-  variant     ProductVariant? @relation(fields: [variantId], references: [id])
-  returnItems ReturnItem[]
+  order          Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product        Product         @relation(fields: [productId], references: [id])
+  variant        ProductVariant? @relation(fields: [variantId], references: [id])
+  returnItems    ReturnItem[]
+  backorderLines BackorderLine[]
 
   @@index([orderId])
   @@index([productId])
@@ -2065,10 +2087,13 @@ model Account {
   createdAt DateTime    @default(now()) @map("created_at")
   updatedAt DateTime    @updatedAt      @map("updated_at")
 
-  store    Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  parent   Account?      @relation("AccountTree", fields: [parentId], references: [id])
-  children Account[]     @relation("AccountTree")
-  lines    JournalLine[]
+  store              Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  parent             Account?      @relation("AccountTree", fields: [parentId], references: [id])
+  children           Account[]     @relation("AccountTree")
+  lines              JournalLine[]
+  expensesByCategory Expense[]     @relation("ExpenseCategoryAccount")
+  expensesPaidFrom   Expense[]     @relation("ExpensePaidFromAccount")
+  purchaseOrders     PurchaseOrder[] @relation("PoApAccount")
 
   @@unique([storeId, code])
   @@index([storeId, type])
@@ -2121,4 +2146,266 @@ model JournalLine {
   @@index([accountId])
   @@index([refTable, refId])
   @@map("journal_lines")
+}
+
+// ==========================================
+// Stock + Backorders + Expenses (Batch 2)
+// ==========================================
+
+enum SupplierPaymentTerms {
+  net0
+  net15
+  net30
+  net60
+  custom
+}
+
+enum PurchaseOrderStatus {
+  draft
+  sent
+  partial
+  received
+  cancelled
+}
+
+enum StockAdjustmentType {
+  cycle_count
+  damage
+  theft
+  loss
+  write_off
+  found
+  return_to_supplier
+}
+
+enum StockAdjustmentStatus {
+  draft
+  posted
+}
+
+enum ExpenseStatus {
+  draft
+  pending
+  approved
+  posted
+  rejected
+}
+
+model Supplier {
+  id              String               @id @default(uuid())
+  storeId         String               @map("store_id")
+  name            String
+  nameAr          String?              @map("name_ar")
+  contactName     String?              @map("contact_name")
+  phone           String?
+  email           String?
+  address         Json?
+  paymentTerms    SupplierPaymentTerms @default(net0) @map("payment_terms")
+  customTermsDays Int?                 @map("custom_terms_days")
+  defaultCurrency String               @default("KWD") @map("default_currency")
+  apBalanceCached Int                  @default(0) @map("ap_balance_cached")
+  isActive        Boolean              @default(true) @map("is_active")
+  notes           String?
+  notesAr         String?              @map("notes_ar")
+  createdAt       DateTime             @default(now()) @map("created_at")
+  updatedAt       DateTime             @updatedAt @map("updated_at")
+  deletedAt       DateTime?            @map("deleted_at")
+
+  store          Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  purchaseOrders PurchaseOrder[]
+  reorderRules   ReorderRule[]
+  expenses       Expense[]
+
+  @@index([storeId])
+  @@index([storeId, isActive])
+  @@map("suppliers")
+}
+
+model PurchaseOrder {
+  id             String              @id @default(uuid())
+  storeId        String              @map("store_id")
+  supplierId     String              @map("supplier_id")
+  poNumber       String              @map("po_number")
+  status         PurchaseOrderStatus @default(draft)
+  expectedDate   DateTime?           @map("expected_date")
+  receivedAt     DateTime?           @map("received_at")
+  subtotal       Int                 @default(0)
+  taxAmount      Int                 @default(0) @map("tax_amount")
+  shippingCost   Int                 @default(0) @map("shipping_cost")
+  total          Int                 @default(0)
+  currency       String              @default("KWD")
+  apAccountId    String?             @map("ap_account_id")
+  journalEntryId String?             @unique @map("journal_entry_id")
+  notes          String?
+  notesAr        String?             @map("notes_ar")
+  createdBy      String?             @map("created_by")
+  receivedBy     String?             @map("received_by")
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+
+  store     Store               @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  supplier  Supplier            @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  apAccount Account?            @relation("PoApAccount", fields: [apAccountId], references: [id])
+  items     PurchaseOrderItem[]
+
+  @@unique([storeId, poNumber])
+  @@index([storeId, status])
+  @@index([supplierId])
+  @@index([storeId, createdAt(sort: Desc)])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id          String   @id @default(uuid())
+  poId        String   @map("po_id")
+  productId   String   @map("product_id")
+  variantId   String?  @map("variant_id")
+  qty         Int
+  qtyReceived Int      @default(0) @map("qty_received")
+  unitCost    Int      @map("unit_cost")
+  total       Int
+  notes       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  po                  PurchaseOrder    @relation(fields: [poId], references: [id], onDelete: Cascade)
+  product             Product          @relation(fields: [productId], references: [id])
+  variant             ProductVariant?  @relation(fields: [variantId], references: [id])
+  backordersFulfilled BackorderLine[]
+
+  @@index([poId])
+  @@index([productId])
+  @@map("purchase_order_items")
+}
+
+model StockAdjustment {
+  id               String                @id @default(uuid())
+  storeId          String                @map("store_id")
+  adjustmentNumber String                @map("adjustment_number")
+  type             StockAdjustmentType
+  status           StockAdjustmentStatus @default(draft)
+  reason           String?
+  reasonAr         String?               @map("reason_ar")
+  evidenceUrl      String?               @map("evidence_url")
+  totalValueImpact Int                   @default(0) @map("total_value_impact")
+  postedAt         DateTime?             @map("posted_at")
+  postedBy         String?               @map("posted_by")
+  journalEntryId   String?               @unique @map("journal_entry_id")
+  createdBy        String?               @map("created_by")
+  createdAt        DateTime              @default(now()) @map("created_at")
+  updatedAt        DateTime              @updatedAt @map("updated_at")
+
+  store Store                @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  items StockAdjustmentItem[]
+
+  @@unique([storeId, adjustmentNumber])
+  @@index([storeId, status])
+  @@index([storeId, postedAt(sort: Desc)])
+  @@map("stock_adjustments")
+}
+
+model StockAdjustmentItem {
+  id           String   @id @default(uuid())
+  adjustmentId String   @map("adjustment_id")
+  productId    String   @map("product_id")
+  variantId    String?  @map("variant_id")
+  previousQty  Int      @map("previous_qty")
+  newQty       Int      @map("new_qty")
+  deltaQty     Int      @map("delta_qty")
+  unitCost     Int      @map("unit_cost")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  adjustment StockAdjustment @relation(fields: [adjustmentId], references: [id], onDelete: Cascade)
+  product    Product         @relation(fields: [productId], references: [id])
+  variant    ProductVariant? @relation(fields: [variantId], references: [id])
+
+  @@index([adjustmentId])
+  @@index([productId])
+  @@map("stock_adjustment_items")
+}
+
+model ReorderRule {
+  id                  String   @id @default(uuid())
+  storeId             String   @map("store_id")
+  productId           String   @map("product_id")
+  variantId           String?  @map("variant_id")
+  minQty              Int      @map("min_qty")
+  reorderQty          Int      @map("reorder_qty")
+  leadTimeDays        Int      @default(7) @map("lead_time_days")
+  safetyStockDays     Int      @default(7) @map("safety_stock_days")
+  preferredSupplierId String?  @map("preferred_supplier_id")
+  isActive            Boolean  @default(true) @map("is_active")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  store             Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  product           Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant           ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  preferredSupplier Supplier?       @relation(fields: [preferredSupplierId], references: [id], onDelete: SetNull)
+
+  @@unique([storeId, productId, variantId])
+  @@index([storeId])
+  @@map("reorder_rules")
+}
+
+model BackorderLine {
+  id                  String    @id @default(uuid())
+  storeId             String    @map("store_id")
+  orderItemId         String    @map("order_item_id")
+  productId           String    @map("product_id")
+  variantId           String?   @map("variant_id")
+  qty                 Int
+  qtyFulfilled        Int       @default(0) @map("qty_fulfilled")
+  fulfilledByPoItemId String?   @map("fulfilled_by_po_item_id")
+  fulfilledAt         DateTime? @map("fulfilled_at")
+  cancelledAt         DateTime? @map("cancelled_at")
+  cancelledReason     String?   @map("cancelled_reason")
+  createdAt           DateTime  @default(now()) @map("created_at")
+
+  store         Store              @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  orderItem     OrderItem          @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  product       Product            @relation(fields: [productId], references: [id])
+  variant       ProductVariant?    @relation(fields: [variantId], references: [id])
+  fulfilledByPo PurchaseOrderItem? @relation(fields: [fulfilledByPoItemId], references: [id], onDelete: SetNull)
+
+  @@index([storeId, fulfilledAt])
+  @@index([productId])
+  @@index([orderItemId])
+  @@map("backorder_lines")
+}
+
+model Expense {
+  id                   String        @id @default(uuid())
+  storeId              String        @map("store_id")
+  expenseNumber        String        @map("expense_number")
+  supplierId           String?       @map("supplier_id")
+  expenseAccountId     String        @map("expense_account_id")
+  paidFromAccountId    String        @map("paid_from_account_id")
+  amount               Int
+  taxAmount            Int           @default(0) @map("tax_amount")
+  total                Int
+  currency             String        @default("KWD")
+  expenseDate          DateTime      @map("expense_date")
+  status               ExpenseStatus @default(draft)
+  receiptImageUrl      String?       @map("receipt_image_url")
+  ocrJson              Json?         @map("ocr_json")
+  categoryAiConfidence Float?        @map("category_ai_confidence")
+  approvedBy           String?       @map("approved_by")
+  approvedAt           DateTime?     @map("approved_at")
+  journalEntryId       String?       @unique @map("journal_entry_id")
+  postedAt             DateTime?     @map("posted_at")
+  notes                String?
+  notesAr              String?       @map("notes_ar")
+  createdBy            String?       @map("created_by")
+  createdAt            DateTime      @default(now()) @map("created_at")
+  updatedAt            DateTime      @updatedAt @map("updated_at")
+
+  store           Store     @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  supplier        Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  expenseAccount  Account   @relation("ExpenseCategoryAccount", fields: [expenseAccountId], references: [id], onDelete: Restrict)
+  paidFromAccount Account   @relation("ExpensePaidFromAccount", fields: [paidFromAccountId], references: [id], onDelete: Restrict)
+
+  @@unique([storeId, expenseNumber])
+  @@index([storeId, status])
+  @@index([storeId, expenseDate(sort: Desc)])
+  @@map("expenses")
 }

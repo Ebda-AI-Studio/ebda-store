@@ -132,6 +132,11 @@ export {
   AccountType,
   JournalEntrySource,
   JournalEntryStatus,
+  SupplierPaymentTerms,
+  PurchaseOrderStatus,
+  StockAdjustmentType,
+  StockAdjustmentStatus,
+  ExpenseStatus,
 } from '@prisma/client';
 
 export { prisma as db };
