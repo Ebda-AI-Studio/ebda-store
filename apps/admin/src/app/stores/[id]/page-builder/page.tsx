@@ -1234,18 +1234,21 @@ export default function StoreLayoutPage() {
               categories: {
                 ...prev.categories,
                 bgColor: palette.categories.bgColor,
+                showCardFrame: true,
                 cardFrameColor: palette.categories.cardFrameColor,
                 cardFrameWidth: palette.categories.cardFrameWidth,
               },
               newArrivals: {
                 ...prev.newArrivals,
                 bgColor: palette.newArrivals.bgColor,
+                showCardFrame: true,
                 cardFrameColor: palette.newArrivals.cardFrameColor,
                 cardFrameWidth: palette.newArrivals.cardFrameWidth,
               },
               bestSellers: {
                 ...prev.bestSellers,
                 bgColor: palette.bestSellers.bgColor,
+                showCardFrame: true,
                 cardFrameColor: palette.bestSellers.cardFrameColor,
                 cardFrameWidth: palette.bestSellers.cardFrameWidth,
               },

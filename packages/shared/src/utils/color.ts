@@ -224,6 +224,35 @@ function rgbToHex(rgb: Rgb): string {
 }
 
 /**
+ * Resolve a ColorValue (hex or token ref) to a concrete hex, then mix toward
+ * white (mix > 0) or black (mix < 0). Used by `generateSectionPalette` to
+ * compute shaded variants when the input is a token ref.
+ *
+ * When `theme` is undefined OR the token doesn't resolve, falls back to the
+ * raw input (preserves the original behavior of returning the token ref
+ * unchanged, so the caller can resolve at render).
+ */
+function resolveAndMix(value: ColorValue, theme: StoreTheme | undefined, mix: number): ColorValue {
+  if (mix === 0) return value;
+  let resolved: ColorValue = value;
+  if (value.startsWith('token:') && theme) {
+    const r = resolveColor(value, theme);
+    if (r) resolved = r;
+  }
+  // If the resolved value is still a token ref (no theme or bad token), return as-is.
+  if (resolved.startsWith('token:')) return value;
+  // Resolved is hsl() or hex — try to lighten/darken via the parser.
+  const rgb = parseColorToRgb(resolved);
+  if (!rgb) return value;
+  const t = Math.max(0, Math.min(1, Math.abs(mix)));
+  const blend =
+    mix > 0
+      ? (c: number) => Math.round(c + (255 - c) * t) // lighten
+      : (c: number) => Math.round(c * (1 - t)); // darken
+  return rgbToHex({ r: blend(rgb.r), g: blend(rgb.g), b: blend(rgb.b) });
+}
+
+/**
  * Mix a color toward white by `amount` (0..1). For `'#FF6E00'` + 0.4 returns a
  * lighter orange suitable for tinted section backgrounds. Token refs pass
  * through unchanged so the caller can resolve at render time.
@@ -301,7 +330,8 @@ const SECTION_ORDER: SectionKey[] = [
  * section (default 'normal').
  */
 export function generateSectionPalette(
-  seeds: PaletteSeeds
+  seeds: PaletteSeeds,
+  theme?: StoreTheme
 ): Record<SectionKey, SectionPaletteEntry> {
   const {
     primary,
@@ -314,30 +344,31 @@ export function generateSectionPalette(
   const neutralBg = neutral ?? '#FFFFFF';
 
   // Accent fallback: if pattern needs an accent slot but none is provided,
-  // use a lightened version of primary (or white if primary is a token ref).
-  const accentBg =
-    accent ??
-    lightenColor(
-      typeof primary === 'string' && primary.startsWith('token:') ? '#FFFFFF' : primary,
-      0.6
-    );
+  // use a lightened version of primary — resolveAndMix handles token refs by
+  // resolving them against the theme before blending.
+  const accentBg = accent ?? resolveAndMix(primary, theme, 0.6);
 
   // Background distribution by pattern.
   // | pattern      | hero    | categories | newArrivals | bestSellers | testimonials |
   // |--------------|---------|------------|-------------|-------------|--------------|
   // | alternating  | primary | neutral    | accent      | neutral     | primary      |
-  // | monochrome   | primary | primary    | primary     | primary     | primary      |
+  // | monochrome   | primary | lighter    | primary     | lighter     | darker       |
   // | triad        | primary | neutral    | accent      | primary     | neutral      |
   // | single-bg    | neutral | neutral    | neutral     | neutral     | neutral      |
   let slots: Record<SectionKey, ColorValue>;
   switch (pattern) {
     case 'monochrome':
+      // monochrome uses one hue family with shaded variants — coherent palette
+      // where each section is visually distinct via lightness, not different hues.
+      // resolveAndMix resolves token refs before blending; when no theme is
+      // available, token slots fall back to primary as-is (sections look
+      // identical but no broken CSS).
       slots = {
-        hero: primary,
-        categories: primary,
+        hero: primary, // stays token-referential or exact hex
+        categories: resolveAndMix(primary, theme, 0.4), // lighter shade
         newArrivals: primary,
-        bestSellers: primary,
-        testimonials: primary,
+        bestSellers: resolveAndMix(primary, theme, 0.4), // same lighter shade
+        testimonials: resolveAndMix(primary, theme, -0.15), // slightly darker
       };
       break;
     case 'triad':

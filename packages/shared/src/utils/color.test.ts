@@ -211,10 +211,30 @@ describe('generateSectionPalette patterns', () => {
     expect(p.testimonials.bgColor).toBe('#FF6E00');
   });
 
-  it('monochrome pattern: every section gets primary bg', () => {
-    const p = generateSectionPalette({ ...seeds, pattern: 'monochrome' as PalettePattern });
+  it('monochrome pattern with theme: shaded variants (primary + lighter + darker)', () => {
+    // Seeds use concrete hex so theme is only needed for token resolution (n/a here).
+    // resolveAndMix on a hex goes directly to the blend math — theme presence
+    // doesn't change the result, but we pass it to exercise the theme code path.
+    const p = generateSectionPalette(
+      { ...seeds, pattern: 'monochrome' as PalettePattern },
+      TEST_THEME
+    );
+    expect(p.hero.bgColor).toBe('#FF6E00'); // primary as-is
+    expect(p.newArrivals.bgColor).toBe('#FF6E00'); // primary as-is
+    expect(p.categories.bgColor).toBe('#FFA866'); // lighten 0.4: r=255 g=168 b=102
+    expect(p.bestSellers.bgColor).toBe(p.categories.bgColor); // same lighter shade
+    expect(p.testimonials.bgColor).toBe('#D95E00'); // darken 0.15: r=217 g=94 b=0
+  });
+
+  it('monochrome pattern without theme: token primary stays unchanged across all slots', () => {
+    // No theme to resolve tokens, so shaded slots fall back to primary as-is.
+    // Acceptable — sections look identical, but no broken CSS.
+    const p = generateSectionPalette({
+      primary: 'token:primary',
+      pattern: 'monochrome' as PalettePattern,
+    });
     for (const k of ['hero', 'categories', 'newArrivals', 'bestSellers', 'testimonials'] as const) {
-      expect(p[k].bgColor).toBe('#FF6E00');
+      expect(p[k].bgColor).toBe('token:primary');
     }
   });
 

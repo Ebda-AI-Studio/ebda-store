@@ -28,6 +28,13 @@ const SECTION_KEYS: SectionKey[] = [
   'testimonials',
 ];
 
+const PATTERN_LABELS: Record<PalettePattern, string> = {
+  alternating: 'Alternating',
+  monochrome: 'Monochrome (shaded)',
+  triad: 'Triad',
+  'single-bg': 'Solid background',
+};
+
 export function SmartPaletteModal({ open, onClose, onApply, theme }: SmartPaletteModalProps) {
   const [primary, setPrimary] = useState<string>('token:primary');
   const [accent, setAccent] = useState<string>('');
@@ -41,6 +48,10 @@ export function SmartPaletteModal({ open, onClose, onApply, theme }: SmartPalett
 
   if (!open) return null;
 
+  // Resolved theme — fall back to DEFAULT_THEME so SectionPreview always gets
+  // a valid StoreTheme object even when the store hasn't been saved yet.
+  const resolvedTheme = theme ?? DEFAULT_THEME;
+
   const seeds: PaletteSeeds = {
     primary,
     accent: accent || undefined,
@@ -49,15 +60,11 @@ export function SmartPaletteModal({ open, onClose, onApply, theme }: SmartPalett
     cardFrameWidth: paletteFrameWidth,
     overrides,
   };
-  const palette = primary ? generateSectionPalette(seeds) : null;
-
-  // Resolved theme — fall back to DEFAULT_THEME so SectionPreview always gets
-  // a valid StoreTheme object even when the store hasn't been saved yet.
-  const resolvedTheme = theme ?? DEFAULT_THEME;
+  const palette = primary ? generateSectionPalette(seeds, resolvedTheme) : null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-card p-6 shadow-2xl">
+      <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-card p-6 shadow-2xl">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-xl font-semibold text-foreground">Smart palette</h2>
           <button
@@ -73,49 +80,50 @@ export function SmartPaletteModal({ open, onClose, onApply, theme }: SmartPalett
           card frame, and heading color. Section text auto-fixes for contrast.
         </p>
 
-        {/* Distribution pattern picker */}
-        <div className="mb-4">
-          <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Distribution pattern
-          </label>
-          <div className="grid grid-cols-4 gap-2">
-            {(['alternating', 'monochrome', 'triad', 'single-bg'] as const).map(p => (
-              <button
-                key={p}
-                type="button"
-                onClick={() => setPattern(p)}
-                className={`rounded border p-2 text-xs font-medium capitalize ${
-                  pattern === p
-                    ? 'border-primary bg-primary/10 text-foreground'
-                    : 'border-border bg-background text-muted-foreground hover:bg-muted'
-                }`}
-              >
-                {p.replace('-', ' ')}
-              </button>
-            ))}
+        {/* Distribution sub-section: pattern + frame thickness */}
+        <div className="mb-4 rounded-xl border border-border bg-muted/30 p-4">
+          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Distribution
+          </h3>
+          <div className="mb-3">
+            <label className="mb-2 block text-xs font-medium text-muted-foreground">Pattern</label>
+            <div className="grid grid-cols-4 gap-2">
+              {(['alternating', 'monochrome', 'triad', 'single-bg'] as const).map(p => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setPattern(p)}
+                  className={`rounded border p-2 text-xs font-medium ${
+                    pattern === p
+                      ? 'border-primary bg-primary/10 text-foreground'
+                      : 'border-border bg-background text-muted-foreground hover:bg-muted'
+                  }`}
+                >
+                  {PATTERN_LABELS[p]}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-
-        {/* Card frame thickness picker */}
-        <div className="mb-4">
-          <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Card frame thickness
-          </label>
-          <div className="grid grid-cols-4 gap-2">
-            {(['thin', 'normal', 'thick', 'xthick'] as const).map(w => (
-              <button
-                key={w}
-                type="button"
-                onClick={() => setPaletteFrameWidth(w)}
-                className={`rounded border p-2 text-xs font-medium capitalize ${
-                  paletteFrameWidth === w
-                    ? 'border-primary bg-primary/10 text-foreground'
-                    : 'border-border bg-background text-muted-foreground hover:bg-muted'
-                }`}
-              >
-                {w}
-              </button>
-            ))}
+          <div>
+            <label className="mb-2 block text-xs font-medium text-muted-foreground">
+              Card frame thickness
+            </label>
+            <div className="grid grid-cols-4 gap-2">
+              {(['thin', 'normal', 'thick', 'xthick'] as const).map(w => (
+                <button
+                  key={w}
+                  type="button"
+                  onClick={() => setPaletteFrameWidth(w)}
+                  className={`rounded border p-2 text-xs font-medium capitalize ${
+                    paletteFrameWidth === w
+                      ? 'border-primary bg-primary/10 text-foreground'
+                      : 'border-border bg-background text-muted-foreground hover:bg-muted'
+                  }`}
+                >
+                  {w}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -144,31 +152,33 @@ export function SmartPaletteModal({ open, onClose, onApply, theme }: SmartPalett
         {/* Interactive preview grid — click any section to override */}
         {palette ? (
           <div className="mt-6">
-            <h3 className="mb-2 text-sm font-semibold text-foreground">
-              Preview — click any section to override
-            </h3>
+            <p className="mb-2 text-xs text-muted-foreground">
+              Preview shows pattern + frame thickness · Click a tile to override that section
+            </p>
             <div className="grid grid-cols-5 gap-2">
               {SECTION_KEYS.map(key => (
                 <div key={key}>
-                  <button
-                    type="button"
-                    onClick={() => setExpandedSection(prev => (prev === key ? null : key))}
-                    className={`w-full rounded-lg border-2 transition-colors ${
-                      expandedSection === key
-                        ? 'border-primary'
-                        : 'border-transparent hover:border-primary/40'
-                    }`}
-                    aria-expanded={expandedSection === key}
-                  >
-                    <SectionPreview
-                      label={key.charAt(0).toUpperCase() + key.slice(1)}
-                      bgColor={palette[key].bgColor}
-                      cardFrameColor={palette[key].cardFrameColor}
-                      cardFrameWidth={palette[key].cardFrameWidth}
-                      headingZone={undefined}
-                      theme={resolvedTheme}
-                    />
-                  </button>
+                  <div className="min-h-[180px]">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedSection(prev => (prev === key ? null : key))}
+                      className={`h-full w-full rounded-lg border-2 transition-colors ${
+                        expandedSection === key
+                          ? 'border-primary'
+                          : 'border-transparent hover:border-primary/40'
+                      }`}
+                      aria-expanded={expandedSection === key}
+                    >
+                      <SectionPreview
+                        label={key.charAt(0).toUpperCase() + key.slice(1)}
+                        bgColor={palette[key].bgColor}
+                        cardFrameColor={palette[key].cardFrameColor}
+                        cardFrameWidth={palette[key].cardFrameWidth}
+                        headingZone={undefined}
+                        theme={resolvedTheme}
+                      />
+                    </button>
+                  </div>
                   {expandedSection === key ? (
                     <div className="mt-2 space-y-2 rounded-lg border border-primary/40 bg-muted/30 p-2">
                       <ColorField
