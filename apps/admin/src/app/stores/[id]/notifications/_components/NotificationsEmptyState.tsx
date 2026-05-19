@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import { useT } from '@/i18n/useT';
 
 /**
- * Rendered when none of whatsapp / sms / push_notifications features are
+ * Rendered when none of sms / push_notifications features are
  * enabled for the store. Includes a direct CTA to the per-store features
  * editor so super admins (the only role that gets this far without being
  * redirected to the dashboard) can flip a channel on without hunting

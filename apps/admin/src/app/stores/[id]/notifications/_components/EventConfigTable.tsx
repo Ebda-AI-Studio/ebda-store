@@ -25,14 +25,10 @@ function translateEventLabel(eventKey: string, fallback: string, t: (k: string) 
 
 interface EventConfigTableProps {
   events: EventConfig[];
-  whatsappEnabled: boolean;
   smsEnabled: boolean;
   pushEnabled: boolean;
   saving: boolean;
-  onToggleEventChannel: (
-    eventIndex: number,
-    channel: 'whatsapp' | 'sms' | 'push_notifications'
-  ) => void;
+  onToggleEventChannel: (eventIndex: number, channel: 'sms' | 'push_notifications') => void;
   onSave: () => void;
 }
 
@@ -44,7 +40,6 @@ interface EventConfigTableProps {
  */
 export function EventConfigTable({
   events,
-  whatsappEnabled,
   smsEnabled,
   pushEnabled,
   saving,
@@ -71,14 +66,6 @@ export function EventConfigTable({
               >
                 {t('columns.event')}
               </th>
-              {whatsappEnabled && (
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider text-center"
-                >
-                  {tShared('channelNames.whatsapp')}
-                </th>
-              )}
               {smsEnabled && (
                 <th
                   scope="col"
@@ -106,17 +93,6 @@ export function EventConfigTable({
                       back gracefully via the catch-all translator behaviour. */}
                   {translateEventLabel(ev.event, ev.label, t)}
                 </td>
-                {whatsappEnabled && (
-                  <td className="px-6 py-3 text-center">
-                    <input
-                      type="checkbox"
-                      checked={ev.whatsapp}
-                      onChange={() => onToggleEventChannel(idx, 'whatsapp')}
-                      className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-                      aria-label={tShared('channelNames.whatsapp')}
-                    />
-                  </td>
-                )}
                 {smsEnabled && (
                   <td className="px-6 py-3 text-center">
                     <input

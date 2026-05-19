@@ -9,7 +9,6 @@ import { useFeatures } from '../../../../hooks/useFeatures';
 import { useAuth } from '../../../../lib/auth';
 import { useT } from '@/i18n/useT';
 import { NotificationsEmptyState } from './_components/NotificationsEmptyState';
-import { WhatsAppChannelCard } from './_components/WhatsAppChannelCard';
 import { SmsChannelCard } from './_components/SmsChannelCard';
 import { PushChannelCard } from './_components/PushChannelCard';
 import { BroadcastComposerCard } from './_components/BroadcastComposerCard';
@@ -28,7 +27,6 @@ import {
 } from './_components/types';
 
 const CHANNEL_NAME_KEYS: Record<ChannelKey, string> = {
-  whatsapp: 'channelNames.whatsapp',
   sms: 'channelNames.sms',
   push_notifications: 'channelNames.push',
 };
@@ -60,16 +58,14 @@ export default function NotificationsPage() {
   const [savingEvents, setSavingEvents] = useState(false);
   const [testingChannel, setTestingChannel] = useState<string | null>(null);
   const [testStatus, setTestStatus] = useState<Record<ChannelKey, TestStatus>>({
-    whatsapp: 'idle',
     sms: 'idle',
     push_notifications: 'idle',
   });
 
   // Feature flags
-  const whatsappEnabled = isEnabled('whatsapp');
   const smsEnabled = isEnabled('sms');
   const pushEnabled = isEnabled('push_notifications');
-  const anyChannelEnabled = whatsappEnabled || smsEnabled || pushEnabled;
+  const anyChannelEnabled = smsEnabled || pushEnabled;
 
   // Hide the page from store_admins when the super_admin hasn't enabled
   // any notification channels for their store. Super_admins still get
@@ -154,11 +150,7 @@ export default function NotificationsPage() {
       const cfg = configs[channel];
       const { enabled } = cfg;
       const credentials: Record<string, unknown> = {};
-      if (channel === 'whatsapp') {
-        if (cfg.phoneNumberId) credentials.phoneNumberId = cfg.phoneNumberId;
-        if (cfg.wabaId) credentials.wabaId = cfg.wabaId;
-        if (cfg.accessToken) credentials.accessToken = cfg.accessToken;
-      } else if (channel === 'sms') {
+      if (channel === 'sms') {
         if (cfg.appSid) credentials.appSid = cfg.appSid;
         if (cfg.senderId) credentials.senderId = cfg.senderId;
       }
@@ -223,7 +215,6 @@ export default function NotificationsPage() {
       // save round-trips cleanly.
       const payload = events.map(e => ({
         event: e.event,
-        whatsapp: e.whatsapp,
         sms: e.sms,
         push: e.push_notifications,
       }));
@@ -252,10 +243,7 @@ export default function NotificationsPage() {
     }));
   }
 
-  function toggleEventChannel(
-    eventIndex: number,
-    channel: 'whatsapp' | 'sms' | 'push_notifications'
-  ) {
+  function toggleEventChannel(eventIndex: number, channel: 'sms' | 'push_notifications') {
     setEvents(prev =>
       prev.map((ev, i) => (i === eventIndex ? { ...ev, [channel]: !ev[channel] } : ev))
     );
@@ -275,18 +263,6 @@ export default function NotificationsPage() {
         <NotificationsEmptyState />
       ) : (
         <div className="space-y-6">
-          {whatsappEnabled && (
-            <WhatsAppChannelCard
-              config={configs.whatsapp}
-              saving={savingChannel === 'whatsapp'}
-              testing={testingChannel === 'whatsapp'}
-              testStatus={testStatus.whatsapp}
-              onConfigChange={patch => updateConfig('whatsapp', patch)}
-              onSave={() => handleSaveChannel('whatsapp')}
-              onTest={() => handleTestConnection('whatsapp')}
-            />
-          )}
-
           {smsEnabled && (
             <SmsChannelCard
               config={configs.sms}
@@ -315,7 +291,6 @@ export default function NotificationsPage() {
 
           <EventConfigTable
             events={events}
-            whatsappEnabled={whatsappEnabled}
             smsEnabled={smsEnabled}
             pushEnabled={pushEnabled}
             saving={savingEvents}
@@ -331,7 +306,6 @@ export default function NotificationsPage() {
             pages={logsPages}
             channelFilter={logsChannelFilter}
             statusFilter={logsStatusFilter}
-            whatsappEnabled={whatsappEnabled}
             smsEnabled={smsEnabled}
             pushEnabled={pushEnabled}
             onChannelFilterChange={value => {

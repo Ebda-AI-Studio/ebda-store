@@ -14,7 +14,6 @@ interface NotificationsLogProps {
   pages: number;
   channelFilter: string;
   statusFilter: string;
-  whatsappEnabled: boolean;
   smsEnabled: boolean;
   pushEnabled: boolean;
   onChannelFilterChange: (value: string) => void;
@@ -23,7 +22,6 @@ interface NotificationsLogProps {
 }
 
 const CHANNEL_LABEL_KEYS: Record<string, string> = {
-  whatsapp: 'channelNames.whatsapp',
   sms: 'channelNames.sms',
   push_notifications: 'channelNames.push',
 };
@@ -40,7 +38,6 @@ export function NotificationsLog({
   pages,
   channelFilter,
   statusFilter,
-  whatsappEnabled,
   smsEnabled,
   pushEnabled,
   onChannelFilterChange,
@@ -70,9 +67,6 @@ export function NotificationsLog({
             className="px-3 py-1.5 text-sm border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
           >
             <option value="all">{t('filters.allChannels')}</option>
-            {whatsappEnabled && (
-              <option value="whatsapp">{tShared('channelNames.whatsapp')}</option>
-            )}
             {smsEnabled && <option value="sms">{tShared('channelNames.sms')}</option>}
             {pushEnabled && (
               <option value="push_notifications">{tShared('channelNames.pushShort')}</option>
