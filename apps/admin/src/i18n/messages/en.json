@@ -3590,56 +3590,5 @@
     "brand": {
       "forceMediaAlt": "Force Media"
     }
-  },
-  "dividers": {
-    "title": "Section Dividers",
-    "description": "Horizontal lines drawn between homepage sections. On by default; tune the style here.",
-    "save": "Save changes",
-    "saving": "Saving…",
-    "saved": "Saved.",
-    "resetDefaults": "Reset to defaults",
-    "preview": "Live preview",
-    "enabled": {
-      "title": "Show section dividers",
-      "hint": "When off, your homepage sections sit edge-to-edge with no horizontal line between them."
-    },
-    "style": {
-      "title": "Line style",
-      "hint": "How the line is drawn.",
-      "solid": "Solid",
-      "dashed": "Dashed",
-      "dotted": "Dotted",
-      "double": "Double"
-    },
-    "thickness": {
-      "title": "Line thickness",
-      "hint": "Pixel height of the line.",
-      "1": "Hairline (1px)",
-      "2": "Medium (2px)",
-      "3": "Bold (3px)"
-    },
-    "width": {
-      "title": "Line width",
-      "hint": "How wide the line spans across the page.",
-      "full": "Edge-to-edge",
-      "contained": "Within content (recommended)",
-      "short": "Short accent (centered)"
-    },
-    "color": {
-      "title": "Line color",
-      "hint": "How the line picks up your store palette.",
-      "auto": "Auto (subtle theme color)",
-      "foreground": "High contrast (foreground)",
-      "accent": "Brand color",
-      "custom": "Custom color",
-      "customLabel": "Pick a custom color"
-    },
-    "spacing": {
-      "title": "Vertical spacing",
-      "hint": "Padding above and below the line.",
-      "tight": "Tight",
-      "normal": "Normal",
-      "loose": "Loose"
-    }
   }
 }

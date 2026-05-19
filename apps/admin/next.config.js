@@ -77,6 +77,11 @@ const nextConfig = {
         destination: '/stores/:id/page-builder',
         permanent: true,
       },
+      {
+        source: '/stores/:id/dividers',
+        destination: '/stores/:id/page-builder',
+        permanent: true,
+      },
     ];
   },
 
