@@ -130,7 +130,7 @@ export function SectionHeading({
           )}
           {text && (
             <h2
-              className={styles.sectionHeading}
+              className={`${styles.sectionHeading} text-center`}
               data-zone="sectionTitle"
               style={{
                 fontFamily: headingZone?.fontFamily,
