@@ -79,6 +79,22 @@ type ReviewSubmittedEvent = EventPayload & {
   };
 };
 
+type StockPoReceivedEvent = EventPayload & {
+  name: 'stock/po-received';
+  data: {
+    storeId: string;
+    poId: string;
+    clearedBackorders: Array<{
+      backorderLineId: string;
+      orderItemId: string;
+      qty: number;
+      actualUnitCost: number;
+      estimateUnitCost: number;
+      variance: number;
+    }>;
+  };
+};
+
 export type AppEvent =
   | OrderCreatedEvent
   | BulkImportStartedEvent
@@ -87,7 +103,8 @@ export type AppEvent =
   | BulkAiSeoEvent
   | OrderDeliveredEvent
   | OrderShippedEvent
-  | ReviewSubmittedEvent;
+  | ReviewSubmittedEvent
+  | StockPoReceivedEvent;
 
 // Inngest re-registers the function manifest only when it detects a
 // deploy-version change. Without an explicit deploy id, Railway boots
