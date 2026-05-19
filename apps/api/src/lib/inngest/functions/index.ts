@@ -22,6 +22,8 @@ import { queueDepthWatch } from './queue-depth-watch';
 import { orderWhatsAppNotify } from './order-whatsapp-notify';
 import { accountingPostOrderJournal } from './accounting-post-order-journal';
 import { accountingPostRefundJournal } from './accounting-post-refund-journal';
+import { accountingDailyClose } from './accounting-daily-close';
+import { accountingPeriodReconciliation } from './accounting-period-reconciliation';
 
 /**
  * Registry of every Inngest function the API exposes. The serve
@@ -53,4 +55,6 @@ export const inngestFunctions: InngestFunction.Any[] = [
   orderWhatsAppNotify,
   accountingPostOrderJournal,
   accountingPostRefundJournal,
+  accountingDailyClose,
+  accountingPeriodReconciliation,
 ];
