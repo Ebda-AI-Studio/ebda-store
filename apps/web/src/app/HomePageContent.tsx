@@ -63,6 +63,17 @@ export function HomePageContent({
   const isRtl = language === 'ar';
   const T = getHomepageTemplate(templateId);
 
+  // Global sectionTitle color from the store's typography zones. This is the
+  // color the merchant set in Admin → Typography for all section headings
+  // platform-wide. We pass it as the fallback to sectionBgStyle so the
+  // contrast auto-fix can fire even when a section has no explicit bgColor
+  // (i.e. it inherits the theme background). The value may be a raw hex,
+  // hsl(), or a token: ref — sectionBgStyle resolves it against the theme.
+  const typoZones = (store.typography as Record<string, unknown> | null | undefined)?.zones as
+    | Record<string, Record<string, string> | undefined>
+    | undefined;
+  const globalSectionTitleColor = typoZones?.sectionTitle?.color ?? undefined;
+
   // Per-section typography zones. Global zones are not accessible client-side
   // here (they're applied via CSS injection in layout.tsx), so we pass
   // undefined for the global zone — resolveSectionZone returns just the
@@ -254,7 +265,14 @@ export function HomePageContent({
   return (
     <ShopChrome>
       {/* Hero — toggleable + mode-aware. bgColor overrides the theme bg when set. */}
-      <div data-section="hero" style={sectionBgStyle(layout.hero.bgColor, store.theme)}>
+      <div
+        data-section="hero"
+        style={sectionBgStyle(
+          layout.hero.bgColor,
+          store.theme,
+          heroHeadingZone?.color ?? globalSectionTitleColor
+        )}
+      >
         {layout.hero.enabled && sliderEligible && T.HeroSlider && (
           <T.HeroSlider
             slides={layout.hero.slides}
@@ -321,7 +339,11 @@ export function HomePageContent({
               <section
                 data-section="categories"
                 className="bg-[hsl(var(--bg-page))] pt-6 pb-14 sm:pt-8 sm:pb-16 lg:pt-10 lg:pb-20"
-                style={sectionBgStyle(layout.categories.bgColor, store.theme)}
+                style={sectionBgStyle(
+                  layout.categories.bgColor,
+                  store.theme,
+                  categoriesHeadingZone?.color ?? globalSectionTitleColor
+                )}
               >
                 {layout.categories.layout === 'horizontal' && T.CategoryStrip ? (
                   <T.CategoryStrip
@@ -406,7 +428,11 @@ export function HomePageContent({
               <section
                 data-section="newArrivals"
                 className="bg-[hsl(var(--bg-section-alt))] py-14 sm:py-16 lg:py-20"
-                style={sectionBgStyle(layout.newArrivals.bgColor, store.theme)}
+                style={sectionBgStyle(
+                  layout.newArrivals.bgColor,
+                  store.theme,
+                  newArrivalsHeadingZone?.color ?? globalSectionTitleColor
+                )}
               >
                 {T.ProductCarousel ? (
                   <T.ProductCarousel
@@ -482,7 +508,11 @@ export function HomePageContent({
               <section
                 data-section="bestSellers"
                 className="bg-[hsl(var(--bg-page))] py-14 sm:py-16 lg:py-20"
-                style={sectionBgStyle(layout.bestSellers.bgColor, store.theme)}
+                style={sectionBgStyle(
+                  layout.bestSellers.bgColor,
+                  store.theme,
+                  bestSellersHeadingZone?.color ?? globalSectionTitleColor
+                )}
               >
                 {T.ProductCarousel ? (
                   <T.ProductCarousel
@@ -584,7 +614,11 @@ export function HomePageContent({
               <section
                 data-section="testimonials"
                 className="bg-[hsl(var(--bg-section-alt))] py-14 sm:py-16 lg:py-20"
-                style={sectionBgStyle(layout.testimonials.bgColor, store.theme)}
+                style={sectionBgStyle(
+                  layout.testimonials.bgColor,
+                  store.theme,
+                  testimonialsHeadingZone?.color ?? globalSectionTitleColor
+                )}
               >
                 <T.TestimonialRow
                   testimonials={testimonials}
