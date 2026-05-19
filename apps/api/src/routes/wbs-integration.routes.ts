@@ -17,6 +17,7 @@ import { authenticate } from '../middleware/auth';
 import { authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { encryption } from '../services/encryption.service';
+import { wbsBridgeService, WbsUnauthorizedError } from '../services/wbs-bridge.service';
 import { auditLog } from '../middleware/security';
 import { getAuthUser } from '../utils/store-helpers';
 import logger from '../lib/logger';
@@ -31,7 +32,8 @@ const templateEntrySchema = z.object({
 });
 
 const wbsIntegrationSchema = z.object({
-  wbsEnabled: z.boolean().default(false),
+  // wbsEnabled: optional on first-connect PUT (only wbsApiKey may be sent)
+  wbsEnabled: z.boolean().optional(),
   wbsClientId: z.string().nullable().optional(),
   // API key: empty string means "no change"; null means "clear"; any other value = new key
   wbsApiKey: z.string().nullable().optional(),
@@ -46,6 +48,7 @@ const wbsIntegrationSchema = z.object({
 });
 
 type WbsIntegrationInput = z.infer<typeof wbsIntegrationSchema>;
+// Note: wbsEnabled is now optional — callers only need to send what they're changing
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -90,6 +93,42 @@ router.get(
         return;
       }
 
+      // If a key is configured, try to fetch live metadata from WBS in parallel.
+      // Never block the GET if WBS is down — return connectedTenant: null + error.
+      let connectedTenant: {
+        businessName: string;
+        phoneNumber: string | null;
+        availableTemplates: Array<{
+          name: string;
+          language: string;
+          status: string;
+          category: string;
+          variableCount: number;
+        }>;
+        keySetAt?: string | null;
+      } | null = null;
+      let connectedTenantError: string | null = null;
+
+      if (store.wbsApiKey) {
+        try {
+          const plaintextKey = encryption.decrypt(store.wbsApiKey);
+          const metadata = await wbsBridgeService.fetchMetadata(plaintextKey);
+          connectedTenant = {
+            businessName: metadata.businessName,
+            phoneNumber: metadata.phoneNumber,
+            availableTemplates: metadata.templates,
+          };
+        } catch (err) {
+          // Silently absorb — WBS may be down or key was just revoked
+          connectedTenantError =
+            err instanceof WbsUnauthorizedError ? 'invalid_api_key' : 'wbs_unavailable';
+          logger.warn(
+            { storeId, err: (err as Error).message },
+            '[WBS-INTEGRATION] Could not fetch metadata during GET'
+          );
+        }
+      }
+
       res.json({
         success: true,
         data: {
@@ -99,6 +138,8 @@ router.get(
           wbsApiKeyMasked: maskApiKey(store.wbsApiKey),
           hasApiKey: Boolean(store.wbsApiKey),
           wbsTemplates: store.wbsTemplates,
+          connectedTenant,
+          ...(connectedTenantError ? { connectedTenantError } : {}),
         },
       });
     } catch (err) {
@@ -129,12 +170,88 @@ router.put(
 
       const input: WbsIntegrationInput = parsed.data;
 
-      // Build update data
-      const updateData: Record<string, unknown> = {
-        wbsEnabled: input.wbsEnabled,
-      };
+      // ── Determine PUT intent ────────────────────────────────────────────────
+      //
+      // Three distinct intents based on what the client sends:
+      //   A) wbsApiKey is a real new key (not masked, not null) → first-connect or rotate
+      //   B) wbsTemplates only → template picks, no metadata call
+      //   C) wbsEnabled = false → disable, no validation
+      //   D) wbsEnabled = true + no key in DB → error: must connect first
 
-      if (input.wbsClientId !== undefined) {
+      const isNewApiKey =
+        input.wbsApiKey !== undefined &&
+        input.wbsApiKey !== null &&
+        input.wbsApiKey !== '' &&
+        !input.wbsApiKey.includes('****');
+
+      const isClearApiKey = input.wbsApiKey === null || input.wbsApiKey === '';
+
+      // Load current store to check key state
+      const currentStore = await prisma.store.findUnique({
+        where: { id: storeId },
+        select: { wbsApiKey: true, wbsEnabled: true },
+      });
+
+      if (!currentStore) {
+        res.status(404).json({ success: false, error: { code: 'STORE_NOT_FOUND' } });
+        return;
+      }
+
+      // Rule: cannot enable when no key is set
+      if (input.wbsEnabled === true && !currentStore.wbsApiKey && !isNewApiKey) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'MUST_CONNECT_KEY_FIRST',
+            message: 'Connect a WBS API key before enabling WhatsApp notifications',
+          },
+        });
+        return;
+      }
+
+      // ── A) First-connect or key rotation — validate via metadata ───────────
+      let autoPopulatedClientId: string | undefined;
+
+      if (isNewApiKey && input.wbsApiKey) {
+        try {
+          const metadata = await wbsBridgeService.fetchMetadata(input.wbsApiKey);
+          // Auto-populate clientId from metadata
+          autoPopulatedClientId = metadata.clientId;
+          logger.info(
+            { storeId, clientId: metadata.clientId, businessName: metadata.businessName },
+            '[WBS-INTEGRATION] Key validated via metadata — clientId auto-populated'
+          );
+        } catch (err) {
+          if (err instanceof WbsUnauthorizedError) {
+            res.status(400).json({
+              success: false,
+              error: {
+                code: 'INVALID_API_KEY',
+                message: 'The API key was rejected by Force WhatsApp Business Platform',
+              },
+            });
+            return;
+          }
+          // WBS server error — allow the key to be saved anyway (merchant can retry)
+          logger.warn(
+            { storeId, err: (err as Error).message },
+            '[WBS-INTEGRATION] WBS unavailable during key validation — saving key anyway'
+          );
+        }
+      }
+
+      // ── Build update data ───────────────────────────────────────────────────
+
+      const updateData: Record<string, unknown> = {};
+
+      if (input.wbsEnabled !== undefined) {
+        updateData.wbsEnabled = input.wbsEnabled;
+      }
+
+      // Auto-populated clientId from metadata takes precedence over any manual value
+      if (autoPopulatedClientId) {
+        updateData.wbsClientId = autoPopulatedClientId;
+      } else if (input.wbsClientId !== undefined) {
         updateData.wbsClientId = input.wbsClientId || null;
       }
 
@@ -142,23 +259,18 @@ router.put(
         updateData.wbsTemplates = input.wbsTemplates;
       }
 
-      // API key handling:
-      //   - null / empty string  → clear the key (disable integration)
-      //   - non-empty string that looks like a masked key (contains '****') → no change
-      //   - any other non-empty string → encrypt and store
-      if (input.wbsApiKey !== undefined) {
-        if (!input.wbsApiKey || input.wbsApiKey === null) {
-          updateData.wbsApiKey = null;
-        } else if (!input.wbsApiKey.includes('****')) {
-          // New key — encrypt it
-          updateData.wbsApiKey = encryption.encrypt(input.wbsApiKey);
-          logger.info({ storeId }, '[WBS-INTEGRATION] API key updated');
-        }
-        // else: masked value passed back → no change
+      // API key handling
+      if (isNewApiKey && input.wbsApiKey) {
+        updateData.wbsApiKey = encryption.encrypt(input.wbsApiKey);
+        logger.info({ storeId }, '[WBS-INTEGRATION] API key updated');
+      } else if (isClearApiKey) {
+        updateData.wbsApiKey = null;
+        updateData.wbsClientId = null;
+        updateData.wbsEnabled = false;
+        logger.info({ storeId }, '[WBS-INTEGRATION] API key cleared — integration disabled');
       }
+      // else: masked value or undefined → no key change
 
-      // If disabling the integration, reset the failure counter indirectly
-      // by updating wbsEnabled = false (the auto-disable path sets this too)
       if (input.wbsEnabled === false) {
         logger.info({ storeId }, '[WBS-INTEGRATION] WBS integration disabled by admin');
       }
@@ -181,8 +293,9 @@ router.put(
         resourceId: storeId,
         details: {
           wbsEnabled: input.wbsEnabled,
-          wbsClientId: input.wbsClientId ?? null,
-          apiKeyChanged: input.wbsApiKey !== undefined && !input.wbsApiKey?.includes('****'),
+          wbsClientId: autoPopulatedClientId || input.wbsClientId || null,
+          apiKeyChanged: isNewApiKey,
+          keyCleared: isClearApiKey,
         },
         ip: req.ip,
         userAgent: req.headers['user-agent'],

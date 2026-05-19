@@ -64,9 +64,25 @@ export interface WbsSendResult {
   status: 'sent' | 'already_sent';
 }
 
+export interface WbsTemplateInfo {
+  name: string;
+  language: string;
+  status: string;
+  category: string;
+  variableCount: number;
+}
+
+export interface WbsMetadataResponse {
+  clientId: string;
+  businessName: string;
+  phoneNumber: string | null;
+  wabaId: string | null;
+  templates: WbsTemplateInfo[];
+}
+
 // ─── Service ────────────────────────────────────────────────────────────────
 
-class WbsBridgeService {
+export class WbsBridgeService {
   private get baseUrl(): string {
     return config.wbsBaseUrl;
   }
@@ -164,6 +180,72 @@ class WbsBridgeService {
     logger.info({ messageId, status, templateName }, '[WBS-BRIDGE] Template sent');
 
     return { messageId, status };
+  }
+
+  /**
+   * Fetch client metadata from WBS using the provided (plaintext) API key.
+   *
+   * Used during the "connect by key" UX: FWB calls this to verify the key and
+   * auto-populate `wbsClientId`, `businessName`, and available templates.
+   *
+   * The caller is responsible for decrypting the key before passing it here.
+   *
+   * Throws:
+   *   WbsUnauthorizedError   — 401 (bad/revoked key)
+   *   WbsServerError         — 5xx or network failure
+   */
+  async fetchMetadata(plaintextApiKey: string): Promise<WbsMetadataResponse> {
+    const url = `${this.baseUrl}/api/v1/external/metadata`;
+
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'x-wbs-api-key': plaintextApiKey,
+        },
+        // 10s timeout — this is a synchronous UX-blocking call
+        signal: AbortSignal.timeout(10_000),
+      });
+    } catch (err) {
+      logger.error(
+        { err: (err as Error).message, url },
+        '[WBS-BRIDGE] Network error fetching metadata'
+      );
+      throw new WbsServerError(`WBS metadata unreachable: ${(err as Error).message}`);
+    }
+
+    let body: Record<string, unknown> = {};
+    try {
+      body = (await response.json()) as Record<string, unknown>;
+    } catch {
+      // Ignore parse failure on non-JSON 5xx
+    }
+
+    if (response.status === 401 || response.status === 403) {
+      throw new WbsUnauthorizedError((body.message as string) || `WBS returned ${response.status}`);
+    }
+
+    if (response.status >= 500) {
+      throw new WbsServerError(`WBS metadata endpoint returned ${response.status}`);
+    }
+
+    if (!response.ok) {
+      throw new WbsServerError(`WBS metadata returned unexpected status ${response.status}`);
+    }
+
+    logger.info(
+      { clientId: body.clientId, businessName: body.businessName },
+      '[WBS-BRIDGE] Metadata fetched'
+    );
+
+    return {
+      clientId: (body.clientId as string) || '',
+      businessName: (body.businessName as string) || '',
+      phoneNumber: (body.phoneNumber as string | null) || null,
+      wabaId: (body.wabaId as string | null) || null,
+      templates: (body.templates as WbsTemplateInfo[]) || [],
+    };
   }
 }
 
