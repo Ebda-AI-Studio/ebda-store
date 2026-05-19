@@ -481,7 +481,7 @@ export class AIService {
     let logoFetch: Response;
     try {
       logoFetch = await fetch(logoUrl);
-    } catch (err) {
+    } catch {
       throw new AppError(502, 'AI_LOGO_FETCH_FAILED', 'Could not reach the logo URL.');
     }
     if (!logoFetch.ok) {
