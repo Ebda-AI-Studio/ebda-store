@@ -6,6 +6,64 @@ import { invalidateCached, invalidateCachedPrefix } from '../lib/public-cache';
 import logger from '../lib/logger';
 import { cleanupRemovedImages } from './r2-cleanup.service';
 
+/**
+ * Compute availability flags for a product (and its variants) based on
+ * inventory counts. Called on the public list + detail paths only — admin
+ * routes return raw Prisma rows without these computed fields.
+ *
+ * Rules:
+ *   inStock          = inventory > 0
+ *   acceptsBackorder = inventory <= 0 && allowBackorder
+ *   lowStock         = inStock && inventory <= lowStockThreshold
+ *   availableQty     = exact qty when (lowStock || acceptsBackorder); null otherwise
+ *                      (avoids leaking exact stock counts for normal in-stock products)
+ *
+ * Variants inherit the parent's lowStockThreshold (no per-variant threshold).
+ * Variants also inherit the parent's allowBackorder flag when their own is false.
+ */
+function enrichStockFlags<
+  P extends {
+    inventory: number;
+    allowBackorder: boolean;
+    lowStockThreshold: number;
+    variants?: Array<{
+      inventory: number;
+      allowBackorder?: boolean;
+      [key: string]: unknown;
+    }>;
+    [key: string]: unknown;
+  },
+>(product: P): P {
+  const inStock = product.inventory > 0;
+  const lowStock = inStock && product.inventory <= product.lowStockThreshold;
+  const acceptsBackorder = product.inventory <= 0 && product.allowBackorder;
+  const availableQty = lowStock || acceptsBackorder ? product.inventory : null;
+
+  const enrichedVariants = (product.variants ?? []).map(v => {
+    const vInStock = v.inventory > 0;
+    const vLowStock = vInStock && v.inventory <= product.lowStockThreshold;
+    const vAcceptsBackorder =
+      v.inventory <= 0 && ((v.allowBackorder ?? false) || product.allowBackorder);
+    const vAvailableQty = vLowStock || vAcceptsBackorder ? v.inventory : null;
+    return {
+      ...v,
+      inStock: vInStock,
+      lowStock: vLowStock,
+      acceptsBackorder: vAcceptsBackorder,
+      availableQty: vAvailableQty,
+    };
+  });
+
+  return {
+    ...product,
+    inStock,
+    lowStock,
+    acceptsBackorder,
+    availableQty,
+    variants: enrichedVariants,
+  };
+}
+
 interface CreateProductData {
   name: string;
   nameAr?: string;
@@ -522,9 +580,16 @@ export class ProductService {
         // products. Without this include, every product looks variant-
         // less to the storefront and the View CTA never appears
         // regardless of how many variants the merchant created.
-        // Light select (price + compareAtPrice) so the join stays cheap.
+        // Light select (price + compareAtPrice + stock fields) so the join
+        // stays cheap while supplying what enrichStockFlags needs.
         variants: {
-          select: { id: true, price: true, compareAtPrice: true },
+          select: {
+            id: true,
+            price: true,
+            compareAtPrice: true,
+            inventory: true,
+            allowBackorder: true,
+          },
         },
       },
       orderBy,
@@ -546,7 +611,7 @@ export class ProductService {
       cursor && productsRaw.length > limit ? (productsRaw[limit] as { id: string }).id : undefined;
 
     const result = {
-      products,
+      products: products.map(p => enrichStockFlags(p as Parameters<typeof enrichStockFlags>[0])),
       meta: {
         page: cursor ? undefined : page,
         limit,
@@ -686,6 +751,7 @@ export class ProductService {
         price: number | null;
         compareAtPrice: number | null;
         inventory: number;
+        allowBackorder: boolean;
         imageUrl: string | null;
         options: Array<{
           value: {
@@ -717,6 +783,7 @@ export class ProductService {
         price: v.price ?? product.price,
         compareAtPrice: v.compareAtPrice ?? undefined,
         inventory: v.inventory,
+        allowBackorder: v.allowBackorder,
         imageUrl: v.imageUrl ?? undefined,
         options,
         optionsAr,
@@ -753,7 +820,11 @@ export class ProductService {
       ratingCount: ratingAggregate._count.rating,
     };
 
-    return { ...this.reshapePublicProductDetail(product), ratingStats };
+    const reshaped = this.reshapePublicProductDetail(product);
+    return {
+      ...enrichStockFlags(reshaped as Parameters<typeof enrichStockFlags>[0]),
+      ratingStats,
+    };
   }
 
   static async getPublicById(storeId: string, productId: string) {
@@ -779,7 +850,11 @@ export class ProductService {
       ratingCount: ratingAggregate._count.rating,
     };
 
-    return { ...this.reshapePublicProductDetail(product), ratingStats };
+    const reshaped = this.reshapePublicProductDetail(product);
+    return {
+      ...enrichStockFlags(reshaped as Parameters<typeof enrichStockFlags>[0]),
+      ratingStats,
+    };
   }
 
   static async getCategories(storeId: string) {
