@@ -255,35 +255,62 @@ export class OrderService {
       // Lock and re-validate inventory for each tracked item before decrementing.
       // FOR UPDATE prevents any concurrent transaction from reading or updating
       // the same Product row until this transaction commits or rolls back.
+      //
+      // backorderedItems collects items where the pre-decrement inventory was
+      // insufficient — these get a BackorderLine row created after the order is
+      // persisted (further down in this transaction).
+      const backorderedItems: Array<{ productId: string; variantId?: string; quantity: number }> =
+        [];
+
       for (const item of cart.items) {
         if (item.product.trackInventory) {
           if ((item as { variantId?: string }).variantId) {
             // Variant-level lock
-            const [lockedVariant] = await tx.$queryRaw<Array<{ inventory: number }>>`
-              SELECT inventory FROM "product_variants"
+            const [lockedVariant] = await tx.$queryRaw<
+              Array<{ inventory: number; allow_backorder: boolean }>
+            >`
+              SELECT inventory, allow_backorder FROM "product_variants"
               WHERE id = ${(item as { variantId: string }).variantId}
               FOR UPDATE
             `;
             if (!lockedVariant || lockedVariant.inventory < item.quantity) {
-              throw new AppError(
-                400,
-                'INSUFFICIENT_INVENTORY',
-                `Not enough inventory for ${item.product.name} (variant)`
-              );
+              if (!lockedVariant?.allow_backorder) {
+                throw new AppError(
+                  400,
+                  'INSUFFICIENT_INVENTORY',
+                  `Not enough inventory for ${item.product.name} (variant)`
+                );
+              }
+              // Backorder accepted — track for BackorderLine creation below
+              backorderedItems.push({
+                productId: item.productId,
+                variantId: (item as { variantId: string }).variantId,
+                quantity: item.quantity,
+              });
             }
           } else {
             // Product-level lock
-            const [lockedProduct] = await tx.$queryRaw<Array<{ inventory: number }>>`
-              SELECT inventory FROM "products"
+            const [lockedProduct] = await tx.$queryRaw<
+              Array<{ inventory: number; allow_backorder: boolean }>
+            >`
+              SELECT inventory, allow_backorder FROM "products"
               WHERE id = ${item.productId}
               FOR UPDATE
             `;
             if (!lockedProduct || lockedProduct.inventory < item.quantity) {
-              throw new AppError(
-                400,
-                'INSUFFICIENT_INVENTORY',
-                `Not enough inventory for ${item.product.name}`
-              );
+              if (!lockedProduct?.allow_backorder) {
+                throw new AppError(
+                  400,
+                  'INSUFFICIENT_INVENTORY',
+                  `Not enough inventory for ${item.product.name}`
+                );
+              }
+              // Backorder accepted — track for BackorderLine creation below
+              backorderedItems.push({
+                productId: item.productId,
+                variantId: undefined,
+                quantity: item.quantity,
+              });
             }
           }
         }
@@ -387,6 +414,32 @@ export class OrderService {
               reason: 'Sold via order',
               reference: newOrder.id,
             },
+          });
+        }
+      }
+
+      // Create BackorderLine rows and mark OrderItems as cost-deferred for any
+      // items that were allowed through with insufficient inventory.
+      if (backorderedItems.length > 0) {
+        for (const newItem of newOrder.items) {
+          const bo = backorderedItems.find(
+            b =>
+              b.productId === newItem.productId &&
+              (b.variantId ?? null) === (newItem.variantId ?? null)
+          );
+          if (!bo) continue;
+          await tx.backorderLine.create({
+            data: {
+              storeId,
+              orderItemId: newItem.id,
+              productId: newItem.productId,
+              variantId: newItem.variantId,
+              qty: newItem.quantity,
+            },
+          });
+          await tx.orderItem.update({
+            where: { id: newItem.id },
+            data: { costPriceDeferred: true },
           });
         }
       }
@@ -939,6 +992,18 @@ export class OrderService {
       .catch(err =>
         logger.error({ err, orderId, storeId }, '[OrderService] Failed to enqueue order/refunded')
       );
+
+    // Auto-cancel any open BackorderLines for this order. A refunded order
+    // will never be fulfilled, so outstanding backorder demand must be
+    // released so purchase-order demand planning stays accurate.
+    await prisma.backorderLine.updateMany({
+      where: {
+        orderItem: { orderId },
+        fulfilledAt: null,
+        cancelledAt: null,
+      },
+      data: { cancelledAt: new Date(), cancelledReason: 'Order refunded' },
+    });
   }
 
   static async getCustomerOrders(

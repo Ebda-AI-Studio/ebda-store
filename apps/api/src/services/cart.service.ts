@@ -96,7 +96,11 @@ export class CartService {
         if (existingItem) {
           const newQuantity = existingItem.quantity + quantity;
 
-          if (product.trackInventory && product.inventory < newQuantity) {
+          if (
+            product.trackInventory &&
+            product.inventory < newQuantity &&
+            !product.allowBackorder
+          ) {
             throw new AppError(400, 'INSUFFICIENT_INVENTORY', 'Not enough inventory');
           }
 
@@ -106,7 +110,7 @@ export class CartService {
           });
         } else {
           // Check inventory for new item
-          if (product.trackInventory && product.inventory < quantity) {
+          if (product.trackInventory && product.inventory < quantity && !product.allowBackorder) {
             throw new AppError(400, 'INSUFFICIENT_INVENTORY', 'Not enough inventory');
           }
 
@@ -154,7 +158,11 @@ export class CartService {
     if (quantity <= 0) {
       await prisma.cartItem.delete({ where: { id: itemId } });
     } else {
-      if (item.product.trackInventory && item.product.inventory < quantity) {
+      if (
+        item.product.trackInventory &&
+        item.product.inventory < quantity &&
+        !item.product.allowBackorder
+      ) {
         throw new AppError(400, 'INSUFFICIENT_INVENTORY', 'Not enough inventory');
       }
 
