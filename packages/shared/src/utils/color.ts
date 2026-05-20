@@ -158,8 +158,22 @@ export function resolveColor(value: ColorValue | undefined, theme: StoreTheme): 
     const raw =
       (theme[themeKey] as string | undefined) ??
       (theme as unknown as Record<string, string | undefined>)[key];
-    if (!raw) return undefined;
-    return raw.startsWith('hsl(') || raw.startsWith('#') ? raw : `hsl(${raw})`;
+    if (raw) {
+      return raw.startsWith('hsl(') || raw.startsWith('#') ? raw : `hsl(${raw})`;
+    }
+    // Theme is missing the matching `<key>Color` field (e.g. legacy stores
+    // saved before card/muted/border/foreground tokens were added to the
+    // theme). Fall back to the global CSS variable — globals.css defines
+    // --card, --muted, --border, --foreground, --primary, --secondary,
+    // --accent for every store, so the merchant's token choice still
+    // resolves to a real color instead of silently dropping.
+    //
+    // Verified FWB 2026-05-20 — wadyaljuz picked `token:card` for the
+    // footer color zone but had no `cardColor` on the theme row; old code
+    // returned undefined here, callers fell back to default → merchant
+    // intent was silently lost across 14 cardFrameColor sites + the
+    // ShopChrome announcement/header/footer bgColor sites.
+    return `hsl(var(--${key}))`;
   }
 
   return value;
