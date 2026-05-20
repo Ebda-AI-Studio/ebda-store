@@ -1,7 +1,20 @@
 'use client';
 
 import { resolveColor, pickReadableForeground } from '@force/shared';
-import type { StoreTheme, CardFrameSize, CardFrameWidth } from '@force/shared';
+import type {
+  StoreTheme,
+  CardFrameSize,
+  CardFrameWidth,
+  SectionDividers,
+  DividerSettings,
+} from '@force/shared';
+
+type ZoneStyle = {
+  color?: string;
+  fontFamily?: string;
+  fontWeight?: string;
+  textAlign?: 'start' | 'center' | 'end';
+};
 
 interface SectionPreviewProps {
   label: string;
@@ -9,16 +22,28 @@ interface SectionPreviewProps {
   cardFrameColor: string | undefined;
   cardFrameWidth: CardFrameWidth | undefined;
   cardFrameSize?: CardFrameSize;
-  headingZone: { color?: string; fontFamily?: string; fontWeight?: string } | undefined;
+  headingZone: ZoneStyle | undefined;
+  kickerZone?: ZoneStyle;
+  subtitleZone?: ZoneStyle;
+  /** Kicker text to display in the preview (defaults to "EXPLORE"). */
+  kickerText?: string;
+  /** Subtitle text to display in the preview (defaults to descriptor). */
+  subtitleText?: string;
   /**
    * Optional per-section product-card typography overrides. When provided,
    * the mock product name + price inside each preview card adopt the
    * specified font + color so the merchant sees product-card typography
    * render alongside the section bg.
    */
-  productNameZone?: { color?: string; fontFamily?: string; fontWeight?: string };
-  productPriceZone?: { color?: string; fontFamily?: string; fontWeight?: string };
-  productCtaZone?: { color?: string; fontFamily?: string; fontWeight?: string };
+  productNameZone?: ZoneStyle;
+  productPriceZone?: ZoneStyle;
+  productCtaZone?: ZoneStyle;
+  /**
+   * Per-section divider settings. Each slot rendered in the preview when its
+   * `enabled` field is true — matches storefront behavior 1:1 so merchants
+   * see exactly what they'll get.
+   */
+  dividers?: SectionDividers;
   theme: StoreTheme;
 }
 
@@ -37,6 +62,98 @@ const SIZE_CLASS: Record<CardFrameSize, string> = {
   spacious: 'p-3',
 };
 
+// Resolve the preview color for a divider per its `color` mode. Mirrors the
+// runtime resolver in apps/web/src/templates/shared/SectionDivider.tsx so the
+// preview and the storefront stay in lockstep.
+function resolveDividerColor(
+  settings: Partial<DividerSettings> | undefined,
+  theme: StoreTheme,
+  autoFg: string
+): string {
+  if (!settings) return 'rgba(0,0,0,0.20)';
+  switch (settings.color) {
+    case 'foreground':
+      return `${autoFg}4D`; // ~30% alpha matching bg-foreground/30
+    case 'accent':
+      return theme.primaryColor ? `hsl(${theme.primaryColor})` : '#FF6E00';
+    case 'custom':
+      return settings.customColor || 'rgba(0,0,0,0.20)';
+    case 'auto':
+    default:
+      return 'rgba(0,0,0,0.20)';
+  }
+}
+
+/** Render a horizontal divider line scaled for the small preview tile. */
+function PreviewHorizontalDivider({
+  settings,
+  theme,
+  autoFg,
+}: {
+  settings: Partial<DividerSettings>;
+  theme: StoreTheme;
+  autoFg: string;
+}) {
+  const color = resolveDividerColor(settings, theme, autoFg);
+  const style = settings.style ?? 'solid';
+  const thickness = settings.thickness ?? 1;
+  const width = settings.width ?? 'short';
+  const spacing = settings.spacing ?? 'normal';
+
+  const widthClass =
+    width === 'full' ? 'w-full' : width === 'contained' ? 'w-[80%] mx-auto' : 'w-[40%] mx-auto';
+  const spacingClass = spacing === 'tight' ? 'my-1' : spacing === 'loose' ? 'my-3' : 'my-2';
+
+  return (
+    <hr
+      className={`m-0 border-0 border-t ${widthClass} ${spacingClass}`}
+      style={{ borderTopStyle: style, borderTopWidth: thickness, borderTopColor: color }}
+    />
+  );
+}
+
+/** Render flanking lines around a text element (kicker/title/subtitle). */
+function PreviewFlankingLines({
+  text,
+  align,
+  textStyle,
+  settings,
+  theme,
+  autoFg,
+}: {
+  text: string;
+  align: 'start' | 'center' | 'end';
+  textStyle: React.CSSProperties;
+  settings: Partial<DividerSettings> | undefined;
+  theme: StoreTheme;
+  autoFg: string;
+}) {
+  const showLines = settings?.enabled === true && align === 'center';
+  const color = resolveDividerColor(settings, theme, autoFg);
+  const thickness = settings?.thickness ?? 1;
+  return (
+    <div
+      className={`flex items-center gap-1.5 ${align === 'start' ? 'justify-start' : align === 'end' ? 'justify-end' : 'justify-center'}`}
+    >
+      {showLines && (
+        <span
+          aria-hidden
+          className="flex-1 max-w-[30px]"
+          style={{ borderTopStyle: 'solid', borderTopWidth: thickness, borderTopColor: color }}
+        />
+      )}
+      <span style={textStyle}>{text}</span>
+      {showLines && (
+        <span
+          aria-hidden
+          className="flex-1 max-w-[30px]"
+          style={{ borderTopStyle: 'solid', borderTopWidth: thickness, borderTopColor: color }}
+        />
+      )}
+    </div>
+  );
+}
+
 export function SectionPreview({
   label,
   bgColor,
@@ -44,87 +161,174 @@ export function SectionPreview({
   cardFrameWidth,
   cardFrameSize,
   headingZone,
+  kickerZone,
+  subtitleZone,
+  kickerText,
+  subtitleText,
   productNameZone,
   productPriceZone,
   productCtaZone,
+  dividers,
   theme,
 }: SectionPreviewProps) {
   const resolvedBg = resolveColor(bgColor, theme) ?? '#FFFFFF';
   const autoFg = pickReadableForeground(resolvedBg) ?? '#000000';
   const headingColor = resolveColor(headingZone?.color, theme) ?? autoFg;
+  const kickerColor = resolveColor(kickerZone?.color, theme) ?? autoFg;
+  const subtitleColor = resolveColor(subtitleZone?.color, theme) ?? autoFg;
   const resolvedFrame = resolveColor(cardFrameColor, theme) ?? '#E5E7EB';
   const widthClass = WIDTH_CLASS[cardFrameWidth ?? 'thin'];
   const sizeClass = SIZE_CLASS[cardFrameSize ?? 'normal'];
 
-  // Mock product-card surface — always contrasts against the section bg so
-  // the cards stay visible regardless of which bg the merchant picked. The
-  // section bg may be brand primary (dark) OR a light neutral; pick the
-  // mock surface that contrasts.
+  // Mock product-card surface — always contrasts against the section bg.
   const cardSurface = autoFg === '#000000' ? '#FFFFFF' : 'rgba(255,255,255,0.10)';
   const cardSurfaceFg = autoFg === '#000000' ? '#1f2937' : '#FFFFFF';
-
   const productNameColor = resolveColor(productNameZone?.color, theme) ?? cardSurfaceFg;
   const productPriceColor = resolveColor(productPriceZone?.color, theme) ?? cardSurfaceFg;
 
+  const headingAlign = headingZone?.textAlign ?? 'center';
+  const kickerAlign = kickerZone?.textAlign ?? 'center';
+  const subtitleAlign = subtitleZone?.textAlign ?? 'center';
+  const titleShowLines = dividers?.title?.enabled === true && headingAlign === 'center';
+
+  const kickerDisplayText = kickerText || 'EXPLORE';
+  const subtitleDisplayText = subtitleText || 'Curated picks';
+
   return (
-    <div className="rounded-lg p-4" style={{ backgroundColor: resolvedBg }}>
-      <p
-        className="mb-3 text-center text-xs font-semibold uppercase tracking-wider"
-        style={{
-          color: headingColor,
-          fontFamily: headingZone?.fontFamily,
-          fontWeight: headingZone?.fontWeight,
-        }}
-      >
-        {label} heading
-      </p>
-      <div className="grid grid-cols-3 gap-2">
-        {[1, 2, 3].map(i => (
-          <div
-            key={i}
-            className={`flex flex-col items-stretch rounded ${widthClass} ${sizeClass} overflow-hidden`}
-            style={{ borderColor: resolvedFrame, backgroundColor: cardSurface }}
-          >
-            {/* image placeholder — visible regardless of section bg */}
-            <div className="aspect-square w-full" style={{ backgroundColor: 'rgba(0,0,0,0.06)' }} />
-            <div className="px-1.5 py-1 text-[9px] leading-tight">
+    <div className="overflow-hidden rounded-lg">
+      {/* `above` divider — renders OUTSIDE the bg-colored section, mirroring
+          how HomePageContent positions <SectionDivider> between sections. */}
+      {dividers?.above?.enabled === true && (
+        <PreviewHorizontalDivider settings={dividers.above} theme={theme} autoFg={autoFg} />
+      )}
+      <div className="p-4" style={{ backgroundColor: resolvedBg }}>
+        {/* Kicker — flanked by hairlines when dividers.kicker.enabled */}
+        {dividers?.kicker?.enabled !== false && (
+          <PreviewFlankingLines
+            text={kickerDisplayText}
+            align={kickerAlign}
+            textStyle={{
+              color: kickerColor,
+              fontFamily: kickerZone?.fontFamily,
+              fontWeight: kickerZone?.fontWeight,
+              fontSize: '9px',
+              letterSpacing: '0.15em',
+              textTransform: 'uppercase',
+            }}
+            settings={dividers?.kicker}
+            theme={theme}
+            autoFg={autoFg}
+          />
+        )}
+        {/* Title — flanked by hairlines when dividers.title.enabled */}
+        <div className="mt-1.5">
+          {titleShowLines ? (
+            <PreviewFlankingLines
+              text={`${label} heading`}
+              align="center"
+              textStyle={{
+                color: headingColor,
+                fontFamily: headingZone?.fontFamily,
+                fontWeight: headingZone?.fontWeight,
+                fontSize: '12px',
+              }}
+              settings={dividers?.title}
+              theme={theme}
+              autoFg={autoFg}
+            />
+          ) : (
+            <p
+              className={`text-xs font-semibold ${headingAlign === 'start' ? 'text-start' : headingAlign === 'end' ? 'text-end' : 'text-center'}`}
+              style={{
+                color: headingColor,
+                fontFamily: headingZone?.fontFamily,
+                fontWeight: headingZone?.fontWeight,
+              }}
+            >
+              {label} heading
+            </p>
+          )}
+        </div>
+        {/* Subtitle — flanked by hairlines when dividers.subtitle.enabled */}
+        {dividers?.subtitle?.enabled !== false && (
+          <div className="mt-1">
+            <PreviewFlankingLines
+              text={subtitleDisplayText}
+              align={subtitleAlign}
+              textStyle={{
+                color: subtitleColor,
+                fontFamily: subtitleZone?.fontFamily,
+                fontWeight: subtitleZone?.fontWeight,
+                fontSize: '9px',
+                opacity: 0.85,
+              }}
+              settings={dividers?.subtitle}
+              theme={theme}
+              autoFg={autoFg}
+            />
+          </div>
+        )}
+        {/* belowHeading divider — between heading block and product grid */}
+        {dividers?.belowHeading?.enabled === true && (
+          <PreviewHorizontalDivider
+            settings={dividers.belowHeading}
+            theme={theme}
+            autoFg={autoFg}
+          />
+        )}
+        {/* Mock product grid */}
+        <div
+          className={`grid grid-cols-3 gap-2 ${dividers?.belowHeading?.enabled ? 'mt-1' : 'mt-3'}`}
+        >
+          {[1, 2, 3].map(i => (
+            <div
+              key={i}
+              className={`flex flex-col items-stretch rounded ${widthClass} ${sizeClass} overflow-hidden`}
+              style={{ borderColor: resolvedFrame, backgroundColor: cardSurface }}
+            >
               <div
-                className="truncate"
-                style={{
-                  color: productNameColor,
-                  fontFamily: productNameZone?.fontFamily,
-                  fontWeight: productNameZone?.fontWeight,
-                }}
-              >
-                Product
-              </div>
-              <div
-                className="font-semibold"
-                style={{
-                  color: productPriceColor,
-                  fontFamily: productPriceZone?.fontFamily,
-                  fontWeight: productPriceZone?.fontWeight,
-                }}
-              >
-                5.000 KD
-              </div>
-              <div
-                className="mt-0.5 rounded-sm py-0.5 text-center text-[8px] font-medium uppercase tracking-wider"
-                style={{
-                  backgroundColor: resolvedFrame,
-                  color:
-                    resolveColor(productCtaZone?.color, theme) ??
-                    pickReadableForeground(resolvedFrame) ??
-                    '#FFFFFF',
-                  fontFamily: productCtaZone?.fontFamily,
-                  fontWeight: productCtaZone?.fontWeight,
-                }}
-              >
-                Add
+                className="aspect-square w-full"
+                style={{ backgroundColor: 'rgba(0,0,0,0.06)' }}
+              />
+              <div className="px-1.5 py-1 text-[9px] leading-tight">
+                <div
+                  className="truncate"
+                  style={{
+                    color: productNameColor,
+                    fontFamily: productNameZone?.fontFamily,
+                    fontWeight: productNameZone?.fontWeight,
+                  }}
+                >
+                  Product
+                </div>
+                <div
+                  className="font-semibold"
+                  style={{
+                    color: productPriceColor,
+                    fontFamily: productPriceZone?.fontFamily,
+                    fontWeight: productPriceZone?.fontWeight,
+                  }}
+                >
+                  5.000 KD
+                </div>
+                <div
+                  className="mt-0.5 rounded-sm py-0.5 text-center text-[8px] font-medium uppercase tracking-wider"
+                  style={{
+                    backgroundColor: resolvedFrame,
+                    color:
+                      resolveColor(productCtaZone?.color, theme) ??
+                      pickReadableForeground(resolvedFrame) ??
+                      '#FFFFFF',
+                    fontFamily: productCtaZone?.fontFamily,
+                    fontWeight: productCtaZone?.fontWeight,
+                  }}
+                >
+                  Add
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   );

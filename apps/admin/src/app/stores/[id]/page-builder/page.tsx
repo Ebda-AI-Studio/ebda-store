@@ -389,6 +389,9 @@ export default function StoreLayoutPage() {
                     cardFrameColor={undefined}
                     cardFrameWidth={undefined}
                     headingZone={layout.hero.typography?.heading}
+                    kickerZone={layout.hero.typography?.kicker}
+                    subtitleZone={layout.hero.typography?.subtitle}
+                    dividers={layout.hero.dividers}
                     theme={storeInfo?.theme ?? FALLBACK_THEME}
                   />
                 </div>
@@ -773,6 +776,11 @@ export default function StoreLayoutPage() {
                     cardFrameWidth={layout.categories.cardFrameWidth}
                     cardFrameSize={layout.categories.cardFrameSize}
                     headingZone={layout.categories.typography?.heading}
+                    kickerZone={layout.categories.typography?.kicker}
+                    subtitleZone={layout.categories.typography?.subtitle}
+                    kickerText={layout.categories.kicker}
+                    subtitleText={layout.categories.subtitle}
+                    dividers={layout.categories.dividers}
                     theme={storeInfo?.theme ?? FALLBACK_THEME}
                   />
                 </div>
@@ -879,6 +887,11 @@ export default function StoreLayoutPage() {
                     cardFrameWidth={layout.newArrivals.cardFrameWidth}
                     cardFrameSize={layout.newArrivals.cardFrameSize}
                     headingZone={layout.newArrivals.typography?.heading}
+                    kickerZone={layout.newArrivals.typography?.kicker}
+                    subtitleZone={layout.newArrivals.typography?.subtitle}
+                    kickerText={layout.newArrivals.kicker}
+                    subtitleText={layout.newArrivals.subtitle}
+                    dividers={layout.newArrivals.dividers}
                     theme={storeInfo?.theme ?? FALLBACK_THEME}
                   />
                 </div>
@@ -985,6 +998,11 @@ export default function StoreLayoutPage() {
                     cardFrameWidth={layout.bestSellers.cardFrameWidth}
                     cardFrameSize={layout.bestSellers.cardFrameSize}
                     headingZone={layout.bestSellers.typography?.heading}
+                    kickerZone={layout.bestSellers.typography?.kicker}
+                    subtitleZone={layout.bestSellers.typography?.subtitle}
+                    kickerText={layout.bestSellers.kicker}
+                    subtitleText={layout.bestSellers.subtitle}
+                    dividers={layout.bestSellers.dividers}
                     theme={storeInfo?.theme ?? FALLBACK_THEME}
                   />
                 </div>
@@ -1086,6 +1104,9 @@ export default function StoreLayoutPage() {
                     cardFrameColor={undefined}
                     cardFrameWidth={undefined}
                     headingZone={layout.testimonials.typography?.heading}
+                    kickerZone={layout.testimonials.typography?.kicker}
+                    subtitleZone={layout.testimonials.typography?.subtitle}
+                    dividers={layout.testimonials.dividers}
                     theme={storeInfo?.theme ?? FALLBACK_THEME}
                   />
                 </div>
