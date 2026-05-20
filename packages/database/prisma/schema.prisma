@@ -270,6 +270,10 @@ model Store {
   // Accounting Settings (Batch 2)
   expenseTwoStepApproval Boolean @default(false) @map("expense_two_step_approval")
 
+  // Accounting Settings (Batch 3)
+  aiFeaturesEnabled  Boolean @default(true) @map("ai_features_enabled")
+  aiBulkThrottleMs   Int     @default(2500)  @map("ai_bulk_throttle_ms")
+
   // Relations
   owner                    User                       @relation(fields: [ownerId], references: [id])
   // Customer accounts that authenticate against this store. Distinct from
@@ -325,6 +329,9 @@ model Store {
   reorderRules             ReorderRule[]
   backorderLines           BackorderLine[]
   expenses                 Expense[]
+  reorderSuggestions       ReorderSuggestion[]
+  deadstockFlags           DeadStockFlag[]
+  profitAnomalies          ProfitAnomaly[]
 
   @@index([ownerId])
   @@index([status])
@@ -553,6 +560,8 @@ model Product {
   stockAdjustmentItems StockAdjustmentItem[]
   reorderRules         ReorderRule[]
   backorderLines       BackorderLine[]
+  reorderSuggestions   ReorderSuggestion[]
+  deadstockFlags       DeadStockFlag[]
 
   @@unique([storeId, slug])
   @@unique([storeId, sku]) // Prevent duplicate SKUs within a store (null values are excluded)
@@ -730,6 +739,8 @@ model ProductVariant {
   stockAdjustmentItems StockAdjustmentItem[]
   reorderRules         ReorderRule[]
   backorderLines       BackorderLine[]
+  reorderSuggestions   ReorderSuggestion[]
+  deadstockFlags       DeadStockFlag[]
 
   @@index([productId])
   @@index([sku])
@@ -2211,10 +2222,11 @@ model Supplier {
   updatedAt       DateTime             @updatedAt @map("updated_at")
   deletedAt       DateTime?            @map("deleted_at")
 
-  store          Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  purchaseOrders PurchaseOrder[]
-  reorderRules   ReorderRule[]
-  expenses       Expense[]
+  store              Store               @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  purchaseOrders     PurchaseOrder[]
+  reorderRules       ReorderRule[]
+  expenses           Expense[]
+  reorderSuggestions ReorderSuggestion[]
 
   @@index([storeId])
   @@index([storeId, isActive])
@@ -2389,6 +2401,8 @@ model Expense {
   receiptImageUrl      String?       @map("receipt_image_url")
   ocrJson              Json?         @map("ocr_json")
   categoryAiConfidence Float?        @map("category_ai_confidence")
+  ocrModelVersion      String?       @map("ocr_model_version")
+  ocrProcessedAt       DateTime?     @map("ocr_processed_at")
   approvedBy           String?       @map("approved_by")
   approvedAt           DateTime?     @map("approved_at")
   journalEntryId       String?       @unique @map("journal_entry_id")
@@ -2408,4 +2422,121 @@ model Expense {
   @@index([storeId, status])
   @@index([storeId, expenseDate(sort: Desc)])
   @@map("expenses")
+}
+
+// ==========================================
+// Smart layer (Batch 3) — advisory tables, soft-deletable
+// ==========================================
+
+enum ReorderSuggestionStatus {
+  open
+  accepted
+  dismissed
+  expired
+}
+
+enum DeadStockFlagStatus {
+  open
+  accepted_clearance
+  dismissed
+  expired
+}
+
+enum AnomalyScope {
+  store
+  category
+  product
+}
+
+enum AnomalyMetric {
+  margin_drop
+  cost_spike
+  revenue_drop
+  refund_spike
+}
+
+enum AnomalySeverity {
+  warning
+  p0
+}
+
+model ReorderSuggestion {
+  id           String  @id @default(uuid())
+  storeId      String  @map("store_id")
+  productId    String  @map("product_id")
+  variantId    String? @map("variant_id")
+  suggestedQty Int     @map("suggested_qty")
+  velocity7d   Float   @map("velocity_7d")
+  velocity28d  Float   @map("velocity_28d")
+  onHand       Int     @map("on_hand")
+  onOrder      Int     @map("on_order")
+  openBacklog  Int     @map("open_backlog")
+  urgencyDays  Int     @map("urgency_days")
+  supplierId   String? @map("supplier_id")
+  reasoningEn  String  @map("reasoning_en")
+  reasoningAr  String? @map("reasoning_ar")
+  status       ReorderSuggestionStatus @default(open)
+  dismissedBy  String?   @map("dismissed_by")
+  dismissedAt  DateTime? @map("dismissed_at")
+  poId         String?   @map("po_id")
+  scannedAt    DateTime  @default(now()) @map("scanned_at")
+
+  store    Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  product  Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant  ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  supplier Supplier?       @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+
+  @@unique([storeId, productId, variantId, scannedAt])
+  @@index([storeId, status, scannedAt(sort: Desc)])
+  @@map("reorder_suggestions")
+}
+
+model DeadStockFlag {
+  id                   String   @id @default(uuid())
+  storeId              String   @map("store_id")
+  productId            String   @map("product_id")
+  variantId            String?  @map("variant_id")
+  daysSinceSale        Int      @map("days_since_sale")
+  stockOnHand          Int      @map("stock_on_hand")
+  stockValueFils       Int      @map("stock_value_fils")
+  suggestedDiscountBps Int      @map("suggested_discount_bps")
+  clearanceCopyEn      String   @map("clearance_copy_en")
+  clearanceCopyAr      String?  @map("clearance_copy_ar")
+  status               DeadStockFlagStatus @default(open)
+  couponCode           String?   @map("coupon_code")
+  dismissedBy          String?   @map("dismissed_by")
+  dismissedAt          DateTime? @map("dismissed_at")
+  scannedAt            DateTime  @default(now()) @map("scanned_at")
+
+  store   Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  product Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, productId, variantId, scannedAt])
+  @@index([storeId, status])
+  @@map("deadstock_flags")
+}
+
+model ProfitAnomaly {
+  id             String          @id @default(uuid())
+  storeId        String          @map("store_id")
+  scope          AnomalyScope
+  scopeId        String?         @map("scope_id")
+  metric         AnomalyMetric
+  current7d      Float           @map("current_7d")
+  baseline28d    Float           @map("baseline_28d")
+  deltaPercent   Float           @map("delta_percent")
+  severity       AnomalySeverity
+  explanationEn  String          @map("explanation_en")
+  explanationAr  String?         @map("explanation_ar")
+  acknowledged   Boolean         @default(false)
+  acknowledgedBy String?         @map("acknowledged_by")
+  acknowledgedAt DateTime?       @map("acknowledged_at")
+  detectedAt     DateTime        @default(now()) @map("detected_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId, severity, detectedAt(sort: Desc)])
+  @@index([storeId, acknowledged])
+  @@map("profit_anomalies")
 }

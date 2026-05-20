@@ -137,6 +137,11 @@ export {
   StockAdjustmentType,
   StockAdjustmentStatus,
   ExpenseStatus,
+  ReorderSuggestionStatus,
+  DeadStockFlagStatus,
+  AnomalyScope,
+  AnomalyMetric,
+  AnomalySeverity,
 } from '@prisma/client';
 
 export { prisma as db };
