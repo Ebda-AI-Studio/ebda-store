@@ -1995,10 +1995,9 @@ function SectionDividersBlock({
 }) {
   const dividers = values.dividers ?? {};
 
-  // Set or unset a slot's `enabled` field. When turning ON, seed an empty
-  // object so the storefront renders with DEFAULT_DIVIDER_SETTINGS. When
-  // turning OFF, mark explicit `enabled: false` so the storefront doesn't
-  // fall back to the legacy boolean.
+  // Slot toggles. When turning ON, seed `enabled: true` while preserving any
+  // existing styling fields. When OFF, mark explicit `enabled: false` so the
+  // storefront doesn't fall back to the legacy boolean.
   function setSlot(slot: 'above' | 'kicker' | 'title' | 'subtitle' | 'belowHeading', on: boolean) {
     onPatch({
       dividers: {
@@ -2016,6 +2015,35 @@ function SectionDividersBlock({
   const titleOn = dividers.title?.enabled === true;
   const subtitleOn = dividers.subtitle?.enabled ?? values.showSubtitleLines !== false;
   const belowHeadingOn = dividers.belowHeading?.enabled === true;
+  const anyOn = aboveOn || kickerOn || titleOn || subtitleOn || belowHeadingOn;
+
+  // Shared styling: one set of style/thickness/width/color/spacing applied to
+  // every enabled slot in this section. Reads from above slot's styling as
+  // the canonical source (falls back to next enabled slot, then defaults).
+  // Writing fans out the change to ALL enabled slots so they stay in sync.
+  const styleSource: Partial<import('@force/shared').DividerSettings> =
+    dividers.above ??
+    dividers.kicker ??
+    dividers.title ??
+    dividers.subtitle ??
+    dividers.belowHeading ??
+    {};
+  const sharedStyle = styleSource.style ?? 'solid';
+  const sharedThickness = styleSource.thickness ?? 1;
+  const sharedWidth = styleSource.width ?? 'short';
+  const sharedColor = styleSource.color ?? 'foreground';
+  const sharedSpacing = styleSource.spacing ?? 'normal';
+
+  function patchSharedStyle(patch: Partial<import('@force/shared').DividerSettings>) {
+    const slots = ['above', 'kicker', 'title', 'subtitle', 'belowHeading'] as const;
+    const next: typeof dividers = { ...dividers };
+    for (const slot of slots) {
+      const existing = dividers[slot];
+      if (!existing) continue; // skip slots that have never been touched
+      next[slot] = { ...existing, ...patch };
+    }
+    onPatch({ dividers: next });
+  }
 
   return (
     <div className="mt-3 rounded-lg border border-dashed border-border bg-muted/20 p-3">
@@ -2023,9 +2051,8 @@ function SectionDividersBlock({
         Section dividers
       </p>
       <p className="mb-3 text-[11px] text-muted-foreground/80">
-        Hairline dividers around each part of this section. Each toggle is independent — turn on the
-        ones that match your visual rhythm. Default OFF except for kicker + subtitle, which inherit
-        the existing &quot;Heading line dividers&quot; behavior.
+        Hairline dividers around each part of this section. Pick which slots show a divider; the
+        styling below applies to all enabled slots so they stay visually consistent.
       </p>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <RowToggle
@@ -2050,7 +2077,94 @@ function SectionDividersBlock({
           onChange={v => setSlot('belowHeading', v)}
         />
       </div>
+
+      {anyOn && (
+        <div className="mt-4 grid grid-cols-2 gap-3 border-t border-border pt-3 sm:grid-cols-5">
+          <DividerStyleSelect
+            label="Style"
+            value={sharedStyle}
+            options={[
+              ['solid', 'Solid'],
+              ['dashed', 'Dashed'],
+              ['dotted', 'Dotted'],
+              ['double', 'Double'],
+            ]}
+            onChange={v => patchSharedStyle({ style: v as 'solid' })}
+          />
+          <DividerStyleSelect
+            label="Thickness"
+            value={String(sharedThickness)}
+            options={[
+              ['1', '1px'],
+              ['2', '2px'],
+              ['3', '3px'],
+            ]}
+            onChange={v => patchSharedStyle({ thickness: Number(v) as 1 | 2 | 3 })}
+          />
+          <DividerStyleSelect
+            label="Width"
+            value={sharedWidth}
+            options={[
+              ['short', 'Short'],
+              ['contained', 'Contained'],
+              ['full', 'Edge-to-edge'],
+            ]}
+            onChange={v => patchSharedStyle({ width: v as 'short' })}
+          />
+          <DividerStyleSelect
+            label="Color"
+            value={sharedColor}
+            options={[
+              ['auto', 'Auto'],
+              ['foreground', 'Foreground'],
+              ['accent', 'Accent'],
+              ['custom', 'Custom'],
+            ]}
+            onChange={v => patchSharedStyle({ color: v as 'auto' })}
+          />
+          <DividerStyleSelect
+            label="Spacing"
+            value={sharedSpacing}
+            options={[
+              ['tight', 'Tight'],
+              ['normal', 'Normal'],
+              ['loose', 'Loose'],
+            ]}
+            onChange={v => patchSharedStyle({ spacing: v as 'tight' })}
+          />
+        </div>
+      )}
     </div>
+  );
+}
+
+/** Tiny labelled native select for the shared divider style controls. */
+function DividerStyleSelect({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: ReadonlyArray<readonly [string, string]>;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        className="rounded-lg border border-border bg-background px-2 py-1.5 text-sm"
+      >
+        {options.map(([v, l]) => (
+          <option key={v} value={v}>
+            {l}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 
