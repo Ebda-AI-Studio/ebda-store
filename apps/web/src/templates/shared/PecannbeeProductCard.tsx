@@ -341,6 +341,7 @@ function PecannbeeProductCardImpl({
             href={href}
             prefetch={false}
             className={`mt-auto inline-flex w-full items-center justify-center gap-2 min-h-[44px] ${styles.productCardCta}`}
+            data-cta="button"
             style={{
               fontFamily: productCtaZone?.fontFamily,
               fontSize: responsiveFontSize(productCtaZone?.fontSize),
@@ -358,6 +359,7 @@ function PecannbeeProductCardImpl({
             type="button"
             disabled={!inStock || isAdding}
             onClick={handleAdd}
+            data-cta="button"
             className={`mt-auto inline-flex w-full items-center justify-center gap-2 min-h-[44px] ${styles.productCardCta} disabled:cursor-not-allowed disabled:opacity-60`}
             style={{
               fontFamily: productCtaZone?.fontFamily,

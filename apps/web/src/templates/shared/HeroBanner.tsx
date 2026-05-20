@@ -121,6 +121,7 @@ export function HeroBanner({
               <Link
                 href={ctaHref}
                 className={`mt-6 inline-flex items-center justify-center ${styles.heroCta}`}
+                data-cta="button"
               >
                 {cta}
               </Link>

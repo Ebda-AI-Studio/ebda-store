@@ -808,3 +808,55 @@
 :where([data-zone]) {
   text-decoration: none;
 }
+
+/* Platform default 2026-05-21: CTA hover animation. Subtle lift +
+ * brightening on any element that opts in via `data-cta` attribute.
+ * Applied to "See all →" links, hero CTAs, product card CTAs, header
+ * cart/account buttons — anywhere the merchant might click to navigate.
+ *
+ * Three levels of motion are encoded:
+ *   1. Subtle scale-up (1 → 1.02) — body-friendly, never jarring
+ *   2. Underline-from-center on text CTAs — only fires when [data-cta=link]
+ *   3. Shadow lift on solid buttons — only fires when [data-cta=button]
+ *
+ * Respects `prefers-reduced-motion: reduce` — falls back to opacity-only
+ * hover state. Per-theme pack-styles still own the resting visual
+ * identity; this just adds the motion. */
+@media (prefers-reduced-motion: no-preference) {
+  :where([data-cta]) {
+    transition:
+      transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1),
+      box-shadow 240ms cubic-bezier(0.2, 0.8, 0.2, 1),
+      filter 200ms ease-out;
+  }
+  :where([data-cta]):hover {
+    transform: translateY(-1px) scale(1.015);
+    filter: brightness(1.05);
+  }
+  :where([data-cta]):active {
+    transform: translateY(0) scale(0.995);
+    transition-duration: 80ms;
+  }
+  :where([data-cta='button']):hover {
+    box-shadow: 0 8px 24px -8px hsl(var(--foreground) / 0.18);
+  }
+  :where([data-cta='link']) {
+    background-image: linear-gradient(currentColor, currentColor);
+    background-size: 0% 1px;
+    background-position: 0 100%;
+    background-repeat: no-repeat;
+    transition:
+      background-size 320ms cubic-bezier(0.2, 0.8, 0.2, 1),
+      transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1),
+      filter 200ms ease-out;
+  }
+  :where([data-cta='link']):hover {
+    background-size: 100% 1px;
+    transform: none; /* underline-from-center is its own motion; no lift */
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :where([data-cta]):hover {
+    filter: brightness(1.05);
+  }
+}

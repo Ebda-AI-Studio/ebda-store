@@ -356,6 +356,7 @@ export function SectionHeading({
             href={seeAllHref}
             className={`mt-2 block text-end shrink-0 sm:absolute sm:end-0 sm:bottom-0 sm:mt-0 ${styles.sectionSeeAll}`}
             data-zone="sectionSeeAll"
+            data-cta="link"
             style={{
               fontFamily: seeAllZone?.fontFamily,
               fontSize: responsiveFontSize(seeAllZone?.fontSize),

@@ -482,6 +482,7 @@ export function ProductCarousel({
                           prefetch={false}
                           className={`block w-full text-center cursor-pointer ${styles.productCardCta}`}
                           data-zone="productCta"
+                          data-cta="button"
                           style={ctaStyle}
                         >
                           {isRtl ? 'عرض' : 'View'}
@@ -504,6 +505,7 @@ export function ProductCarousel({
                             onClick={() => onAddToCart(product.id)}
                             className={`block w-full text-center cursor-pointer ${styles.productCardCta}`}
                             data-zone="productCta"
+                            data-cta="button"
                             style={ctaStyle}
                           >
                             {isRtl ? 'إضافة للسلة' : 'Add to cart'}
