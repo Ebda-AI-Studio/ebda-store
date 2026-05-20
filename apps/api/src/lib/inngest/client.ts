@@ -127,6 +127,15 @@ type StockDeadstockScanRequestedEvent = EventPayload & {
   };
 };
 
+type AccountingExpenseOcrProcessEvent = EventPayload & {
+  name: 'accounting/expense-ocr-process';
+  data: {
+    storeId: string;
+    receiptUrl: string;
+    uploadedBy?: string;
+  };
+};
+
 export type AppEvent =
   | OrderCreatedEvent
   | BulkImportStartedEvent
@@ -140,7 +149,8 @@ export type AppEvent =
   | StockAdjustmentPostedEvent
   | AccountingExpensePostedEvent
   | StockReorderScanRequestedEvent
-  | StockDeadstockScanRequestedEvent;
+  | StockDeadstockScanRequestedEvent
+  | AccountingExpenseOcrProcessEvent;
 
 // Inngest re-registers the function manifest only when it detects a
 // deploy-version change. Without an explicit deploy id, Railway boots

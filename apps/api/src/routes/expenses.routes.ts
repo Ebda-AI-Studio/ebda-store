@@ -1,8 +1,13 @@
 import { Router } from 'express';
+import multer from 'multer';
 import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
+import { uploadLimiter, dailyUploadLimiter } from '../middleware/security';
+import { StorageService } from '../services/storage.service';
 import { runInTenantContext } from '@force/database';
+import { inngest } from '../lib/inngest/client';
+import logger from '../lib/logger';
 import {
   createExpense,
   approveExpense,
@@ -13,6 +18,20 @@ import {
 } from '../services/accounting/expense.service';
 
 const router = Router();
+
+// Multer for receipt image uploads (memory storage, same pattern as upload.routes.ts)
+const receiptUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024, files: 1 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = new Set(['image/jpeg', 'image/png', 'image/webp']);
+    if (allowed.has(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`Unsupported file type: ${file.mimetype}. Allowed: jpeg, png, webp`));
+    }
+  },
+});
 
 const createSchema = z.object({
   supplierId: z.string().uuid().optional(),
@@ -169,20 +188,69 @@ router.post(
   }
 );
 
-// POST /:storeId/expenses/upload-receipt — receipt OCR deferred to Batch 3.
-// This stub stores the URL and returns it; the merchant attaches it via the
-// create endpoint. Full R2 upload + OCR extraction ships in Batch 3.
+// POST /:storeId/expenses/upload-receipt — upload a receipt image to R2 and
+// queue async OCR extraction via Inngest. Returns 202 immediately; the expense
+// draft appears in the list once the OCR job completes (typically <10 seconds).
 router.post(
   '/:storeId/expenses/upload-receipt',
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
-  async (_req, res, _next) => {
-    res.status(501).json({
-      error: 'not_implemented',
-      message:
-        'Receipt upload is scheduled for Batch 3 (OCR pipeline). Pass receiptImageUrl directly on expense creation for now.',
-    });
+  uploadLimiter,
+  dailyUploadLimiter,
+  receiptUpload.single('file'),
+  async (req, res, next) => {
+    try {
+      if (!req.file) {
+        res
+          .status(400)
+          .json({ error: 'no_file', message: 'No file uploaded. Send field name: file' });
+        return;
+      }
+
+      if (!StorageService.isAvailable()) {
+        res
+          .status(503)
+          .json({ error: 'storage_unavailable', message: 'R2 storage is not configured.' });
+        return;
+      }
+
+      // Upload to R2 under stores/<storeId>/receipts/
+      const uploaded = await runInTenantContext(req.params.storeId, () =>
+        StorageService.upload(req.file!.buffer, req.file!.originalname, {
+          folder: 'misc', // misc is on the ALLOWED_FOLDERS list in storage.service.ts
+          storeId: req.params.storeId,
+          contentType: req.file!.mimetype,
+          allowedTypes: ['image/jpeg', 'image/png', 'image/webp'],
+        })
+      );
+
+      // Fire async OCR job — non-blocking
+      try {
+        await inngest.send({
+          name: 'accounting/expense-ocr-process',
+          data: {
+            storeId: req.params.storeId,
+            receiptUrl: uploaded.url,
+            uploadedBy: req.user?.userId,
+          },
+        });
+      } catch (inngestErr) {
+        // Log but don't fail the upload — the URL is already in R2
+        logger.error(
+          { err: inngestErr, storeId: req.params.storeId, url: uploaded.url },
+          'upload-receipt: failed to enqueue OCR job'
+        );
+      }
+
+      res.status(202).json({
+        jobAccepted: true,
+        receiptUrl: uploaded.url,
+        message: 'Processing — your expense draft will appear shortly.',
+      });
+    } catch (err) {
+      next(err);
+    }
   }
 );
 
