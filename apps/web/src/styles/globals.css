@@ -805,6 +805,6 @@
  * per-theme basis (e.g. modern adds hover:underline to sectionSeeAll).
  * Merchant typography overrides via [data-zone="X"] in the per-store style
  * tag win via source order — that tag is emitted AFTER this stylesheet. */
-[data-zone] {
+:where([data-zone]) {
   text-decoration: none;
 }
