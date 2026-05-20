@@ -1,7 +1,12 @@
 'use client';
 
 import { useStore } from '../../contexts/StoreContext';
-import { DEFAULT_DIVIDER_SETTINGS, type DividerSettings } from '@force/shared';
+import {
+  DEFAULT_DIVIDER_SETTINGS,
+  resolveColor,
+  type DividerSettings,
+  type StoreTheme,
+} from '@force/shared';
 
 interface SectionDividerProps {
   /**
@@ -85,7 +90,7 @@ export function SectionDivider({ settings, hideForExplicitBg }: SectionDividerPr
 
   // Color resolution — single source of truth so the admin live preview
   // and the storefront render stay in lockstep.
-  const colorCss = resolveDividerColor(merged, store.theme?.primaryColor);
+  const colorCss = resolveDividerColor(merged, store.theme);
 
   // Vertical padding bands per spacing token. Padding sits OUTSIDE the
   // line itself so adjacent sections don't grow when dividers turn on.
@@ -122,16 +127,24 @@ export function SectionDivider({ settings, hideForExplicitBg }: SectionDividerPr
   );
 }
 
-function resolveDividerColor(settings: DividerSettings, primaryColor?: string): string {
+function resolveDividerColor(settings: DividerSettings, theme: StoreTheme | undefined): string {
   switch (settings.color) {
     case 'foreground':
       // 0.30 matches the SectionKicker hairline opacity (bg-foreground/30)
       // exactly — Ahmad's reference 2026-05-17 evening.
       return 'hsl(var(--foreground) / 0.30)';
     case 'accent':
-      return primaryColor ? `hsl(${primaryColor})` : 'hsl(var(--primary))';
+      return theme?.primaryColor ? `hsl(${theme.primaryColor})` : 'hsl(var(--primary))';
     case 'custom':
-      return settings.customColor || 'hsl(var(--border))';
+      // 2026-05-20: customColor now accepts EITHER a raw hex (#RRGGBB) OR
+      // a brand token reference (token:primary / token:accent / etc).
+      // resolveColor handles both transparently; hex passes through, tokens
+      // resolve via the StoreTheme.
+      if (settings.customColor) {
+        if (!theme) return settings.customColor;
+        return resolveColor(settings.customColor, theme) ?? settings.customColor;
+      }
+      return 'hsl(var(--border))';
     case 'auto':
     default:
       return 'hsl(var(--border))';

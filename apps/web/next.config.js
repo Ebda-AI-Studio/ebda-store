@@ -68,12 +68,14 @@ const nextConfig = {
       {
         source: '/:path*',
         headers: [
-          // X-Frame-Options is the legacy header; modern browsers use CSP
-          // frame-ancestors (below) which is stricter + per-source. Setting
-          // to SAMEORIGIN so the admin page-builder live-preview iframe works
-          // for own-origin admin domains. CSP `frame-ancestors` below is the
-          // actual gate — DENY here would block CSP-allowed origins too.
-          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+          // X-Frame-Options REMOVED 2026-05-20 — Ahmad's live preview was
+          // still showing "This content is blocked" because some browsers
+          // (notably Safari and older Chrome variants) honor X-Frame-Options
+          // OVER CSP frame-ancestors when both are present. SAMEORIGIN
+          // blocked admin.forcemediakw.com → wadyaljuz.com framing even
+          // though CSP frame-ancestors allowed it. CSP frame-ancestors below
+          // is the canonical gate. Modern browsers ignore the absence of
+          // X-Frame-Options; legacy browsers (IE) just allow framing.
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           { key: 'Permissions-Policy', value: 'geolocation=(), microphone=(), camera=()' },

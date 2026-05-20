@@ -638,6 +638,7 @@ export default function StoreLayoutPage() {
                   section="categories"
                   values={layout.categories}
                   onPatch={patch => updateSection('categories', s => ({ ...s, ...patch }))}
+                  theme={storeInfo?.theme ?? FALLBACK_THEME}
                 />
                 {/* Card size, aspect, and visual toggles — Ahmad 2026-05-16
                     'make categories smaller + add options through admin'. */}
@@ -918,6 +919,7 @@ export default function StoreLayoutPage() {
                   section="newArrivals"
                   values={layout.newArrivals}
                   onPatch={patch => updateSection('newArrivals', s => ({ ...s, ...patch }))}
+                  theme={storeInfo?.theme ?? FALLBACK_THEME}
                 />
                 <ProductCardControls
                   values={layout.newArrivals}
@@ -1030,6 +1032,7 @@ export default function StoreLayoutPage() {
                   section="bestSellers"
                   values={layout.bestSellers}
                   onPatch={patch => updateSection('bestSellers', s => ({ ...s, ...patch }))}
+                  theme={storeInfo?.theme ?? FALLBACK_THEME}
                 />
                 <ProductCardControls
                   values={layout.bestSellers}
@@ -2199,11 +2202,16 @@ function KickerSubtitleControls({
   section,
   values,
   onPatch,
+  theme,
 }: {
   storeId: string;
   section: 'categories' | 'newArrivals' | 'bestSellers' | 'featured' | 'testimonials';
   values: KickerSubtitleValues;
   onPatch: (patch: Partial<KickerSubtitleValues>) => void;
+  /** Pass-through to the embedded SectionDividersBlock so its custom-color
+   *  ColorField can resolve brand tokens. Optional — falls back to a hex-only
+   *  picker when omitted. */
+  theme?: import('@force/shared').StoreTheme;
 }) {
   return (
     <>
@@ -2254,7 +2262,7 @@ function KickerSubtitleControls({
           dir="rtl"
         />
       </div>
-      <SectionDividersBlock values={values} onPatch={onPatch} />
+      <SectionDividersBlock values={values} onPatch={onPatch} theme={theme} />
     </>
   );
 }
@@ -3166,6 +3174,7 @@ function ExtraCarouselCard({
           onPatch={patch => {
             if (patch.dividers) onPatch({ dividers: patch.dividers });
           }}
+          theme={theme}
         />
         <SectionPaddingMaxWidthBlock values={extra} onPatch={p => onPatch(p)} />
         <SectionPreview
@@ -3329,6 +3338,7 @@ function ExtraSectionCard({
           onPatch={patch => {
             if (patch.dividers) onPatch({ dividers: patch.dividers });
           }}
+          theme={theme}
           // Audit fix 2026-05-20: Header/Footer/Announcement/BrandStory/
           // TrustStrip/BlogCarousel don't render a SectionHeading with
           // kicker/title/subtitle, so those toggles would be decorative.
@@ -3451,6 +3461,7 @@ function SectionDividersBlock({
   values,
   onPatch,
   availableSlots,
+  theme,
 }: {
   values: KickerSubtitleValues;
   onPatch: (patch: Partial<KickerSubtitleValues>) => void;
@@ -3461,6 +3472,11 @@ function SectionDividersBlock({
    *  decorative because those sections don't render a heading with those
    *  parts. Audit fix Ahmad 2026-05-20. */
   availableSlots?: DividerSlot[];
+  /** Resolved store theme — needed for the ColorField when color === 'custom'
+   *  so the brand-token dropdown can resolve primary/accent/etc + show the
+   *  contrast preview. Optional (pre-existing callsites without theme still
+   *  work, just without contrast preview). */
+  theme?: import('@force/shared').StoreTheme;
 }) {
   const dividers = values.dividers ?? {};
 
@@ -3591,36 +3607,31 @@ function SectionDividersBlock({
             ]}
             onChange={v => patchSharedStyle({ width: v as 'short' })}
           />
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1 sm:col-span-2">
             <DividerStyleSelect
               label="Color"
               value={sharedColor}
               options={[
-                ['auto', 'Auto (theme)'],
-                ['foreground', 'Foreground'],
-                ['accent', 'Brand accent'],
-                ['custom', 'Custom hex'],
+                ['auto', 'Auto (theme border token)'],
+                ['foreground', 'Foreground (high contrast)'],
+                ['accent', 'Brand accent (primary)'],
+                ['custom', 'Custom — brand token or hex'],
               ]}
               onChange={v => patchSharedStyle({ color: v as 'auto' })}
             />
             {sharedColor === 'custom' && (
-              <div className="flex items-center gap-2 rounded-lg border border-border bg-background px-2 py-1.5">
-                <input
-                  type="color"
-                  value={sharedCustomColor}
-                  onChange={e => patchSharedStyle({ customColor: e.target.value })}
-                  className="h-6 w-8 cursor-pointer rounded border-0 bg-transparent"
-                  aria-label="Custom divider color"
-                />
-                <input
-                  type="text"
-                  value={sharedCustomColor}
-                  onChange={e => patchSharedStyle({ customColor: e.target.value })}
-                  placeholder="#RRGGBB"
-                  pattern="^#[0-9a-fA-F]{3,8}$"
-                  className="w-24 rounded border border-border bg-background px-2 py-0.5 font-mono text-xs"
-                />
-              </div>
+              // 2026-05-20: replaced the tiny inline color input with the
+              // proper ColorField — gives merchants the brand-token dropdown
+              // (primary / secondary / accent / card / muted / foreground /
+              // background / border / etc) AND a full-size hex picker AND a
+              // contrast preview. Same component used by every other color
+              // field in page-builder.
+              <ColorField
+                label=""
+                value={sharedCustomColor}
+                onChange={v => patchSharedStyle({ customColor: v || undefined })}
+                theme={theme}
+              />
             )}
           </div>
           <DividerStyleSelect
