@@ -419,19 +419,19 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     // emitted as a CSS value and the browser silently dropped the rule.
     if (v.startsWith('token:')) {
       const key = v.slice('token:'.length);
-      // Bg tokens used as text → flip to readable text counterpart so the
-      // merchant doesn't accidentally make text invisible.
-      if (context === 'text' && (key === 'background' || key === 'card')) {
-        return 'hsl(var(--foreground, 220 13% 12%))';
-      }
-      if (context === 'text' && key === 'muted') {
-        return 'hsl(var(--muted-foreground, 220 9% 46%))';
-      }
-      // Text tokens used as bg → flip to bg counterpart.
-      if (context === 'background' && key === 'foreground') {
-        return 'hsl(var(--background, 0 0% 100%))';
-      }
-      // Generic — any other token name maps directly to its CSS variable.
+      // 2026-05-20 night: NO "smart" readability flips. Honor merchant intent
+      // exactly. ColorField in admin already shows a contrast preview against
+      // the store's background, so the merchant has feedback at the point of
+      // pick. Auto-flipping `token:card` (bg token) when used as TEXT was
+      // wrong — a merchant who saved a dark footer bg + picked `card` for
+      // the text was deliberately choosing white text on the dark surface.
+      // The flip rewrote it to `--foreground` (dark) → dark-on-dark
+      // invisible. Verified on Wady Aljuz footer.
+      //
+      // Reference: feedback-self-suppressing-convenience-gate (global). The
+      // merchant's explicit toggle/pick beats any platform "designer
+      // preference" auto-correct.
+      //
       // Identifier-only allowlist to keep CSS-injection surface zero.
       if (/^[a-zA-Z][a-zA-Z0-9-]{0,32}$/.test(key)) {
         return `hsl(var(--${key}))`;
