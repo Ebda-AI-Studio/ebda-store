@@ -6,7 +6,9 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useCart } from '../contexts/CartContext';
 import { useTemplateComponents } from '../hooks/useTemplateComponents';
 import { BottomTabBar } from '../templates/shared/BottomTabBar';
+import { FloatingWidget } from '../templates/shared/FloatingWidget';
 import { SectionDivider } from '../templates/shared/SectionDivider';
+import type { FloatingWidgetConfig } from '@force/shared';
 import { resolveColor } from '@force/shared';
 import type { StoreLayoutSettings } from '@force/shared';
 import type {
@@ -327,6 +329,21 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
           the component. Mounts last so its fixed positioning sits above
           everything else in the chrome. */}
       <BottomTabBar />
+
+      {/* Floating Widget — opt-in engagement feature 2026-05-21. Renders
+          only when:
+            1. `floating_widget` is in store.enabledFeatures (super-admin
+               gated via the feature registry), AND
+            2. `store.settings.floatingWidget.enabled` is true (merchant
+               flipped it on from /stores/[id]/floating-widget).
+          When either gate fails, FloatingWidget returns null. */}
+      {store.enabledFeatures?.includes('floating_widget') && (
+        <FloatingWidget
+          config={(store.settings?.floatingWidget as FloatingWidgetConfig | undefined) ?? undefined}
+          theme={store.theme}
+          isRtl={isRtl}
+        />
+      )}
     </div>
   );
 }

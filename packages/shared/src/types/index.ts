@@ -13,6 +13,11 @@ export * from './typography';
 // admin "Recommended size" hints + future server-side validators).
 export * from './image-standards';
 
+// Engagement: floating action button widget (super-admin opt-in via
+// the `floating_widget` feature flag; per-store config on
+// `Store.settings.floatingWidget`).
+export * from './floating-widget';
+
 // API Response Types
 export interface ApiResponse<T = unknown> {
   success: boolean;
