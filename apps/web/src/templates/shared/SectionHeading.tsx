@@ -2,11 +2,13 @@
 
 import type React from 'react';
 import Link from 'next/link';
-import type { TemplateId, SectionDividers } from '@force/shared';
+import type { TemplateId, SectionDividers, DividerSettings } from '@force/shared';
+import { DEFAULT_DIVIDER_SETTINGS } from '@force/shared';
 import { getPackStyles } from './pack-styles';
 import type { ResolvedZone } from './section-typography';
 import { responsiveFontSize } from './section-typography';
-import { SectionDivider } from './SectionDivider';
+import { SectionDivider, resolveDividerColor } from './SectionDivider';
+import { useStore } from '../../contexts/StoreContext';
 
 interface SectionHeadingProps {
   title?: string;
@@ -84,9 +86,39 @@ export function SectionHeading({
   // booleans when present. When the new `dividers.{kicker,title,subtitle}` is
   // undefined, fall back to the deprecated boolean props so existing stores
   // keep their current look.
+  const { store } = useStore();
   const kickerLinesEnabled = dividers?.kicker?.enabled ?? showKickerLines !== false;
   const titleLinesEnabled = dividers?.title?.enabled === true;
   const subtitleLinesEnabled = dividers?.subtitle?.enabled ?? showSubtitleLines !== false;
+
+  // Compute the flanking line style for each slot from the merchant's saved
+  // DividerSettings. The line was hardcoded `bg-foreground/30` (Tailwind class)
+  // which silently ignored merchant `customColor` / `color` / `thickness` picks
+  // — verified FWB 2026-05-20: Ahmad saved customColor=token:card for the
+  // categories subtitle divider but the storefront kept rendering the default
+  // foreground hairline. Fix: resolve the merchant's pick via the canonical
+  // resolveDividerColor helper and apply as inline backgroundColor + height.
+  //
+  // When the merchant left settings at default (`color: 'auto'` and no other
+  // overrides), keep the legacy `bg-foreground/30` editorial-hairline class so
+  // existing stores see zero visual change.
+  const flankingLineStyle = (slot: Partial<DividerSettings> | undefined) => {
+    const explicitPick =
+      slot && (slot.color !== undefined || slot.customColor || slot.thickness || slot.style);
+    if (!explicitPick) return undefined;
+    const merged: DividerSettings = { ...DEFAULT_DIVIDER_SETTINGS, ...slot };
+    const color = resolveDividerColor(merged, store.theme);
+    return {
+      backgroundColor: color,
+      height: `${merged.thickness ?? 1}px`,
+    } as React.CSSProperties;
+  };
+  const kickerLineStyle = flankingLineStyle(dividers?.kicker);
+  const titleLineStyle = flankingLineStyle(dividers?.title);
+  const subtitleLineStyle = flankingLineStyle(dividers?.subtitle);
+  // Tailwind fallback class — used only when the merchant didn't pick.
+  const FLANK_DEFAULT_CLS = 'h-px bg-foreground/30';
+  const flankBaseCls = 'flex-1 max-w-[140px] sm:max-w-[200px]';
   const text = isRtl ? (titleAr ?? title) : (title ?? titleAr);
   const kickerText = isRtl ? (kickerAr ?? kicker) : (kicker ?? kickerAr);
   const subtitleText = isRtl ? (subtitleAr ?? subtitle) : (subtitle ?? subtitleAr);
@@ -151,7 +183,10 @@ export function SectionHeading({
                 <span
                   aria-hidden
                   data-kicker-divider-line
-                  className="h-px flex-1 max-w-[140px] sm:max-w-[200px] bg-foreground/30"
+                  className={
+                    kickerLineStyle ? flankBaseCls : `${FLANK_DEFAULT_CLS} ${flankBaseCls}`
+                  }
+                  style={kickerLineStyle}
                 />
               )}
               <span
@@ -174,7 +209,10 @@ export function SectionHeading({
                 <span
                   aria-hidden
                   data-kicker-divider-line
-                  className="h-px flex-1 max-w-[140px] sm:max-w-[200px] bg-foreground/30"
+                  className={
+                    kickerLineStyle ? flankBaseCls : `${FLANK_DEFAULT_CLS} ${flankBaseCls}`
+                  }
+                  style={kickerLineStyle}
                 />
               )}
             </div>
@@ -198,7 +236,8 @@ export function SectionHeading({
                 <span
                   aria-hidden
                   data-title-divider-line
-                  className="h-px flex-1 max-w-[140px] sm:max-w-[200px] bg-foreground/30"
+                  className={titleLineStyle ? flankBaseCls : `${FLANK_DEFAULT_CLS} ${flankBaseCls}`}
+                  style={titleLineStyle}
                 />
                 <h2
                   className={styles.sectionHeading}
@@ -219,7 +258,8 @@ export function SectionHeading({
                 <span
                   aria-hidden
                   data-title-divider-line
-                  className="h-px flex-1 max-w-[140px] sm:max-w-[200px] bg-foreground/30"
+                  className={titleLineStyle ? flankBaseCls : `${FLANK_DEFAULT_CLS} ${flankBaseCls}`}
+                  style={titleLineStyle}
                 />
               </div>
             ) : (
@@ -275,7 +315,10 @@ export function SectionHeading({
                 <span
                   aria-hidden
                   data-subtitle-divider-line
-                  className="h-px flex-1 max-w-[140px] sm:max-w-[200px] bg-foreground/30"
+                  className={
+                    subtitleLineStyle ? flankBaseCls : `${FLANK_DEFAULT_CLS} ${flankBaseCls}`
+                  }
+                  style={subtitleLineStyle}
                 />
               )}
               <p
@@ -299,7 +342,10 @@ export function SectionHeading({
                 <span
                   aria-hidden
                   data-subtitle-divider-line
-                  className="h-px flex-1 max-w-[140px] sm:max-w-[200px] bg-foreground/30"
+                  className={
+                    subtitleLineStyle ? flankBaseCls : `${FLANK_DEFAULT_CLS} ${flankBaseCls}`
+                  }
+                  style={subtitleLineStyle}
                 />
               )}
             </div>

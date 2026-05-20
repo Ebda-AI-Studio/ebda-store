@@ -127,7 +127,10 @@ export function SectionDivider({ settings, hideForExplicitBg }: SectionDividerPr
   );
 }
 
-function resolveDividerColor(settings: DividerSettings, theme: StoreTheme | undefined): string {
+export function resolveDividerColor(
+  settings: DividerSettings,
+  theme: StoreTheme | undefined
+): string {
   switch (settings.color) {
     case 'foreground':
       // 0.30 matches the SectionKicker hairline opacity (bg-foreground/30)
