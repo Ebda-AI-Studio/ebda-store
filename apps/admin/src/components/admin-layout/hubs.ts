@@ -8,6 +8,7 @@ export interface HubDefinition {
     | 'stock'
     | 'finance'
     | 'analytics'
+    | 'insights'
     | 'marketing'
     | 'settings';
   /** URL path segments (after `/stores/[id]`) that belong to this hub. */
@@ -40,6 +41,12 @@ export type HubLabels = {
   journal: string;
   expenses: string;
   reports: string;
+  // Insights tabs
+  insightsDashboard: string;
+  insightsCohorts: string;
+  insightsFunnel: string;
+  insightsSegments: string;
+  insightsProducts: string;
   // Marketing tabs
   aiTools: string;
   whatsapp: string;
@@ -98,6 +105,17 @@ export const HUBS: HubDefinition[] = [
     key: 'analytics',
     urlPrefixes: ['/analytics'],
     buildTabs: () => [],
+  },
+  {
+    key: 'insights',
+    urlPrefixes: ['/insights'],
+    buildTabs: (storeId, labels) => [
+      { label: labels.insightsDashboard, href: `/stores/${storeId}/insights/dashboard` },
+      { label: labels.insightsCohorts, href: `/stores/${storeId}/insights/cohorts` },
+      { label: labels.insightsFunnel, href: `/stores/${storeId}/insights/funnel` },
+      { label: labels.insightsSegments, href: `/stores/${storeId}/insights/segments` },
+      { label: labels.insightsProducts, href: `/stores/${storeId}/insights/products` },
+    ],
   },
   {
     key: 'marketing',

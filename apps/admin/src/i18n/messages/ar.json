@@ -164,6 +164,7 @@
         "netThisMonth": "صافي الربح للشهر",
         "stockValue": "قيمة المخزون",
         "openBackorders": "الطلبات المعلقة",
+        "topRfmSegment": "أبرز شريحة عملاء",
         "error": "تعذر تحميل الملخص المالي"
       },
       "details": {
@@ -3589,6 +3590,7 @@
       "navStock": "المخزون",
       "navFinance": "المالية",
       "navAnalytics": "التحليلات",
+      "navInsights": "الإحصاءات",
       "navMarketing": "التسويق",
       "navSettings": "الإعدادات",
       "navStores": "المتاجر",
@@ -3614,6 +3616,11 @@
         "journal": "اليومية",
         "expenses": "المصروفات",
         "reports": "التقارير",
+        "insightsDashboard": "نظرة عامة",
+        "insightsCohorts": "الشرائح الزمنية",
+        "insightsFunnel": "قمع الشراء",
+        "insightsSegments": "شرائح العملاء",
+        "insightsProducts": "المنتجات",
         "aiTools": "أدوات الذكاء الاصطناعي",
         "whatsapp": "واتساب"
       },

@@ -164,6 +164,7 @@
         "netThisMonth": "Net income this month",
         "stockValue": "Stock value",
         "openBackorders": "Open backorders",
+        "topRfmSegment": "Top Customer Segment",
         "error": "Unable to load financial summary"
       },
       "details": {
@@ -3586,6 +3587,7 @@
       "navStock": "Stock",
       "navFinance": "Finance",
       "navAnalytics": "Analytics",
+      "navInsights": "Insights",
       "navMarketing": "Marketing",
       "navSettings": "Settings",
       "navStores": "Stores",
@@ -3611,6 +3613,11 @@
         "journal": "Journal",
         "expenses": "Expenses",
         "reports": "Reports",
+        "insightsDashboard": "Overview",
+        "insightsCohorts": "Cohorts",
+        "insightsFunnel": "Funnel",
+        "insightsSegments": "Segments",
+        "insightsProducts": "Products",
         "aiTools": "AI Tools",
         "whatsapp": "WhatsApp"
       },

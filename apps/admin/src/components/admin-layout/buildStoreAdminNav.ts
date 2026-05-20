@@ -14,19 +14,20 @@ export interface NavItem {
 }
 
 /**
- * Labels for the 8 top-level sidebar hub items + super-admin items.
+ * Labels for the 9 top-level sidebar hub items + super-admin items.
  *
  * The per-tab labels used inside each hub (Products, Orders, Chart of Accounts,
  * etc.) live in HubLabels (hubs.ts) and are passed to HubTabs separately.
  */
 export type NavLabels = {
-  // Hub names (sidebar — 8 items)
+  // Hub names (sidebar — 9 items)
   dashboard: string;
   catalog: string;
   sales: string;
   stock: string;
   finance: string;
   analytics: string;
+  insights: string;
   marketing: string;
   settings: string;
   // Super-admin only items
@@ -111,6 +112,12 @@ export function buildStoreAdminNav(storeId: string, labels: NavLabels): NavItem[
       href: `/stores/${storeId}/analytics`,
       hubKey: 'analytics',
       // Bar chart icon
+      icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
+    },
+    {
+      name: labels.insights,
+      href: `/stores/${storeId}/insights/dashboard`,
+      hubKey: 'insights',
       icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
     },
     {

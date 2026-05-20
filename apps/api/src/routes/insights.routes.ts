@@ -395,6 +395,35 @@ router.get(
 );
 
 // ---------------------------------------------------------------------------
+// GET /:storeId/insights/customers/rfm-batch
+// Returns Array<{ customerId, segment }> for all customers with an RFM snapshot.
+// Lightweight — select only the two fields needed for the badge.
+// ---------------------------------------------------------------------------
+
+router.get(
+  '/:storeId/insights/customers/rfm-batch',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const storeId = req.params.storeId;
+
+      const rows = await runInTenantContext(storeId, () =>
+        prisma.customerRfmSnapshot.findMany({
+          where: { storeId, isGuest: false },
+          select: { customerId: true, segment: true },
+        })
+      );
+
+      res.json({ data: rows });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ---------------------------------------------------------------------------
 // GET /:storeId/insights/customers/:customerId/rfm
 // ---------------------------------------------------------------------------
 

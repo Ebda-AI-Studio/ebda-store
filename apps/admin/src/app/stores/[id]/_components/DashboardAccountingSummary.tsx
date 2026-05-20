@@ -18,6 +18,22 @@ interface StockSnapshot {
   reorderRulesCount: number;
 }
 
+interface SegmentRow {
+  name: string;
+  count: number;
+  revenue: number;
+}
+
+const SEGMENT_LABEL: Record<string, string> = {
+  vip: 'VIP',
+  loyal: 'Loyal',
+  potential: 'Potential',
+  new_customer: 'New',
+  at_risk: 'At Risk',
+  hibernating: 'Dormant',
+  lost: 'Lost',
+};
+
 interface Props {
   storeId: string;
 }
@@ -38,6 +54,7 @@ export function DashboardAccountingSummary({ storeId }: Props) {
   const t = useT('stores.dashboard.accountingSummary');
   const [fin, setFin] = useState<FinanceDashboard | null>(null);
   const [stock, setStock] = useState<StockSnapshot | null>(null);
+  const [topSegment, setTopSegment] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -51,13 +68,23 @@ export function DashboardAccountingSummary({ storeId }: Props) {
         data: null,
         error: null,
       })),
+      // Fetch top RFM segment — graceful no-op if rollup hasn't run yet
+      apiGet<{ segments: SegmentRow[] }>(`/api/v1/stores/${storeId}/insights/segments`).catch(
+        () => ({ data: null, error: null })
+      ),
     ])
-      .then(([fRes, sRes]) => {
+      .then(([fRes, sRes, segRes]) => {
         if (cancelled) return;
         const f = (fRes as { data: FinanceDashboard | null }).data ?? null;
         const s = (sRes as { data: StockSnapshot | null }).data ?? null;
+        const segData = (segRes as { data: { segments: SegmentRow[] } | null }).data;
         if (f) setFin(f);
         if (s) setStock(s);
+        if (segData?.segments?.length) {
+          // Top segment = highest customer count
+          const top = segData.segments.reduce((a, b) => (b.count > a.count ? b : a));
+          setTopSegment(top.name);
+        }
         if (!f && !s) setError(t('error'));
       })
       .catch(() => {
@@ -102,6 +129,13 @@ export function DashboardAccountingSummary({ storeId }: Props) {
       unit: '',
       tone: stock.openBackorderCount > 0 ? ('warning' as const) : ('muted' as const),
     },
+    topSegment && {
+      href: `/stores/${storeId}/insights/segments`,
+      label: t('topRfmSegment'),
+      value: SEGMENT_LABEL[topSegment] ?? topSegment,
+      unit: '',
+      tone: 'primary' as const,
+    },
   ].filter(Boolean) as Array<{
     href: string;
     label: string;
@@ -124,7 +158,7 @@ export function DashboardAccountingSummary({ storeId }: Props) {
       <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
         {t('title')}
       </h2>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         {tiles.map(tile => (
           <Link
             key={tile.label}

@@ -95,12 +95,24 @@ function formatDate(dateString: string) {
   });
 }
 
+/** Segment → { label, bg-class, text-class } mapping for the badge */
+const RFM_BADGE: Record<string, { label: string; bg: string; text: string }> = {
+  vip: { label: 'VIP', bg: 'bg-yellow-100', text: 'text-yellow-800' },
+  loyal: { label: 'Loyal', bg: 'bg-green-100', text: 'text-green-800' },
+  potential: { label: 'Potential', bg: 'bg-blue-100', text: 'text-blue-800' },
+  new_customer: { label: 'New', bg: 'bg-info/10', text: 'text-info' },
+  at_risk: { label: 'At Risk', bg: 'bg-warning/10', text: 'text-warning-foreground' },
+  hibernating: { label: 'Dormant', bg: 'bg-muted', text: 'text-muted-foreground' },
+  lost: { label: 'Lost', bg: 'bg-destructive/10', text: 'text-destructive' },
+};
+
 export default function StoreCustomersPage() {
   const params = useParams();
   const storeId = params?.id as string;
   const t = useT('customers.page');
 
   const [customers, setCustomers] = useState<CustomerRow[]>([]);
+  const [rfmMap, setRfmMap] = useState<Map<string, string>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -228,6 +240,23 @@ export default function StoreCustomersPage() {
       // Sort by total spent descending
       const sorted = Array.from(customerMap.values()).sort((a, b) => b.totalSpent - a.totalSpent);
       setCustomers(sorted);
+
+      // Fetch RFM snapshots in the background — graceful no-op if not yet computed
+      apiGet<Array<{ customerId: string; segment: string }>>(
+        `/api/v1/stores/${storeId}/insights/customers/rfm-batch`
+      )
+        .then(({ data }) => {
+          if (!data) return;
+          const rows = Array.isArray(data) ? data : ((data as any).data ?? []);
+          setRfmMap(
+            new Map(
+              rows.map((r: { customerId: string; segment: string }) => [r.customerId, r.segment])
+            )
+          );
+        })
+        .catch(() => {
+          // insights not yet computed — badge stays hidden
+        });
     } catch {
       setError(t('connectionError'));
     } finally {
@@ -486,9 +515,23 @@ export default function StoreCustomersPage() {
                           {customer.firstName?.[0]}
                           {customer.lastName?.[0]}
                         </div>
-                        <p className="font-medium text-foreground">
-                          {customer.firstName} {customer.lastName}
-                        </p>
+                        <div className="flex flex-col gap-0.5">
+                          <p className="font-medium text-foreground">
+                            {customer.firstName} {customer.lastName}
+                          </p>
+                          {(() => {
+                            const seg = rfmMap.get(customer.id);
+                            const badge = seg ? RFM_BADGE[seg] : undefined;
+                            if (!badge) return null;
+                            return (
+                              <span
+                                className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${badge.bg} ${badge.text}`}
+                              >
+                                {badge.label}
+                              </span>
+                            );
+                          })()}
+                        </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-muted-foreground">{customer.email}</td>

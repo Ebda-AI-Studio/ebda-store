@@ -80,13 +80,14 @@ export function AdminLayout({
       : (explicitMode ?? (isStoreScopedPath ? 'store_admin' : 'super_admin'));
 
   const navLabels: NavLabels = {
-    // Hub names (sidebar — 8 items)
+    // Hub names (sidebar — 9 items)
     dashboard: t('navDashboard'),
     catalog: t('navCatalog'),
     sales: t('navSales'),
     stock: t('navStock'),
     finance: t('navFinance'),
     analytics: t('navAnalytics'),
+    insights: t('navInsights'),
     marketing: t('navMarketing'),
     settings: t('navSettings'),
     // Super-admin only
@@ -119,6 +120,12 @@ export function AdminLayout({
     journal: t('hubTabs.journal'),
     expenses: t('hubTabs.expenses'),
     reports: t('hubTabs.reports'),
+    // Insights tabs
+    insightsDashboard: t('hubTabs.insightsDashboard'),
+    insightsCohorts: t('hubTabs.insightsCohorts'),
+    insightsFunnel: t('hubTabs.insightsFunnel'),
+    insightsSegments: t('hubTabs.insightsSegments'),
+    insightsProducts: t('hubTabs.insightsProducts'),
     // Marketing tabs
     aiTools: t('hubTabs.aiTools'),
     whatsapp: t('hubTabs.whatsapp'),
