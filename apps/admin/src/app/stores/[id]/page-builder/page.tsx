@@ -3150,6 +3150,15 @@ function ExtraSectionCard({
           onPatch={patch => {
             if (patch.dividers) onPatch({ dividers: patch.dividers });
           }}
+          // Audit fix 2026-05-20: Header/Footer/Announcement/BrandStory/
+          // TrustStrip/BlogCarousel don't render a SectionHeading with
+          // kicker/title/subtitle, so those toggles would be decorative.
+          // Restrict to the slots that actually flow through to storefront.
+          availableSlots={
+            kind === 'header' || kind === 'footer' || kind === 'announcement'
+              ? ['above']
+              : ['above', 'belowHeading']
+          }
         />
         <SectionPaddingMaxWidthBlock values={settings} onPatch={p => onPatch(p)} />
         {typographyZones && typographyZones.length > 0 && globalZones && onZonePatch && (
@@ -3179,6 +3188,9 @@ function ExtraSectionCard({
           cardFrameWidth={undefined}
           headingZone={undefined}
           dividers={settings?.dividers}
+          // Audit fix: these sections don't render product cards on the
+          // storefront — hide the mock 3-card grid in the preview tile.
+          hideCards
           theme={theme}
         />
       </div>
@@ -3254,12 +3266,22 @@ function SectionPaddingMaxWidthBlock({
   );
 }
 
+type DividerSlot = 'above' | 'kicker' | 'title' | 'subtitle' | 'belowHeading';
+
 function SectionDividersBlock({
   values,
   onPatch,
+  availableSlots,
 }: {
   values: KickerSubtitleValues;
   onPatch: (patch: Partial<KickerSubtitleValues>) => void;
+  /** Which of the 5 slots to expose for this section. Default: all 5.
+   *  Sections without a SectionHeading (Header / Footer / Announcement /
+   *  Brand Story / Trust Strip / Blog Carousel) restrict to ['above',
+   *  'belowHeading'] only — the kicker/title/subtitle toggles would be
+   *  decorative because those sections don't render a heading with those
+   *  parts. Audit fix Ahmad 2026-05-20. */
+  availableSlots?: DividerSlot[];
 }) {
   const dividers = values.dividers ?? {};
 
@@ -3323,27 +3345,37 @@ function SectionDividersBlock({
         styling below applies to all enabled slots so they stay visually consistent.
       </p>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <RowToggle
-          label="Above this section"
-          checked={aboveOn}
-          onChange={v => setSlot('above', v)}
-        />
-        <RowToggle
-          label="Around kicker text"
-          checked={kickerOn}
-          onChange={v => setSlot('kicker', v)}
-        />
-        <RowToggle label="Around title" checked={titleOn} onChange={v => setSlot('title', v)} />
-        <RowToggle
-          label="Around subtitle"
-          checked={subtitleOn}
-          onChange={v => setSlot('subtitle', v)}
-        />
-        <RowToggle
-          label="Below heading (before content)"
-          checked={belowHeadingOn}
-          onChange={v => setSlot('belowHeading', v)}
-        />
+        {(!availableSlots || availableSlots.includes('above')) && (
+          <RowToggle
+            label="Above this section"
+            checked={aboveOn}
+            onChange={v => setSlot('above', v)}
+          />
+        )}
+        {(!availableSlots || availableSlots.includes('kicker')) && (
+          <RowToggle
+            label="Around kicker text"
+            checked={kickerOn}
+            onChange={v => setSlot('kicker', v)}
+          />
+        )}
+        {(!availableSlots || availableSlots.includes('title')) && (
+          <RowToggle label="Around title" checked={titleOn} onChange={v => setSlot('title', v)} />
+        )}
+        {(!availableSlots || availableSlots.includes('subtitle')) && (
+          <RowToggle
+            label="Around subtitle"
+            checked={subtitleOn}
+            onChange={v => setSlot('subtitle', v)}
+          />
+        )}
+        {(!availableSlots || availableSlots.includes('belowHeading')) && (
+          <RowToggle
+            label="Below heading (before content)"
+            checked={belowHeadingOn}
+            onChange={v => setSlot('belowHeading', v)}
+          />
+        )}
       </div>
 
       {anyOn && (

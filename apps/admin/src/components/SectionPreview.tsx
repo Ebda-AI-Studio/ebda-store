@@ -46,6 +46,13 @@ interface SectionPreviewProps {
    * see exactly what they'll get.
    */
   dividers?: SectionDividers;
+  /**
+   * Suppress the mock 3-product-card grid below the heading. Use for sections
+   * that don't render product cards on the storefront (Header / Footer /
+   * Announcement / Brand Story / Trust Strip / Blog Carousel) — showing them
+   * here would be decorative. Audit fix Ahmad 2026-05-20.
+   */
+  hideCards?: boolean;
   theme: StoreTheme;
 }
 
@@ -172,6 +179,7 @@ export function SectionPreview({
   productPriceZone,
   productCtaZone,
   dividers,
+  hideCards,
   theme,
 }: SectionPreviewProps) {
   const resolvedBg = resolveColor(bgColor, theme) ?? '#FFFFFF';
@@ -280,59 +288,63 @@ export function SectionPreview({
             autoFg={autoFg}
           />
         )}
-        {/* Mock product grid */}
-        <div
-          className={`grid grid-cols-3 gap-2 ${dividers?.belowHeading?.enabled ? 'mt-1' : 'mt-3'}`}
-        >
-          {[1, 2, 3].map(i => (
-            <div
-              key={i}
-              className={`flex flex-col items-stretch rounded ${widthClass} ${sizeClass} overflow-hidden`}
-              style={{ borderColor: resolvedFrame, backgroundColor: cardSurface }}
-            >
+        {/* Mock product grid — suppressed for sections without product cards
+            (header/footer/announcement/brand-story/trust-strip/blog). Audit
+            fix Ahmad 2026-05-20: showing them was decorative for those. */}
+        {!hideCards && (
+          <div
+            className={`grid grid-cols-3 gap-2 ${dividers?.belowHeading?.enabled ? 'mt-1' : 'mt-3'}`}
+          >
+            {[1, 2, 3].map(i => (
               <div
-                className="aspect-square w-full"
-                style={{ backgroundColor: 'rgba(0,0,0,0.06)' }}
-              />
-              <div className="px-1.5 py-1 text-[9px] leading-tight">
+                key={i}
+                className={`flex flex-col items-stretch rounded ${widthClass} ${sizeClass} overflow-hidden`}
+                style={{ borderColor: resolvedFrame, backgroundColor: cardSurface }}
+              >
                 <div
-                  className="truncate"
-                  style={{
-                    color: productNameColor,
-                    fontFamily: productNameZone?.fontFamily,
-                    fontWeight: productNameZone?.fontWeight,
-                  }}
-                >
-                  Product
-                </div>
-                <div
-                  className="font-semibold"
-                  style={{
-                    color: productPriceColor,
-                    fontFamily: productPriceZone?.fontFamily,
-                    fontWeight: productPriceZone?.fontWeight,
-                  }}
-                >
-                  5.000 KD
-                </div>
-                <div
-                  className="mt-0.5 rounded-sm py-0.5 text-center text-[8px] font-medium uppercase tracking-wider"
-                  style={{
-                    backgroundColor: resolvedFrame,
-                    color:
-                      resolveColor(productCtaZone?.color, theme) ??
-                      pickReadableForeground(resolvedFrame) ??
-                      '#FFFFFF',
-                    fontFamily: productCtaZone?.fontFamily,
-                    fontWeight: productCtaZone?.fontWeight,
-                  }}
-                >
-                  Add
+                  className="aspect-square w-full"
+                  style={{ backgroundColor: 'rgba(0,0,0,0.06)' }}
+                />
+                <div className="px-1.5 py-1 text-[9px] leading-tight">
+                  <div
+                    className="truncate"
+                    style={{
+                      color: productNameColor,
+                      fontFamily: productNameZone?.fontFamily,
+                      fontWeight: productNameZone?.fontWeight,
+                    }}
+                  >
+                    Product
+                  </div>
+                  <div
+                    className="font-semibold"
+                    style={{
+                      color: productPriceColor,
+                      fontFamily: productPriceZone?.fontFamily,
+                      fontWeight: productPriceZone?.fontWeight,
+                    }}
+                  >
+                    5.000 KD
+                  </div>
+                  <div
+                    className="mt-0.5 rounded-sm py-0.5 text-center text-[8px] font-medium uppercase tracking-wider"
+                    style={{
+                      backgroundColor: resolvedFrame,
+                      color:
+                        resolveColor(productCtaZone?.color, theme) ??
+                        pickReadableForeground(resolvedFrame) ??
+                        '#FFFFFF',
+                      fontFamily: productCtaZone?.fontFamily,
+                      fontWeight: productCtaZone?.fontWeight,
+                    }}
+                  >
+                    Add
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
