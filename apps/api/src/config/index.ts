@@ -209,16 +209,13 @@ export const config = {
 
 // Additional production validations (core secrets already validated above)
 if (config.nodeEnv === 'production') {
-  // Warn if no payment provider is configured
-  if (
-    !config.tapApiKey &&
-    !config.myfatoorahApiKey &&
-    !config.hesabeApiKey &&
-    !config.upaymentsApiKey
-  ) {
-    // Logger cannot be used here (it depends on config) — write directly to stderr
-    process.stderr.write('[CONFIG] Warning: No payment provider configured!\n');
-  }
+  // Payment-provider warning removed 2026-05-20 — FWB uses per-store
+  // PaymentConfig table rows (encrypted via ENCRYPTION_KEY) for every real
+  // checkout. The TAP_* / MYFATOORAH_* / HESABE_* / UPAYMENTS_* env vars
+  // only feed the legacy platform-level fallback path, which is never hit
+  // in production (no super-admin payment without a store context). The
+  // boot-time warning was misleading — it shouted about an unused code path
+  // and looked like a P0 in railway logs every cold start.
 
   // Validate JWT secret strength
   if (config.jwtSecret.length < 32) {
