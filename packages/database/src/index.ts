@@ -142,6 +142,7 @@ export {
   AnomalyScope,
   AnomalyMetric,
   AnomalySeverity,
+  RfmSegment,
 } from '@prisma/client';
 
 export { prisma as db };

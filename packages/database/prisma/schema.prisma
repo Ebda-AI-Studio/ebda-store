@@ -274,6 +274,10 @@ model Store {
   aiFeaturesEnabled  Boolean @default(true) @map("ai_features_enabled")
   aiBulkThrottleMs   Int     @default(2500)  @map("ai_bulk_throttle_ms")
 
+  // Accounting Settings (Batch 4 — Insights)
+  aiNarrationEnabled Boolean @default(true) @map("ai_narration_enabled")
+  insightsRollupCron String  @default("daily") @map("insights_rollup_cron")
+
   // Relations
   owner                    User                       @relation(fields: [ownerId], references: [id])
   // Customer accounts that authenticate against this store. Distinct from
@@ -332,6 +336,9 @@ model Store {
   reorderSuggestions       ReorderSuggestion[]
   deadstockFlags           DeadStockFlag[]
   profitAnomalies          ProfitAnomaly[]
+  customerCohortSnapshots  CustomerCohortSnapshot[]
+  funnelSnapshots          FunnelSnapshot[]
+  customerRfmSnapshots     CustomerRfmSnapshot[]
 
   @@index([ownerId])
   @@index([status])
@@ -2539,4 +2546,83 @@ model ProfitAnomaly {
   @@index([storeId, severity, detectedAt(sort: Desc)])
   @@index([storeId, acknowledged])
   @@map("profit_anomalies")
+}
+
+// ==========================================
+// Insights / BI Tier (Accounting Batch 4)
+// ==========================================
+//
+// Three nightly snapshot tables materialized by the analytics-daily-rollup
+// Inngest cron (02:00 KW). All reads from existing Order / AbandonedCart /
+// Product / User data — no new operational events, no journal posting.
+//
+// RLS: same store_id pattern as all other tenant tables (policies in migration).
+
+enum RfmSegment {
+  vip
+  loyal
+  potential
+  new_customer
+  at_risk
+  hibernating
+  lost
+}
+
+model CustomerCohortSnapshot {
+  id               String   @id @default(uuid())
+  storeId          String   @map("store_id")
+  cohortMonth      String   @map("cohort_month")    // 'YYYY-MM'
+  periodOffset     Int      @map("period_offset")
+  customersTotal   Int      @map("customers_total")
+  customersActive  Int      @map("customers_active")
+  ordersInPeriod   Int      @map("orders_in_period")
+  revenueInPeriod  Int      @map("revenue_in_period")
+  computedAt       DateTime @default(now()) @map("computed_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, cohortMonth, periodOffset])
+  @@index([storeId, cohortMonth])
+  @@map("customer_cohort_snapshots")
+}
+
+model FunnelSnapshot {
+  id                 String   @id @default(uuid())
+  storeId            String   @map("store_id")
+  periodDate         DateTime @map("period_date")
+  productViews       Int      @map("product_views")
+  cartsCreated       Int      @map("carts_created")
+  cartItemsAdded     Int      @map("cart_items_added")
+  checkoutsStarted   Int      @map("checkouts_started")
+  ordersCompleted    Int      @map("orders_completed")
+  ordersAbandoned    Int      @map("orders_abandoned")
+  revenueFils        Int      @map("revenue_fils")
+  computedAt         DateTime @default(now()) @map("computed_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, periodDate])
+  @@index([storeId, periodDate(sort: Desc)])
+  @@map("funnel_snapshots")
+}
+
+model CustomerRfmSnapshot {
+  id              String      @id @default(uuid())
+  storeId         String      @map("store_id")
+  customerId      String      @map("customer_id")
+  isGuest         Boolean     @default(false) @map("is_guest")
+  recencyDays     Int         @map("recency_days")
+  frequencyOrders Int         @map("frequency_orders")
+  monetaryFils    Int         @map("monetary_fils")
+  rfmScore        Int         @map("rfm_score")
+  segment         RfmSegment
+  previousSegment RfmSegment? @map("previous_segment")
+  computedAt      DateTime    @default(now()) @map("computed_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, customerId])
+  @@index([storeId, segment])
+  @@index([storeId, rfmScore(sort: Desc)])
+  @@map("customer_rfm_snapshots")
 }
