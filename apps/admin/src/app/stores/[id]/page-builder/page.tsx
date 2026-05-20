@@ -64,7 +64,7 @@ import { SectionPreview } from '../../../../components/SectionPreview';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { Toggle } from '../../../../components/Toggle';
 import { ImageUpload } from '../../../../components/ImageUpload';
-import { apiGet, apiPost, apiPut } from '../../../../lib/api';
+import { apiGet, apiPost, apiPut, apiFetch } from '../../../../lib/api';
 import { getStoreHref } from '../../../../lib/store-url';
 
 interface StoreInfo {
@@ -318,14 +318,16 @@ export default function StoreLayoutPage() {
               </div>
 
               {/* Fonts — manage the font library the storefront pulls in.
-                  v1: Google Fonts add via family + URL. Custom upload deferred
-                  to v2.5 (needs R2 upload route + validation). */}
+                  Google Fonts add via family (URL auto-builds) + custom
+                  font upload (.woff2/.woff/.ttf/.otf to R2 via /uploads/font). */}
               <FontsCard
+                storeId={storeId}
                 fonts={
                   typographyFonts as Array<{
                     type: 'google' | 'custom';
                     family: string;
                     url: string;
+                    format?: string;
                   }>
                 }
                 onChange={next => setTypographyFonts(next)}
@@ -2272,18 +2274,31 @@ const SECTION_LABELS: Record<SectionKey, string> = {
 // Custom font upload (v2.5) needs an R2 upload endpoint + format detection;
 // merchants who need a custom font today can hand-edit the JSONB via
 // /api/v1/stores/:id/typography.
-type FontEntry = { type: 'google' | 'custom'; family: string; url: string };
+type FontEntry = {
+  type: 'google' | 'custom';
+  family: string;
+  url: string;
+  format?: string;
+};
 
 function FontsCard({
+  storeId,
   fonts,
   onChange,
 }: {
+  storeId: string;
   fonts: FontEntry[];
   onChange: (next: FontEntry[]) => void;
 }) {
   const [showAdd, setShowAdd] = useState(false);
   const [family, setFamily] = useState('');
   const [url, setUrl] = useState('');
+  // Custom upload state
+  const [showUpload, setShowUpload] = useState(false);
+  const [uploadFamily, setUploadFamily] = useState('');
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   function addGoogle() {
     const trimmedFamily = family.trim();
@@ -2306,16 +2321,57 @@ function FontsCard({
     onChange(fonts.filter((_, i) => i !== idx));
   }
 
+  async function uploadCustom() {
+    setUploadError(null);
+    const fam = uploadFamily.trim();
+    if (!fam || !uploadFile) {
+      setUploadError('Family name and font file are both required.');
+      return;
+    }
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', uploadFile);
+      const res = await apiFetch(`/api/v1/uploads/font?storeId=${encodeURIComponent(storeId)}`, {
+        method: 'POST',
+        body: formData,
+      });
+      const data = (await res.json()) as {
+        success?: boolean;
+        data?: { url?: string; format?: string };
+        error?: { message?: string };
+      };
+      if (!res.ok || !data.success || !data.data?.url) {
+        setUploadError(data.error?.message ?? `Upload failed (HTTP ${res.status})`);
+        return;
+      }
+      onChange([
+        ...fonts,
+        {
+          type: 'custom',
+          family: fam,
+          url: data.data.url,
+          format: data.data.format ?? 'woff2',
+        },
+      ]);
+      setUploadFamily('');
+      setUploadFile(null);
+      setShowUpload(false);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Upload failed.');
+    } finally {
+      setIsUploading(false);
+    }
+  }
+
   return (
     <section className="rounded-2xl border border-border bg-card p-4 sm:p-5">
       <div className="mb-3">
         <h3 className="text-base font-semibold text-foreground">Fonts</h3>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          Fonts available to use in any Typography zone below. Add Google Fonts by family (e.g.{' '}
-          <code className="rounded bg-muted px-1 py-0.5 text-[10px]">Cairo</code>,{' '}
-          <code className="rounded bg-muted px-1 py-0.5 text-[10px]">Inter</code>) — the URL
-          auto-builds. Custom font upload coming in v2.5; in the meantime use the typography
-          endpoint directly.
+          Fonts available to use in any Typography zone below. Add Google Fonts by family name (e.g.{' '}
+          <code className="rounded bg-muted px-1 py-0.5 text-[10px]">Cairo</code>) — URL
+          auto-builds. Or upload a custom font file (.woff2/.woff/.ttf/.otf, max 5MB).
         </p>
       </div>
       {fonts.length > 0 && (
@@ -2397,14 +2453,82 @@ function FontsCard({
             </button>
           </div>
         </div>
+      ) : showUpload ? (
+        <div className="space-y-2 rounded-lg border border-dashed border-border bg-muted/20 p-3">
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-muted-foreground">
+              Font family name (display label)
+            </span>
+            <input
+              type="text"
+              value={uploadFamily}
+              onChange={e => setUploadFamily(e.target.value)}
+              placeholder='e.g. "My Brand Sans"'
+              className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-base sm:text-sm"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-muted-foreground">
+              Font file (.woff2 / .woff / .ttf / .otf — max 5MB)
+            </span>
+            <input
+              type="file"
+              accept=".woff2,.woff,.ttf,.otf,font/woff2,font/woff,font/ttf,font/otf"
+              onChange={e => setUploadFile(e.target.files?.[0] ?? null)}
+              className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+            />
+            {uploadFile && (
+              <span className="text-[11px] text-muted-foreground">
+                {uploadFile.name} ({Math.round(uploadFile.size / 1024)} KB)
+              </span>
+            )}
+          </label>
+          {uploadError && (
+            <p className="rounded-md bg-destructive/10 px-2 py-1 text-[11px] text-destructive">
+              {uploadError}
+            </p>
+          )}
+          <div className="flex justify-end gap-2 pt-1">
+            <button
+              type="button"
+              disabled={isUploading}
+              onClick={() => {
+                setShowUpload(false);
+                setUploadFamily('');
+                setUploadFile(null);
+                setUploadError(null);
+              }}
+              className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={!uploadFamily.trim() || !uploadFile || isUploading}
+              onClick={uploadCustom}
+              className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-40"
+            >
+              {isUploading ? 'Uploading…' : 'Upload font'}
+            </button>
+          </div>
+        </div>
       ) : (
-        <button
-          type="button"
-          onClick={() => setShowAdd(true)}
-          className="w-full rounded-lg border-2 border-dashed border-border bg-card/40 px-4 py-2 text-sm font-semibold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-        >
-          + Add Google Font
-        </button>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => setShowAdd(true)}
+            className="rounded-lg border-2 border-dashed border-border bg-card/40 px-4 py-2 text-sm font-semibold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+          >
+            + Add Google Font
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowUpload(true)}
+            className="rounded-lg border-2 border-dashed border-border bg-card/40 px-4 py-2 text-sm font-semibold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+          >
+            ↥ Upload custom font
+          </button>
+        </div>
       )}
     </section>
   );

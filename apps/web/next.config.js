@@ -110,10 +110,17 @@ const nextConfig = {
               // blocks it and the pixel still fires the event API but loses
               // the cookie-bridge piece.
               'frame-src https://vercel.live https://www.facebook.com https://td.doubleclick.net',
-              // Allow framing from the admin domain (page-builder live preview)
-              // + localhost for dev. Storefront is otherwise non-frameable so
-              // clickjacking via other origins stays blocked.
-              "frame-ancestors 'self' https://app.forcemediakw.com http://localhost:3001",
+              // Allow framing from admin origins for the page-builder live
+              // preview. Reads `STOREFRONT_FRAME_ANCESTORS` env var as a
+              // space-separated allowlist; falls back to the platform admin
+              // + localhost dev. Set this var per deployment if admins live
+              // at custom domains (e.g. admin.<merchant>.com). Storefront is
+              // otherwise non-frameable so clickjacking via other origins
+              // stays blocked.
+              `frame-ancestors 'self' ${
+                process.env.STOREFRONT_FRAME_ANCESTORS ??
+                'https://app.forcemediakw.com http://localhost:3001'
+              }`,
             ].join('; '),
           },
         ],
