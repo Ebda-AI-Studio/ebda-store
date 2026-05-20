@@ -84,6 +84,7 @@ export default function ElegantFooter({
 
   return (
     <footer
+      data-zone="footer"
       style={bgColor ? { backgroundColor: bgColor } : undefined}
       className={`${bgColor ? '' : 'bg-[hsl(var(--bg-section-alt))]'} border-t border-border mt-auto`}
       dir={isRtl ? 'rtl' : 'ltr'}

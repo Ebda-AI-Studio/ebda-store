@@ -60,6 +60,7 @@ export default function BoldFooter({
 
   return (
     <footer
+      data-zone="footer"
       style={bgColor ? { backgroundColor: bgColor } : undefined}
       className={`${bgColor ? '' : 'bg-[hsl(var(--bg-section-alt))]'} text-foreground mt-auto`}
       dir={isRtl ? 'rtl' : 'ltr'}

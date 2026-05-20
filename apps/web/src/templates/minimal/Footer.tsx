@@ -52,6 +52,7 @@ export default function MinimalFooter({
 
   return (
     <footer
+      data-zone="footer"
       style={bgColor ? { backgroundColor: bgColor } : undefined}
       className={`${bgColor ? '' : 'bg-[hsl(var(--bg-section-alt))]'} mt-auto py-12 md:py-16`}
       dir={isRtl ? 'rtl' : 'ltr'}
