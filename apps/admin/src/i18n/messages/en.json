@@ -3775,8 +3775,18 @@
         "notes": "Notes (English)",
         "notesAr": "Notes (Arabic)",
         "receiptUrl": "Receipt URL",
-        "receiptHint": "Paste an R2 URL. Auto-upload with OCR is coming in Batch 3.",
-        "submit": "Create draft expense"
+        "receiptHint": "Paste an R2 URL, or use the upload section above.",
+        "submit": "Create draft expense",
+        "ocr": {
+          "title": "Upload receipt (AI auto-fill)",
+          "selectFile": "Choose receipt image",
+          "upload": "Upload + process",
+          "processing": "Reading receipt with AI…",
+          "success": "Expense draft created. Review + approve.",
+          "timeout": "OCR taking longer than expected. Check the Expenses list in a moment.",
+          "unsupported": "Only JPG, PNG, and WebP are supported.",
+          "manualHint": "Or fill in manually below"
+        }
       }
     },
     "reports": {
@@ -3828,8 +3838,9 @@
       "onHandSkus": "On-hand SKUs",
       "lowStockSkus": "Low-stock SKUs",
       "openBackorders": "Open Backorders",
-      "reorderSuggestions": "Reorder Suggestions",
-      "comingBatch3": "Coming in Batch 3 (AI-powered)"
+      "reorderSuggestions": "Reorder suggestions",
+      "deadStockCount": "Dead stock SKUs",
+      "viewAll": "View all"
     },
     "inventory": {
       "title": "Inventory",
@@ -3839,7 +3850,9 @@
       "onHand": "On Hand",
       "lowStockThreshold": "Low-Stock Threshold",
       "allowsBackorder": "Allows Backorder",
-      "quickAdjust": "Quick Adjust"
+      "quickAdjust": "Quick Adjust",
+      "badgeReorder": "Reorder suggested",
+      "badgeDeadstock": "Dead stock"
     },
     "adjustments": {
       "title": "Stock Adjustments",

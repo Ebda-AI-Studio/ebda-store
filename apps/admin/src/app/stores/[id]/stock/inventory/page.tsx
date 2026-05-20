@@ -23,6 +23,15 @@ interface ProductsResponse {
   meta: { total: number; page: number; limit: number; totalPages: number };
 }
 
+interface FlagItem {
+  productId: string;
+}
+
+interface FlagListResponse {
+  data: FlagItem[];
+  meta?: { total: number };
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function StockInventoryPage() {
@@ -33,10 +42,14 @@ export default function StockInventoryPage() {
   const tc = useT('common');
 
   const [products, setProducts] = useState<ProductRow[] | null>(null);
+  const [suggestedSet, setSuggestedSet] = useState<Set<string>>(new Set());
+  const [deadSet, setDeadSet] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!storeId) return;
+
+    // Products list
     apiGet<ProductsResponse>(`/api/v1/stores/${storeId}/products?status=active&limit=100`)
       .then(({ data, error: apiError }) => {
         if (apiError) {
@@ -46,6 +59,24 @@ export default function StockInventoryPage() {
         }
       })
       .catch(() => setError('Failed to load inventory'));
+
+    // Reorder suggestions — fetch all open, build productId set
+    apiGet<FlagListResponse>(
+      `/api/v1/stores/${storeId}/stock/reorder-suggestions?status=open&perPage=500`
+    ).then(({ data }) => {
+      if (data?.data) {
+        setSuggestedSet(new Set(data.data.map((s: FlagItem) => s.productId)));
+      }
+    });
+
+    // Dead-stock flags — fetch all open, build productId set
+    apiGet<FlagListResponse>(
+      `/api/v1/stores/${storeId}/stock/deadstock-flags?status=open&perPage=500`
+    ).then(({ data }) => {
+      if (data?.data) {
+        setDeadSet(new Set(data.data.map((f: FlagItem) => f.productId)));
+      }
+    });
   }, [storeId]);
 
   if (error) {
@@ -95,12 +126,28 @@ export default function StockInventoryPage() {
               <tbody>
                 {products.map(p => {
                   const isLow = p.inventory > 0 && p.inventory <= p.lowStockThreshold;
+                  const hasReorder = suggestedSet.has(p.id);
+                  const hasDead = deadSet.has(p.id);
                   return (
                     <tr key={p.id} className="border-t border-border/40">
                       <td className="px-3 py-2 font-mono text-xs text-muted-foreground">
                         {p.sku ?? '—'}
                       </td>
-                      <td className="px-3 py-2 truncate max-w-[14rem]">{p.name}</td>
+                      <td className="px-3 py-2">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="truncate max-w-[10rem]">{p.name}</span>
+                          {hasReorder && (
+                            <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium bg-red-100 text-red-800 shrink-0">
+                              🔴 {t('badgeReorder')}
+                            </span>
+                          )}
+                          {hasDead && (
+                            <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium bg-yellow-100 text-yellow-800 shrink-0">
+                              🟡 {t('badgeDeadstock')}
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       <td
                         className={`px-3 py-2 text-end font-mono text-xs font-semibold ${
                           p.inventory === 0 ? 'text-red-600' : isLow ? 'text-amber-600' : ''

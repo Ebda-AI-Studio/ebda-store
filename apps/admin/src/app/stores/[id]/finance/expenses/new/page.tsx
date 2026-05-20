@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
-import { apiGet, apiPost } from '@/lib/api';
+import { apiGet, apiPost, getApiUrl } from '@/lib/api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -29,6 +29,17 @@ interface SupplierRow {
   name: string;
 }
 
+interface ExpenseListItem {
+  id: string;
+  createdAt: string;
+  status: string;
+}
+
+interface ExpensesListResponse {
+  data: ExpenseListItem[];
+  meta?: { total: number };
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function flattenTree(nodes: AccountNode[]): AccountNode[] {
@@ -45,6 +56,10 @@ function flattenTree(nodes: AccountNode[]): AccountNode[] {
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
+
+const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+const MAX_POLLS = 15;
+const POLL_INTERVAL_MS = 2000;
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -73,6 +88,16 @@ export default function NewExpensePage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // OCR upload state
+  const [ocrFile, setOcrFile] = useState<File | null>(null);
+  const [ocrUploading, setOcrUploading] = useState(false);
+  const [ocrStatus, setOcrStatus] = useState<
+    'idle' | 'processing' | 'success' | 'timeout' | 'error'
+  >('idle');
+  const [ocrMessage, setOcrMessage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     if (!storeId) return;
 
@@ -91,7 +116,108 @@ export default function NewExpensePage() {
     apiGet<SupplierRow[]>(`/api/v1/stores/${storeId}/suppliers`).then(({ data }) => {
       setSuppliers(data ?? []);
     });
+
+    return () => {
+      if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+    };
   }, [storeId]);
+
+  // ── OCR upload handler ───────────────────────────────────────────────────
+
+  async function handleOcrUpload() {
+    if (!ocrFile || !storeId) return;
+
+    if (!ALLOWED_TYPES.includes(ocrFile.type)) {
+      setOcrStatus('error');
+      setOcrMessage(t('ocr.unsupported'));
+      return;
+    }
+
+    setOcrUploading(true);
+    setOcrStatus('processing');
+    setOcrMessage(t('ocr.processing'));
+
+    // Snapshot current draft count before upload (for polling comparison)
+    const beforeTs = Date.now();
+
+    // POST multipart
+    const formData = new FormData();
+    formData.append('file', ocrFile);
+
+    try {
+      const csrfToken = typeof window !== 'undefined' ? localStorage.getItem('csrfToken') : null;
+      const accessToken =
+        typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+
+      const headers: Record<string, string> = {};
+      if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
+      if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+
+      const uploadRes = await fetch(
+        `${getApiUrl()}/api/v1/stores/${storeId}/expenses/upload-receipt`,
+        {
+          method: 'POST',
+          credentials: 'include',
+          headers,
+          body: formData,
+        }
+      );
+
+      if (!uploadRes.ok) {
+        const body = await uploadRes.json().catch(() => ({}));
+        setOcrStatus('error');
+        setOcrMessage(body?.error?.message ?? `Upload failed (${uploadRes.status})`);
+        setOcrUploading(false);
+        return;
+      }
+    } catch {
+      setOcrStatus('error');
+      setOcrMessage('Upload failed. Please try again.');
+      setOcrUploading(false);
+      return;
+    }
+
+    // Poll for the new draft expense (created within last 60s)
+    let polls = 0;
+
+    function schedulePoll() {
+      pollTimerRef.current = setTimeout(async () => {
+        polls += 1;
+
+        const { data } = await apiGet<ExpensesListResponse>(
+          `/api/v1/stores/${storeId}/expenses?status=draft&hasOcr=true&perPage=1`
+        );
+
+        const items = data?.data ?? [];
+        const newest = items[0];
+
+        if (newest) {
+          const createdMs = new Date(newest.createdAt).getTime();
+          // Accept if created after we started the upload
+          if (createdMs >= beforeTs - 5000) {
+            setOcrStatus('success');
+            setOcrMessage(t('ocr.success'));
+            setOcrUploading(false);
+            router.push(`/stores/${storeId}/finance/expenses`);
+            return;
+          }
+        }
+
+        if (polls >= MAX_POLLS) {
+          setOcrStatus('timeout');
+          setOcrMessage(t('ocr.timeout'));
+          setOcrUploading(false);
+          return;
+        }
+
+        schedulePoll();
+      }, POLL_INTERVAL_MS);
+    }
+
+    schedulePoll();
+  }
+
+  // ── Manual form submit ───────────────────────────────────────────────────
 
   const totalFils = (Number(amount) || 0) + (Number(taxAmount) || 0);
   const totalKwd = (totalFils / 1000).toFixed(3);
@@ -147,6 +273,79 @@ export default function NewExpensePage() {
   return (
     <AdminLayout title={t('title')}>
       <div className="max-w-2xl space-y-5">
+        {/* ── OCR Upload Section ──────────────────────────────────────────── */}
+        <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-3">
+          <p className="text-sm font-semibold">{t('ocr.title')}</p>
+
+          <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+            <label className="flex-1">
+              <span className="sr-only">{t('ocr.selectFile')}</span>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                disabled={ocrUploading}
+                onChange={e => {
+                  const f = e.target.files?.[0] ?? null;
+                  setOcrFile(f);
+                  setOcrStatus('idle');
+                  setOcrMessage(null);
+                }}
+                className="block w-full text-sm text-muted-foreground
+                  file:mr-3 file:py-1.5 file:px-3
+                  file:rounded file:border file:border-border
+                  file:text-xs file:font-medium file:bg-background
+                  file:cursor-pointer hover:file:bg-muted/50
+                  disabled:opacity-50"
+              />
+            </label>
+
+            <button
+              type="button"
+              onClick={handleOcrUpload}
+              disabled={ocrUploading || !ocrFile}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded text-sm font-medium disabled:opacity-50 whitespace-nowrap"
+            >
+              {ocrUploading ? (
+                <span className="flex items-center gap-1.5">
+                  <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                  </svg>
+                  {t('ocr.processing')}
+                </span>
+              ) : (
+                t('ocr.upload')
+              )}
+            </button>
+          </div>
+
+          {ocrMessage && (
+            <p
+              className={`text-xs ${
+                ocrStatus === 'error' || ocrStatus === 'timeout'
+                  ? 'text-red-600'
+                  : ocrStatus === 'success'
+                    ? 'text-green-600'
+                    : 'text-muted-foreground'
+              }`}
+            >
+              {ocrMessage}
+            </p>
+          )}
+
+          <p className="text-xs text-muted-foreground">{t('ocr.manualHint')}</p>
+        </div>
+
+        {/* ── Manual form ────────────────────────────────────────────────── */}
+
         {/* Expense Date */}
         <label className="block space-y-1">
           <span className="text-sm font-medium">
