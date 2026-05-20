@@ -1,0 +1,314 @@
+'use client';
+
+import { useEffect, useState, useCallback } from 'react';
+import { useParams } from 'next/navigation';
+import { AdminLayout } from '@/components/AdminLayout';
+import { useT } from '@/i18n/useT';
+import { apiGet, apiPost } from '@/lib/api';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type AnomalySeverity = 'p0' | 'warning';
+type AnomalyMetric = 'margin_drop' | 'cost_spike' | 'revenue_drop' | 'refund_spike';
+type AnomalyScope = 'store' | 'category' | 'product';
+
+interface ProfitAnomaly {
+  id: string;
+  storeId: string;
+  scope: AnomalyScope;
+  scopeId: string | null;
+  metric: AnomalyMetric;
+  current7d: number;
+  baseline28d: number;
+  deltaPercent: number;
+  severity: AnomalySeverity;
+  explanationEn: string;
+  explanationAr: string | null;
+  acknowledged: boolean;
+  acknowledgedBy: string | null;
+  acknowledgedAt: string | null;
+  detectedAt: string;
+}
+
+interface ListMeta {
+  page: number;
+  perPage: number;
+  total: number;
+  totalPages: number;
+}
+
+type SeverityFilter = 'all' | 'p0' | 'warning';
+type AckFilter = 'all' | 'false' | 'true';
+
+// ─── Severity badge ───────────────────────────────────────────────────────────
+
+function SeverityBadge({ severity, t }: { severity: AnomalySeverity; t: (k: string) => string }) {
+  if (severity === 'p0') {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700">
+        {t('severity.p0')}
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
+      {t('severity.warning')}
+    </span>
+  );
+}
+
+// ─── Anomaly row ──────────────────────────────────────────────────────────────
+
+function AnomalyRow({
+  item,
+  onAcknowledge,
+  t,
+  tc,
+}: {
+  item: ProfitAnomaly;
+  onAcknowledge: (id: string) => void;
+  t: (k: string) => string;
+  tc: (k: string) => string;
+}) {
+  const [acking, setAcking] = useState(false);
+
+  const deltaSign = item.deltaPercent >= 0 ? '+' : '';
+  const metricKey = `metric.${item.metric}` as const;
+
+  async function handleAck() {
+    if (acking || item.acknowledged) return;
+    setAcking(true);
+    await onAcknowledge(item.id);
+    setAcking(false);
+  }
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+      {/* Top row: metric + scope + severity + timestamp */}
+      <div className="flex items-start justify-between gap-2 flex-wrap">
+        <div className="space-y-0.5">
+          <div className="flex items-center gap-2">
+            <span className="font-medium text-sm">{t(metricKey)}</span>
+            <span className="text-xs text-muted-foreground capitalize">{item.scope}</span>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {new Date(item.detectedAt).toLocaleDateString()}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <SeverityBadge severity={item.severity} t={t} />
+          {item.acknowledged && (
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground">
+              {t('acknowledged')}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Numbers */}
+      <div className="grid grid-cols-3 gap-3 text-xs">
+        <div>
+          <p className="text-muted-foreground">{t('current7d')}</p>
+          <p className="font-mono font-medium">{item.current7d.toFixed(2)}</p>
+        </div>
+        <div>
+          <p className="text-muted-foreground">{t('baseline28d')}</p>
+          <p className="font-mono font-medium">{item.baseline28d.toFixed(2)}</p>
+        </div>
+        <div>
+          <p className="text-muted-foreground">{t('delta')}</p>
+          <p
+            className={`font-mono font-medium ${
+              item.deltaPercent < 0 ? 'text-red-600' : 'text-green-700'
+            }`}
+          >
+            {deltaSign}
+            {item.deltaPercent.toFixed(1)}%
+          </p>
+        </div>
+      </div>
+
+      {/* AI explanation */}
+      <p className="text-sm text-muted-foreground leading-relaxed">{item.explanationEn}</p>
+      {item.explanationAr && (
+        <p className="text-sm text-muted-foreground leading-relaxed" dir="rtl">
+          {item.explanationAr}
+        </p>
+      )}
+
+      {/* Acknowledge button */}
+      {!item.acknowledged && (
+        <button
+          type="button"
+          onClick={handleAck}
+          disabled={acking}
+          className="px-3 py-1.5 rounded border border-border text-sm text-foreground disabled:opacity-60 hover:bg-muted/40 transition-colors"
+        >
+          {acking ? tc('saving') : t('acknowledge')}
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
+export default function AnomaliesPage() {
+  const params = useParams();
+  const storeId = params?.id as string;
+  const t = useT('finance.anomalies');
+  const tc = useT('common');
+
+  const [items, setItems] = useState<ProfitAnomaly[]>([]);
+  const [meta, setMeta] = useState<ListMeta | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [severityFilter, setSeverityFilter] = useState<SeverityFilter>('all');
+  const [ackFilter, setAckFilter] = useState<AckFilter>('false');
+
+  const load = useCallback(
+    async (page = 1) => {
+      if (!storeId) return;
+      setLoading(true);
+      const qs = new URLSearchParams({
+        page: String(page),
+        perPage: '20',
+        severity: severityFilter,
+        acknowledged: ackFilter,
+      });
+      const { data, error: apiError } = await apiGet<{
+        data: ProfitAnomaly[];
+        meta: ListMeta;
+      }>(`/api/v1/stores/${storeId}/finance/anomalies?${qs}`);
+      setLoading(false);
+      if (apiError) {
+        setError(apiError.message);
+        return;
+      }
+      if (data) {
+        setItems(data.data);
+        setMeta(data.meta);
+      }
+    },
+    [storeId, severityFilter, ackFilter]
+  );
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function handleAcknowledge(id: string) {
+    const { error: apiError } = await apiPost(
+      `/api/v1/stores/${storeId}/finance/anomalies/${id}/acknowledge`,
+      {}
+    );
+    if (!apiError) {
+      setItems(prev => prev.map(a => (a.id === id ? { ...a, acknowledged: true } : a)));
+    }
+  }
+
+  return (
+    <AdminLayout title={t('title')}>
+      <div className="max-w-3xl space-y-6">
+        {/* Description */}
+        <p className="text-sm text-muted-foreground">{t('description')}</p>
+
+        {/* Filters */}
+        <div className="flex flex-wrap gap-2">
+          {/* Severity filter */}
+          {(['all', 'p0', 'warning'] as SeverityFilter[]).map(sev => (
+            <button
+              key={sev}
+              type="button"
+              onClick={() => setSeverityFilter(sev)}
+              className={`px-3 py-1 rounded border text-sm transition-colors ${
+                severityFilter === sev
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'border-border text-muted-foreground hover:bg-muted/40'
+              }`}
+            >
+              {sev === 'all'
+                ? t('filter.all')
+                : sev === 'p0'
+                  ? t('filter.p0')
+                  : t('severity.warning')}
+            </button>
+          ))}
+          <span className="border-l border-border mx-1" />
+          {/* Acknowledged filter */}
+          {(['false', 'all', 'true'] as AckFilter[]).map(ack => (
+            <button
+              key={ack}
+              type="button"
+              onClick={() => setAckFilter(ack)}
+              className={`px-3 py-1 rounded border text-sm transition-colors ${
+                ackFilter === ack
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'border-border text-muted-foreground hover:bg-muted/40'
+              }`}
+            >
+              {ack === 'false'
+                ? t('filter.open')
+                : ack === 'all'
+                  ? t('filter.all')
+                  : t('acknowledged')}
+            </button>
+          ))}
+        </div>
+
+        {/* Error */}
+        {error && <p className="text-sm text-red-600">{error}</p>}
+
+        {/* Loading */}
+        {loading && <p className="text-sm text-muted-foreground">{tc('loading')}</p>}
+
+        {/* Empty state */}
+        {!loading && !error && items.length === 0 && (
+          <div className="rounded-xl border border-border bg-muted/10 p-6 text-center">
+            <p className="text-sm text-muted-foreground">{t('empty')}</p>
+          </div>
+        )}
+
+        {/* Rows */}
+        {items.length > 0 && (
+          <div className="space-y-4">
+            {items.map(item => (
+              <AnomalyRow
+                key={item.id}
+                item={item}
+                onAcknowledge={handleAcknowledge}
+                t={t}
+                tc={tc}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Pagination */}
+        {meta && meta.totalPages > 1 && (
+          <div className="flex items-center gap-2 text-sm">
+            <button
+              type="button"
+              disabled={meta.page === 1}
+              onClick={() => load(meta.page - 1)}
+              className="px-3 py-1 rounded border border-border disabled:opacity-40"
+            >
+              ←
+            </button>
+            <span className="text-muted-foreground">
+              {meta.page} / {meta.totalPages}
+            </span>
+            <button
+              type="button"
+              disabled={meta.page >= meta.totalPages}
+              onClick={() => load(meta.page + 1)}
+              className="px-3 py-1 rounded border border-border disabled:opacity-40"
+            >
+              →
+            </button>
+          </div>
+        )}
+      </div>
+    </AdminLayout>
+  );
+}

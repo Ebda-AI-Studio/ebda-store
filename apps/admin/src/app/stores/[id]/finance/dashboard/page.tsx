@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
 import { apiGet } from '@/lib/api';
@@ -30,6 +30,16 @@ interface DashboardData {
   };
 }
 
+interface ProfitAnomaly {
+  id: string;
+  metric: string;
+  severity: 'p0' | 'warning';
+  deltaPercent: number;
+  explanationEn: string;
+  acknowledged: boolean;
+  detectedAt: string;
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function kwd(fils: number): string {
@@ -40,15 +50,20 @@ function kwd(fils: number): string {
 
 export default function FinanceDashboardPage() {
   const params = useParams();
+  const router = useRouter();
   const storeId = params?.id as string;
   const t = useT('finance.dashboard');
   const tc = useT('common');
 
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [recentAnomalies, setRecentAnomalies] = useState<ProfitAnomaly[]>([]);
+  const [pendingOcrCount, setPendingOcrCount] = useState<number | null>(null);
 
   useEffect(() => {
     if (!storeId) return;
+
+    // Main dashboard
     apiGet<DashboardData>(`/api/v1/stores/${storeId}/finance/dashboard`)
       .then(({ data: d, error: apiError }) => {
         if (apiError) {
@@ -58,6 +73,20 @@ export default function FinanceDashboardPage() {
         }
       })
       .catch(() => setError('Failed to load finance dashboard'));
+
+    // Recent unacknowledged anomalies (top 3)
+    apiGet<{ data: ProfitAnomaly[]; meta: { total: number } }>(
+      `/api/v1/stores/${storeId}/finance/anomalies?acknowledged=false&perPage=3&page=1`
+    ).then(({ data: ad }) => {
+      if (ad) setRecentAnomalies(ad.data);
+    });
+
+    // Pending OCR drafts count
+    apiGet<{ meta: { total: number } }>(
+      `/api/v1/stores/${storeId}/expenses?status=draft&hasOcr=true&perPage=1&page=1`
+    ).then(({ data: ed }) => {
+      if (ed) setPendingOcrCount(ed.meta.total);
+    });
   }, [storeId]);
 
   if (error) {
@@ -206,6 +235,89 @@ export default function FinanceDashboardPage() {
                 </p>
                 <p className="text-xl font-semibold font-mono">{kwd(balanceSheet.totalEquity)}</p>
                 <p className="text-xs text-muted-foreground">KWD</p>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        {/* ── Smart layer cards ─────────────────────────────────────────────── */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Recent anomalies */}
+          <section>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-base font-semibold">{t('recentAnomalies')}</h2>
+              <button
+                type="button"
+                onClick={() => router.push(`/stores/${storeId}/finance/anomalies`)}
+                className="text-xs text-primary hover:underline"
+              >
+                {t('viewAll')}
+              </button>
+            </div>
+            <div className="rounded-xl border border-border overflow-hidden">
+              {recentAnomalies.length === 0 ? (
+                <div className="p-4 text-sm text-muted-foreground">—</div>
+              ) : (
+                <div className="divide-y divide-border/40">
+                  {recentAnomalies.map(a => {
+                    const sign = a.deltaPercent >= 0 ? '+' : '';
+                    return (
+                      <div key={a.id} className="px-3 py-2 space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${
+                              a.severity === 'p0'
+                                ? 'bg-red-100 text-red-700'
+                                : 'bg-amber-100 text-amber-700'
+                            }`}
+                          >
+                            {a.severity.toUpperCase()}
+                          </span>
+                          <span className="text-sm font-medium capitalize">
+                            {a.metric.replace(/_/g, ' ')}
+                          </span>
+                          <span
+                            className={`text-xs font-mono ms-auto ${
+                              a.deltaPercent < 0 ? 'text-red-600' : 'text-green-700'
+                            }`}
+                          >
+                            {sign}
+                            {a.deltaPercent.toFixed(1)}%
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground line-clamp-1">
+                          {a.explanationEn}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* Pending OCR drafts */}
+          <section>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-base font-semibold">{t('pendingOcrDrafts')}</h2>
+              <button
+                type="button"
+                onClick={() => router.push(`/stores/${storeId}/finance/expenses?status=draft`)}
+                className="text-xs text-primary hover:underline"
+              >
+                {t('viewAll')}
+              </button>
+            </div>
+            <div className="rounded-xl border border-border p-6 flex items-center justify-center">
+              <div className="text-center space-y-1">
+                {pendingOcrCount === null ? (
+                  <p className="text-sm text-muted-foreground">{tc('loading')}</p>
+                ) : (
+                  <>
+                    <p className="text-3xl font-semibold font-mono">{pendingOcrCount}</p>
+                    <p className="text-sm text-muted-foreground">{t('pendingOcrDrafts')}</p>
+                  </>
+                )}
               </div>
             </div>
           </section>

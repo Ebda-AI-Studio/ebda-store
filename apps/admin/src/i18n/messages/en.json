@@ -3708,7 +3708,35 @@
       "assets": "Assets",
       "liabilities": "Liabilities",
       "equity": "Equity",
-      "negativeBalanceTooltip": "Negative balance — check opening balance + stock adjustments"
+      "negativeBalanceTooltip": "Negative balance — check opening balance + stock adjustments",
+      "recentAnomalies": "Recent anomalies",
+      "pendingOcrDrafts": "Pending OCR drafts",
+      "viewAll": "View all"
+    },
+    "anomalies": {
+      "title": "Profit Anomalies",
+      "description": "Detected deviations from baseline gross margin, cost, revenue, or refund rate.",
+      "severity": {
+        "p0": "Critical",
+        "warning": "Warning"
+      },
+      "metric": {
+        "margin_drop": "Margin drop",
+        "cost_spike": "Cost spike",
+        "revenue_drop": "Revenue drop",
+        "refund_spike": "Refund spike"
+      },
+      "current7d": "Current (7d)",
+      "baseline28d": "Baseline (28d)",
+      "delta": "Delta",
+      "acknowledge": "Acknowledge",
+      "acknowledged": "Acknowledged",
+      "filter": {
+        "all": "All",
+        "open": "Unacknowledged",
+        "p0": "Critical only"
+      },
+      "empty": "No anomalies detected."
     },
     "expenses": {
       "title": "Expenses",
@@ -3928,15 +3956,38 @@
     },
     "reorder": {
       "title": "Reorder Suggestions",
+      "description": "AI-powered reorder suggestions based on velocity + lead time + open backorders.",
+      "lastScanned": "Last scanned {time}",
+      "rescanNow": "Re-scan now",
+      "empty": "No reorder suggestions right now. The next AI scan runs tomorrow at 06:00 KW.",
       "comingSoon": "AI-powered reorder suggestions are coming in Batch 3.",
       "explainer": "We'll compute weekly velocity × supplier lead time + safety stock + open backorders to surface 'reorder N units of X' cards. One click to draft a PO pre-filled with quantities and the best supplier.",
-      "notify": "Notify me when ready"
+      "notify": "Notify me when ready",
+      "card": {
+        "qtyLabel": "Reorder qty",
+        "supplierLabel": "Suggested supplier",
+        "urgency": "Urgency",
+        "urgencyDays": "{days} days",
+        "draftPo": "Draft PO",
+        "dismiss": "Dismiss"
+      }
     },
     "deadstock": {
-      "title": "Dead-Stock Detection",
+      "title": "Dead Stock",
+      "description": "Slow-moving SKUs with AI-suggested clearance.",
+      "lastScanned": "Last scanned {time}",
+      "rescanNow": "Re-scan now",
+      "empty": "No dead stock detected.",
       "comingSoon": "AI-powered dead-stock detection is coming in Batch 3.",
       "explainer": "We'll flag products with 0 sales in 90 days and stock value above KWD 50, with AI-generated bilingual clearance copy and suggested discount %.",
-      "notify": "Notify me when ready"
+      "notify": "Notify me when ready",
+      "card": {
+        "daysSinceSale": "Last sold {days} days ago",
+        "stockValue": "Stock value",
+        "suggestedDiscount": "Suggested discount",
+        "runClearance": "Run Clearance",
+        "dismiss": "Dismiss"
+      }
     }
   }
 }
