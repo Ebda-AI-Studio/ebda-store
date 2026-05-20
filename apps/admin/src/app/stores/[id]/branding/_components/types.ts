@@ -40,6 +40,12 @@ export interface StoreTheme {
   trustStripLayout?: 'horizontal' | 'vertical';
   /** Trust-strip size — scales icons + labels together. Default 'md'. */
   trustStripSize?: 'sm' | 'md' | 'lg';
+  /** Footer-specific logo URL — overrides branding.logo on the storefront
+   *  footer when set. Ahmad 2026-05-20: for dark footers needing a white logo. */
+  footerLogo?: string;
+  /** Apply CSS `filter: brightness(0) invert(1)` to the main logo in the
+   *  footer (renders it white). Ignored when footerLogo is set. */
+  footerLogoInvert?: boolean;
 }
 
 export interface StoreBranding {

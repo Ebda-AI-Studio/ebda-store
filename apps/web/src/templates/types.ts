@@ -236,6 +236,25 @@ export interface FooterProps {
   disabledCmsSlugs?: string[];
   isRtl?: boolean;
   urlPrefix?: string;
+  /**
+   * Per-store footer background override (resolved hex). When set, the theme's
+   * default footer bg class is replaced by an inline style — without this the
+   * theme's tailwind class painted over ShopChrome's outer wrapper, swallowing
+   * the merchant's page-builder bgColor choice. Ahmad 2026-05-20.
+   */
+  bgColor?: string;
+  /**
+   * Per-store footer logo override (R2 URL). When set, used instead of the
+   * main branding.logo. Useful when the footer is dark and the merchant
+   * needs a white/inverted version of their logo. Edited via Branding admin.
+   */
+  footerLogo?: string;
+  /**
+   * When true, the theme footer applies CSS `filter: brightness(0) invert(1)`
+   * to the logo image — turns any dark logo white without requiring a separate
+   * upload. Ignored when `footerLogo` is set (the custom upload wins).
+   */
+  footerLogoInvert?: boolean;
 }
 
 /**

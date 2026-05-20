@@ -178,6 +178,22 @@ export interface StoreTheme {
    */
   trustStripSize?: 'sm' | 'md' | 'lg';
 
+  /**
+   * Footer logo override (R2 URL). When set, the storefront footer uses this
+   * image instead of `branding.logo`. Useful when the footer has a dark bg
+   * and the main logo doesn't read well — merchant uploads a white/inverted
+   * version here. Edited via Branding → Theme. Ahmad 2026-05-20.
+   */
+  footerLogo?: string;
+  /**
+   * When true, the storefront footer applies CSS `filter: brightness(0)
+   * invert(1)` to the logo image to render it as solid white. Quick toggle
+   * for dark footer backgrounds where uploading a separate white-on-
+   * transparent logo (footerLogo above) would be overkill. The custom upload
+   * wins when both are set.
+   */
+  footerLogoInvert?: boolean;
+
   // Custom CSS (for advanced users)
   customCss?: string;
 }

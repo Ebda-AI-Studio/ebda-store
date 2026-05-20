@@ -16,11 +16,14 @@ export default function MinimalFooter({
   disabledCmsSlugs,
   isRtl: isRtlProp,
   urlPrefix = '',
+  bgColor,
+  footerLogo,
+  footerLogoInvert,
 }: FooterProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const displayName = isRtl && branding.nameAr ? branding.nameAr : branding.name;
-  const displayLogo = isRtl && branding.logoAr ? branding.logoAr : branding.logo;
+  const displayLogo = footerLogo || (isRtl && branding.logoAr ? branding.logoAr : branding.logo);
 
   // Minimal renders a single horizontal nav row, so per-store sections are
   // flattened into one list (preserving section order: shop -> company ->
@@ -49,7 +52,8 @@ export default function MinimalFooter({
 
   return (
     <footer
-      className="bg-[hsl(var(--bg-section-alt))] mt-auto py-12 md:py-16"
+      style={bgColor ? { backgroundColor: bgColor } : undefined}
+      className={`${bgColor ? '' : 'bg-[hsl(var(--bg-section-alt))]'} mt-auto py-12 md:py-16`}
       dir={isRtl ? 'rtl' : 'ltr'}
     >
       <div className="container mx-auto px-6">
@@ -62,6 +66,11 @@ export default function MinimalFooter({
                 src={displayLogo}
                 alt={displayName}
                 className="h-16 sm:h-20 w-auto object-contain"
+                style={
+                  !footerLogo && footerLogoInvert
+                    ? { filter: 'brightness(0) invert(1)' }
+                    : undefined
+                }
               />
             ) : (
               <span className="text-xs tracking-[0.25em] uppercase font-light text-foreground">

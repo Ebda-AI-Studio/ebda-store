@@ -25,6 +25,9 @@ export default function ModernFooter({
   disabledCmsSlugs,
   isRtl: isRtlProp,
   urlPrefix = '',
+  bgColor,
+  footerLogo,
+  footerLogoInvert,
 }: FooterProps) {
   const { isRtl: ctxIsRtl, language } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -101,7 +104,8 @@ export default function ModernFooter({
 
   return (
     <footer
-      className="bg-[hsl(var(--bg-section-alt))] text-foreground/75 mt-auto"
+      style={bgColor ? { backgroundColor: bgColor } : undefined}
+      className={`${bgColor ? '' : 'bg-[hsl(var(--bg-section-alt))]'} text-foreground/75 mt-auto`}
       dir={isRtl ? 'rtl' : 'ltr'}
     >
       <div className="container mx-auto px-4 py-16 lg:py-20">
@@ -110,9 +114,14 @@ export default function ModernFooter({
           <div className="lg:col-span-1 space-y-5">
             {displayLogo ? (
               <img
-                src={displayLogo}
+                src={footerLogo || displayLogo}
                 alt={displayName}
                 className="h-16 sm:h-20 w-auto object-contain"
+                style={
+                  !footerLogo && footerLogoInvert
+                    ? { filter: 'brightness(0) invert(1)' }
+                    : undefined
+                }
               />
             ) : (
               <h3 className="text-xl font-bold text-foreground">{displayName}</h3>

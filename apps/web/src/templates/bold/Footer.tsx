@@ -20,11 +20,14 @@ export default function BoldFooter({
   disabledCmsSlugs,
   isRtl: isRtlProp,
   urlPrefix = '',
+  bgColor,
+  footerLogo,
+  footerLogoInvert,
 }: FooterProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const displayName = isRtl && branding.nameAr ? branding.nameAr : branding.name;
-  const displayLogo = isRtl && branding.logoAr ? branding.logoAr : branding.logo;
+  const displayLogo = footerLogo || (isRtl && branding.logoAr ? branding.logoAr : branding.logo);
   const displayDescription =
     isRtl && branding.descriptionAr ? branding.descriptionAr : branding.description;
   const displayPhone = isRtl && contact.phoneAr ? contact.phoneAr : contact.phone;
@@ -57,7 +60,8 @@ export default function BoldFooter({
 
   return (
     <footer
-      className="bg-[hsl(var(--bg-section-alt))] text-foreground mt-auto"
+      style={bgColor ? { backgroundColor: bgColor } : undefined}
+      className={`${bgColor ? '' : 'bg-[hsl(var(--bg-section-alt))]'} text-foreground mt-auto`}
       dir={isRtl ? 'rtl' : 'ltr'}
     >
       <div className="container mx-auto px-4 py-12 sm:py-16 md:py-20">
@@ -72,6 +76,11 @@ export default function BoldFooter({
                 src={displayLogo}
                 alt={displayName}
                 className="h-16 sm:h-20 w-auto object-contain mb-6"
+                style={
+                  !footerLogo && footerLogoInvert
+                    ? { filter: 'brightness(0) invert(1)' }
+                    : undefined
+                }
               />
             ) : (
               <h3 className="text-3xl font-black uppercase tracking-wider mb-6 text-foreground">

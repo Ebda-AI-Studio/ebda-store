@@ -22,6 +22,9 @@ export default function ClassicFooter({
   disabledCmsSlugs,
   isRtl: isRtlProp,
   urlPrefix = '',
+  bgColor,
+  footerLogo,
+  footerLogoInvert,
 }: FooterProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -58,7 +61,8 @@ export default function ClassicFooter({
 
   return (
     <footer
-      className="bg-[hsl(var(--bg-section-alt))] border-t border-border mt-auto"
+      style={bgColor ? { backgroundColor: bgColor } : undefined}
+      className={`${bgColor ? '' : 'bg-[hsl(var(--bg-section-alt))]'} border-t border-border mt-auto`}
       dir={isRtl ? 'rtl' : 'ltr'}
     >
       <div className="container mx-auto px-4 pt-16 pb-8">
@@ -68,9 +72,14 @@ export default function ClassicFooter({
           <div className="lg:col-span-2 space-y-5">
             {displayLogo ? (
               <img
-                src={displayLogo}
+                src={footerLogo || displayLogo}
                 alt={displayName}
                 className="h-16 sm:h-20 w-auto object-contain"
+                style={
+                  !footerLogo && footerLogoInvert
+                    ? { filter: 'brightness(0) invert(1)' }
+                    : undefined
+                }
               />
             ) : (
               <h3 className="text-xl font-serif font-bold text-foreground">{displayName}</h3>

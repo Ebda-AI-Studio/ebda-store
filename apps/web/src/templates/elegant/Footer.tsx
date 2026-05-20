@@ -23,11 +23,14 @@ export default function ElegantFooter({
   disabledCmsSlugs,
   isRtl: isRtlProp,
   urlPrefix = '',
+  bgColor,
+  footerLogo,
+  footerLogoInvert,
 }: FooterProps) {
   const { isRtl: ctxIsRtl, language } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const displayName = isRtl && branding.nameAr ? branding.nameAr : branding.name;
-  const displayLogo = isRtl && branding.logoAr ? branding.logoAr : branding.logo;
+  const displayLogo = footerLogo || (isRtl && branding.logoAr ? branding.logoAr : branding.logo);
   const displayDescription =
     isRtl && branding.descriptionAr ? branding.descriptionAr : branding.description;
   const displayPhone = isRtl && contact.phoneAr ? contact.phoneAr : contact.phone;
@@ -81,7 +84,8 @@ export default function ElegantFooter({
 
   return (
     <footer
-      className="bg-[hsl(var(--bg-section-alt))] border-t border-border mt-auto"
+      style={bgColor ? { backgroundColor: bgColor } : undefined}
+      className={`${bgColor ? '' : 'bg-[hsl(var(--bg-section-alt))]'} border-t border-border mt-auto`}
       dir={isRtl ? 'rtl' : 'ltr'}
     >
       {/* Newsletter — hidden when the store explicitly opts out. */}
@@ -169,6 +173,11 @@ export default function ElegantFooter({
                 src={displayLogo}
                 alt={displayName}
                 className="h-16 sm:h-20 w-auto object-contain mb-6"
+                style={
+                  !footerLogo && footerLogoInvert
+                    ? { filter: 'brightness(0) invert(1)' }
+                    : undefined
+                }
               />
             ) : (
               <h3 className="text-base font-medium tracking-[0.2em] text-foreground mb-6 font-serif">

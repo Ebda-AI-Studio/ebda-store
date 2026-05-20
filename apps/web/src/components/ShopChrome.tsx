@@ -281,15 +281,13 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
       {layout?.footer?.dividers?.above?.enabled && (
         <SectionDivider settings={layout.footer.dividers.above} />
       )}
-      <footer
-        role="contentinfo"
-        data-zone="footer"
-        style={
-          layout?.footer?.bgColor
-            ? { backgroundColor: resolveColor(layout.footer.bgColor, store.theme) ?? undefined }
-            : undefined
-        }
-      >
+      {/* Footer wrapper carries data-zone for typography emitter targeting.
+          Background override is NOT applied here — the theme's <footer>
+          inside paints over it. We pass bgColor down via the FooterProps
+          prop instead so the theme can replace its default bg class with
+          the merchant's inline color. Ahmad 2026-05-20: footer bg save was
+          not landing because of this nested-bg paint-over. */}
+      <div data-zone="footer">
         <T.Footer
           branding={branding}
           contact={{
@@ -311,8 +309,15 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
           disabledCmsSlugs={store.disabledCmsSlugs}
           isRtl={isRtl}
           urlPrefix={urlPrefix}
+          bgColor={
+            layout?.footer?.bgColor
+              ? (resolveColor(layout.footer.bgColor, store.theme) ?? undefined)
+              : undefined
+          }
+          footerLogo={store.theme?.footerLogo ?? undefined}
+          footerLogoInvert={store.theme?.footerLogoInvert === true}
         />
-      </footer>
+      </div>
       {/* afterFooter — empty placeholder so any merchant-injected text
           below the footer (cookie disclaimer, copyright, etc) inherits
           the typography zone. Kept zero-height when there's no content. */}
