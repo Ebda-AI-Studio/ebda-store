@@ -1,0 +1,53 @@
+import type { InngestFunction } from 'inngest';
+import { prisma } from '@force/database';
+import logger from '../../logger';
+import { inngest } from '../client';
+import { runProfitAnomalyScan } from '../../../services/accounting/profit-anomaly.service';
+
+/**
+ * Daily profit anomaly scan — runs at 06:30 Kuwait time (03:30 UTC).
+ *
+ * For every store with accountingEnabled + aiFeaturesEnabled, calls
+ * runProfitAnomalyScan() which:
+ *   1. Computes 7d vs 28d metrics (margin, cost, revenue, refunds).
+ *   2. Calls Gemini for bilingual explanations on any anomaly.
+ *   3. Writes ProfitAnomaly rows.
+ *   4. Fires a P0 Telegram alert when severity='p0' and no alert was
+ *      sent for the same metric in the last 24h.
+ *
+ * Each per-store scan is wrapped in step.run() so Inngest retries only
+ * the failing store without re-running healthy ones.
+ */
+export const accountingProfitAnomalyCron: InngestFunction.Any = inngest.createFunction(
+  {
+    id: 'accounting-profit-anomaly-cron',
+    name: 'Profit anomaly scan — daily cron (AI)',
+    retries: 2,
+    concurrency: { limit: 1 },
+    triggers: [{ cron: '30 3 * * *' }], // 06:30 KW = 03:30 UTC (Kuwait is UTC+3)
+  },
+  async ({ step }) => {
+    const stores = await step.run('list-stores', () =>
+      prisma.store.findMany({
+        where: { accountingEnabled: true, aiFeaturesEnabled: true, deletedAt: null },
+        select: { id: true },
+      })
+    );
+
+    let totalDetected = 0;
+    let totalP0 = 0;
+
+    for (const store of stores) {
+      const result = await step.run(`anomaly-${store.id}`, () => runProfitAnomalyScan(store.id));
+      totalDetected += result.detected;
+      totalP0 += result.p0Count;
+    }
+
+    logger.info(
+      { stores: stores.length, totalDetected, totalP0 },
+      'accounting-profit-anomaly-cron completed'
+    );
+
+    return { stores: stores.length, totalDetected, totalP0 };
+  }
+);
