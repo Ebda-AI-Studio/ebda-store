@@ -111,6 +111,14 @@ type AccountingExpensePostedEvent = EventPayload & {
   };
 };
 
+type StockReorderScanRequestedEvent = EventPayload & {
+  name: 'stock/reorder-scan-requested';
+  data: {
+    storeId: string;
+    requestedBy?: string;
+  };
+};
+
 export type AppEvent =
   | OrderCreatedEvent
   | BulkImportStartedEvent
@@ -122,7 +130,8 @@ export type AppEvent =
   | ReviewSubmittedEvent
   | StockPoReceivedEvent
   | StockAdjustmentPostedEvent
-  | AccountingExpensePostedEvent;
+  | AccountingExpensePostedEvent
+  | StockReorderScanRequestedEvent;
 
 // Inngest re-registers the function manifest only when it detects a
 // deploy-version change. Without an explicit deploy id, Railway boots

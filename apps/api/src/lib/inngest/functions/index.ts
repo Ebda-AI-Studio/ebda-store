@@ -27,6 +27,7 @@ import { accountingPeriodReconciliation } from './accounting-period-reconciliati
 import { accountingPostPoReceiveJournal } from './accounting-post-po-receive-journal';
 import { accountingPostStockAdjustmentJournal } from './accounting-post-stock-adjustment-journal';
 import { accountingPostExpenseJournal } from './accounting-post-expense-journal';
+import { stockReorderScanCron, stockReorderScanOnDemand } from './stock-reorder-scan';
 
 /**
  * Registry of every Inngest function the API exposes. The serve
@@ -63,4 +64,6 @@ export const inngestFunctions: InngestFunction.Any[] = [
   accountingPostPoReceiveJournal,
   accountingPostStockAdjustmentJournal,
   accountingPostExpenseJournal,
+  stockReorderScanCron,
+  stockReorderScanOnDemand,
 ];
