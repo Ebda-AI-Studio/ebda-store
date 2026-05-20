@@ -158,6 +158,14 @@
         "customers": "العملاء",
         "revenue": "الإيرادات"
       },
+      "accountingSummary": {
+        "title": "نظرة سريعة على المالية والمخزون",
+        "revenueThisMonth": "إيرادات الشهر",
+        "netThisMonth": "صافي الربح للشهر",
+        "stockValue": "قيمة المخزون",
+        "openBackorders": "الطلبات المعلقة",
+        "error": "تعذر تحميل الملخص المالي"
+      },
       "details": {
         "title": "تفاصيل المتجر",
         "cancel": "إلغاء",

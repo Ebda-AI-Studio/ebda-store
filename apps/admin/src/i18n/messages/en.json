@@ -158,6 +158,14 @@
         "customers": "Customers",
         "revenue": "Revenue"
       },
+      "accountingSummary": {
+        "title": "Finance + Stock at a glance",
+        "revenueThisMonth": "Revenue this month",
+        "netThisMonth": "Net income this month",
+        "stockValue": "Stock value",
+        "openBackorders": "Open backorders",
+        "error": "Unable to load financial summary"
+      },
       "details": {
         "title": "Store Details",
         "cancel": "Cancel",

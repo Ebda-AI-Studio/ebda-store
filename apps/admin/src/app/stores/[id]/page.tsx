@@ -12,6 +12,7 @@ import { useDashboardData } from './_hooks/useDashboardData';
 // OnboardingChecklist removed per merchant feedback — the file lives in
 // _components/ for future use but is unmounted from the dashboard.
 import { StatsGrid } from './_components/StatsGrid';
+import { DashboardAccountingSummary } from './_components/DashboardAccountingSummary';
 import { StoreDetailsCard } from './_components/StoreDetailsCard';
 import { StoreOwnerCard } from './_components/StoreOwnerCard';
 import { QuickActions } from './_components/QuickActions';
@@ -124,6 +125,10 @@ export default function StoreDetailPage() {
       }
     >
       <StatsGrid store={store} />
+
+      <div className="mt-8">
+        <DashboardAccountingSummary storeId={storeId} />
+      </div>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-3">
         <StoreDetailsCard

@@ -1,0 +1,146 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { useT } from '@/i18n/useT';
+import { apiGet } from '../../../../lib/api';
+
+interface FinanceDashboard {
+  thisMonth: { revenue: number; expenses: number; net: number };
+  cash: Array<{ id: string; code: string; nameEn: string; balance: number }>;
+  stockValue: number;
+}
+
+interface StockSnapshot {
+  stockValue: number;
+  openBackorderCount: number;
+  backorderedDemandValue: number;
+  reorderRulesCount: number;
+}
+
+interface Props {
+  storeId: string;
+}
+
+function fmtKwd(fils: number) {
+  return (fils / 1000).toLocaleString('en-KW', {
+    minimumFractionDigits: 3,
+    maximumFractionDigits: 3,
+  });
+}
+
+/**
+ * Surfaces Batch 1 + Batch 2 accounting numbers on the merchant dashboard.
+ * Links directly into Finance + Stock hubs so the dashboard becomes a
+ * jumping-off point, not a dead-end summary.
+ */
+export function DashboardAccountingSummary({ storeId }: Props) {
+  const t = useT('stores.dashboard.accountingSummary');
+  const [fin, setFin] = useState<FinanceDashboard | null>(null);
+  const [stock, setStock] = useState<StockSnapshot | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      apiGet<FinanceDashboard>(`/api/v1/stores/${storeId}/finance/dashboard`).catch(() => ({
+        data: null,
+        error: null,
+      })),
+      apiGet<StockSnapshot>(`/api/v1/stores/${storeId}/analytics/stock-snapshot`).catch(() => ({
+        data: null,
+        error: null,
+      })),
+    ])
+      .then(([fRes, sRes]) => {
+        if (cancelled) return;
+        const f = (fRes as { data: FinanceDashboard | null }).data ?? null;
+        const s = (sRes as { data: StockSnapshot | null }).data ?? null;
+        if (f) setFin(f);
+        if (s) setStock(s);
+        if (!f && !s) setError(t('error'));
+      })
+      .catch(() => {
+        if (!cancelled) setError(t('error'));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [storeId, t]);
+
+  if (error) return null; // silent failure — the existing StatsGrid still shows
+  if (!fin && !stock) return null;
+
+  const netPositive = (fin?.thisMonth.net ?? 0) >= 0;
+
+  const tiles = [
+    fin && {
+      href: `/stores/${storeId}/finance/dashboard`,
+      label: t('revenueThisMonth'),
+      value: fmtKwd(fin.thisMonth.revenue),
+      unit: 'KWD',
+      tone: 'primary' as const,
+    },
+    fin && {
+      href: `/stores/${storeId}/finance/dashboard`,
+      label: t('netThisMonth'),
+      value: fmtKwd(fin.thisMonth.net),
+      unit: 'KWD',
+      tone: netPositive ? ('success' as const) : ('danger' as const),
+    },
+    (fin || stock) && {
+      href: `/stores/${storeId}/stock/dashboard`,
+      label: t('stockValue'),
+      value: fmtKwd(stock?.stockValue ?? fin?.stockValue ?? 0),
+      unit: 'KWD',
+      tone: 'info' as const,
+    },
+    stock && {
+      href: `/stores/${storeId}/stock/backorders`,
+      label: t('openBackorders'),
+      value: String(stock.openBackorderCount),
+      unit: '',
+      tone: stock.openBackorderCount > 0 ? ('warning' as const) : ('muted' as const),
+    },
+  ].filter(Boolean) as Array<{
+    href: string;
+    label: string;
+    value: string;
+    unit: string;
+    tone: 'primary' | 'success' | 'danger' | 'info' | 'warning' | 'muted';
+  }>;
+
+  const toneClass = {
+    primary: 'border-primary/30 hover:border-primary',
+    success: 'border-success/30 hover:border-success text-success',
+    danger: 'border-destructive/30 hover:border-destructive text-destructive',
+    info: 'border-info/30 hover:border-info',
+    warning: 'border-warning/40 hover:border-warning text-warning-foreground',
+    muted: 'border-border hover:border-muted-foreground text-muted-foreground',
+  };
+
+  return (
+    <section className="space-y-3">
+      <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+        {t('title')}
+      </h2>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {tiles.map(tile => (
+          <Link
+            key={tile.label}
+            href={tile.href}
+            className={`block rounded-2xl border p-4 transition-colors bg-card ${toneClass[tile.tone]}`}
+          >
+            <p className="text-xs font-medium text-muted-foreground">{tile.label}</p>
+            <p className="mt-2 text-2xl font-bold tracking-tight">
+              {tile.value}
+              {tile.unit && (
+                <span className="ms-1 text-sm font-medium text-muted-foreground">{tile.unit}</span>
+              )}
+            </p>
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+}
