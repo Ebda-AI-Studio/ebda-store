@@ -488,13 +488,19 @@ export interface BlogCarouselSettings extends SectionBgOverride, SectionPaddingM
  * v2 will add `'category:<id>'` (carousel filtered to a single category)
  * and `'manual:<id[]>'` (curated list of product ids).
  */
-export type ExtraCarouselSource = 'newest' | 'best_seller' | 'featured';
+export type ExtraCarouselSource = 'newest' | 'best_seller' | 'featured' | 'category' | 'manual';
 
 export interface ExtraCarouselSettings extends ProductCarouselSettings {
   /** Unique id (uuid). Required for stable ordering + admin keying. */
   id: string;
   /** Product source — determines which products appear in the carousel. */
   productSource: ExtraCarouselSource;
+  /** When productSource === 'category', filter products by this category slug.
+   *  Falls back to 'newest' if the slug doesn't match any fetched products. */
+  categorySlug?: string;
+  /** When productSource === 'manual', the list of product ids to render in
+   *  the carousel. Falls back to 'newest' when the list is empty. */
+  manualProductIds?: string[];
 }
 
 /**

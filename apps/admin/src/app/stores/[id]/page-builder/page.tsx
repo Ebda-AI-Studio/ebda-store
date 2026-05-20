@@ -1262,6 +1262,7 @@ export default function StoreLayoutPage() {
                   key={extra.id}
                   extra={extra}
                   index={idx}
+                  total={(layout.extraCarousels ?? []).length}
                   onPatch={patch =>
                     setLayout(prev => {
                       if (!prev) return prev;
@@ -1274,6 +1275,16 @@ export default function StoreLayoutPage() {
                     setLayout(prev => {
                       if (!prev) return prev;
                       const list = (prev.extraCarousels ?? []).filter((_, i) => i !== idx);
+                      return { ...prev, extraCarousels: list };
+                    })
+                  }
+                  onMove={delta =>
+                    setLayout(prev => {
+                      if (!prev) return prev;
+                      const list = [...(prev.extraCarousels ?? [])];
+                      const target = idx + delta;
+                      if (target < 0 || target >= list.length) return prev;
+                      [list[idx], list[target]] = [list[target], list[idx]];
                       return { ...prev, extraCarousels: list };
                     })
                   }
@@ -2363,14 +2374,18 @@ function SortableSectionRow({
 function ExtraCarouselCard({
   extra,
   index,
+  total,
   onPatch,
   onDelete,
+  onMove,
   theme,
 }: {
   extra: import('@force/shared').ExtraCarouselSettings;
   index: number;
+  total: number;
   onPatch: (patch: Partial<import('@force/shared').ExtraCarouselSettings>) => void;
   onDelete: () => void;
+  onMove: (delta: -1 | 1) => void;
   theme: import('@force/shared').StoreTheme;
 }) {
   const enabled = extra.enabled !== false;
@@ -2443,8 +2458,45 @@ function ExtraCarouselCard({
               <option value="newest">Newest (same as New Arrivals)</option>
               <option value="best_seller">Best sellers</option>
               <option value="featured">Featured</option>
+              <option value="category">Category</option>
+              <option value="manual">Manual product list</option>
             </select>
           </label>
+          {extra.productSource === 'category' && (
+            <label className="flex flex-col gap-1 sm:col-span-2">
+              <span className="text-xs font-medium text-muted-foreground">Category slug</span>
+              <input
+                type="text"
+                value={extra.categorySlug ?? ''}
+                onChange={e => onPatch({ categorySlug: e.target.value || undefined })}
+                placeholder="exact slug as in /products?category=<slug>"
+                className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-base sm:text-sm"
+              />
+            </label>
+          )}
+          {extra.productSource === 'manual' && (
+            <label className="flex flex-col gap-1 sm:col-span-2">
+              <span className="text-xs font-medium text-muted-foreground">
+                Manual product IDs (comma-separated)
+              </span>
+              <input
+                type="text"
+                value={(extra.manualProductIds ?? []).join(', ')}
+                onChange={e => {
+                  const ids = e.target.value
+                    .split(',')
+                    .map(s => s.trim())
+                    .filter(Boolean);
+                  onPatch({ manualProductIds: ids.length ? ids : undefined });
+                }}
+                placeholder="product-uuid-1, product-uuid-2, ..."
+                className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-base sm:text-sm"
+              />
+              <span className="mt-0.5 text-[11px] text-muted-foreground/80">
+                Copy product IDs from the Products admin URL. v2.5 will add a picker.
+              </span>
+            </label>
+          )}
           <label className="flex flex-col gap-1">
             <span className="text-xs font-medium text-muted-foreground">Max products</span>
             <input
@@ -2489,7 +2541,30 @@ function ExtraCarouselCard({
           dividers={extra.dividers}
           theme={theme}
         />
-        <div className="border-t border-border pt-3 flex justify-end">
+        <div className="border-t border-border pt-3 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">
+              Position {index + 1} of {total}
+            </span>
+            <button
+              type="button"
+              disabled={index === 0}
+              onClick={() => onMove(-1)}
+              className="rounded-lg border border-border px-2.5 py-1.5 text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed"
+              aria-label="Move up"
+            >
+              ↑ Move up
+            </button>
+            <button
+              type="button"
+              disabled={index === total - 1}
+              onClick={() => onMove(1)}
+              className="rounded-lg border border-border px-2.5 py-1.5 text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed"
+              aria-label="Move down"
+            >
+              ↓ Move down
+            </button>
+          </div>
           <button
             type="button"
             onClick={() => {

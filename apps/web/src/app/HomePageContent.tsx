@@ -740,14 +740,42 @@ export function HomePageContent({
         // them in array order AFTER the static section loop; v2 will integrate
         // with sectionOrder via 'extra:<id>' keys.
         const extras = layout.extraCarousels ?? [];
+        // Union of all server-fetched RAW products (not template adapters) so
+        // 'category' filter can read raw.categories[].slug. We re-map to
+        // TemplateProduct after filtering.
+        const allRawProducts = (() => {
+          const map = new Map<string, Product>();
+          for (const p of [...newArrivals, ...bestSellers, ...featuredProducts]) {
+            map.set(p.id, p);
+          }
+          return Array.from(map.values());
+        })();
         const extraJSX = extras.map(extra => {
           if (extra.enabled === false) return null;
-          const sourceProducts =
-            extra.productSource === 'best_seller'
-              ? templateBestSellers
-              : extra.productSource === 'featured'
-                ? templateProducts
-                : templateNewArrivals;
+          let sourceProducts: typeof templateNewArrivals;
+          if (extra.productSource === 'best_seller') {
+            sourceProducts = templateBestSellers;
+          } else if (extra.productSource === 'featured') {
+            sourceProducts = templateProducts;
+          } else if (extra.productSource === 'category' && extra.categorySlug) {
+            const slug = extra.categorySlug.toLowerCase();
+            const matched = allRawProducts.filter(p =>
+              (p.categories ?? []).some(c => (c?.category?.slug ?? '').toLowerCase() === slug)
+            );
+            sourceProducts = matched.map(toTemplateProduct);
+            // Empty match → fall back to newest so the carousel never renders
+            // as a confusing 0-product block once a merchant configures it.
+            if (sourceProducts.length === 0) sourceProducts = templateNewArrivals;
+          } else if (extra.productSource === 'manual' && extra.manualProductIds?.length) {
+            const productMap = new Map(allRawProducts.map(p => [p.id, p]));
+            const matched = extra.manualProductIds
+              .map(id => productMap.get(id))
+              .filter((p): p is Product => !!p);
+            sourceProducts = matched.map(toTemplateProduct);
+            if (sourceProducts.length === 0) sourceProducts = templateNewArrivals;
+          } else {
+            sourceProducts = templateNewArrivals;
+          }
           const capped = sourceProducts.slice(0, extra.limit ?? 12);
           if (capped.length === 0) return null;
           if (!T.ProductCarousel) return null;
