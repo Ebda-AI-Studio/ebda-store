@@ -136,6 +136,14 @@ type AccountingExpenseOcrProcessEvent = EventPayload & {
   };
 };
 
+type InsightsRollupRequestedEvent = EventPayload & {
+  name: 'insights/rollup-requested';
+  data: {
+    storeId: string;
+    requestedBy?: string;
+  };
+};
+
 export type AppEvent =
   | OrderCreatedEvent
   | BulkImportStartedEvent
@@ -150,7 +158,8 @@ export type AppEvent =
   | AccountingExpensePostedEvent
   | StockReorderScanRequestedEvent
   | StockDeadstockScanRequestedEvent
-  | AccountingExpenseOcrProcessEvent;
+  | AccountingExpenseOcrProcessEvent
+  | InsightsRollupRequestedEvent;
 
 // Inngest re-registers the function manifest only when it detects a
 // deploy-version change. Without an explicit deploy id, Railway boots

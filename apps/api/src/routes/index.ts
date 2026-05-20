@@ -41,6 +41,7 @@ import typographyRoutes from './typography.routes';
 import wbsIntegrationRoutes from './wbs-integration.routes';
 import financeRoutes from './finance.routes';
 import smartLayerRoutes from './smart-layer.routes';
+import insightsRoutes from './insights.routes';
 import suppliersRoutes from './suppliers.routes';
 import purchaseOrdersRoutes from './purchase-orders.routes';
 import stockAdjustmentsRoutes from './stock-adjustments.routes';
@@ -147,6 +148,9 @@ router.use('/stores', tenantContext, financeRoutes);
 
 // Smart layer routes (reorder suggestions + deadstock flags + profit anomalies)
 router.use('/stores', tenantContext, smartLayerRoutes);
+
+// Insights routes (cohort + funnel + rfm + dashboard — Batch 4)
+router.use('/stores', tenantContext, insightsRoutes);
 
 // Supplier CRUD (Batch 2 accounting)
 router.use('/stores', tenantContext, suppliersRoutes);
