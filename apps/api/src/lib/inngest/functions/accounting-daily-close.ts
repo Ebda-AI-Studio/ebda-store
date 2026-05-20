@@ -36,7 +36,7 @@ export const accountingDailyClose: InngestFunction.Any = inngest.createFunction(
             COALESCE(SUM(l.credit), 0) AS total_credit
           FROM public.journal_lines l
           JOIN public.journal_entries e ON e.id = l.entry_id
-          WHERE e.store_id = ${store.id}::uuid AND e.status = 'posted'
+          WHERE e.store_id = ${store.id} AND e.status = 'posted'
         `;
         const dr = Number(sums[0].total_debit);
         const cr = Number(sums[0].total_credit);

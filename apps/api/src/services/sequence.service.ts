@@ -29,7 +29,7 @@ export async function nextSequence(storeId: string, kind: SequenceKind): Promise
   // don't inherit search_path=public still resolve the relation correctly.
   const row = await prisma.$queryRaw<{ next: number }[]>`
     INSERT INTO public.sequences (store_id, kind, next, updated_at)
-    VALUES (${storeId}::uuid, ${kind}, 2, now())
+    VALUES (${storeId}, ${kind}, 2, now())
     ON CONFLICT (store_id, kind)
     DO UPDATE SET next = public.sequences.next + 1, updated_at = now()
     RETURNING next - 1 AS next

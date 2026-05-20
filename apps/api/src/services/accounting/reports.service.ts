@@ -34,7 +34,7 @@ export async function trialBalance(storeId: string, asOf?: Date): Promise<TrialB
     LEFT JOIN public.journal_entries e
       ON e.id = l.entry_id
       AND e.status = 'posted'${asOf ? ' AND e.posted_at <= $2' : ''}
-    WHERE a.store_id = $1::uuid
+    WHERE a.store_id = $1
     GROUP BY a.id, a.code, a.name_en, a.name_ar, a.type
     ORDER BY a.code ASC
   `;

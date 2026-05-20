@@ -377,7 +377,7 @@ router.get(
           prisma.$queryRawUnsafe<{ total: bigint }[]>(
             `SELECT COALESCE(SUM(inventory * COALESCE(cost_price, 0)), 0) AS total
              FROM public.products
-             WHERE store_id = $1::uuid AND deleted_at IS NULL`,
+             WHERE store_id = $1 AND deleted_at IS NULL`,
             req.params.storeId
           ),
         ]);

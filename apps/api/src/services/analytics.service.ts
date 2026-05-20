@@ -712,7 +712,7 @@ export class AnalyticsService {
     const [valueRow, backorderRow, rulesCount] = await Promise.all([
       prisma.$queryRaw<{ total: bigint }[]>`
         SELECT COALESCE(SUM(inventory * COALESCE(cost_price, 0)), 0) AS total
-        FROM public.products WHERE store_id = ${storeId}::uuid AND deleted_at IS NULL
+        FROM public.products WHERE store_id = ${storeId} AND deleted_at IS NULL
       `,
       prisma.$queryRaw<{ count: bigint; value: bigint }[]>`
         SELECT
@@ -720,7 +720,7 @@ export class AnalyticsService {
           COALESCE(SUM(bl.qty * COALESCE(p.cost_price, 0)), 0) AS value
         FROM public.backorder_lines bl
         JOIN public.products p ON p.id = bl.product_id
-        WHERE bl.store_id = ${storeId}::uuid
+        WHERE bl.store_id = ${storeId}
           AND bl.fulfilled_at IS NULL
           AND bl.cancelled_at IS NULL
       `,
@@ -745,7 +745,7 @@ export class AnalyticsService {
       FROM public.journal_lines l
       JOIN public.journal_entries e ON e.id = l.entry_id
       JOIN public.accounts a       ON a.id = l.account_id
-      WHERE e.store_id = ${storeId}::uuid
+      WHERE e.store_id = ${storeId}
         AND e.status = 'posted'
         AND e.posted_at BETWEEN ${from} AND ${to}
         AND a.code IN ('1000','1010','1020','1030')

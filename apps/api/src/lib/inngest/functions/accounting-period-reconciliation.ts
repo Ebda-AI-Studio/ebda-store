@@ -45,7 +45,7 @@ export const accountingPeriodReconciliation: InngestFunction.Any = inngest.creat
           FROM public.journal_lines l
           JOIN public.journal_entries e ON e.id = l.entry_id
           JOIN public.accounts a       ON a.id = l.account_id
-          WHERE e.store_id = ${store.id}::uuid
+          WHERE e.store_id = ${store.id}
             AND e.status = 'posted'
             AND e.posted_at >= ${since}
             AND a.code IN ('4000', '4010', '2100')
