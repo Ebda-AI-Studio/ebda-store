@@ -373,6 +373,38 @@ const layoutSchema = z
       })
       .partial()
       .optional(),
+    // Announcement bar / Header / Footer — folded into page-builder 2026-05-20.
+    announcement: z
+      .object({
+        enabled: z.boolean().optional(),
+        bgColor: colorValue,
+        typography: sectionTypographyOverride,
+        dividers: sectionDividers,
+        ...sectionPaddingMaxWidthVisibility,
+      })
+      .partial()
+      .optional(),
+    header: z
+      .object({
+        enabled: z.boolean().optional(),
+        sticky: z.boolean().optional(),
+        bgColor: colorValue,
+        typography: sectionTypographyOverride,
+        dividers: sectionDividers,
+        ...sectionPaddingMaxWidthVisibility,
+      })
+      .partial()
+      .optional(),
+    footer: z
+      .object({
+        enabled: z.boolean().optional(),
+        bgColor: colorValue,
+        typography: sectionTypographyOverride,
+        dividers: sectionDividers,
+        ...sectionPaddingMaxWidthVisibility,
+      })
+      .partial()
+      .optional(),
     // Drag-to-reorder data model (page-builder 2026-05-20, ui in v2).
     sectionOrder: z
       .array(

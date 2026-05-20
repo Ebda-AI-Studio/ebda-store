@@ -475,6 +475,38 @@ export interface BlogCarouselSettings extends SectionBgOverride, SectionPaddingM
 }
 
 /**
+ * Header chrome — folded into page-builder 2026-05-20. v1 ships
+ * bg/typography/dividers/sticky. Per-theme chrome (logo size, nav layout)
+ * deferred to v2 — needs all 5 theme Header components to accept per-section
+ * props.
+ */
+export interface HeaderSettings extends SectionBgOverride, SectionPaddingMaxWidthVisibility {
+  enabled?: boolean;
+  sticky?: boolean;
+  typography?: SectionTypographyOverride;
+  dividers?: SectionDividers;
+}
+
+/** Footer chrome — folded into page-builder 2026-05-20. */
+export interface FooterSettings extends SectionBgOverride, SectionPaddingMaxWidthVisibility {
+  enabled?: boolean;
+  typography?: SectionTypographyOverride;
+  dividers?: SectionDividers;
+}
+
+/**
+ * Announcement bar — folded into page-builder 2026-05-20. Content (text +
+ * link) still lives at `theme.announcement`. This layout entry controls
+ * visibility + visual chrome only.
+ */
+export interface AnnouncementSectionSettings
+  extends SectionBgOverride, SectionPaddingMaxWidthVisibility {
+  enabled?: boolean;
+  typography?: SectionTypographyOverride;
+  dividers?: SectionDividers;
+}
+
+/**
  * Global product-card defaults — drives the PLP, category, search, and
  * any non-homepage product-card surface. Homepage carousels
  * (newArrivals / bestSellers) read their own fields first and fall back
@@ -521,6 +553,12 @@ export interface StoreLayoutSettings {
   trustStrip?: TrustStripSettings;
   /** Homepage blog carousel. Page-builder 2026-05-20. */
   blogCarousel?: BlogCarouselSettings;
+  /** Announcement bar chrome. Page-builder 2026-05-20. */
+  announcement?: AnnouncementSectionSettings;
+  /** Header chrome. Page-builder 2026-05-20. */
+  header?: HeaderSettings;
+  /** Footer chrome. Page-builder 2026-05-20. */
+  footer?: FooterSettings;
   sizing: SizingContract;
   /** Defaults applied to all non-homepage product-card surfaces. */
   productCardDefaults?: ProductCardDefaults;
@@ -619,6 +657,9 @@ export function resolveLayoutSettings(input: unknown): StoreLayoutSettings {
     brandStory: raw.brandStory,
     trustStrip: raw.trustStrip,
     blogCarousel: raw.blogCarousel,
+    announcement: raw.announcement,
+    header: raw.header,
+    footer: raw.footer,
     sizing: { ...DEFAULT_LAYOUT_SETTINGS.sizing, ...(raw.sizing ?? {}) },
     productCardDefaults: { ...(raw.productCardDefaults ?? {}) },
     sectionOrder: raw.sectionOrder,

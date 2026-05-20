@@ -1173,6 +1173,56 @@ export default function StoreLayoutPage() {
                 theme={storeInfo?.theme ?? FALLBACK_THEME}
               />
 
+              {/* Announcement bar — text content edited via /announcement page;
+                  this card controls visibility + chrome (bg/dividers/padding). */}
+              <ExtraSectionCard
+                kind="announcement"
+                label="Announcement bar"
+                description="Site-wide message above the header. Visible content edited via the Announcement Bar admin page; here you control chrome and dividers."
+                settings={layout.announcement}
+                legacyEnabled={true}
+                onPatch={patch =>
+                  setLayout(prev =>
+                    prev
+                      ? { ...prev, announcement: { ...(prev.announcement ?? {}), ...patch } }
+                      : prev
+                  )
+                }
+                theme={storeInfo?.theme ?? FALLBACK_THEME}
+              />
+
+              {/* Header chrome — bg, dividers, sticky toggle. Per-theme chrome
+                  (logo size, nav layout) deferred — needs all 5 theme Header
+                  components to accept per-section props. */}
+              <ExtraSectionCard
+                kind="header"
+                label="Header"
+                description="Top header chrome — background color, sticky-on-scroll, dividers, spacing."
+                settings={layout.header}
+                legacyEnabled={true}
+                onPatch={patch =>
+                  setLayout(prev =>
+                    prev ? { ...prev, header: { ...(prev.header ?? {}), ...patch } } : prev
+                  )
+                }
+                theme={storeInfo?.theme ?? FALLBACK_THEME}
+              />
+
+              {/* Footer chrome — bg, dividers, padding. */}
+              <ExtraSectionCard
+                kind="footer"
+                label="Footer"
+                description="Bottom footer chrome — background color, dividers, spacing."
+                settings={layout.footer}
+                legacyEnabled={true}
+                onPatch={patch =>
+                  setLayout(prev =>
+                    prev ? { ...prev, footer: { ...(prev.footer ?? {}), ...patch } } : prev
+                  )
+                }
+                theme={storeInfo?.theme ?? FALLBACK_THEME}
+              />
+
               {/* Product Card Defaults — global card controls that apply
                   to the PLP, search, and any product surface outside the
                   homepage carousels. Per-section settings above override
@@ -2076,20 +2126,26 @@ function ExtraSectionCard({
   onPatch,
   theme,
 }: {
-  kind: 'brandStory' | 'trustStrip' | 'blogCarousel';
+  kind: 'brandStory' | 'trustStrip' | 'blogCarousel' | 'announcement' | 'header' | 'footer';
   label: string;
   description: string;
   settings:
     | import('@force/shared').BrandStorySettings
     | import('@force/shared').TrustStripSettings
     | import('@force/shared').BlogCarouselSettings
+    | import('@force/shared').AnnouncementSectionSettings
+    | import('@force/shared').HeaderSettings
+    | import('@force/shared').FooterSettings
     | undefined;
   legacyEnabled: boolean;
   onPatch: (
     patch: Partial<
       import('@force/shared').BrandStorySettings &
         import('@force/shared').TrustStripSettings &
-        import('@force/shared').BlogCarouselSettings
+        import('@force/shared').BlogCarouselSettings &
+        import('@force/shared').AnnouncementSectionSettings &
+        import('@force/shared').HeaderSettings &
+        import('@force/shared').FooterSettings
     >
   ) => void;
   theme: import('@force/shared').StoreTheme;
