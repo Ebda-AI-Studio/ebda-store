@@ -2,6 +2,7 @@ import { prisma } from '@force/database';
 import type { JournalEntry, JournalEntrySource, Prisma } from '@prisma/client';
 import { Prisma as PrismaNs } from '@prisma/client';
 import { nextSequence } from '../sequence.service';
+import { broadcastToStore } from '../../lib/socket-broadcast';
 
 export interface JournalLineInput {
   accountId: string;
@@ -90,9 +91,10 @@ export async function postEntry(input: PostEntryInput): Promise<JournalEntry> {
     },
   };
 
+  let entry: JournalEntry;
   try {
     const client = input.tx ?? prisma;
-    return await client.journalEntry.create({ data: createData });
+    entry = await client.journalEntry.create({ data: createData });
   } catch (err: unknown) {
     // P2002 = unique constraint violation. With the
     // journal_entries_store_source_source_id_unique partial index in place,
@@ -115,6 +117,14 @@ export async function postEntry(input: PostEntryInput): Promise<JournalEntry> {
     }
     throw err;
   }
+
+  // Non-blocking UI refresh signal — best-effort, never throws
+  broadcastToStore(input.storeId, {
+    name: 'ui/journal-posted',
+    data: { entryId: entry.id, source: input.source, sourceId: input.sourceId },
+  });
+
+  return entry;
 }
 
 /**
@@ -175,5 +185,13 @@ export async function reverseEntry(
 
     return reversal;
   };
-  return tx ? run(tx) : prisma.$transaction(run);
+  const reversal = await (tx ? run(tx) : prisma.$transaction(run));
+
+  // Non-blocking UI refresh signal — best-effort, never throws
+  broadcastToStore(reversal.storeId, {
+    name: 'ui/journal-reversed',
+    data: { entryId: reversal.id, originalId },
+  });
+
+  return reversal;
 }

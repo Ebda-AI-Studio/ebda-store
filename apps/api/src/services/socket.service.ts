@@ -4,6 +4,22 @@ import jwt from 'jsonwebtoken';
 import { config } from '../config';
 import { prisma } from '@force/database';
 import logger from '../lib/logger';
+// UiRefreshEvent is defined in lib/socket-broadcast and re-exported; we inline
+// the interface here to avoid a circular dependency
+// (socket-broadcast → socket.service → socket-broadcast).
+export interface UiRefreshEvent {
+  name:
+    | 'ui/journal-posted'
+    | 'ui/journal-reversed'
+    | 'ui/po-received'
+    | 'ui/stock-adjusted'
+    | 'ui/expense-posted'
+    | 'ui/reorder-scanned'
+    | 'ui/deadstock-scanned'
+    | 'ui/anomaly-detected'
+    | 'ui/insights-rollup-completed';
+  data?: Record<string, unknown>;
+}
 
 interface AuthPayload {
   userId: string;
@@ -331,6 +347,15 @@ class SocketService {
       data: returnRequest,
       createdAt: new Date(),
     });
+  }
+
+  /**
+   * Broadcast a UI refresh signal to all admin clients in a store room.
+   * Used by broadcastToStore() in lib/socket-broadcast.ts. Never throws.
+   */
+  broadcastUiRefresh(storeId: string, event: UiRefreshEvent): void {
+    if (!this.io) return;
+    this.io.to(`store:${storeId}`).emit('ui-refresh', event);
   }
 
   /**

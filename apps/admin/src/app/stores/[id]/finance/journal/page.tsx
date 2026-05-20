@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AdminLayout } from '../../../../../components/AdminLayout';
 import { useT } from '@/i18n/useT';
 import { apiGet } from '@/lib/api';
 import { useRouter } from 'next/navigation';
+import { useNotifications, useUiRefresh } from '@/contexts/NotificationContext';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -38,8 +39,31 @@ export default function JournalListPage() {
   const tc = useT('common');
   const router = useRouter();
 
+  const { subscribeToStore, unsubscribeFromStore } = useNotifications();
+
   const [entries, setEntries] = useState<JournalEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Increment to trigger a refetch without resetting entries to null (avoids flicker)
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // Subscribe to this store's socket room so ui-refresh signals reach us
+  useEffect(() => {
+    if (!storeId) return;
+    subscribeToStore(storeId);
+    return () => unsubscribeFromStore(storeId);
+  }, [storeId, subscribeToStore, unsubscribeFromStore]);
+
+  // When the server posts a new journal entry, refetch the list
+  useUiRefresh(
+    'ui/journal-posted',
+    useCallback(() => setRefreshKey(k => k + 1), [])
+  );
+
+  // When a journal entry is reversed, refetch the list
+  useUiRefresh(
+    'ui/journal-reversed',
+    useCallback(() => setRefreshKey(k => k + 1), [])
+  );
 
   useEffect(() => {
     if (!storeId) return;
@@ -52,7 +76,7 @@ export default function JournalListPage() {
         }
       })
       .catch(() => setError('Failed to load journal entries'));
-  }, [storeId]);
+  }, [storeId, refreshKey]);
 
   if (error) {
     return (

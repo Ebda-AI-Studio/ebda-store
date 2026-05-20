@@ -13,6 +13,8 @@ import type { Socket } from 'socket.io-client';
 import { useAuth } from '@/lib/auth';
 import { getApiUrl } from '@/lib/api';
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
 interface Notification {
   id: string;
   type: string;
@@ -23,6 +25,22 @@ interface Notification {
   read: boolean;
 }
 
+export interface UiRefreshEvent {
+  name:
+    | 'ui/journal-posted'
+    | 'ui/journal-reversed'
+    | 'ui/po-received'
+    | 'ui/stock-adjusted'
+    | 'ui/expense-posted'
+    | 'ui/reorder-scanned'
+    | 'ui/deadstock-scanned'
+    | 'ui/anomaly-detected'
+    | 'ui/insights-rollup-completed';
+  data?: Record<string, unknown>;
+}
+
+type RefreshCallback = (event: UiRefreshEvent) => void;
+
 interface NotificationContextType {
   notifications: Notification[];
   unreadCount: number;
@@ -32,7 +50,11 @@ interface NotificationContextType {
   clearNotifications: () => void;
   subscribeToStore: (storeId: string) => void;
   unsubscribeFromStore: (storeId: string) => void;
+  /** Register a callback for a specific ui-refresh event name. Returns cleanup fn. */
+  registerRefreshCallback: (eventName: UiRefreshEvent['name'], cb: RefreshCallback) => () => void;
 }
+
+// ─── Context ──────────────────────────────────────────────────────────────────
 
 const NotificationContext = createContext<NotificationContextType | null>(null);
 
@@ -42,6 +64,9 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const [isConnected, setIsConnected] = useState(false);
   const socketRef = useRef<Socket | null>(null);
   const subscribedStoresRef = useRef<Set<string>>(new Set());
+
+  // Map of event-name → list of callbacks registered by pages via useUiRefresh
+  const refreshCallbacksRef = useRef<Map<string, RefreshCallback[]>>(new Map());
 
   // Connect to WebSocket when user is authenticated
   useEffect(() => {
@@ -98,6 +123,12 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         setNotifications(prev => [newNotification, ...prev].slice(0, 50)); // Keep last 50
       });
 
+      // UI refresh signals — pages register callbacks via useUiRefresh
+      socketRef.current.on('ui-refresh', (event: UiRefreshEvent) => {
+        const callbacks = refreshCallbacksRef.current.get(event.name) ?? [];
+        callbacks.forEach(cb => cb(event));
+      });
+
       socketRef.current.on('connect_error', error => {
         console.error('Socket connection error:', error.message);
       });
@@ -136,6 +167,22 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     setNotifications([]);
   }, []);
 
+  const registerRefreshCallback = useCallback(
+    (eventName: UiRefreshEvent['name'], cb: RefreshCallback): (() => void) => {
+      const map = refreshCallbacksRef.current;
+      if (!map.has(eventName)) map.set(eventName, []);
+      map.get(eventName)!.push(cb);
+      // Return a cleanup function
+      return () => {
+        const list = map.get(eventName);
+        if (!list) return;
+        const idx = list.indexOf(cb);
+        if (idx !== -1) list.splice(idx, 1);
+      };
+    },
+    []
+  );
+
   const unreadCount = useMemo(() => notifications.filter(n => !n.read).length, [notifications]);
 
   return (
@@ -149,12 +196,15 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         clearNotifications,
         subscribeToStore,
         unsubscribeFromStore,
+        registerRefreshCallback,
       }}
     >
       {children}
     </NotificationContext.Provider>
   );
 }
+
+// ─── Hooks ────────────────────────────────────────────────────────────────────
 
 const defaultNotificationContext: NotificationContextType = {
   notifications: [],
@@ -165,9 +215,33 @@ const defaultNotificationContext: NotificationContextType = {
   clearNotifications: () => {},
   subscribeToStore: () => {},
   unsubscribeFromStore: () => {},
+  registerRefreshCallback: () => () => {},
 };
 
 export function useNotifications() {
   const context = useContext(NotificationContext);
   return context ?? defaultNotificationContext;
+}
+
+/**
+ * Subscribe to a ui-refresh event from the server. Callback fires whenever
+ * the server broadcasts the named event to this store's room.
+ *
+ * Usage:
+ *   useUiRefresh('ui/journal-posted', () => { setRefreshKey(k => k + 1); });
+ */
+export function useUiRefresh(
+  eventName: UiRefreshEvent['name'],
+  callback: (event: UiRefreshEvent) => void
+) {
+  const { registerRefreshCallback } = useNotifications();
+
+  useEffect(() => {
+    const cleanup = registerRefreshCallback(eventName, callback);
+    return cleanup;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventName, registerRefreshCallback]);
+  // NOTE: `callback` intentionally excluded — callers should pass a stable ref
+  // (useCallback) or accept that re-registration happens on every render.
+  // For the journal page this is a one-time mount, so it doesn't matter.
 }
