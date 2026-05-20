@@ -593,12 +593,16 @@ export function HomePageContent({
                 strip ships 3 universal items (Fast Delivery / Quality /
                 Support) with bilingual platform copy. Both auto-hide
                 when their data isn't present. */}
-            {/* Brand story + trust strip are per-store toggles (default
-                on) — Ahmad 2026-05-17 evening. Set via Branding -> Theme. */}
-            {store.theme?.showBrandStory !== false && (
+            {/* Brand Story / Blog / Trust Strip — folded into page-builder
+                2026-05-20. Each section has its own `enabled` toggle on
+                `layout.{brandStory,trustStrip,blogCarousel}`. Legacy fallback:
+                `theme.showBrandStory` / `theme.showTrustStrip` / `store.blogEnabled`. */}
+            {(layout.brandStory?.enabled ?? store.theme?.showBrandStory !== false) && (
               <>
-                {/* Divider before brand story; prev section is best-sellers. */}
-                <SectionDivider hideForExplicitBg={!!layout.bestSellers.bgColor} />
+                <SectionDivider
+                  settings={layout.brandStory?.dividers?.above}
+                  hideForExplicitBg={!!(layout.bestSellers.bgColor || layout.brandStory?.bgColor)}
+                />
                 <BrandStoryBlock
                   image={store.heroImage ?? undefined}
                   body={store.description ?? undefined}
@@ -606,13 +610,21 @@ export function HomePageContent({
                 />
               </>
             )}
-            {/* Divider before blog carousel. BrandStory and blog have no
-                per-section bgColor fields, so hideForExplicitBg stays false. */}
-            <SectionDivider />
-            <HomeBlogCarousel />
-            {store.theme?.showTrustStrip !== false && (
+            {(layout.blogCarousel?.enabled ?? store.blogEnabled !== false) && (
               <>
-                <SectionDivider />
+                <SectionDivider
+                  settings={layout.blogCarousel?.dividers?.above}
+                  hideForExplicitBg={!!layout.blogCarousel?.bgColor}
+                />
+                <HomeBlogCarousel />
+              </>
+            )}
+            {(layout.trustStrip?.enabled ?? store.theme?.showTrustStrip !== false) && (
+              <>
+                <SectionDivider
+                  settings={layout.trustStrip?.dividers?.above}
+                  hideForExplicitBg={!!layout.trustStrip?.bgColor}
+                />
                 <TrustStrip />
               </>
             )}

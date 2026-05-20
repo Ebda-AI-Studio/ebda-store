@@ -114,6 +114,16 @@ const sectionDividers = z
   .partial()
   .optional();
 
+// Per-section layout knobs (padding / max-width / visibility breakpoint) —
+// item #6 of the page-builder gap fill. Mixed into every section schema below.
+const sectionPaddingMaxWidthVisibility = {
+  paddingTop: z.enum(['none', 'tight', 'normal', 'loose', 'xloose']).optional(),
+  paddingBottom: z.enum(['none', 'tight', 'normal', 'loose', 'xloose']).optional(),
+  maxWidth: z.enum(['contained', 'full']).optional(),
+  hideOnMobile: z.boolean().optional(),
+  hideOnDesktop: z.boolean().optional(),
+} as const;
+
 const layoutSchema = z
   .object({
     hero: z.object({
@@ -132,6 +142,8 @@ const layoutSchema = z
       typography: sectionTypographyOverride,
       // Per-section divider overrides — see sectionDividers + SectionDividers type.
       dividers: sectionDividers,
+      // Per-section layout (padding / max-width / visibility) — item #6.
+      ...sectionPaddingMaxWidthVisibility,
     }),
     categories: z.object({
       enabled: z.boolean(),
@@ -198,6 +210,8 @@ const layoutSchema = z
       typography: sectionTypographyOverride,
       // Per-section divider overrides — see sectionDividers + SectionDividers type.
       dividers: sectionDividers,
+      // Per-section layout (padding / max-width / visibility) — item #6.
+      ...sectionPaddingMaxWidthVisibility,
     }),
     // Product carousels — newArrivals + bestSellers. 2026-05-16: extended
     // to mirror the categories block so merchants can tune product card
@@ -247,6 +261,8 @@ const layoutSchema = z
       typography: sectionTypographyOverride,
       // Per-section divider overrides — see sectionDividers + SectionDividers type.
       dividers: sectionDividers,
+      // Per-section layout (padding / max-width / visibility) — item #6.
+      ...sectionPaddingMaxWidthVisibility,
     }),
     bestSellers: z.object({
       enabled: z.boolean(),
@@ -290,6 +306,8 @@ const layoutSchema = z
       typography: sectionTypographyOverride,
       // Per-section divider overrides — see sectionDividers + SectionDividers type.
       dividers: sectionDividers,
+      // Per-section layout (padding / max-width / visibility) — item #6.
+      ...sectionPaddingMaxWidthVisibility,
     }),
     filterSidebar: z.object({
       enabled: z.boolean(),
@@ -309,6 +327,8 @@ const layoutSchema = z
       typography: sectionTypographyOverride,
       // Per-section divider overrides — see sectionDividers + SectionDividers type.
       dividers: sectionDividers,
+      // Per-section layout (padding / max-width / visibility) — item #6.
+      ...sectionPaddingMaxWidthVisibility,
     }),
     // sibling UGC section, added 2026-05-16. without listing here Zod
     // would silently strip it on every save — same bug class as imageMobile
@@ -317,6 +337,56 @@ const layoutSchema = z
       .object({
         enabled: z.boolean(),
       })
+      .optional(),
+    // Brand story / trust strip / blog carousel — folded into page-builder
+    // 2026-05-20 from scattered ThemeTab toggles. Each shares the same
+    // section-shaped schema (enabled, bgColor, typography, dividers).
+    brandStory: z
+      .object({
+        enabled: z.boolean().optional(),
+        bgColor: colorValue,
+        typography: sectionTypographyOverride,
+        dividers: sectionDividers,
+        ...sectionPaddingMaxWidthVisibility,
+      })
+      .partial()
+      .optional(),
+    trustStrip: z
+      .object({
+        enabled: z.boolean().optional(),
+        layout: z.enum(['horizontal', 'vertical']).optional(),
+        bgColor: colorValue,
+        typography: sectionTypographyOverride,
+        dividers: sectionDividers,
+        ...sectionPaddingMaxWidthVisibility,
+      })
+      .partial()
+      .optional(),
+    blogCarousel: z
+      .object({
+        enabled: z.boolean().optional(),
+        limit: z.number().int().min(1).max(20).optional(),
+        bgColor: colorValue,
+        typography: sectionTypographyOverride,
+        dividers: sectionDividers,
+        ...sectionPaddingMaxWidthVisibility,
+      })
+      .partial()
+      .optional(),
+    // Drag-to-reorder data model (page-builder 2026-05-20, ui in v2).
+    sectionOrder: z
+      .array(
+        z.enum([
+          'hero',
+          'categories',
+          'newArrivals',
+          'bestSellers',
+          'brandStory',
+          'blogCarousel',
+          'trustStrip',
+          'testimonials',
+        ])
+      )
       .optional(),
     sizing: z.object({
       heroAspect: z.enum(['2.45:1', '16:9', '4:3']),

@@ -16,6 +16,27 @@
 export type HeroMode = 'single' | 'slider';
 
 /**
+ * Per-section layout knobs added 2026-05-20 (item #6 of the page-builder
+ * gap fill). Every section settings interface that extends these gets
+ * padding-top/bottom, max-width override, and breakpoint visibility.
+ *
+ * Defaults: all undefined (= storefront baseline behavior unchanged).
+ * Merchants opt in per-section.
+ */
+export interface SectionPaddingMaxWidthVisibility {
+  /** Vertical padding above the section content. Default: section's baseline. */
+  paddingTop?: 'none' | 'tight' | 'normal' | 'loose' | 'xloose';
+  /** Vertical padding below the section content. */
+  paddingBottom?: 'none' | 'tight' | 'normal' | 'loose' | 'xloose';
+  /** Container width — 'contained' = max-w-7xl, 'full' = edge-to-edge. */
+  maxWidth?: 'contained' | 'full';
+  /** Hide on mobile (< 768px viewport). Default false. */
+  hideOnMobile?: boolean;
+  /** Hide on desktop (≥ 768px viewport). Default false. */
+  hideOnDesktop?: boolean;
+}
+
+/**
  * Per-section divider slots — each section can have its own dividers around
  * each part of its heading + content. Replaces the platform-wide
  * `theme.dividers` (now deprecated, still read for back-compat).
@@ -133,7 +154,7 @@ export interface SectionTypographyOverride {
   categoryLabel?: ZoneOverride;
 }
 
-export interface HeroSettings extends SectionBgOverride {
+export interface HeroSettings extends SectionBgOverride, SectionPaddingMaxWidthVisibility {
   enabled: boolean;
   mode: HeroMode;
   /** Autoplay interval in ms; ignored when mode === 'single' */
@@ -276,7 +297,8 @@ export type CardShape =
 export type CategoryCardSize = CardSize;
 export type CategoryCardAspect = CardAspect;
 
-export interface CategoriesSettings extends SectionTitleOverride, SectionBgOverride {
+export interface CategoriesSettings
+  extends SectionTitleOverride, SectionBgOverride, SectionPaddingMaxWidthVisibility {
   enabled: boolean;
   // 2026-05-16: split layout + captionPosition into desktop + mobile so
   // merchants can choose e.g. grid on desktop + horizontal-scroll on
@@ -330,7 +352,8 @@ export interface CategoriesSettings extends SectionTitleOverride, SectionBgOverr
   dividers?: SectionDividers;
 }
 
-export interface ProductCarouselSettings extends SectionTitleOverride, SectionBgOverride {
+export interface ProductCarouselSettings
+  extends SectionTitleOverride, SectionBgOverride, SectionPaddingMaxWidthVisibility {
   enabled: boolean;
   /** Max products to load */
   limit: number;
@@ -377,7 +400,8 @@ export interface FilterSidebarSettings {
   defaultOpen: boolean;
 }
 
-export interface TestimonialsSettings extends SectionTitleOverride, SectionBgOverride {
+export interface TestimonialsSettings
+  extends SectionTitleOverride, SectionBgOverride, SectionPaddingMaxWidthVisibility {
   enabled: boolean;
   minRating: number;
   verifiedOnly: boolean;
@@ -406,6 +430,48 @@ export interface SizingContract {
  */
 export interface ReviewSectionSettings {
   enabled: boolean;
+}
+
+/**
+ * Brand Story block. Folded into page-builder 2026-05-20 (was only a theme
+ * toggle in Branding before). Storefront content sourced from `store.heroImage`
+ * + `store.description` / `store.descriptionAr`.
+ */
+export interface BrandStorySettings extends SectionBgOverride, SectionPaddingMaxWidthVisibility {
+  /** When false, hide the block on storefront. Legacy fallback: `theme.showBrandStory`. */
+  enabled?: boolean;
+  /** Per-section typography overrides. */
+  typography?: SectionTypographyOverride;
+  /** Per-section divider slots. */
+  dividers?: SectionDividers;
+}
+
+/**
+ * Trust Strip — 3 trust-signal badges (free delivery / returns / support).
+ * Folded into page-builder 2026-05-20.
+ */
+export interface TrustStripSettings extends SectionBgOverride, SectionPaddingMaxWidthVisibility {
+  /** When false, hide on storefront. Legacy fallback: `theme.showTrustStrip`. */
+  enabled?: boolean;
+  /** Horizontal (3-up tight) or vertical (stacked). Default 'horizontal'.
+   *  Legacy fallback: `theme.trustStripLayout`. */
+  layout?: 'horizontal' | 'vertical';
+  typography?: SectionTypographyOverride;
+  dividers?: SectionDividers;
+}
+
+/**
+ * Home blog carousel. Folded into page-builder 2026-05-20.
+ * Note: per-store `Store.blogEnabled` column ALSO gates the /blog routes —
+ * this section's `enabled` controls homepage placement only.
+ */
+export interface BlogCarouselSettings extends SectionBgOverride, SectionPaddingMaxWidthVisibility {
+  /** When false, hide carousel on home. Legacy fallback: `store.blogEnabled`. */
+  enabled?: boolean;
+  /** Max posts to render. Default 6. */
+  limit?: number;
+  typography?: SectionTypographyOverride;
+  dividers?: SectionDividers;
 }
 
 /**
@@ -449,9 +515,31 @@ export interface StoreLayoutSettings {
   filterSidebar: FilterSidebarSettings;
   testimonials: TestimonialsSettings;
   reviewSection: ReviewSectionSettings;
+  /** Brand story block on homepage. Page-builder 2026-05-20. */
+  brandStory?: BrandStorySettings;
+  /** Trust strip badges on homepage. Page-builder 2026-05-20. */
+  trustStrip?: TrustStripSettings;
+  /** Homepage blog carousel. Page-builder 2026-05-20. */
+  blogCarousel?: BlogCarouselSettings;
   sizing: SizingContract;
   /** Defaults applied to all non-homepage product-card surfaces. */
   productCardDefaults?: ProductCardDefaults;
+  /**
+   * Drag-to-reorder data model (page-builder 2026-05-20, scaffolded for v2 ui).
+   * When set, HomePageContent renders sections in this order instead of the
+   * hardcoded sequence. Unknown keys are skipped; missing known keys append
+   * at the end so new sections appear automatically on existing stores.
+   */
+  sectionOrder?: Array<
+    | 'hero'
+    | 'categories'
+    | 'newArrivals'
+    | 'bestSellers'
+    | 'brandStory'
+    | 'blogCarousel'
+    | 'trustStrip'
+    | 'testimonials'
+  >;
 }
 
 /**
@@ -528,7 +616,11 @@ export function resolveLayoutSettings(input: unknown): StoreLayoutSettings {
     filterSidebar: { ...DEFAULT_LAYOUT_SETTINGS.filterSidebar, ...(raw.filterSidebar ?? {}) },
     testimonials: { ...DEFAULT_LAYOUT_SETTINGS.testimonials, ...(raw.testimonials ?? {}) },
     reviewSection: { ...DEFAULT_LAYOUT_SETTINGS.reviewSection, ...(raw.reviewSection ?? {}) },
+    brandStory: raw.brandStory,
+    trustStrip: raw.trustStrip,
+    blogCarousel: raw.blogCarousel,
     sizing: { ...DEFAULT_LAYOUT_SETTINGS.sizing, ...(raw.sizing ?? {}) },
     productCardDefaults: { ...(raw.productCardDefaults ?? {}) },
+    sectionOrder: raw.sectionOrder,
   };
 }

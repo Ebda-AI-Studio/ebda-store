@@ -58,6 +58,9 @@ interface StoreInfo {
   template?: TemplateId;
   /** Store theme — used by ColorField to resolve brand tokens for the contrast preview. */
   theme?: StoreTheme;
+  /** Whether the /blog routes are enabled. Page-builder reads this as the
+   *  legacy fallback for the blogCarousel.enabled toggle. */
+  blogEnabled?: boolean;
 }
 
 // Neutral fallback used by SectionPreview before the real theme loads from the
@@ -1121,6 +1124,55 @@ export default function StoreLayoutPage() {
                 defaultExpanded={layout.reviewSection.enabled}
               ></SectionCard>
 
+              {/* Brand Story — folded into page-builder 2026-05-20 (was a
+                  theme toggle in Branding before). Content sourced from
+                  store.heroImage + store.description{Ar}. */}
+              <ExtraSectionCard
+                kind="brandStory"
+                label="Brand story"
+                description="Image + story block sourced from your store hero image + description."
+                settings={layout.brandStory}
+                legacyEnabled={storeInfo?.theme?.showBrandStory !== false}
+                onPatch={patch =>
+                  setLayout(prev =>
+                    prev ? { ...prev, brandStory: { ...(prev.brandStory ?? {}), ...patch } } : prev
+                  )
+                }
+                theme={storeInfo?.theme ?? FALLBACK_THEME}
+              />
+
+              {/* Home blog carousel */}
+              <ExtraSectionCard
+                kind="blogCarousel"
+                label="Blog carousel"
+                description="Latest blog posts on the homepage. The /blog routes are gated separately by Store.blogEnabled."
+                settings={layout.blogCarousel}
+                legacyEnabled={storeInfo?.blogEnabled === true}
+                onPatch={patch =>
+                  setLayout(prev =>
+                    prev
+                      ? { ...prev, blogCarousel: { ...(prev.blogCarousel ?? {}), ...patch } }
+                      : prev
+                  )
+                }
+                theme={storeInfo?.theme ?? FALLBACK_THEME}
+              />
+
+              {/* Trust strip — 3 trust-signal badges (delivery / returns / support) */}
+              <ExtraSectionCard
+                kind="trustStrip"
+                label="Trust strip"
+                description="3 trust-signal badges (free delivery, returns, support) — bilingual platform copy."
+                settings={layout.trustStrip}
+                legacyEnabled={storeInfo?.theme?.showTrustStrip !== false}
+                onPatch={patch =>
+                  setLayout(prev =>
+                    prev ? { ...prev, trustStrip: { ...(prev.trustStrip ?? {}), ...patch } } : prev
+                  )
+                }
+                theme={storeInfo?.theme ?? FALLBACK_THEME}
+              />
+
               {/* Product Card Defaults — global card controls that apply
                   to the PLP, search, and any product surface outside the
                   homepage carousels. Per-section settings above override
@@ -2007,6 +2059,189 @@ function KickerSubtitleControls({
  * stored + zod-accepted but uses defaults for rendering. v2 will add
  * per-slot styling controls.
  */
+/**
+ * Lightweight SectionCard for the 3 new sections folded into page-builder
+ * 2026-05-20: Brand Story, Trust Strip, Blog carousel. Each shares the
+ * same shape — enabled toggle + bg color + dividers + a small live preview.
+ * Doesn't expose full typography overrides yet (storefront components
+ * don't currently consume per-section typography for these surfaces);
+ * extend in v3 if merchants ask.
+ */
+function ExtraSectionCard({
+  kind,
+  label,
+  description,
+  settings,
+  legacyEnabled,
+  onPatch,
+  theme,
+}: {
+  kind: 'brandStory' | 'trustStrip' | 'blogCarousel';
+  label: string;
+  description: string;
+  settings:
+    | import('@force/shared').BrandStorySettings
+    | import('@force/shared').TrustStripSettings
+    | import('@force/shared').BlogCarouselSettings
+    | undefined;
+  legacyEnabled: boolean;
+  onPatch: (
+    patch: Partial<
+      import('@force/shared').BrandStorySettings &
+        import('@force/shared').TrustStripSettings &
+        import('@force/shared').BlogCarouselSettings
+    >
+  ) => void;
+  theme: import('@force/shared').StoreTheme;
+}) {
+  const enabled = settings?.enabled ?? legacyEnabled;
+  // KickerSubtitleValues shape used by SectionDividersBlock — these sections
+  // don't have kicker/subtitle fields, but the divider block only reads
+  // values.dividers, so we wrap with empty placeholders.
+  const dividerValues = {
+    dividers: settings?.dividers,
+    showKickerLines: true,
+    showSubtitleLines: true,
+  };
+  return (
+    <SectionCard
+      title={label}
+      description={description}
+      enabled={enabled}
+      onToggle={v => onPatch({ enabled: v })}
+      defaultExpanded={enabled}
+    >
+      <div className="space-y-4">
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-muted-foreground">Background color</span>
+          <input
+            type="text"
+            value={settings?.bgColor ?? ''}
+            onChange={e => onPatch({ bgColor: e.target.value || undefined })}
+            placeholder="#FFFFFF or token:primary or leave empty"
+            className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-base sm:text-sm"
+          />
+        </label>
+        {kind === 'trustStrip' && (
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-muted-foreground">Layout</span>
+            <select
+              value={
+                (settings as import('@force/shared').TrustStripSettings | undefined)?.layout ??
+                'horizontal'
+              }
+              onChange={e => onPatch({ layout: e.target.value as 'horizontal' | 'vertical' })}
+              className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+            >
+              <option value="horizontal">Horizontal (3-up)</option>
+              <option value="vertical">Vertical (stacked)</option>
+            </select>
+          </label>
+        )}
+        {kind === 'blogCarousel' && (
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-muted-foreground">Max posts</span>
+            <input
+              type="number"
+              min={1}
+              max={20}
+              value={
+                (settings as import('@force/shared').BlogCarouselSettings | undefined)?.limit ?? 6
+              }
+              onChange={e => onPatch({ limit: Number(e.target.value) || 6 })}
+              className="rounded-lg border border-border bg-background px-3 py-2 text-sm w-32"
+            />
+          </label>
+        )}
+        <SectionDividersBlock
+          values={dividerValues}
+          onPatch={patch => {
+            if (patch.dividers) onPatch({ dividers: patch.dividers });
+          }}
+        />
+        <SectionPaddingMaxWidthBlock values={settings} onPatch={p => onPatch(p)} />
+        <SectionPreview
+          label={label}
+          bgColor={settings?.bgColor}
+          cardFrameColor={undefined}
+          cardFrameWidth={undefined}
+          headingZone={undefined}
+          dividers={settings?.dividers}
+          theme={theme}
+        />
+      </div>
+    </SectionCard>
+  );
+}
+
+/**
+ * Per-section padding / max-width / breakpoint visibility controls — item #6
+ * of the page-builder gap fill. 5 fields rendered inline so any section card
+ * (existing or new) can host them via one component invocation.
+ */
+function SectionPaddingMaxWidthBlock({
+  values,
+  onPatch,
+}: {
+  values: import('@force/shared').SectionPaddingMaxWidthVisibility | undefined;
+  onPatch: (patch: Partial<import('@force/shared').SectionPaddingMaxWidthVisibility>) => void;
+}) {
+  return (
+    <div className="rounded-lg border border-dashed border-border bg-muted/20 p-3">
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        Spacing & visibility
+      </p>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <DividerStyleSelect
+          label="Padding top"
+          value={values?.paddingTop ?? 'normal'}
+          options={[
+            ['none', 'None'],
+            ['tight', 'Tight'],
+            ['normal', 'Normal'],
+            ['loose', 'Loose'],
+            ['xloose', 'X-loose'],
+          ]}
+          onChange={v => onPatch({ paddingTop: v as 'normal' })}
+        />
+        <DividerStyleSelect
+          label="Padding bottom"
+          value={values?.paddingBottom ?? 'normal'}
+          options={[
+            ['none', 'None'],
+            ['tight', 'Tight'],
+            ['normal', 'Normal'],
+            ['loose', 'Loose'],
+            ['xloose', 'X-loose'],
+          ]}
+          onChange={v => onPatch({ paddingBottom: v as 'normal' })}
+        />
+        <DividerStyleSelect
+          label="Max width"
+          value={values?.maxWidth ?? 'contained'}
+          options={[
+            ['contained', 'Contained (max-w-7xl)'],
+            ['full', 'Edge-to-edge'],
+          ]}
+          onChange={v => onPatch({ maxWidth: v as 'contained' })}
+        />
+      </div>
+      <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <RowToggle
+          label="Hide on mobile"
+          checked={values?.hideOnMobile === true}
+          onChange={v => onPatch({ hideOnMobile: v })}
+        />
+        <RowToggle
+          label="Hide on desktop"
+          checked={values?.hideOnDesktop === true}
+          onChange={v => onPatch({ hideOnDesktop: v })}
+        />
+      </div>
+    </div>
+  );
+}
+
 function SectionDividersBlock({
   values,
   onPatch,
