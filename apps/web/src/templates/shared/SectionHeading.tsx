@@ -48,9 +48,7 @@ interface SectionHeadingProps {
   /**
    * Per-section typography overrides resolved by resolveSectionZone().
    * When provided, applied as inline styles on the heading h2, kicker span,
-   * and subtitle wrapper. The auto-fix cascade rule in globals.css uses
-   * !important on --section-fg so auto-picked contrast color wins over the
-   * color field here when the section has an explicit bgColor.
+   * and subtitle wrapper. Merchant intent wins — no runtime auto-fix.
    */
   headingZone?: ResolvedZone;
   kickerZone?: ResolvedZone;

@@ -96,8 +96,7 @@ export interface StoreData {
   /**
    * Per-store typography overrides (font family, size, color per zone).
    * Shape mirrors `ResolvedStore.typography` and `Store.typography` JSON.
-   * Used by HomePageContent to read the global sectionTitle zone color so
-   * sectionBgStyle can fire the contrast auto-fix on inherited bg sections.
+   * Used by HomePageContent for per-section heading inline styles.
    */
   typography?: Record<string, unknown> | null;
   pwaSettings?: Record<string, unknown>;
