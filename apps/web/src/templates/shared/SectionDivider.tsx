@@ -56,19 +56,32 @@ export function SectionDivider({ settings, hideForExplicitBg }: SectionDividerPr
 
   if (!merged.enabled) return null;
 
-  // Mutual exclusion with backgroundPreset (Ahmad 2026-05-17 evening):
-  // both systems separate sections visually — running them together is
-  // unpleasant double-separation. Only applies to between-section dividers;
-  // intra-section line dividers (kicker/title/subtitle) bypass this check
-  // because they're not affected by background alternation.
-  const bgPreset = store.theme?.backgroundPreset ?? 'none';
-  if (bgPreset !== 'none' && hideForExplicitBg !== undefined) return null;
+  // Explicit per-section override (settings prop provided + enabled true) wins
+  // over BOTH the backgroundPreset mutex AND the per-section bgColor mutex.
+  // The merchant explicitly opted in via the page-builder Section dividers
+  // toggle — honor that intent regardless of any auto-suppression rules that
+  // applied to the legacy platform-wide divider. Verified 2026-05-20 when
+  // Ahmad reported "Section dividers are not rendering in storefront while
+  // it's on in admin for wadyaljuz" — wadyaljuz's `theme.backgroundPreset`
+  // was non-'none' which was suppressing every between-section divider via
+  // the mutex below.
+  const isExplicitOverride = settings !== undefined && settings.enabled === true;
 
-  // Per-section bgColor mutex (2026-05-19): merchants can color individual
-  // sections without changing the global backgroundPreset. When either
-  // flanking section has an explicit bgColor, the color shift already
-  // acts as a separator — suppress the <hr> to avoid double-separation.
-  if (hideForExplicitBg) return null;
+  if (!isExplicitOverride) {
+    // Mutual exclusion with backgroundPreset (legacy 2026-05-17 evening):
+    // both systems separate sections visually — running them together is
+    // unpleasant double-separation. Only applies to between-section dividers;
+    // intra-section line dividers (kicker/title/subtitle) bypass this check
+    // because they're not affected by background alternation.
+    const bgPreset = store.theme?.backgroundPreset ?? 'none';
+    if (bgPreset !== 'none' && hideForExplicitBg !== undefined) return null;
+
+    // Per-section bgColor mutex (2026-05-19): merchants can color individual
+    // sections without changing the global backgroundPreset. When either
+    // flanking section has an explicit bgColor, the color shift already
+    // acts as a separator — suppress the <hr> to avoid double-separation.
+    if (hideForExplicitBg) return null;
+  }
 
   // Color resolution — single source of truth so the admin live preview
   // and the storefront render stay in lockstep.
