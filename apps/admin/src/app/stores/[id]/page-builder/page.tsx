@@ -7,7 +7,6 @@ import { useT } from '@/i18n/useT';
 import {
   resolveLayoutSettings,
   DEFAULT_THEME,
-  DEFAULT_DIVIDER_SETTINGS,
   type StoreLayoutSettings,
   type ProductCardDefaults,
   type HeroSlide,
@@ -19,12 +18,6 @@ import {
   type ZoneOverride,
   type SectionTypographyOverride,
   type ColorToken,
-  type DividerSettings,
-  type DividerStyle,
-  type DividerThickness,
-  type DividerWidth,
-  type DividerColorMode,
-  type DividerSpacing,
 } from '@force/shared';
 
 // ---------------------------------------------------------------------------
@@ -86,6 +79,13 @@ export default function StoreLayoutPage() {
   const [storeInfo, setStoreInfo] = useState<StoreInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  // Smart Palette + future brand-token edits stage their theme updates here
+  // instead of writing immediately to /theme. The main Save button flushes
+  // these alongside layout + typography so the merchant has one source of
+  // truth for "is this saved?" and can discard with a page reload before
+  // confirming. Ahmad 2026-05-20: "smart palette does apply automatically
+  // i don't want this".
+  const [pendingThemeUpdates, setPendingThemeUpdates] = useState<ThemeUpdates>({});
   const [paletteOpen, setPaletteOpen] = useState(false);
   // Global typography zones — fetched from the same typography endpoint as
   // the standalone /typography page. Populated in fetchData and used as
@@ -96,13 +96,6 @@ export default function StoreLayoutPage() {
   // overwrite the merchant's custom/Google font library with an empty array
   // when only the zones are edited from this page.
   const [typographyFonts, setTypographyFonts] = useState<unknown[]>([]);
-  // Divider settings — fetched from storeInfo.theme.dividers, persisted via
-  // PUT /api/v1/admin/stores/:id/theme alongside Smart Palette saves.
-  const [dividerSettings, setDividerSettings] = useState<DividerSettings>(DEFAULT_DIVIDER_SETTINGS);
-  // Track whether the theme object has been loaded so we can round-trip other
-  // theme fields unchanged when persisting divider edits.
-  const [loadedTheme, setLoadedTheme] = useState<Partial<StoreTheme>>({});
-  const [dividerSaveMsg, setDividerSaveMsg] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     if (!storeId) return;
@@ -123,11 +116,6 @@ export default function StoreLayoutPage() {
       }
       if (storeRes.data?.store) {
         setStoreInfo(storeRes.data.store);
-        // Hydrate divider settings from the theme object so the Dividers card
-        // reflects the merchant's saved choices without a separate API call.
-        const theme: Partial<StoreTheme> = storeRes.data.store.theme ?? {};
-        setLoadedTheme(theme);
-        setDividerSettings({ ...DEFAULT_DIVIDER_SETTINGS, ...(theme.dividers ?? {}) });
       }
       if (typographyRes.data?.typography) {
         // Preserve fonts so handleSave can round-trip them unchanged.
@@ -166,12 +154,26 @@ export default function StoreLayoutPage() {
     if (!layout) return;
     setIsSaving(true);
     try {
-      const [layoutResult, typographyResult] = await Promise.allSettled([
+      // Build the parallel PUT batch. Theme updates only fire when the merchant
+      // has staged some (Smart Palette apply, future brand-token edits) —
+      // empty stage = skip the request entirely.
+      const themeUpdateKeys = Object.keys(pendingThemeUpdates);
+      const hasThemeUpdates = themeUpdateKeys.length > 0;
+      const themePromise =
+        hasThemeUpdates && storeInfo?.theme
+          ? apiPut(`/api/v1/stores/${storeId}/theme`, {
+              ...storeInfo.theme,
+              ...pendingThemeUpdates,
+            })
+          : Promise.resolve({ data: undefined, error: undefined } as const);
+
+      const [layoutResult, typographyResult, themeResult] = await Promise.allSettled([
         apiPut(`/api/v1/admin/stores/${storeId}/layout`, layout),
         apiPut(`/api/v1/stores/${storeId}/typography`, {
           fonts: typographyFonts,
           zones: globalZones,
         }),
+        themePromise,
       ]);
 
       const layoutFailed =
@@ -180,6 +182,10 @@ export default function StoreLayoutPage() {
       const typographyFailed =
         typographyResult.status === 'rejected' ||
         (typographyResult.status === 'fulfilled' && !!typographyResult.value.error);
+      const themeFailed =
+        hasThemeUpdates &&
+        (themeResult.status === 'rejected' ||
+          (themeResult.status === 'fulfilled' && !!themeResult.value.error));
 
       if (layoutFailed && typographyFailed) {
         toastError(t('saveError'));
@@ -187,28 +193,26 @@ export default function StoreLayoutPage() {
         toastError(t('saveErrorLayoutOnly'));
       } else if (typographyFailed) {
         toastError(t('saveErrorTypographyOnly'));
+      } else if (themeFailed) {
+        toastError(
+          'Brand colors save failed. Layout + typography saved successfully — re-apply brand colors in Smart Palette or /branding to retry.'
+        );
       } else {
         toastSuccess(t('saved'));
+        // Clear pending theme updates only on successful save — otherwise the
+        // merchant might assume they're saved when the request failed.
+        if (hasThemeUpdates) {
+          // Refresh storeInfo so subsequent ColorField "Brand: ..." picks
+          // resolve to the freshly saved tokens.
+          const storeRes = await apiGet<{ store: StoreInfo }>(`/api/v1/admin/stores/${storeId}`);
+          if (storeRes.data?.store) {
+            setStoreInfo(storeRes.data.store);
+          }
+          setPendingThemeUpdates({});
+        }
       }
     } finally {
       setIsSaving(false);
-    }
-  };
-
-  // Standalone save for the Dividers card — uses PUT /theme (same endpoint as
-  // Smart Palette) to persist only the dividers sub-field while preserving all
-  // other theme fields. Mirrors the standalone /dividers page's handleSave.
-  const handleSaveDividers = async () => {
-    setIsSaving(true);
-    setDividerSaveMsg(null);
-    const nextTheme = { ...loadedTheme, dividers: dividerSettings };
-    const { error } = await apiPut(`/api/v1/admin/stores/${storeId}/theme`, nextTheme);
-    setIsSaving(false);
-    if (error) {
-      setDividerSaveMsg(error.message);
-    } else {
-      setDividerSaveMsg('Saved.');
-      setLoadedTheme(nextTheme);
     }
   };
 
@@ -235,6 +239,15 @@ export default function StoreLayoutPage() {
           >
             Smart palette
           </button>
+          {Object.keys(pendingThemeUpdates).length > 0 && (
+            <span
+              className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700"
+              title="Brand color changes from Smart Palette are pending. Click Save to commit."
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+              Unsaved brand colors
+            </span>
+          )}
           <button
             type="button"
             onClick={handleSave}
@@ -1190,214 +1203,7 @@ export default function StoreLayoutPage() {
                   back-compat with existing stores' saved JSON but isn't
                   surfaced in admin or read by render code. */}
 
-              {/* Section dividers card REMOVED 2026-05-20 — Ahmad: "i want them by
-                  each section". Per-section divider controls now live inside each
-                  SectionCard above (hero, categories, newArrivals, bestSellers,
-                  testimonials) via the SectionDividers data model (5 slots each:
-                  above / kicker / title / subtitle / belowHeading).
-
-                  Storefront `<SectionDivider>` still reads legacy `theme.dividers`
-                  as a fallback when no per-section override is set, so existing
-                  stores keep their current look until merchants opt-in per-section.
-
-                  The save handler `handleSaveDividers` + state `dividerSettings`
-                  are now unused by this card but kept for v1 migration safety —
-                  will be removed in a follow-up commit once all stores are on
-                  per-section dividers. */}
-              {false && (
-                <SectionCard
-                  title="Section dividers (platform-wide) — DEPRECATED"
-                  description="Removed in 2026-05-20. Use per-section dividers inside each SectionCard above."
-                  alwaysOn
-                  defaultExpanded={false}
-                >
-                  <div className="space-y-5">
-                    {/* Group A — Master toggle */}
-                    <DividerControlGroup
-                      heading="Visibility"
-                      description="Master switch for the horizontal rule between sections. Color-shift backgrounds already separate sections visually — turning dividers off when you use a background preset keeps the page from feeling over-separated."
-                    >
-                      <label className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card p-4 cursor-pointer">
-                        <span className="flex-1 min-w-0">
-                          <span className="block text-sm font-semibold text-foreground">
-                            Show section dividers
-                          </span>
-                          <span className="mt-0.5 block text-xs text-muted-foreground">
-                            When off, your homepage sections sit edge-to-edge with no horizontal
-                            line between them.
-                          </span>
-                        </span>
-                        <input
-                          type="checkbox"
-                          checked={dividerSettings.enabled}
-                          onChange={e =>
-                            setDividerSettings(prev => ({ ...prev, enabled: e.target.checked }))
-                          }
-                          className="h-5 w-5 cursor-pointer accent-primary"
-                        />
-                      </label>
-                    </DividerControlGroup>
-
-                    {/* All other controls disabled when master off */}
-                    <fieldset
-                      disabled={!dividerSettings.enabled}
-                      className={`space-y-5 ${dividerSettings.enabled ? '' : 'opacity-50 pointer-events-none'}`}
-                    >
-                      {/* Group B — Style & thickness */}
-                      <DividerControlGroup
-                        heading="Style & thickness"
-                        description="What the line itself looks like."
-                      >
-                        <DividerRadioPicker
-                          label="Line style"
-                          hint="How the line is drawn."
-                          value={dividerSettings.style}
-                          options={[
-                            { value: 'solid', label: 'Solid' },
-                            { value: 'dashed', label: 'Dashed' },
-                            { value: 'dotted', label: 'Dotted' },
-                            { value: 'double', label: 'Double' },
-                          ]}
-                          onChange={v =>
-                            setDividerSettings(prev => ({
-                              ...prev,
-                              style: v as DividerStyle,
-                            }))
-                          }
-                        />
-                        <DividerRadioPicker
-                          label="Line thickness"
-                          hint="Pixel height of the line."
-                          value={String(dividerSettings.thickness)}
-                          options={[
-                            { value: '1', label: 'Hairline (1px)' },
-                            { value: '2', label: 'Medium (2px)' },
-                            { value: '3', label: 'Bold (3px)' },
-                          ]}
-                          onChange={v =>
-                            setDividerSettings(prev => ({
-                              ...prev,
-                              thickness: Number(v) as DividerThickness,
-                            }))
-                          }
-                        />
-                      </DividerControlGroup>
-
-                      {/* Group C — Position & size */}
-                      <DividerControlGroup
-                        heading="Position & size"
-                        description="How wide the line is and how much space it leaves around itself."
-                      >
-                        <DividerRadioPicker
-                          label="Line width"
-                          hint="How wide the line spans across the page."
-                          value={dividerSettings.width}
-                          options={[
-                            { value: 'full', label: 'Edge-to-edge' },
-                            { value: 'contained', label: 'Within content (recommended)' },
-                            { value: 'short', label: 'Short accent (centered)' },
-                          ]}
-                          onChange={v =>
-                            setDividerSettings(prev => ({
-                              ...prev,
-                              width: v as DividerWidth,
-                            }))
-                          }
-                        />
-                        <DividerRadioPicker
-                          label="Vertical spacing"
-                          hint="Padding above and below the line."
-                          value={dividerSettings.spacing}
-                          options={[
-                            { value: 'tight', label: 'Tight' },
-                            { value: 'normal', label: 'Normal' },
-                            { value: 'loose', label: 'Loose' },
-                          ]}
-                          onChange={v =>
-                            setDividerSettings(prev => ({
-                              ...prev,
-                              spacing: v as DividerSpacing,
-                            }))
-                          }
-                        />
-                      </DividerControlGroup>
-
-                      {/* Group D — Color */}
-                      <DividerControlGroup
-                        heading="Color"
-                        description="Pick a tone that matches your sections. Auto lets the theme decide; Accent uses your brand primary."
-                      >
-                        <DividerRadioPicker
-                          label="Line color"
-                          hint="How the line picks up your store palette."
-                          value={dividerSettings.color}
-                          options={[
-                            { value: 'auto', label: 'Auto (subtle theme color)' },
-                            { value: 'foreground', label: 'High contrast (foreground)' },
-                            { value: 'accent', label: 'Brand color' },
-                            { value: 'custom', label: 'Custom color' },
-                          ]}
-                          onChange={v =>
-                            setDividerSettings(prev => ({
-                              ...prev,
-                              color: v as DividerColorMode,
-                            }))
-                          }
-                        />
-                        {dividerSettings.color === 'custom' && (
-                          <label className="flex items-center gap-3 rounded-lg border border-border bg-card p-4">
-                            <span className="text-sm text-foreground">Pick a custom color</span>
-                            <input
-                              type="color"
-                              value={dividerSettings.customColor ?? '#cccccc'}
-                              onChange={e =>
-                                setDividerSettings(prev => ({
-                                  ...prev,
-                                  customColor: e.target.value,
-                                }))
-                              }
-                              className="h-10 w-16 cursor-pointer rounded border border-border"
-                            />
-                            <span className="font-mono text-sm text-muted-foreground">
-                              {dividerSettings.customColor ?? '#cccccc'}
-                            </span>
-                          </label>
-                        )}
-                      </DividerControlGroup>
-                    </fieldset>
-
-                    {/* Live preview */}
-                    <DividerPreviewBlock
-                      settings={dividerSettings}
-                      primaryColor={storeInfo?.theme?.primaryColor}
-                    />
-
-                    <div className="flex flex-wrap items-center gap-3 border-t border-border pt-4">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setDividerSettings(DEFAULT_DIVIDER_SETTINGS);
-                          setDividerSaveMsg(null);
-                        }}
-                        className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-foreground hover:bg-muted transition-colors cursor-pointer"
-                      >
-                        Reset to defaults
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleSaveDividers}
-                        disabled={isSaving}
-                        className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60 transition-colors cursor-pointer"
-                      >
-                        {isSaving ? 'Saving…' : 'Save dividers'}
-                      </button>
-                      {dividerSaveMsg && (
-                        <span className="text-sm text-muted-foreground">{dividerSaveMsg}</span>
-                      )}
-                    </div>
-                  </div>
-                </SectionCard>
-              )}
+              {/* Platform-wide section dividers card deleted 2026-05-20. Per-section dividers now live inside each SectionCard above. Storefront falls back to legacy theme.dividers for existing stores. */}
 
               {/* Header + Footer typography — only truly platform-wide zones.
                   Section-specific zones (sectionTitle / sectionKicker / etc.)
@@ -1532,37 +1338,16 @@ export default function StoreLayoutPage() {
             };
           });
 
-          // 2. Persist brand-token updates to StoreTheme so ColorField "Brand: ..."
-          //    picks resolve to the colors the merchant just chose. This is
-          //    independent of the main Save button — merchant clicked Apply, so
-          //    the theme is written immediately.
+          // 2. Stage brand-token updates in local pending state instead of
+          //    PUT-ing /theme immediately. The merchant clicks the main Save
+          //    button to commit layout + typography + theme together. This
+          //    matches every other admin form's "edit locally, save explicitly"
+          //    behavior — Ahmad 2026-05-20: "smart palette does apply
+          //    automatically i don't want this".
           const hasThemeUpdates =
             themeUpdates.primaryColor !== undefined || themeUpdates.accentColor !== undefined;
-          if (hasThemeUpdates && storeInfo?.theme) {
-            const updatedTheme = { ...storeInfo.theme, ...themeUpdates };
-            try {
-              const res = await apiPut(`/api/v1/stores/${storeId}/theme`, updatedTheme);
-              if (res.error) {
-                // Theme write failed but layout apply succeeded — surface a toast but
-                // don't block the merchant. They can update brand colors in /branding.
-                toastError(
-                  'Brand colors saved to sections, but theme update failed. Update in Branding if needed.'
-                );
-              } else {
-                // Refresh storeInfo so subsequent ColorField empty-state previews
-                // show the new brand colors.
-                const storeRes = await apiGet<{ store: StoreInfo }>(
-                  `/api/v1/admin/stores/${storeId}`
-                );
-                if (storeRes.data?.store) {
-                  setStoreInfo(storeRes.data.store);
-                }
-              }
-            } catch {
-              toastError(
-                'Brand colors saved to sections, but theme update failed. Update in Branding if needed.'
-              );
-            }
+          if (hasThemeUpdates) {
+            setPendingThemeUpdates(prev => ({ ...prev, ...themeUpdates }));
           }
         }}
       />
@@ -2656,125 +2441,3 @@ function IconButton({
 // DividerPreview components verbatim so the UX is identical in both places.
 // The standalone page was merged into page-builder on 2026-05-19.
 // ---------------------------------------------------------------------------
-
-function DividerControlGroup({
-  heading,
-  description,
-  children,
-}: {
-  heading: string;
-  description?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="rounded-2xl border border-border bg-card/40 p-4">
-      <div className="mb-3">
-        <h2 className="text-sm font-semibold text-foreground">{heading}</h2>
-        {description && <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>}
-      </div>
-      <div className="space-y-3">{children}</div>
-    </section>
-  );
-}
-
-function DividerRadioPicker({
-  label,
-  hint,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  hint?: string;
-  value: string;
-  options: Array<{ value: string; label: string }>;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <div className="rounded-lg border border-border bg-card p-4">
-      <div className="mb-3">
-        <p className="text-sm font-semibold text-foreground">{label}</p>
-        {hint && <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>}
-      </div>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-        {options.map(opt => (
-          <label
-            key={opt.value}
-            className={`flex cursor-pointer items-center gap-2 rounded-lg border p-2.5 text-sm transition-colors ${
-              value === opt.value
-                ? 'border-primary bg-primary/5 text-foreground'
-                : 'border-border text-muted-foreground hover:border-foreground/30'
-            }`}
-          >
-            <input
-              type="radio"
-              checked={value === opt.value}
-              onChange={() => onChange(opt.value)}
-              className="sr-only"
-            />
-            {opt.label}
-          </label>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function DividerPreviewBlock({
-  settings,
-  primaryColor,
-}: {
-  settings: DividerSettings;
-  primaryColor?: string;
-}) {
-  // Mirrors storefront resolveDividerColor exactly so what merchants see
-  // here matches the live render to the pixel.
-  const colorCss =
-    settings.color === 'foreground'
-      ? 'rgba(0, 0, 0, 0.25)'
-      : settings.color === 'accent'
-        ? primaryColor
-          ? `hsl(${primaryColor})`
-          : 'hsl(26, 100%, 50%)'
-        : settings.color === 'custom'
-          ? settings.customColor || '#cccccc'
-          : '#e5e7eb';
-  const padY = settings.spacing === 'tight' ? 16 : settings.spacing === 'loose' ? 48 : 28;
-  const lineWidth =
-    settings.width === 'full' ? '100%' : settings.width === 'short' ? '80px' : '90%';
-
-  return (
-    <div className="rounded-2xl border border-border bg-card p-4">
-      <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        Live preview
-      </p>
-      <div className="rounded-lg bg-muted/30 p-4">
-        <div className="rounded bg-background p-3 text-center text-xs text-muted-foreground">
-          Section above
-        </div>
-        <div
-          className={settings.enabled ? '' : 'opacity-30'}
-          style={{ paddingTop: padY, paddingBottom: padY }}
-        >
-          <div className="flex justify-center">
-            <hr
-              className="m-0 border-0 border-t"
-              style={{
-                borderTopStyle: settings.style,
-                borderTopWidth: `${settings.thickness}px`,
-                borderTopColor: colorCss,
-                width: lineWidth,
-              }}
-            />
-          </div>
-        </div>
-        <div className="rounded bg-background p-3 text-center text-xs text-muted-foreground">
-          Section below
-        </div>
-      </div>
-      <p className="mt-3 text-[11px] text-muted-foreground/80">
-        Live preview — the page reflects every change before you save.
-      </p>
-    </div>
-  );
-}
