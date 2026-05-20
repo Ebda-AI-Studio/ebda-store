@@ -3303,20 +3303,36 @@ function ExtraSectionCard({
           theme={theme}
         />
         {kind === 'trustStrip' && (
-          <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-muted-foreground">Layout</span>
-            <select
-              value={
-                (settings as import('@force/shared').TrustStripSettings | undefined)?.layout ??
-                'horizontal'
-              }
-              onChange={e => onPatch({ layout: e.target.value as 'horizontal' | 'vertical' })}
-              className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
-            >
-              <option value="horizontal">Horizontal (3-up)</option>
-              <option value="vertical">Vertical (stacked)</option>
-            </select>
-          </label>
+          <>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-muted-foreground">Layout</span>
+              <select
+                value={
+                  (settings as import('@force/shared').TrustStripSettings | undefined)?.layout ??
+                  'horizontal'
+                }
+                onChange={e => onPatch({ layout: e.target.value as 'horizontal' | 'vertical' })}
+                className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+              >
+                <option value="horizontal">Horizontal (3-up)</option>
+                <option value="vertical">Vertical (stacked)</option>
+              </select>
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-muted-foreground">Size</span>
+              <select
+                value={
+                  (settings as import('@force/shared').TrustStripSettings | undefined)?.size ?? 'md'
+                }
+                onChange={e => onPatch({ size: e.target.value as 'sm' | 'md' | 'lg' })}
+                className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+              >
+                <option value="sm">Small</option>
+                <option value="md">Medium</option>
+                <option value="lg">Large</option>
+              </select>
+            </label>
+          </>
         )}
         {kind === 'blogCarousel' && (
           <label className="flex flex-col gap-1">

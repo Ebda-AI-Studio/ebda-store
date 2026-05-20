@@ -461,6 +461,9 @@ export interface TrustStripSettings extends SectionBgOverride, SectionPaddingMax
   /** Horizontal (3-up tight) or vertical (stacked). Default 'horizontal'.
    *  Legacy fallback: `theme.trustStripLayout`. */
   layout?: 'horizontal' | 'vertical';
+  /** Scales icons + labels together. Default 'md'.
+   *  Legacy fallback: `theme.trustStripSize`. */
+  size?: 'sm' | 'md' | 'lg';
   typography?: SectionTypographyOverride;
   dividers?: SectionDividers;
 }

@@ -656,7 +656,7 @@ export function HomePageContent({
                 settings={layout.trustStrip?.dividers?.above}
                 hideForExplicitBg={!!layout.trustStrip?.bgColor}
               />
-              <TrustStrip />
+              <TrustStrip settings={layout.trustStrip} />
             </>
           ) : null;
 

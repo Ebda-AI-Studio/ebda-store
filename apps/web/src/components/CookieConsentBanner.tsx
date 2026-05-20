@@ -28,6 +28,21 @@ export function CookieConsentBanner() {
   // link is how they get back to change their mind later.
   if (hasDecided) return null;
 
+  // Suppress in admin live-preview iframe context. Ahmad 2026-05-20: the
+  // banner kept reappearing in the page-builder preview every iframe reload
+  // because the iframe is a separate browsing context with no consent cookie.
+  // Two signals — `window.top !== window.self` (we're framed) AND the
+  // `?_preview=` query param (admin live-preview injects it). Either one is
+  // sufficient. Real visitors hit the storefront top-level and see the
+  // banner normally.
+  if (typeof window !== 'undefined') {
+    const inIframe = window.top !== window.self;
+    const hasPreviewParam =
+      window.location.search.includes('_preview=') ||
+      window.location.search.includes('_layoutDraft=');
+    if (inIframe || hasPreviewParam) return null;
+  }
+
   return (
     <div
       role="dialog"

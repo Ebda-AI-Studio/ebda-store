@@ -110,47 +110,12 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
         />
       </label>
 
-      {/* Homepage section toggles (2026-05-17 evening) — added after Ahmad
-          asked "where to toggle this off" about the brand story block. */}
-      <label className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card p-4 cursor-pointer">
-        <span className="flex-1 min-w-0">
-          <span className="block text-sm font-semibold text-foreground">
-            {t('brandStory.title')}
-          </span>
-          <span className="mt-0.5 block text-xs text-muted-foreground">{t('brandStory.hint')}</span>
-        </span>
-        <input
-          type="checkbox"
-          checked={branding.theme.showBrandStory !== false}
-          onChange={e =>
-            onChange({
-              ...branding,
-              theme: { ...branding.theme, showBrandStory: e.target.checked },
-            })
-          }
-          className="h-5 w-5 cursor-pointer accent-primary"
-        />
-      </label>
-
-      <label className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card p-4 cursor-pointer">
-        <span className="flex-1 min-w-0">
-          <span className="block text-sm font-semibold text-foreground">
-            {t('trustStrip.title')}
-          </span>
-          <span className="mt-0.5 block text-xs text-muted-foreground">{t('trustStrip.hint')}</span>
-        </span>
-        <input
-          type="checkbox"
-          checked={branding.theme.showTrustStrip !== false}
-          onChange={e =>
-            onChange({
-              ...branding,
-              theme: { ...branding.theme, showTrustStrip: e.target.checked },
-            })
-          }
-          className="h-5 w-5 cursor-pointer accent-primary"
-        />
-      </label>
+      {/* Brand Story + Trust Strip enable/disable + Trust Strip layout/size
+          REMOVED 2026-05-20: page-builder owns these per-section settings.
+          Theme-tab versions were redundant. Storefront still honors
+          theme.showBrandStory / showTrustStrip / trustStripLayout / size as
+          legacy fallback for stores saved before the page-builder section
+          landed (see TrustStrip.tsx + HomePageContent.tsx). */}
 
       {/* Footer-specific logo. Ahmad 2026-05-20: dark footer bgs need a
           white/inverted logo. Two paths: (a) upload a separate footer logo
@@ -201,88 +166,6 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
             above.
           </span>
         </label>
-      </div>
-
-      {/* Trust-strip layout direction — radio pair (horizontal vs
-          vertical). Only meaningful when showTrustStrip is on, so the
-          control fades when the parent toggle is off. */}
-      <div
-        className={`rounded-lg border border-border bg-card p-4 transition-opacity ${
-          branding.theme.showTrustStrip === false ? 'opacity-50 pointer-events-none' : ''
-        }`}
-      >
-        <div className="mb-3">
-          <p className="text-sm font-semibold text-foreground">{t('trustStripLayout.title')}</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">{t('trustStripLayout.hint')}</p>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          {(['horizontal', 'vertical'] as const).map(opt => {
-            const selected = (branding.theme.trustStripLayout ?? 'horizontal') === opt;
-            return (
-              <label
-                key={opt}
-                className={`flex cursor-pointer items-center gap-2 rounded-lg border p-2.5 text-sm transition-colors ${
-                  selected
-                    ? 'border-primary bg-primary/5 text-foreground'
-                    : 'border-border text-muted-foreground hover:border-foreground/30'
-                }`}
-              >
-                <input
-                  type="radio"
-                  checked={selected}
-                  onChange={() =>
-                    onChange({
-                      ...branding,
-                      theme: { ...branding.theme, trustStripLayout: opt },
-                    })
-                  }
-                  className="sr-only"
-                />
-                {t(`trustStripLayout.${opt}`)}
-              </label>
-            );
-          })}
-        </div>
-
-        {/* Trust strip SIZE — scales icons + labels together (sm/md/lg).
-            Ahmad 2026-05-18: "add sizing so we can make the icons and font
-            bigger and smaller together". Hardcoded English labels for now;
-            translation keys can land in a follow-up i18n pass. */}
-        <div className="mt-4">
-          <p className="text-sm font-semibold text-foreground">Trust strip size</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Scales icons + labels together. Default Medium.
-          </p>
-          <div className="mt-3 grid grid-cols-3 gap-2">
-            {(['sm', 'md', 'lg'] as const).map(opt => {
-              const selected = (branding.theme.trustStripSize ?? 'md') === opt;
-              const label = opt === 'sm' ? 'Small' : opt === 'md' ? 'Medium' : 'Large';
-              return (
-                <label
-                  key={opt}
-                  className={`flex cursor-pointer items-center justify-center gap-2 rounded-lg border p-2.5 text-sm transition-colors ${
-                    selected
-                      ? 'border-primary bg-primary/5 text-foreground'
-                      : 'border-border text-muted-foreground hover:border-foreground/30'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    checked={selected}
-                    onChange={() =>
-                      onChange({
-                        ...branding,
-                        theme: { ...branding.theme, trustStripSize: opt },
-                      })
-                    }
-                    className="sr-only"
-                  />
-                  {label}
-                </label>
-              );
-            })}
-          </div>
-        </div>
       </div>
 
       <BrandPreview theme={branding.theme} />

@@ -2,6 +2,7 @@
 
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
+import type { TrustStripSettings } from '@force/shared';
 
 /**
  * Sprint 3 (2026-05-17): 3-up trust badge strip rendered on the homepage
@@ -59,20 +60,13 @@ const DEFAULT_TRUST_ITEMS: TrustItem[] = [
   },
 ];
 
-export function TrustStrip() {
+export function TrustStrip({ settings }: { settings?: TrustStripSettings } = {}) {
   const { isRtl } = useLanguage();
   const { store } = useStore();
-  // Layout direction per merchant choice. 'horizontal' (default) = 3-up
-  // grid (compact mobile, comfortable desktop). 'vertical' = stacked
-  // single column regardless of viewport. Ahmad 2026-05-17 evening.
-  const layout = store.theme?.trustStripLayout ?? 'horizontal';
-  // Size scales icon + title + sub together via a single token. Ahmad
-  // 2026-05-18: "add sizing so we can make the icons and font bigger
-  // and smaller together". Defaults to 'md' which matches the prior
-  // hardcoded sizes. Horizontal mode still shrinks the mobile icon
-  // slightly per `iconWrapMobile` so 3-up fits comfortably without
-  // wrapping titles.
-  const size = store.theme?.trustStripSize ?? 'md';
+  // Layout + size: page-builder layout.trustStrip wins; legacy theme.*
+  // fallback covers stores saved before the page-builder section landed.
+  const layout = settings?.layout ?? store.theme?.trustStripLayout ?? 'horizontal';
+  const size = settings?.size ?? store.theme?.trustStripSize ?? 'md';
   const listClass =
     layout === 'vertical' ? 'grid grid-cols-1 gap-6' : 'grid grid-cols-3 gap-2 sm:gap-8';
 
