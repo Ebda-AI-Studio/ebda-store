@@ -25,6 +25,8 @@ interface SectionPreviewProps {
   headingZone: ZoneStyle | undefined;
   kickerZone?: ZoneStyle;
   subtitleZone?: ZoneStyle;
+  /** Title text to display in the preview (defaults to "{label} heading"). */
+  titleText?: string;
   /** Kicker text to display in the preview (defaults to "EXPLORE"). */
   kickerText?: string;
   /** Subtitle text to display in the preview (defaults to descriptor). */
@@ -163,6 +165,7 @@ export function SectionPreview({
   headingZone,
   kickerZone,
   subtitleZone,
+  titleText,
   kickerText,
   subtitleText,
   productNameZone,
@@ -191,6 +194,7 @@ export function SectionPreview({
   const subtitleAlign = subtitleZone?.textAlign ?? 'center';
   const titleShowLines = dividers?.title?.enabled === true && headingAlign === 'center';
 
+  const titleDisplayText = titleText || `${label} heading`;
   const kickerDisplayText = kickerText || 'EXPLORE';
   const subtitleDisplayText = subtitleText || 'Curated picks';
 
@@ -224,7 +228,7 @@ export function SectionPreview({
         <div className="mt-1.5">
           {titleShowLines ? (
             <PreviewFlankingLines
-              text={`${label} heading`}
+              text={titleDisplayText}
               align="center"
               textStyle={{
                 color: headingColor,
@@ -245,7 +249,7 @@ export function SectionPreview({
                 fontWeight: headingZone?.fontWeight,
               }}
             >
-              {label} heading
+              {titleDisplayText}
             </p>
           )}
         </div>

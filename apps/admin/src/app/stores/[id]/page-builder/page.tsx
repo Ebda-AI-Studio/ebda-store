@@ -808,6 +808,7 @@ export default function StoreLayoutPage() {
                     headingZone={layout.categories.typography?.heading}
                     kickerZone={layout.categories.typography?.kicker}
                     subtitleZone={layout.categories.typography?.subtitle}
+                    titleText={layout.categories.title}
                     kickerText={layout.categories.kicker}
                     subtitleText={layout.categories.subtitle}
                     dividers={layout.categories.dividers}
@@ -919,6 +920,7 @@ export default function StoreLayoutPage() {
                     headingZone={layout.newArrivals.typography?.heading}
                     kickerZone={layout.newArrivals.typography?.kicker}
                     subtitleZone={layout.newArrivals.typography?.subtitle}
+                    titleText={layout.newArrivals.title}
                     kickerText={layout.newArrivals.kicker}
                     subtitleText={layout.newArrivals.subtitle}
                     dividers={layout.newArrivals.dividers}
@@ -1030,6 +1032,7 @@ export default function StoreLayoutPage() {
                     headingZone={layout.bestSellers.typography?.heading}
                     kickerZone={layout.bestSellers.typography?.kicker}
                     subtitleZone={layout.bestSellers.typography?.subtitle}
+                    titleText={layout.bestSellers.title}
                     kickerText={layout.bestSellers.kicker}
                     subtitleText={layout.bestSellers.subtitle}
                     dividers={layout.bestSellers.dividers}
@@ -1136,6 +1139,7 @@ export default function StoreLayoutPage() {
                     headingZone={layout.testimonials.typography?.heading}
                     kickerZone={layout.testimonials.typography?.kicker}
                     subtitleZone={layout.testimonials.typography?.subtitle}
+                    titleText={layout.testimonials.title}
                     dividers={layout.testimonials.dividers}
                     theme={storeInfo?.theme ?? FALLBACK_THEME}
                   />

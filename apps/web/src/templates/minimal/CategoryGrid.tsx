@@ -31,6 +31,7 @@ export default function MinimalCategoryGrid({
   subtitleAr,
   showKickerLines,
   showSubtitleLines,
+  dividers,
   cardSize,
   cardAspect,
   cardShape,
@@ -68,6 +69,7 @@ export default function MinimalCategoryGrid({
           subtitleAr={subtitleAr}
           showKickerLines={showKickerLines}
           showSubtitleLines={showSubtitleLines}
+          dividers={dividers}
           isRtl={isRtl}
           pack="minimal"
           seeAllHref={seeAllHref}

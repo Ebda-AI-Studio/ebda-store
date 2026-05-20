@@ -25,6 +25,7 @@ export default function ModernCategoryGrid({
   subtitleAr,
   showKickerLines,
   showSubtitleLines,
+  dividers,
   cardSize,
   cardAspect,
   cardShape,
@@ -82,6 +83,7 @@ export default function ModernCategoryGrid({
         subtitleAr={subtitleAr}
         showKickerLines={showKickerLines}
         showSubtitleLines={showSubtitleLines}
+        dividers={dividers}
         isRtl={isRtl}
         pack="modern"
         seeAllHref={seeAllHref}

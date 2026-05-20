@@ -29,6 +29,7 @@ export default function ClassicCategoryGrid({
   subtitleAr,
   showKickerLines,
   showSubtitleLines,
+  dividers,
   cardSize,
   cardAspect,
   cardShape,
@@ -66,6 +67,7 @@ export default function ClassicCategoryGrid({
           subtitleAr={subtitleAr}
           showKickerLines={showKickerLines}
           showSubtitleLines={showSubtitleLines}
+          dividers={dividers}
           isRtl={isRtl}
           pack="classic"
           seeAllHref={seeAllHref}

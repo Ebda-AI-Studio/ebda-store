@@ -31,6 +31,7 @@ export default function BoldCategoryGrid({
   subtitleAr,
   showKickerLines,
   showSubtitleLines,
+  dividers,
   cardSize,
   cardAspect,
   cardShape,
@@ -75,6 +76,7 @@ export default function BoldCategoryGrid({
           subtitleAr={subtitleAr}
           showKickerLines={showKickerLines}
           showSubtitleLines={showSubtitleLines}
+          dividers={dividers}
           isRtl={isRtl}
           pack="bold"
           seeAllHref={seeAllHref}
