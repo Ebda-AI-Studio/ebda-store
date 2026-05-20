@@ -300,3 +300,69 @@ export async function cancelPurchaseOrder(storeId: string, id: string) {
   if (po.status === 'received') throw new Error('Cannot cancel a fully-received PO');
   return prisma.purchaseOrder.update({ where: { id }, data: { status: 'cancelled' } });
 }
+
+/**
+ * One-click "Draft PO from suggestion" factory used by the Reorder admin page
+ * (Batch 3 Task 7). Reads the ReorderSuggestion, resolves the supplier (rule's
+ * preferredSupplier > last PO supplier for this product > throw), creates a
+ * draft PO with the suggested qty at the product's current costPrice, and
+ * marks the suggestion accepted with the resulting poId for audit trace.
+ */
+export async function createPoFromSuggestion(
+  suggestionId: string,
+  createdBy?: string
+): Promise<PurchaseOrder & { items: PurchaseOrderItem[] }> {
+  const sug = await prisma.reorderSuggestion.findUnique({
+    where: { id: suggestionId },
+    include: { product: { select: { costPrice: true, name: true } } },
+  });
+  if (!sug) throw new Error(`ReorderSuggestion ${suggestionId} not found`);
+  if (sug.status !== 'open')
+    throw new Error(`ReorderSuggestion ${suggestionId} already ${sug.status}`);
+
+  const supplierId = sug.supplierId ?? (await pickLastSupplierForProduct(sug.productId));
+  if (!supplierId) {
+    throw new Error(
+      `No supplier on suggestion + no prior PO supplier for product ${sug.productId}. ` +
+        `Set ReorderRule.preferredSupplierId or place a manual PO first.`
+    );
+  }
+
+  const po = await createPurchaseOrder({
+    storeId: sug.storeId,
+    supplierId,
+    items: [
+      {
+        productId: sug.productId,
+        variantId: sug.variantId ?? undefined,
+        qty: sug.suggestedQty,
+        unitCost: sug.product.costPrice ?? 0,
+      },
+    ],
+    createdBy,
+    notes: `Auto-drafted from reorder suggestion (urgency ${sug.urgencyDays}d, velocity ${sug.velocity7d.toFixed(2)}/d)`,
+  });
+
+  await prisma.reorderSuggestion.update({
+    where: { id: suggestionId },
+    data: { status: 'accepted', poId: po.id },
+  });
+
+  return po;
+}
+
+/**
+ * Used by createPoFromSuggestion fallback supplier resolution + by reorder-scan
+ * candidate enrichment when no ReorderRule.preferredSupplierId is set.
+ *
+ * Returns the supplier from the most recent PurchaseOrder containing this
+ * productId, or null if no PO has ever been placed for it.
+ */
+export async function pickLastSupplierForProduct(productId: string): Promise<string | null> {
+  const lastPoItem = await prisma.purchaseOrderItem.findFirst({
+    where: { productId },
+    select: { po: { select: { supplierId: true } } },
+    orderBy: { po: { createdAt: 'desc' } },
+  });
+  return lastPoItem?.po.supplierId ?? null;
+}
