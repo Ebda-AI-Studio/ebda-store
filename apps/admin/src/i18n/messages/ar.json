@@ -3066,7 +3066,8 @@
       "commerce": "التجارة",
       "marketing": "التسويق",
       "operations": "العمليات",
-      "storefront": "واجهة المتجر"
+      "storefront": "واجهة المتجر",
+      "engagement": "التفاعل"
     },
     "category": {
       "enabledOfTotal": "{enabled} من {total} مفعّل"

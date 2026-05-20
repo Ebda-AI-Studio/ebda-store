@@ -7,6 +7,7 @@ const CATEGORY_COLORS: Record<FeatureCategory, { icon: string; bg: string; text:
   marketing: { icon: 'bg-info/10', bg: 'bg-info', text: 'text-info' },
   operations: { icon: 'bg-primary/10', bg: 'bg-primary', text: 'text-primary' },
   storefront: { icon: 'bg-success/10', bg: 'bg-success', text: 'text-success' },
+  engagement: { icon: 'bg-warning/10', bg: 'bg-warning', text: 'text-warning' },
 };
 
 export function CategoryIcon({ category }: { category: FeatureCategory }) {
@@ -76,6 +77,21 @@ export function CategoryIcon({ category }: { category: FeatureCategory }) {
             strokeLinejoin="round"
             strokeWidth={2}
             d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+          />
+        </svg>
+      )}
+      {category === 'engagement' && (
+        <svg
+          className={`h-4 w-4 ${colors.text}`}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
           />
         </svg>
       )}

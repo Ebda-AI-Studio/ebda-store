@@ -3063,7 +3063,8 @@
       "commerce": "Commerce",
       "marketing": "Marketing",
       "operations": "Operations",
-      "storefront": "Storefront"
+      "storefront": "Storefront",
+      "engagement": "Engagement"
     },
     "category": {
       "enabledOfTotal": "{enabled} of {total} enabled"

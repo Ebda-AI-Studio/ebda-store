@@ -23,7 +23,13 @@ interface FeaturesResponse {
   registry: Record<FeatureKey, FeatureDefinition>;
 }
 
-const CATEGORY_ORDER: FeatureCategory[] = ['commerce', 'marketing', 'operations', 'storefront'];
+const CATEGORY_ORDER: FeatureCategory[] = [
+  'commerce',
+  'marketing',
+  'operations',
+  'storefront',
+  'engagement',
+];
 
 export default function StoreFeaturesPage() {
   const params = useParams();
@@ -167,6 +173,7 @@ export default function StoreFeaturesPage() {
     marketing: [],
     operations: [],
     storefront: [],
+    engagement: [],
   };
   // Hide features marked as such in the registry — these are either not
   // implemented (customer_wallet / email_campaigns / staff_accounts) or
