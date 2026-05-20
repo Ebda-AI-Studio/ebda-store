@@ -2,6 +2,23 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { useToast } from '@force/ui';
 import { useT } from '@/i18n/useT';
 import {
@@ -294,6 +311,16 @@ export default function StoreLayoutPage() {
                   Collapse all
                 </button>
               </div>
+
+              {/* Section order — drag-to-reorder ui (page-builder 2026-05-20).
+                  Renders a sortable list of section keys; persists to
+                  layout.sectionOrder. */}
+              <SectionOrderCard
+                order={layout.sectionOrder}
+                onChange={next =>
+                  setLayout(prev => (prev ? { ...prev, sectionOrder: next } : prev))
+                }
+              />
 
               {/* Hero — single image OR autoplay slider. The two modes share
                   the same slide list; "Static" pins to the first slide and
@@ -2117,6 +2144,157 @@ function KickerSubtitleControls({
  * don't currently consume per-section typography for these surfaces);
  * extend in v3 if merchants ask.
  */
+// ---------------------------------------------------------------------------
+// Section order (drag-to-reorder) — Ahmad 2026-05-20.
+// ---------------------------------------------------------------------------
+// All sections that participate in the homepage order. Hero is included so
+// merchants who want to anchor a banner at a non-default position can do so.
+// Stays in sync with the SectionOrder enum in @force/shared StoreLayoutSettings.
+type SectionKey =
+  | 'hero'
+  | 'categories'
+  | 'newArrivals'
+  | 'bestSellers'
+  | 'brandStory'
+  | 'blogCarousel'
+  | 'trustStrip'
+  | 'testimonials';
+
+const ALL_SECTION_KEYS: SectionKey[] = [
+  'hero',
+  'categories',
+  'newArrivals',
+  'bestSellers',
+  'brandStory',
+  'blogCarousel',
+  'trustStrip',
+  'testimonials',
+];
+
+const SECTION_LABELS: Record<SectionKey, string> = {
+  hero: 'Hero banner / slider',
+  categories: 'Categories',
+  newArrivals: 'New arrivals',
+  bestSellers: 'Best sellers',
+  brandStory: 'Brand story',
+  blogCarousel: 'Blog carousel',
+  trustStrip: 'Trust strip',
+  testimonials: 'Testimonials',
+};
+
+function SectionOrderCard({
+  order,
+  onChange,
+}: {
+  order: SectionKey[] | undefined;
+  onChange: (next: SectionKey[]) => void;
+}) {
+  // Resolve current order: merchant-saved value wins; missing keys append at
+  // the end so new sections shipped later show up automatically. Unknown keys
+  // (from older saves) get filtered out.
+  const resolved: SectionKey[] = (() => {
+    if (!order || order.length === 0) return ALL_SECTION_KEYS;
+    const seen = new Set(order.filter(k => ALL_SECTION_KEYS.includes(k)));
+    const tail = ALL_SECTION_KEYS.filter(k => !seen.has(k));
+    return [...Array.from(seen), ...tail];
+  })();
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIdx = resolved.indexOf(active.id as SectionKey);
+    const newIdx = resolved.indexOf(over.id as SectionKey);
+    if (oldIdx < 0 || newIdx < 0) return;
+    onChange(arrayMove(resolved, oldIdx, newIdx));
+  }
+
+  return (
+    <section className="rounded-2xl border border-border bg-card p-4 sm:p-5">
+      <div className="mb-3">
+        <h3 className="text-base font-semibold text-foreground">Section order</h3>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          Drag to reorder homepage sections. The new order saves on the main Save button.
+        </p>
+        <p className="mt-2 rounded-md bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-800">
+          Admin v1 — drag persistence is live. Storefront enforcement of this order is coming in v2;
+          for now the storefront keeps its hardcoded sequence regardless of the value saved here.
+        </p>
+      </div>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={resolved} strategy={verticalListSortingStrategy}>
+          <ul className="space-y-2">
+            {resolved.map((key, i) => (
+              <SortableSectionRow key={key} id={key} label={SECTION_LABELS[key]} index={i + 1} />
+            ))}
+          </ul>
+        </SortableContext>
+      </DndContext>
+    </section>
+  );
+}
+
+function SortableSectionRow({
+  id,
+  label,
+  index,
+}: {
+  id: SectionKey;
+  label: string;
+  index: number;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+  });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+  return (
+    <li
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center gap-3 rounded-lg border border-border bg-background px-3 py-2.5 ${
+        isDragging ? 'shadow-md' : ''
+      }`}
+    >
+      <button
+        type="button"
+        {...attributes}
+        {...listeners}
+        className="flex h-6 w-6 cursor-grab items-center justify-center text-muted-foreground hover:text-foreground active:cursor-grabbing"
+        aria-label={`Drag to reorder ${label}`}
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="h-4 w-4"
+          aria-hidden
+        >
+          <circle cx="9" cy="6" r="1" />
+          <circle cx="15" cy="6" r="1" />
+          <circle cx="9" cy="12" r="1" />
+          <circle cx="15" cy="12" r="1" />
+          <circle cx="9" cy="18" r="1" />
+          <circle cx="15" cy="18" r="1" />
+        </svg>
+      </button>
+      <span className="text-xs font-medium text-muted-foreground tabular-nums">{index}.</span>
+      <span className="flex-1 text-sm font-medium text-foreground">{label}</span>
+    </li>
+  );
+}
+
 function ExtraSectionCard({
   kind,
   label,
