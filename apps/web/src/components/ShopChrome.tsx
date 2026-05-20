@@ -6,6 +6,9 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useCart } from '../contexts/CartContext';
 import { useTemplateComponents } from '../hooks/useTemplateComponents';
 import { BottomTabBar } from '../templates/shared/BottomTabBar';
+import { SectionDivider } from '../templates/shared/SectionDivider';
+import { resolveColor } from '@force/shared';
+import type { StoreLayoutSettings } from '@force/shared';
 import type {
   FooterBottomBarConfig,
   FooterLinkSection,
@@ -15,13 +18,26 @@ import type {
 } from '../templates/types';
 import { ReactNode } from 'react';
 
+interface ShopChromeProps {
+  children: ReactNode;
+  /**
+   * Per-page layout settings. When provided (homepage passes from
+   * HomePageContent), ShopChrome applies layout.header.{bgColor, sticky}
+   * + layout.footer.{bgColor, dividers.above}. Other routes (PDP, catalog,
+   * blog) pass undefined and inherit the existing theme-default chrome —
+   * homepage-only customization for v1. v2 will fetch layout in
+   * StoreContext so every route consistently applies.
+   */
+  layout?: StoreLayoutSettings;
+}
+
 /**
  * The full storefront chrome: template-selected Header + AnnouncementBar +
  * children + Footer. Wrap a page's content in this to get the selected
  * template's look across the whole surface. Only /auth, /checkout, and the
  * public wishlist-share page use MinimalChrome instead.
  */
-export function ShopChrome({ children }: { children: ReactNode }) {
+export function ShopChrome({ children, layout }: ShopChromeProps) {
   const router = useRouter();
   const { store } = useStore();
   const branding = useStoreBranding();
@@ -210,22 +226,40 @@ export function ShopChrome({ children }: { children: ReactNode }) {
           apps/web/src/app/layout.tsx target each storefront zone
           without having to rewrite the templates' internal markup.
           Six zones, applied uniformly across all 5 packs. */}
-      {store.announcementBar?.enabled && store.announcementBar.text && (
-        <div data-zone="beforeHeader">
-          <T.AnnouncementBar
-            text={store.announcementBar.text}
-            textAr={store.announcementBar.textAr}
-            link={store.announcementBar.link}
-            linkText={store.announcementBar.linkText}
-            linkTextAr={store.announcementBar.linkTextAr}
-            bgColor={store.announcementBar.bgColor}
-            textColor={store.announcementBar.textColor}
-            dismissible={store.announcementBar.dismissible}
-            isRtl={isRtl}
-          />
-        </div>
-      )}
-      <header role="banner" data-zone="header">
+      {/* Announcement bar — gated by both content presence AND page-builder
+          layout.announcement.enabled (when explicitly false, hides regardless
+          of content). bgColor falls back: layout.announcement.bgColor wins
+          over the legacy store.announcementBar.bgColor. */}
+      {(layout?.announcement?.enabled ?? store.announcementBar?.enabled) &&
+        store.announcementBar?.text && (
+          <div data-zone="beforeHeader">
+            <T.AnnouncementBar
+              text={store.announcementBar.text}
+              textAr={store.announcementBar.textAr}
+              link={store.announcementBar.link}
+              linkText={store.announcementBar.linkText}
+              linkTextAr={store.announcementBar.linkTextAr}
+              bgColor={
+                (layout?.announcement?.bgColor
+                  ? resolveColor(layout.announcement.bgColor, store.theme)
+                  : undefined) ?? store.announcementBar.bgColor
+              }
+              textColor={store.announcementBar.textColor}
+              dismissible={store.announcementBar.dismissible}
+              isRtl={isRtl}
+            />
+          </div>
+        )}
+      <header
+        role="banner"
+        data-zone="header"
+        className={layout?.header?.sticky ? 'sticky top-0 z-40' : undefined}
+        style={
+          layout?.header?.bgColor
+            ? { backgroundColor: resolveColor(layout.header.bgColor, store.theme) ?? undefined }
+            : undefined
+        }
+      >
         <T.Header
           branding={branding}
           navigation={navigation}
@@ -239,7 +273,20 @@ export function ShopChrome({ children }: { children: ReactNode }) {
       <main role="main" className="flex-1">
         {children}
       </main>
-      <footer role="contentinfo" data-zone="footer">
+      {/* Footer divider (per-section opt-in) — renders between the last
+          page section and the footer. Honors `layout.footer.dividers.above`. */}
+      {layout?.footer?.dividers?.above?.enabled && (
+        <SectionDivider settings={layout.footer.dividers.above} />
+      )}
+      <footer
+        role="contentinfo"
+        data-zone="footer"
+        style={
+          layout?.footer?.bgColor
+            ? { backgroundColor: resolveColor(layout.footer.bgColor, store.theme) ?? undefined }
+            : undefined
+        }
+      >
         <T.Footer
           branding={branding}
           contact={{

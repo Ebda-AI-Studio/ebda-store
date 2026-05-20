@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import type { Product, Category } from '@/lib/api';
 import { useStore, useStoreUrl } from '../contexts/StoreContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -263,55 +264,49 @@ export function HomePageContent({
   );
 
   return (
-    <ShopChrome>
-      {/* Hero — toggleable + mode-aware. bgColor overrides the theme bg when set. */}
-      <div
-        data-section="hero"
-        style={sectionBgStyle(
-          layout.hero.bgColor,
-          store.theme,
-          heroHeadingZone?.color ?? globalSectionTitleColor
-        )}
-      >
-        {layout.hero.enabled && sliderEligible && T.HeroSlider && (
-          <T.HeroSlider
-            slides={layout.hero.slides}
-            autoplayMs={layout.hero.autoplayMs}
-            isRtl={isRtl}
-            pack={templateId}
-            presentation={layout.hero.presentation}
-            headingZone={heroHeadingZone}
-          />
-        )}
-        {layout.hero.enabled && bannerEligible && T.HeroBanner && (
-          <T.HeroBanner
-            {...layout.hero.slides[0]}
-            isRtl={isRtl}
-            pack={templateId}
-            presentation={layout.hero.presentation}
-            headingZone={heroHeadingZone}
-          />
-        )}
-        {layout.hero.enabled && !sliderEligible && !bannerEligible && legacyHeroHasContent && (
-          <T.Hero
-            title={heroTitleEn}
-            titleAr={heroTitleArVal}
-            subtitle={heroSubtitleEn}
-            subtitleAr={heroSubtitleArVal}
-            image={heroImage}
-            ctaText={heroCtaEn}
-            ctaTextAr={heroCtaArVal}
-            ctaLink={heroCtaLink}
-            isRtl={isRtl}
-          />
-        )}
-      </div>
-
+    <ShopChrome layout={layout}>
       {/* Section titles. Each section settings type extends
           SectionTitleOverride, so the merchant can change the heading
           via the admin Layout page. Empty / unset falls back to the
-          platform default. */}
+          platform default.
+          Hero is now included in this IIFE so all 8 sections can be
+          ordered dynamically via layout.sectionOrder. */}
       {(() => {
+        // ── Section ordering ──────────────────────────────────────────────
+        type SectionKey =
+          | 'hero'
+          | 'categories'
+          | 'newArrivals'
+          | 'bestSellers'
+          | 'brandStory'
+          | 'blogCarousel'
+          | 'trustStrip'
+          | 'testimonials';
+
+        const ALL_SECTION_KEYS: SectionKey[] = [
+          'hero',
+          'categories',
+          'newArrivals',
+          'bestSellers',
+          'brandStory',
+          'blogCarousel',
+          'trustStrip',
+          'testimonials',
+        ];
+
+        // Resolve active order: saved order (with unknown keys filtered out)
+        // followed by any keys not yet in the saved list (forward-compat).
+        const resolved: SectionKey[] = (() => {
+          const saved = layout.sectionOrder;
+          if (!saved || saved.length === 0) return ALL_SECTION_KEYS;
+          const seen = new Set(
+            saved.filter((k): k is SectionKey => ALL_SECTION_KEYS.includes(k as SectionKey))
+          );
+          const tail = ALL_SECTION_KEYS.filter(k => !seen.has(k));
+          return [...Array.from(seen), ...tail];
+        })();
+
+        // ── Section title locals ──────────────────────────────────────────
         const categoriesTitle = layout.categories.title || 'Shop by Category';
         const categoriesTitleAr = layout.categories.titleAr || 'تسوق حسب الفئة';
         const newArrivalsTitle = layout.newArrivals.title || 'New Arrivals';
@@ -321,20 +316,67 @@ export function HomePageContent({
         const testimonialsTitle = layout.testimonials.title || 'Customer Reviews';
         const testimonialsTitleAr = layout.testimonials.titleAr || 'آراء العملاء';
 
-        return (
+        // ── Per-section JSX nodes ─────────────────────────────────────────
+
+        // Hero — toggleable + mode-aware. bgColor overrides the theme bg when set.
+        const heroJSX = (
+          <div
+            data-section="hero"
+            style={sectionBgStyle(
+              layout.hero.bgColor,
+              store.theme,
+              heroHeadingZone?.color ?? globalSectionTitleColor
+            )}
+          >
+            {layout.hero.enabled && sliderEligible && T.HeroSlider && (
+              <T.HeroSlider
+                slides={layout.hero.slides}
+                autoplayMs={layout.hero.autoplayMs}
+                isRtl={isRtl}
+                pack={templateId}
+                presentation={layout.hero.presentation}
+                headingZone={heroHeadingZone}
+              />
+            )}
+            {layout.hero.enabled && bannerEligible && T.HeroBanner && (
+              <T.HeroBanner
+                {...layout.hero.slides[0]}
+                isRtl={isRtl}
+                pack={templateId}
+                presentation={layout.hero.presentation}
+                headingZone={heroHeadingZone}
+              />
+            )}
+            {layout.hero.enabled && !sliderEligible && !bannerEligible && legacyHeroHasContent && (
+              <T.Hero
+                title={heroTitleEn}
+                titleAr={heroTitleArVal}
+                subtitle={heroSubtitleEn}
+                subtitleAr={heroSubtitleArVal}
+                image={heroImage}
+                ctaText={heroCtaEn}
+                ctaTextAr={heroCtaArVal}
+                ctaLink={heroCtaLink}
+                isRtl={isRtl}
+              />
+            )}
+          </div>
+        );
+
+        // Categories — grid or horizontal strip. Top padding kept
+        // small (pt-6/pt-8) so the section sits right under the
+        // hero with no awkward white gap — Ahmad 2026-05-16
+        // 'close the white gap between it and the hero banner'.
+        // Bottom padding stays generous so the rhythm into "New
+        // Arrivals" below feels balanced.
+        // Sprint 1 (2026-05-17): bg-[hsl(var(--bg-page))] = first
+        // of the alternating section-background pair. When the
+        // merchant's backgroundPreset is `none`, both tokens
+        // resolve to the same color and the rhythm comes from
+        // padding alone; when a preset is picked, adjacent
+        // sections alternate visibly.
+        const categoriesJSX = (
           <>
-            {/* Categories — grid or horizontal strip. Top padding kept
-                small (pt-6/pt-8) so the section sits right under the
-                hero with no awkward white gap — Ahmad 2026-05-16
-                'close the white gap between it and the hero banner'.
-                Bottom padding stays generous so the rhythm into "New
-                Arrivals" below feels balanced.
-                Sprint 1 (2026-05-17): bg-[hsl(var(--bg-page))] = first
-                of the alternating section-background pair. When the
-                merchant's backgroundPreset is `none`, both tokens
-                resolve to the same color and the rhythm comes from
-                padding alone; when a preset is picked, adjacent
-                sections alternate visibly. */}
             {/* Per-section `above` divider (opt-in) — renders before categories. */}
             {layout.categories.dividers?.above?.enabled && (
               <SectionDivider settings={layout.categories.dividers.above} />
@@ -419,20 +461,23 @@ export function HomePageContent({
                 )}
               </section>
             )}
+          </>
+        );
 
-            {/* Divider between categories and new-arrivals. Suppressed when
-                either flanking section has an explicit per-section bgColor —
-                the color shift already acts as the visual separator. Per-section
-                `newArrivals.dividers.above` wins over the legacy theme.dividers
-                fallback when set. */}
+        // New Arrivals — pack ProductCarousel or ProductGrid fallback.
+        // Divider between categories and new-arrivals. Suppressed when
+        // either flanking section has an explicit per-section bgColor —
+        // the color shift already acts as the visual separator. Per-section
+        // `newArrivals.dividers.above` wins over the legacy theme.dividers
+        // fallback when set.
+        // Sprint 1: bg-[hsl(var(--bg-section-alt))] alternates with
+        // the categories section above.
+        const newArrivalsJSX = (
+          <>
             <SectionDivider
               settings={layout.newArrivals.dividers?.above}
               hideForExplicitBg={!!(layout.categories.bgColor || layout.newArrivals.bgColor)}
             />
-
-            {/* New Arrivals — pack ProductCarousel or ProductGrid fallback.
-                Sprint 1: bg-[hsl(var(--bg-section-alt))] alternates with
-                the categories section above. */}
             {layout.newArrivals.enabled && templateNewArrivals.length > 0 && (
               <section
                 data-section="newArrivals"
@@ -502,21 +547,24 @@ export function HomePageContent({
                 )}
               </section>
             )}
+          </>
+        );
 
-            {/* Divider between new-arrivals and best-sellers. Per-section
-                `bestSellers.dividers.above` wins over the legacy theme.dividers
-                fallback when set. */}
+        // Best Sellers carousel.
+        // Divider between new-arrivals and best-sellers. Per-section
+        // `bestSellers.dividers.above` wins over the legacy theme.dividers
+        // fallback when set.
+        // Sprint 1: was `bg-muted/30` (a hardcoded muted tone);
+        // now `bg-[hsl(var(--bg-page))]` so it alternates with
+        // the section above. The previous muted-grey is preserved
+        // when the merchant picks the `coolGrey` preset and is
+        // the new default visual under `none`.
+        const bestSellersJSX = (
+          <>
             <SectionDivider
               settings={layout.bestSellers.dividers?.above}
               hideForExplicitBg={!!(layout.newArrivals.bgColor || layout.bestSellers.bgColor)}
             />
-
-            {/* Best Sellers carousel.
-                Sprint 1: was `bg-muted/30` (a hardcoded muted tone);
-                now `bg-[hsl(var(--bg-page))]` so it alternates with
-                the section above. The previous muted-grey is preserved
-                when the merchant picks the `coolGrey` preset and is
-                the new default visual under `none`. */}
             {layout.bestSellers.enabled && templateBestSellers.length > 0 && (
               <section
                 data-section="bestSellers"
@@ -586,60 +634,69 @@ export function HomePageContent({
                 )}
               </section>
             )}
+          </>
+        );
 
-            {/* Sprint 3 + Bucket E (2026-05-17): brand story + trust strip
-                bands. Brand story uses store.heroImage + store.description
-                as platform defaults — null-safe via internal guard. Trust
-                strip ships 3 universal items (Fast Delivery / Quality /
-                Support) with bilingual platform copy. Both auto-hide
-                when their data isn't present. */}
-            {/* Brand Story / Blog / Trust Strip — folded into page-builder
-                2026-05-20. Each section has its own `enabled` toggle on
-                `layout.{brandStory,trustStrip,blogCarousel}`. Legacy fallback:
-                `theme.showBrandStory` / `theme.showTrustStrip` / `store.blogEnabled`. */}
-            {(layout.brandStory?.enabled ?? store.theme?.showBrandStory !== false) && (
-              <>
-                <SectionDivider
-                  settings={layout.brandStory?.dividers?.above}
-                  hideForExplicitBg={!!(layout.bestSellers.bgColor || layout.brandStory?.bgColor)}
-                />
-                <BrandStoryBlock
-                  image={store.heroImage ?? undefined}
-                  body={store.description ?? undefined}
-                  bodyAr={store.descriptionAr ?? undefined}
-                />
-              </>
-            )}
-            {(layout.blogCarousel?.enabled ?? store.blogEnabled !== false) && (
-              <>
-                <SectionDivider
-                  settings={layout.blogCarousel?.dividers?.above}
-                  hideForExplicitBg={!!layout.blogCarousel?.bgColor}
-                />
-                <HomeBlogCarousel />
-              </>
-            )}
-            {(layout.trustStrip?.enabled ?? store.theme?.showTrustStrip !== false) && (
-              <>
-                <SectionDivider
-                  settings={layout.trustStrip?.dividers?.above}
-                  hideForExplicitBg={!!layout.trustStrip?.bgColor}
-                />
-                <TrustStrip />
-              </>
-            )}
+        // Sprint 3 + Bucket E (2026-05-17): brand story band.
+        // Brand story uses store.heroImage + store.description
+        // as platform defaults — null-safe via internal guard.
+        // Brand Story — folded into page-builder 2026-05-20.
+        // Legacy fallback: `theme.showBrandStory`.
+        const brandStoryJSX =
+          (layout.brandStory?.enabled ?? store.theme?.showBrandStory !== false) ? (
+            <>
+              <SectionDivider
+                settings={layout.brandStory?.dividers?.above}
+                hideForExplicitBg={!!(layout.bestSellers.bgColor || layout.brandStory?.bgColor)}
+              />
+              <BrandStoryBlock
+                image={store.heroImage ?? undefined}
+                body={store.description ?? undefined}
+                bodyAr={store.descriptionAr ?? undefined}
+              />
+            </>
+          ) : null;
 
-            {/* Divider before testimonials. Suppressed when testimonials
-                section has an explicit per-section bgColor. Per-section
-                `testimonials.dividers.above` wins over the legacy fallback. */}
+        // Blog Carousel — folded into page-builder 2026-05-20.
+        // Legacy fallback: `store.blogEnabled`.
+        const blogCarouselJSX =
+          (layout.blogCarousel?.enabled ?? store.blogEnabled !== false) ? (
+            <>
+              <SectionDivider
+                settings={layout.blogCarousel?.dividers?.above}
+                hideForExplicitBg={!!layout.blogCarousel?.bgColor}
+              />
+              <HomeBlogCarousel />
+            </>
+          ) : null;
+
+        // Trust Strip — folded into page-builder 2026-05-20.
+        // Ships 3 universal items (Fast Delivery / Quality / Support)
+        // with bilingual platform copy. Auto-hides when disabled.
+        // Legacy fallback: `theme.showTrustStrip`.
+        const trustStripJSX =
+          (layout.trustStrip?.enabled ?? store.theme?.showTrustStrip !== false) ? (
+            <>
+              <SectionDivider
+                settings={layout.trustStrip?.dividers?.above}
+                hideForExplicitBg={!!layout.trustStrip?.bgColor}
+              />
+              <TrustStrip />
+            </>
+          ) : null;
+
+        // Testimonials — auto-hides when no qualifying reviews.
+        // Sprint 1: bg-[hsl(var(--bg-section-alt))] alternates
+        // with Best Sellers above. Divider before testimonials.
+        // Suppressed when testimonials section has an explicit
+        // per-section bgColor. Per-section `testimonials.dividers.above`
+        // wins over the legacy fallback.
+        const testimonialsJSX = (
+          <>
             <SectionDivider
               settings={layout.testimonials.dividers?.above}
               hideForExplicitBg={!!layout.testimonials.bgColor}
             />
-
-            {/* Testimonials — auto-hides when no qualifying reviews.
-                Sprint 1: bg-[hsl(var(--bg-section-alt))] alternates
-                with Best Sellers above. */}
             {layout.testimonials.enabled && testimonials.length > 0 && T.TestimonialRow && (
               <section
                 data-section="testimonials"
@@ -663,6 +720,26 @@ export function HomePageContent({
                 />
               </section>
             )}
+          </>
+        );
+
+        // ── Section map + ordered render ──────────────────────────────────
+        const sectionMap: Record<SectionKey, React.ReactNode> = {
+          hero: heroJSX,
+          categories: categoriesJSX,
+          newArrivals: newArrivalsJSX,
+          bestSellers: bestSellersJSX,
+          brandStory: brandStoryJSX,
+          blogCarousel: blogCarouselJSX,
+          trustStrip: trustStripJSX,
+          testimonials: testimonialsJSX,
+        };
+
+        return (
+          <>
+            {resolved.map(key => (
+              <React.Fragment key={key}>{sectionMap[key]}</React.Fragment>
+            ))}
           </>
         );
       })()}
