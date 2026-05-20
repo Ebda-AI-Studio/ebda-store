@@ -262,44 +262,54 @@ export function ZoneEditor({
             <option value="none">None (explicit)</option>
           </select>
         </label>
+      </div>
 
-        {/* Text alignment — logical (start/center/end) so RTL Arabic flips
-            correctly. 3-button segmented control mirrors the visual choice
-            better than a select. "Inherit" = no value → consumer default. */}
-        <div className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-muted-foreground">Text alignment</span>
-          <div className="flex items-stretch overflow-hidden rounded-lg border border-border">
-            {(
-              [
-                { value: '', label: 'Auto', title: 'Inherit (use consumer default)' },
-                { value: 'start', label: 'Start', title: 'Left in LTR, right in RTL' },
-                { value: 'center', label: 'Center', title: 'Always centered' },
-                { value: 'end', label: 'End', title: 'Right in LTR, left in RTL' },
-              ] as const
-            ).map(opt => {
-              const active = (values.textAlign ?? '') === opt.value;
-              return (
-                <button
-                  key={opt.value || 'auto'}
-                  type="button"
-                  title={opt.title}
-                  onClick={() =>
-                    onChange({
-                      textAlign:
-                        opt.value === '' ? undefined : (opt.value as ZoneOverride['textAlign']),
-                    })
-                  }
-                  className={`flex-1 px-2 py-1.5 text-xs font-medium transition-colors ${
-                    active
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-background text-muted-foreground hover:bg-muted hover:text-foreground'
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              );
-            })}
-          </div>
+      {/* Text alignment — pulled OUT of the grid above and rendered full-width
+          for breathing room (same reasoning as Color below). When nested in
+          the 3-col grid the 4 buttons + labels were getting clipped by
+          overflow-hidden, especially inside Smart Palette modal where the
+          editor column is ~150px wide.
+
+          Logical values (start/center/end) so RTL Arabic flips correctly.
+          4-button segmented control with rounded outer corners + dividers
+          between options. Each label has an aria-label spelling out the
+          LTR/RTL effect for screen readers. */}
+      <div className="mt-3 flex flex-col gap-1">
+        <span className="text-xs font-medium text-muted-foreground">Text alignment</span>
+        <div className="grid grid-cols-4 overflow-hidden rounded-lg border border-border">
+          {(
+            [
+              { value: '', label: 'Auto', title: 'Inherit (use consumer default)' },
+              { value: 'start', label: 'Start', title: 'Left in LTR, right in RTL' },
+              { value: 'center', label: 'Center', title: 'Always centered' },
+              { value: 'end', label: 'End', title: 'Right in LTR, left in RTL' },
+            ] as const
+          ).map((opt, i) => {
+            const active = (values.textAlign ?? '') === opt.value;
+            return (
+              <button
+                key={opt.value || 'auto'}
+                type="button"
+                title={opt.title}
+                aria-label={`${opt.label} — ${opt.title}`}
+                onClick={() =>
+                  onChange({
+                    textAlign:
+                      opt.value === '' ? undefined : (opt.value as ZoneOverride['textAlign']),
+                  })
+                }
+                className={`px-3 py-2 text-sm font-medium transition-colors ${
+                  i > 0 ? 'border-s border-border' : ''
+                } ${
+                  active
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-background text-muted-foreground hover:bg-muted hover:text-foreground'
+                }`}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
