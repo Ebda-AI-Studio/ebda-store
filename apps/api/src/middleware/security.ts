@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { v4 as uuidv4 } from 'uuid';
 import { prisma } from '@force/database';
 import { redis } from '../services/redis.service';
@@ -236,9 +236,11 @@ export const authLimiter = rateLimit({
   legacyHeaders: false,
   skip: skipForLoadTestOrTests,
   keyGenerator: req => {
-    // Use IP + email for more granular limiting
+    // Use IP + email for more granular limiting. ipKeyGenerator() normalizes
+    // IPv6 to /64 prefix so an attacker can't rotate the lower 64 bits to
+    // get a fresh bucket per request (ERR_ERL_KEY_GEN_IPV6).
     const email = req.body?.email || 'unknown';
-    return `${req.ip}-${email}`;
+    return `${ipKeyGenerator(req.ip ?? '')}-${email}`;
   },
 });
 
@@ -296,8 +298,10 @@ export const uploadLimiter = rateLimit({
   legacyHeaders: false,
   skip: skipForLoadTest,
   keyGenerator: req => {
-    // Limit per user, not per IP
-    return req.user?.userId || req.ip || 'anonymous';
+    // Limit per user, not per IP. ipKeyGenerator() applied to the IP
+    // fallback so anonymous IPv6 callers can't bypass via lower-64-bit
+    // rotation (ERR_ERL_KEY_GEN_IPV6).
+    return req.user?.userId || ipKeyGenerator(req.ip ?? '') || 'anonymous';
   },
 });
 
@@ -313,7 +317,8 @@ export const dailyUploadLimiter = rateLimit({
   legacyHeaders: false,
   skip: skipForLoadTest,
   keyGenerator: req => {
-    return req.user?.userId || req.ip || 'anonymous';
+    // ipKeyGenerator() normalizes IPv6 to /64 prefix (ERR_ERL_KEY_GEN_IPV6).
+    return req.user?.userId || ipKeyGenerator(req.ip ?? '') || 'anonymous';
   },
 });
 
@@ -362,9 +367,10 @@ export const cartLimiter = rateLimit({
   legacyHeaders: false,
   skip: skipForLoadTest,
   keyGenerator: req => {
-    // Use session ID if available, otherwise IP
+    // Use session ID if available, otherwise normalized IP (ipKeyGenerator
+    // collapses IPv6 to /64 prefix — ERR_ERL_KEY_GEN_IPV6).
     const sessionId = req.headers['x-session-id'] as string;
-    return sessionId || req.ip || 'anonymous';
+    return sessionId || ipKeyGenerator(req.ip ?? '') || 'anonymous';
   },
 });
 
@@ -383,8 +389,9 @@ export const newsletterLimiter = rateLimit({
   legacyHeaders: false,
   skip: skipForLoadTest,
   keyGenerator: req => {
+    // ipKeyGenerator() collapses IPv6 to /64 prefix — ERR_ERL_KEY_GEN_IPV6.
     const sessionId = req.headers['x-session-id'] as string;
-    return `${sessionId || 'anon'}:${req.ip || 'noip'}`;
+    return `${sessionId || 'anon'}:${ipKeyGenerator(req.ip ?? '') || 'noip'}`;
   },
 });
 
