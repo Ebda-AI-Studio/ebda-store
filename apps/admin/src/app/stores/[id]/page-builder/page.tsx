@@ -292,9 +292,21 @@ export default function StoreLayoutPage() {
               if (!layout) return;
               setIsGeneratingPreview(true);
               try {
+                // 2026-05-20: send the FULL preview bundle — layout +
+                // typography (global fonts + per-zone overrides) + theme
+                // (with any pending palette / card-flag updates merged in).
+                // Without bundling, merchant tweaks to global zones or
+                // theme didn't show in the iframe until Save committed.
+                const themeForPreview = storeInfo?.theme
+                  ? { ...storeInfo.theme, ...pendingThemeUpdates }
+                  : pendingThemeUpdates;
                 const res = await apiPost<{ token: string }>(
                   `/api/v1/admin/stores/${storeId}/layout/preview`,
-                  layout
+                  {
+                    layout,
+                    typography: { fonts: typographyFonts, zones: globalZones },
+                    theme: themeForPreview,
+                  }
                 );
                 if (res.data?.token) {
                   setPreviewDraftToken(res.data.token);

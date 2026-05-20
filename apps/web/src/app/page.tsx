@@ -6,6 +6,7 @@ import { storeJsonLd, breadcrumbJsonLd, itemList, getSiteUrl } from '../lib/stru
 import { JsonLd } from '../components/JsonLd';
 import { HomePageContent } from './HomePageContent';
 import { PlatformLanding } from '../components/PlatformLanding';
+import { emitZoneCss } from '../lib/emit-zone-css';
 
 /**
  * Server-side data fetch for the homepage. Mirrors the pattern in
@@ -186,22 +187,33 @@ async function fetchHomepageData(
   return { featuredProducts, newArrivals, bestSellers, categories, testimonials, extraProducts };
 }
 
-async function fetchLayoutSettings(
-  storeId: string,
-  draftToken?: string
-): Promise<StoreLayoutSettings> {
-  if (!storeId || storeId === 'demo') return resolveLayoutSettings({});
+interface DraftBundle {
+  layout: StoreLayoutSettings;
+  typography?: unknown;
+  theme?: unknown;
+}
+
+async function fetchLayoutSettings(storeId: string, draftToken?: string): Promise<DraftBundle> {
+  if (!storeId || storeId === 'demo') {
+    return { layout: resolveLayoutSettings({}) };
+  }
   try {
     const url = draftToken
       ? `${API_URL}/public/stores/${storeId}/layout?_layoutDraft=${encodeURIComponent(draftToken)}`
       : `${API_URL}/public/stores/${storeId}/layout`;
     // Drafts bypass cache (per-iteration unique). Committed layouts cache 60s.
     const res = await fetch(url, draftToken ? { cache: 'no-store' } : { next: { revalidate: 60 } });
-    if (!res.ok) return resolveLayoutSettings({});
+    if (!res.ok) return { layout: resolveLayoutSettings({}) };
     const json = await res.json();
-    return resolveLayoutSettings(json?.data?.layout ?? {});
+    return {
+      layout: resolveLayoutSettings(json?.data?.layout ?? {}),
+      // Bundle keys are only populated by the API when a draft is being
+      // served — the committed-layout path returns just `layout`.
+      typography: json?.data?.typography,
+      theme: json?.data?.theme,
+    };
   } catch {
-    return resolveLayoutSettings({});
+    return { layout: resolveLayoutSettings({}) };
   }
 }
 
@@ -226,7 +238,16 @@ export default async function HomePage({
     return <PlatformLanding />;
   }
 
-  const layout = await fetchLayoutSettings(store.id, draftToken);
+  const draftBundle = await fetchLayoutSettings(store.id, draftToken);
+  const layout = draftBundle.layout;
+  // Draft typography + theme override CSS — emitted in body so source order
+  // beats the head-emitted committed-store typography. Only present when the
+  // admin live-preview iframe passes ?_layoutDraft=<token> AND the draft
+  // bundle includes typography. The CSS string mirrors layout.tsx's emitter.
+  const draftStyleCss =
+    draftToken && draftBundle.typography
+      ? emitZoneCss(draftBundle.typography as Parameters<typeof emitZoneCss>[0], store.theme)
+      : '';
   const { featuredProducts, newArrivals, bestSellers, categories, testimonials, extraProducts } =
     await fetchHomepageData(store, layout);
 
@@ -266,8 +287,18 @@ export default async function HomePage({
         )
       : null;
 
+  // CSS string is sanitized by emitZoneCss (sanitizeFontValue strips CSS
+  // injection vectors). Same pattern + same sanitization as the existing
+  // typography emitter in apps/web/src/app/layout.tsx.
+  const draftStyleProp = draftStyleCss ? { __html: draftStyleCss } : null;
   return (
     <>
+      {/* Draft typography override — emitted when ?_layoutDraft=token is
+          present AND the draft bundle includes typography. Source order
+          puts this AFTER the head's committed-typography style tag, so
+          the draft rules win at equal specificity. Powers the page-builder
+          "Preview unsaved" iteration loop. */}
+      {draftStyleProp && <style dangerouslySetInnerHTML={draftStyleProp} />}
       {/* JSON-LD: Store + Breadcrumb + optional ItemList */}
       <JsonLd data={homeStoreJsonLd} />
       <JsonLd data={homeBreadcrumbJsonLd} />

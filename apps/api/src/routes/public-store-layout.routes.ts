@@ -28,11 +28,26 @@ router.get('/stores/:storeId/layout', async (req: Request, res: Response, next: 
     if (draftToken) {
       const draft = await redis.get<unknown>(`layout-preview:${storeId}:${draftToken}`, true);
       if (draft) {
-        const layout = resolveLayoutSettings(draft);
-        // Draft previews must NOT be cached — every iteration changes the
-        // payload. Edge caches honor `private, no-store`.
+        // 2026-05-20: draft payload shape is now a bundle `{ layout,
+        // typography?, theme? }` so the storefront can also preview global
+        // typography zone edits + theme changes (palette, card-level flags).
+        // Legacy clients that posted a bare layout get auto-wrapped server-
+        // side; here we accept either shape for safety.
+        const draftBundle =
+          draft && typeof draft === 'object' && ('layout' in draft || 'typography' in draft)
+            ? (draft as { layout?: unknown; typography?: unknown; theme?: unknown })
+            : { layout: draft, typography: undefined, theme: undefined };
+        const layout = resolveLayoutSettings(draftBundle.layout);
         res.setHeader('Cache-Control', 'private, no-store');
-        res.json({ success: true, data: { layout, isDraft: true } });
+        res.json({
+          success: true,
+          data: {
+            layout,
+            typography: draftBundle.typography,
+            theme: draftBundle.theme,
+            isDraft: true,
+          },
+        });
         return;
       }
       // Token expired or never existed — fall through to committed layout

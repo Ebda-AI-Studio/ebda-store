@@ -622,11 +622,29 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
-      // We don't strictly validate the body shape here — the storefront
-      // applies it through `resolveLayoutSettings` which tolerates malformed
-      // input gracefully. Stricter validation would slow the iteration loop.
-      const layout = req.body;
-      if (!layout || typeof layout !== 'object') {
+      // Body shape evolved 2026-05-20: accept either the bare layout (legacy
+      // single-key shape) OR a `{ layout, typography?, theme? }` bundle. The
+      // bundle form lets the page-builder preview global typography zone
+      // changes (per-section colors / fonts / text-decoration) + theme
+      // updates (primary/accent palette, showBrandBadge, etc.) — without it,
+      // those merchant tweaks didn't show until Save committed them. The
+      // storefront applies the draft through resolveLayoutSettings which
+      // tolerates malformed input gracefully; stricter validation would slow
+      // the iteration loop.
+      const body = req.body;
+      if (!body || typeof body !== 'object') {
+        res.status(400).json({
+          success: false,
+          error: { code: 'INVALID_BODY', message: 'Preview payload required' },
+        });
+        return;
+      }
+      // Heuristic: a bundle has at least one of layout/typography/theme keys.
+      // A bare layout has the section keys directly (hero, categories, ...).
+      // Detect bundle by presence of any of the 3 known top-level keys.
+      const isBundle = 'layout' in body || 'typography' in body || 'theme' in body;
+      const bundle = isBundle ? body : { layout: body, typography: undefined, theme: undefined };
+      if (!bundle.layout || typeof bundle.layout !== 'object') {
         res.status(400).json({
           success: false,
           error: { code: 'INVALID_BODY', message: 'Layout payload required' },
@@ -635,7 +653,7 @@ router.post(
       }
       const token = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
       // Redis key includes storeId so a cross-tenant token paste can't leak.
-      await redis.set(`layout-preview:${storeId}:${token}`, layout, 3600);
+      await redis.set(`layout-preview:${storeId}:${token}`, bundle, 3600);
       res.json({ success: true, data: { token } });
     } catch (error) {
       next(error);
