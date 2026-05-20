@@ -288,6 +288,39 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
+/**
+ * Preview-draft fetcher 2026-05-21 — when the middleware has set the
+ * force-preview-draft cookie (because the iframe loaded with ?_layoutDraft=
+ * at any point in the past hour), fetch the draft bundle from the API and
+ * return its typography + theme. Used to override the committed-store
+ * values for the typography CSS emitter so EVERY page in the iframe
+ * (not just the homepage) reflects the merchant's pending changes.
+ *
+ * Returns nulls when the cookie is missing, the token has expired in
+ * Redis, or the fetch fails. Callers fall back to committed store data
+ * in that case.
+ */
+async function fetchDraftBundleForCurrentRequest(
+  storeId: string | undefined,
+  draftToken: string | undefined,
+  apiUrl: string
+): Promise<{ typography: unknown; theme: unknown } | null> {
+  if (!storeId || !draftToken) return null;
+  try {
+    const res = await fetch(
+      `${apiUrl}/public/stores/${storeId}/layout?_layoutDraft=${encodeURIComponent(draftToken)}`,
+      { cache: 'no-store' }
+    );
+    if (!res.ok) return null;
+    const json = await res.json();
+    const data = json?.data;
+    if (!data?.isDraft) return null;
+    return { typography: data.typography, theme: data.theme };
+  } catch {
+    return null;
+  }
+}
+
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   // Fetch store data server-side
   const store = await getStore();
@@ -300,6 +333,18 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // every setLanguage() call.
   const cookieStore = await cookies();
   const cookieLang = cookieStore.get('force-language')?.value as 'en' | 'ar' | undefined;
+  // Preview-draft propagation (set by middleware). Header wins for FIRST
+  // load with ?_layoutDraft= in the URL (cookies set in the response
+  // aren't visible to the same response's server components). Cookie
+  // fallback covers subsequent navigations within the iframe.
+  const headersList = await headers();
+  const draftToken =
+    headersList.get('x-preview-draft') ?? cookieStore.get('force-preview-draft')?.value;
+  const draftBundle = await fetchDraftBundleForCurrentRequest(
+    store.id,
+    draftToken,
+    process.env.NEXT_PUBLIC_API_URL ?? ''
+  );
   const storeDefaultLanguage = (store.settings as Record<string, unknown>)?.defaultLanguage as
     | 'en'
     | 'ar'
@@ -463,7 +508,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     if (/["'<>{}\\]/.test(v)) return null;
     return v;
   };
-  const typo = store.typography as
+  // Draft preview typography wins over committed when the cookie is set
+  // and the API still has the bundle in Redis. Otherwise falls back to
+  // store.typography (committed values).
+  const effectiveTypographyRaw = draftBundle?.typography ?? store.typography;
+  const typo = effectiveTypographyRaw as
     | {
         fonts?: Array<
           | { type: 'google'; url?: string; family?: string }

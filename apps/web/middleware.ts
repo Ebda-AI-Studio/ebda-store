@@ -111,6 +111,31 @@ export function middleware(request: NextRequest) {
   const hostname = request.headers.get('host') || '';
   const storeIdentifier = getStoreIdentifier(hostname);
 
+  // 2026-05-21: Preview-unsaved draft cookie propagation. When the admin
+  // page-builder loads the storefront with ?_layoutDraft=<token>, that
+  // query param only exists on the initial iframe load — Link clicks
+  // inside the iframe drop it, and the root layout (server component)
+  // can't read searchParams to reach the draft. Solution: stash the
+  // token in a same-origin cookie at middleware time so root layout +
+  // every page sees it consistently.
+  //
+  // Cookie is SameSite=None + Secure so it's sent in cross-site iframe
+  // contexts (admin.forcemediakw.com embedding wadyaljuz.com).
+  // TTL = 1h matches the Redis preview-token TTL on the API side.
+  const draftToken = request.nextUrl.searchParams.get('_layoutDraft');
+  const draftCookie = (response: NextResponse) => {
+    if (draftToken) {
+      response.cookies.set('force-preview-draft', draftToken, {
+        path: '/',
+        maxAge: 3600,
+        sameSite: 'none',
+        secure: true,
+        httpOnly: true,
+      });
+    }
+    return response;
+  };
+
   // Bare root on `store.forcemediakw.com` no longer redirects to
   // forcemediakw.com — the homepage now serves a dedicated Force
   // Store Builder landing page (apps/web/src/components/PlatformLanding.tsx)
@@ -125,6 +150,18 @@ export function middleware(request: NextRequest) {
   // Always set the original host header
   requestHeaders.set('x-original-host', hostname);
 
+  // Also propagate the draft token as a REQUEST header so server
+  // components in the SAME request can read it (cookies set in the
+  // response aren't visible to that response's server components).
+  // Layout.tsx reads this header on first ?_layoutDraft load AND falls
+  // back to the cookie on subsequent navigations in the iframe.
+  if (draftToken) {
+    requestHeaders.set('x-preview-draft', draftToken);
+  } else {
+    const cookieDraft = request.cookies.get('force-preview-draft')?.value;
+    if (cookieDraft) requestHeaders.set('x-preview-draft', cookieDraft);
+  }
+
   if (storeIdentifier) {
     // This is a custom domain - set store identification headers
     requestHeaders.set('x-store-domain', storeIdentifier);
@@ -135,7 +172,7 @@ export function middleware(request: NextRequest) {
       request: { headers: requestHeaders },
     });
     response.headers.set('x-store-domain', storeIdentifier);
-    return response;
+    return draftCookie(response);
   }
 
   // Platform domain — check for store slug in URL path
@@ -159,7 +196,7 @@ export function middleware(request: NextRequest) {
     if (request.cookies.get('x-store-slug')?.value !== slugInfo.slug) {
       response.cookies.set('x-store-slug', slugInfo.slug, { path: '/', httpOnly: true });
     }
-    return response;
+    return draftCookie(response);
   }
 
   // Bare root on platform domain — reset to default. Clear any sticky
@@ -171,7 +208,7 @@ export function middleware(request: NextRequest) {
     if (request.cookies.get('x-store-slug')) {
       response.cookies.delete('x-store-slug');
     }
-    return response;
+    return draftCookie(response);
   }
 
   // Subroute on platform domain (no slug in URL) — use cookie to maintain
@@ -181,9 +218,11 @@ export function middleware(request: NextRequest) {
     requestHeaders.set('x-store-slug', cookieSlug);
   }
 
-  return NextResponse.next({
-    request: { headers: requestHeaders },
-  });
+  return draftCookie(
+    NextResponse.next({
+      request: { headers: requestHeaders },
+    })
+  );
 }
 
 /**
