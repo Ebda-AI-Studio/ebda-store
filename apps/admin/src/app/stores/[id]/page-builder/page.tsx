@@ -1254,6 +1254,59 @@ export default function StoreLayoutPage() {
                 theme={storeInfo?.theme ?? FALLBACK_THEME}
               />
 
+              {/* Extra duplicated product carousels (section duplication 2026-05-20).
+                  Renders one card per entry + a "+ add carousel" button at the
+                  bottom. Up to 8 extras. */}
+              {(layout.extraCarousels ?? []).map((extra, idx) => (
+                <ExtraCarouselCard
+                  key={extra.id}
+                  extra={extra}
+                  index={idx}
+                  onPatch={patch =>
+                    setLayout(prev => {
+                      if (!prev) return prev;
+                      const list = [...(prev.extraCarousels ?? [])];
+                      list[idx] = { ...list[idx], ...patch };
+                      return { ...prev, extraCarousels: list };
+                    })
+                  }
+                  onDelete={() =>
+                    setLayout(prev => {
+                      if (!prev) return prev;
+                      const list = (prev.extraCarousels ?? []).filter((_, i) => i !== idx);
+                      return { ...prev, extraCarousels: list };
+                    })
+                  }
+                  theme={storeInfo?.theme ?? FALLBACK_THEME}
+                />
+              ))}
+              {(layout.extraCarousels?.length ?? 0) < 8 && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setLayout(prev => {
+                      if (!prev) return prev;
+                      const next: import('@force/shared').ExtraCarouselSettings = {
+                        id:
+                          typeof crypto !== 'undefined' && 'randomUUID' in crypto
+                            ? crypto.randomUUID()
+                            : `extra-${Date.now()}`,
+                        productSource: 'newest',
+                        enabled: true,
+                        limit: 12,
+                      };
+                      return {
+                        ...prev,
+                        extraCarousels: [...(prev.extraCarousels ?? []), next],
+                      };
+                    })
+                  }
+                  className="w-full rounded-2xl border-2 border-dashed border-border bg-card/40 p-4 text-sm font-semibold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                >
+                  + Add product carousel ({layout.extraCarousels?.length ?? 0} / 8 used)
+                </button>
+              )}
+
               {/* Product Card Defaults — global card controls that apply
                   to the PLP, search, and any product surface outside the
                   homepage carousels. Per-section settings above override
@@ -2296,6 +2349,161 @@ function SortableSectionRow({
       <span className="text-xs font-medium text-muted-foreground tabular-nums">{index}.</span>
       <span className="flex-1 text-sm font-medium text-foreground">{label}</span>
     </li>
+  );
+}
+
+/**
+ * Section-duplication card — Ahmad 2026-05-20. One per entry in
+ * `layout.extraCarousels`. Renders the minimum-viable controls: source
+ * picker, title/kicker/subtitle text, limit, bgColor, dividers, padding.
+ * Plus a delete button. Reuses the existing SectionDividersBlock +
+ * SectionPaddingMaxWidthBlock helpers for visual parity with the static
+ * section cards.
+ */
+function ExtraCarouselCard({
+  extra,
+  index,
+  onPatch,
+  onDelete,
+  theme,
+}: {
+  extra: import('@force/shared').ExtraCarouselSettings;
+  index: number;
+  onPatch: (patch: Partial<import('@force/shared').ExtraCarouselSettings>) => void;
+  onDelete: () => void;
+  theme: import('@force/shared').StoreTheme;
+}) {
+  const enabled = extra.enabled !== false;
+  const dividerValues = {
+    dividers: extra.dividers,
+    showKickerLines: extra.showKickerLines ?? true,
+    showSubtitleLines: extra.showSubtitleLines ?? true,
+  };
+  return (
+    <SectionCard
+      title={extra.title || `Extra carousel ${index + 1}`}
+      description={`Source: ${extra.productSource}. Drag-reorder support coming in v2.`}
+      enabled={enabled}
+      onToggle={v => onPatch({ enabled: v })}
+      defaultExpanded={enabled}
+    >
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-muted-foreground">Title (EN)</span>
+            <input
+              type="text"
+              value={extra.title ?? ''}
+              onChange={e => onPatch({ title: e.target.value })}
+              placeholder="e.g. Editor's Picks"
+              className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-base sm:text-sm"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-muted-foreground">Title (AR)</span>
+            <input
+              type="text"
+              value={extra.titleAr ?? ''}
+              onChange={e => onPatch({ titleAr: e.target.value })}
+              placeholder="مثال: اختيارات المحرر"
+              dir="rtl"
+              className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-base sm:text-sm"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-muted-foreground">Subtitle (EN)</span>
+            <input
+              type="text"
+              value={extra.subtitle ?? ''}
+              onChange={e => onPatch({ subtitle: e.target.value })}
+              className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-base sm:text-sm"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-muted-foreground">Subtitle (AR)</span>
+            <input
+              type="text"
+              value={extra.subtitleAr ?? ''}
+              onChange={e => onPatch({ subtitleAr: e.target.value })}
+              dir="rtl"
+              className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-base sm:text-sm"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-muted-foreground">Product source</span>
+            <select
+              value={extra.productSource}
+              onChange={e =>
+                onPatch({
+                  productSource: e.target.value as import('@force/shared').ExtraCarouselSource,
+                })
+              }
+              className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+            >
+              <option value="newest">Newest (same as New Arrivals)</option>
+              <option value="best_seller">Best sellers</option>
+              <option value="featured">Featured</option>
+            </select>
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-muted-foreground">Max products</span>
+            <input
+              type="number"
+              min={1}
+              max={50}
+              value={extra.limit ?? 12}
+              onChange={e => onPatch({ limit: Number(e.target.value) || 12 })}
+              className="rounded-lg border border-border bg-background px-3 py-2 text-sm w-32"
+            />
+          </label>
+          <label className="flex flex-col gap-1 sm:col-span-2">
+            <span className="text-xs font-medium text-muted-foreground">Background color</span>
+            <input
+              type="text"
+              value={extra.bgColor ?? ''}
+              onChange={e => onPatch({ bgColor: e.target.value || undefined })}
+              placeholder="#FFFFFF or token:primary or leave empty"
+              className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-base sm:text-sm"
+            />
+          </label>
+        </div>
+        <SectionDividersBlock
+          values={dividerValues}
+          onPatch={patch => {
+            if (patch.dividers) onPatch({ dividers: patch.dividers });
+          }}
+        />
+        <SectionPaddingMaxWidthBlock values={extra} onPatch={p => onPatch(p)} />
+        <SectionPreview
+          label={extra.title || `Extra ${index + 1}`}
+          bgColor={extra.bgColor}
+          cardFrameColor={extra.cardFrameColor}
+          cardFrameWidth={extra.cardFrameWidth}
+          cardFrameSize={extra.cardFrameSize}
+          headingZone={extra.typography?.heading}
+          kickerZone={extra.typography?.kicker}
+          subtitleZone={extra.typography?.subtitle}
+          titleText={extra.title}
+          kickerText={extra.kicker}
+          subtitleText={extra.subtitle}
+          dividers={extra.dividers}
+          theme={theme}
+        />
+        <div className="border-t border-border pt-3 flex justify-end">
+          <button
+            type="button"
+            onClick={() => {
+              if (confirm(`Delete this carousel${extra.title ? ` ("${extra.title}")` : ''}?`)) {
+                onDelete();
+              }
+            }}
+            className="rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-1.5 text-xs font-semibold text-destructive hover:bg-destructive/10"
+          >
+            Delete carousel
+          </button>
+        </div>
+      </div>
+    </SectionCard>
   );
 }
 

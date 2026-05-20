@@ -37,9 +37,12 @@ interface ShopChromeProps {
  * template's look across the whole surface. Only /auth, /checkout, and the
  * public wishlist-share page use MinimalChrome instead.
  */
-export function ShopChrome({ children, layout }: ShopChromeProps) {
+export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
   const router = useRouter();
-  const { store } = useStore();
+  const { store, layout: ctxLayout } = useStore();
+  // Prop wins (homepage server-fetches layout for SSR correctness); context
+  // layout is the lazy-fetched fallback for other routes.
+  const layout = layoutProp ?? ctxLayout ?? undefined;
   const branding = useStoreBranding();
   const contact = useStoreContact();
   const storeUrl = useStoreUrl();

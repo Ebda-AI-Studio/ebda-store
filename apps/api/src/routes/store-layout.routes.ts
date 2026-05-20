@@ -405,6 +405,56 @@ const layoutSchema = z
       })
       .partial()
       .optional(),
+    // Extra duplicated product carousels (section duplication 2026-05-20).
+    // Each entry has a unique id + productSource + the full ProductCarousel
+    // shape via z.passthrough() (forward-compat with new fields without zod churn).
+    extraCarousels: z
+      .array(
+        z
+          .object({
+            id: z.string().min(1).max(80),
+            productSource: z.enum(['newest', 'best_seller', 'featured']),
+            enabled: z.boolean().optional(),
+            limit: z.number().int().min(1).max(50).optional(),
+            title: z.string().optional(),
+            titleAr: z.string().optional(),
+            kicker: z.string().optional(),
+            kickerAr: z.string().optional(),
+            subtitle: z.string().optional(),
+            subtitleAr: z.string().optional(),
+            showKickerLines: z.boolean().optional(),
+            showSubtitleLines: z.boolean().optional(),
+            bgColor: colorValue,
+            cardSize: z.enum(['xxs', 'xs', 'sm', 'md', 'lg', 'xl']).optional(),
+            cardAspect: z.enum(['theme', 'square', 'portrait', 'landscape']).optional(),
+            cardShape: z
+              .enum([
+                'theme',
+                'circle',
+                'rounded-square',
+                'square',
+                'soft',
+                'portrait',
+                'landscape',
+                'pill',
+              ])
+              .optional(),
+            cardGap: z.enum(['tight', 'normal', 'loose', 'xloose']).optional(),
+            showLabel: z.boolean().optional(),
+            showHover: z.boolean().optional(),
+            showCardFrame: z.boolean().optional(),
+            cardFrameStyle: z.enum(['soft', 'outline', 'shadow', 'paper']).optional(),
+            cardFrameWidth: z.enum(['thin', 'normal', 'thick', 'xthick']).optional(),
+            cardFrameSize: z.enum(['compact', 'normal', 'comfortable', 'spacious']).optional(),
+            cardFrameColor: z.string().optional(),
+            typography: sectionTypographyOverride,
+            dividers: sectionDividers,
+            ...sectionPaddingMaxWidthVisibility,
+          })
+          .passthrough()
+      )
+      .max(8)
+      .optional(),
     // Drag-to-reorder data model (page-builder 2026-05-20, ui in v2).
     sectionOrder: z
       .array(

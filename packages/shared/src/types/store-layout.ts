@@ -475,6 +475,29 @@ export interface BlogCarouselSettings extends SectionBgOverride, SectionPaddingM
 }
 
 /**
+ * Section duplication (page-builder 2026-05-20) — merchants can add extra
+ * product carousels to the homepage beyond newArrivals + bestSellers
+ * (e.g. "Featured", "Editor's Picks", "Back in Stock"). Each extra has a
+ * unique id and a productSource that determines which products it shows.
+ *
+ * v1 productSource options:
+ *   - `'newest'` — most recent products (mirrors newArrivals's source)
+ *   - `'best_seller'` — top-selling products (mirrors bestSellers)
+ *   - `'featured'` — products tagged isFeatured=true
+ *
+ * v2 will add `'category:<id>'` (carousel filtered to a single category)
+ * and `'manual:<id[]>'` (curated list of product ids).
+ */
+export type ExtraCarouselSource = 'newest' | 'best_seller' | 'featured';
+
+export interface ExtraCarouselSettings extends ProductCarouselSettings {
+  /** Unique id (uuid). Required for stable ordering + admin keying. */
+  id: string;
+  /** Product source — determines which products appear in the carousel. */
+  productSource: ExtraCarouselSource;
+}
+
+/**
  * Header chrome — folded into page-builder 2026-05-20. v1 ships
  * bg/typography/dividers/sticky. Per-theme chrome (logo size, nav layout)
  * deferred to v2 — needs all 5 theme Header components to accept per-section
@@ -559,6 +582,9 @@ export interface StoreLayoutSettings {
   header?: HeaderSettings;
   /** Footer chrome. Page-builder 2026-05-20. */
   footer?: FooterSettings;
+  /** Extra duplicated product carousels (section duplication). v1 renders
+   *  in array order after testimonials; v2 will integrate with sectionOrder. */
+  extraCarousels?: ExtraCarouselSettings[];
   sizing: SizingContract;
   /** Defaults applied to all non-homepage product-card surfaces. */
   productCardDefaults?: ProductCardDefaults;
@@ -660,6 +686,7 @@ export function resolveLayoutSettings(input: unknown): StoreLayoutSettings {
     announcement: raw.announcement,
     header: raw.header,
     footer: raw.footer,
+    extraCarousels: raw.extraCarousels,
     sizing: { ...DEFAULT_LAYOUT_SETTINGS.sizing, ...(raw.sizing ?? {}) },
     productCardDefaults: { ...(raw.productCardDefaults ?? {}) },
     sectionOrder: raw.sectionOrder,

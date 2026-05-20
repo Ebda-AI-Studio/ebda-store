@@ -735,11 +735,68 @@ export function HomePageContent({
           testimonials: testimonialsJSX,
         };
 
+        // Extra duplicated carousels (section duplication 2026-05-20). Each
+        // entry is a ProductCarousel with its own product source. v1 renders
+        // them in array order AFTER the static section loop; v2 will integrate
+        // with sectionOrder via 'extra:<id>' keys.
+        const extras = layout.extraCarousels ?? [];
+        const extraJSX = extras.map(extra => {
+          if (extra.enabled === false) return null;
+          const sourceProducts =
+            extra.productSource === 'best_seller'
+              ? templateBestSellers
+              : extra.productSource === 'featured'
+                ? templateProducts
+                : templateNewArrivals;
+          const capped = sourceProducts.slice(0, extra.limit ?? 12);
+          if (capped.length === 0) return null;
+          if (!T.ProductCarousel) return null;
+          return (
+            <React.Fragment key={`extra:${extra.id}`}>
+              {extra.dividers?.above?.enabled && <SectionDivider settings={extra.dividers.above} />}
+              <section
+                data-section={`extra:${extra.id}`}
+                className="bg-[hsl(var(--bg-page))] py-14 sm:py-16 lg:py-20"
+                style={sectionBgStyle(extra.bgColor, store.theme, undefined)}
+              >
+                <T.ProductCarousel
+                  products={capped}
+                  title={extra.title}
+                  titleAr={extra.titleAr}
+                  kicker={extra.kicker}
+                  kickerAr={extra.kickerAr}
+                  subtitle={extra.subtitle}
+                  subtitleAr={extra.subtitleAr}
+                  showKickerLines={extra.showKickerLines}
+                  showSubtitleLines={extra.showSubtitleLines}
+                  dividers={extra.dividers}
+                  isRtl={isRtl}
+                  currency={store.currency}
+                  onAddToCart={handleAddToCart}
+                  pack={templateId}
+                  cardSize={extra.cardSize}
+                  cardAspect={extra.cardAspect}
+                  cardShape={extra.cardShape}
+                  cardGap={extra.cardGap}
+                  showLabel={extra.showLabel}
+                  showHover={extra.showHover}
+                  showCardFrame={extra.showCardFrame}
+                  cardFrameStyle={extra.cardFrameStyle}
+                  cardFrameWidth={extra.cardFrameWidth}
+                  cardFrameSize={extra.cardFrameSize}
+                  cardFrameColor={extra.cardFrameColor}
+                />
+              </section>
+            </React.Fragment>
+          );
+        });
+
         return (
           <>
             {resolved.map(key => (
               <React.Fragment key={key}>{sectionMap[key]}</React.Fragment>
             ))}
+            {extraJSX}
           </>
         );
       })()}

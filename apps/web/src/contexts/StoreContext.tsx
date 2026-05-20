@@ -145,6 +145,16 @@ interface StoreContextValue {
   store: StoreData;
   isLoading: boolean;
   error: Error | null;
+  /**
+   * Per-page layout settings. Fetched lazily on mount so non-homepage routes
+   * (PDP / catalog / blog) can read header/footer chrome overrides from
+   * `layout.header` / `layout.footer` via ShopChrome.
+   *
+   * Null until the fetch resolves. Homepage's HomePageContent passes its own
+   * server-fetched layout via the ShopChrome `layout` prop — that wins over
+   * this lazy fetch (no race between SSR-fetched-on-server vs lazy-on-client).
+   */
+  layout: import('@force/shared').StoreLayoutSettings | null;
 }
 
 const StoreContext = createContext<StoreContextValue | null>(null);
@@ -194,6 +204,35 @@ export function StoreProvider({ children, initialStore }: StoreProviderProps) {
   const [store] = useState<StoreData>(mergedInitialStore);
   const [isLoading] = useState(!initialStore);
   const [error] = useState<Error | null>(null);
+  const [layout, setLayout] = useState<import('@force/shared').StoreLayoutSettings | null>(null);
+
+  // Lazy-fetch layout settings for non-homepage routes so ShopChrome can apply
+  // header / footer / announcement chrome overrides everywhere, not only home.
+  // 60s freshness via the API's Cache-Control header is fine — chrome edits
+  // don't need real-time propagation.
+  useEffect(() => {
+    if (!store.id || store.id === 'demo') return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/v1/public/stores/${store.id}/layout`,
+          { credentials: 'include' }
+        );
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          data?: { layout?: import('@force/shared').StoreLayoutSettings };
+        };
+        if (cancelled) return;
+        if (data.data?.layout) setLayout(data.data.layout);
+      } catch {
+        // Silent: layout chrome is a nice-to-have, fallback is the default chrome.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [store.id]);
 
   // Push the store id into the api client BEFORE any child effects run so the
   // first client-side request already carries X-Store-ID. Using an effect
@@ -222,7 +261,9 @@ export function StoreProvider({ children, initialStore }: StoreProviderProps) {
   }, [store.favicon]);
 
   return (
-    <StoreContext.Provider value={{ store, isLoading, error }}>{children}</StoreContext.Provider>
+    <StoreContext.Provider value={{ store, isLoading, error, layout }}>
+      {children}
+    </StoreContext.Provider>
   );
 }
 
