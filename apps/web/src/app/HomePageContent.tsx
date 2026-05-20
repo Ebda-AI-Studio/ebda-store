@@ -43,6 +43,10 @@ interface HomePageContentProps {
   bestSellers: Product[];
   categories: Category[];
   testimonials: HomepageTestimonial[];
+  /** Additional products server-fetched for layout.extracarousels entries
+   *  (category-slug and manual-ids sources). Merged into the union the
+   *  storefront filters against. */
+  extraProducts?: Product[];
   storeName: string;
   layout: StoreLayoutSettings;
 }
@@ -54,6 +58,7 @@ export function HomePageContent({
   bestSellers,
   categories,
   testimonials,
+  extraProducts,
   layout,
 }: HomePageContentProps) {
   const { store } = useStore();
@@ -741,11 +746,20 @@ export function HomePageContent({
         // with sectionOrder via 'extra:<id>' keys.
         const extras = layout.extraCarousels ?? [];
         // Union of all server-fetched RAW products (not template adapters) so
-        // 'category' filter can read raw.categories[].slug. We re-map to
-        // TemplateProduct after filtering.
+        // 'category' filter can read raw.categories[].slug. Includes
+        // extraProducts which were fetched specifically for layout.extracarousels
+        // entries that use 'category' or 'manual' productSource — without this
+        // merge the storefront would only see products already in newArrivals/
+        // bestSellers/featured and miss any merchant-configured category that
+        // doesn't overlap with those lists.
         const allRawProducts = (() => {
           const map = new Map<string, Product>();
-          for (const p of [...newArrivals, ...bestSellers, ...featuredProducts]) {
+          for (const p of [
+            ...newArrivals,
+            ...bestSellers,
+            ...featuredProducts,
+            ...(extraProducts ?? []),
+          ]) {
             map.set(p.id, p);
           }
           return Array.from(map.values());

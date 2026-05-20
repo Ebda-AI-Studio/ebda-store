@@ -35,6 +35,11 @@ async function fetchHomepageData(
   bestSellers: Product[];
   categories: Category[];
   testimonials: HomepageTestimonial[];
+  /** Products fetched specifically for layout.extracarousels entries with
+   *  `productSource === 'category'` or `'manual'`. Keyed for de-dup before
+   *  the storefront filter pass; HomePageContent merges them into the
+   *  product union for source resolution. */
+  extraProducts: Product[];
 }> {
   const storeHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -49,6 +54,7 @@ async function fetchHomepageData(
       bestSellers: [],
       categories: [],
       testimonials: [],
+      extraProducts: [],
     };
   }
 
@@ -121,7 +127,57 @@ async function fetchHomepageData(
   const bestSellers: Product[] = bestSellersResult?.data?.products ?? [];
   const testimonials: HomepageTestimonial[] = testimonialsResult?.data?.testimonials ?? [];
 
-  return { featuredProducts, newArrivals, bestSellers, categories, testimonials };
+  // Extra carousels (page-builder section duplication) — fetch products for
+  // any entries with `productSource === 'category'` or `'manual'`. Otherwise
+  // the storefront filter only sees the union of newArrivals/bestSellers/
+  // featured, which misses products in unrelated categories or manually-
+  // chosen products not in any of those lists.
+  const extras = layout.extraCarousels ?? [];
+  const categoryFetches = Array.from(
+    new Set(
+      extras
+        .filter(e => e.enabled !== false && e.productSource === 'category' && e.categorySlug)
+        .map(e => e.categorySlug as string)
+    )
+  );
+  const manualIds = Array.from(
+    new Set(
+      extras
+        .filter(e => e.enabled !== false && e.productSource === 'manual')
+        .flatMap(e => e.manualProductIds ?? [])
+    )
+  );
+  const extraResults = await Promise.all([
+    ...categoryFetches.map(slug =>
+      fetch(`${API_URL}/public/products?category=${encodeURIComponent(slug)}&limit=50`, {
+        next: { revalidate: 60 },
+        headers: storeHeaders,
+      })
+        .then(r => (r.ok ? r.json() : null))
+        .catch(() => null)
+    ),
+    manualIds.length > 0
+      ? fetch(
+          `${API_URL}/public/products?ids=${encodeURIComponent(manualIds.join(','))}&limit=50`,
+          {
+            next: { revalidate: 60 },
+            headers: storeHeaders,
+          }
+        )
+          .then(r => (r.ok ? r.json() : null))
+          .catch(() => null)
+      : Promise.resolve(null),
+  ]);
+  const extraProductsMap = new Map<string, Product>();
+  for (const result of extraResults) {
+    const list: Product[] = result?.data?.products ?? [];
+    for (const p of list) {
+      if (p?.id) extraProductsMap.set(p.id, p);
+    }
+  }
+  const extraProducts: Product[] = Array.from(extraProductsMap.values());
+
+  return { featuredProducts, newArrivals, bestSellers, categories, testimonials, extraProducts };
 }
 
 async function fetchLayoutSettings(storeId: string): Promise<StoreLayoutSettings> {
@@ -151,7 +207,7 @@ export default async function HomePage() {
   }
 
   const layout = await fetchLayoutSettings(store.id);
-  const { featuredProducts, newArrivals, bestSellers, categories, testimonials } =
+  const { featuredProducts, newArrivals, bestSellers, categories, testimonials, extraProducts } =
     await fetchHomepageData(store, layout);
 
   const siteUrl = getSiteUrl(store);
@@ -203,6 +259,7 @@ export default async function HomePage() {
         bestSellers={bestSellers}
         categories={categories}
         testimonials={testimonials}
+        extraProducts={extraProducts}
         storeName={store.name}
         layout={layout}
       />

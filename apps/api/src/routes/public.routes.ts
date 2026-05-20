@@ -102,7 +102,8 @@ const createOrderSchema = z.object({
 // GET /products - List all public products (cached 30s)
 router.get('/products', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { page, limit, category, search, featured, sort, minPrice, maxPrice, cursor } = req.query;
+    const { page, limit, category, search, featured, sort, minPrice, maxPrice, cursor, ids } =
+      req.query;
     const storeId = await getStoreIdFromRequest(req);
 
     const sortValue =
@@ -118,8 +119,19 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
         ? cursor
         : undefined;
 
-    // Cache key includes cursor — different cursor positions get distinct entries.
-    const cacheKey = `public:products:${storeId}:${page || 1}:${limit || 20}:${category || ''}:${search || ''}:${featured || ''}:${sortValue || ''}:${minPrice || ''}:${maxPrice || ''}:${validCursor || ''}`;
+    // ids query param — comma-separated product UUIDs. Used by page-builder
+    // ExtraCarousel with `productSource === 'manual'`. Service caps at 50.
+    const idsParam =
+      typeof ids === 'string' && ids.length > 0
+        ? ids
+            .split(',')
+            .map(s => s.trim())
+            .filter(Boolean)
+            .slice(0, 50)
+        : undefined;
+
+    // Cache key includes cursor + ids — different cursor positions / id sets get distinct entries.
+    const cacheKey = `public:products:${storeId}:${page || 1}:${limit || 20}:${category || ''}:${search || ''}:${featured || ''}:${sortValue || ''}:${minPrice || ''}:${maxPrice || ''}:${validCursor || ''}:${idsParam?.sort().join(',') ?? ''}`;
 
     const result = await getCached(cacheKey, 120, () =>
       ProductService.listPublic(storeId, {
@@ -132,6 +144,7 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
         minPrice: minPrice ? parseInt(minPrice as string, 10) : undefined,
         maxPrice: maxPrice ? parseInt(maxPrice as string, 10) : undefined,
         cursor: validCursor,
+        ids: idsParam,
       })
     );
 

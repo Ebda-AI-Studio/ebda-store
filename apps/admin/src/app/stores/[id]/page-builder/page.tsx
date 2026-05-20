@@ -1260,6 +1260,7 @@ export default function StoreLayoutPage() {
               {(layout.extraCarousels ?? []).map((extra, idx) => (
                 <ExtraCarouselCard
                   key={extra.id}
+                  storeId={storeId}
                   extra={extra}
                   index={idx}
                   total={(layout.extraCarousels ?? []).length}
@@ -2364,6 +2365,230 @@ function SortableSectionRow({
 }
 
 /**
+ * Manual product picker — used by ExtraCarouselCard when productSource ===
+ * 'manual'. Search input + result dropdown + selected-pills row with
+ * up/down reorder + remove buttons. Calls the admin product search endpoint
+ * /api/v1/admin/stores/:storeId/products?search=... + the `ids` param to
+ * hydrate names for already-selected products on mount.
+ */
+interface ProductSummary {
+  id: string;
+  name: string;
+  nameAr?: string | null;
+  sku?: string | null;
+  images?: Array<{ url: string }>;
+}
+
+function ManualProductPicker({
+  storeId,
+  value,
+  onChange,
+}: {
+  storeId: string;
+  value: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  const [search, setSearch] = useState('');
+  const [searchResults, setSearchResults] = useState<ProductSummary[]>([]);
+  const [selectedDetails, setSelectedDetails] = useState<Record<string, ProductSummary>>({});
+  const [isSearching, setIsSearching] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  // Hydrate names for already-saved ids on mount + whenever the value array
+  // grows to include unknown ids.
+  useEffect(() => {
+    const missing = value.filter(id => !selectedDetails[id]);
+    if (missing.length === 0) return;
+    (async () => {
+      try {
+        const res = await apiGet<{
+          products?: ProductSummary[];
+          data?: { products?: ProductSummary[] };
+        }>(`/api/v1/admin/stores/${storeId}/products?ids=${missing.join(',')}&limit=50`);
+        const list =
+          res.data?.products ?? (res.data as { products?: ProductSummary[] })?.products ?? [];
+        const next: Record<string, ProductSummary> = { ...selectedDetails };
+        for (const p of list) next[p.id] = p;
+        setSelectedDetails(next);
+      } catch {
+        // silent — picker stays functional with id-only display fallback
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, storeId]);
+
+  // Debounced search.
+  useEffect(() => {
+    const q = search.trim();
+    if (!q) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+    setIsSearching(true);
+    const t = setTimeout(async () => {
+      try {
+        const res = await apiGet<{
+          products?: ProductSummary[];
+          data?: { products?: ProductSummary[] };
+        }>(`/api/v1/admin/stores/${storeId}/products?search=${encodeURIComponent(q)}&limit=10`);
+        const list =
+          res.data?.products ?? (res.data as { products?: ProductSummary[] })?.products ?? [];
+        setSearchResults(list);
+      } catch {
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [search, storeId]);
+
+  function add(id: string, summary?: ProductSummary) {
+    if (value.includes(id)) return;
+    if (value.length >= 50) {
+      alert('Maximum 50 products per carousel');
+      return;
+    }
+    if (summary) {
+      setSelectedDetails(prev => ({ ...prev, [id]: summary }));
+    }
+    onChange([...value, id]);
+    setSearch('');
+    setSearchResults([]);
+    setOpen(false);
+  }
+
+  function remove(id: string) {
+    onChange(value.filter(v => v !== id));
+  }
+
+  function move(idx: number, delta: -1 | 1) {
+    const target = idx + delta;
+    if (target < 0 || target >= value.length) return;
+    const next = [...value];
+    [next[idx], next[target]] = [next[target], next[idx]];
+    onChange(next);
+  }
+
+  return (
+    <div className="space-y-2">
+      {/* Selected products list */}
+      {value.length > 0 && (
+        <ul className="space-y-1.5">
+          {value.map((id, idx) => {
+            const detail = selectedDetails[id];
+            return (
+              <li
+                key={id}
+                className="flex items-center gap-2 rounded-lg border border-border bg-background px-2 py-1.5"
+              >
+                {detail?.images?.[0]?.url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={detail.images[0].url}
+                    alt=""
+                    className="h-8 w-8 shrink-0 rounded object-cover"
+                  />
+                ) : (
+                  <div className="h-8 w-8 shrink-0 rounded bg-muted" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="truncate text-xs font-medium text-foreground">
+                    {detail?.name || id}
+                  </p>
+                  {detail?.sku && (
+                    <p className="truncate text-[10px] text-muted-foreground">SKU: {detail.sku}</p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  disabled={idx === 0}
+                  onClick={() => move(idx, -1)}
+                  className="rounded p-1 text-muted-foreground hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
+                  aria-label="Move up"
+                >
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  disabled={idx === value.length - 1}
+                  onClick={() => move(idx, 1)}
+                  className="rounded p-1 text-muted-foreground hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
+                  aria-label="Move down"
+                >
+                  ↓
+                </button>
+                <button
+                  type="button"
+                  onClick={() => remove(id)}
+                  className="rounded p-1 text-destructive hover:bg-destructive/10"
+                  aria-label="Remove"
+                >
+                  ×
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {/* Search input + results dropdown */}
+      <div className="relative">
+        <input
+          type="text"
+          value={search}
+          onChange={e => {
+            setSearch(e.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          placeholder={`Search products to add (${value.length}/50)…`}
+          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-base sm:text-sm"
+        />
+        {open && (search.trim() !== '' || searchResults.length > 0) && (
+          <div className="absolute z-20 mt-1 max-h-72 w-full overflow-y-auto rounded-lg border border-border bg-card shadow-lg">
+            {isSearching && (
+              <div className="px-3 py-2 text-xs text-muted-foreground">Searching…</div>
+            )}
+            {!isSearching && searchResults.length === 0 && search.trim() !== '' && (
+              <div className="px-3 py-2 text-xs text-muted-foreground">No matches.</div>
+            )}
+            {searchResults
+              .filter(p => !value.includes(p.id))
+              .map(p => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => add(p.id, p)}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-start hover:bg-muted"
+                >
+                  {p.images?.[0]?.url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={p.images[0].url}
+                      alt=""
+                      className="h-8 w-8 shrink-0 rounded object-cover"
+                    />
+                  ) : (
+                    <div className="h-8 w-8 shrink-0 rounded bg-muted" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="truncate text-xs font-medium text-foreground">{p.name}</p>
+                    {p.sku && (
+                      <p className="truncate text-[10px] text-muted-foreground">SKU: {p.sku}</p>
+                    )}
+                  </div>
+                </button>
+              ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
  * Section-duplication card — Ahmad 2026-05-20. One per entry in
  * `layout.extraCarousels`. Renders the minimum-viable controls: source
  * picker, title/kicker/subtitle text, limit, bgColor, dividers, padding.
@@ -2372,6 +2597,7 @@ function SortableSectionRow({
  * section cards.
  */
 function ExtraCarouselCard({
+  storeId,
   extra,
   index,
   total,
@@ -2380,6 +2606,7 @@ function ExtraCarouselCard({
   onMove,
   theme,
 }: {
+  storeId: string;
   extra: import('@force/shared').ExtraCarouselSettings;
   index: number;
   total: number;
@@ -2475,27 +2702,14 @@ function ExtraCarouselCard({
             </label>
           )}
           {extra.productSource === 'manual' && (
-            <label className="flex flex-col gap-1 sm:col-span-2">
-              <span className="text-xs font-medium text-muted-foreground">
-                Manual product IDs (comma-separated)
-              </span>
-              <input
-                type="text"
-                value={(extra.manualProductIds ?? []).join(', ')}
-                onChange={e => {
-                  const ids = e.target.value
-                    .split(',')
-                    .map(s => s.trim())
-                    .filter(Boolean);
-                  onPatch({ manualProductIds: ids.length ? ids : undefined });
-                }}
-                placeholder="product-uuid-1, product-uuid-2, ..."
-                className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-base sm:text-sm"
+            <div className="sm:col-span-2 flex flex-col gap-1">
+              <span className="text-xs font-medium text-muted-foreground">Manual products</span>
+              <ManualProductPicker
+                storeId={storeId}
+                value={extra.manualProductIds ?? []}
+                onChange={ids => onPatch({ manualProductIds: ids.length ? ids : undefined })}
               />
-              <span className="mt-0.5 text-[11px] text-muted-foreground/80">
-                Copy product IDs from the Products admin URL. v2.5 will add a picker.
-              </span>
-            </label>
+            </div>
           )}
           <label className="flex flex-col gap-1">
             <span className="text-xs font-medium text-muted-foreground">Max products</span>

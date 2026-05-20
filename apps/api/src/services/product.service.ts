@@ -103,6 +103,10 @@ interface ListProductsOptions {
   minPrice?: number;
   /** Inclusive upper bound on `Product.price` (in fils). */
   maxPrice?: number;
+  /** Filter to a specific list of product ids — used by page-builder
+   *  ExtraCarousel with `productSource === 'manual'`. Capped at 50.
+   *  When provided, all other filters apply on top. */
+  ids?: string[];
 }
 
 interface AdvancedSearchOptions {
@@ -130,7 +134,7 @@ interface AdvancedSearchOptions {
 
 export class ProductService {
   static async list(storeId: string, options: ListProductsOptions = {}) {
-    const { status, category, search, featured } = options;
+    const { status, category, search, featured, ids } = options;
     const page = Math.max(1, options.page || 1);
     // Cap matches the admin per-page selector's max option (500). 100 was
     // too low — merchants hitting 200/500 in the UI got silently
@@ -146,6 +150,11 @@ export class ProductService {
 
     if (featured !== undefined) {
       where.featured = featured;
+    }
+
+    if (ids && ids.length > 0) {
+      const safeIds = ids.slice(0, 50).filter(id => typeof id === 'string' && id.length > 0);
+      if (safeIds.length > 0) where.id = { in: safeIds };
     }
 
     if (search) {
@@ -465,6 +474,7 @@ export class ProductService {
       maxPrice,
       sort,
       cursor,
+      ids,
     } = options;
     const page = Math.max(1, options.page || 1);
     const limit = Math.min(100, Math.max(1, options.limit || 20));
@@ -516,6 +526,15 @@ export class ProductService {
 
     if (featured !== undefined) {
       where.featured = featured;
+    }
+
+    if (ids && ids.length > 0) {
+      // Cap at 50 to match the zod max on layout.extracarousels[].manualProductIds.
+      // Prevents accidental over-fetch via a crafted ?ids=… with hundreds of values.
+      const safeIds = ids.slice(0, 50).filter(id => typeof id === 'string' && id.length > 0);
+      if (safeIds.length > 0) {
+        where.id = { in: safeIds };
+      }
     }
 
     if (search) {

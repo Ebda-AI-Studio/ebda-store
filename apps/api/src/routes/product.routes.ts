@@ -129,7 +129,15 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
-      const { page, limit, status, category, search, featured } = req.query;
+      const { page, limit, status, category, search, featured, ids } = req.query;
+      const idsParam =
+        typeof ids === 'string' && ids.length > 0
+          ? ids
+              .split(',')
+              .map(s => s.trim())
+              .filter(Boolean)
+              .slice(0, 50)
+          : undefined;
 
       const result = await ProductService.list(storeId, {
         page: page ? parseInt(page as string) : undefined,
@@ -138,6 +146,7 @@ router.get(
         category: category as string,
         search: search as string,
         featured: featured === 'true',
+        ids: idsParam,
       });
 
       res.json({
