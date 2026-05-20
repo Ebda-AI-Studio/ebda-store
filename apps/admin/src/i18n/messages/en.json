@@ -3598,6 +3598,7 @@
         "pageBuilder": "Page Builder",
         "content": "Content",
         "blog": "Blog",
+        "floatingWidget": "Floating Widget",
         "orders": "Orders",
         "customers": "Customers",
         "stockDashboard": "Overview",

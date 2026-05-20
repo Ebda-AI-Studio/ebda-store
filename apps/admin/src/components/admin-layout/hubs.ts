@@ -22,6 +22,7 @@ export type HubLabels = {
   pageBuilder: string;
   content: string;
   blog: string;
+  floatingWidget: string;
   // Sales tabs
   orders: string;
   customers: string;
@@ -63,12 +64,20 @@ export const HUBS: HubDefinition[] = [
   },
   {
     key: 'catalog',
-    urlPrefixes: ['/products', '/page-builder', '/content', '/blog', '/catalog'],
+    urlPrefixes: [
+      '/products',
+      '/page-builder',
+      '/content',
+      '/blog',
+      '/catalog',
+      '/floating-widget',
+    ],
     buildTabs: (storeId, labels) => [
       { label: labels.products, href: `/stores/${storeId}/products` },
       { label: labels.pageBuilder, href: `/stores/${storeId}/page-builder` },
       { label: labels.content, href: `/stores/${storeId}/content` },
       { label: labels.blog, href: `/stores/${storeId}/blog` },
+      { label: labels.floatingWidget, href: `/stores/${storeId}/floating-widget` },
     ],
   },
   {
