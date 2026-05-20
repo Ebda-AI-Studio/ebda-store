@@ -9,6 +9,7 @@ export interface ResolvedZone {
   letterSpacing?: string;
   lineHeight?: string;
   textTransform?: string;
+  textDecoration?: string;
   textAlign?: 'start' | 'center' | 'end';
 }
 
@@ -42,6 +43,7 @@ export function resolveSectionZone(
   pick('letterSpacing');
   pick('lineHeight');
   pick('textTransform');
+  pick('textDecoration');
   pick('textAlign');
 
   // Color goes through resolveColor so token: refs work at the override level too.

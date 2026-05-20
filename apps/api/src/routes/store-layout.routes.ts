@@ -62,6 +62,7 @@ const zoneOverride = z
     letterSpacing: z.string().max(20).optional(),
     lineHeight: z.string().max(20).optional(),
     textTransform: z.enum(['none', 'uppercase', 'lowercase', 'capitalize']).optional(),
+    textDecoration: z.enum(['none', 'underline', 'overline', 'line-through']).optional(),
     textAlign: z.enum(['start', 'center', 'end']).optional(),
   })
   .partial()

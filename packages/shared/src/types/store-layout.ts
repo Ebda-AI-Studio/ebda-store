@@ -117,6 +117,11 @@ export interface ZoneOverride {
   lineHeight?: string;
   textTransform?: 'none' | 'uppercase' | 'lowercase' | 'capitalize';
   /**
+   * Underline / strikethrough / overline. Maps to CSS text-decoration-line.
+   * Default unset = no decoration (matches browser baseline).
+   */
+  textDecoration?: 'none' | 'underline' | 'overline' | 'line-through';
+  /**
    * Per-zone text alignment. Uses logical values so RTL Arabic flips correctly:
    *   - `start` → left in LTR, right in RTL
    *   - `center` → always centered

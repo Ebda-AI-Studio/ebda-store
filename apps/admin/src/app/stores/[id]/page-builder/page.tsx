@@ -99,6 +99,10 @@ export default function StoreLayoutPage() {
   const [storeInfo, setStoreInfo] = useState<StoreInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  // Bumps after every successful Save so the live-preview iframe reloads.
+  // The iframe `src` includes this as a query param — change → React re-renders
+  // → iframe issues a fresh request → merchant sees their saved changes.
+  const [previewRefreshTick, setPreviewRefreshTick] = useState(0);
   // Smart Palette + future brand-token edits stage their theme updates here
   // instead of writing immediately to /theme. The main Save button flushes
   // these alongside layout + typography so the merchant has one source of
@@ -219,6 +223,7 @@ export default function StoreLayoutPage() {
         );
       } else {
         toastSuccess(t('saved'));
+        setPreviewRefreshTick(t => t + 1);
         // Clear pending theme updates only on successful save — otherwise the
         // merchant might assume they're saved when the request failed.
         if (hasThemeUpdates) {
@@ -311,6 +316,20 @@ export default function StoreLayoutPage() {
                   Collapse all
                 </button>
               </div>
+
+              {/* Fonts — manage the font library the storefront pulls in.
+                  v1: Google Fonts add via family + URL. Custom upload deferred
+                  to v2.5 (needs R2 upload route + validation). */}
+              <FontsCard
+                fonts={
+                  typographyFonts as Array<{
+                    type: 'google' | 'custom';
+                    family: string;
+                    url: string;
+                  }>
+                }
+                onChange={next => setTypographyFonts(next)}
+              />
 
               {/* Section order — drag-to-reorder ui (page-builder 2026-05-20).
                   Renders a sortable list of section keys; persists to
@@ -1222,13 +1241,14 @@ export default function StoreLayoutPage() {
                 theme={storeInfo?.theme ?? FALLBACK_THEME}
               />
 
-              {/* Header chrome — bg, dividers, sticky toggle. Per-theme chrome
-                  (logo size, nav layout) deferred — needs all 5 theme Header
-                  components to accept per-section props. */}
+              {/* Header — bg, dividers, sticky toggle + typography zones
+                  (beforeHeader / header / storeName). Folded the platform-wide
+                  typography zones in here 2026-05-20 so merchant has ONE
+                  place for header chrome AND header text styling. */}
               <ExtraSectionCard
                 kind="header"
                 label="Header"
-                description="Top header chrome — background color, sticky-on-scroll, dividers, spacing."
+                description="Header chrome — background, sticky-on-scroll, dividers, spacing, typography."
                 settings={layout.header}
                 legacyEnabled={true}
                 onPatch={patch =>
@@ -1237,13 +1257,30 @@ export default function StoreLayoutPage() {
                   )
                 }
                 theme={storeInfo?.theme ?? FALLBACK_THEME}
+                typographyZones={['beforeHeader', 'header', 'storeName']}
+                globalZones={globalZones}
+                onZonePatch={(zoneKey, next) =>
+                  setGlobalZones(prev => ({
+                    ...prev,
+                    [zoneKey]: { ...(prev[zoneKey] ?? {}), ...next },
+                  }))
+                }
+                onZoneReset={zoneKey =>
+                  setGlobalZones(prev => {
+                    const cp = { ...prev };
+                    delete cp[zoneKey];
+                    return cp;
+                  })
+                }
               />
 
-              {/* Footer chrome — bg, dividers, padding. */}
+              {/* Footer — bg, dividers, padding + typography zones
+                  (footer / afterFooter). Folded the platform-wide typography
+                  zones in here 2026-05-20. */}
               <ExtraSectionCard
                 kind="footer"
                 label="Footer"
-                description="Bottom footer chrome — background color, dividers, spacing."
+                description="Footer chrome — background, dividers, spacing, typography."
                 settings={layout.footer}
                 legacyEnabled={true}
                 onPatch={patch =>
@@ -1252,6 +1289,21 @@ export default function StoreLayoutPage() {
                   )
                 }
                 theme={storeInfo?.theme ?? FALLBACK_THEME}
+                typographyZones={['footer', 'afterFooter']}
+                globalZones={globalZones}
+                onZonePatch={(zoneKey, next) =>
+                  setGlobalZones(prev => ({
+                    ...prev,
+                    [zoneKey]: { ...(prev[zoneKey] ?? {}), ...next },
+                  }))
+                }
+                onZoneReset={zoneKey =>
+                  setGlobalZones(prev => {
+                    const cp = { ...prev };
+                    delete cp[zoneKey];
+                    return cp;
+                  })
+                }
               />
 
               {/* Extra duplicated product carousels (section duplication 2026-05-20).
@@ -1424,94 +1476,52 @@ export default function StoreLayoutPage() {
 
               {/* Platform-wide section dividers card deleted 2026-05-20. Per-section dividers now live inside each SectionCard above. Storefront falls back to legacy theme.dividers for existing stores. */}
 
-              {/* Header + Footer typography — only truly platform-wide zones.
-                  Section-specific zones (sectionTitle / sectionKicker / etc.)
-                  have been moved into each section card above (Wave 3A).
-                  Edits here update `globalZones` local state only.
-                  Persistence via a parallel PUT /typography call in handleSave. */}
-              <SectionCard
-                title="Header + Footer typography (platform-wide)"
-                description="These defaults apply to the header, footer, and announcement bar. Per-section typography is controlled in each section card above."
-                alwaysOn
-                defaultExpanded={false}
-              >
-                <div className="space-y-3">
-                  {(['beforeHeader', 'header', 'storeName', 'footer', 'afterFooter'] as const).map(
-                    zoneKey => (
-                      <ZoneEditor
-                        key={zoneKey}
-                        zoneKey={zoneKey}
-                        zoneLabel={GLOBAL_ZONE_LABELS[zoneKey] ?? zoneKey}
-                        values={globalZones[zoneKey] ?? {}}
-                        onChange={next =>
-                          setGlobalZones(prev => ({
-                            ...prev,
-                            [zoneKey]: { ...(prev[zoneKey] ?? {}), ...next },
-                          }))
-                        }
-                        onReset={() =>
-                          setGlobalZones(prev => {
-                            const next = { ...prev };
-                            delete next[zoneKey];
-                            return next;
-                          })
-                        }
-                        theme={storeInfo?.theme}
-                      />
-                    )
-                  )}
-                </div>
-              </SectionCard>
+              {/* Platform-wide Header + Footer typography card removed
+                  2026-05-20. Zones (beforeHeader / header / storeName /
+                  footer / afterFooter) moved into the Header and Footer
+                  ExtraSectionCards above via the `typographyZones` prop —
+                  merchant edits chrome AND text styling in one place. */}
             </>
           )}
         </div>
 
-        {/* Live preview pane — sticky on lg+, hidden on mobile to keep the
-            forms front-and-centre on small screens. */}
+        {/* Live preview pane — iframe to the storefront. CSP frame-ancestors
+            was relaxed to allow framing from app.forcemediakw.com (admin) +
+            localhost:3001 (dev). 2026-05-20: was a "click to open" link
+            because of stricter CSP; now renders inline. */}
         <aside className="hidden lg:block">
-          <div className="sticky top-4 space-y-3">
-            <h3 className="text-sm font-semibold text-foreground">Preview</h3>
+          <div className="sticky top-4 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-foreground">Live preview</h3>
+              {previewUrl && (
+                <a
+                  href={previewUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[11px] font-semibold text-primary hover:underline"
+                >
+                  Open in new tab ↗
+                </a>
+              )}
+            </div>
             {previewUrl ? (
-              // The storefront's CSP refuses to be framed (X-Frame-Options:
-              // DENY + frame-ancestors 'none'), which is correct for a
-              // public e-commerce site to avoid clickjacking. We open the
-              // preview in a new tab instead so changes are visible without
-              // weakening storefront security.
-              <a
-                href={previewUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block rounded-2xl border border-border bg-card p-6 text-center hover:bg-muted transition-colors"
-              >
-                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                  <svg
-                    className="h-6 w-6"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    aria-hidden
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                    />
-                  </svg>
-                </div>
-                <p className="text-sm font-semibold text-foreground">Open storefront preview</p>
-                <p className="mt-1 text-xs text-muted-foreground break-all">{previewUrl}</p>
-                <p className="mt-3 text-[11px] text-muted-foreground">
-                  Opens in a new tab — your storefront blocks framing for security.
-                </p>
-              </a>
+              <div className="overflow-hidden rounded-2xl border border-border bg-card">
+                <iframe
+                  key={`${previewUrl}#${previewRefreshTick}`}
+                  src={`${previewUrl}${previewUrl.includes('?') ? '&' : '?'}_preview=${previewRefreshTick}`}
+                  title="Storefront preview"
+                  className="block h-[calc(100vh-160px)] w-full bg-background"
+                  loading="lazy"
+                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                />
+              </div>
             ) : (
               <div className="rounded-2xl border border-border bg-card p-6 text-center text-xs text-muted-foreground">
                 Preview unavailable — the store has no slug or domain configured.
               </div>
             )}
-            <p className="text-xs text-muted-foreground">
-              Click <strong>Save changes</strong> to refresh the preview with your latest toggles.
+            <p className="text-[11px] text-muted-foreground">
+              Click <strong>Save changes</strong> to refresh — the iframe reloads after each save.
             </p>
           </div>
         </aside>
@@ -2251,6 +2261,155 @@ const SECTION_LABELS: Record<SectionKey, string> = {
   testimonials: 'Testimonials',
 };
 
+// ---------------------------------------------------------------------------
+// Font library — Ahmad 2026-05-20.
+// ---------------------------------------------------------------------------
+// Merchant manages the typography.fonts array consumed by the storefront
+// (apps/web/src/app/layout.tsx → renders <link rel="stylesheet"> per Google
+// entry, and @font-face per custom entry).
+//
+// v1 ships ADD GOOGLE FONT (family + URL → push to array) + REMOVE per entry.
+// Custom font upload (v2.5) needs an R2 upload endpoint + format detection;
+// merchants who need a custom font today can hand-edit the JSONB via
+// /api/v1/stores/:id/typography.
+type FontEntry = { type: 'google' | 'custom'; family: string; url: string };
+
+function FontsCard({
+  fonts,
+  onChange,
+}: {
+  fonts: FontEntry[];
+  onChange: (next: FontEntry[]) => void;
+}) {
+  const [showAdd, setShowAdd] = useState(false);
+  const [family, setFamily] = useState('');
+  const [url, setUrl] = useState('');
+
+  function addGoogle() {
+    const trimmedFamily = family.trim();
+    const trimmedUrl = url.trim();
+    if (!trimmedFamily) return;
+    // If URL missing, auto-build the standard Google Fonts URL from the family.
+    // Quote-wrap families with spaces ("Open Sans" → "Open+Sans").
+    const finalUrl = trimmedUrl
+      ? trimmedUrl
+      : `https://fonts.googleapis.com/css2?family=${encodeURIComponent(
+          trimmedFamily.replace(/\s+/g, '+')
+        )}:wght@300;400;500;600;700&display=swap`;
+    onChange([...fonts, { type: 'google', family: trimmedFamily, url: finalUrl }]);
+    setFamily('');
+    setUrl('');
+    setShowAdd(false);
+  }
+
+  function remove(idx: number) {
+    onChange(fonts.filter((_, i) => i !== idx));
+  }
+
+  return (
+    <section className="rounded-2xl border border-border bg-card p-4 sm:p-5">
+      <div className="mb-3">
+        <h3 className="text-base font-semibold text-foreground">Fonts</h3>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          Fonts available to use in any Typography zone below. Add Google Fonts by family (e.g.{' '}
+          <code className="rounded bg-muted px-1 py-0.5 text-[10px]">Cairo</code>,{' '}
+          <code className="rounded bg-muted px-1 py-0.5 text-[10px]">Inter</code>) — the URL
+          auto-builds. Custom font upload coming in v2.5; in the meantime use the typography
+          endpoint directly.
+        </p>
+      </div>
+      {fonts.length > 0 && (
+        <ul className="mb-3 space-y-1.5">
+          {fonts.map((f, i) => (
+            <li
+              key={`${f.family}-${i}`}
+              className="flex items-center gap-3 rounded-lg border border-border bg-background px-3 py-2"
+            >
+              <span
+                className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                  f.type === 'google'
+                    ? 'bg-sky-100 text-sky-800'
+                    : 'bg-emerald-100 text-emerald-800'
+                }`}
+              >
+                {f.type === 'google' ? 'Google' : 'Custom'}
+              </span>
+              <span
+                className="flex-1 truncate text-sm font-medium text-foreground"
+                style={{ fontFamily: `"${f.family}", system-ui` }}
+              >
+                {f.family}
+              </span>
+              <button
+                type="button"
+                onClick={() => remove(i)}
+                className="rounded-lg border border-destructive/40 bg-destructive/5 px-2.5 py-1 text-xs font-semibold text-destructive hover:bg-destructive/10"
+              >
+                Remove
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {showAdd ? (
+        <div className="space-y-2 rounded-lg border border-dashed border-border bg-muted/20 p-3">
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-muted-foreground">Font family name</span>
+            <input
+              type="text"
+              value={family}
+              onChange={e => setFamily(e.target.value)}
+              placeholder='e.g. Cairo, Inter, "Open Sans"'
+              className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-base sm:text-sm"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-muted-foreground">
+              Google Fonts URL (optional — auto-built from family)
+            </span>
+            <input
+              type="text"
+              value={url}
+              onChange={e => setUrl(e.target.value)}
+              placeholder="https://fonts.googleapis.com/css2?family=..."
+              className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-base sm:text-sm"
+            />
+          </label>
+          <div className="flex justify-end gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => {
+                setShowAdd(false);
+                setFamily('');
+                setUrl('');
+              }}
+              className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={!family.trim()}
+              onClick={addGoogle}
+              className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-40"
+            >
+              Add font
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setShowAdd(true)}
+          className="w-full rounded-lg border-2 border-dashed border-border bg-card/40 px-4 py-2 text-sm font-semibold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+        >
+          + Add Google Font
+        </button>
+      )}
+    </section>
+  );
+}
+
 function SectionOrderCard({
   order,
   onChange,
@@ -2894,6 +3053,10 @@ function ExtraSectionCard({
   legacyEnabled,
   onPatch,
   theme,
+  typographyZones,
+  globalZones,
+  onZonePatch,
+  onZoneReset,
 }: {
   kind: 'brandStory' | 'trustStrip' | 'blogCarousel' | 'announcement' | 'header' | 'footer';
   label: string;
@@ -2918,6 +3081,14 @@ function ExtraSectionCard({
     >
   ) => void;
   theme: import('@force/shared').StoreTheme;
+  /** Optional list of platform-wide typography zone keys to expose inside
+   *  this card. Used by Header (['beforeHeader','header','storeName']) and
+   *  Footer (['footer','afterFooter']) — replaces the deleted
+   *  platform-wide Header+Footer Typography card 2026-05-20. */
+  typographyZones?: string[];
+  globalZones?: Record<string, import('@force/shared').ZoneOverride>;
+  onZonePatch?: (zoneKey: string, next: Partial<import('@force/shared').ZoneOverride>) => void;
+  onZoneReset?: (zoneKey: string) => void;
 }) {
   const enabled = settings?.enabled ?? legacyEnabled;
   // KickerSubtitleValues shape used by SectionDividersBlock — these sections
@@ -2937,16 +3108,12 @@ function ExtraSectionCard({
       defaultExpanded={enabled}
     >
       <div className="space-y-4">
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-muted-foreground">Background color</span>
-          <input
-            type="text"
-            value={settings?.bgColor ?? ''}
-            onChange={e => onPatch({ bgColor: e.target.value || undefined })}
-            placeholder="#FFFFFF or token:primary or leave empty"
-            className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-base sm:text-sm"
-          />
-        </label>
+        <ColorField
+          label="Background color"
+          value={settings?.bgColor}
+          onChange={v => onPatch({ bgColor: v })}
+          theme={theme}
+        />
         {kind === 'trustStrip' && (
           <label className="flex flex-col gap-1">
             <span className="text-xs font-medium text-muted-foreground">Layout</span>
@@ -2985,6 +3152,26 @@ function ExtraSectionCard({
           }}
         />
         <SectionPaddingMaxWidthBlock values={settings} onPatch={p => onPatch(p)} />
+        {typographyZones && typographyZones.length > 0 && globalZones && onZonePatch && (
+          <div className="rounded-lg border border-dashed border-border bg-muted/20 p-3">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Typography
+            </p>
+            <div className="space-y-3">
+              {typographyZones.map(zoneKey => (
+                <ZoneEditor
+                  key={zoneKey}
+                  zoneKey={zoneKey}
+                  zoneLabel={GLOBAL_ZONE_LABELS[zoneKey] ?? zoneKey}
+                  values={globalZones[zoneKey] ?? {}}
+                  onChange={next => onZonePatch(zoneKey, next)}
+                  onReset={onZoneReset ? () => onZoneReset(zoneKey) : undefined}
+                  theme={theme}
+                />
+              ))}
+            </div>
+          </div>
+        )}
         <SectionPreview
           label={label}
           bgColor={settings?.bgColor}

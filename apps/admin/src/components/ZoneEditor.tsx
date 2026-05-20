@@ -262,6 +262,31 @@ export function ZoneEditor({
             <option value="none">None (explicit)</option>
           </select>
         </label>
+
+        {/* Text decoration (underline / strikethrough / overline) — 2026-05-20.
+            Sits beside text-transform; applies via inline style.textDecoration
+            on the zone's text element. */}
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-muted-foreground">Text decoration</span>
+          <select
+            value={values.textDecoration ?? ''}
+            onChange={e =>
+              onChange({
+                textDecoration:
+                  e.target.value === ''
+                    ? undefined
+                    : (e.target.value as ZoneOverride['textDecoration']),
+              })
+            }
+            className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+          >
+            <option value="">Inherit (none)</option>
+            <option value="underline">Underline</option>
+            <option value="overline">Overline</option>
+            <option value="line-through">Strikethrough</option>
+            <option value="none">None (explicit)</option>
+          </select>
+        </label>
       </div>
 
       {/* Text alignment — pulled OUT of the grid above and rendered full-width

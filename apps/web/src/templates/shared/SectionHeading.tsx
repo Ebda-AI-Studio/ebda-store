@@ -165,6 +165,7 @@ export function SectionHeading({
                   letterSpacing: kickerZone?.letterSpacing,
                   lineHeight: kickerZone?.lineHeight,
                   textTransform: kickerZone?.textTransform as React.CSSProperties['textTransform'],
+                  textDecoration: kickerZone?.textDecoration,
                 }}
               >
                 {kickerText}
@@ -231,6 +232,7 @@ export function SectionHeading({
                   letterSpacing: headingZone?.letterSpacing,
                   lineHeight: headingZone?.lineHeight,
                   textTransform: headingZone?.textTransform as React.CSSProperties['textTransform'],
+                  textDecoration: headingZone?.textDecoration,
                 }}
               >
                 {text}
@@ -280,6 +282,7 @@ export function SectionHeading({
                   lineHeight: subtitleZone?.lineHeight,
                   textTransform:
                     subtitleZone?.textTransform as React.CSSProperties['textTransform'],
+                  textDecoration: subtitleZone?.textDecoration,
                 }}
               >
                 {subtitleText}
@@ -307,6 +310,7 @@ export function SectionHeading({
               letterSpacing: seeAllZone?.letterSpacing,
               lineHeight: seeAllZone?.lineHeight,
               textTransform: seeAllZone?.textTransform as React.CSSProperties['textTransform'],
+              textDecoration: seeAllZone?.textDecoration,
             }}
           >
             {isRtl ? 'عرض الكل' : 'See all'}

@@ -68,7 +68,12 @@ const nextConfig = {
       {
         source: '/:path*',
         headers: [
-          { key: 'X-Frame-Options', value: 'DENY' },
+          // X-Frame-Options is the legacy header; modern browsers use CSP
+          // frame-ancestors (below) which is stricter + per-source. Setting
+          // to SAMEORIGIN so the admin page-builder live-preview iframe works
+          // for own-origin admin domains. CSP `frame-ancestors` below is the
+          // actual gate — DENY here would block CSP-allowed origins too.
+          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           { key: 'Permissions-Policy', value: 'geolocation=(), microphone=(), camera=()' },
@@ -105,7 +110,10 @@ const nextConfig = {
               // blocks it and the pixel still fires the event API but loses
               // the cookie-bridge piece.
               'frame-src https://vercel.live https://www.facebook.com https://td.doubleclick.net',
-              "frame-ancestors 'none'",
+              // Allow framing from the admin domain (page-builder live preview)
+              // + localhost for dev. Storefront is otherwise non-frameable so
+              // clickjacking via other origins stays blocked.
+              "frame-ancestors 'self' https://app.forcemediakw.com http://localhost:3001",
             ].join('; '),
           },
         ],
