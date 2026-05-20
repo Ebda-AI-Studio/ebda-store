@@ -8,7 +8,6 @@ export interface HubDefinition {
     | 'stock'
     | 'finance'
     | 'analytics'
-    | 'insights'
     | 'marketing'
     | 'settings';
   /** URL path segments (after `/stores/[id]`) that belong to this hub. */
@@ -41,7 +40,11 @@ export type HubLabels = {
   journal: string;
   expenses: string;
   reports: string;
-  // Insights tabs
+  // Analytics tabs — Overview is the legacy /analytics dashboard; the rest
+  // are the former /insights subroutes folded into the analytics hub
+  // (Ahmad 2026-05-20: "insights and analytics are not the same, remove one
+  // if so" — kept both content surfaces but merged the nav).
+  analyticsOverview: string;
   insightsDashboard: string;
   insightsCohorts: string;
   insightsFunnel: string;
@@ -103,13 +106,9 @@ export const HUBS: HubDefinition[] = [
   },
   {
     key: 'analytics',
-    urlPrefixes: ['/analytics'],
-    buildTabs: () => [],
-  },
-  {
-    key: 'insights',
-    urlPrefixes: ['/insights'],
+    urlPrefixes: ['/analytics', '/insights'],
     buildTabs: (storeId, labels) => [
+      { label: labels.analyticsOverview, href: `/stores/${storeId}/analytics` },
       { label: labels.insightsDashboard, href: `/stores/${storeId}/insights/dashboard` },
       { label: labels.insightsCohorts, href: `/stores/${storeId}/insights/cohorts` },
       { label: labels.insightsFunnel, href: `/stores/${storeId}/insights/funnel` },

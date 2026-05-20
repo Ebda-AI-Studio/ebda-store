@@ -87,7 +87,6 @@ export function AdminLayout({
     stock: t('navStock'),
     finance: t('navFinance'),
     analytics: t('navAnalytics'),
-    insights: t('navInsights'),
     marketing: t('navMarketing'),
     settings: t('navSettings'),
     // Super-admin only
@@ -120,7 +119,8 @@ export function AdminLayout({
     journal: t('hubTabs.journal'),
     expenses: t('hubTabs.expenses'),
     reports: t('hubTabs.reports'),
-    // Insights tabs
+    // Analytics tabs (Overview = legacy /analytics; rest = ex-/insights)
+    analyticsOverview: t('hubTabs.analyticsOverview'),
     insightsDashboard: t('hubTabs.insightsDashboard'),
     insightsCohorts: t('hubTabs.insightsCohorts'),
     insightsFunnel: t('hubTabs.insightsFunnel'),
