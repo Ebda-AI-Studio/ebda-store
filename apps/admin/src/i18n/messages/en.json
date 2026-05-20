@@ -4002,5 +4002,73 @@
         "dismiss": "Dismiss"
       }
     }
+  },
+  "insights": {
+    "navGroup": "Insights",
+    "dashboard": {
+      "title": "Insights Dashboard",
+      "aov": "Average Order Value",
+      "mrr30d": "30-day Revenue",
+      "repeatPurchase": "Repeat Purchase Rate",
+      "topSegment": "Top Segment",
+      "topSkus": "Top 5 SKUs (last 7 days)",
+      "yesterdayFunnel": "Yesterday's Conversion",
+      "aiCallout": "AI:",
+      "noDataYet": "Insights will populate after the first nightly rollup at 02:00 KW."
+    },
+    "cohorts": {
+      "title": "Customer Cohorts",
+      "description": "Month-by-month retention of customer cohorts grouped by first paid order.",
+      "monthLabel": "Cohort",
+      "periodLabel": "Month",
+      "customers": "Customers",
+      "retention": "Retention"
+    },
+    "funnel": {
+      "title": "Checkout Funnel",
+      "description": "Daily aggregate funnel rates. Per-session attribution coming when the storefront analytics SDK ships.",
+      "windowLabel": "Window",
+      "window7d": "7 days",
+      "window30d": "30 days",
+      "window90d": "90 days",
+      "views": "Product Views",
+      "carts": "Carts Created",
+      "checkouts": "Checkouts Started",
+      "completed": "Orders Completed",
+      "abandoned": "Abandoned",
+      "revenue": "Revenue (KWD)",
+      "dropoff": "Drop-off",
+      "viewsNote": "Per-session view tracking pending storefront SDK."
+    },
+    "segments": {
+      "title": "Customer Segments (RFM)",
+      "description": "Recency × Frequency × Monetary scoring per customer.",
+      "segment": {
+        "vip": "VIP",
+        "loyal": "Loyal",
+        "potential": "Potential",
+        "new_customer": "New",
+        "at_risk": "At Risk",
+        "hibernating": "Hibernating",
+        "lost": "Lost"
+      },
+      "count": "Customers",
+      "revenue": "Revenue",
+      "recommendedAction": "Recommended Action"
+    },
+    "products": {
+      "title": "Product Velocity",
+      "description": "Top-selling SKUs ranked by recent velocity + average selling price + on-hand stock.",
+      "rank": "#",
+      "sku": "SKU",
+      "name": "Name",
+      "sold7d": "Sold 7d",
+      "sold30d": "Sold 30d",
+      "velocity": "Velocity",
+      "velocityUnit": "units/day",
+      "asp": "ASP",
+      "stockOnHand": "Stock",
+      "costPrice": "Cost"
+    }
   }
 }
