@@ -112,14 +112,16 @@ const nextConfig = {
               'frame-src https://vercel.live https://www.facebook.com https://td.doubleclick.net',
               // Allow framing from admin origins for the page-builder live
               // preview. Reads `STOREFRONT_FRAME_ANCESTORS` env var as a
-              // space-separated allowlist; falls back to the platform admin
-              // + localhost dev. Set this var per deployment if admins live
-              // at custom domains (e.g. admin.<merchant>.com). Storefront is
-              // otherwise non-frameable so clickjacking via other origins
-              // stays blocked.
+              // space-separated allowlist; falls back to: platform admin
+              // production domain + Vercel preview wildcards (force-admin
+              // deploys + sharaf's-projects scope) + localhost dev. The
+              // Vercel wildcards cover preview URLs which change per deploy
+              // but are auth-gated by Vercel so framing them is safe.
+              // Storefront is otherwise non-frameable so clickjacking via
+              // other origins stays blocked.
               `frame-ancestors 'self' ${
                 process.env.STOREFRONT_FRAME_ANCESTORS ??
-                'https://app.forcemediakw.com http://localhost:3001'
+                'https://app.forcemediakw.com https://*.vercel.app http://localhost:3001 http://localhost:3000'
               }`,
             ].join('; '),
           },

@@ -186,12 +186,17 @@ async function fetchHomepageData(
   return { featuredProducts, newArrivals, bestSellers, categories, testimonials, extraProducts };
 }
 
-async function fetchLayoutSettings(storeId: string): Promise<StoreLayoutSettings> {
+async function fetchLayoutSettings(
+  storeId: string,
+  draftToken?: string
+): Promise<StoreLayoutSettings> {
   if (!storeId || storeId === 'demo') return resolveLayoutSettings({});
   try {
-    const res = await fetch(`${API_URL}/public/stores/${storeId}/layout`, {
-      next: { revalidate: 60 },
-    });
+    const url = draftToken
+      ? `${API_URL}/public/stores/${storeId}/layout?_layoutDraft=${encodeURIComponent(draftToken)}`
+      : `${API_URL}/public/stores/${storeId}/layout`;
+    // Drafts bypass cache (per-iteration unique). Committed layouts cache 60s.
+    const res = await fetch(url, draftToken ? { cache: 'no-store' } : { next: { revalidate: 60 } });
     if (!res.ok) return resolveLayoutSettings({});
     const json = await res.json();
     return resolveLayoutSettings(json?.data?.layout ?? {});
@@ -200,7 +205,16 @@ async function fetchLayoutSettings(storeId: string): Promise<StoreLayoutSettings
   }
 }
 
-export default async function HomePage() {
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = (await searchParams) ?? {};
+  const draftToken =
+    typeof params._layoutDraft === 'string' && params._layoutDraft.length > 0
+      ? params._layoutDraft
+      : undefined;
   const store = await getStoreOrNotFound();
 
   // Bare-root on a platform domain (no slug, no custom domain) —
@@ -212,7 +226,7 @@ export default async function HomePage() {
     return <PlatformLanding />;
   }
 
-  const layout = await fetchLayoutSettings(store.id);
+  const layout = await fetchLayoutSettings(store.id, draftToken);
   const { featuredProducts, newArrivals, bestSellers, categories, testimonials, extraProducts } =
     await fetchHomepageData(store, layout);
 

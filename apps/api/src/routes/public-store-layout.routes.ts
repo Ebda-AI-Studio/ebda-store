@@ -8,12 +8,37 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '@force/database';
 import { resolveLayoutSettings } from '@force/shared';
+import { redis } from '../services/redis.service';
 
 const router = Router();
 
 router.get('/stores/:storeId/layout', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { storeId } = req.params;
+
+    // Real-time preview path (Ahmad 2026-05-20): when the merchant clicks
+    // "Preview unsaved changes" in admin page-builder, the storefront iframe
+    // reloads with ?_layoutDraft=<token>. We look up the token in Redis and
+    // return the draft layout instead of the committed DB row. Tokens are
+    // scoped to storeId so a leaked token can't preview another store.
+    const draftToken =
+      typeof req.query._layoutDraft === 'string' && req.query._layoutDraft.length > 0
+        ? req.query._layoutDraft
+        : null;
+    if (draftToken) {
+      const draft = await redis.get<unknown>(`layout-preview:${storeId}:${draftToken}`, true);
+      if (draft) {
+        const layout = resolveLayoutSettings(draft);
+        // Draft previews must NOT be cached — every iteration changes the
+        // payload. Edge caches honor `private, no-store`.
+        res.setHeader('Cache-Control', 'private, no-store');
+        res.json({ success: true, data: { layout, isDraft: true } });
+        return;
+      }
+      // Token expired or never existed — fall through to committed layout
+      // so the preview at least shows the saved state rather than a 404.
+    }
+
     const store = await prisma.store.findFirst({
       where: { id: storeId, status: 'active' },
       select: { layoutSettings: true },

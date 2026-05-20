@@ -114,13 +114,15 @@ export function SectionHeading({
   const kickerAlign = kickerZone?.textAlign ?? 'center';
   const titleAlign = headingZone?.textAlign ?? 'center';
   const subtitleAlign = subtitleZone?.textAlign ?? 'center';
-  // Flanking hairlines only render when text alignment is center — they look
-  // disjointed flanking left/right-aligned text. Combine the resolved-toggle
-  // value (kickerLinesEnabled etc — already accounts for legacy boolean
-  // fallback) with the alignment gate.
-  const kickerShowLines = kickerLinesEnabled && kickerAlign === 'center';
-  const titleShowLines = titleLinesEnabled && titleAlign === 'center';
-  const subtitleShowLines = subtitleLinesEnabled && subtitleAlign === 'center';
+  // 2026-05-20: removed the `&& align === 'center'` gate that previously
+  // auto-suppressed flanking hairlines for non-centered text. That was
+  // me second-guessing the merchant — if they explicitly enable the
+  // toggle, render the lines regardless of alignment. Merchant turns
+  // OFF if they don't like the look with start/end-aligned text.
+  // Was suppressing subtitle lines on Wadyaljuz (Ahmad 2026-05-20).
+  const kickerShowLines = kickerLinesEnabled;
+  const titleShowLines = titleLinesEnabled;
+  const subtitleShowLines = subtitleLinesEnabled;
   return (
     <div className="mb-8 flex flex-col gap-2 sm:mb-12 sm:gap-3">
       {/* relative row: title-block is full-width-centered, seeAll absolute-anchored
@@ -186,7 +188,15 @@ export function SectionHeading({
             // — hairlines flank the centered title h2. When alignment is not
             // center the lines auto-suppress (see titleShowLines).
             (titleShowLines ? (
-              <div className="self-stretch flex items-center justify-center gap-3 sm:gap-4">
+              <div
+                className={`self-stretch flex items-center gap-3 sm:gap-4 ${
+                  titleAlign === 'start'
+                    ? 'justify-start'
+                    : titleAlign === 'end'
+                      ? 'justify-end'
+                      : 'justify-center'
+                }`}
+              >
                 <span
                   aria-hidden
                   data-title-divider-line

@@ -103,6 +103,12 @@ export default function StoreLayoutPage() {
   // The iframe `src` includes this as a query param — change → React re-renders
   // → iframe issues a fresh request → merchant sees their saved changes.
   const [previewRefreshTick, setPreviewRefreshTick] = useState(0);
+  // Real-time draft token — when set, iframe loads ?_layoutDraft=<token>.
+  // Storefront reads from Redis instead of the committed DB row, so merchant
+  // sees pending changes without committing. Cleared on Save (saved version
+  // becomes the source) or by clicking "Reset preview".
+  const [previewDraftToken, setPreviewDraftToken] = useState<string | null>(null);
+  const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
   // Smart Palette + future brand-token edits stage their theme updates here
   // instead of writing immediately to /theme. The main Save button flushes
   // these alongside layout + typography so the merchant has one source of
@@ -224,6 +230,9 @@ export default function StoreLayoutPage() {
       } else {
         toastSuccess(t('saved'));
         setPreviewRefreshTick(t => t + 1);
+        // Saved layout is now authoritative — drop the draft token so the
+        // iframe shows the committed version, not a stale preview.
+        setPreviewDraftToken(null);
         // Clear pending theme updates only on successful save — otherwise the
         // merchant might assume they're saved when the request failed.
         if (hasThemeUpdates) {
@@ -272,6 +281,46 @@ export default function StoreLayoutPage() {
               <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
               Unsaved brand colors
             </span>
+          )}
+          {/* Real-time preview — POSTs current local layout to Redis with a
+              short-lived token, reloads iframe with ?_layoutDraft=<token>.
+              Storefront renders the draft layout. Save commits permanently. */}
+          <button
+            type="button"
+            disabled={!layout || isGeneratingPreview}
+            onClick={async () => {
+              if (!layout) return;
+              setIsGeneratingPreview(true);
+              try {
+                const res = await apiPost<{ token: string }>(
+                  `/api/v1/admin/stores/${storeId}/layout/preview`,
+                  layout
+                );
+                if (res.data?.token) {
+                  setPreviewDraftToken(res.data.token);
+                  setPreviewRefreshTick(t => t + 1);
+                }
+              } finally {
+                setIsGeneratingPreview(false);
+              }
+            }}
+            className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-60"
+          >
+            {isGeneratingPreview ? 'Generating…' : '👁  Preview unsaved'}
+          </button>
+          {previewDraftToken && (
+            <button
+              type="button"
+              onClick={() => {
+                setPreviewDraftToken(null);
+                setPreviewRefreshTick(t => t + 1);
+              }}
+              className="inline-flex items-center gap-1.5 rounded-full bg-sky-50 px-2.5 py-0.5 text-xs font-medium text-sky-700 hover:bg-sky-100"
+              title="Stop previewing unsaved changes — show the saved version instead."
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-sky-500" />
+              Preview is showing unsaved changes (click to reset)
+            </button>
           )}
           <button
             type="button"
@@ -1509,8 +1558,14 @@ export default function StoreLayoutPage() {
             {previewUrl ? (
               <div className="overflow-hidden rounded-2xl border border-border bg-card">
                 <iframe
-                  key={`${previewUrl}#${previewRefreshTick}`}
-                  src={`${previewUrl}${previewUrl.includes('?') ? '&' : '?'}_preview=${previewRefreshTick}`}
+                  key={`${previewUrl}#${previewRefreshTick}#${previewDraftToken ?? ''}`}
+                  src={(() => {
+                    const sep = previewUrl.includes('?') ? '&' : '?';
+                    const draft = previewDraftToken
+                      ? `&_layoutDraft=${encodeURIComponent(previewDraftToken)}`
+                      : '';
+                    return `${previewUrl}${sep}_preview=${previewRefreshTick}${draft}`;
+                  })()}
                   title="Storefront preview"
                   className="block h-[calc(100vh-160px)] w-full bg-background"
                   loading="lazy"
@@ -3446,6 +3501,7 @@ function SectionDividersBlock({
   const sharedThickness = styleSource.thickness ?? 1;
   const sharedWidth = styleSource.width ?? 'short';
   const sharedColor = styleSource.color ?? 'foreground';
+  const sharedCustomColor = styleSource.customColor ?? '#cccccc';
   const sharedSpacing = styleSource.spacing ?? 'normal';
 
   function patchSharedStyle(patch: Partial<import('@force/shared').DividerSettings>) {
@@ -3535,17 +3591,38 @@ function SectionDividersBlock({
             ]}
             onChange={v => patchSharedStyle({ width: v as 'short' })}
           />
-          <DividerStyleSelect
-            label="Color"
-            value={sharedColor}
-            options={[
-              ['auto', 'Auto'],
-              ['foreground', 'Foreground'],
-              ['accent', 'Accent'],
-              ['custom', 'Custom'],
-            ]}
-            onChange={v => patchSharedStyle({ color: v as 'auto' })}
-          />
+          <div className="flex flex-col gap-1">
+            <DividerStyleSelect
+              label="Color"
+              value={sharedColor}
+              options={[
+                ['auto', 'Auto (theme)'],
+                ['foreground', 'Foreground'],
+                ['accent', 'Brand accent'],
+                ['custom', 'Custom hex'],
+              ]}
+              onChange={v => patchSharedStyle({ color: v as 'auto' })}
+            />
+            {sharedColor === 'custom' && (
+              <div className="flex items-center gap-2 rounded-lg border border-border bg-background px-2 py-1.5">
+                <input
+                  type="color"
+                  value={sharedCustomColor}
+                  onChange={e => patchSharedStyle({ customColor: e.target.value })}
+                  className="h-6 w-8 cursor-pointer rounded border-0 bg-transparent"
+                  aria-label="Custom divider color"
+                />
+                <input
+                  type="text"
+                  value={sharedCustomColor}
+                  onChange={e => patchSharedStyle({ customColor: e.target.value })}
+                  placeholder="#RRGGBB"
+                  pattern="^#[0-9a-fA-F]{3,8}$"
+                  className="w-24 rounded border border-border bg-background px-2 py-0.5 font-mono text-xs"
+                />
+              </div>
+            )}
+          </div>
           <DividerStyleSelect
             label="Spacing"
             value={sharedSpacing}

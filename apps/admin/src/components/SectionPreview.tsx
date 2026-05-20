@@ -137,7 +137,10 @@ function PreviewFlankingLines({
   theme: StoreTheme;
   autoFg: string;
 }) {
-  const showLines = settings?.enabled === true && align === 'center';
+  // 2026-05-20: dropped `align === 'center'` gate (parity with storefront
+  // SectionHeading). Lines render whenever the merchant explicitly enabled
+  // the toggle, regardless of alignment.
+  const showLines = settings?.enabled === true;
   const color = resolveDividerColor(settings, theme, autoFg);
   const thickness = settings?.thickness ?? 1;
   return (

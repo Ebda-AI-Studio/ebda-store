@@ -16,6 +16,7 @@ import { requireStoreAccess } from '../middleware/store-access';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { getAuthUser } from '../utils/store-helpers';
 import { cleanupRemovedJsonUrls } from '../services/r2-cleanup.service';
+import { redis } from '../services/redis.service';
 import logger from '../lib/logger';
 
 const router = Router({ mergeParams: true });
@@ -594,6 +595,48 @@ router.put(
       });
 
       res.json({ success: true, data: { layout: merged } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /admin/stores/:storeId/layout/preview
+ *
+ * Real-time-preview endpoint added 2026-05-20 (Ahmad). Stores the merchant's
+ * UNSAVED layout in Redis under a short-lived token (1h TTL) and returns the
+ * token. The admin page-builder posts the in-memory layout here, then reloads
+ * the storefront iframe with `?_layoutDraft=<token>` — storefront reads the
+ * draft from Redis instead of DB. Merchant can iterate visually without
+ * committing; the actual save still goes through PUT /layout above.
+ *
+ * Auth: same as PUT (store owner OR super_admin). Tokens are scoped to the
+ * caller's store; storeId is verified before the Redis write.
+ */
+router.post(
+  '/preview',
+  authenticate,
+  requireStoreAccess,
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      // We don't strictly validate the body shape here — the storefront
+      // applies it through `resolveLayoutSettings` which tolerates malformed
+      // input gracefully. Stricter validation would slow the iteration loop.
+      const layout = req.body;
+      if (!layout || typeof layout !== 'object') {
+        res.status(400).json({
+          success: false,
+          error: { code: 'INVALID_BODY', message: 'Layout payload required' },
+        });
+        return;
+      }
+      const token = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+      // Redis key includes storeId so a cross-tenant token paste can't leak.
+      await redis.set(`layout-preview:${storeId}:${token}`, layout, 3600);
+      res.json({ success: true, data: { token } });
     } catch (error) {
       next(error);
     }
