@@ -280,11 +280,11 @@ export function ZoneEditor({
             }
             className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
           >
-            <option value="">Inherit (none)</option>
+            <option value="">Use default (inherit)</option>
+            <option value="none">No decoration (force off)</option>
             <option value="underline">Underline</option>
             <option value="overline">Overline</option>
             <option value="line-through">Strikethrough</option>
-            <option value="none">None (explicit)</option>
           </select>
         </label>
       </div>
